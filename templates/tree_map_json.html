@@ -1,0 +1,42 @@
+{% load leaflet_tags %}
+<html>
+  <head>
+    {% leaflet_js %}
+    {% leaflet_css %}
+    <style>
+      .leaflet-container { height: 100%; }
+    </style>
+    <script type="text/javascript">
+      var dataurl = '{% url "tree_data" %}';
+      var myRenderer = L.canvas({ padding: 0.5 });
+
+      window.addEventListener("map:init", function (event) {
+        var map = event.detail.map;
+        // Download GeoJSON data with Ajax
+        fetch(dataurl)
+          .then(function(resp) {
+            return resp.json();
+          })
+          .then(function(data) {
+            L.geoJson(data, {
+                pointToLayer: function (feature, latlng) {
+                    return L.circleMarker(latlng, {
+                        renderer: myRenderer,
+                        color: '#63c36c',
+                        fillOpacity: 1,
+                        radius: 5,
+                        stroke: false
+                    })
+                },
+                onEachFeature: function onEachFeature(feature, layer) {
+                }
+            }).addTo(map);
+          });
+      });
+    </script>
+  </head>
+  <body>
+    <h1>FLEXIBI Tree DST</h1>
+    {% leaflet_map "main" %}
+  </body>
+</html>
