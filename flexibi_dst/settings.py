@@ -11,6 +11,7 @@ https://docs.djangoproject.com/en/3.0/ref/settings/
 """
 
 import os
+import sys
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -26,7 +27,7 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
-# GDAL_LIBRARY_PATH = 'C:\OSGeo4W64\bin'
+GDAL_LIBRARY_PATH = os.path.join(os.path.dirname(os.path.dirname(sys.executable)), 'Lib', 'site-packages', 'osgeo', 'gdal204.dll')
 # Application definition
 
 INSTALLED_APPS = [
@@ -59,7 +60,7 @@ ROOT_URLCONF = 'flexibi_dst.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': ['H:/projects/django_dev/flexibi_dst/templates'],
+        'DIRS': [os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'templates')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -84,7 +85,7 @@ DATABASES = {
         'NAME': 'flexibi_dst',
         'USER': 'flexibi_dst',
         'PASSWORD': 'flexibi',
-        'HOST': '134.28.65.102',
+        'HOST': '127.0.0.1',
         'PORT': '5432',
     }
 }
