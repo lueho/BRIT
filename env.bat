@@ -1,4 +1,4 @@
-set OSGEO4W_ROOT=C:\OSGeo4W
+set OSGEO4W_ROOT=C:\OSGeo4W64
 set PYTHON_ROOT=H:\Projects\venvs\flexibi_dst\Scripts\python.exe
 set GDAL_DATA=%OSGEO4W_ROOT%\share\gdal
 set PROJ_LIB=%OSGEO4W_ROOT%\share\proj
