@@ -27,6 +27,7 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
+# GDAL_LIBRARY_PATH = 'C:/OSGeo4W64/bin/gdal204.dll'
 GDAL_LIBRARY_PATH = os.path.join(os.path.dirname(os.path.dirname(sys.executable)), 'Lib', 'site-packages', 'osgeo', 'gdal204.dll')
 # Application definition
 
@@ -42,6 +43,7 @@ INSTALLED_APPS = [
     'rest_framework_gis',
     'django_filters',
     'leaflet',
+    'flexibi_dst',
     'trees',
 ]
 
