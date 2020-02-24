@@ -36,7 +36,19 @@
     </script>
   </head>
   <body>
+    <script>
+    var filter = {{ filter }}
+    </script>
     <h1>FLEXIBI Tree DST</h1>
+    <form method="get">
+   {{ filter.form.as_p }}
+   <button type="submit">Search</button>
+   </form>
     {% leaflet_map "main" %}
+   <ul>
+   {% for tree in filter.qs %}
+    <li>{{ tree.gattung_deutsch }} - {{ tree.bezirk }} - {{ tree.pflanzjahr }} - {{ tree.stammumfang }} - {{ tree.geom }}</li>
+   {% endfor %}
+   </ul>
   </body>
 </html>
