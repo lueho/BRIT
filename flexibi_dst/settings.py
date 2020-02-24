@@ -27,8 +27,7 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
-# GDAL_LIBRARY_PATH = 'C:/OSGeo4W64/bin/gdal204.dll'
-GDAL_LIBRARY_PATH = os.path.join(os.path.dirname(os.path.dirname(sys.executable)), 'Lib', 'site-packages', 'osgeo', 'gdal204.dll')
+GDAL_LIBRARY_PATH = 'C:/OSGeo4W64/bin/gdal204.dll'
 # Application definition
 
 INSTALLED_APPS = [
@@ -62,7 +61,7 @@ ROOT_URLCONF = 'flexibi_dst.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'templates')],
+        'DIRS': [os.path.join(BASE_DIR, 'templates')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -87,7 +86,8 @@ DATABASES = {
         'NAME': 'flexibi_dst',
         'USER': 'flexibi_dst',
         'PASSWORD': 'flexibi',
-        'HOST': '127.0.0.1',
+        'HOST': '134.28.65.102',
+        # 'HOST': '127.0.0.1',
         'PORT': '5432',
     }
 }
