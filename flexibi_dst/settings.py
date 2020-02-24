@@ -27,7 +27,15 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
-GDAL_LIBRARY_PATH = 'C:/OSGeo4W64/bin/gdal204.dll'
+import getpass
+
+if getpass.getuser() == 'luess':
+    GDAL_LIBRARY_PATH = os.path.join(os.path.dirname(os.path.dirname(sys.executable)), 'Lib', 'site-packages', 'osgeo', 'gdal204.dll')
+    host_address = '127.0.0.1'
+else:
+    GDAL_LIBRARY_PATH = 'C:/OSGeo4W64/bin/gdal204.dll'
+    host_address = '134.28.65.102'
+
 # Application definition
 
 INSTALLED_APPS = [
@@ -86,8 +94,7 @@ DATABASES = {
         'NAME': 'flexibi_dst',
         'USER': 'flexibi_dst',
         'PASSWORD': 'flexibi',
-        'HOST': '134.28.65.102',
-        # 'HOST': '127.0.0.1',
+        'HOST': host_address,
         'PORT': '5432',
     }
 }
