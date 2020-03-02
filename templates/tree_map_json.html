@@ -7,18 +7,41 @@
       .leaflet-container { height: 100%; }
     </style>
     <script type="text/javascript">
-      var dataurl = '{% url "tree_data" %}';
-      var myRenderer = L.canvas({ padding: 0.5 });
-
+    
+      var map;
       window.addEventListener("map:init", function (event) {
-        var map = event.detail.map;
+        map = event.detail.map;
+      });
+    
+      
+      var myRenderer = L.canvas({ padding: 0.5 });
+      var treeLayer;
+      function refreshMap(){
+        var gattung_deutsch = document.getElementById("input_tree_type").value;
+        var bezirk = document.getElementById("input_bezirk").value;
+        var pflanzjahr_min = document.getElementById("input_pflanzjahr_min").value;
+        var pflanzjahr_max = document.getElementById("input_pflanzjahr_max").value;
+        var defaultParameters = {
+            gattung_deutsch : document.getElementById("input_tree_type").value,
+            bezirk : document.getElementById("input_bezirk").value,
+            pflanzjahr_min : document.getElementById("input_pflanzjahr_min").value,
+            pflanzjahr_max : document.getElementById("input_pflanzjahr_max").value,
+            };
+        var parameters = L.Util.extend(defaultParameters);
+        var dataurl = '/map/data.moregeojson' + L.Util.getParamString(parameters);
+        console.log(dataurl)
         // Download GeoJSON data with Ajax
+        if (treeLayer != undefined) {
+          map.removeLayer(treeLayer);
+        };
+        
         fetch(dataurl)
           .then(function(resp) {
             return resp.json();
           })
           .then(function(data) {
-            L.geoJson(data, {
+            console.log(data)
+            treeLayer = L.geoJson(data, {
                 pointToLayer: function (feature, latlng) {
                     return L.circleMarker(latlng, {
                         renderer: myRenderer,
@@ -32,23 +55,34 @@
                 }
             }).addTo(map);
           });
-      });
+      }
+      
+      var dataurl = '{{ url }}';
+      console.log(dataurl);
+
     </script>
   </head>
   <body>
-    <script>
-    var filter = {{ filter }}
-    </script>
     <h1>FLEXIBI Tree DST</h1>
-    <form method="get">
-   {{ filter.form.as_p }}
-   <button type="submit">Search</button>
-   </form>
+    <div>
+        <label for="input_tree_type">Baumart:</label>
+        <input id="input_tree_type" type="text" value="Linde"></input>
+    </div> 
+    <div>
+        <label for="input_bezirk">Bezirk:</label>
+        <input id="input_bezirk" type="text" value="Altona"></input>
+    </div>
+    <div>
+        <label for="input_pflanzjahr_min">Gepflanzt nach:</label>
+        <input id="input_pflanzjahr_min" type="text" value="1800"></input>
+    </div>
+    <div>
+        <label for="pflanzjahr_max">Gepflanzt vor:</label>
+        <input id="input_pflanzjahr_max" type="text" value="2020"></input>
+    </div>
+    <div>
+        <button id="button_tree_type" onclick="refreshMap()">Refresh Map</button>
+    </div>
     {% leaflet_map "main" %}
-   <ul>
-   {% for tree in filter.qs %}
-    <li>{{ tree.gattung_deutsch }} - {{ tree.bezirk }} - {{ tree.pflanzjahr }} - {{ tree.stammumfang }} - {{ tree.geom }}</li>
-   {% endfor %}
-   </ul>
   </body>
 </html>

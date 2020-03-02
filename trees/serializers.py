@@ -5,4 +5,4 @@ class TreeSerializer(GeoFeatureModelSerializer):
     class Meta:
         model = HH_Roadside
         geo_field = 'geom'
-        fields = ['gattung_deutsch', 'pflanzjahr', 'stammumfang']
+        fields = ['gattung_deutsch', 'bezirk', 'pflanzjahr', 'stammumfang']

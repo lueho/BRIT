@@ -3,7 +3,7 @@ from django.views.generic import ListView, TemplateView
 from djgeojson.views import GeoJSONLayerView
 from .models import HH_Roadside
 from rest_framework.routers import DefaultRouter
-from .views import TreeViewSet, BootstrapTreeView
+from .views import TreeViewSet, BootstrapTreeView, GeoJSONTreeData, TreeMapView
 from .views import treeSearch
 
 # router = DefaultRouter()
@@ -28,4 +28,6 @@ urlpatterns = [
     path('data.geojson', tree_json, name='tree_data'),
     path('treesearch/', treeSearch, name='tree_search'),
     path('bootstrap/', BootstrapTreeView, name='bootstrap'),
+    path('data.moregeojson/', GeoJSONTreeData, name='more_tree_data'),
+    path ('testmap/', TreeMapView, name='test_map'),
 ]
