@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'rest_framework_gis',
     'django_filters',
     'leaflet',
+    'bioresource_explorer.apps.BioresourceExplorerConfig',
     'flexibi_dst',
     'trees',
 ]

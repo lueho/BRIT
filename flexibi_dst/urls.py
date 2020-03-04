@@ -9,6 +9,7 @@ urlpatterns = [
     path('', views.dst, name='dst'),
     path('map/', include('trees.urls')),
     path('bootstrap/', views.home, name='home'),
+    path('bioresource_explorer/', include('bioresource_explorer.urls'))
 ]
 
 if settings.DEBUG:

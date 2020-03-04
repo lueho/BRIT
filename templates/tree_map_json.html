@@ -73,7 +73,8 @@
     </div>
     <div class="row h-100">
         <div class="col-sm-3">
-            <table cellpadding="10">
+            <h3>Search Filter:</h3>
+            <div><table cellpadding="10">
                 <tr>
                     <td align="right"><label for="input_tree_type">Baumart:</label></td>
                     <td><input id="input_tree_type" type="text" value="Linde"></input></td>
@@ -93,7 +94,16 @@
                 <tr>
                     <td colspan="2", align="center"><button id="button_tree_type" onclick="refreshMap()">Refresh Map</button></td>
                 </tr>
-            </table>
+            </table></div>
+            <div>
+                <h3>Summary:</h3>
+                <table>
+                    <tr>
+                        <td>Tree count:</td>
+                        <td>{{ tree_count }}</td>
+                    </tr>
+                </table>
+            </div>
         </div>
         <div class="col">
             {% leaflet_map "main" %}

@@ -1,0 +1,29 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+    <script>
+        function choose() {
+        var sel = document.getElementById("select-case-study-region");
+        var region = sel.options[sel.selectedIndex].value;
+        window.location.href = window.location.href + region;
+        }
+    </script>
+    
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+      <h1 class="h3 mb-0 text-gray-800">Bioresource Explorer</h1>
+    </div>
+    <div class="row h-100">
+        <div class="col">
+            <p>This is the bioresource explorer. It allows you to freely explore the available datasets and get some information about the case study regions of the FLEXIBI project.</p>
+            <label for="select-case-study-region">Please choose a case study region:</label>
+
+            <select id="select-case-study-region">
+              <option value="nantes">Nantes</option>
+              <option value="hamburg">Hamburg</option>
+            </select>
+            <button onclick=choose()>Go explore!</button>
+        </div>
+    </div>
+    {% endblock %}
