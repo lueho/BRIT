@@ -1,15 +1,10 @@
 {% extends 'base.html' %}
 {% block content %}
 {% load leaflet_tags %}
-<!-- <html> -->
-  <!-- <head> -->
-    <!-- {% leaflet_js %} -->
-    <!-- {% leaflet_css %} -->
-    <style>
-      .leaflet-container { height: 100%; }
-    </style>
-  <!-- </head> -->
-  <!-- <body> -->
+
+    <!-- <style> -->
+      <!-- .leaflet-container { height: 100%; } -->
+    <!-- </style> -->
   
     {% leaflet_js %}
     {% leaflet_css %}
@@ -70,27 +65,33 @@
 
     </script>
     
-    <h1>FLEXIBI Tree DST</h1>
-    <div>
-        <label for="input_tree_type">Baumart:</label>
-        <input id="input_tree_type" type="text" value="Linde"></input>
-    </div> 
-    <div>
-        <label for="input_bezirk">Bezirk:</label>
-        <input id="input_bezirk" type="text" value="Altona"></input>
+    <h2>Hamburg Roadside Tree Explorer</h2>
+    <div class="row h-100">
+        <div class="col-sm-3">
+            <table cellpadding="10">
+                <tr>
+                    <td align="right"><label for="input_tree_type">Baumart:</label></td>
+                    <td><input id="input_tree_type" type="text" value="Linde"></input></td>
+                </tr>
+                <tr>
+                    <td align="right"><label for="input_bezirk">Bezirk:</label></td>
+                    <td><input id="input_bezirk" type="text" value="Altona"></input></td>
+                </tr>
+                <tr>
+                    <td align="right"><label for="input_pflanzjahr_min">Gepflanzt nach:</label></td>
+                    <td><input id="input_pflanzjahr_min" type="text" value="1800"></input></td>
+                </tr>
+                <tr>
+                    <td align="right"><label for="pflanzjahr_max">Gepflanzt vor:</label></td>
+                    <td><input id="input_pflanzjahr_max" type="text" value="2020"></input></td>  
+                </tr>
+                <tr>
+                    <td colspan="2", align="center"><button id="button_tree_type" onclick="refreshMap()">Refresh Map</button></td>
+                </tr>
+            </table>
+        </div>
+        <div class="col">
+            {% leaflet_map "main" %}
+        <div class="col">
     </div>
-    <div>
-        <label for="input_pflanzjahr_min">Gepflanzt nach:</label>
-        <input id="input_pflanzjahr_min" type="text" value="1800"></input>
-    </div>
-    <div>
-        <label for="pflanzjahr_max">Gepflanzt vor:</label>
-        <input id="input_pflanzjahr_max" type="text" value="2020"></input>
-    </div>
-    <div>
-        <button id="button_tree_type" onclick="refreshMap()">Refresh Map</button>
-    </div>
-    {% leaflet_map "main" %}
     {% endblock %}
-  <!-- </body> -->
-<!-- </html> -->
