@@ -1,11 +1,19 @@
+{% extends 'base.html' %}
+{% block content %}
 {% load leaflet_tags %}
-<html>
-  <head>
-    {% leaflet_js %}
-    {% leaflet_css %}
+<!-- <html> -->
+  <!-- <head> -->
+    <!-- {% leaflet_js %} -->
+    <!-- {% leaflet_css %} -->
     <style>
       .leaflet-container { height: 100%; }
     </style>
+  <!-- </head> -->
+  <!-- <body> -->
+  
+    {% leaflet_js %}
+    {% leaflet_css %}
+  
     <script type="text/javascript">
     
       var map;
@@ -61,8 +69,7 @@
       console.log(dataurl);
 
     </script>
-  </head>
-  <body>
+    
     <h1>FLEXIBI Tree DST</h1>
     <div>
         <label for="input_tree_type">Baumart:</label>
@@ -84,5 +91,6 @@
         <button id="button_tree_type" onclick="refreshMap()">Refresh Map</button>
     </div>
     {% leaflet_map "main" %}
-  </body>
-</html>
+    {% endblock %}
+  <!-- </body> -->
+<!-- </html> -->

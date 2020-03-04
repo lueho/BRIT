@@ -8,6 +8,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('', views.dst, name='dst'),
     path('map/', include('trees.urls')),
+    path('bootstrap/', views.home, name='home'),
 ]
 
 if settings.DEBUG:
