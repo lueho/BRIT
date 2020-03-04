@@ -139,3 +139,10 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'static_root')
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
+
+LEAFLET_CONFIG = {
+  'DEFAULT_CENTER': (53.559714, 10.004034),
+  'DEFAULT_ZOOM': 10,
+  'MIN_ZOOM': 8,
+  'MAX_ZOOM': 15,
+}

@@ -1,18 +1,19 @@
 {% extends 'base.html' %}
+
 {% block content %}
 {% load leaflet_tags %}
 
-    <!-- <style> -->
-      <!-- .leaflet-container { height: 100%; } -->
-    <!-- </style> -->
-  
-    {% leaflet_js %}
-    {% leaflet_css %}
+{% leaflet_js %}
+{% leaflet_css %}
+    
   
     <script type="text/javascript">
     
       var map;
+      var e;
       window.addEventListener("map:init", function (event) {
+        event.detail.options.zoom = 11;
+        e = event;
         map = event.detail.map;
       });
     
@@ -65,7 +66,11 @@
 
     </script>
     
-    <h2>Hamburg Roadside Tree Explorer</h2>
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+      <h1 class="h3 mb-0 text-gray-800">Bioresource Explorer</h1>
+      <a href="#" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm"><i class="fas fa-download fa-sm text-white-50"></i> Generate Report</a>
+    </div>
     <div class="row h-100">
         <div class="col-sm-3">
             <table cellpadding="10">
