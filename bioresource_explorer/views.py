@@ -10,10 +10,13 @@ from django.shortcuts import render
 from django_filters import rest_framework as filters
 from django.http import QueryDict, JsonResponse
 from urllib.parse import urlencode
+from django.views.generic import TemplateView
 
+class BioresourceExplorerHomeView(TemplateView):
+    template_name = 'bioresource_explorer_home.html'
     
-def TreeMapView(request):
-    return render(request, 'tree_map_json.html', {})
+class TreeMapView(TemplateView):
+    template_name = 'tree_map_json.html'
     
 def is_valid_queryparam(param):
     return param != '' and param is not None
@@ -78,5 +81,3 @@ def TreeAnalysisResults(request):
     
     return JsonResponse(response, safe=False)
     
-def BioresourceExplorerHomeView(request):
-    return render(request, 'bioresource_explorer_home.html', {})
