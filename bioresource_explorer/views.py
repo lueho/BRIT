@@ -3,8 +3,8 @@ from django.http import JsonResponse
 from django.views.generic import TemplateView
 from rest_framework.views import APIView
 from flexibi_dst.models import Districts_HH
-from .models import HH_Roadside
-from .serializers import TreeSerializer
+from .models import HamburgRoadsideTrees
+from .serializers import HamburgRoadsideTreeGeometrySerializer
 
 class BioresourceExplorerHomeView(TemplateView):
     template_name = 'bioresource_explorer_home.html'
@@ -21,7 +21,7 @@ def is_valid_queryparam(param):
 class HamburgRoadsideTreeAPIView(APIView):
 
     def get(self, request):
-        qs = HH_Roadside.objects.all()
+        qs = HamburgRoadsideTrees.objects.all()
         gattung_deutsch_query = request.GET.get('gattung_deutsch')
         pflanzjahr_min_query = request.GET.get('pflanzjahr_min')
         pflanzjahr_max_query = request.GET.get('pflanzjahr_max')
@@ -40,7 +40,7 @@ class HamburgRoadsideTreeAPIView(APIView):
             qs = qs.filter(bezirk__icontains=district_query)
             
             
-        serializer = TreeSerializer(qs, many=True)
+        serializer = HamburgRoadsideTreeGeometrySerializer(qs, many=True)
         data = {
             'geoJson': serializer.data,
             'analysis': {

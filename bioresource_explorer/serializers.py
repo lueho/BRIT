@@ -1,10 +1,9 @@
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
-from .models import HH_Roadside
+from .models import HamburgRoadsideTrees
 
-class TreeSerializer(GeoFeatureModelSerializer):
+class HamburgRoadsideTreeGeometrySerializer(GeoFeatureModelSerializer):
     class Meta:
-        model = HH_Roadside
+        model = HamburgRoadsideTrees
         geo_field = 'geom'
-        # fields = ['gattung_deutsch', 'bezirk', 'pflanzjahr', 'stammumfang']
         fields = []
         

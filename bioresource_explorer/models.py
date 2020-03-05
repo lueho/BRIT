@@ -2,7 +2,7 @@ from django.contrib.gis.db.models import PointField
 from django.db import models
 
     
-class HH_Roadside(models.Model):
+class HamburgRoadsideTrees(models.Model):
     geom = PointField(blank=True, null=True)
     baumid = models.IntegerField(blank=True, null=True)
     gattung_latein = models.CharField(max_length=20, blank=True, null=True)
