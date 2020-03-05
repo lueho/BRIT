@@ -52,7 +52,6 @@ INSTALLED_APPS = [
     'leaflet',
     'bioresource_explorer.apps.BioresourceExplorerConfig',
     'flexibi_dst',
-    'trees',
 ]
 
 MIDDLEWARE = [
