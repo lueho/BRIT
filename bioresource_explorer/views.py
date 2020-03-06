@@ -10,15 +10,12 @@ from .forms import HamburgRoadsideTreeFilterForm
 class BioresourceExplorerHomeView(TemplateView):
     template_name = 'bioresource_explorer_home.html'
     
-class HamburgExplorerView(TemplateView):
+class HamburgExplorerView(FormView):
     template_name = 'tree_map_json.html'
-    
-class HamburgExplorerViewTest(FormView):
-    template_name = 'tree_map_model_form.html'
     form_class = HamburgRoadsideTreeFilterForm
     
     def get_form_kwargs(self):
-        form_kwargs = super(HamburgExplorerViewTest, self).get_form_kwargs()
+        form_kwargs = super(HamburgExplorerView, self).get_form_kwargs()
         return form_kwargs
     
 class NantesExplorerView(TemplateView):

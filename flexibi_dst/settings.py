@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'leaflet',
     'bioresource_explorer.apps.BioresourceExplorerConfig',
     'flexibi_dst',
+    'crispy_forms',
 ]
 
 MIDDLEWARE = [
@@ -146,3 +147,5 @@ LEAFLET_CONFIG = {
   'MIN_ZOOM': 8,
   'MAX_ZOOM': 15,
 }
+
+CRISPY_TEMPLATE_PACK = 'bootstrap4'

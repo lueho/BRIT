@@ -3,6 +3,13 @@ from django.db import models
 
     
 class HamburgRoadsideTrees(models.Model):
+
+    DISTRICT_CHOICES = [
+        ('Altona', 'Altona'),
+        ('Bergedorf', 'Bergedorf'),
+        ('Eimsbüttel', 'Eimsbüttel'),
+    ]
+    
     geom = PointField(blank=True, null=True)
     baumid = models.IntegerField(blank=True, null=True)
     gattung_latein = models.CharField(max_length=20, blank=True, null=True)
@@ -16,7 +23,7 @@ class HamburgRoadsideTrees(models.Model):
     hausnummer = models.CharField(max_length=10, blank=True, null=True)
     ortsteil_nr = models.CharField(max_length=10, blank=True, null=True)
     stadtteil = models.CharField(max_length=30, blank=True, null=True)
-    bezirk = models.CharField(max_length=20, blank=True, null=True)
+    bezirk = models.CharField(max_length=20, blank=True, null=True, choices=DISTRICT_CHOICES)
 
     class Meta:
         managed = False
