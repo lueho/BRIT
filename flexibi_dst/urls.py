@@ -12,6 +12,7 @@ urlpatterns = [
     path('login/', DstLoginView.as_view(), name='login'),
     path('logout/', LogoutView.as_view(), {'next_page': settings.LOGOUT_REDIRECT_URL}, name='logout'),
     path('bioresource_explorer/', include('bioresource_explorer.urls')),
+    path('scenario_builder/', include('scenario_builder.urls')),
 ]
 
 if settings.DEBUG:
