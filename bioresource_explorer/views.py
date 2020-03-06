@@ -6,11 +6,12 @@ from flexibi_dst.models import Districts_HH
 from .models import HamburgRoadsideTrees
 from .serializers import HamburgRoadsideTreeGeometrySerializer
 from .forms import HamburgRoadsideTreeFilterForm
+from django.contrib.auth.mixins import LoginRequiredMixin
 
 class BioresourceExplorerHomeView(TemplateView):
     template_name = 'bioresource_explorer_home.html'
     
-class HamburgExplorerView(FormView):
+class HamburgExplorerView(LoginRequiredMixin, FormView):
     template_name = 'tree_map_json.html'
     form_class = HamburgRoadsideTreeFilterForm
     

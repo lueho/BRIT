@@ -149,3 +149,7 @@ LEAFLET_CONFIG = {
 }
 
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
+
+LOGOUT_REDIRECT_URL = 'home'
+LOGIN_REDIRECT_URL = 'home'
+LOGIN_URL = '/login/'
