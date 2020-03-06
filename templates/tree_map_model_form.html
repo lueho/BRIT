@@ -18,19 +18,21 @@
         <h3>Search Filter:</h3>
         <div><table cellpadding="10">
             <tr>
-                <th align="right"><label for="input_tree_type">Tree type:</label></th>
+                <td align="right"><label for="input_tree_type">Baumart:</label></td>
                 <td><input id="input_tree_type" type="text" value="Linde"></input></td>
             </tr>
             <tr>
-                <th align="right"><label for="input_bezirk">District:</label></th>
+                <td align="right"><label for="input_bezirk">Bezirk:</label></td>
                 <td><input id="input_bezirk" type="text" value="Altona"></input></td>
             </tr>
             <tr>
-                <th colspan="2">Planted between:</th>
+                <td align="right"><label for="input_pflanzjahr_min">Gepflanzt nach:</label></td>
+                <!-- <td><input id="input_pflanzjahr_min" type="text" value="1800"></input></td> -->
+                <td>{{ form.pflanzjahr_min }}</td>
             </tr>
             <tr>
-                <td><input id="input_pflanzjahr_min" type="number" step="1" value="1800" min="1000" max="2018" size="4"></input></td>
-                <td><input id="input_pflanzjahr_max" type="number" step="1" value="2018" min="1000" max="2018"></input></td>  
+                <td align="right"><label for="pflanzjahr_max">Gepflanzt vor:</label></td>
+                <td><input id="input_pflanzjahr_max" type="text" value="2020"></input></td>  
             </tr>
             <tr>
                 <td colspan="2", align="center"><button id="button_tree_type" onclick="queryDatasets()">Submit</button></td>
@@ -43,6 +45,11 @@
                     <td>Tree count:</td>
                     <td id="result-tree-count"></td>
                 </tr>
+            </table>
+            <table>
+            <!-- <form method="get"> -->
+                {{ form.as_table }}
+            <!-- </form> -->
             </table>
         </div>
     </div>
@@ -69,8 +76,8 @@ async function queryDatasets(){
     
     // Define query string for REST API
     var params = L.Util.extend({
-            gattung_deutsch : document.getElementById("input_tree_type").value,
-            bezirk : document.getElementById("input_bezirk").value,
+            gattung_deutsch : document.getElementById("id_input_tree_type").value,
+            bezirk : document.getElementById("id_input_bezirk").value,
             pflanzjahr_min : document.getElementById("input_pflanzjahr_min").value,
             pflanzjahr_max : document.getElementById("input_pflanzjahr_max").value,
         });

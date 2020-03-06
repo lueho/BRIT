@@ -1,16 +1,25 @@
 from django.shortcuts import render
 from django.http import JsonResponse
-from django.views.generic import TemplateView
+from django.views.generic import TemplateView, FormView
 from rest_framework.views import APIView
 from flexibi_dst.models import Districts_HH
 from .models import HamburgRoadsideTrees
 from .serializers import HamburgRoadsideTreeGeometrySerializer
+from .forms import HamburgRoadsideTreeFilterForm
 
 class BioresourceExplorerHomeView(TemplateView):
     template_name = 'bioresource_explorer_home.html'
     
 class HamburgExplorerView(TemplateView):
     template_name = 'tree_map_json.html'
+    
+class HamburgExplorerViewTest(FormView):
+    template_name = 'tree_map_model_form.html'
+    form_class = HamburgRoadsideTreeFilterForm
+    
+    def get_form_kwargs(self):
+        form_kwargs = super(HamburgExplorerViewTest, self).get_form_kwargs()
+        return form_kwargs
     
 class NantesExplorerView(TemplateView):
     template_name = 'tree_map_json.html'
