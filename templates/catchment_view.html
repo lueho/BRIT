@@ -1,0 +1,88 @@
+{% extends 'base.html' %}
+
+{% block content %}
+{% load leaflet_tags %}
+{% load crispy_forms_tags %}
+
+{% leaflet_js plugins="draw" %}
+{% leaflet_css plugins="draw" %}
+    
+<!-- Page Heading -->
+<div class="d-sm-flex align-items-center justify-content-between mb-4">
+  <h1 class="h3 mb-0 text-gray-800">Catchment View</h1>
+</div>
+
+<!-- Filter Form -->
+<div class="row h-100">
+    <div class="col-sm-3">
+        <!-- <form method="get"> -->
+            <p>Select a catchment to view it on the map</p>
+            <select id="sel-select-catchment" onchange="fetchCatchmentGeometry()" style="margin-bottom: 1cm">
+            {% for title in titles %}
+            <option>{{ title.title }}</option>
+            {% endfor %}
+            </select>
+            <h4>Name</h4>
+            <p id="catchment-title" style="min-height: 1rem;"> </p>
+            <h4>Type</h4>
+            <p id="catchment-type" style="min-height: 1rem;"> </p>
+            <h4>Description</h4>
+            <p id="catchment-description" style="min-height: 1rem;"></p>
+        <!-- </form> -->
+            <a href="{% url 'catchment_definition' %}">Define new custom catchment</a>
+    </div>
+    <div class="col">
+        {% leaflet_map "main" %}
+    <div class="col">
+</div>
+{% endblock content %}
+
+{% block javascript %}
+{{ block.super }}
+
+<script type="text/javascript">
+
+var map;
+var catchment_layer;
+
+window.addEventListener("map:init", function (event) {
+    map = event.detail.map;
+});
+
+async function fetchCatchmentGeometry(){
+    
+    // Define query string for REST API
+    var params = L.Util.extend({
+            title : document.getElementById("sel-select-catchment").value
+        });
+    console.log(params);
+        
+    var dataurl = "{% url 'data.catchment_geometries' %}" + L.Util.getParamString(params);
+    console.log(dataurl)
+    
+    // Remove existing layer
+    if (catchment_layer != undefined) {
+      map.removeLayer(catchment_layer);
+    };
+    
+    // Fetch data from REST API
+    let response = await fetch(dataurl);
+    let data = await response.json();
+    
+    // Render geodata on map
+    geodata = data['geoJson']
+    catchment_layer = L.geoJson(geodata, {
+        pointToLayer: function (feature, latlng) {
+            return L.polygon(latlng, {
+            })
+        }
+    }).addTo(map);
+    
+    document.getElementById("catchment-title").innerHTML = geodata.features[0].properties.title
+    document.getElementById("catchment-type").innerHTML = geodata.features[0].properties.type
+    document.getElementById("catchment-description").innerHTML = geodata.features[0].properties.description
+}
+  
+
+    </script>
+{% endblock %}

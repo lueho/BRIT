@@ -52,6 +52,7 @@ INSTALLED_APPS = [
     'leaflet',
     'bioresource_explorer.apps.BioresourceExplorerConfig',
     'flexibi_dst',
+    'scenario_builder',
     'crispy_forms',
 ]
 
@@ -146,7 +147,14 @@ LEAFLET_CONFIG = {
   'DEFAULT_ZOOM': 10,
   'MIN_ZOOM': 8,
   'MAX_ZOOM': 15,
-}
+  'PLUGINS': {'draw': {'css': 'draw/leaflet.draw.css',
+                       'js': 'draw/leaflet.draw.js',
+                       'auto-include':True
+                       },
+              'forms': {'auto-include':True},
+                
+             }
+}             
 
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
 

@@ -9,32 +9,13 @@
     
 <!-- Page Heading -->
 <div class="d-sm-flex align-items-center justify-content-between mb-4">
-  <h1 class="h3 mb-0 text-gray-800">Bioresource Explorer</h1>
+  <h1 class="h3 mb-0 text-gray-800">Catchment definition</h1>
   <a href="#" class="d-none d-sm-inline-block btn btn-sm btn-primary shadow-sm"><i class="fas fa-download fa-sm text-white-50"></i> Generate Report</a>
 </div>
 
 <!-- Filter Form -->
 <div class="row h-100">
     <div class="col-sm-3">
-        <h3>Search Filter:</h3>
-        <div>
-            <table>
-            <!-- <form method="get"> -->
-                {{ form|crispy }}
-            <!-- </form> -->
-            </table>
-            <button id="button_tree_type" onclick="queryDatasets()">Submit</button>
-        </div>
-        <div>
-            <h3>Summary:</h3>
-            <table cellpadding="10">
-                <tr>
-                    <td>Tree count:</td>
-                    <td id="result-tree-count"></td>
-                </tr>
-            </table>
-            
-        </div>
     </div>
     <div class="col">
         {% leaflet_map "main" %}
@@ -48,27 +29,25 @@
 <script type="text/javascript">
 
 var map;
-var myRenderer = L.canvas({ padding: 0.5 });
-var treeLayer;
-var drawnItems = new L.FeatureGroup();
-var drawControl = new L.Control.Draw({
-            edit: {
-                featureGroup: drawnItems
-            }
-        });
+<!-- var myRenderer = L.canvas({ padding: 0.5 }); -->
+<!-- var treeLayer; -->
+<!-- var drawnItems = new L.FeatureGroup(); -->
+<!-- var drawControl = new L.Control.Draw({ -->
+            <!-- edit: { -->
+                <!-- featureGroup: drawnItems -->
+            <!-- } -->
+        <!-- }); -->
 
 window.addEventListener("map:init", function (event) {
     map = event.detail.map;
-    map.addControl(drawControl);
-    map.addLayer(drawnItems);
-    map.on('draw:created', function (e) {
-            var type = e.layerType,
-                layer = e.layer;
-            drawnItems.addLayer(layer);
-        })
+    <!-- map.addControl(drawControl); -->
+    <!-- map.addLayer(drawnItems); -->
+    <!-- map.on('draw:created', function (e) { -->
+        <!-- var type = e.layerType, -->
+            <!-- layer = e.layer; -->
+        <!-- drawnItems.addLayer(layer); -->
+    <!-- }) -->
 });
-
-;
   
 async function queryDatasets(){
     

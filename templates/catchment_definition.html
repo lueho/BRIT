@@ -15,11 +15,14 @@
 
 <!-- Filter Form -->
 <div class="row h-100">
-    <div class="col-sm-3">
+    <div class="col">
+        <h1>Edit {{ Object }}</h1>
+        <form method="post">
+            {% csrf_token %}
+            {{ form|crispy}}
+            <input type="submit"/>
+        </form>
     </div>
-    <div class="col">
-        {% leaflet_map "main" %}
-    <div class="col">
 </div>
 {% endblock content %}
 
@@ -31,6 +34,12 @@
 var map;
 var myRenderer = L.canvas({ padding: 0.5 });
 var treeLayer;
+<!-- var drawnItems = new L.FeatureGroup(); -->
+<!-- var drawControl = new L.Control.Draw({ -->
+            <!-- edit: { -->
+                <!-- featureGroup: drawnItems -->
+            <!-- } -->
+        <!-- }); -->
 
 window.addEventListener("map:init", function (event) {
     map = event.detail.map;
