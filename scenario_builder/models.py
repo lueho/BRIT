@@ -1,14 +1,13 @@
 from django.contrib.gis.db.models import PolygonField
 from django.db import models
 
-TYPES=(
+TYPES = (
     ('administrative', 'administrative'),
     ('custom', 'custom'),
 )
 
 
 class Catchment(models.Model):
-
     title = models.CharField(max_length=256)
     description = models.TextField()
     type = models.CharField(max_length=14, choices=TYPES, default='custom')

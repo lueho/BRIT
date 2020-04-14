@@ -10,6 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/3.0/ref/settings/
 """
 
+import getpass
 import os
 import sys
 
@@ -27,10 +28,9 @@ DEBUG = True
 
 ALLOWED_HOSTS = []
 
-import getpass
-
 if getpass.getuser() == 'luess':
-    GDAL_LIBRARY_PATH = os.path.join(os.path.dirname(os.path.dirname(sys.executable)), 'Lib', 'site-packages', 'osgeo', 'gdal204.dll')
+    GDAL_LIBRARY_PATH = os.path.join(os.path.dirname(os.path.dirname(sys.executable)), 'Lib', 'site-packages', 'osgeo',
+                                     'gdal204.dll')
     host_address = '127.0.0.1'
 else:
     GDAL_LIBRARY_PATH = 'C:/OSGeo4W64/bin/gdal204.dll'
@@ -86,7 +86,6 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'flexibi_dst.wsgi.application'
 
-
 # Database
 # https://docs.djangoproject.com/en/3.0/ref/settings/#databases
 
@@ -100,7 +99,6 @@ DATABASES = {
         'PORT': '5432',
     }
 }
-
 
 # Password validation
 # https://docs.djangoproject.com/en/3.0/ref/settings/#auth-password-validators
@@ -120,7 +118,6 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
-
 # Internationalization
 # https://docs.djangoproject.com/en/3.0/topics/i18n/
 
@@ -134,7 +131,6 @@ USE_L10N = True
 
 USE_TZ = True
 
-
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.0/howto/static-files/
 
@@ -143,18 +139,18 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'static_root')
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 
 LEAFLET_CONFIG = {
-  'DEFAULT_CENTER': (53.559714, 10.004034),
-  'DEFAULT_ZOOM': 10,
-  'MIN_ZOOM': 8,
-  'MAX_ZOOM': 15,
-  'PLUGINS': {'draw': {'css': 'draw/leaflet.draw.css',
-                       'js': 'draw/leaflet.draw.js',
-                       'auto-include':True
-                       },
-              'forms': {'auto-include':True},
-                
-             }
-}             
+    'DEFAULT_CENTER': (53.559714, 10.004034),
+    'DEFAULT_ZOOM': 10,
+    'MIN_ZOOM': 8,
+    'MAX_ZOOM': 15,
+    'PLUGINS': {'draw': {'css': 'draw/leaflet.draw.css',
+                         'js': 'draw/leaflet.draw.js',
+                         'auto-include': True
+                         },
+                'forms': {'auto-include': True},
+
+                }
+}
 
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
 

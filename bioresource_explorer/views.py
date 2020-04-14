@@ -1,29 +1,33 @@
-from django.shortcuts import render
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import JsonResponse
 from django.views.generic import TemplateView, FormView
 from rest_framework.views import APIView
-from flexibi_dst.models import Districts_HH
+
+from .forms import HamburgRoadsideTreeFilterForm
 from .models import HamburgRoadsideTrees
 from .serializers import HamburgRoadsideTreeGeometrySerializer
-from .forms import HamburgRoadsideTreeFilterForm
-from django.contrib.auth.mixins import LoginRequiredMixin
+
 
 class BioresourceExplorerHomeView(TemplateView):
     template_name = 'bioresource_explorer_home.html'
-    
+
+
 class HamburgExplorerView(LoginRequiredMixin, FormView):
     template_name = 'tree_map_json.html'
     form_class = HamburgRoadsideTreeFilterForm
-    
+
     def get_form_kwargs(self):
         form_kwargs = super(HamburgExplorerView, self).get_form_kwargs()
         return form_kwargs
-    
+
+
 class NantesExplorerView(TemplateView):
     template_name = 'tree_map_json.html'
-    
+
+
 def is_valid_queryparam(param):
     return param != '' and param is not None
+
 
 class HamburgRoadsideTreeAPIView(APIView):
 
@@ -42,11 +46,10 @@ class HamburgRoadsideTreeAPIView(APIView):
 
         if is_valid_queryparam(pflanzjahr_max_query):
             qs = qs.filter(pflanzjahr__lt=pflanzjahr_max_query)
-            
+
         if is_valid_queryparam(district_query) and district_query != 'Bitte wählen...':
             qs = qs.filter(bezirk__icontains=district_query)
-            
-            
+
         serializer = HamburgRoadsideTreeGeometrySerializer(qs, many=True)
         data = {
             'geoJson': serializer.data,
@@ -55,4 +58,4 @@ class HamburgRoadsideTreeAPIView(APIView):
             }
         }
 
-        return JsonResponse(data, safe=False)    
+        return JsonResponse(data, safe=False)

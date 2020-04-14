@@ -1,5 +1,7 @@
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
+
 from .models import Catchment
+
 
 class CatchmentSerializer(GeoFeatureModelSerializer):
     class Meta:
