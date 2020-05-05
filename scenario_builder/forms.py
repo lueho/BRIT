@@ -7,7 +7,7 @@ from .models import Catchment
 class CatchmentForm(ModelForm):
     class Meta:
         model = Catchment
-        fields = ['title', 'description', 'geom', ]
+        fields = ['name', 'description', 'geom', ]
         widgets = {'geom': LeafletWidget()}
 
 # class CatchmentSelectForm(ModelForm):

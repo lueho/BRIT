@@ -30,9 +30,9 @@ class CatchmentDeleteView(DeleteView):
 # success_url = reverse_lazy('catchment_view')
 
 def catchmentView(request):
-    catchment_titles = Catchment.objects.all().values('title')
+    catchment_names = Catchment.objects.all().values('name')
 
-    return render(request, 'catchment_view.html', {'titles': catchment_titles})
+    return render(request, 'catchment_view.html', {'names': catchment_names})
 
 
 def catchmentDelete(request):
@@ -42,8 +42,8 @@ def catchmentDelete(request):
 class CatchmentAPIView(APIView):
 
     def get(self, request):
-        title = request.GET.get('title')
-        qs = Catchment.objects.filter(title=title)
+        name = request.GET.get('name')
+        qs = Catchment.objects.filter(name=name)
 
         serializer = CatchmentSerializer(qs, many=True)
         data = {
