@@ -1,6 +1,6 @@
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
-from .models import HamburgRoadsideTrees
+from gis_source_manager.models import HamburgRoadsideTrees
 
 
 class HamburgRoadsideTreeGeometrySerializer(GeoFeatureModelSerializer):

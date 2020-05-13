@@ -2,7 +2,7 @@ from django.forms import (IntegerField,
                           ModelForm,
                           TextInput)
 
-from .models import HamburgRoadsideTrees
+from gis_source_manager.models import HamburgRoadsideTrees
 
 
 class HamburgRoadsideTreeFilterForm(ModelForm):

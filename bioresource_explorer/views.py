@@ -3,8 +3,8 @@ from django.http import JsonResponse
 from django.views.generic import TemplateView, FormView
 from rest_framework.views import APIView
 
+from gis_source_manager.models import HamburgRoadsideTrees
 from .forms import HamburgRoadsideTreeFilterForm
-from .models import HamburgRoadsideTrees
 from .serializers import HamburgRoadsideTreeGeometrySerializer
 
 

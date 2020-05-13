@@ -53,6 +53,7 @@ INSTALLED_APPS = [
     'bioresource_explorer.apps.BioresourceExplorerConfig',
     'flexibi_dst',
     'scenario_builder',
+    'gis_source_manager',
     'crispy_forms',
 ]
 
@@ -93,8 +94,8 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.contrib.gis.db.backends.postgis',
         'NAME': 'flexibi_dst',
-        'USER': 'flexibi_dst',
-        'PASSWORD': 'flexibi',
+        'USER': 'postgres',
+        'PASSWORD': 'postgre',
         'HOST': host_address,
         'PORT': '5432',
     }

@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Scenario List</title>
+</head>
+<body>
+{% block content %}
+    <h1>This is the scenario list view!</h1>
+    {% for instance in object_list %}
+        <p><a href="{{ instance.get_absolute_url }}">{{ instance.name }}</a></p>
+    {% endfor %}
+{% endblock content %}
+</body>
+</html>

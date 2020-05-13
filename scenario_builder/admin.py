@@ -1,16 +1,19 @@
 from django.contrib import admin
+from django.contrib.admin import ModelAdmin
 from django.contrib.gis.admin import OSMGeoAdmin
-from django.db import connection
 from django.forms import ModelForm, ValidationError
-from django.utils.html import format_html_join
+from django.urls import reverse
+from django.utils.html import format_html, format_html_join
 
 from .models import (Catchment,
                      InventoryAlgorithm,
                      InventoryAlgorithmParameter,
+                     InventoryAlgorithmParameterValue,
                      Material,
                      MaterialComponent,
                      Region,
                      Scenario,
+                     ScenarioInventoryConfiguration,
                      SFBSite,
                      GeoDataset, )
 
@@ -25,16 +28,6 @@ class CatchmentForm(ModelForm):
         region_geom = region.geom
         catchment_geom = catchment.get('geom')
         return region_geom.contains(catchment_geom)
-
-    @staticmethod
-    def postgis_contains(region, catchment):
-        with connection.cursor() as cursor:
-            cursor.execute(
-                "SELECT ST_CONTAINS((SELECT geom FROM scenario_builder_region WHERE name=%s),"
-                "(SELECT geom FROM scenario_builder_catchment WHERE name=%s))",
-                [region.name, catchment.get('name')]
-            )
-            return cursor.fetchone()
 
     def clean(self):
         catchment = super().clean()
@@ -51,23 +44,27 @@ class CatchmentAdmin(OSMGeoAdmin):
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request)
-        queryset = queryset.order_by('type', 'region', 'name')
+        queryset = queryset.order_by('type', 'region', 'name', )
         return queryset
 
 
 @admin.register(Region)
 class RegionAdmin(OSMGeoAdmin):
-    list_display = ('name', 'country', 'available_feedstock_inventories',)
-    readonly_fields = ('available_feedstock_inventories',)
+    list_display = ('name', 'country', 'implemented_algorithms',)
+    readonly_fields = ('implemented_algorithms',)
 
     @staticmethod
-    def available_feedstock_inventories(obj):
-        feedstocks = list(set([ds.feedstock.name for ds in GeoDataset.objects.filter(region=obj)]))
-        feedstock_list = format_html_join(
-            '\n', "<li>{}</li>",
-            ((f,) for f in feedstocks)
+    def implemented_algorithms(obj):
+        algorithms = [(reverse('admin:scenario_builder_inventoryalgorithm_change', args=(alg.id,)),
+                       alg.geodataset.name,
+                       reverse('admin:scenario_builder_material_change', args=(alg.feedstock.id,)),
+                       alg.feedstock.name)
+                      for alg in InventoryAlgorithm.objects.filter(geodataset__region=obj)]
+        algorithm_list = format_html_join(
+            '\n', "<li><a href='{}'>{}</a>: <a href='{}'>{}</a></li>",
+            (alg for alg in algorithms)
         )
-        return feedstock_list
+        return algorithm_list
 
     def get_queryset(self, request):
         queryset = super(RegionAdmin, self).get_queryset(request)
@@ -75,10 +72,123 @@ class RegionAdmin(OSMGeoAdmin):
         return queryset
 
 
-admin.site.register(Material)
+@admin.register(Material)
+class MaterialAdmin(ModelAdmin):
+    list_display = ('name', 'stan_flow_id', 'is_feedstock', 'description',)
+
+
+@admin.register(InventoryAlgorithm)
+class InventoryAlgorithmAdmin(ModelAdmin):
+    list_display = ('name', 'geodataset_link', 'feedstock_link', 'parameter_list', 'default', 'description',)
+
+    @staticmethod
+    def geodataset_link(obj):
+        url = reverse('admin:scenario_builder_geodataset_change', args=(obj.geodataset.id,))
+        return format_html("<a href='{}'>{}</a>", url, obj.geodataset.name)
+
+    @staticmethod
+    def feedstock_link(obj):
+        url = reverse('admin:scenario_builder_material_change', args=(obj.feedstock.id,))
+        return format_html("<a href='{}'>{}</a>", url, obj.feedstock.name)
+
+    @staticmethod
+    def parameter_list(obj):
+        parameter_list = format_html_join(
+            '\n', "<li><a href='{}'>{}</a></li>",
+            ((reverse('admin:scenario_builder_inventoryalgorithmparameter_change', args=(p.id,)), p) for p in
+             InventoryAlgorithmParameter.objects.filter(inventory_algorithm=obj))
+        )
+        return parameter_list
+
+
+@admin.register(InventoryAlgorithmParameter)
+class InventoryAlgorithmParameterAdmin(ModelAdmin):
+    list_display = ('descriptive_name', 'unit', 'algorithm', 'is_required', 'description',)
+
+    @staticmethod
+    def algorithm(obj):
+        url = reverse('admin:scenario_builder_inventoryalgorithm_change', args=(obj.inventory_algorithm.id,))
+        return format_html("<a href='{}'>{}</a>", url, obj.inventory_algorithm.name)
+
+
+@admin.register(InventoryAlgorithmParameterValue)
+class InventoryAlgorithmParameterValueAdmin(ModelAdmin):
+    list_display = ('name', 'parameter_link', 'value', 'standard_deviation', 'unit', 'default', 'source',)
+
+    @staticmethod
+    def parameter_link(obj):
+        url = reverse('admin:scenario_builder_inventoryalgorithmparameter_change', args=(obj.parameter.id,))
+        return format_html("<a href='{}'>{}</a>", url, obj.parameter.descriptive_name)
+
+    @staticmethod
+    def unit(obj):
+        return obj.parameter.unit
+
+
+@admin.register(ScenarioInventoryConfiguration)
+class ScenarioInventoryConfigurationAdmin(ModelAdmin):
+    list_display = ('scenario', 'feedstock_link', 'geodataset_link', 'inventory_algorithm_link',
+                    'parameter', 'value',)
+
+    @staticmethod
+    def feedstock_link(obj):
+        url = reverse('admin:scenario_builder_material_change', args=(obj.feedstock.id,))
+        return format_html("<a href='{}'>{}</a>", url, obj.feedstock.name)
+
+    @staticmethod
+    def geodataset_link(obj):
+        url = reverse('admin:scenario_builder_geodataset_change', args=(obj.geodataset.id,))
+        return format_html("<a href='{}'>{}</a>", url, obj.geodataset.name)
+
+    @staticmethod
+    def inventory_algorithm_link(obj):
+        url = reverse('admin:scenario_builder_inventoryalgorithm_change', args=(obj.inventory_algorithm.id,))
+        return format_html("<a href='{}'>{}</a>", url, obj.inventory_algorithm.name)
+
+    @staticmethod
+    def parameter(obj):
+        url = reverse('admin:scenario_builder_inventoryalgorithmparameter_change', args=(obj.inventory_parameter.id,))
+        return format_html("<a href='{}'>{}</a>", url, obj.inventory_parameter.descriptive_name)
+
+    @staticmethod
+    def value(obj):
+        url = reverse('admin:scenario_builder_inventoryalgorithmparametervalue_change', args=(obj.inventory_value.id,))
+        return format_html("<a href='{}'>{}</a>", url, obj.inventory_value.name)
+
+
+@admin.register(GeoDataset)
+class GeoDatasetAdmin(ModelAdmin):
+    list_display = ('name', 'region', 'description')
+
+
+@admin.register(Scenario)
+class ScenarioAdmin(ModelAdmin):
+    list_display = ('name', 'region_link', 'site_link', 'catchment_link', 'feedstock_list', 'description')
+
+    @staticmethod
+    def region_link(obj):
+        url = reverse('admin:scenario_builder_region_change', args=(obj.region.id,))
+        return format_html("<a href='{}'>{}</a>", url, obj.region.name)
+
+    @staticmethod
+    def site_link(obj):
+        url = reverse('admin:scenario_builder_sfbsite_change', args=(obj.site.id,))
+        return format_html("<a href='{}'>{}</a>", url, obj.site.name)
+
+    @staticmethod
+    def catchment_link(obj):
+        url = reverse('admin:scenario_builder_catchment_change', args=(obj.catchment.id,))
+        return format_html("<a href='{}'>{}</a>", url, obj.catchment.name)
+
+    @staticmethod
+    def feedstock_list(obj):
+        feedstock_list = format_html_join(
+            '\n', "<li><a href='{}'>{}</a></li>",
+            ((reverse('admin:scenario_builder_material_change', args=(m.id,)), m.name) for m in
+             Material.objects.filter(scenario=obj))
+        )
+        return feedstock_list
+
+
 admin.site.register(MaterialComponent)
-admin.site.register(Scenario)
 admin.site.register(SFBSite)
-admin.site.register(GeoDataset)
-admin.site.register(InventoryAlgorithm)
-admin.site.register(InventoryAlgorithmParameter)
