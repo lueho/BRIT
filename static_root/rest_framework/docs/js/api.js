@@ -107,21 +107,21 @@ $(function () {
     var entries = formEntries($form.get()[0])
 
     for (var i = 0; i < entries.length; i++) {
-      var entry = entries[i]
-      var paramKey = entry[0]
-      var paramValue = entry[1]
-      var $elem = $form.find('[name="' + paramKey + '"]')
-      var dataType = $elem.data('type') || 'string'
+        var entry = entries[i]
+        var paramKey = entry[0]
+        var paramValue = entry[1]
+        var $elem = $form.find('[function_name="' + paramKey + '"]')
+        var dataType = $elem.data('type') || 'string'
 
-      if (dataType === 'integer' && paramValue) {
-        var value = parseInt(paramValue)
-        if (!isNaN(value)) {
-          params[paramKey] = value
-        }
-      } else if (dataType === 'number' && paramValue) {
-        var value = parseFloat(paramValue)
-        if (!isNaN(value)) {
-          params[paramKey] = value
+        if (dataType === 'integer' && paramValue) {
+            var value = parseInt(paramValue)
+            if (!isNaN(value)) {
+                params[paramKey] = value
+            }
+        } else if (dataType === 'number' && paramValue) {
+            var value = parseFloat(paramValue)
+            if (!isNaN(value)) {
+                params[paramKey] = value
         }
       } else if (dataType === 'boolean' && paramValue) {
         var value = {

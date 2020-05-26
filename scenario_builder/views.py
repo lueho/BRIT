@@ -41,7 +41,7 @@ class InventoryMixin(SingleObjectMixin):
         for algorithm_name, parameter_dict in inventory_config.items():
             parameter_list = []
             for parameter, value in inventory_config[algorithm_name].items():
-                parameter_list.append({'name': parameter,
+                parameter_list.append({'function_name': parameter,
                                        'value': value})
             inventory_config_list.append({'algorithm': algorithm_name,
                                           'parameters': parameter_list})
@@ -119,7 +119,7 @@ def catchmentDelete(request):
 class CatchmentAPIView(APIView):
 
     def get(self, request):
-        name = request.GET.get('name')
+        name = request.GET.get('function_name')
         qs = Catchment.objects.filter(name=name)
 
         serializer = CatchmentSerializer(qs, many=True)

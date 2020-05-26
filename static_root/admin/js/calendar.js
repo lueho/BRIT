@@ -148,7 +148,7 @@ depends on core.js for utility functions like removeChildren or quickElement
     function Calendar(div_id, callback, selected) {
         // div_id (string) is the ID of the element in which the calendar will
         //     be displayed
-        // callback (string) is the name of a JavaScript function that will be
+        // callback (string) is the function_name of a JavaScript function that will be
         //     called with the parameters (year, month, day) when a day in the
         //     calendar is clicked
         this.div_id = div_id;

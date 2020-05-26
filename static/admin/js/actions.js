@@ -112,14 +112,14 @@
         $('form#changelist-form table#result_list tr').on('change', 'td:gt(0) :input', function() {
             list_editable_changed = true;
         });
-        $('form#changelist-form button[name="index"]').on('click', function(event) {
+        $('form#changelist-form button[function_name="index"]').on('click', function (event) {
             if (list_editable_changed) {
                 return confirm(gettext("You have unsaved changes on individual editable fields. If you run an action, your unsaved changes will be lost."));
             }
         });
-        $('form#changelist-form input[name="_save"]').on('click', function(event) {
+        $('form#changelist-form input[function_name="_save"]').on('click', function (event) {
             var action_changed = false;
-            $('select option:selected', options.actionContainer).each(function() {
+            $('select option:selected', options.actionContainer).each(function () {
                 if ($(this).val()) {
                     action_changed = true;
                 }

@@ -41,9 +41,9 @@ class Material(models.Model):
     description = models.TextField(blank=True, null=True)
     is_feedstock = models.BooleanField(default=False)
     stan_flow_id = models.CharField(max_length=5,
-                                    validators=[RegexValidator(regex='^[0-9]{5}?',
+                                    validators=[RegexValidator(regex=r'^[0-9]{5}?',
                                                                message='STAN id must have 5 digits.s',
-                                                               code='nomatch')])
+                                                               code='invalid_stan_id')])
 
     def __str__(self):
         return self.name
@@ -116,9 +116,10 @@ class InventoryAlgorithm(models.Model):
 
 class InventoryAlgorithmParameter(models.Model):
     short_name = models.CharField(max_length=28,
-                                  validators=[RegexValidator(regex='^\w{1,28}$',
-                                                             message='STAN id must have 5 digits.s',
-                                                             code='nomatch')])
+                                  validators=[RegexValidator(regex=r'^\w{1,28}$',
+                                                             message='Invalid parameter short_name. Do not use space'
+                                                                     'or special characters.',
+                                                             code='invalid_parameter_name')])
     descriptive_name = models.CharField(max_length=56)
     description = models.TextField(blank=True, null=True)
     inventory_algorithm = models.ForeignKey(InventoryAlgorithm, on_delete=models.CASCADE, null=True)
@@ -175,7 +176,7 @@ class Scenario(models.Model):
         algorithms = [c.inventory_algorithm for c in
                       ScenarioInventoryConfiguration.objects.filter(scenario=self).distinct('inventory_algorithm')]
 
-        # Are all required parameters included in the configurarion?
+        # Are all required parameters included in the configuration?
         required = \
             InventoryAlgorithmParameter.objects.filter(inventory_algorithm__in=algorithms, is_required=True) \
                 .values_list('id')
@@ -240,24 +241,3 @@ class ScenarioInventoryConfiguration(models.Model):
                         inventory_algorithm=self.inventory_algorithm,
                         inventory_parameter=self.inventory_parameter) \
                 .update(inventory_value=self.inventory_value)
-
-
-class BaseScenarioResult(models.Model):
-    """
-    Base class for scenario results that need to be saved in the database. It relates any kind of result inherits from
-    this to the corresponding scenario and algorithm. This should not be used directly. Instead, use ancestors that
-    provide the specific required functionality for each result type, e.g. statistics, gis, etc.
-    """
-    scenario = models.ForeignKey(Scenario, on_delete=models.CASCADE, null=True)
-    algorithm = models.ForeignKey(InventoryAlgorithm, on_delete=models.CASCADE, null=True)
-    last_update = models.DateTimeField(auto_now=True)
-
-
-class InventoryResultPointLayer(BaseScenarioResult):
-    """
-    Base class for dynamically created result models that consist of a point layer. This should not be used directly.
-    Use type(<"result name">, (InventoryResultPointLayer,),) to create ancestors.
-    """
-    geom = PointField()
-    average = models.FloatField(null=True)
-    standard_deviation = models.FloatField(null=True)

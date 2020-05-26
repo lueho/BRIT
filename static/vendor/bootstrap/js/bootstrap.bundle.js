@@ -2369,7 +2369,7 @@
    * @memberof Popper.Utils
    * @param {dataObject} data
    * @param {Array} modifiers
-   * @param {String} ends - Optional modifier name used as stopper
+   * @param {String} ends - Optional modifier function_name used as stopper
    * @returns {dataObject}
    */
   function runModifiers(modifiers, data, ends) {
@@ -2455,30 +2455,30 @@
    * @returns {Boolean}
    */
   function isModifierEnabled(modifiers, modifierName) {
-    return modifiers.some(function (_ref) {
-      var name = _ref.name,
-          enabled = _ref.enabled;
-      return enabled && name === modifierName;
-    });
+      return modifiers.some(function (_ref) {
+          var name = _ref.name,
+              enabled = _ref.enabled;
+          return enabled && name === modifierName;
+      });
   }
 
-  /**
-   * Get the prefixed supported property name
-   * @method
-   * @memberof Popper.Utils
-   * @argument {String} property (camelCase)
-   * @returns {String} prefixed property (camelCase or PascalCase, depending on the vendor prefix)
-   */
-  function getSupportedPropertyName(property) {
-    var prefixes = [false, 'ms', 'Webkit', 'Moz', 'O'];
-    var upperProp = property.charAt(0).toUpperCase() + property.slice(1);
+    /**
+     * Get the prefixed supported property function_name
+     * @method
+     * @memberof Popper.Utils
+     * @argument {String} property (camelCase)
+     * @returns {String} prefixed property (camelCase or PascalCase, depending on the vendor prefix)
+     */
+    function getSupportedPropertyName(property) {
+        var prefixes = [false, 'ms', 'Webkit', 'Moz', 'O'];
+        var upperProp = property.charAt(0).toUpperCase() + property.slice(1);
 
-    for (var i = 0; i < prefixes.length; i++) {
-      var prefix = prefixes[i];
-      var toCheck = prefix ? '' + prefix + upperProp : property;
-      if (typeof document.body.style[toCheck] !== 'undefined') {
-        return toCheck;
-      }
+        for (var i = 0; i < prefixes.length; i++) {
+            var prefix = prefixes[i];
+            var toCheck = prefix ? '' + prefix + upperProp : property;
+            if (typeof document.body.style[toCheck] !== 'undefined') {
+                return toCheck;
+            }
     }
     return null;
   }
@@ -2849,33 +2849,33 @@
       'x-placement': data.placement
     };
 
-    // Update `data` attributes, styles and arrowStyles
-    data.attributes = _extends({}, attributes, data.attributes);
-    data.styles = _extends({}, styles, data.styles);
-    data.arrowStyles = _extends({}, data.offsets.arrow, data.arrowStyles);
+      // Update `data` attributes, styles and arrowStyles
+      data.attributes = _extends({}, attributes, data.attributes);
+      data.styles = _extends({}, styles, data.styles);
+      data.arrowStyles = _extends({}, data.offsets.arrow, data.arrowStyles);
 
-    return data;
+      return data;
   }
 
-  /**
-   * Helper used to know if the given modifier depends from another one.<br />
-   * It checks if the needed modifier is listed and enabled.
-   * @method
-   * @memberof Popper.Utils
-   * @param {Array} modifiers - list of modifiers
-   * @param {String} requestingName - name of requesting modifier
-   * @param {String} requestedName - name of requested modifier
-   * @returns {Boolean}
-   */
-  function isModifierRequired(modifiers, requestingName, requestedName) {
-    var requesting = find(modifiers, function (_ref) {
-      var name = _ref.name;
-      return name === requestingName;
-    });
+    /**
+     * Helper used to know if the given modifier depends from another one.<br />
+     * It checks if the needed modifier is listed and enabled.
+     * @method
+     * @memberof Popper.Utils
+     * @param {Array} modifiers - list of modifiers
+     * @param {String} requestingName - function_name of requesting modifier
+     * @param {String} requestedName - function_name of requested modifier
+     * @returns {Boolean}
+     */
+    function isModifierRequired(modifiers, requestingName, requestedName) {
+        var requesting = find(modifiers, function (_ref) {
+            var name = _ref.name;
+            return name === requestingName;
+        });
 
-    var isRequired = !!requesting && modifiers.some(function (modifier) {
-      return modifier.name === requestedName && modifier.enabled && modifier.order < requesting.order;
-    });
+        var isRequired = !!requesting && modifiers.some(function (modifier) {
+            return modifier.name === requestedName && modifier.enabled && modifier.order < requesting.order;
+        });
 
     if (!isRequired) {
       var _requesting = '`' + requestingName + '`';
@@ -3818,40 +3818,40 @@
       fn: applyStyle,
       /** @prop {Function} */
       onLoad: applyStyleOnLoad,
-      /**
-       * @deprecated since version 1.10.0, the property moved to `computeStyle` modifier
-       * @prop {Boolean} gpuAcceleration=true
-       * If true, it uses the CSS 3D transformation to position the popper.
-       * Otherwise, it will use the `top` and `left` properties
-       */
-      gpuAcceleration: undefined
+        /**
+         * @deprecated since version 1.10.0, the property moved to `computeStyle` modifier
+         * @prop {Boolean} gpuAcceleration=true
+         * If true, it uses the CSS 3D transformation to position the popper.
+         * Otherwise, it will use the `top` and `left` properties
+         */
+        gpuAcceleration: undefined
     }
   };
 
-  /**
-   * The `dataObject` is an object containing all the information used by Popper.js.
-   * This object is passed to modifiers and to the `onCreate` and `onUpdate` callbacks.
-   * @name dataObject
-   * @property {Object} data.instance The Popper.js instance
-   * @property {String} data.placement Placement applied to popper
-   * @property {String} data.originalPlacement Placement originally defined on init
-   * @property {Boolean} data.flipped True if popper has been flipped by flip modifier
-   * @property {Boolean} data.hide True if the reference element is out of boundaries, useful to know when to hide the popper
-   * @property {HTMLElement} data.arrowElement Node used as arrow by arrow modifier
-   * @property {Object} data.styles Any CSS property defined here will be applied to the popper. It expects the JavaScript nomenclature (eg. `marginBottom`)
-   * @property {Object} data.arrowStyles Any CSS property defined here will be applied to the popper arrow. It expects the JavaScript nomenclature (eg. `marginBottom`)
-   * @property {Object} data.boundaries Offsets of the popper boundaries
-   * @property {Object} data.offsets The measurements of popper, reference and arrow elements
-   * @property {Object} data.offsets.popper `top`, `left`, `width`, `height` values
-   * @property {Object} data.offsets.reference `top`, `left`, `width`, `height` values
-   * @property {Object} data.offsets.arrow] `top` and `left` offsets, only one of them will be different from 0
-   */
+    /**
+     * The `dataObject` is an object containing all the information used by Popper.js.
+     * This object is passed to modifiers and to the `onCreate` and `onUpdate` callbacks.
+     * @function_name dataObject
+     * @property {Object} data.instance The Popper.js instance
+     * @property {String} data.placement Placement applied to popper
+     * @property {String} data.originalPlacement Placement originally defined on init
+     * @property {Boolean} data.flipped True if popper has been flipped by flip modifier
+     * @property {Boolean} data.hide True if the reference element is out of boundaries, useful to know when to hide the popper
+     * @property {HTMLElement} data.arrowElement Node used as arrow by arrow modifier
+     * @property {Object} data.styles Any CSS property defined here will be applied to the popper. It expects the JavaScript nomenclature (eg. `marginBottom`)
+     * @property {Object} data.arrowStyles Any CSS property defined here will be applied to the popper arrow. It expects the JavaScript nomenclature (eg. `marginBottom`)
+     * @property {Object} data.boundaries Offsets of the popper boundaries
+     * @property {Object} data.offsets The measurements of popper, reference and arrow elements
+     * @property {Object} data.offsets.popper `top`, `left`, `width`, `height` values
+     * @property {Object} data.offsets.reference `top`, `left`, `width`, `height` values
+     * @property {Object} data.offsets.arrow] `top` and `left` offsets, only one of them will be different from 0
+     */
 
-  /**
-   * Default options provided to Popper.js constructor.<br />
-   * These can be overridden using the `options` argument of Popper.js.<br />
-   * To override an option, simply pass an object with the same
-   * structure of the `options` object, as the 3rd argument. For example:
+    /**
+     * Default options provided to Popper.js constructor.<br />
+     * These can be overridden using the `options` argument of Popper.js.<br />
+     * To override an option, simply pass an object with the same
+     * structure of the `options` object, as the 3rd argument. For example:
    * ```
    * new Popper(ref, pop, {
    *   modifiers: {
@@ -3972,28 +3972,28 @@
       // Refactoring modifiers' list (Object => Array)
       this.modifiers = Object.keys(this.options.modifiers).map(function (name) {
         return _extends({
-          name: name
+            name: name
         }, _this.options.modifiers[name]);
       })
-      // sort the modifiers by order
-      .sort(function (a, b) {
-        return a.order - b.order;
-      });
+          // sort the modifiers by order
+          .sort(function (a, b) {
+              return a.order - b.order;
+          });
 
-      // modifiers have the ability to execute arbitrary code when Popper.js get inited
-      // such code is executed in the same order of its modifier
-      // they could add new properties to their options configuration
-      // BE AWARE: don't add options to `options.modifiers.name` but to `modifierOptions`!
-      this.modifiers.forEach(function (modifierOptions) {
-        if (modifierOptions.enabled && isFunction(modifierOptions.onLoad)) {
-          modifierOptions.onLoad(_this.reference, _this.popper, _this.options, modifierOptions, _this.state);
-        }
-      });
+        // modifiers have the ability to execute arbitrary code when Popper.js get inited
+        // such code is executed in the same order of its modifier
+        // they could add new properties to their options configuration
+        // BE AWARE: don't add options to `options.modifiers.function_name` but to `modifierOptions`!
+        this.modifiers.forEach(function (modifierOptions) {
+            if (modifierOptions.enabled && isFunction(modifierOptions.onLoad)) {
+                modifierOptions.onLoad(_this.reference, _this.popper, _this.options, modifierOptions, _this.state);
+            }
+        });
 
-      // fire the first update to position the popper in the right place
-      this.update();
+        // fire the first update to position the popper in the right place
+        this.update();
 
-      var eventsEnabled = this.options.eventsEnabled;
+        var eventsEnabled = this.options.eventsEnabled;
       if (eventsEnabled) {
         // setup event listeners, they will take care of update the position in specific situations
         this.enableEventListeners();
@@ -4066,7 +4066,7 @@
    * ```
    *
    * NB: This feature isn't supported in Internet Explorer 10.
-   * @name referenceObject
+   * @function_name referenceObject
    * @property {Function} data.getBoundingClientRect
    * A function that returns a set of coordinates compatible with the native `getBoundingClientRect` method.
    * @property {number} data.clientWidth
@@ -5301,10 +5301,10 @@
     };
 
     for (var i = 0, len = elements.length; i < len; i++) {
-      var _ret = _loop(i, len);
+        var _ret = _loop(i, len);
 
-      if (_ret === "continue") continue;
-    }
+        if (_ret === "continue")
+            }
 
     return createdDocument.body.innerHTML;
   }

@@ -1,10 +1,6 @@
 from django.contrib.gis.db.models import PointField
 from django.db import models
 
-GIS_SOURCE_MODELS = (
-    ('HamburgRoadsideTrees', 'HamburgRoadsideTrees'),
-)
-
 
 class HamburgRoadsideTrees(models.Model):
     geom = PointField(blank=True, null=True)
@@ -26,8 +22,3 @@ class HamburgRoadsideTrees(models.Model):
     ortsteil_nr = models.CharField(max_length=56, blank=True, null=True)
     stadtteil = models.CharField(max_length=56, blank=True, null=True)
     bezirk = models.CharField(max_length=56, blank=True, null=True)
-
-
-CATALOGUE = {
-    'HamburgRoadsideTrees': HamburgRoadsideTrees
-}

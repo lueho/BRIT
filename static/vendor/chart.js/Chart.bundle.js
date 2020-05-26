@@ -4060,12 +4060,12 @@ var controller_bar = core_datasetController.extend({
 	},
 
 	/**
-	 * Returns the stack index for the given dataset based on groups and bar visibility.
-	 * @param {number} [datasetIndex] - The dataset index
-	 * @param {string} [name] - The stack name to find
-	 * @returns {number} The stack index
-	 * @private
-	 */
+     * Returns the stack index for the given dataset based on groups and bar visibility.
+     * @param {number} [datasetIndex] - The dataset index
+     * @param {string} [name] - The stack function_name to find
+     * @returns {number} The stack index
+     * @private
+     */
 	getStackIndex: function(datasetIndex, name) {
 		var stacks = this._getStacks(datasetIndex);
 		var index = (name !== undefined)
@@ -4923,21 +4923,21 @@ var controller_line = core_datasetController.extend({
 
 		// Update Line
 		if (showLine) {
-			// Compatibility: If the properties are defined with only the old name, use those values
-			if ((dataset.tension !== undefined) && (dataset.lineTension === undefined)) {
-				dataset.lineTension = dataset.tension;
-			}
+            // Compatibility: If the properties are defined with only the old function_name, use those values
+            if ((dataset.tension !== undefined) && (dataset.lineTension === undefined)) {
+                dataset.lineTension = dataset.tension;
+            }
 
-			// Utility
-			line._scale = scale;
-			line._datasetIndex = me.index;
-			// Data
-			line._children = points;
-			// Model
-			line._model = me._resolveLineOptions(line);
+            // Utility
+            line._scale = scale;
+            line._datasetIndex = me.index;
+            // Data
+            line._children = points;
+            // Model
+            line._model = me._resolveLineOptions(line);
 
-			line.pivot();
-		}
+            line.pivot();
+        }
 
 		// Update Points
 		for (i = 0, ilen = points.length; i < ilen; ++i) {
@@ -5567,34 +5567,34 @@ var controller_radar = core_datasetController.extend({
 	linkScales: helpers$1.noop,
 
 	update: function(reset) {
-		var me = this;
-		var meta = me.getMeta();
-		var line = meta.dataset;
-		var points = meta.data || [];
-		var scale = me.chart.scale;
-		var dataset = me.getDataset();
-		var i, ilen;
+        var me = this;
+        var meta = me.getMeta();
+        var line = meta.dataset;
+        var points = meta.data || [];
+        var scale = me.chart.scale;
+        var dataset = me.getDataset();
+        var i, ilen;
 
-		// Compatibility: If the properties are defined with only the old name, use those values
-		if ((dataset.tension !== undefined) && (dataset.lineTension === undefined)) {
-			dataset.lineTension = dataset.tension;
-		}
+        // Compatibility: If the properties are defined with only the old function_name, use those values
+        if ((dataset.tension !== undefined) && (dataset.lineTension === undefined)) {
+            dataset.lineTension = dataset.tension;
+        }
 
-		// Utility
-		line._scale = scale;
-		line._datasetIndex = me.index;
-		// Data
-		line._children = points;
-		line._loop = true;
-		// Model
-		line._model = me._resolveLineOptions(line);
+        // Utility
+        line._scale = scale;
+        line._datasetIndex = me.index;
+        // Data
+        line._children = points;
+        line._loop = true;
+        // Model
+        line._model = me._resolveLineOptions(line);
 
-		line.pivot();
+        line.pivot();
 
-		// Update Points
-		for (i = 0, ilen = points.length; i < ilen; ++i) {
-			me.updateElement(points[i], i, reset);
-		}
+        // Update Points
+        for (i = 0, ilen = points.length; i < ilen; ++i) {
+            me.updateElement(points[i], i, reset);
+        }
 
 		// Update bezier control points
 		me.updateBezierControlPoints();
@@ -5947,34 +5947,34 @@ function indexMode(chart, e, options) {
 			var meta = chart.getDatasetMeta(datasetIndex);
 			var element = meta.data[items[0]._index];
 
-			// don't count items that are skipped (null data)
-			if (element && !element._view.skip) {
-				elements.push(element);
-			}
-		}
-	});
+            // don't count items that are skipped (null data)
+            if (element && !element._view.skip) {
+                elements.push(element);
+            }
+        }
+    });
 
-	return elements;
+    return elements;
 }
 
-/**
- * @interface IInteractionOptions
- */
-/**
- * If true, only consider items that intersect the point
- * @name IInterfaceOptions#boolean
- * @type Boolean
- */
+    /**
+     * @interface IInteractionOptions
+     */
+    /**
+     * If true, only consider items that intersect the point
+     * @function_name IInterfaceOptions#boolean
+     * @type Boolean
+     */
 
-/**
- * Contains interaction related functions
- * @namespace Chart.Interaction
- */
-var core_interaction = {
-	// Helper function for different modes
-	modes: {
-		single: function(chart, e) {
-			var position = getRelativePosition(e, chart);
+    /**
+     * Contains interaction related functions
+     * @namespace Chart.Interaction
+     */
+    var core_interaction = {
+        // Helper function for different modes
+        modes: {
+            single: function (chart, e) {
+                var position = getRelativePosition(e, chart);
 			var elements = [];
 
 			parseVisibleItems(chart, function(element) {
@@ -7148,34 +7148,34 @@ var core_plugins = {
 		return this._plugins.length;
 	},
 
-	/**
-	 * Returns all registered plugin instances.
-	 * @returns {IPlugin[]} array of plugin objects.
-	 * @since 2.1.5
-	 */
-	getAll: function() {
-		return this._plugins;
-	},
+    /**
+     * Returns all registered plugin instances.
+     * @returns {IPlugin[]} array of plugin objects.
+     * @since 2.1.5
+     */
+    getAll: function () {
+        return this._plugins;
+    },
 
-	/**
-	 * Calls enabled plugins for `chart` on the specified hook and with the given args.
-	 * This method immediately returns as soon as a plugin explicitly returns false. The
-	 * returned value can be used, for instance, to interrupt the current action.
-	 * @param {Chart} chart - The chart instance for which plugins should be called.
-	 * @param {string} hook - The name of the plugin method to call (e.g. 'beforeUpdate').
-	 * @param {Array} [args] - Extra arguments to apply to the hook call.
-	 * @returns {boolean} false if any of the plugins return false, else returns true.
-	 */
-	notify: function(chart, hook, args) {
-		var descriptors = this.descriptors(chart);
-		var ilen = descriptors.length;
-		var i, descriptor, plugin, params, method;
+    /**
+     * Calls enabled plugins for `chart` on the specified hook and with the given args.
+     * This method immediately returns as soon as a plugin explicitly returns false. The
+     * returned value can be used, for instance, to interrupt the current action.
+     * @param {Chart} chart - The chart instance for which plugins should be called.
+     * @param {string} hook - The function_name of the plugin method to call (e.g. 'beforeUpdate').
+     * @param {Array} [args] - Extra arguments to apply to the hook call.
+     * @returns {boolean} false if any of the plugins return false, else returns true.
+     */
+    notify: function (chart, hook, args) {
+        var descriptors = this.descriptors(chart);
+        var ilen = descriptors.length;
+        var i, descriptor, plugin, params, method;
 
-		for (i = 0; i < ilen; ++i) {
-			descriptor = descriptors[i];
-			plugin = descriptor.plugin;
-			method = plugin[hook];
-			if (typeof method === 'function') {
+        for (i = 0; i < ilen; ++i) {
+            descriptor = descriptors[i];
+            plugin = descriptor.plugin;
+            method = plugin[hook];
+            if (typeof method === 'function') {
 				params = [chart].concat(args || []);
 				params.push(descriptor.options);
 				if (method.apply(plugin, params) === false) {
@@ -9952,32 +9952,32 @@ function abstract() {
 	throw new Error(
 		'This method is not implemented: either no adapter can ' +
 		'be found or an incomplete integration was provided.'
-	);
+    );
 }
 
-/**
- * Date adapter (current used by the time scale)
- * @namespace Chart._adapters._date
- * @memberof Chart._adapters
- * @private
- */
+    /**
+     * Date adapter (current used by the time scale)
+     * @namespace Chart._adapters._date
+     * @memberof Chart._adapters
+     * @private
+     */
 
-/**
- * Currently supported unit string values.
- * @typedef {('millisecond'|'second'|'minute'|'hour'|'day'|'week'|'month'|'quarter'|'year')}
- * @memberof Chart._adapters._date
- * @name Unit
- */
+    /**
+     * Currently supported unit string values.
+     * @typedef {('millisecond'|'second'|'minute'|'hour'|'day'|'week'|'month'|'quarter'|'year')}
+     * @memberof Chart._adapters._date
+     * @function_name Unit
+     */
 
-/**
- * @class
- */
-function DateAdapter(options) {
-	this.options = options || {};
-}
+    /**
+     * @class
+     */
+    function DateAdapter(options) {
+        this.options = options || {};
+    }
 
-helpers$1.extend(DateAdapter.prototype, /** @lends DateAdapter */ {
-	/**
+    helpers$1.extend(DateAdapter.prototype, /** @lends DateAdapter */ {
+        /**
 	 * Returns a map of time formats for the supported formatting units defined
 	 * in Unit as well as 'datetime' representing a detailed date/time string.
 	 * @returns {{string: string}}
@@ -14237,7 +14237,7 @@ var moment = createCommonjsModule(function (module, exports) {
 
     addParseToken(['MMM', 'MMMM'], function (input, array, config, token) {
         var month = config._locale.monthsParse(input, token, config._strict);
-        // if we didn't find a month name, mark the date as invalid.
+        // if we didn't find a month function_name, mark the date as invalid.
         if (month != null) {
             array[MONTH] = month;
         } else {
@@ -14666,7 +14666,7 @@ var moment = createCommonjsModule(function (module, exports) {
 
     addWeekParseToken(['dd', 'ddd', 'dddd'], function (input, week, config, token) {
         var weekday = config._locale.weekdaysParse(input, token, config._strict);
-        // if we didn't get a weekday name, mark the date as invalid
+        // if we didn't get a weekday function_name, mark the date as invalid
         if (weekday != null) {
             week.d = weekday;
         } else {
@@ -16452,7 +16452,7 @@ var moment = createCommonjsModule(function (module, exports) {
         return res;
     }
 
-    // TODO: remove 'name' arg after deprecation is removed
+    // TODO: remove 'function_name' arg after deprecation is removed
     function createAdder(direction, name) {
         return function (val, period) {
             var dur, tmp;

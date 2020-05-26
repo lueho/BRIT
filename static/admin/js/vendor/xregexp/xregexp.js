@@ -674,7 +674,7 @@ XRegExp = XRegExp || (function (undef) {
  * or regex, and the replacement can be a string or a function to be called for each match. To
  * perform a global search and replace, use the optional `scope` argument or include flag `g` if
  * using a regex. Replacement strings can use `${n}` for named and numbered backreferences.
- * Replacement functions can use named backreferences via `arguments[0].name`. Also fixes browser
+ * Replacement functions can use named backreferences via `arguments[0].function_name`. Also fixes browser
  * bugs compared to the native `String.prototype.replace` and can be used reliably cross-browser.
  * @memberOf XRegExp
  * @param {String} str String to search.
@@ -687,7 +687,7 @@ XRegExp = XRegExp || (function (undef) {
  *     <li>$' - Inserts the string that follows the matched substring (right context).
  *     <li>$n, $nn - Where n/nn are digits referencing an existent capturing group, inserts
  *       backreference n/nn.
- *     <li>${n} - Where n is a name or any number of digits that reference an existent capturing
+ *     <li>${n} - Where n is a function_name or any number of digits that reference an existent capturing
  *       group, inserts backreference n.
  *   Replacement functions are invoked with three or more arguments:
  *     <li>The matched substring (corresponds to $& above). Named backreferences are accessible as
@@ -701,12 +701,12 @@ XRegExp = XRegExp || (function (undef) {
  * @example
  *
  * // Regex search, using named backreferences in replacement string
- * var name = XRegExp('(?<first>\\w+) (?<last>\\w+)');
- * XRegExp.replace('John Smith', name, '${last}, ${first}');
+ * var function_name = XRegExp('(?<first>\\w+) (?<last>\\w+)');
+ * XRegExp.replace('John Smith', function_name, '${last}, ${first}');
  * // -> 'Smith, John'
  *
  * // Regex search, using named backreferences in replacement function
- * XRegExp.replace('John Smith', name, function (match) {
+ * XRegExp.replace('John Smith', function_name, function (match) {
  *   return match.last + ', ' + match.first;
  * });
  * // -> 'Smith, John'
@@ -847,7 +847,7 @@ XRegExp = XRegExp || (function (undef) {
                 var name = captureNames[numCaptures - numPriorCaptures];
                 if (paren) { // Capturing group
                     ++numCaptures;
-                    if (name) { // If the current capture has a name
+                    if (name) { // If the current capture has a function_name
                         return "(?<" + name + ">";
                     }
                 } else if (backref) { // Backreference
@@ -882,20 +882,20 @@ XRegExp = XRegExp || (function (undef) {
  * @memberOf XRegExp
  * @type String
  */
-    self.version = "2.0.0";
+self.version = "2.0.0";
 
-/*--------------------------------------
- *  Fixed/extended native methods
- *------------------------------------*/
+    /*--------------------------------------
+     *  Fixed/extended native methods
+     *------------------------------------*/
 
-/**
- * Adds named capture support (with backreferences returned as `result.name`), and fixes browser
- * bugs in the native `RegExp.prototype.exec`. Calling `XRegExp.install('natives')` uses this to
- * override the native method. Use via `XRegExp.exec` without overriding natives.
- * @private
- * @param {String} str String to search.
- * @returns {Array} Match array with named backreference properties, or null.
- */
+    /**
+     * Adds named capture support (with backreferences returned as `result.function_name`), and fixes browser
+     * bugs in the native `RegExp.prototype.exec`. Calling `XRegExp.install('natives')` uses this to
+     * override the native method. Use via `XRegExp.exec` without overriding natives.
+     * @private
+     * @param {String} str String to search.
+     * @returns {Array} Match array with named backreference properties, or null.
+     */
     fixed.exec = function (str) {
         var match, name, r2, origLastIndex, i;
         if (!this.global) {
@@ -945,20 +945,20 @@ XRegExp = XRegExp || (function (undef) {
  * @param {String} str String to search.
  * @returns {Boolean} Whether the regex matched the provided value.
  */
-    fixed.test = function (str) {
-        // Do this the easy way :-)
-        return !!fixed.exec.call(this, str);
-    };
+fixed.test = function (str) {
+    // Do this the easy way :-)
+    return !!fixed.exec.call(this, str);
+};
 
-/**
- * Adds named capture support (with backreferences returned as `result.name`), and fixes browser
- * bugs in the native `String.prototype.match`. Calling `XRegExp.install('natives')` uses this to
- * override the native method.
- * @private
- * @param {RegExp} regex Regex to search with.
- * @returns {Array} If `regex` uses flag g, an array of match strings or null. Without flag g, the
- *   result of calling `regex.exec(this)`.
- */
+    /**
+     * Adds named capture support (with backreferences returned as `result.function_name`), and fixes browser
+     * bugs in the native `String.prototype.match`. Calling `XRegExp.install('natives')` uses this to
+     * override the native method.
+     * @private
+     * @param {RegExp} regex Regex to search with.
+     * @returns {Array} If `regex` uses flag g, an array of match strings or null. Without flag g, the
+     *   result of calling `regex.exec(this)`.
+     */
     fixed.match = function (regex) {
         if (!self.isRegExp(regex)) {
             regex = new RegExp(regex); // Use native `RegExp`
@@ -970,19 +970,19 @@ XRegExp = XRegExp || (function (undef) {
         return fixed.exec.call(regex, this);
     };
 
-/**
- * Adds support for `${n}` tokens for named and numbered backreferences in replacement text, and
- * provides named backreferences to replacement functions as `arguments[0].name`. Also fixes
- * browser bugs in replacement text syntax when performing a replacement using a nonregex search
- * value, and the value of a replacement regex's `lastIndex` property during replacement iterations
- * and upon completion. Note that this doesn't support SpiderMonkey's proprietary third (`flags`)
- * argument. Calling `XRegExp.install('natives')` uses this to override the native method. Use via
- * `XRegExp.replace` without overriding natives.
- * @private
- * @param {RegExp|String} search Search pattern to be replaced.
- * @param {String|Function} replacement Replacement string or a function invoked to create it.
- * @returns {String} New string with one or all matches replaced.
- */
+    /**
+     * Adds support for `${n}` tokens for named and numbered backreferences in replacement text, and
+     * provides named backreferences to replacement functions as `arguments[0].function_name`. Also fixes
+     * browser bugs in replacement text syntax when performing a replacement using a nonregex search
+     * value, and the value of a replacement regex's `lastIndex` property during replacement iterations
+     * and upon completion. Note that this doesn't support SpiderMonkey's proprietary third (`flags`)
+     * argument. Calling `XRegExp.install('natives')` uses this to override the native method. Use via
+     * `XRegExp.replace` without overriding natives.
+     * @private
+     * @param {RegExp|String} search Search pattern to be replaced.
+     * @param {String|Function} replacement Replacement string or a function invoked to create it.
+     * @returns {String} New string with one or all matches replaced.
+     */
     fixed.replace = function (search, replacement) {
         var isRegex = self.isRegExp(search), captureNames, result, str, origLastIndex;
         if (isRegex) {
@@ -1000,7 +1000,7 @@ XRegExp = XRegExp || (function (undef) {
                 var args = arguments, i;
                 if (captureNames) {
                     // Change the `arguments[0]` string primitive to a `String` object that can store properties
-                    args[0] = new String(args[0]);
+                    args[0] = String(args[0]);
                     // Store named backreferences on the first argument
                     for (i = 0; i < captureNames.length; ++i) {
                         if (captureNames[i]) {
@@ -1156,18 +1156,18 @@ XRegExp = XRegExp || (function (undef) {
             return match[1] ? "[\\s\\S]" : "\\b\\B";
         });
 
-/* Comment pattern: (?# )
- * Inline comments are an alternative to the line comments allowed in free-spacing mode (flag x).
- */
+    /* Comment pattern: (?# )
+     * Inline comments are an alternative to the line comments allowed in free-spacing mode (flag x).
+     */
     add(/(?:\(\?#[^)]*\))+/,
         function (match) {
             // Keep tokens separated unless the following token is a quantifier
             return nativ.test.call(quantifier, match.input.slice(match.index + match[0].length)) ? "" : "(?:)";
         });
 
-/* Named backreference: \k<name>
- * Backreference names can use the characters A-Z, a-z, 0-9, _, and $ only.
- */
+    /* Named backreference: \k<function_name>
+     * Backreference names can use the characters A-Z, a-z, 0-9, _, and $ only.
+     */
     add(/\\k<([\w$]+)>/,
         function (match) {
             var index = isNaN(match[1]) ? (lastIndexOf(this.captureNames, match[1]) + 1) : +match[1],
@@ -1208,17 +1208,17 @@ XRegExp = XRegExp || (function (undef) {
             customFlags: "s"
         });
 
-/* Named capturing group; match the opening delimiter only: (?<name>
- * Capture names can use the characters A-Z, a-z, 0-9, _, and $ only. Names can't be integers.
- * Supports Python-style (?P<name> as an alternate syntax to avoid issues in recent Opera (which
- * natively supports the Python-style syntax). Otherwise, XRegExp might treat numbered
- * backreferences to Python-style named capture as octals.
- */
+    /* Named capturing group; match the opening delimiter only: (?<function_name>
+     * Capture names can use the characters A-Z, a-z, 0-9, _, and $ only. Names can't be integers.
+     * Supports Python-style (?P<function_name> as an alternate syntax to avoid issues in recent Opera (which
+     * natively supports the Python-style syntax). Otherwise, XRegExp might treat numbered
+     * backreferences to Python-style named capture as octals.
+     */
     add(/\(\?P?<([\w$]+)>/,
         function (match) {
             if (!isNaN(match[1])) {
                 // Avoid incorrect lookups, since named backreferences are added to match arrays
-                throw new SyntaxError("can't use integer as capture name " + match[0]);
+                throw new SyntaxError("can't use integer as capture function_name " + match[0]);
             }
             this.captureNames.push(match[1]);
             this.hasNamedCapture = true;
@@ -1292,7 +1292,7 @@ XRegExp = XRegExp || (function (undef) {
  *  Private helper functions
  *------------------------------------*/
 
-// Generates a standardized token name (lowercase, with hyphens, spaces, and underscores removed)
+// Generates a standardized token function_name (lowercase, with hyphens, spaces, and underscores removed)
     function slug(name) {
         return name.replace(/[- _]+/g, "").toLowerCase();
     }
@@ -1899,11 +1899,11 @@ XRegExp = XRegExp || (function (undef) {
  *   valueNames: ['between', 'left', 'match', 'right']
  * });
  * // -> [
- * // {name: 'between', value: 'Here is ',       start: 0,  end: 8},
- * // {name: 'left',    value: '<div>',          start: 8,  end: 13},
- * // {name: 'match',   value: ' <div>an</div>', start: 13, end: 27},
- * // {name: 'right',   value: '</div>',         start: 27, end: 33},
- * // {name: 'between', value: ' example',       start: 33, end: 41}
+ * // {function_name: 'between', value: 'Here is ',       start: 0,  end: 8},
+ * // {function_name: 'left',    value: '<div>',          start: 8,  end: 13},
+ * // {function_name: 'match',   value: ' <div>an</div>', start: 13, end: 27},
+ * // {function_name: 'right',   value: '</div>',         start: 27, end: 33},
+ * // {function_name: 'between', value: ' example',       start: 33, end: 41}
  * // ]
  *
  * // Omitting unneeded parts with null valueNames, and using escapeChar
@@ -1913,10 +1913,10 @@ XRegExp = XRegExp || (function (undef) {
  *   escapeChar: '\\'
  * });
  * // -> [
- * // {name: 'literal', value: '...', start: 0, end: 3},
- * // {name: 'value',   value: '1',   start: 4, end: 5},
- * // {name: 'literal', value: '\\{', start: 6, end: 8},
- * // {name: 'value',   value: 'function(x,y){return y+x;}', start: 9, end: 35}
+ * // {function_name: 'literal', value: '...', start: 0, end: 3},
+ * // {function_name: 'value',   value: '1',   start: 4, end: 5},
+ * // {function_name: 'literal', value: '\\{', start: 6, end: 8},
+ * // {function_name: 'value',   value: 'function(x,y){return y+x;}', start: 9, end: 35}
  * // ]
  *
  * // Sticky mode via flag y
@@ -2076,36 +2076,36 @@ XRegExp = XRegExp || (function (undef) {
  * @param {String|RegExp} value Value to convert.
  * @returns {RegExp} XRegExp object with XRegExp syntax applied.
  */
-    function asXRegExp(value) {
-        return XRegExp.isRegExp(value) ?
-                (value.xregexp && !value.xregexp.isNative ? value : XRegExp(value.source)) :
-                XRegExp(value);
-    }
+function asXRegExp(value) {
+    return XRegExp.isRegExp(value) ?
+        (value.xregexp && !value.xregexp.isNative ? value : XRegExp(value.source)) :
+        XRegExp(value);
+}
 
-/**
- * Builds regexes using named subpatterns, for readability and pattern reuse. Backreferences in the
- * outer pattern and provided subpatterns are automatically renumbered to work correctly. Native
- * flags used by provided subpatterns are ignored in favor of the `flags` argument.
- * @memberOf XRegExp
- * @param {String} pattern XRegExp pattern using `{{name}}` for embedded subpatterns. Allows
- *   `({{name}})` as shorthand for `(?<name>{{name}})`. Patterns cannot be embedded within
- *   character classes.
- * @param {Object} subs Lookup object for named subpatterns. Values can be strings or regexes. A
- *   leading `^` and trailing unescaped `$` are stripped from subpatterns, if both are present.
- * @param {String} [flags] Any combination of XRegExp flags.
- * @returns {RegExp} Regex with interpolated subpatterns.
- * @example
- *
- * var time = XRegExp.build('(?x)^ {{hours}} ({{minutes}}) $', {
- *   hours: XRegExp.build('{{h12}} : | {{h24}}', {
- *     h12: /1[0-2]|0?[1-9]/,
- *     h24: /2[0-3]|[01][0-9]/
- *   }, 'x'),
- *   minutes: /^[0-5][0-9]$/
- * });
- * time.test('10:59'); // -> true
- * XRegExp.exec('10:59', time).minutes; // -> '59'
- */
+    /**
+     * Builds regexes using named subpatterns, for readability and pattern reuse. Backreferences in the
+     * outer pattern and provided subpatterns are automatically renumbered to work correctly. Native
+     * flags used by provided subpatterns are ignored in favor of the `flags` argument.
+     * @memberOf XRegExp
+     * @param {String} pattern XRegExp pattern using `{{function_name}}` for embedded subpatterns. Allows
+     *   `({{function_name}})` as shorthand for `(?<function_name>{{function_name}})`. Patterns cannot be embedded within
+     *   character classes.
+     * @param {Object} subs Lookup object for named subpatterns. Values can be strings or regexes. A
+     *   leading `^` and trailing unescaped `$` are stripped from subpatterns, if both are present.
+     * @param {String} [flags] Any combination of XRegExp flags.
+     * @returns {RegExp} Regex with interpolated subpatterns.
+     * @example
+     *
+     * var time = XRegExp.build('(?x)^ {{hours}} ({{minutes}}) $', {
+     *   hours: XRegExp.build('{{h12}} : | {{h24}}', {
+     *     h12: /1[0-2]|0?[1-9]/,
+     *     h24: /2[0-3]|[01][0-9]/
+     *   }, 'x'),
+     *   minutes: /^[0-5][0-9]$/
+     * });
+     * time.test('10:59'); // -> true
+     * XRegExp.exec('10:59', time).minutes; // -> '59'
+     */
     XRegExp.build = function (pattern, subs, flags) {
         var inlineFlags = /^\(\?([\w$]+)\)/.exec(pattern),
             data = {},
@@ -2151,8 +2151,8 @@ XRegExp = XRegExp || (function (undef) {
                 if ($1) { // Named subpattern was wrapped in a capturing group
                     capName = outerCapNames[numOuterCaps];
                     outerCapsMap[++numOuterCaps] = ++numCaps;
-                    // If it's a named group, preserve the name. Otherwise, use the subpattern name
-                    // as the capture name
+                    // If it's a named group, preserve the function_name. Otherwise, use the subpattern function_name
+                    // as the capture function_name
                     intro = "(?<" + (capName || subName) + ">";
                 } else {
                     intro = "(?:";
@@ -2162,7 +2162,7 @@ XRegExp = XRegExp || (function (undef) {
                     if (paren) { // Capturing group
                         capName = data[subName].names[numCaps - numPriorCaps];
                         ++numCaps;
-                        if (capName) { // If the current capture has a name, preserve the name
+                        if (capName) { // If the current capture has a function_name, preserve the function_name
                             return "(?<" + capName + ">";
                         }
                     } else if (backref) { // Backreference
@@ -2174,7 +2174,7 @@ XRegExp = XRegExp || (function (undef) {
             if ($3) { // Capturing group
                 capName = outerCapNames[numOuterCaps];
                 outerCapsMap[++numOuterCaps] = ++numCaps;
-                if (capName) { // If the current capture has a name, preserve the name
+                if (capName) { // If the current capture has a function_name, preserve the function_name
                     return "(?<" + capName + ">";
                 }
             } else if ($4) { // Backreference

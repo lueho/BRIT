@@ -3719,7 +3719,7 @@
       }
 
       if (iconName && prefix && !config.showMissingIcons) {
-        reject(new MissingIcon("Icon is missing for prefix ".concat(prefix, " with icon name ").concat(iconName)));
+        reject(new MissingIcon("Icon is missing for prefix ".concat(prefix, " with icon function_name ").concat(iconName)));
       } else {
         resolve(val);
       }
@@ -3895,11 +3895,11 @@
       var fontWeight = styles.getPropertyValue('font-weight');
 
       if (alreadyProcessedPseudoElement && !fontFamily) {
-        // If we've already processed it but the current computed style does not result in a font-family,
-        // that probably means that a class name that was previously present to make the icon has been
-        // removed. So we now should delete the icon.
-        node.removeChild(alreadyProcessedPseudoElement);
-        return resolve();
+          // If we've already processed it but the current computed style does not result in a font-family,
+          // that probably means that a class function_name that was previously present to make the icon has been
+          // removed. So we now should delete the icon.
+          node.removeChild(alreadyProcessedPseudoElement);
+          return resolve();
       } else if (fontFamily) {
         var content = styles.getPropertyValue('content');
         var prefix = ~['Solid', 'Regular', 'Light', 'Duotone', 'Brands'].indexOf(fontFamily[1]) ? STYLE_TO_PREFIX[fontFamily[1].toLowerCase()] : FONT_WEIGHT_TO_PREFIX[fontWeight];

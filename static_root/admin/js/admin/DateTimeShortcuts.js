@@ -19,15 +19,15 @@
         },
         dismissClockFunc: [],
         dismissCalendarFunc: [],
-        calendarDivName1: 'calendarbox', // name of calendar <div> that gets toggled
-        calendarDivName2: 'calendarin', // name of <div> that contains calendar
-        calendarLinkName: 'calendarlink', // name of the link that is used to toggle
-        clockDivName: 'clockbox', // name of clock <div> that gets toggled
-        clockLinkName: 'clocklink', // name of the link that is used to toggle
+        calendarDivName1: 'calendarbox', // function_name of calendar <div> that gets toggled
+        calendarDivName2: 'calendarin', // function_name of <div> that contains calendar
+        calendarLinkName: 'calendarlink', // function_name of the link that is used to toggle
+        clockDivName: 'clockbox', // function_name of clock <div> that gets toggled
+        clockLinkName: 'clocklink', // function_name of the link that is used to toggle
         shortCutsClass: 'datetimeshortcuts', // class of the clock and cal shortcuts
         timezoneWarningClass: 'timezonewarning', // class of the warning for timezone mismatch
         timezoneOffset: 0,
-        init: function() {
+        init: function () {
             var body = document.getElementsByTagName('body')[0];
             var serverOffset = body.getAttribute('data-admin-utc-offset');
             if (serverOffset) {
@@ -158,18 +158,20 @@
             clock_box.className = 'clockbox module';
             clock_box.setAttribute('id', DateTimeShortcuts.clockDivName + num);
             document.body.appendChild(clock_box);
-            clock_box.addEventListener('click', function(e) { e.stopPropagation(); });
+            clock_box.addEventListener('click', function (e) {
+                e.stopPropagation();
+            });
 
             quickElement('h2', clock_box, gettext('Choose a time'));
             var time_list = quickElement('ul', clock_box);
             time_list.className = 'timelist';
             // The list of choices can be overridden in JavaScript like this:
-            // DateTimeShortcuts.clockHours.name = [['3 a.m.', 3]];
-            // where name is the name attribute of the <input>.
+            // DateTimeShortcuts.clockHours.function_name = [['3 a.m.', 3]];
+            // where function_name is the function_name attribute of the <input>.
             var name = typeof DateTimeShortcuts.clockHours[inp.name] === 'undefined' ? 'default_' : inp.name;
-            DateTimeShortcuts.clockHours[name].forEach(function(element) {
+            DateTimeShortcuts.clockHours[name].forEach(function (element) {
                 var time_link = quickElement('a', quickElement('li', time_list), gettext(element[0]), 'href', '#');
-                time_link.addEventListener('click', function(e) {
+                time_link.addEventListener('click', function (e) {
                     e.preventDefault();
                     DateTimeShortcuts.handleClockQuicklink(num, element[1]);
                 });

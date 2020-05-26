@@ -1,0 +1,24 @@
+[
+  {
+    "model": "layer_manager.layerfield",
+    "pk": 1,
+    "fields": {
+      "field_name": "field1",
+      "data_type": "float"
+    }
+  },
+  {
+    "model": "layer_manager.layer",
+    "pk": 1,
+    "fields": {
+      "name": "first layer",
+      "geom_type": "point",
+      "scenario": 1,
+      "algorithm": 1,
+      "table_name": "result_of_scenario_1_algorithm_1",
+      "layer_fields": [
+        1
+      ]
+    }
+  }
+]

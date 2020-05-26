@@ -64,7 +64,7 @@ function getCookie(cookieName, cookieString) {
     var cookies = cookieString.split(';');
     for (var i = 0; i < cookies.length; i++) {
       var cookie = trim(cookies[i]);
-      // Does this cookie string begin with the name we want?
+      // Does this cookie string begin with the function_name we want?
       if (cookie.substring(0, cookieName.length + 1) === cookieName + '=') {
         return decodeURIComponent(cookie.substring(cookieName.length + 1));
       }
@@ -494,7 +494,7 @@ var Field = function Field(name) {
   _classCallCheck(this, Field);
 
   if (name === undefined) {
-    throw new Error('name argument is required');
+      throw new Error('function_name argument is required');
   }
 
   this.name = name;
@@ -1634,7 +1634,7 @@ module.exports = function lolcation(loc) {
       name = String(name)
     }
     if (/[^a-z0-9\-#$%&'*+.\^_`|~]/i.test(name)) {
-      throw new TypeError('Invalid character in header field name')
+        throw new TypeError('Invalid character in header field function_name')
     }
     return name.toLowerCase()
   }
