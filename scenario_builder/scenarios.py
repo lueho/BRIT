@@ -83,8 +83,6 @@ class GisInventory(BaseScenario):
                     fields[key] = type(value).__name__
                 fields.pop('geom')
 
-                # field_names = [key for key in self.results[algorithm_function_name]['features'][0].keys()]
-                # field_names.remove('geom')
                 result_layer = Layer.objects.create_or_replace_layer(name=algorithm_function_name,
                                                                      geom_type=geom_type,
                                                                      scenario=self.scenario,
