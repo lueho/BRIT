@@ -77,7 +77,7 @@ class GisInventory(BaseScenario):
                 'algorithm': algorithm,
                 'results': results
             }
-            Layer.objects.create_or_replace_layer(**kwargs)
+            Layer.objects.create_or_replace(**kwargs)
 
     def set_gis_source_model(self, gis_source_model_name: str):
         """

@@ -51,7 +51,7 @@ class LayerField(models.Model):
 class LayerManager(models.Manager):
     supported_geometry_types = ['Point', 'MultiPolygon']
 
-    def create_or_replace_layer(self, **kwargs):
+    def create_or_replace(self, **kwargs):
 
         results = kwargs.pop('results')
 
@@ -86,92 +86,24 @@ class LayerManager(models.Manager):
             layer, created = Layer.objects.get_or_create(table_name=kwargs['table_name'], defaults=kwargs)
 
             if created:
-                layer.add_layer_fields_from_dict(fields)
-                feature_collection = self.create_feature_collection(fields, kwargs['geom_type'], kwargs['table_name'])
-                self.create_table_from_model(feature_collection)
+                layer.add_layer_fields(fields)
+                feature_collection = layer.update_or_create_feature_collection()
+                layer.create_feature_table()
             else:
-                feature_collection = layer.get_feature_collection()
                 if layer.is_defined_by(fields=fields, **kwargs):
+                    feature_collection = layer.get_feature_collection()
                     feature_collection.objects.all().delete()
                 else:
-                    self.delete_table_from_model(feature_collection)
                     layer.delete()
-                    del apps.all_models['layer_manager'][kwargs['table_name']]
                     layer = self.create(**kwargs)
-                    layer.add_layer_fields_from_dict(fields)
-                    feature_collection = self.create_feature_collection(fields,
-                                                                        kwargs['geom_type'],
-                                                                        kwargs['table_name'])
-                    self.create_table_from_model(feature_collection)
+                    layer.add_layer_fields(fields)
+                    feature_collection = layer.update_or_create_feature_collection()
+                    layer.create_feature_table()
 
             for feature in features:
                 feature_collection.objects.create(**feature)
 
-            return layer
-
-    @staticmethod
-    def create_feature_collection(fields: dict, geom_type: str, table_name: str):
-
-        if fields is None:
-            fields = {}
-
-        # Empty app registry from any previous version of this model
-        model_name = table_name
-        if model_name in apps.all_models['layer_manager']:
-            raise ModelAlreadyRegistered
-            # del apps.all_models['layer_manager'][model_name]
-
-        attrs = {
-            '__module__': 'layer_manager.models'
-        }
-
-        # Add correct geometry column to model
-        if geom_type == 'Point':
-            attrs['geom'] = PointField(srid=4326)
-        elif geom_type == 'MultiPolygon':
-            attrs['geom'] = MultiPolygonField(srid=4326)
-
-        # Add all custom columns to model
-        for field_name, data_type in fields.items():
-            attrs[field_name] = LayerField.model_field_type(data_type)
-
-        # Create model class and assign table_name
-        model = type(model_name, (models.Model,), attrs)
-        model._meta.db_table = table_name
-
-        return model
-
-    @staticmethod
-    def create_table_from_model(model):
-        """
-        Creates a new table with all given fields from a model
-        :return:
-        """
-
-        # Check if any table of the name already exists
-        with connection.cursor() as cursor:
-            cursor.execute(f"SELECT to_regclass('{model._meta.db_table}')")
-            if cursor.fetchone()[0]:
-                raise TableAlreadyExists
-
-        # After cleanup, now create the new version of the result table
-        with connection.schema_editor() as schema_editor:
-            schema_editor.create_model(model)
-
-    @staticmethod
-    def delete_table_from_model(model):
-        """
-        Deletes a table from a given model
-        :param model:
-        :return:
-        """
-        with connection.cursor() as cursor:
-            cursor.execute(f"SELECT to_regclass('{model._meta.db_table}')")
-            if cursor.fetchone()[0] is None:
-                return
-
-        with connection.schema_editor() as schema_editor:
-            schema_editor.delete_model(model)
+            return layer, feature_collection
 
 
 class Layer(models.Model):
@@ -193,21 +125,18 @@ class Layer(models.Model):
             models.UniqueConstraint(fields=['table_name'], name='unique table_name')
         ]
 
-    def add_layer_fields_from_dict(self, fields: dict):
+    def add_layer_fields(self, fields: dict):
         for field_name, data_type in fields.items():
             field, created = LayerField.objects.get_or_create(field_name=field_name, data_type=data_type)
             self.layer_fields.add(field)
 
-    def get_feature_collection(self):
-        """
-        Returns a model for the table that holds the GIS features of the result layer
-        """
+    def update_or_create_feature_collection(self):
 
-        # If the model is still registered, return original model
-        if self.table_name in apps.all_models['layer_manager']:
-            return apps.all_models['layer_manager'][self.table_name]
+        # Empty app registry from any previous version of this model
+        model_name = self.table_name
+        if model_name in apps.all_models['layer_manager']:
+            del apps.all_models['layer_manager'][model_name]
 
-        # If the model cannot be found, recreate it
         attrs = {
             '__module__': 'layer_manager.models'
         }
@@ -217,15 +146,65 @@ class Layer(models.Model):
             attrs['geom'] = PointField(srid=4326)
         elif self.geom_type == 'MultiPolygon':
             attrs['geom'] = MultiPolygonField(srid=4326)
-        else:
-            # This is also checked before saving
-            raise InvalidGeometryType(self.geom_type)
 
+        # Add all custom columns to model
         for field in self.layer_fields.all():
             attrs[field.field_name] = LayerField.model_field_type(field.data_type)
-        model = type(self.table_name, (models.Model,), attrs)
+
+        # Create model class and assign table_name
+        model = type(model_name, (models.Model,), attrs)
         model._meta.db_table = self.table_name
+
         return model
+
+    def create_feature_table(self):
+        """
+        Creates a new table with all given fields from a model
+        :return:
+        """
+
+        feature_collection = self.get_feature_collection()
+
+        # Check if any table of the name already exists
+        with connection.cursor() as cursor:
+            cursor.execute(f"SELECT to_regclass('{feature_collection._meta.db_table}')")
+            if cursor.fetchone()[0]:
+                raise TableAlreadyExists
+
+        # After cleanup, now create the new version of the result table
+        with connection.schema_editor() as schema_editor:
+            schema_editor.create_model(feature_collection)
+
+    def delete(self, **kwargs):
+        self.delete_feature_table()
+        del apps.all_models['layer_manager'][self.table_name]
+        super().delete()
+
+    def delete_feature_table(self):
+        """
+        Deletes a table from a given model
+        :return:
+        """
+        feature_collection = self.get_feature_collection()
+
+        with connection.cursor() as cursor:
+            cursor.execute(f"SELECT to_regclass('{feature_collection._meta.db_table}')")
+            if cursor.fetchone()[0] is None:
+                return
+
+        with connection.schema_editor() as schema_editor:
+            schema_editor.delete_model(feature_collection)
+
+    def get_feature_collection(self):
+        """
+        Returns a model for the table that holds the GIS features of the result layer
+        """
+
+        # If the model is still registered, return original model
+        if self.table_name in apps.all_models['layer_manager']:
+            return apps.all_models['layer_manager'][self.table_name]
+        else:
+            return self.update_or_create_feature_collection()
 
     def is_defined_by(self, **kwargs):
 

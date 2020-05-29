@@ -1,54 +1,45 @@
 from django.apps import apps
 from django.contrib.gis.geos import GEOSGeometry
-from django.db import models, connection
+from django.db import connection
 from django.test import TestCase
 
 from gis_source_manager.models import HamburgGreenAreas
 from scenario_builder.models import Scenario, InventoryAlgorithm
 from .models import Layer, LayerField
-from .models import ModelAlreadyRegistered, TableAlreadyExists
 
 
 class LayerTestCase(TestCase):
     fixtures = ['regions.json', 'scenarios.json', 'layers.json', 'catchments.json', 'parks.json']
 
     def setUp(self):
-        self.fields = {'field1': 'float',
-                       'fieldnumber2': 'int'
-                       }
-        self.name = 'name'
-        self.geom_type = 'Point'
 
-    def test_create_layer_model(self):
-        model = Layer.objects.create_feature_collection(fields=self.fields, geom_type='Point',
-                                                        table_name='test_table_name')
-        model_fields = [field.name for field in model._meta.fields]
+        self.testkwargs = {
+            'name': 'test name',
+            'scenario': Scenario.objects.get(name='Hamburg standard'),
+            'algorithm': InventoryAlgorithm.objects.get(function_name='avg_point_yield'),
+            'geom_type': 'Point',
+            'table_name': 'test_table_name',
+        }
+        self.fields = {'field1': 'float', 'field2': 'int'}
+
+    def test_update_or_create_feature_collection(self):
+        kwargs = self.testkwargs
+        layer = Layer.objects.create(**kwargs)
+        layer.add_layer_fields(self.fields)
+        feature_collection = layer.update_or_create_feature_collection()
+        feature_table_fields = [field.name for field in feature_collection._meta.fields]
         for field in self.fields:
-            self.assertIn(field, model_fields)
-        self.assertEqual(model._meta.db_table, 'test_table_name')
+            self.assertIn(field, feature_table_fields)
+        self.assertEqual(feature_collection._meta.db_table, self.testkwargs['table_name'])
 
-        def create_duplicate():
-            Layer.objects.create_feature_collection(fields=self.fields, geom_type='point',
-                                                    table_name='test_table_name')
+    def test_create_feature_table(self):
+        kwargs = self.testkwargs
+        layer = Layer.objects.create(**kwargs)
+        layer.add_layer_fields(self.fields)
+        layer.update_or_create_feature_collection()
+        layer.create_feature_table()
 
-        self.assertRaises(ModelAlreadyRegistered, create_duplicate)
-        # del apps.all_models['layer_manager']['result_of_scenario_1_algorithm_1']
-
-    def test_create_layer_table(self):
-        Layer.objects.create_table_from_model(
-            type('test_model', (models.Model,), {'__module__': 'layer_manager.models'}))
-        with connection.cursor() as cursor:
-            cursor.execute(f"SELECT to_regclass('layer_manager_test_model')")
-            self.assertTrue(cursor.fetchone()[0])
-
-        def create_duplicate_table():
-            model = type('test_model_2', (models.Model,), {'__module__': 'layer_manager.models'})
-            model._meta.db_table = 'layer_manager_test_model'
-            Layer.objects.create_table_from_model(model)
-
-        self.assertRaises(TableAlreadyExists, create_duplicate_table)
-
-    def test_create_or_replace_layer(self):
+    def test_create_or_replace(self):
 
         results = {
             'avg_area_yield': {
@@ -63,10 +54,10 @@ class LayerTestCase(TestCase):
         # Test creation of completely new layer
         scenario = Scenario.objects.get(name='Hamburg standard')
         algorithm = InventoryAlgorithm.objects.get(function_name='avg_area_yield')
-        layer = Layer.objects.create_or_replace_layer(name='new layer',
-                                                      scenario=scenario,
-                                                      algorithm=algorithm,
-                                                      results=results['avg_area_yield'])
+        layer, feature_collection = Layer.objects.create_or_replace(name='new layer',
+                                                                    scenario=scenario,
+                                                                    algorithm=algorithm,
+                                                                    results=results['avg_area_yield'])
 
         # Is the table name generated correctly?
         self.assertEqual(layer.table_name, 'result_of_scenario_4_algorithm_3')
@@ -86,13 +77,13 @@ class LayerTestCase(TestCase):
 
         # Test creation of layer that already exists but has equal shape
 
-        Layer.objects.create_or_replace_layer(name='second new layer',
-                                              scenario=scenario,
-                                              algorithm=algorithm,
-                                              results=results['avg_area_yield'])
+        Layer.objects.create_or_replace(name='second new layer',
+                                        scenario=scenario,
+                                        algorithm=algorithm,
+                                        results=results['avg_area_yield'])
         del apps.all_models['layer_manager']['result_of_scenario_4_algorithm_3']
 
-    def test_get_layer_model(self):
+    def test_get_feature_collection(self):
 
         results = {
             'avg_area_yield': {
@@ -106,10 +97,10 @@ class LayerTestCase(TestCase):
 
         scenario = Scenario.objects.get(name='Hamburg standard')
         algorithm = InventoryAlgorithm.objects.get(function_name='avg_area_yield')
-        Layer.objects.create_or_replace_layer(name='second layer',
-                                              scenario=scenario,
-                                              algorithm=algorithm,
-                                              results=results['avg_area_yield'])
+        Layer.objects.create_or_replace(name='second layer',
+                                        scenario=scenario,
+                                        algorithm=algorithm,
+                                        results=results['avg_area_yield'])
 
         # If the model is found in registry
         layer = Layer.objects.get(name='second layer')
@@ -146,10 +137,7 @@ class LayerTestCase(TestCase):
 
         self.assertEqual(features[1][0], 12.5)
 
-    def test_store_field_definitions(self):
-        pass
-
-    def test_is_identical_layer(self):
+    def test_is_defined_by(self):
         kwargs = {
             'table_name': 'test_table',
             'geom_type': 'point',
@@ -159,7 +147,7 @@ class LayerTestCase(TestCase):
         layer = Layer.objects.create(**kwargs)
 
         field_definitions = {'field1': 'float',
-                             'fieldnumber2': 'int'}
+                             'field2': 'int'}
         for field_name, data_type in field_definitions.items():
             layer.layer_fields.add(LayerField.objects.create(field_name=field_name, data_type=data_type))
 
