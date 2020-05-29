@@ -1,13 +1,13 @@
 from django.contrib.gis.geos import GEOSGeometry
 from django.test import TestCase
 
-from gis_source_manager.models import HamburgRoadsideTrees
+from gis_source_manager.models import HamburgRoadsideTrees, HamburgGreenAreas
 from .models import Catchment, Material, Region, Scenario
 from .scenarios import GisInventory
 
 
 class GisInventoryTestCase(TestCase):
-    fixtures = ['scenarios.json', 'trees.json']
+    fixtures = ['regions.json', 'catchments.json', 'scenarios.json', 'trees.json', 'parks.json']
 
     def setUp(self):
         scenario = Scenario(
@@ -17,7 +17,7 @@ class GisInventoryTestCase(TestCase):
             use_default_configuration=True
         )
         scenario.save()
-        scenario.feedstocks.add(Material.objects.get(name='prunings'))
+        scenario.feedstocks.add(Material.objects.get(name='Tree prunings (winter)'))
         scenario.create_default_configuration()
         self.inventory = GisInventory(scenario)
 
@@ -30,7 +30,13 @@ class GisInventoryTestCase(TestCase):
             'avg_point_yield': {
                 'point_yield': {
                     'value': 10.5,
-                    'standard_deviation': 1.5
+                    'standard_deviation': 0.5
+                }
+            },
+            'avg_area_yield': {
+                'area_yield': {
+                    'value': 0.1,
+                    'standard_deviation': 0.05
                 }
             }
         }
@@ -57,6 +63,12 @@ class GisInventoryTestCase(TestCase):
                 ]
             }
         }
+
+    def test_clip_polygons(self):
+        input_qs = HamburgGreenAreas.objects.all()
+        mask_qs = Catchment.objects.filter(name='Harburg')
+        clipped = GisInventory.clip_polygons(input_qs, mask_qs)
+        self.assertEqual(len(clipped), 372)
 
     def test_run(self):
         self.assertIsNone(self.inventory.results)

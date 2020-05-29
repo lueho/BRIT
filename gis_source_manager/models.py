@@ -25,17 +25,21 @@ class HamburgRoadsideTrees(models.Model):
 
 
 class HamburgGreenAreas(models.Model):
-    geom = MultiPolygonField(srid=25832, blank=True, null=True)
-    quelle_daten = models.CharField(max_length=63, blank=True, null=True)
+    geom = MultiPolygonField(srid=4326, blank=True, null=True)
+    quelle_daten = models.CharField(max_length=200, blank=True, null=True)
     identnummer = models.CharField(max_length=63, blank=True, null=True)
     dgpkey = models.IntegerField(blank=True, null=True)
-    anlagenname = models.CharField(max_length=63, blank=True, null=True)
-    belegenheit = models.CharField(max_length=63, blank=True, null=True)
-    eigentum = models.CharField(max_length=63, blank=True, null=True)
+    anlagenname = models.CharField(max_length=200, blank=True, null=True)
+    belegenheit = models.CharField(max_length=200, blank=True, null=True)
+    eigentum = models.CharField(max_length=200, blank=True, null=True)
     bezirksnummer = models.IntegerField(blank=True, null=True)
     ortsteil = models.IntegerField(blank=True, null=True)
     flaeche_qm = models.FloatField(blank=True, null=True)
     flaeche_ha = models.FloatField(blank=True, null=True)
-    gruenart = models.CharField(max_length=63, blank=True, null=True)
+    gruenart = models.CharField(max_length=200, blank=True, null=True)
     nutzcode = models.IntegerField(blank=True, null=True)
     stand = models.CharField(max_length=63, blank=True, null=True)
+
+    # class Meta:
+    # managed = False
+    # db_table = 'trees_hh_parks'

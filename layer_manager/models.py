@@ -1,6 +1,6 @@
 from django.apps import apps
 from django.contrib.gis.db.models import PointField, MultiPolygonField
-from django.contrib.gis.geos import Point
+from django.contrib.gis.geos import Point, MultiPolygon
 from django.db import models, connection
 
 from scenario_builder.models import Scenario, InventoryAlgorithm
@@ -12,6 +12,11 @@ class ModelAlreadyRegistered(Exception):
 
 class TableAlreadyExists(Exception):
     """The table you are trying to create already exists in the database"""
+
+
+class InvalidGeometryType(Exception):
+    def __init__(self, geometry_type: str):
+        f"""Invalid geometry type \"{geometry_type}\"."""
 
 
 class LayerField(models.Model):
@@ -32,19 +37,25 @@ class LayerField(models.Model):
     @staticmethod
     def model_field_type(data_type: str):
         if data_type == 'float':
-            return models.FloatField()
+            return models.FloatField(blank=True, null=True)
         elif data_type == 'int':
-            return models.IntegerField()
+            return models.IntegerField(blank=True, null=True)
         elif data_type == 'str':
-            return models.CharField(max_length=56)
+            return models.CharField(blank=True, null=True, max_length=200)
 
 
 class LayerManager(models.Manager):
+    supported_geometry_types = [Point, MultiPolygon]
 
     def create_or_replace_layer(self, **kwargs):
         kwargs['table_name'] = 'result_of_scenario_' + \
                                str(kwargs['scenario'].id) + '_algorithm_' + \
                                str(kwargs['algorithm'].id)
+
+        if kwargs['geom_type'] not in self.supported_geometry_types:
+            raise InvalidGeometryType(kwargs['geom_type'].__name__)
+        kwargs['geom_type'] = kwargs['geom_type'].__name__
+
         # Check if this layer has previously been created
         if not Layer.objects.filter(table_name=kwargs['table_name']):
             pass
@@ -58,9 +69,6 @@ class LayerManager(models.Manager):
                 self._delete_layer_table(layer_model)
                 layer.delete()
                 del apps.all_models['layer_manager'][kwargs['table_name']]
-
-        if kwargs['geom_type'] == Point:
-            kwargs['geom_type'] = 'point'
 
         fields = kwargs.pop('fields')
         layer = self.create(name=kwargs['name'],
@@ -109,9 +117,9 @@ class LayerManager(models.Manager):
         }
 
         # Add correct geometry column to model
-        if geom_type == 'point':
+        if geom_type == 'Point':
             attrs['geom'] = PointField(srid=4326)
-        elif geom_type == 'multi-polygon':
+        elif geom_type == 'MultiPolygon':
             attrs['geom'] = MultiPolygonField(srid=4326)
 
         # Add all custom columns to model
@@ -191,10 +199,13 @@ class Layer(models.Model):
         }
 
         # Add correct geometry column to model
-        if self.geom_type == 'point':
+        if self.geom_type == 'Point':
             attrs['geom'] = PointField(srid=4326)
-        elif self.geom_type == 'multi-polygon':
+        elif self.geom_type == 'MultiPolygon':
             attrs['geom'] = MultiPolygonField(srid=4326)
+        else:
+            # This is also checked before saving
+            raise InvalidGeometryType(self.geom_type)
 
         for field in self.layer_fields.all():
             attrs[field.field_name] = LayerField.model_field_type(field.data_type)

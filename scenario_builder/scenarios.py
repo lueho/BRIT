@@ -1,6 +1,10 @@
 from django.apps import apps
+from django.contrib.gis.geos import GEOSGeometry
+from django.db import connection
+from django.db.models import QuerySet
 
 import gis_source_manager.models as gis_models
+from gis_source_manager.models import HamburgGreenAreas
 from layer_manager.models import Layer
 from scenario_builder.models import (InventoryAlgorithm,
                                      ScenarioInventoryConfiguration)
@@ -16,6 +20,10 @@ class BaseScenario:
         self.scenario = scenario
         self.region = scenario.region
         self.catchment = scenario.catchment
+
+
+class EmptyQueryset(Exception):
+    """The Queryset cannot be empty"""
 
 
 class GisInventory(BaseScenario):
@@ -78,9 +86,24 @@ class GisInventory(BaseScenario):
             if self.results[algorithm_function_name]['features']:
                 geom_type = type(self.results[algorithm_function_name]['features'][0]['geom'])
                 algorithm = InventoryAlgorithm.objects.get(function_name=algorithm_function_name)
+
+                features = self.results[algorithm_function_name]['features']
                 fields = {}
-                for key, value in self.results[algorithm_function_name]['features'][0].items():
-                    fields[key] = type(value).__name__
+                # The data types of the fields are detected from their content. Any column that has only null values
+                # will be omitted completely
+                fields_with_unknown_datatype = list(features[0].keys())
+                for feature in features:
+                    if not fields_with_unknown_datatype:
+                        break
+                    for key, value in feature.items():
+                        if feature[key] and key in fields_with_unknown_datatype:
+                            fields[key] = type(value).__name__
+                            fields_with_unknown_datatype.remove(key)
+
+                # At this point there might be fields left out because there were only null values from which the
+                # data type could be detected. They should be omitted but this information should be logged
+                # TODO: add omitted columns info to log
+
                 fields.pop('geom')
 
                 result_layer = Layer.objects.create_or_replace_layer(name=algorithm_function_name,
@@ -130,6 +153,84 @@ class GisInventory(BaseScenario):
             })
         return result
 
+    def avg_area_yield(self, area_yield: dict = None):
+        """
+        Assignes a global average and standard deviation to park areas that where found in the scenario catchment.
+        :param area_yield:
+        :return:
+        """
+        input_qs = HamburgGreenAreas.objects.all()
+        mask_qs = Catchment.objects.filter(id=self.catchment.id)
+        keep_columns = ['anlagenname', 'belegenheit', 'gruenart', 'nutzcode']
+        clipped_polygons = self.clip_polygons(input_qs, mask_qs, keep_columns=keep_columns)
+        result = {
+            'total_area': 0,
+            'total_yield_average': 0,
+            'features': []
+        }
+        for polygon in clipped_polygons:
+            result['total_area'] += polygon['area']
+            result['total_yield_average'] += polygon['area'] * area_yield['value']
+            result['features'].append({
+                'geom': polygon['geom'],
+                'area': polygon['area'],
+                'yield_average': polygon['area'] * area_yield['value'],
+                'name': polygon['anlagenname'],
+                'usage': polygon['gruenart']})
+
+        return result
+
     @staticmethod
-    def stupid_inventory(num1=None, num2=None):
-        return num1['value'] + num2['value']
+    def clip_polygons(input_qs: QuerySet, mask_qs: QuerySet, keep_columns: [str] = None):
+
+        if not input_qs:
+            raise EmptyQueryset
+
+        if not mask_qs:
+            raise EmptyQueryset
+
+        # Clean up column names and remove any non existing column names
+        input_fields_names = [field.name for field in input_qs.model._meta.get_fields()]
+        columns = []
+        if keep_columns is not None:
+            for column_name in keep_columns:
+                if column_name in input_fields_names:
+                    columns.append(column_name)
+
+        if columns:
+            columns_str = ', '.join(['input.' + name for name in columns]) + ','
+        else:
+            columns_str = ''
+
+        input_table_name = input_qs.model._meta.db_table
+        input_ids = '(' + ', '.join(str(id) for id in input_qs.values_list('id', flat=True)) + ')'
+        mask_table_name = mask_qs.model._meta.db_table
+        mask_ids = '(' + ', '.join(str(id) for id in mask_qs.values_list('id', flat=True)) + ')'
+
+        # Query based on: https://postgis.net/docs/ST_Intersection.html
+        query = f"""-- noinspection SqlResolve
+                    SELECT clipped.*, ST_Area(clipped.geom::geography) AS area
+                    FROM (
+                        SELECT
+                            {columns_str}
+                            ST_Multi(
+                                ST_Buffer(ST_Intersection(mask.geom, input.geom), 0.0)
+                            ) AS geom
+                        FROM (SELECT * FROM {input_table_name} WHERE id IN {input_ids}) AS input
+                        INNER JOIN (SELECT geom FROM {mask_table_name} WHERE id IN {mask_ids}) mask
+                        ON ST_Intersects(mask.geom, input.geom)
+                        WHERE NOT ST_IsEmpty(ST_Buffer(ST_Intersection(mask.geom, input.geom), 0.0))) clipped;
+                """
+
+        with connection.cursor() as cursor:
+            cursor.execute(query)
+            columns = [column[0] for column in cursor.description]
+            features = [
+                dict(zip(columns, row))
+                for row in cursor.fetchall()
+            ]
+        # The cursor gets the geometry only as string representation. Create a geometry objects from it with GEOS API
+        for feature in features:
+            feature['geom'] = GEOSGeometry(feature['geom'])
+
+        return features

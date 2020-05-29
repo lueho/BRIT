@@ -1,5 +1,3 @@
-from typing import Tuple
-
 from django.contrib.auth.models import User
 from django.contrib.gis.db.models import MultiPolygonField, PointField
 from django.core.validators import RegexValidator
@@ -10,8 +8,9 @@ TYPES = (
     ('custom', 'custom'),
 )
 
-GIS_SOURCE_MODELS: Tuple[Tuple[str, str]] = (
+GIS_SOURCE_MODELS = (
     ('HamburgRoadsideTrees', 'HamburgRoadsideTrees'),
+    ('HamburgGreenAreas', 'HamburgGreenAreas')
 )
 
 

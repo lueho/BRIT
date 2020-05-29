@@ -11,7 +11,7 @@ class BaseScenarioResultTestCase(TestCase):
 
 
 class InventoryResultPointLayerTestCase(TestCase):
-    fixtures = ['scenarios.json', 'trees.json']
+    fixtures = ['regions.json', 'catchments.json', 'scenarios.json', 'trees.json']
 
     def setUp(self):
         scenario = Scenario(
@@ -21,7 +21,7 @@ class InventoryResultPointLayerTestCase(TestCase):
             use_default_configuration=True
         )
         scenario.save()
-        scenario.feedstocks.add(Material.objects.get(name='prunings'))
+        scenario.feedstocks.add(Material.objects.get(name='Tree prunings (winter)'))
         scenario.create_default_configuration()
         self.inventory = GisInventory(scenario)
 

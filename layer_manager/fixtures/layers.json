@@ -12,10 +12,10 @@
     "pk": 1,
     "fields": {
       "name": "first layer",
-      "geom_type": "point",
-      "scenario": 1,
+      "geom_type": "Point",
+      "scenario": 4,
       "algorithm": 1,
-      "table_name": "result_of_scenario_1_algorithm_1",
+      "table_name": "result_of_scenario_4_algorithm_1",
       "layer_fields": [
         1
       ]

@@ -12,18 +12,18 @@ from .models import (Catchment,
 
 
 class MaterialTestCase(TestCase):
-    fixtures = ['scenarios.json']
+    fixtures = ['regions.json', 'scenarios.json', 'catchments.json']
 
     def setUp(self):
         pass
 
     def test_create(self):
-        material = Material.objects.get(name='prunings')
-        self.assertEqual(material.name, 'prunings')
+        material = Material.objects.get(name='Tree prunings (winter)')
+        self.assertEqual(material.name, 'Tree prunings (winter)')
 
 
 class RegionTestCase(TestCase):
-    fixtures = ['scenarios.json']
+    fixtures = ['regions.json', 'catchments.json', 'scenarios.json']
 
     def setUp(self):
         pass
@@ -34,7 +34,7 @@ class RegionTestCase(TestCase):
 
 
 class CatchmentTestCase(TestCase):
-    fixtures = ['scenarios.json']
+    fixtures = ['regions.json', 'catchments.json', 'scenarios.json']
 
     def test_create(self):
         catchment = Catchment.objects.get(name='Wandsbek')
@@ -42,15 +42,15 @@ class CatchmentTestCase(TestCase):
 
 
 class GeoDatasetTestCase(TestCase):
-    fixtures = ['scenarios.json']
+    fixtures = ['regions.json', 'catchments.json', 'scenarios.json']
 
     def test_create(self):
         ds = GeoDataset.objects.get(id=1)
-        self.assertEqual(ds.name, 'Hamburg roadside trees')
+        self.assertEqual(ds.name, 'Hamburg Roadsidetrees')
 
 
 class InventoryAlgorithmTestCase(TestCase):
-    fixtures = ['scenarios.json']
+    fixtures = ['regions.json', 'catchments.json', 'scenarios.json']
 
     def test_create(self):
         alg = InventoryAlgorithm.objects.get(id=1)
@@ -58,7 +58,7 @@ class InventoryAlgorithmTestCase(TestCase):
 
 
 class InventoryAlgorithmParameterTestCase(TestCase):
-    fixtures = ['scenarios.json']
+    fixtures = ['regions.json', 'catchments.json', 'scenarios.json']
 
     def test_create(self):
         param = InventoryAlgorithmParameter.objects.get(id=1)
@@ -66,16 +66,16 @@ class InventoryAlgorithmParameterTestCase(TestCase):
 
 
 class InventoryAlgorithmParameterValueTestCase(TestCase):
-    fixtures = ['scenarios.json']
+    fixtures = ['regions.json', 'catchments.json', 'scenarios.json']
 
     def test_create(self):
         param_value = InventoryAlgorithmParameterValue.objects.get(id=1)
         self.assertEqual(param_value.value, 10.5)
-        self.assertEqual(param_value.standard_deviation, 1.5)
+        self.assertEqual(param_value.standard_deviation, 0.5)
 
 
 class ScenarioTestCase(TestCase):
-    fixtures = ['scenarios.json']
+    fixtures = ['regions.json', 'catchments.json', 'scenarios.json']
 
     def setUp(self):
         scenario = Scenario(
@@ -85,18 +85,18 @@ class ScenarioTestCase(TestCase):
             use_default_configuration=True
         )
         scenario.save()
-        scenario.feedstocks.add(Material.objects.get(name='prunings'))
+        scenario.feedstocks.add(Material.objects.get(name='Tree prunings (winter)'))
 
     def test_create(self):
         scenario = Scenario.objects.get(name='Test scenario')
         self.assertIsInstance(scenario, Scenario)
         feedstocks = scenario.feedstocks.all()
         self.assertEqual(len(feedstocks), 1)
-        self.assertEqual(feedstocks[0].name, 'prunings')
+        self.assertEqual(feedstocks[0].name, 'Tree prunings (winter)')
         algorithms = InventoryAlgorithm.objects.filter(feedstock=feedstocks[0],
                                                        geodataset__region=scenario.region,
                                                        default=True)
-        self.assertEqual(len(algorithms), 1)
+        self.assertEqual(len(algorithms), 2)
         self.assertEqual(algorithms[0].function_name, 'avg_point_yield')
         parameters = InventoryAlgorithmParameter.objects.filter(inventory_algorithm=algorithms[0])
         self.assertEqual(len(parameters), 1)
@@ -107,7 +107,7 @@ class ScenarioTestCase(TestCase):
         scenario.create_default_configuration()  # TODO: Where can this be automated?
         config = ScenarioInventoryConfiguration.objects.filter(scenario=scenario)
         self.assertIsNotNone(config)
-        self.assertEqual(len(config), 1)
+        self.assertEqual(len(config), 2)
         for entry in config:
             self.assertTrue(entry.inventory_value.default)
-            self.assertIn(entry.inventory_parameter.short_name, ['point_yield', ])
+            self.assertIn(entry.inventory_parameter.short_name, ['point_yield', 'area_yield', ])
