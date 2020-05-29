@@ -1,4 +1,3 @@
-from django.contrib.gis.geos import GEOSGeometry
 from django.test import TestCase
 
 from gis_source_manager.models import HamburgRoadsideTrees, HamburgGreenAreas
@@ -50,19 +49,7 @@ class GisInventoryTestCase(TestCase):
         self.assertEqual(self.inventory.catchment.name, 'Wandsbek')
 
     def test_save_results_in_database(self):
-        self.inventory.results = {
-            'avg_point_yield': {
-                'trees_count': 10000,
-                'total_yield': 150000,
-                'features': [
-                    {
-                        'geom': GEOSGeometry('POINT (10.120232 53.712156)'),
-                        'point_yield_average': 15.0,
-                        'point_yield_standard_deviation': 5.0
-                    }
-                ]
-            }
-        }
+        pass
 
     def test_clip_polygons(self):
         input_qs = HamburgGreenAreas.objects.all()

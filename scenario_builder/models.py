@@ -161,8 +161,8 @@ class Scenario(models.Model):
     owner = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
     description = models.TextField(blank=True, null=True)
     region = models.ForeignKey(Region, on_delete=models.CASCADE, null=True)
-    site = models.ForeignKey(SFBSite, on_delete=models.CASCADE, null=True)
-    catchment = models.ForeignKey(Catchment, on_delete=models.CASCADE, null=True)
+    site = models.ForeignKey(SFBSite, on_delete=models.CASCADE, null=True)  # TODO: make many-to-many?
+    catchment = models.ForeignKey(Catchment, on_delete=models.CASCADE, null=True)  # TODO: make many-to-many?
     feedstocks = models.ManyToManyField(Material, limit_choices_to={'is_feedstock': True})
     use_default_configuration = models.BooleanField(default=True)
 

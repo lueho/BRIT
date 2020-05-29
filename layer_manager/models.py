@@ -1,6 +1,5 @@
 from django.apps import apps
 from django.contrib.gis.db.models import PointField, MultiPolygonField
-from django.contrib.gis.geos import Point, MultiPolygon
 from django.db import models, connection
 
 from scenario_builder.models import Scenario, InventoryAlgorithm
@@ -16,7 +15,12 @@ class TableAlreadyExists(Exception):
 
 class InvalidGeometryType(Exception):
     def __init__(self, geometry_type: str):
-        f"""Invalid geometry type \"{geometry_type}\"."""
+        f"""Invalid geometry type: \"{geometry_type}\"."""
+
+
+class NoFeaturesProvided(Exception):
+    def __init__(self, results):
+        f"""No features provided in results: \"{results}\"."""
 
 
 class LayerField(models.Model):
@@ -45,63 +49,68 @@ class LayerField(models.Model):
 
 
 class LayerManager(models.Manager):
-    supported_geometry_types = [Point, MultiPolygon]
+    supported_geometry_types = ['Point', 'MultiPolygon']
 
     def create_or_replace_layer(self, **kwargs):
-        kwargs['table_name'] = 'result_of_scenario_' + \
-                               str(kwargs['scenario'].id) + '_algorithm_' + \
-                               str(kwargs['algorithm'].id)
 
-        if kwargs['geom_type'] not in self.supported_geometry_types:
-            raise InvalidGeometryType(kwargs['geom_type'].__name__)
-        kwargs['geom_type'] = kwargs['geom_type'].__name__
+        results = kwargs.pop('results')
 
-        # Check if this layer has previously been created
-        if not Layer.objects.filter(table_name=kwargs['table_name']):
-            pass
+        if not results['features']:
+            raise NoFeaturesProvided(results)
         else:
-            layer = Layer.objects.get(table_name=kwargs['table_name'])
-            layer_model = layer.get_layer_model()
-            if self._is_identical_layer(layer, **kwargs):
-                layer_model.objects.all().delete()
-                return layer
+            features = results['features']
+            fields = {}
+            # The data types of the fields are detected from their content. Any column that has only null values
+            # will be omitted completely
+            fields_with_unknown_datatype = list(features[0].keys())
+            for feature in features:
+                if not fields_with_unknown_datatype:
+                    break
+                for key, value in feature.items():
+                    if feature[key] and key in fields_with_unknown_datatype:
+                        fields[key] = type(value).__name__
+                        fields_with_unknown_datatype.remove(key)
+
+            # At this point there might be fields left out because there were only null values from which the
+            # data type could be detected. They should be omitted but this information should be logged
+            # TODO: add omitted columns info to log
+
+            kwargs['geom_type'] = fields.pop('geom')
+            if kwargs['geom_type'] not in self.supported_geometry_types:
+                raise InvalidGeometryType(kwargs['geom_type'])
+
+            kwargs['table_name'] = 'result_of_scenario_' + \
+                                   str(kwargs['scenario'].id) + '_algorithm_' + \
+                                   str(kwargs['algorithm'].id)
+
+            layer, created = Layer.objects.get_or_create(table_name=kwargs['table_name'], defaults=kwargs)
+
+            if created:
+                layer.add_layer_fields_from_dict(fields)
+                feature_collection = self.create_feature_collection(fields, kwargs['geom_type'], kwargs['table_name'])
+                self.create_table_from_model(feature_collection)
             else:
-                self._delete_layer_table(layer_model)
-                layer.delete()
-                del apps.all_models['layer_manager'][kwargs['table_name']]
+                feature_collection = layer.get_feature_collection()
+                if layer.is_defined_by(fields=fields, **kwargs):
+                    feature_collection.objects.all().delete()
+                else:
+                    self.delete_table_from_model(feature_collection)
+                    layer.delete()
+                    del apps.all_models['layer_manager'][kwargs['table_name']]
+                    layer = self.create(**kwargs)
+                    layer.add_layer_fields_from_dict(fields)
+                    feature_collection = self.create_feature_collection(fields,
+                                                                        kwargs['geom_type'],
+                                                                        kwargs['table_name'])
+                    self.create_table_from_model(feature_collection)
 
-        fields = kwargs.pop('fields')
-        layer = self.create(name=kwargs['name'],
-                            geom_type=kwargs['geom_type'],
-                            table_name=kwargs['table_name'],
-                            scenario=kwargs['scenario'],
-                            algorithm=kwargs['algorithm'])
-        for field_name, data_type in fields.items():
-            layer.layer_fields.add(LayerField.objects.create(field_name=field_name, data_type=data_type))
+            for feature in features:
+                feature_collection.objects.create(**feature)
 
-        layer_model = self._create_layer_model(fields, kwargs['geom_type'], kwargs['table_name'])
-        self._create_layer_table(layer_model)
-
-        return layer
-
-    @staticmethod
-    def _is_identical_layer(layer, **kwargs):
-
-        fields = {}
-        for field in layer.layer_fields.all():
-            fields[field.field_name] = field.data_type
-
-        comparisons = [
-            layer.table_name == kwargs['table_name'],
-            layer.geom_type == kwargs['geom_type'],
-            layer.scenario == kwargs['scenario'],
-            layer.algorithm == kwargs['algorithm'],
-            fields == kwargs['fields']
-        ]
-        return all(comparisons)
+            return layer
 
     @staticmethod
-    def _create_layer_model(fields=None, geom_type=None, table_name=None):
+    def create_feature_collection(fields: dict, geom_type: str, table_name: str):
 
         if fields is None:
             fields = {}
@@ -133,7 +142,7 @@ class LayerManager(models.Manager):
         return model
 
     @staticmethod
-    def _create_layer_table(layer_model):
+    def create_table_from_model(model):
         """
         Creates a new table with all given fields from a model
         :return:
@@ -141,28 +150,28 @@ class LayerManager(models.Manager):
 
         # Check if any table of the name already exists
         with connection.cursor() as cursor:
-            cursor.execute(f"SELECT to_regclass('{layer_model._meta.db_table}')")
+            cursor.execute(f"SELECT to_regclass('{model._meta.db_table}')")
             if cursor.fetchone()[0]:
                 raise TableAlreadyExists
 
         # After cleanup, now create the new version of the result table
         with connection.schema_editor() as schema_editor:
-            schema_editor.create_model(layer_model)
+            schema_editor.create_model(model)
 
     @staticmethod
-    def _delete_layer_table(layer_model):
+    def delete_table_from_model(model):
         """
         Deletes a table from a given model
-        :param layer_model:
+        :param model:
         :return:
         """
         with connection.cursor() as cursor:
-            cursor.execute(f"SELECT to_regclass('{layer_model._meta.db_table}')")
+            cursor.execute(f"SELECT to_regclass('{model._meta.db_table}')")
             if cursor.fetchone()[0] is None:
                 return
 
         with connection.schema_editor() as schema_editor:
-            schema_editor.delete_model(layer_model)
+            schema_editor.delete_model(model)
 
 
 class Layer(models.Model):
@@ -184,7 +193,12 @@ class Layer(models.Model):
             models.UniqueConstraint(fields=['table_name'], name='unique table_name')
         ]
 
-    def get_layer_model(self):
+    def add_layer_fields_from_dict(self, fields: dict):
+        for field_name, data_type in fields.items():
+            field, created = LayerField.objects.get_or_create(field_name=field_name, data_type=data_type)
+            self.layer_fields.add(field)
+
+    def get_feature_collection(self):
         """
         Returns a model for the table that holds the GIS features of the result layer
         """
@@ -212,3 +226,28 @@ class Layer(models.Model):
         model = type(self.table_name, (models.Model,), attrs)
         model._meta.db_table = self.table_name
         return model
+
+    def is_defined_by(self, **kwargs):
+
+        fields = {}
+        for field in self.layer_fields.all():
+            fields[field.field_name] = field.data_type
+
+        comparisons = [
+            self.table_name == kwargs['table_name'],
+            self.geom_type == kwargs['geom_type'],
+            self.scenario == kwargs['scenario'],
+            self.algorithm == kwargs['algorithm'],
+            fields == kwargs['fields']
+        ]
+        return all(comparisons)
+
+
+class LayerAggregatedValue(models.Model):
+    """
+    Class to hold all aggregated results from a result layer
+    """
+
+    name = models.CharField(max_length=63)
+    value = models.FloatField()
+    layer = models.ForeignKey(Layer, on_delete=models.CASCADE)

@@ -68,55 +68,16 @@ class GisInventory(BaseScenario):
                 if func not in self.results:
                     self.results[func] = {}
                 self.results[func] = inventory_algorithm(**kwargs)
-        self._save_results_in_database()
 
-    def results_as_list(self):
-        result_list = []
-        for alg, res in self.results.items():
-            result_list.append({'algorithm': alg, 'result': res})
-        return result_list
-
-    def _save_results_in_database(self):
-        """
-        Goes through the inventory results to create a layer for each result and store them in the database.
-        :return: None
-        """
-        result_layers = []
-        for algorithm_function_name in self.config.keys():
-            if self.results[algorithm_function_name]['features']:
-                geom_type = type(self.results[algorithm_function_name]['features'][0]['geom'])
-                algorithm = InventoryAlgorithm.objects.get(function_name=algorithm_function_name)
-
-                features = self.results[algorithm_function_name]['features']
-                fields = {}
-                # The data types of the fields are detected from their content. Any column that has only null values
-                # will be omitted completely
-                fields_with_unknown_datatype = list(features[0].keys())
-                for feature in features:
-                    if not fields_with_unknown_datatype:
-                        break
-                    for key, value in feature.items():
-                        if feature[key] and key in fields_with_unknown_datatype:
-                            fields[key] = type(value).__name__
-                            fields_with_unknown_datatype.remove(key)
-
-                # At this point there might be fields left out because there were only null values from which the
-                # data type could be detected. They should be omitted but this information should be logged
-                # TODO: add omitted columns info to log
-
-                fields.pop('geom')
-
-                result_layer = Layer.objects.create_or_replace_layer(name=algorithm_function_name,
-                                                                     geom_type=geom_type,
-                                                                     scenario=self.scenario,
-                                                                     algorithm=algorithm,
-                                                                     fields=fields)
-
-                result_model = result_layer.get_layer_model()
-                for feature in self.results[algorithm_function_name]['features']:
-                    result_model.objects.create(**feature)
-
-        return result_layers
+        for function_name, results in self.results.items():
+            algorithm = InventoryAlgorithm.objects.get(function_name=function_name)
+            kwargs = {
+                'name': algorithm.function_name,
+                'scenario': self.scenario,
+                'algorithm': algorithm,
+                'results': results
+            }
+            Layer.objects.create_or_replace_layer(**kwargs)
 
     def set_gis_source_model(self, gis_source_model_name: str):
         """
