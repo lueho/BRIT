@@ -34,6 +34,9 @@ class LayerField(models.Model):
 class LayerManager(models.Manager):
     supported_geometry_types = ['Point', 'MultiPolygon']
 
+    def create(self, **kwargs):
+        self.create_or_replace(**kwargs)
+
     def create_or_replace(self, **kwargs):
 
         results = kwargs.pop('results')
@@ -66,7 +69,7 @@ class LayerManager(models.Manager):
                                    str(kwargs['scenario'].id) + '_algorithm_' + \
                                    str(kwargs['algorithm'].id)
 
-            layer, created = Layer.objects.get_or_create(table_name=kwargs['table_name'], defaults=kwargs)
+            layer, created = super().get_or_create(table_name=kwargs['table_name'], defaults=kwargs)
 
             if created:
                 layer.add_layer_fields(fields)
@@ -78,7 +81,7 @@ class LayerManager(models.Manager):
                     feature_collection.objects.all().delete()
                 else:
                     layer.delete()
-                    layer = self.create(**kwargs)
+                    layer = super().create(**kwargs)
                     layer.add_layer_fields(fields)
                     feature_collection = layer.update_or_create_feature_collection()
                     layer.create_feature_table()
@@ -91,7 +94,11 @@ class LayerManager(models.Manager):
 
 class Layer(models.Model):
     """
-    Registry of all created layers
+    Registry of all created layers. This main model holds all meta information about each layer. When a new layer record
+    is created, another custom model named "features collection" is automatically generated, preserving the original
+    shape of the gis source dataset as much as required. The feature collection can be used to manage the actual
+    features of the layer. It will create a separate database table with the name given in "table_name" to store the
+    features.
     """
 
     name = models.CharField(max_length=56)
@@ -114,6 +121,10 @@ class Layer(models.Model):
             self.layer_fields.add(field)
 
     def update_or_create_feature_collection(self):
+        """
+        Dynamically creates model connected to this layer instance that is used to handle its features and store them
+        in a separate custom database table.
+        """
 
         # Empty app registry from any previous version of this model
         model_name = self.table_name
@@ -136,6 +147,7 @@ class Layer(models.Model):
 
         # Create model class and assign table_name
         model = type(model_name, (models.Model,), attrs)
+        model._meta.layer = self
         model._meta.db_table = self.table_name
 
         return model
@@ -180,10 +192,10 @@ class Layer(models.Model):
 
     def get_feature_collection(self):
         """
-        Returns a model for the table that holds the GIS features of the result layer
+        Returns the feature collection model that is used to manage the features connected to this layer.
         """
 
-        # If the model is still registered, return original model
+        # If the model is already registered, return original model
         if self.table_name in apps.all_models['layer_manager']:
             return apps.all_models['layer_manager'][self.table_name]
         else:
