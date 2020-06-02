@@ -3,24 +3,7 @@ from django.contrib.gis.db.models import PointField, MultiPolygonField
 from django.db import models, connection
 
 from scenario_builder.models import Scenario, InventoryAlgorithm
-
-
-class ModelAlreadyRegistered(Exception):
-    """The model you are trying to create is already registered"""
-
-
-class TableAlreadyExists(Exception):
-    """The table you are trying to create already exists in the database"""
-
-
-class InvalidGeometryType(Exception):
-    def __init__(self, geometry_type: str):
-        f"""Invalid geometry type: \"{geometry_type}\"."""
-
-
-class NoFeaturesProvided(Exception):
-    def __init__(self, results):
-        f"""No features provided in results: \"{results}\"."""
+from .exceptions import InvalidGeometryType, NoFeaturesProvided, TableAlreadyExists
 
 
 class LayerField(models.Model):
