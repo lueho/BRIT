@@ -32,9 +32,15 @@ if getpass.getuser() == 'luess':
     GDAL_LIBRARY_PATH = os.path.join(os.path.dirname(os.path.dirname(sys.executable)), 'Lib', 'site-packages', 'osgeo',
                                      'gdal204.dll')
     host_address = '127.0.0.1'
+    user = 'postgres'
+    password = 'postgre'
 else:
-    GDAL_LIBRARY_PATH = 'C:/OSGeo4W64/bin/gdal204.dll'
+    # GDAL_LIBRARY_PATH = 'C:/OSGeo4W64/bin/gdal204.dll'
+    GDAL_LIBRARY_PATH = os.path.join(os.path.dirname(os.path.dirname(sys.executable)), 'Lib', 'site-packages', 'osgeo',
+                                     'gdal204.dll')
     host_address = '134.28.65.102'
+    user = 'flexibi_dst'
+    password = 'flexibi'
 
 # Application definition
 
@@ -96,8 +102,8 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.contrib.gis.db.backends.postgis',
         'NAME': 'flexibi_dst',
-        'USER': 'postgres',
-        'PASSWORD': 'postgre',
+        'USER': user,
+        'PASSWORD': password,
         'HOST': host_address,
         'PORT': '5432',
     }
