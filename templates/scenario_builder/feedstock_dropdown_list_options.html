@@ -1,0 +1,4 @@
+<option value="">---------</option>
+{% for feedstock in feedstocks %}
+    <option value="{{ feedstock.pk }}">{{ feedstock.name }}</option>
+{% endfor %}

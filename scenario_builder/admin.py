@@ -163,7 +163,7 @@ class GeoDatasetAdmin(ModelAdmin):
 
 @admin.register(Scenario)
 class ScenarioAdmin(ModelAdmin):
-    list_display = ('name', 'region_link', 'site_link', 'catchment_link', 'feedstock_list', 'description')
+    list_display = ('name', 'region_link', 'site_link', 'catchment_link', 'description')
 
     @staticmethod
     def region_link(obj):
@@ -179,15 +179,6 @@ class ScenarioAdmin(ModelAdmin):
     def catchment_link(obj):
         url = reverse('admin:scenario_builder_catchment_change', args=(obj.catchment.id,))
         return format_html("<a href='{}'>{}</a>", url, obj.catchment.name)
-
-    @staticmethod
-    def feedstock_list(obj):
-        feedstock_list = format_html_join(
-            '\n', "<li><a href='{}'>{}</a></li>",
-            ((reverse('admin:scenario_builder_material_change', args=(m.id,)), m.name) for m in
-             Material.objects.filter(scenario=obj))
-        )
-        return feedstock_list
 
 
 admin.site.register(MaterialComponent)

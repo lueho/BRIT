@@ -1,0 +1,4 @@
+<option value="">---------</option>
+{% for algorithm in algorithms %}
+    <option value="{{ algorithm.pk }}">{{ algorithm.name }}</option>
+{% endfor %}

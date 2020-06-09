@@ -8,7 +8,8 @@ from .models import (Catchment,
                      Material,
                      Region,
                      Scenario,
-                     ScenarioInventoryConfiguration, )
+                     ScenarioInventoryConfiguration,
+                     WrongParameterForInventoryAlgorithm)
 
 
 class MaterialTestCase(TestCase):
@@ -77,33 +78,53 @@ class InventoryAlgorithmParameterValueTestCase(TestCase):
 class ScenarioTestCase(TestCase):
     fixtures = ['regions.json', 'catchments.json', 'scenarios.json']
 
-    def setUp(self):
-        scenario = Scenario(
-            name='Test scenario',
-            region=Region.objects.get(name='Hamburg'),
-            catchment=Catchment.objects.get(name='Wandsbek'),
-            use_default_configuration=True
-        )
-        scenario.save()
-        scenario.feedstocks.add(Material.objects.get(name='Tree prunings (winter)'))
+    def test_add_inventory_algorithm(self):
+        scenario = Scenario.objects.get(name='Hamburg standard')
+        algorithm = InventoryAlgorithm.objects.get(name='Average point yield')
+
+        # run with defaults and non existing entries
+        old_config_entries = ScenarioInventoryConfiguration.objects.filter(scenario=scenario,
+                                                                           inventory_algorithm=algorithm)
+        values = InventoryAlgorithmParameterValue.objects.filter(parameter__inventory_algorithm=algorithm,
+                                                                 default=True)
+        values.delete()
+        scenario.add_inventory_algorithm(algorithm)
+        config_entries = ScenarioInventoryConfiguration.objects.filter(scenario=scenario,
+                                                                       inventory_algorithm=algorithm)
+        self.assertQuerysetEqual(old_config_entries, config_entries)
+
+        # run when overwriting existing entry
+        # new_values = [v for v in InventoryAlgorithmParameterValue.objects.filter(name='Educated guess')]
+        parameter = InventoryAlgorithmParameter.objects.filter(inventory_algorithm=algorithm)[0]
+        new_value = InventoryAlgorithmParameterValue.objects.create(name='test', parameter=parameter, value=10)
+        scenario.add_inventory_algorithm(algorithm, [new_value, ])
+        config_entries = ScenarioInventoryConfiguration.objects.filter(scenario=scenario,
+                                                                       inventory_algorithm=algorithm)
+        self.assertEqual(config_entries.count(), 1)
+        value = config_entries[0].inventory_value
+        self.assertEqual(new_value, value)
+
+        # run with wrong custom values
+
+        def wrong_parameter():
+            parameter = InventoryAlgorithmParameter.objects.get(short_name='area_yield')
+            value = InventoryAlgorithmParameterValue.objects.create(name='test', parameter=parameter, value=10)
+            scenario.add_inventory_algorithm(algorithm, [value, ])
+
+        self.assertRaises(WrongParameterForInventoryAlgorithm, wrong_parameter)
 
     def test_create(self):
-        scenario = Scenario.objects.get(name='Test scenario')
+        params = {
+            'name': 'test scenario',
+            'region': Region.objects.get(name='Hamburg'),
+            'catchment': Catchment.objects.get(name='Harburg')
+
+        }
+        scenario = Scenario.objects.create(**params)
         self.assertIsInstance(scenario, Scenario)
-        feedstocks = scenario.feedstocks.all()
-        self.assertEqual(len(feedstocks), 1)
-        self.assertEqual(feedstocks[0].name, 'Tree prunings (winter)')
-        algorithms = InventoryAlgorithm.objects.filter(feedstock=feedstocks[0],
-                                                       geodataset__region=scenario.region,
-                                                       default=True)
-        self.assertEqual(len(algorithms), 2)
-        self.assertEqual(algorithms[0].function_name, 'avg_point_yield')
-        parameters = InventoryAlgorithmParameter.objects.filter(inventory_algorithm=algorithms[0])
-        self.assertEqual(len(parameters), 1)
-        self.assertTrue(scenario.use_default_configuration)
 
     def test_create_default_configuration(self):
-        scenario = Scenario.objects.get(name='Test scenario')
+        scenario = Scenario.objects.get(name='Hamburg standard')
         scenario.create_default_configuration()  # TODO: Where can this be automated?
         config = ScenarioInventoryConfiguration.objects.filter(scenario=scenario)
         self.assertIsNotNone(config)

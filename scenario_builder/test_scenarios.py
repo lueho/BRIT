@@ -1,7 +1,7 @@
 from django.test import TestCase
 
-from gis_source_manager.models import HamburgRoadsideTrees, HamburgGreenAreas
-from .models import Catchment, Material, Region, Scenario
+from gis_source_manager.models import HamburgGreenAreas
+from .models import Catchment, Region, Scenario, InventoryAlgorithm
 from .scenarios import GisInventory
 
 
@@ -9,41 +9,14 @@ class GisInventoryTestCase(TestCase):
     fixtures = ['regions.json', 'catchments.json', 'scenarios.json', 'trees.json', 'parks.json']
 
     def setUp(self):
-        scenario = Scenario(
+        scenario = Scenario.objects.create(
             name='Test scenario',
             region=Region.objects.get(name='Hamburg'),
             catchment=Catchment.objects.get(name='Wandsbek'),
-            use_default_configuration=True
         )
-        scenario.save()
-        scenario.feedstocks.add(Material.objects.get(name='Tree prunings (winter)'))
-        scenario.create_default_configuration()
+        scenario.add_inventory_algorithm(InventoryAlgorithm.objects.get(function_name='avg_point_yield'))
+        scenario.add_inventory_algorithm(InventoryAlgorithm.objects.get(function_name='avg_area_yield'))
         self.inventory = GisInventory(scenario)
-
-    def test_load_inventory_config(self):
-        self.assertIsInstance(self.inventory, GisInventory)
-        self.assertIsInstance(self.inventory.scenario, Scenario)
-        self.assertEqual(self.inventory.scenario.name, 'Test scenario')
-        self.assertIsInstance(self.inventory.config, dict)
-        config = {
-            'avg_point_yield': {
-                'point_yield': {
-                    'value': 10.5,
-                    'standard_deviation': 0.5
-                }
-            },
-            'avg_area_yield': {
-                'area_yield': {
-                    'value': 0.1,
-                    'standard_deviation': 0.05
-                }
-            }
-        }
-        self.assertDictEqual(self.inventory.config, config)
-
-    def test_set_gis_source_model(self):
-        self.inventory.set_gis_source_model('HamburgRoadsideTrees')
-        self.assertIsInstance(self.inventory.gis_source_model(), HamburgRoadsideTrees)
 
     def test_avg_point_yield(self):
         self.assertEqual(self.inventory.catchment.name, 'Wandsbek')

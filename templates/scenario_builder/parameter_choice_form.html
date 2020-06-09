@@ -1,0 +1,15 @@
+<h3>Parameters for this algorithm:</h3>
+<table class="table-borderless pr-3">
+    <tr>
+        <th>Parameter name</th>
+        <th>Value</th>
+        <th>Source</th>
+    </tr>
+    {% for parameter, value in parameters.items %}
+        <tr>
+            <td class="pr-3">{{ parameter.descriptive_name }}</td>
+            <td class="pr-3">{{ value.value }}+-{{ value.standard_deviation }} {{ parameter.unit }}</td>
+            <td class="pr-3">({{ value.source }})</td>
+        </tr>
+    {% endfor %}
+</table>

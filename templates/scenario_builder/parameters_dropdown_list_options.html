@@ -1,0 +1,17 @@
+<h3>Parameters for this algorithm:</h3>
+{% for parameter, values in parameters.items %}
+    <div id="div_id_parameter_{{ parameter.pk }}" class="form-group">
+        <label class="requiredField" for="id_parameter_{{ parameter.pk }}">{{ parameter.descriptive_name }}</label>
+        <div class="">
+            <select id="id_parameter_{{ parameter.pk }}" class="select form-control"
+                    name="parameter_{{ parameter_id }}">
+                <option value="">---------</option>
+                {% for value in values %}
+                    <option value="{{ value.pk }}">{{ value.name }}: {{ value.value }}+-{{ value.standard_deviation }} {{ parameter.unit }}
+                        source: ({{ value.source }})
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+    </div>
+{% endfor %}

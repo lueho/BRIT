@@ -43,7 +43,9 @@ class LayerTestCase(TestCase):
 
         results = {
             'avg_area_yield': {
-                'total_yield': 1000,
+                'aggregated_values': {
+                    'total_yield': 1000
+                },
                 'features': []
             }
         }
@@ -87,7 +89,9 @@ class LayerTestCase(TestCase):
 
         results = {
             'avg_area_yield': {
-                'total_yield': 1000,
+                'aggregated_values': {
+                    'total_yield': 1000,
+                },
                 'features': []
             }
         }

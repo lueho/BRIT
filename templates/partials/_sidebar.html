@@ -1,9 +1,9 @@
 {% load static %}
 
-<ul class="navbar-nav bg-gradient-primary sidebar sidebar-dark accordion" id="accordionSidebar">
+<ul class="navbar-nav bg-gradient-primary sidebar sidebar-light accordion" id="accordionSidebar">
 
-      <!-- Sidebar - Brand -->
-      <a class="sidebar-brand d-flex align-items-center justify-content-center" href="index.html">
+    <!-- Sidebar - Brand -->
+    <a class="sidebar-brand d-flex align-items-center justify-content-center" href="index.html">
         <img src="{% static 'img/LOGO_Flexibi_Farbe.png' %}">
       </a>
 
@@ -25,25 +25,29 @@
         Utilities
       </div>
 
-      <!-- Nav Item - Pages Collapse Menu -->
-      <li class="nav-item">
-        <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseTwo" aria-expanded="true" aria-controls="collapseTwo">
-          <i class="fas fa-fw fa-cog"></i>
-          <span>Scenario Builder</span>
+    <!-- Nav Item - Pages Collapse Menu -->
+    <li class="nav-item">
+        <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseTwo" aria-expanded="true"
+           aria-controls="collapseTwo">
+            <i class="fas fa-fw fa-cog"></i>
+            <span>Scenario Builder</span>
         </a>
         <div id="collapseTwo" class="collapse" aria-labelledby="headingTwo" data-parent="#accordionSidebar">
-          <div class="bg-white py-2 collapse-inner rounded">
-            <h6 class="collapse-header">Scenario components:</h6>
-            <a class="collapse-item" href="{% url 'catchment_definition' %}">Catchment definition</a>
-            <a class="collapse-item" href="{% url 'feedstock_definition' %}">Feedstock definition</a>
-          </div>
+            <div class="bg-white py-2 collapse-inner rounded">
+                <h6 class="collapse-header">Scenario components:</h6>
+                <a class="collapse-item" href="{% url 'scenario_list' %}">Browse scenarios</a>
+                <a class="collapse-item" href="{% url 'create_scenario' %}">Create a new scenario</a>
+                <a class="collapse-item" href="{% url 'catchment_definition' %}">Catchment definition</a>
+                <a class="collapse-item" href="{% url 'feedstock_definition' %}">Feedstock definition</a>
+            </div>
         </div>
-      </li>
+    </li>
 
-      <!-- Nav Item - Utilities Collapse Menu -->
-      <li class="nav-item">
-        <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseUtilities" aria-expanded="true" aria-controls="collapseUtilities">
-          <i class="fas fa-globe-europe"></i>
+    <!-- Nav Item - Utilities Collapse Menu -->
+    <li class="nav-item">
+        <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseUtilities"
+           aria-expanded="true" aria-controls="collapseUtilities">
+            <i class="fas fa-globe-europe"></i>
           <span>Utilities</span>
         </a>
         <div id="collapseUtilities" class="collapse" aria-labelledby="headingUtilities" data-parent="#accordionSidebar">

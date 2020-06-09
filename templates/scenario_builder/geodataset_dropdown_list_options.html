@@ -1,0 +1,4 @@
+<option value="">---------</option>
+{% for geodataset in geodatasets %}
+    <option value="{{ geodataset.pk }}">{{ geodataset.name }}</option>
+{% endfor %}

@@ -1,6 +1,7 @@
+import django.contrib.gis.db.models as gis_models
 from django.apps import apps
-from django.contrib.gis.db.models import PointField, MultiPolygonField
 from django.db import models, connection
+from django.urls import reverse
 
 from scenario_builder.models import Scenario, InventoryAlgorithm
 from .exceptions import InvalidGeometryType, NoFeaturesProvided, TableAlreadyExists
@@ -32,16 +33,13 @@ class LayerField(models.Model):
 
 
 class LayerManager(models.Manager):
-    supported_geometry_types = ['Point', 'MultiPolygon']
-
-    def create(self, **kwargs):
-        self.create_or_replace(**kwargs)
+    supported_geometry_types = ['Point', 'MultiPoint', 'LineString', 'MultiLineString', 'Polygon', 'MultiPolygon', ]
 
     def create_or_replace(self, **kwargs):
 
         results = kwargs.pop('results')
 
-        if not results['features']:
+        if 'features' not in results:
             raise NoFeaturesProvided(results)
         else:
             features = results['features']
@@ -89,7 +87,9 @@ class LayerManager(models.Manager):
             for feature in features:
                 feature_collection.objects.create(**feature)
 
-            return layer, feature_collection
+        layer.add_aggregated_values(results['aggregated_values'])
+
+        return layer, feature_collection
 
 
 class Layer(models.Model):
@@ -115,6 +115,10 @@ class Layer(models.Model):
             models.UniqueConstraint(fields=['table_name'], name='unique table_name')
         ]
 
+    def add_aggregated_values(self, aggregates: dict):
+        for name, value in aggregates.items():
+            LayerAggregatedValue.objects.create(name=name, value=value, layer=self)
+
     def add_layer_fields(self, fields: dict):
         for field_name, data_type in fields.items():
             field, created = LayerField.objects.get_or_create(field_name=field_name, data_type=data_type)
@@ -132,14 +136,9 @@ class Layer(models.Model):
             del apps.all_models['layer_manager'][model_name]
 
         attrs = {
-            '__module__': 'layer_manager.models'
+            '__module__': 'layer_manager.models',
+            'geom': getattr(gis_models, self.geom_type + 'Field')(srid=4326)
         }
-
-        # Add correct geometry column to model
-        if self.geom_type == 'Point':
-            attrs['geom'] = PointField(srid=4326)
-        elif self.geom_type == 'MultiPolygon':
-            attrs['geom'] = MultiPolygonField(srid=4326)
 
         # Add all custom columns to model
         for field in self.layer_fields.all():
@@ -169,6 +168,9 @@ class Layer(models.Model):
         # After cleanup, now create the new version of the result table
         with connection.schema_editor() as schema_editor:
             schema_editor.create_model(feature_collection)
+
+    def feature_table_url(self):
+        return reverse('scenario_result_map', kwargs={'pk': self.scenario.id, 'algo_pk': self.algorithm.id})
 
     def delete(self, **kwargs):
         self.delete_feature_table()
@@ -203,9 +205,7 @@ class Layer(models.Model):
 
     def is_defined_by(self, **kwargs):
 
-        fields = {}
-        for field in self.layer_fields.all():
-            fields[field.field_name] = field.data_type
+        fields = {field.field_name: field.data_type for field in self.layer_fields.all()}
 
         comparisons = [
             self.table_name == kwargs['table_name'],

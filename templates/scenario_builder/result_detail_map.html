@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    {% load leaflet_tags %}
+
+    {% leaflet_js %}
+    {% leaflet_css %}
+
+    <div class="col">
+        {% leaflet_map "main" %}
+    </div>
+
+{% endblock content %}
+
+{% block javascript %}
+    {{ block.super }}
+
+    <script type="text/javascript">
+
+        let map;
+        let pointLayer;
+
+        const resultRenderer = L.canvas({padding: 0.5});
+
+        window.addEventListener("map:init", function (event) {
+            map = event.detail.map;
+        });
+
+        async function queryDatasets() {
+
+            const dataurl = "{% url 'data.result_layer' layer.table_name %}";
+            console.log(dataurl)
+
+            // Fetch data from REST API
+            let response = await fetch(dataurl);
+            let data = await response.json();
+
+            // Render geodata on map
+            let geodata = data['geoJson']
+            pointLayer = L.geoJson(geodata, {
+                pointToLayer: function (feature, latlng) {
+                    return L.circleMarker(latlng, {
+                        renderer: resultRenderer,
+                        color: '#63c36c',
+                        fillOpacity: 1,
+                        radius: 5,
+                        stroke: false
+                    })
+                },
+                onEachFeature: function onEachFeature(feature, layer) {
+                }
+            }).addTo(map);
+
+        }
+
+        queryDatasets()
+
+    </script>
+{% endblock %}

@@ -68,7 +68,6 @@ window.addEventListener("map:init", function (event) {
         })
 });
 
-;
   
 async function queryDatasets(){
     
@@ -82,17 +81,17 @@ async function queryDatasets(){
         
     var dataurl = "{% url 'data.hamburg_roadside_trees' %}" + L.Util.getParamString(params);
     console.log(dataurl)
-    
+
     // Remove existing layer
     if (treeLayer != undefined) {
-      map.removeLayer(treeLayer);
-    };
-    
+        map.removeLayer(treeLayer);
+    }
+
     // Fetch data from REST API
     let response = await fetch(dataurl);
     let data = await response.json();
     console.log(data);
-    
+
     // Render geodata on map
     geodata = data['geoJson']
     treeLayer = L.geoJson(geodata, {

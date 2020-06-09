@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <h2>Scenario basics:</h2>
+    <div class="row">
+        <div class="col col-6">
+            <table class="table shadow">
+                <tr>
+                    <td class="col-3"><b>Name:</b></td>
+                    <td>{{ object.name }}</td>
+                <tr>
+                    <td class="col-3"><b>Description:</b></td>
+                    <td>{{ object.description }}</td>
+                <tr>
+                    <td class="col-3"><b>Case study region:</b></td>
+                    <td>
+                        <a href="{% url 'admin:scenario_builder_region_change' object.region.id %}">{{ object.region }}</a>
+                    </td>
+                <tr>
+                    <td class="col-3"><b>Catchment:</b></td>
+                    <td>
+                        <a href="{% url 'admin:scenario_builder_catchment_change' object.catchment.id %}">{{ object.catchment }}</a>
+                    </td>
+            </table>
+        </div>
+    </div>
+    <table>
+        {% for name, fc in feature_collections.items %}
+            <tr>
+                <td>{{ name }}</td>
+            </tr>
+        {% endfor %}
+    </table>
+{% endblock content %}

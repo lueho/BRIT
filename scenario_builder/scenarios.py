@@ -1,4 +1,3 @@
-from django.apps import apps
 from django.contrib.gis.geos import GEOSGeometry
 from django.db import connection
 from django.db.models import QuerySet
@@ -6,8 +5,7 @@ from django.db.models import QuerySet
 import gis_source_manager.models as gis_models
 from gis_source_manager.models import HamburgGreenAreas
 from layer_manager.models import Layer
-from scenario_builder.models import (InventoryAlgorithm,
-                                     ScenarioInventoryConfiguration)
+from scenario_builder.models import InventoryAlgorithm
 from .models import Catchment, Region, Scenario
 
 
@@ -27,48 +25,27 @@ class EmptyQueryset(Exception):
 
 
 class GisInventory(BaseScenario):
-    gis_source_model = None
     config: dict = None
     results: dict = None
 
     def __init__(self, *args, **kwargs):
         super(GisInventory, self).__init__(*args, **kwargs)
-        self._load_inventory_config()
-
-    def _load_inventory_config(self):
-        """
-        Fetches all configuration entries that are associated with this scenario and assembles a dictionary holding
-        all configuration information for the inventory.
-        :return: None
-        """
-        config_queryset = ScenarioInventoryConfiguration.objects.filter(scenario=self.scenario)
-
-        inventory_config = {}
-        for entry in config_queryset:
-            function = entry.inventory_algorithm.function_name
-            parameter = entry.inventory_parameter.short_name
-            value = entry.inventory_value.value
-            standard_deviation = entry.inventory_value.standard_deviation
-
-            if function not in inventory_config.keys():
-                inventory_config[function] = {}
-            if parameter not in inventory_config[function]:
-                inventory_config[function][parameter] = {'value': value, 'standard_deviation': standard_deviation}
-
-        self.config = inventory_config
-
-    def _get_inventory_algorithm(self, function_name: str):
-        return getattr(self, function_name)
+        self.config = self.scenario.configuration_as_dict()
 
     def run(self):
-        self.results = {}
-        if self.config:
-            for func, kwargs in self.config.items():
-                inventory_algorithm = self._get_inventory_algorithm(func)
-                if func not in self.results:
-                    self.results[func] = {}
-                self.results[func] = inventory_algorithm(**kwargs)
+        """
+        Runs all algorithms that have been set up in self.config and creates layers in the database. Returns the
+        instance of Layer and a feature_collection model that is dynamically generated in case the results contain
+        geometric features. The feature_collection can be used to manage the features themselves, which are stored
+        in an autimatically created separated table in the database.
+        """
 
+        # run the algorithms
+        if self.config:
+            self.results = {func_name: getattr(self, func_name)(**kwargs) for func_name, kwargs in self.config.items()}
+
+        # create layers and store results in database
+        created_layers = {}
         for function_name, results in self.results.items():
             algorithm = InventoryAlgorithm.objects.get(function_name=function_name)
             kwargs = {
@@ -77,16 +54,9 @@ class GisInventory(BaseScenario):
                 'algorithm': algorithm,
                 'results': results
             }
-            Layer.objects.create_or_replace(**kwargs)
-
-    def set_gis_source_model(self, gis_source_model_name: str):
-        """
-        Fetches the model class for a given model class function_name. The model must be registered in
-        gis_source_manager.models.CATALOGUE.
-        :param gis_source_model_name: str
-        :return: class
-        """
-        self.gis_source_model = apps.all_models['gis_source_manager'][gis_source_model_name.lower()]
+            layer, feature_collection = Layer.objects.create_or_replace(**kwargs)
+            created_layers[layer] = feature_collection
+        return created_layers
 
     def avg_point_yield(self, point_yield: dict = None):
         """
@@ -102,8 +72,10 @@ class GisInventory(BaseScenario):
         # If result is a gis layer, it must have a list of features under key ['features']. Each feature must have
         # an entry for the key 'geom'
         result = {
-            'trees_count': trees_count,
-            'total_yield': prunings_yield,
+            'aggregated_values': {
+                'trees_count': trees_count,
+                'total_yield': prunings_yield,
+            },
             'features': []
         }
         for tree in trees_in_catchment:
@@ -125,13 +97,15 @@ class GisInventory(BaseScenario):
         keep_columns = ['anlagenname', 'belegenheit', 'gruenart', 'nutzcode']
         clipped_polygons = self.clip_polygons(input_qs, mask_qs, keep_columns=keep_columns)
         result = {
-            'total_area': 0,
-            'total_yield_average': 0,
+            'aggregated_values': {
+                'total_area': 0,
+                'total_yield_average': 0
+            },
             'features': []
         }
         for polygon in clipped_polygons:
-            result['total_area'] += polygon['area']
-            result['total_yield_average'] += polygon['area'] * area_yield['value']
+            result['aggregated_values']['total_area'] += polygon['area']
+            result['aggregated_values']['total_yield_average'] += polygon['area'] * area_yield['value']
             result['features'].append({
                 'geom': polygon['geom'],
                 'area': polygon['area'],
@@ -164,9 +138,9 @@ class GisInventory(BaseScenario):
             columns_str = ''
 
         input_table_name = input_qs.model._meta.db_table
-        input_ids = '(' + ', '.join(str(id) for id in input_qs.values_list('id', flat=True)) + ')'
+        input_ids = '(' + ', '.join(str(id_) for id_ in input_qs.values_list('id', flat=True)) + ')'
         mask_table_name = mask_qs.model._meta.db_table
-        mask_ids = '(' + ', '.join(str(id) for id in mask_qs.values_list('id', flat=True)) + ')'
+        mask_ids = '(' + ', '.join(str(id_) for id_ in mask_qs.values_list('id', flat=True)) + ')'
 
         # Query based on: https://postgis.net/docs/ST_Intersection.html
         query = f"""-- noinspection SqlResolve
