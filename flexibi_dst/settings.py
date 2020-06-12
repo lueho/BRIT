@@ -59,7 +59,7 @@ INSTALLED_APPS = [
     'bioresource_explorer.apps.BioresourceExplorerConfig',
     'flexibi_dst',
     'scenario_builder',
-    'scenario_evaluation',
+    'scenario_evaluator',
     'gis_source_manager',
     'layer_manager',
     'crispy_forms',

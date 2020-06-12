@@ -30,20 +30,20 @@ class Migration(migrations.Migration):
             fields=[
                 ('scenarioresult_ptr',
                  models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True,
-                                      primary_key=True, serialize=False, to='scenario_evaluation.ScenarioResult')),
+                                      primary_key=True, serialize=False, to='scenario_evaluator.ScenarioResult')),
                 ('name', models.CharField(max_length=56)),
                 ('value', models.FloatField()),
                 ('standard_deviation', models.FloatField(null=True)),
                 ('unit', models.CharField(max_length=56, null=True)),
             ],
-            bases=('scenario_evaluation.scenarioresult',),
+            bases=('scenario_evaluator.scenarioresult',),
         ),
         migrations.CreateModel(
             name='ScenarioResultLayer',
             fields=[
                 ('scenarioresult_ptr',
                  models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True,
-                                      primary_key=True, serialize=False, to='scenario_evaluation.ScenarioResult')),
+                                      primary_key=True, serialize=False, to='scenario_evaluator.ScenarioResult')),
                 ('name', models.CharField(max_length=200)),
                 ('base_class', models.CharField(max_length=200)),
                 ('table_name', models.CharField(max_length=200, null=True, validators=[
@@ -51,6 +51,6 @@ class Migration(migrations.Migration):
                                                           message='Invalid parameter function_name. Do not use space or                                                                special characters.',
                                                           regex='^\\w{1,28}$')])),
             ],
-            bases=('scenario_evaluation.scenarioresult',),
+            bases=('scenario_evaluator.scenarioresult',),
         ),
     ]

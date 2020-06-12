@@ -3,8 +3,8 @@
     <div id="div_id_parameter_{{ parameter.pk }}" class="form-group">
         <label class="requiredField" for="id_parameter_{{ parameter.pk }}">{{ parameter.descriptive_name }}</label>
         <div class="">
-            <select id="id_parameter_{{ parameter.pk }}" class="select form-control"
-                    name="parameter_{{ parameter_id }}">
+            <select id="id_parameter_{{ parameter.id }}" class="select form-control"
+                    name="parameter_{{ parameter.id }}">
                 <option value="">---------</option>
                 {% for value in values %}
                     <option value="{{ value.pk }}">{{ value.name }}: {{ value.value }}+-{{ value.standard_deviation }} {{ parameter.unit }}

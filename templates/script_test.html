@@ -1,0 +1,42 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <h1>Nur für Skripte</h1>
+    <form id="test_form" method="post">
+        <label for="geodatasets">Geodatasets</label>
+        <select id="geodatasets" name="geodata">
+            {#            Here the options will appear#}
+        </select>
+
+    </form>
+    <button onclick="setGeoDatasetOptions()">Push the button</button>
+{% endblock content %}
+
+{% block javascript %}
+    {{ block.super }}
+
+    <script type="text/javascript">
+
+        form = document.getElementById("test_form")
+
+        function setGeoDatasetOptions() {
+            loadGeodatasets()
+                .then(data => document.getElementById("geodatasets").innerHTML = data)
+                .catch((err) => console.log(err))
+        }
+
+        async function loadGeodatasets() {
+
+            const url = "{% url 'ajax_load_geodatasets' %}";
+            let args = new URLSearchParams({
+                scenario: "4",
+                feedstock: "2",
+                options: "create"
+            });
+
+            let response = await fetch(url + "?" + args);
+            return await response.text();
+        }
+
+    </script>
+{% endblock javascript %}

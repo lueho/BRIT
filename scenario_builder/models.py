@@ -2,6 +2,7 @@ from django.contrib.auth.models import User
 from django.contrib.gis.db.models import MultiPolygonField, PointField
 from django.core.validators import RegexValidator
 from django.db import models, transaction
+from django.db.models.query import QuerySet
 from django.urls import reverse
 
 TYPES = (
@@ -36,6 +37,12 @@ class Catchment(models.Model):
         return self.name
 
 
+class MaterialManager(models.Manager):
+
+    def feedstocks(self):
+        return self.filter(is_feedstock=True)
+
+
 class Material(models.Model):
     name = models.CharField(max_length=28)
     description = models.TextField(blank=True, null=True)
@@ -44,6 +51,8 @@ class Material(models.Model):
                                     validators=[RegexValidator(regex=r'^[0-9]{5}?',
                                                                message='STAN id must have 5 digits.s',
                                                                code='invalid_stan_id')])
+
+    objects = MaterialManager()
 
     def __str__(self):
         return self.name
@@ -199,27 +208,96 @@ class Scenario(models.Model):
     objects = ScenarioManager()
 
     def available_feedstocks(self):
-        return [alg.feedstock for alg in self.available_inventory_algorithms().distinct('feedstock')]
+        return Material.objects.filter(id__in=self.available_inventory_algorithms().values('feedstock'))
 
     def included_feedstocks(self):
-        return [config_entry.feedstock for config_entry in
-                ScenarioInventoryConfiguration.objects.distinct('feedstock').filter(scenario=self)]
+        return Material.objects.filter(
+            id__in=ScenarioInventoryConfiguration.objects.filter(scenario=self).values('feedstock'))
 
     def add_feedstock(self, feedstock: Material):
         # not needed anymore. Each feedstock is added automatically with an associated inventory_algorithm.
         # No feedstocks should be added witout inventory_algorihtm
         pass
 
-    def available_inventory_algorithms(self):
-        return InventoryAlgorithm.objects.filter(geodataset__region=self.region)
+    def remaining_feedstock_options(self):
+        pass
+
+    def available_geodatasets(self, feedstock: Material = None, feedstocks: QuerySet = None):
+        """
+        Returns a queryset of geodatasets that can be used in this scenario. By providing either a Material object or
+        a queryset of Materials as keyword argument feedstock/feedstocks respectively, the query is reduced to
+        geodatasets which have algorithms for these given feedstocks.
+        """
+        if feedstocks is None and feedstock is None:
+            feedstocks = Material.objects.feedstocks()
+        elif feedstocks is None and feedstock is not None:
+            feedstocks = Material.objects.filter(id=feedstock.id)
+
+        return GeoDataset.objects.filter(
+            id__in=InventoryAlgorithm.objects.filter(
+                feedstock__in=feedstocks, geodataset__region=self.region).values('geodataset'))
+
+    def evaluated_geodatasets(self, feedstock: Material = None, feedstocks: QuerySet = None):
+        if feedstocks is None and feedstock is None:
+            feedstocks = Material.objects.feedstocks()
+        elif feedstocks is None and feedstock is not None:
+            feedstocks = Material.objects.filter(id=feedstock.id)
+        return GeoDataset.objects.filter(
+            id__in=ScenarioInventoryConfiguration.objects.filter(
+                scenario=self, feedstock__in=feedstocks).values('geodataset'))
+
+    def remaining_geodataset_options(self, feedstock: Material = None, feedstocks: QuerySet = None):
+        if feedstocks is None and feedstock is None:
+            feedstocks = Material.objects.feedstocks()
+        elif feedstocks is None and feedstock is not None:
+            feedstocks = Material.objects.filter(id=feedstock.id)
+        return self.available_geodatasets(
+            feedstocks=feedstocks).difference(self.evaluated_geodatasets(feedstocks=feedstocks))
+
+    def available_inventory_algorithms(self,
+                                       feedstock: Material = None,
+                                       feedstocks: QuerySet = None,
+                                       geodataset: GeoDataset = None,
+                                       geodatasets: QuerySet = None):
+
+        if feedstocks is None and feedstock is None:
+            feedstocks = Material.objects.feedstocks()
+        elif feedstocks is None and feedstock is not None:
+            feedstocks = Material.objects.filter(id=feedstock.id)
+
+        if geodatasets is None and geodataset is None:
+            geodatasets = GeoDataset.objects.all()
+        elif geodatasets is None and geodataset is not None:
+            geodatasets = GeoDataset.objects.filter(id=geodataset.id)
+
+        geodatasets = geodatasets.filter(region=self.region)
+
+        return InventoryAlgorithm.objects.filter(feedstock__in=feedstocks, geodataset__in=geodatasets)
+
+    def evaluated_inventory_algorithms(self):
+        return InventoryAlgorithm.objects.filter(
+            id__in=ScenarioInventoryConfiguration.objects.filter(scenario=self).values('inventory_algorithm'))
+
+    def remaining_inventory_algorithm_options(self, feedstock, geodataset):
+
+        if ScenarioInventoryConfiguration.objects.filter(scenario=self, feedstock=feedstock, geodataset=geodataset):
+            return InventoryAlgorithm.objects.none()
+        else:
+            return InventoryAlgorithm.objects.filter(feedstock=feedstock, geodataset=geodataset)
 
     def default_inventory_algorithms(self):
         return InventoryAlgorithm.objects.filter(geodataset__region=self.region,
                                                  default=True)
 
-    def included_inventory_algorithms(self):
-        return [config_entry.inventory_algorithm for config_entry in
-                ScenarioInventoryConfiguration.objects.distinct('inventory_algorithm').filter(scenario=self)]
+    def inventory_algorithm_config(self, algorithm):
+        return {
+            'scenario': self,
+            'feedstock': algorithm.feedstock,
+            'geodataset': algorithm.geodataset,
+            'inventory_algorithm': algorithm,
+            'parameters': [{conf.inventory_parameter.id: conf.inventory_value.id} for conf in
+                           ScenarioInventoryConfiguration.objects.filter(scenario=self, inventory_algorithm=algorithm)]
+        }
 
     def add_inventory_algorithm(self, algorithm: InventoryAlgorithm, custom_parameter_values=None):
         """
@@ -365,7 +443,7 @@ class Scenario(models.Model):
         return [layer.get_feature_collection() for layer in self.layer_set()]
 
     def get_absolute_url(self):
-        return reverse('scenario_configuration', kwargs={'pk': self.pk})
+        return reverse('scenario_detail', kwargs={'pk': self.pk})
 
     def __str__(self):
         return self.name
@@ -393,4 +471,4 @@ class ScenarioInventoryConfiguration(models.Model):
                 .update(inventory_value=self.inventory_value)
 
     def get_absolute_url(self):
-        return reverse('scenario_configuration', kwargs={'pk': self.scenario.pk})
+        return reverse('scenario_detail', kwargs={'pk': self.scenario.pk})

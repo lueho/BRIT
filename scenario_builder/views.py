@@ -1,4 +1,4 @@
-from django.http import JsonResponse
+from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect
 from django.urls import reverse, reverse_lazy
 from django.views.generic import TemplateView, CreateView, DeleteView, DetailView, ListView, View, UpdateView
@@ -9,7 +9,8 @@ from rest_framework.views import APIView
 
 from layer_manager.models import Layer
 from scenario_builder.scenarios import GisInventory
-from .forms import CatchmentForm, ScenarioModelForm, ScenarioInventoryConfigurationForm
+from .forms import (CatchmentForm, ScenarioModelForm, ScenarioInventoryConfigurationAddForm,
+                    ScenarioInventoryConfigurationUpdateForm)
 from .models import Catchment, Scenario, ScenarioInventoryConfiguration, Material, GeoDataset, InventoryAlgorithm, \
     InventoryAlgorithmParameter, InventoryAlgorithmParameterValue
 from .serializers import CatchmentSerializer, BaseResultMapSerializer
@@ -51,22 +52,6 @@ class InventoryMixin(SingleObjectMixin):
         return inventory_config_list
 
 
-class ScenarioDetailView(InventoryMixin, DetailView):
-    """
-    View to display the details of the setup of an inventory inside a scenario.
-    """
-
-    model = Scenario
-
-    def get(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        self.config = self.object.configuration_as_dict()
-        self.inventory_config_list = self.reformat_inventory_config(self.inventory_config)
-        context = self.get_context_data(object=self.object)
-        context['config'] = self.inventory_config_list
-        return self.render_to_response(context)
-
-
 class ScenarioListView(ListView):
     model = Scenario
 
@@ -82,7 +67,7 @@ class ScenarioUpdateView(UpdateView):
     form_class = ScenarioModelForm
 
     def get_success_url(self):
-        return reverse('scenario_configuration', kwargs={'pk': self.object.id})
+        return reverse('scenario_detail', kwargs={'pk': self.object.id})
 
 
 class ScenarioDeleteView(DeleteView):
@@ -93,15 +78,15 @@ class ScenarioDeleteView(DeleteView):
         return Scenario.objects.get(id=scenario_id)
 
     def get_success_url(self):
-        return reverse_lazy('scenario-list')
+        return reverse_lazy('scenario_list')
 
 
-class ScenarioConfigurationView(InventoryMixin, DetailView):
+class ScenarioDetailView(InventoryMixin, DetailView):
     """Summary of the Scenario with complete configuration. Page for final review, which also contains the
     'run' button."""
 
     model = Scenario
-    template_name = 'scenario_builder/scenario_configuration_summary.html'
+    template_name = 'scenario_builder/scenario_detail.html'
 
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()
@@ -119,10 +104,12 @@ class ScenarioConfigurationView(InventoryMixin, DetailView):
 
 class ScenarioAddInventoryAlgorithmView(TemplateResponseMixin, ModelFormMixin, View):
     model = ScenarioInventoryConfiguration
-    form_class = ScenarioInventoryConfigurationForm
-    template_name = 'scenario_builder/scenarioinventoryconfiguration_form.html'
+    form_class = ScenarioInventoryConfigurationAddForm
+    template_name = 'scenario_builder/scenario_configuration_add.html'
+    object = None
 
-    def post(self, request, *args, **kwargs):
+    @staticmethod
+    def post(request, *args, **kwargs):
         scenario_id = request.POST.get('scenario')
         scenario = Scenario.objects.get(id=scenario_id)
         algorithm_id = request.POST.get('inventory_algorithm')
@@ -130,13 +117,21 @@ class ScenarioAddInventoryAlgorithmView(TemplateResponseMixin, ModelFormMixin, V
         parameters = InventoryAlgorithmParameter.objects.filter(inventory_algorithm=algorithm)
         values = []
         for parameter in parameters:
-            if 'parameter_' + str(parameter.pk) in request.POST:
-                values.append(request.POST.get('parameter_' + str(parameter.pk)))
+            parameter_id = 'parameter_' + str(parameter.pk)
+            if parameter_id in request.POST:
+                value_id = request.POST.get(parameter_id)
+                values.append(InventoryAlgorithmParameterValue.objects.get(id=value_id))
         scenario.add_inventory_algorithm(algorithm, values)
-        return redirect('scenario_configuration', pk=scenario_id)
+        return redirect('scenario_detail', pk=scenario_id)
 
     def get_object(self, **kwargs):
         return Scenario.objects.get(pk=self.kwargs.get('pk'))
+
+    def get_initial(self):
+        return {
+            'feedstocks': self.object.available_feedstocks(),
+            'scenario': self.object
+        }
 
     def get_context_data(self, **kwargs):
         context = {'scenario': self.object,
@@ -149,82 +144,101 @@ class ScenarioAddInventoryAlgorithmView(TemplateResponseMixin, ModelFormMixin, V
         return self.render_to_response(context)
 
 
-def remove_algorithm_from_scenario(request, scenario_pk, algo_pk):
+class ScenarioAlgorithmConfigurationUpdateView(TemplateResponseMixin, ModelFormMixin, View):
+    model = ScenarioInventoryConfiguration
+    form_class = ScenarioInventoryConfigurationUpdateForm
+    template_name = 'scenario_builder/scenario_configuration_update.html'
+    object = None
+
+    @staticmethod
+    def post(request, *args, **kwargs):
+        scenario = Scenario.objects.get(id=request.POST.get('scenario'))
+        current_algorithm = InventoryAlgorithm.objects.get(id=request.POST.get('current_algorithm'))
+        scenario.remove_inventory_algorithm(current_algorithm)
+        new_algorithm = InventoryAlgorithm.objects.get(id=request.POST.get('inventory_algorithm'))
+        parameters = InventoryAlgorithmParameter.objects.filter(inventory_algorithm=new_algorithm)
+        values = []
+        for parameter in parameters:
+            parameter_id = 'parameter_' + str(parameter.pk)
+            if parameter_id in request.POST:
+                value_id = request.POST.get(parameter_id)
+                value = InventoryAlgorithmParameterValue.objects.get(id=value_id)
+                values.append(value)
+        scenario.add_inventory_algorithm(new_algorithm, values)
+        return redirect('scenario_detail', pk=request.POST.get('scenario'))
+
+    def get_object(self, **kwargs):
+        return Scenario.objects.get(pk=self.kwargs.get('scenario_pk'))
+
+    def get_initial(self):
+        scenario = Scenario.objects.get(id=self.kwargs.get('scenario_pk'))
+        algorithm = InventoryAlgorithm.objects.get(id=self.kwargs.get('algorithm_pk'))
+        config = scenario.inventory_algorithm_config(algorithm)
+        return config
+
+    def get_context_data(self, **kwargs):
+        context = self.get_initial()
+        context['form'] = self.get_form()
+        return super().get_context_data(**context)
+
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        context = self.get_context_data(object=self.object)
+        return self.render_to_response(context)
+
+
+def remove_algorithm_from_scenario(request, scenario_pk, algorithm_pk):
     scenario = Scenario.objects.get(id=scenario_pk)
-    algorithm = InventoryAlgorithm.objects.get(id=algo_pk)
+    algorithm = InventoryAlgorithm.objects.get(id=algorithm_pk)
     scenario.remove_inventory_algorithm(algorithm)
-    return redirect('scenario_configuration', pk=scenario_pk)
-
-
-def load_feedstock_options(request):
-    scenario_id = request.GET.get('scenario')
-    scenario = Scenario.objects.get(id=scenario_id)
-    feedstocks = scenario.available_feedstocks()
-    return render(request, 'scenario_builder/feedstock_dropdown_list_options.html', {'feedstocks': feedstocks})
+    return redirect('scenario_detail', pk=scenario_pk)
 
 
 def load_geodataset_options(request):
-    scenario_id = request.GET.get('scenario')
-    scenario = Scenario.objects.get(id=scenario_id)
-    region = scenario.region
-    feedstock_id = request.GET.get('feedstock')
-    feedstock = Material.objects.get(id=feedstock_id)
-    algorithms = InventoryAlgorithm.objects.filter(feedstock=feedstock)
-    geodatasets = GeoDataset.objects.filter(region=region, id__in=algorithms.values('geodataset_id'))
+    scenario = Scenario.objects.get(id=request.GET.get('scenario'))
+    if request.GET.get('feedstock'):
+        feedstock = Material.objects.get(id=request.GET.get('feedstock'))
+        if request.GET.get('options') == 'create':
+            geodatasets = scenario.remaining_geodataset_options(feedstock=feedstock)
+        elif request.GET.get('options') == 'update':
+            current = GeoDataset.objects.filter(id=request.GET.get('current_geodataset'))
+            geodatasets = scenario.remaining_geodataset_options(feedstock=feedstock).union(current)
+        else:
+            geodatasets = scenario.available_geodatasets()
+    else:
+        geodatasets = GeoDataset.objects.none()
     return render(request, 'scenario_builder/geodataset_dropdown_list_options.html', {'geodatasets': geodatasets})
 
 
 def load_algorithm_options(request):
-    geodataset_id = request.GET.get('geodataset')
-    geodataset = GeoDataset.objects.get(id=geodataset_id)
-    algorithms = geodataset.inventoryalgorithm_set.all()
+    scenario = Scenario.objects.get(id=request.GET.get('scenario'))
+    if request.GET.get('feedstock') and request.GET.get('geodataset'):
+        feedstock = Material.objects.get(id=request.GET.get('feedstock'))
+        geodataset = GeoDataset.objects.get(id=request.GET.get('geodataset'))
+        if request.GET.get('options') == 'create':
+            algorithms = scenario.remaining_inventory_algorithm_options(feedstock, geodataset)
+        elif request.GET.get('options') == 'update':
+            current_algorithm = InventoryAlgorithm.objects.filter(id=request.GET.get('current_inventory_algorithm'),
+                                                                  feedstock=feedstock, geodataset=geodataset)
+            algorithms = scenario.remaining_inventory_algorithm_options(feedstock, geodataset).union(current_algorithm)
+        else:
+            algorithms = scenario.available_inventory_algorithms()
+    else:
+        algorithms = InventoryAlgorithm.objects.none()
     return render(request, 'scenario_builder/algorithm_dropdown_list_options.html', {'algorithms': algorithms})
 
 
 def load_parameter_options(request):
-    algorithm_id = request.GET.get('algorithm')
-    algorithm = InventoryAlgorithm.objects.get(id=algorithm_id)
-    parameters = InventoryAlgorithmParameter.objects.filter(inventory_algorithm=algorithm)
-    context = {
-        'parameters': {
-            parameter: InventoryAlgorithmParameterValue.objects.filter(parameter=parameter) for parameter in
-            parameters}}
-    return render(request, 'scenario_builder/parameters_dropdown_list_options.html', context)
-
-
-class ScenarioResultView(DetailView):
-    """
-    View that triggers the evaluation of a scenario and displays the results.
-    """
-
-    template_name = 'scenario_builder/scenario_evaluation.html'
-    model = Scenario
-    context_object_name = 'scenario'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        scenario = self.object
-        layers = Layer.objects.filter(scenario=scenario)
-        context['feature_collections'] = {layer.name: layer.get_feature_collection() for layer in layers}
-        return context
-
-    # def get(self, request, *args, **kwargs):
-    #     super().get(request, *args, **kwargs)
-    #     layers = Layer.objects.filter(scenario=self.object)
-    #     feature_collections = {layer.name: layer.get_feature_collection() for layer in layers}
-    #     return self.render_to_response(self.context)
-
-
-class ScenarioResultDetailMapView(DetailView):
-    """View of an individual result map in large size"""
-    model = Layer
-    context_object_name = 'layer'
-    template_name = 'scenario_builder/result_detail_map.html'
-
-    def get_object(self, **kwargs):
-        scenario = Scenario.objects.get(id=self.kwargs.get('pk'))
-        algorithm = InventoryAlgorithm.objects.get(id=self.kwargs.get('algo_pk'))
-        return Layer.objects.get(scenario=scenario, algorithm=algorithm)
+    if request.GET.get('inventory_algorithm'):
+        algorithm = InventoryAlgorithm.objects.get(id=request.GET.get('inventory_algorithm'))
+        parameters = InventoryAlgorithmParameter.objects.filter(inventory_algorithm=algorithm)
+        context = {
+            'parameters': {
+                parameter: InventoryAlgorithmParameterValue.objects.filter(parameter=parameter) for parameter in
+                parameters}}
+        return render(request, 'scenario_builder/parameters_dropdown_list_options.html', context)
+    else:
+        return HttpResponse("")
 
 
 class FeedstockDefinitionView(TemplateView):
@@ -261,7 +275,8 @@ def catchmentDelete(request):
 class ResultMapAPIView(APIView):
     """Rest API to get features from automatically generated result tables. Endpoint for Leaflet maps"""
 
-    def get(self, request, *args, **kwargs):
+    @staticmethod
+    def get(request, *args, **kwargs):
         layer = Layer.objects.get(table_name=kwargs['layer_name'])
         feature_collection = layer.get_feature_collection()
         features = feature_collection.objects.all()
@@ -278,7 +293,8 @@ class ResultMapAPIView(APIView):
 
 class CatchmentAPIView(APIView):
 
-    def get(self, request):
+    @staticmethod
+    def get(request):
         name = request.GET.get('function_name')
         qs = Catchment.objects.filter(name=name)
 

@@ -192,6 +192,9 @@ class Layer(models.Model):
         with connection.schema_editor() as schema_editor:
             schema_editor.delete_model(feature_collection)
 
+    def feedstock(self):
+        return self.algorithm.feedstock
+
     def get_feature_collection(self):
         """
         Returns the feature collection model that is used to manage the features connected to this layer.

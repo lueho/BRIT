@@ -2,4 +2,4 @@ from django.apps import AppConfig
 
 
 class ScenarioEvaluationConfig(AppConfig):
-    name = 'scenario_evaluation'
+    name = 'scenario_evaluator'

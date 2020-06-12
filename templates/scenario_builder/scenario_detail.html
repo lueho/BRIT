@@ -1,35 +1,74 @@
-scenario_detail.html<!DOCTYPE html>
-<html lang="en">
-<head>
-    <style>
-        table, th, td {
-            border: 1px solid black;
-        }
-    </style>
-    <meta charset="UTF-8">
-    <title>Scenario output</title>
-</head>
-<body>
+{% extends 'base.html' %}
+
 {% block content %}
-    <h1>{{ object.name }}</h1>
-    <p>{{ object.description }}</p>
-    <p>{{ object.region }}</p>
-    <p>{{ object.owner }}</p>
-    <p>{{ object.catchment }}</p>
-    <table>
-        {% for entry in inventory_config %}
-            <tr>
-                <td rowspan="{{ entry.parameters|length|add:'1' }}">{{ entry.algorithm }}</td>
-            </tr>
-            {% for parameter in entry.parameters %}
+    <h1>Summary of Scenario "{{ object.name }}"</h1>
+
+    <h2>Scenario basics:</h2>
+    <div class="row">
+        <div class="col col-6">
+            <table class="table shadow">
                 <tr>
-                    <td>{{ parameter.name }}</td>
-                    <td>{{ parameter.value }}</td>
-                </tr>
-            {% endfor %}
-        {% endfor %}
-    </table>
+                    <td class="col-3"><b>Name:</b></td>
+                    <td>{{ object.name }}</td>
+                <tr>
+                    <td class="col-3"><b>Description:</b></td>
+                    <td>{{ object.description }}</td>
+                <tr>
+                    <td class="col-3"><b>Case study region:</b></td>
+                    <td>
+                        <a href="{% url 'admin:scenario_builder_region_change' object.region.id %}">{{ object.region }}</a>
+                    </td>
+                <tr>
+                    <td class="col-3"><b>Catchment:</b></td>
+                    <td>
+                        <a href="{% url 'admin:scenario_builder_catchment_change' object.catchment.id %}">{{ object.catchment }}</a>
+                    </td>
+            </table>
+        </div>
+        <div class="col col-3">
+            <p>This is a summary of the complete configuration of this scenario. Please check if everything is as it
+                should be. Once you are sure, everything is correct you can run the scenario evaluation from here.</p>
+            <form method="post">
+                {% csrf_token %}
+                <button type="submit" name="run" class="btn btn-primary">Run scenario evaluation</button>
+            </form>
+        </div>
+    </div> <!-- end of general summary row -->
+    <div class="row mt-1 mb-3">
+        <div class="col">
+            <a href="{% url 'scenario_update' scenario.id %}">
+                <i class="fas fa-fw fa-edit"></i> Edit scenario basics
+            </a>
+        </div>
+    </div>
+    <h2>Used Inventory Algorithms:</h2>
+    {% for algo, parameters in config.items %}
+        <div class="card border-left-primary border shadow">
+            <div class="card-header">
+                <h6 class="m-0 font-weight-bold text-primary">{{ algo.name }}</h6>
+            </div>
+            <div class="card-body">
+                {% for parameter, value in parameters.items %}
+                    {{ parameter.descriptive_name }}: {{ value.value }}+-{{ value.standard_deviation }}
+                    {{ parameter.unit }} source: ({{ value.source }})
+                {% endfor %}
+            </div>
+            <div class="card-footer">
+                <a href="{% url 'scenario_update_config' scenario.id algo.id %}" class="mx-2">
+                    <i class="fas fa-fw fa-edit"></i> Edit
+                </a>
+                <a href="{% url 'remove_algorithm_from_scenario' scenario.id algo.id %}" class="mx-2">
+                    <i class="fas fa-fw fa-trash"></i> Remove from configuration
+                </a>
+            </div>
+        </div>
+    {% endfor %}
+    <div class="row mt-3">
+        <div class="col">
+            <a href="{% url 'add_scenario_configuration' scenario.id %}">
+                <i class="fas fa-fw fa-plus"></i> Add algorithm to configuration
+            </a>
+        </div>
+    </div>
 
 {% endblock %}
-</body>
-</html>

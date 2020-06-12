@@ -26,9 +26,22 @@
     </div>
     <table>
         {% for name, fc in feature_collections.items %}
-            <tr>
-                <td>{{ name }}</td>
-            </tr>
+            <div class="card border-left-primary border shadow">
+                <div class="card-header">
+                    <h6 class="m-0 font-weight-bold text-primary">Result of algorithm: {{ name }}</h6>
+                </div>
+                <div class="card-body">
+                    <a href="{{ }}"
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'scenario_update' algo.id %}" class="mx-2">
+                        <i class="fas fa-fw fa-edit"></i> Edit
+                    </a>
+                    <a href="{% url 'remove_algorithm_from_scenario' scenario.id algo.id %}" class="mx-2">
+                        <i class="fas fa-fw fa-trash"></i> Remove from configuration
+                    </a>
+                </div>
+            </div>
         {% endfor %}
     </table>
 {% endblock content %}

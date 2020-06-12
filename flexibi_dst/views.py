@@ -1,14 +1,15 @@
 from django.contrib.auth.forms import AuthenticationForm
 from django.contrib.auth.views import LoginView
 from django.shortcuts import render
-
-
-def dst(request):
-    return render(request, 'map.html')
+from django.views.generic import TemplateView
 
 
 def home(request):
     return render(request, 'base.html', {})
+
+
+class ScriptTestView(TemplateView):
+    template_name = 'script_test.html'
 
 
 class DstLoginView(LoginView):

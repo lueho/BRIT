@@ -6,7 +6,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ('scenario_evaluation', '0001_initial'),
+        ('scenario_evaluator', '0001_initial'),
     ]
 
     operations = [
@@ -17,7 +17,7 @@ class Migration(migrations.Migration):
                 ('field_name', models.CharField(max_length=56)),
                 ('field_type', models.CharField(max_length=56)),
                 ('layer', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE,
-                                            to='scenario_evaluation.ScenarioResultLayer')),
+                                            to='scenario_evaluator.ScenarioResultLayer')),
             ],
         ),
     ]
