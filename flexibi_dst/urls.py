@@ -4,11 +4,9 @@ from django.contrib import admin
 from django.contrib.auth.views import LogoutView
 from django.urls import path, include
 
-from . import views
 from .views import DstLoginView, ScriptTestView
 
 urlpatterns = [
-    path('', views.dst, name='home'),
     path('admin/', admin.site.urls),
     path('login/', DstLoginView.as_view(), name='login'),
     path('logout/', LogoutView.as_view(), {'next_page': settings.LOGOUT_REDIRECT_URL}, name='logout'),
