@@ -99,7 +99,7 @@ class ScenarioDetailView(InventoryMixin, DetailView):
         self.object = self.get_object()
         inventory = GisInventory(self.object)
         inventory.run()
-        return self.get(request, *args, **kwargs)
+        return redirect('scenario_result', pk=inventory.scenario.id)
 
 
 class ScenarioAddInventoryAlgorithmView(TemplateResponseMixin, ModelFormMixin, View):

@@ -72,10 +72,18 @@ class GisInventory(BaseScenario):
         # If result is a gis layer, it must have a list of features under key ['features']. Each feature must have
         # an entry for the key 'geom'
         result = {
-            'aggregated_values': {
-                'trees_count': trees_count,
-                'total_yield': prunings_yield,
-            },
+            'aggregated_values': [
+                {
+                    'name': 'Number of trees',
+                    'value': trees_count,
+                    'unit': ''
+                },
+                {
+                    'name': 'Total production',
+                    'value': prunings_yield,
+                    'unit': 'kg'
+                }
+            ],
             'features': []
         }
         for tree in trees_in_catchment:
@@ -97,15 +105,23 @@ class GisInventory(BaseScenario):
         keep_columns = ['anlagenname', 'belegenheit', 'gruenart', 'nutzcode']
         clipped_polygons = self.clip_polygons(input_qs, mask_qs, keep_columns=keep_columns)
         result = {
-            'aggregated_values': {
-                'total_area': 0,
-                'total_yield_average': 0
-            },
+            'aggregated_values': [
+                {
+                    'name': 'Total area',
+                    'value': 0,
+                    'unit': 'm²'
+                },
+                {
+                    'name': 'Total production',
+                    'value': 0,
+                    'unit': 'kg'
+                }
+            ],
             'features': []
         }
         for polygon in clipped_polygons:
-            result['aggregated_values']['total_area'] += polygon['area']
-            result['aggregated_values']['total_yield_average'] += polygon['area'] * area_yield['value']
+            result['aggregated_values'][0]['value'] += polygon['area']
+            result['aggregated_values'][1]['value'] += polygon['area'] * area_yield['value']
             result['features'].append({
                 'geom': polygon['geom'],
                 'area': polygon['area'],

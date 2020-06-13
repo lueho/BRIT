@@ -1,42 +1,28 @@
 {% extends 'base.html' %}
 
 {% block content %}
-    <h1>Nur für Skripte</h1>
-    <form id="test_form" method="post">
-        <label for="geodatasets">Geodatasets</label>
-        <select id="geodatasets" name="geodata">
-            {#            Here the options will appear#}
-        </select>
-
-    </form>
-    <button onclick="setGeoDatasetOptions()">Push the button</button>
+    <div class="row">
+        <div class="col col-6">
+            <h2>Scenario result summery:</h2>
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Bar Chart</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-bar">
+                        <canvas id="myBarChart"></canvas>
+                    </div>
+                    <hr>
+                    Styling for the bar chart can be found in the <code>/js/demo/chart-bar-demo.js</code> file.
+                </div>
+            </div>
+        </div>
+    </div>
 {% endblock content %}
 
 {% block javascript %}
     {{ block.super }}
+    {% load static %}
 
-    <script type="text/javascript">
-
-        form = document.getElementById("test_form")
-
-        function setGeoDatasetOptions() {
-            loadGeodatasets()
-                .then(data => document.getElementById("geodatasets").innerHTML = data)
-                .catch((err) => console.log(err))
-        }
-
-        async function loadGeodatasets() {
-
-            const url = "{% url 'ajax_load_geodatasets' %}";
-            let args = new URLSearchParams({
-                scenario: "4",
-                feedstock: "2",
-                options: "create"
-            });
-
-            let response = await fetch(url + "?" + args);
-            return await response.text();
-        }
-
-    </script>
+    <script src="{% static 'js/demo/chart-bar-demo.js' %}"></script>
 {% endblock javascript %}

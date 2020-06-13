@@ -1,0 +1,24 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <h1>Your Scenarios</h1>
+    <div class="row">
+        <div class="col">
+            <ul class="list-group">
+                {% for scenario in object_list %}
+                    <li class="list-group-item"><a
+                            href="{% url 'scenario_result' scenario.id %}">{{ scenario.name }}</a> <a
+                            href="{% url 'scenario_update' scenario.id %}"><i class="fas fa-fw fa-edit"></i></a> <a
+                            href="{% url 'scenario_delete' scenario.id %}"><i class="fas fa-fw fa-trash"></i></a></li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    <div class="row mt-3">
+        <div class="col">
+            <a href="{% url 'create_scenario' %}">
+                <i class="fas fa-fw fa-plus"></i> Create new scenario
+            </a>
+        </div>
+    </div>
+{% endblock content %}

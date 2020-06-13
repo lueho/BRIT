@@ -84,6 +84,8 @@ class LayerManager(models.Manager):
                     feature_collection = layer.update_or_create_feature_collection()
                     layer.create_feature_table()
 
+                layer.delete_aggregated_values()
+
             for feature in features:
                 feature_collection.objects.create(**feature)
 
@@ -115,14 +117,33 @@ class Layer(models.Model):
             models.UniqueConstraint(fields=['table_name'], name='unique table_name')
         ]
 
-    def add_aggregated_values(self, aggregates: dict):
-        for name, value in aggregates.items():
-            LayerAggregatedValue.objects.create(name=name, value=value, layer=self)
+    def add_aggregated_values(self, aggregates: []):
+        for aggregate in aggregates:
+            LayerAggregatedValue.objects.create(name=aggregate['name'],
+                                                value=aggregate['value'],
+                                                unit=aggregate['unit'],
+                                                layer=self)
 
     def add_layer_fields(self, fields: dict):
         for field_name, data_type in fields.items():
             field, created = LayerField.objects.get_or_create(field_name=field_name, data_type=data_type)
             self.layer_fields.add(field)
+
+    def as_dict(self):
+        return {
+            'name': self.name,
+            'geom_type': self.geom_type,
+            'table_name': self.table_name,
+            'scenario': self.scenario,
+            'inventory_algorithm': self.algorithm,
+            'layer_fields': [field for field in self.layer_fields.all()],
+            'aggregated_results': [
+                {'name': aggregate.name,
+                 'value': int(aggregate.value),
+                 'unit': aggregate.unit}
+                for aggregate in self.layeraggregatedvalue_set.all()
+            ]
+        }
 
     def update_or_create_feature_collection(self):
         """
@@ -192,6 +213,9 @@ class Layer(models.Model):
         with connection.schema_editor() as schema_editor:
             schema_editor.delete_model(feature_collection)
 
+    def delete_aggregated_values(self):
+        LayerAggregatedValue.objects.filter(layer=self).delete()
+
     def feedstock(self):
         return self.algorithm.feedstock
 
@@ -227,4 +251,5 @@ class LayerAggregatedValue(models.Model):
 
     name = models.CharField(max_length=63)
     value = models.FloatField()
+    unit = models.CharField(max_length=15, blank=True, null=True, default='')
     layer = models.ForeignKey(Layer, on_delete=models.CASCADE)
