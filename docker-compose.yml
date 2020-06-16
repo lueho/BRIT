@@ -1,0 +1,25 @@
+version: '3.7'
+
+services:
+  db:
+    image: "postgis/postgis"
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_DB: flexibi_dst
+      POSTGRES_USER: flexibi_dst
+      POSTGRES_PASSWORD: flexibi
+  web:
+    build: .
+    volumes:
+      - ./:/app
+    depends_on:
+      - db
+    ports:
+      - "8000:8000"
+    environment:
+      - DEBUG=1
+      - SECRET_KEY=(%yn0aw%$hxmajy^f=s^1t2v7-=^=vo9)u6ru*ic&=wsx2qs26
+      - DJANGO_ALLOWED_HOSTS=localhost 127.0.0.1 [::1]
+    links:
+      - db

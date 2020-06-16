@@ -26,18 +26,18 @@ SECRET_KEY = '(%yn0aw%$hxmajy^f=s^1t2v7-=^=vo9)u6ru*ic&=wsx2qs26'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['*']
 
 if getpass.getuser() == 'luess':
-    GDAL_LIBRARY_PATH = os.path.join(os.path.dirname(os.path.dirname(sys.executable)), 'Lib', 'site-packages', 'osgeo',
-                                     'gdal204.dll')
+    # GDAL_LIBRARY_PATH = os.path.join(os.path.dirname(os.path.dirname(sys.executable)), 'Lib', 'site-packages', 'osgeo',
+    #                                  'gdal204.dll')
     host_address = '127.0.0.1'
     user = 'postgres'
     password = 'postgre'
 else:
     # GDAL_LIBRARY_PATH = 'C:/OSGeo4W64/bin/gdal204.dll'
-    GDAL_LIBRARY_PATH = os.path.join(os.path.dirname(os.path.dirname(sys.executable)), 'Lib', 'site-packages', 'osgeo',
-                                     'gdal204.dll')
+    # GDAL_LIBRARY_PATH = os.path.join(os.path.dirname(os.path.dirname(sys.executable)), 'Lib', 'site-packages', 'osgeo',
+    #                                  'gdal204.dll')
     host_address = '134.28.65.102'
     user = 'flexibi_dst'
     password = 'flexibi'
@@ -54,7 +54,6 @@ INSTALLED_APPS = [
     'django.contrib.gis',
     'rest_framework',
     'rest_framework_gis',
-    'django_filters',
     'leaflet',
     'bioresource_explorer.apps.BioresourceExplorerConfig',
     'flexibi_dst',
@@ -102,9 +101,9 @@ DATABASES = {
     'default': {
         'ENGINE': 'django.contrib.gis.db.backends.postgis',
         'NAME': 'flexibi_dst',
-        'USER': user,
-        'PASSWORD': password,
-        'HOST': host_address,
+        'USER': 'flexibi_dst',
+        'PASSWORD': 'flexibi',
+        'HOST': 'db',
         'PORT': '5432',
     }
 }

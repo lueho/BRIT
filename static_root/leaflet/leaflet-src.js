@@ -1530,15 +1530,15 @@ var CRS = {
 	// pixel coordinates for a particular zoom. For example, it returns
 	// `256 * 2^zoom` for Mercator-based CRS.
 	scale: function (zoom) {
-		return 256 * Math.pow(2, zoom);
-	},
+        return 256 * Math.pow(2, zoom);
+    },
 
-	// @method zoom(scale: Number): Number
-	// Inverse of `scale()`, returns the zoom level corresponding to a scale
-	// factor of `scale`.
-	zoom: function (scale) {
-		return Math.log(scale / 256) / Math.LN2;
-	},
+    // @method zoom(scale: Number): Number
+    // Inverse of `scale()`, returns the zoom level corresponding to a scale
+    // factor of `scale`.
+    zoom: function (scale) {
+        return Math.log(scale / 256) / Math.LN2;
+    },
 
     // @method getProjectedBounds(zoom: Number): Bounds
     // Returns the projection's bounds scaled and transformed for the provided `zoom`.
@@ -1559,7 +1559,7 @@ var CRS = {
     // Returns the distance between two geographical coordinates.
 
     // @property code: String
-    // Standard code function_name of the CRS passed into WMS services (e.g. `'EPSG:3857'`)
+    // Standard code name of the CRS passed into WMS services (e.g. `'EPSG:3857'`)
     //
     // @property wrapLng: Number[]
     // An array of two numbers defining whether the longitude (horizontal) coordinate
@@ -1578,16 +1578,16 @@ var CRS = {
 
     // @method wrapLatLng(latlng: LatLng): LatLng
     // Returns a `LatLng` where lat and lng has been wrapped according to the
-	// CRS's `wrapLat` and `wrapLng` properties, if they are outside the CRS's bounds.
-	wrapLatLng: function (latlng) {
-		var lng = this.wrapLng ? wrapNum(latlng.lng, this.wrapLng, true) : latlng.lng,
-		    lat = this.wrapLat ? wrapNum(latlng.lat, this.wrapLat, true) : latlng.lat,
-		    alt = latlng.alt;
+    // CRS's `wrapLat` and `wrapLng` properties, if they are outside the CRS's bounds.
+    wrapLatLng: function (latlng) {
+        var lng = this.wrapLng ? wrapNum(latlng.lng, this.wrapLng, true) : latlng.lng,
+            lat = this.wrapLat ? wrapNum(latlng.lat, this.wrapLat, true) : latlng.lat,
+            alt = latlng.alt;
 
-		return new LatLng(lat, lng, alt);
-	},
+        return new LatLng(lat, lng, alt);
+    },
 
-	// @method wrapLatLngBounds(bounds: LatLngBounds): LatLngBounds
+    // @method wrapLatLngBounds(bounds: LatLngBounds): LatLngBounds
 	// Returns a `LatLngBounds` with the same size as the given one, ensuring
 	// that its center is within the CRS's bounds.
 	// Only accepts actual `L.LatLngBounds` instances, not arrays.
@@ -1783,9 +1783,9 @@ var EPSG900913 = extend({}, EPSG3857, {
 // @namespace SVG; @section
 // There are several static functions which can be called without instantiating L.SVG:
 
-// @function create(function_name: String): SVGElement
+// @function create(name: String): SVGElement
 // Returns a instance of [SVGElement](https://developer.mozilla.org/docs/Web/API/SVGElement),
-// corresponding to the class function_name passed. For example, using 'line' will return
+// corresponding to the class name passed. For example, using 'line' will return
 // an instance of [SVGLineElement](https://developer.mozilla.org/docs/Web/API/SVGLineElement).
 function svgCreate(name) {
 	return document.createElementNS('http://www.w3.org/2000/svg', name);
@@ -2541,7 +2541,7 @@ var DomEvent = (Object.freeze || Object)({
 
 
 // @property TRANSFORM: String
-// Vendor-prefixed transform style function_name (e.g. `'webkitTransform'` for WebKit).
+// Vendor-prefixed transform style name (e.g. `'webkitTransform'` for WebKit).
 var TRANSFORM = testProp(
 	['transform', 'WebkitTransform', 'OTransform', 'MozTransform', 'msTransform']);
 
@@ -2549,12 +2549,12 @@ var TRANSFORM = testProp(
 // the same for the transitionend event, in particular the Android 4.1 stock browser
 
 // @property TRANSITION: String
-// Vendor-prefixed transition style function_name.
+// Vendor-prefixed transition style name.
 var TRANSITION = testProp(
 	['webkitTransition', 'transition', 'OTransition', 'MozTransition', 'msTransition']);
 
 // @property TRANSITION_END: String
-// Vendor-prefixed transitionend event function_name.
+// Vendor-prefixed transitionend event name.
 var TRANSITION_END =
 	TRANSITION === 'webkitTransition' || TRANSITION === 'OTransition' ? TRANSITION + 'End' : 'transitionend';
 
@@ -2626,8 +2626,8 @@ function empty(el) {
         }
     }
 
-// @function hasClass(el: HTMLElement, function_name: String): Boolean
-// Returns `true` if the element's class attribute contains `function_name`.
+// @function hasClass(el: HTMLElement, name: String): Boolean
+// Returns `true` if the element's class attribute contains `name`.
     function hasClass(el, name) {
         if (el.classList !== undefined) {
             return el.classList.contains(name);
@@ -2636,8 +2636,8 @@ function empty(el) {
         return className.length > 0 && new RegExp('(^|\\s)' + name + '(\\s|$)').test(className);
     }
 
-// @function addClass(el: HTMLElement, function_name: String)
-// Adds `function_name` to the element's class attribute.
+// @function addClass(el: HTMLElement, name: String)
+// Adds `name` to the element's class attribute.
     function addClass(el, name) {
         if (el.classList !== undefined) {
             var classes = splitWords(name);
@@ -2650,8 +2650,8 @@ function empty(el) {
         }
     }
 
-// @function removeClass(el: HTMLElement, function_name: String)
-// Removes `function_name` from the element's class attribute.
+// @function removeClass(el: HTMLElement, name: String)
+// Removes `name` from the element's class attribute.
     function removeClass(el, name) {
         if (el.classList !== undefined) {
             el.classList.remove(name);
@@ -2660,7 +2660,7 @@ function empty(el) {
         }
     }
 
-// @function setClass(el: HTMLElement, function_name: String)
+// @function setClass(el: HTMLElement, name: String)
 // Sets the element's class.
     function setClass(el, name) {
         if (el.className.baseVal === undefined) {
@@ -2669,7 +2669,7 @@ function empty(el) {
             // in case of SVG element
             el.className.baseVal = name;
         }
-}
+    }
 
 // @function getClass(el: HTMLElement): String
 // Returns the element's class.
@@ -2689,10 +2689,10 @@ function setOpacity(el, value) {
 }
 
 function _setOpacityIE(el, value) {
-	var filter = false,
-	    filterName = 'DXImageTransform.Microsoft.Alpha';
+    var filter = false,
+        filterName = 'DXImageTransform.Microsoft.Alpha';
 
-	// filters collection throws an error if we try to retrieve a filter that doesn't exist
+    // filters collection throws an error if we try to retrieve a filter that doesn't exist
     try {
         filter = el.filters.item(filterName);
     } catch (e) {
@@ -2714,8 +2714,8 @@ function _setOpacityIE(el, value) {
 }
 
 // @function testProp(props: String[]): String|false
-// Goes through the array of style names and returns the first function_name
-// that is a valid style function_name for an element. If no such function_name is found,
+// Goes through the array of style names and returns the first name
+// that is a valid style name for an element. If no such name is found,
 // it returns false. Useful for vendor-prefixed styles like `transform`.
     function testProp(props) {
         var style = document.documentElement.style;
@@ -3624,12 +3624,12 @@ var Map = Evented.extend({
 		    options = this._locateOptions;
 
 		if (options.setView) {
-			var zoom = this.getBoundsZoom(bounds);
-			this.setView(latlng, options.maxZoom ? Math.min(zoom, options.maxZoom) : zoom);
-		}
+            var zoom = this.getBoundsZoom(bounds);
+            this.setView(latlng, options.maxZoom ? Math.min(zoom, options.maxZoom) : zoom);
+        }
 
-		var data = {
-			latlng: latlng,
+        var data = {
+            latlng: latlng,
             bounds: bounds,
             timestamp: pos.timestamp
         };
@@ -3648,8 +3648,8 @@ var Map = Evented.extend({
 
     // TODO Appropriate docs section?
     // @section Other Methods
-    // @method addHandler(function_name: String, HandlerClass: Function): this
-    // Adds a new `Handler` to the map, given its function_name and constructor function.
+    // @method addHandler(name: String, HandlerClass: Function): this
+    // Adds a new `Handler` to the map, given its name and constructor function.
     addHandler: function (name, HandlerClass) {
         if (!HandlerClass) {
             return this;
@@ -3666,15 +3666,15 @@ var Map = Evented.extend({
         return this;
     },
 
-	// @method remove(): this
-	// Destroys the map and clears all related event listeners.
-	remove: function () {
+    // @method remove(): this
+    // Destroys the map and clears all related event listeners.
+    remove: function () {
 
-		this._initEvents(true);
+        this._initEvents(true);
 
-		if (this._containerId !== this._container._leaflet_id) {
-			throw new Error('Map container is being reused by another instance');
-		}
+        if (this._containerId !== this._container._leaflet_id) {
+            throw new Error('Map container is being reused by another instance');
+        }
 
 		try {
 			// throws error in IE6-8
@@ -3699,13 +3699,13 @@ var Map = Evented.extend({
 			this._clearControlPos();
 		}
 
-		this._clearHandlers();
+        this._clearHandlers();
 
-		if (this._loaded) {
-			// @section Map state change events
-			// @event unload: Event
-			// Fired when the map is destroyed with [remove](#map-remove) method.
-			this.fire('unload');
+        if (this._loaded) {
+            // @section Map state change events
+            // @event unload: Event
+            // Fired when the map is destroyed with [remove](#map-remove) method.
+            this.fire('unload');
         }
 
         var i;
@@ -3725,8 +3725,8 @@ var Map = Evented.extend({
     },
 
     // @section Other Methods
-    // @method createPane(function_name: String, container?: HTMLElement): HTMLElement
-    // Creates a new [map pane](#map-pane) with the given function_name if it doesn't exist already,
+    // @method createPane(name: String, container?: HTMLElement): HTMLElement
+    // Creates a new [map pane](#map-pane) with the given name if it doesn't exist already,
     // then returns it. The pane is created as a child of `container`, or
     // as a child of the main map pane if not set.
     createPane: function (name, container) {
@@ -3742,15 +3742,15 @@ var Map = Evented.extend({
     // @section Methods for Getting Map State
 
     // @method getCenter(): LatLng
-	// Returns the geographical center of the map view
-	getCenter: function () {
-		this._checkIfLoaded();
+    // Returns the geographical center of the map view
+    getCenter: function () {
+        this._checkIfLoaded();
 
-		if (this._lastCenter && !this._moved()) {
-			return this._lastCenter;
-		}
-		return this.layerPointToLatLng(this._getCenterLayerPoint());
-	},
+        if (this._lastCenter && !this._moved()) {
+            return this._lastCenter;
+        }
+        return this.layerPointToLatLng(this._getCenterLayerPoint());
+    },
 
 	// @method getZoom(): Number
 	// Returns the current zoom level of the map view
@@ -3826,15 +3826,15 @@ var Map = Evented.extend({
 		return this._size.clone();
 	},
 
-	// @method getPixelBounds(): Bounds
-	// Returns the bounds of the current map view in projected pixel
-	// coordinates (sometimes useful in layer and overlay implementations).
-	getPixelBounds: function (center, zoom) {
-		var topLeftPoint = this._getTopLeftPoint(center, zoom);
-		return new Bounds(topLeftPoint, topLeftPoint.add(this.getSize()));
-	},
+    // @method getPixelBounds(): Bounds
+    // Returns the bounds of the current map view in projected pixel
+    // coordinates (sometimes useful in layer and overlay implementations).
+    getPixelBounds: function (center, zoom) {
+        var topLeftPoint = this._getTopLeftPoint(center, zoom);
+        return new Bounds(topLeftPoint, topLeftPoint.add(this.getSize()));
+    },
 
-	// TODO: Check semantics - isn't the pixel origin the 0,0 coord relative to
+    // TODO: Check semantics - isn't the pixel origin the 0,0 coord relative to
     // the map pane? "left point of the map layer" can be confusing, specially
     // since there can be negative offsets.
     // @method getPixelOrigin(): Point
@@ -3855,7 +3855,7 @@ var Map = Evented.extend({
     // @section Other Methods
 
     // @method getPane(pane: String|HTMLElement): HTMLElement
-    // Returns a [map pane](#map-pane), given its function_name or its HTML element (its identity).
+    // Returns a [map pane](#map-pane), given its name or its HTML element (its identity).
     getPane: function (pane) {
         return typeof pane === 'string' ? this._panes[pane] : pane;
     },
@@ -3876,15 +3876,15 @@ var Map = Evented.extend({
 
     // @section Conversion Methods
 
-	// @method getZoomScale(toZoom: Number, fromZoom: Number): Number
-	// Returns the scale factor to be applied to a map transition from zoom level
-	// `fromZoom` to `toZoom`. Used internally to help with zoom animations.
-	getZoomScale: function (toZoom, fromZoom) {
-		// TODO replace with universal implementation after refactoring projections
-		var crs = this.options.crs;
-		fromZoom = fromZoom === undefined ? this._zoom : fromZoom;
-		return crs.scale(toZoom) / crs.scale(fromZoom);
-	},
+    // @method getZoomScale(toZoom: Number, fromZoom: Number): Number
+    // Returns the scale factor to be applied to a map transition from zoom level
+    // `fromZoom` to `toZoom`. Used internally to help with zoom animations.
+    getZoomScale: function (toZoom, fromZoom) {
+        // TODO replace with universal implementation after refactoring projections
+        var crs = this.options.crs;
+        fromZoom = fromZoom === undefined ? this._zoom : fromZoom;
+        return crs.scale(toZoom) / crs.scale(fromZoom);
+    },
 
 	// @method getScaleZoom(scale: Number, fromZoom: Number): Number
 	// Returns the zoom level that the map would end up at, if it is at `fromZoom`
@@ -4841,9 +4841,9 @@ var Layers = Control.extend({
 	// @section
 	// @aka Control.Layers options
 	options: {
-		// @option collapsed: Boolean = true
-		// If `true`, the control will be collapsed into an icon and expanded on mouse hover or touch.
-		collapsed: true,
+        // @option collapsed: Boolean = true
+        // If `true`, the control will be collapsed into an icon and expanded on mouse hover or touch.
+        collapsed: true,
         position: 'topright',
 
         // @option autoZIndex: Boolean = true
@@ -4864,7 +4864,7 @@ var Layers = Control.extend({
         // that will be used for sorting the layers, when `sortLayers` is `true`.
         // The function receives both the `L.Layer` instances and their names, as in
         // `sortFunction(layerA, layerB, nameA, nameB)`.
-        // By default, it sorts layers alphabetically by their function_name.
+        // By default, it sorts layers alphabetically by their name.
         sortFunction: function (layerA, layerB, nameA, nameB) {
             return nameA < nameB ? -1 : (nameB < nameA ? 1 : 0);
         }
@@ -4879,22 +4879,22 @@ var Layers = Control.extend({
         this._handlingClick = false;
 
         for (var i in baseLayers) {
-			this._addLayer(baseLayers[i], i);
-		}
+            this._addLayer(baseLayers[i], i);
+        }
 
-		for (i in overlays) {
-			this._addLayer(overlays[i], i, true);
-		}
-	},
+        for (i in overlays) {
+            this._addLayer(overlays[i], i, true);
+        }
+    },
 
 	onAdd: function (map) {
-		this._initLayout();
-		this._update();
+        this._initLayout();
+        this._update();
 
-		this._map = map;
-		map.on('zoomend', this._checkDisabledLayers, this);
+        this._map = map;
+        map.on('zoomend', this._checkDisabledLayers, this);
 
-		for (var i = 0; i < this._layers.length; i++) {
+        for (var i = 0; i < this._layers.length; i++) {
             this._layers[i].layer.on('add remove', this._onLayerChange, this);
         }
 
@@ -4915,15 +4915,15 @@ var Layers = Control.extend({
         }
     },
 
-    // @method addBaseLayer(layer: Layer, function_name: String): this
-    // Adds a base layer (radio button entry) with the given function_name to the control.
+    // @method addBaseLayer(layer: Layer, name: String): this
+    // Adds a base layer (radio button entry) with the given name to the control.
     addBaseLayer: function (layer, name) {
         this._addLayer(layer, name);
         return (this._map) ? this._update() : this;
     },
 
-    // @method addOverlay(layer: Layer, function_name: String): this
-    // Adds an overlay (checkbox entry) with the given function_name to the control.
+    // @method addOverlay(layer: Layer, name: String): this
+    // Adds an overlay (checkbox entry) with the given name to the control.
     addOverlay: function (layer, name) {
         this._addLayer(layer, name, true);
         return (this._map) ? this._update() : this;
@@ -4943,16 +4943,16 @@ var Layers = Control.extend({
 
     // @method expand(): this
     // Expand the control container if collapsed.
-	expand: function () {
-		addClass(this._container, 'leaflet-control-layers-expanded');
-		this._form.style.height = null;
-		var acceptableHeight = this._map.getSize().y - (this._container.offsetTop + 50);
-		if (acceptableHeight < this._form.clientHeight) {
-			addClass(this._form, 'leaflet-control-layers-scrollbar');
-			this._form.style.height = acceptableHeight + 'px';
-		} else {
-			removeClass(this._form, 'leaflet-control-layers-scrollbar');
-		}
+    expand: function () {
+        addClass(this._container, 'leaflet-control-layers-expanded');
+        this._form.style.height = null;
+        var acceptableHeight = this._map.getSize().y - (this._container.offsetTop + 50);
+        if (acceptableHeight < this._form.clientHeight) {
+            addClass(this._form, 'leaflet-control-layers-scrollbar');
+            this._form.style.height = acceptableHeight + 'px';
+        } else {
+            removeClass(this._form, 'leaflet-control-layers-scrollbar');
+        }
 		this._checkDisabledLayers();
 		return this;
 	},
@@ -5087,20 +5087,20 @@ var Layers = Control.extend({
 		// Fired when an overlay is selected through the [layer control](#control-layers).
 		// @event overlayremove: LayersControlEvent
 		// Fired when an overlay is deselected through the [layer control](#control-layers).
-		// @namespace Control.Layers
-		var type = obj.overlay ?
-			(e.type === 'add' ? 'overlayadd' : 'overlayremove') :
-			(e.type === 'add' ? 'baselayerchange' : null);
+        // @namespace Control.Layers
+        var type = obj.overlay ?
+            (e.type === 'add' ? 'overlayadd' : 'overlayremove') :
+            (e.type === 'add' ? 'baselayerchange' : null);
 
-		if (type) {
-			this._map.fire(type, obj);
-		}
-	},
+        if (type) {
+            this._map.fire(type, obj);
+        }
+    },
 
     // IE7 bugs out if you create a radio dynamically, so you have to do it this hacky way (see http://bit.ly/PqYLBe)
     _createRadioElement: function (name, checked) {
 
-        var radioHtml = '<input type="radio" class="leaflet-control-layers-selector" function_name="' +
+        var radioHtml = '<input type="radio" class="leaflet-control-layers-selector" name="' +
             name + '"' + (checked ? ' checked="checked"' : '') + '/>';
 
         var radioFragment = document.createElement('div');
@@ -5118,15 +5118,15 @@ var Layers = Control.extend({
             input = document.createElement('input');
             input.type = 'checkbox';
             input.className = 'leaflet-control-layers-selector';
-			input.defaultChecked = checked;
-		} else {
-			input = this._createRadioElement('leaflet-base-layers', checked);
-		}
+            input.defaultChecked = checked;
+        } else {
+            input = this._createRadioElement('leaflet-base-layers', checked);
+        }
 
-		this._layerControlInputs.push(input);
-		input.layerId = stamp(obj.layer);
+        this._layerControlInputs.push(input);
+        input.layerId = stamp(obj.layer);
 
-		on(input, 'click', this._onInputClick, this);
+        on(input, 'click', this._onInputClick, this);
 
 		var name = document.createElement('span');
 		name.innerHTML = ' ' + obj.name;
@@ -5638,16 +5638,18 @@ var Handler = Class.extend({
 		if (this._enabled) { return this; }
 
 		this._enabled = true;
-		this.addHooks();
-		return this;
-	},
+        this.addHooks();
+        return this;
+    },
 
-	// @method disable(): this
-	// Disables the handler
-	disable: function () {
-		if (!this._enabled) { return this; }
+    // @method disable(): this
+    // Disables the handler
+    disable: function () {
+        if (!this._enabled) {
+            return this;
+        }
 
-		this._enabled = false;
+        this._enabled = false;
         this.removeHooks();
         return this;
     },
@@ -5667,8 +5669,8 @@ var Handler = Class.extend({
 });
 
 // @section There is static function which can be called without instantiating L.Handler:
-// @function addTo(map: Map, function_name: String): this
-// Adds a new Handler to the given map with the given function_name.
+// @function addTo(map: Map, name: String): this
+// Adds a new Handler to the given map with the given name.
     Handler.addTo = function (map, name) {
         map.addHandler(name, this);
         return this;
@@ -5701,16 +5703,16 @@ var Handler = Class.extend({
     };
     var MOVE = {
         mousedown: 'mousemove',
-	touchstart: 'touchmove',
-	pointerdown: 'touchmove',
-	MSPointerDown: 'touchmove'
-};
+        touchstart: 'touchmove',
+        pointerdown: 'touchmove',
+        MSPointerDown: 'touchmove'
+    };
 
 
-var Draggable = Evented.extend({
+    var Draggable = Evented.extend({
 
-	options: {
-		// @section
+        options: {
+            // @section
 		// @aka Draggable options
 		// @option clickTolerance: Number = 3
 		// The max number of pixels a user can shift the mouse pointer during a click
@@ -6422,16 +6424,16 @@ var Layer = Evented.extend({
 		// String to be shown in the attribution control, describes the layer data, e.g. "© Mapbox".
 		attribution: null,
 
-		bubblingMouseEvents: true
-	},
+        bubblingMouseEvents: true
+    },
 
-	/* @section
-	 * Classes extending `L.Layer` will inherit the following methods:
-	 *
-	 * @method addTo(map: Map|LayerGroup): this
-	 * Adds the layer to the given map or layer group.
-	 */
-	addTo: function (map) {
+    /* @section
+     * Classes extending `L.Layer` will inherit the following methods:
+     *
+     * @method addTo(map: Map|LayerGroup): this
+     * Adds the layer to the given map or layer group.
+     */
+    addTo: function (map) {
         map.addLayer(this);
         return this;
     },
@@ -6451,8 +6453,8 @@ var Layer = Evented.extend({
         return this;
     },
 
-    // @method getPane(function_name? : String): HTMLElement
-    // Returns the `HTMLElement` representing the named pane on the map. If `function_name` is omitted, returns the pane for this layer.
+    // @method getPane(name? : String): HTMLElement
+    // Returns the `HTMLElement` representing the named pane on the map. If `name` is omitted, returns the pane for this layer.
     getPane: function (name) {
         return this._map.getPane(name ? (this.options[name] || name) : this.options.pane);
     },
@@ -6471,16 +6473,18 @@ var Layer = Evented.extend({
     // Used by the `attribution control`, returns the [attribution option](#gridlayer-attribution).
     getAttribution: function () {
         return this.options.attribution;
-	},
+    },
 
-	_layerAdd: function (e) {
-		var map = e.target;
+    _layerAdd: function (e) {
+        var map = e.target;
 
-		// check in case layer gets added and then removed before the map is ready
-		if (!map.hasLayer(this)) { return; }
+        // check in case layer gets added and then removed before the map is ready
+        if (!map.hasLayer(this)) {
+            return;
+        }
 
-		this._map = map;
-		this._zoomAnimated = map._zoomAnimated;
+        this._map = map;
+        this._zoomAnimated = map._zoomAnimated;
 
 		if (this.getEvents) {
 			var events = this.getEvents();
@@ -6975,7 +6979,7 @@ var Icon = Class.extend({
 	 * as iconAnchor if not specified).
 	 *
 	 * @option className: String = ''
-	 * A custom class function_name to assign to both icon and shadow images. Empty by default.
+	 * A custom class name to assign to both icon and shadow images. Empty by default.
 	 */
 
 	options: {
@@ -8906,12 +8910,12 @@ var ImageOverlay = Layer.extend({
 	// @section
 	// @aka ImageOverlay options
 	options: {
-		// @option opacity: Number = 1.0
-		// The opacity of the image overlay.
-		opacity: 1,
+        // @option opacity: Number = 1.0
+        // The opacity of the image overlay.
+        opacity: 1,
 
-		// @option alt: String = ''
-		// Text for the `alt` attribute of the image (useful for accessibility).
+        // @option alt: String = ''
+        // Text for the `alt` attribute of the image (useful for accessibility).
         alt: '',
 
         // @option interactive: Boolean = false
@@ -8931,7 +8935,7 @@ var ImageOverlay = Layer.extend({
         zIndex: 1,
 
         // @option className: String = ''
-        // A custom class function_name to assign to the image. Empty by default.
+        // A custom class name to assign to the image. Empty by default.
         className: '',
     },
 
@@ -8944,16 +8948,16 @@ var ImageOverlay = Layer.extend({
 
     onAdd: function () {
         if (!this._image) {
-			this._initImage();
+            this._initImage();
 
-			if (this.options.opacity < 1) {
-				this._updateOpacity();
-			}
-		}
+            if (this.options.opacity < 1) {
+                this._updateOpacity();
+            }
+        }
 
-		if (this.options.interactive) {
-			addClass(this._image, 'leaflet-interactive');
-			this.addInteractiveTarget(this._image);
+        if (this.options.interactive) {
+            addClass(this._image, 'leaflet-interactive');
+            this.addInteractiveTarget(this._image);
 		}
 
 		this.getPane().appendChild(this._image);
@@ -9235,8 +9239,8 @@ function videoOverlay(video, bounds, options) {
 // @namespace DivOverlay
 var DivOverlay = Layer.extend({
 
-	// @section
-	// @aka DivOverlay options
+    // @section
+    // @aka DivOverlay options
     options: {
         // @option offset: Point = Point(0, 7)
         // The offset of the popup position. Useful to control the anchor
@@ -9244,7 +9248,7 @@ var DivOverlay = Layer.extend({
         offset: [0, 7],
 
         // @option className: String = ''
-        // A custom CSS class function_name to assign to the popup.
+        // A custom CSS class name to assign to the popup.
         className: '',
 
         // @option pane: String = 'popupPane'
@@ -9261,15 +9265,15 @@ var DivOverlay = Layer.extend({
     onAdd: function (map) {
         this._zoomAnimated = map._zoomAnimated;
 
-		if (!this._container) {
-			this._initLayout();
-		}
+        if (!this._container) {
+            this._initLayout();
+        }
 
-		if (map._fadeAnimated) {
-			setOpacity(this._container, 0);
-		}
+        if (map._fadeAnimated) {
+            setOpacity(this._container, 0);
+        }
 
-		clearTimeout(this._removeTimeout);
+        clearTimeout(this._removeTimeout);
 		this.getPane().appendChild(this._container);
 		this.update();
 
@@ -9484,14 +9488,14 @@ var Popup = DivOverlay.extend({
 		// view after autopanning was performed.
 		autoPanPaddingBottomRight: null,
 
-		// @option autoPanPadding: Point = Point(5, 5)
-		// Equivalent of setting both top left and bottom right autopan padding to the same value.
-		autoPanPadding: [5, 5],
+        // @option autoPanPadding: Point = Point(5, 5)
+        // Equivalent of setting both top left and bottom right autopan padding to the same value.
+        autoPanPadding: [5, 5],
 
-		// @option keepInView: Boolean = false
-		// Set it to `true` if you want to prevent users from panning the popup
-		// off of the screen while it is open.
-		keepInView: false,
+        // @option keepInView: Boolean = false
+        // Set it to `true` if you want to prevent users from panning the popup
+        // off of the screen while it is open.
+        keepInView: false,
 
         // @option closeButton: Boolean = true
         // Controls the presence of a close button in the popup.
@@ -9512,7 +9516,7 @@ var Popup = DivOverlay.extend({
         // on the map. Defaults to the map's [`closePopupOnClick`](#map-closepopuponclick) option.
 
         // @option className: String = ''
-        // A custom CSS class function_name to assign to the popup.
+        // A custom CSS class name to assign to the popup.
         className: ''
     },
 
@@ -9525,16 +9529,16 @@ var Popup = DivOverlay.extend({
     },
 
     onAdd: function (map) {
-		DivOverlay.prototype.onAdd.call(this, map);
+        DivOverlay.prototype.onAdd.call(this, map);
 
-		// @namespace Map
-		// @section Popup events
-		// @event popupopen: PopupEvent
-		// Fired when a popup is opened in the map
-		map.fire('popupopen', {popup: this});
+        // @namespace Map
+        // @section Popup events
+        // @event popupopen: PopupEvent
+        // Fired when a popup is opened in the map
+        map.fire('popupopen', {popup: this});
 
-		if (this._source) {
-			// @namespace Layer
+        if (this._source) {
+            // @namespace Layer
 			// @section Popup events
 			// @event popupopen: PopupEvent
 			// Fired when a popup bound to this layer is opened
@@ -10528,15 +10532,15 @@ var GridLayer = Layer.extend({
 		// The minimum zoom level down to which this layer will be displayed (inclusive).
 		minZoom: 0,
 
-		// @option maxZoom: Number = undefined
-		// The maximum zoom level up to which this layer will be displayed (inclusive).
-		maxZoom: undefined,
+        // @option maxZoom: Number = undefined
+        // The maximum zoom level up to which this layer will be displayed (inclusive).
+        maxZoom: undefined,
 
-		// @option maxNativeZoom: Number = undefined
-		// Maximum zoom number the tile source has available. If it is specified,
-		// the tiles on all zoom levels higher than `maxNativeZoom` will be loaded
-		// from `maxNativeZoom` level and auto-scaled.
-		maxNativeZoom: undefined,
+        // @option maxNativeZoom: Number = undefined
+        // Maximum zoom number the tile source has available. If it is specified,
+        // the tiles on all zoom levels higher than `maxNativeZoom` will be loaded
+        // from `maxNativeZoom` level and auto-scaled.
+        maxNativeZoom: undefined,
 
         // @option minNativeZoom: Number = undefined
         // Minimum zoom number the tile source has available. If it is specified,
@@ -10557,7 +10561,7 @@ var GridLayer = Layer.extend({
         pane: 'tilePane',
 
         // @option className: String = ''
-        // A custom class function_name to assign to the tile layer. Empty by default.
+        // A custom class name to assign to the tile layer. Empty by default.
         className: '',
 
         // @option keepBuffer: Number = 2
@@ -10575,12 +10579,12 @@ var GridLayer = Layer.extend({
         this._levels = {};
         this._tiles = {};
 
-		this._resetView();
-		this._update();
-	},
+        this._resetView();
+        this._update();
+    },
 
-	beforeAdd: function (map) {
-		map._addZoomLimit(this);
+    beforeAdd: function (map) {
+        map._addZoomLimit(this);
 	},
 
 	onRemove: function (map) {
@@ -11390,7 +11394,7 @@ var TileLayer = GridLayer.extend({
         maxZoom: 18,
 
         // @option subdomains: String|String[] = 'abc'
-        // Subdomains of the tile service. Can be passed in the form of one string (where each letter is a subdomain function_name) or an array of strings.
+        // Subdomains of the tile service. Can be passed in the form of one string (where each letter is a subdomain name) or an array of strings.
         subdomains: 'abc',
 
         // @option errorTileUrl: String = ''
@@ -11410,13 +11414,13 @@ var TileLayer = GridLayer.extend({
         zoomReverse: false,
 
         // @option detectRetina: Boolean = false
-		// If `true` and user is on a retina display, it will request four tiles of half the specified size and a bigger zoom level in place of one to utilize the high resolution.
-		detectRetina: false,
+        // If `true` and user is on a retina display, it will request four tiles of half the specified size and a bigger zoom level in place of one to utilize the high resolution.
+        detectRetina: false,
 
-		// @option crossOrigin: Boolean = false
-		// If true, all tiles will have their crossOrigin attribute set to ''. This is needed if you want to access tile pixel data.
-		crossOrigin: false
-	},
+        // @option crossOrigin: Boolean = false
+        // If true, all tiles will have their crossOrigin attribute set to ''. This is needed if you want to access tile pixel data.
+        crossOrigin: false
+    },
 
 	initialize: function (url, options) {
 
@@ -12552,7 +12556,7 @@ var SVG = Renderer.extend({
 
         // @namespace Path
         // @option className: String = null
-        // Custom class function_name set on an element. Only for SVG renderer.
+        // Custom class name set on an element. Only for SVG renderer.
         if (layer.options.className) {
             addClass(path, layer.options.className);
         }
@@ -12565,15 +12569,17 @@ var SVG = Renderer.extend({
         this._layers[stamp(layer)] = layer;
     },
 
-	_addPath: function (layer) {
-		if (!this._rootGroup) { this._initContainer(); }
-		this._rootGroup.appendChild(layer._path);
-		layer.addInteractiveTarget(layer._path);
-	},
+    _addPath: function (layer) {
+        if (!this._rootGroup) {
+            this._initContainer();
+        }
+        this._rootGroup.appendChild(layer._path);
+        layer.addInteractiveTarget(layer._path);
+    },
 
-	_removePath: function (layer) {
-		remove(layer._path);
-		layer.removeInteractiveTarget(layer._path);
+    _removePath: function (layer) {
+        remove(layer._path);
+        layer.removeInteractiveTarget(layer._path);
 		delete this._layers[stamp(layer)];
 	},
 

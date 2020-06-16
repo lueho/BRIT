@@ -83,8 +83,8 @@ this.Element && Element.prototype.attachEvent && !Element.prototype.addEventList
 				typeListeners.event(eventObject);
 			}
 
-			return;
-		}
+
+        }
 	});
 
 	// CustomEvent

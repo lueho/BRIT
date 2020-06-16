@@ -30,7 +30,7 @@ $(document).ready(function() {
   }
 
   if (selectedTabName) {
-    selectedTab = $('.form-switcher a[function_name=' + selectedTabName + ']');
+    selectedTab = $('.form-switcher a[name=' + selectedTabName + ']');
   }
 
   if (selectedTab && selectedTab.length > 0) {
