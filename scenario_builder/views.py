@@ -1,5 +1,3 @@
-from typing import List, Any
-
 from celery.result import AsyncResult
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect
@@ -17,7 +15,6 @@ from .forms import (CatchmentForm, ScenarioModelForm, ScenarioInventoryConfigura
 from .models import Catchment, Scenario, ScenarioInventoryConfiguration, Material, GeoDataset, InventoryAlgorithm, \
     InventoryAlgorithmParameter, InventoryAlgorithmParameterValue
 from .serializers import CatchmentSerializer, BaseResultMapSerializer
-from .tasks import run_inventory_algorithm
 
 
 class InventoryMixin(SingleObjectMixin):
@@ -115,18 +112,10 @@ class ScenarioDetailView(InventoryMixin, DetailView):
         scenario = self.object
         scenario.delete_result_layers()
         inventory = GisInventory(self.object)
-        tasks: List[Any] = []
-        for algorithm_name, kwargs in inventory.config.items():
-            task = run_inventory_algorithm.delay(algorithm_name, **kwargs)
-            algorithm = InventoryAlgorithm.objects.get(function_name=algorithm_name)
-            tasks.append({
-                'task_id': task.id,
-                'algorithm_name': algorithm.name,
-                'task_status': task.state
-            })
+        inventory.start_evaluation()
         context = {
             'scenario': self.object,
-            'task_list': {'tasks': tasks}
+            'task_list': {'tasks': inventory.running_tasks}
         }
         return render(request, 'scenario_evaluator/evaluation_progress.html', context)
 

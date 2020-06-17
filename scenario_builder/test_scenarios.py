@@ -32,5 +32,5 @@ class GisInventoryTestCase(TestCase):
 
     def test_run(self):
         self.assertIsNone(self.inventory.results)
-        self.inventory.run()
+        self.inventory.start_evaluation()
         self.assertIsNotNone(self.inventory.results)
