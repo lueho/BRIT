@@ -6,7 +6,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - flexibi_db/:/var/lib/postgresql/flexibi_db/
+      - flexibi_db/:/var/lib/postgresql/data/
     environment:
       POSTGRES_DB: flexibi_dst
       POSTGRES_USER: flexibi_dst
