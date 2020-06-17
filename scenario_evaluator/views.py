@@ -31,8 +31,19 @@ class ScenarioResultView(DetailView):
 
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()
+        scenario = self.object
         context = self.get_context_data()
         return self.render_to_response(context)
+
+
+class ScenarioEvaluationProgressView(DetailView):
+    """
+    The page users land on if a scenario is being calculated. The progress of the evaluation is shown and upon
+    finishing the calculation, the user is redirected to the result page.
+    """
+
+    template_name = 'scenario_evaluator/evaluation_progress.html'
+    model = Scenario
 
 
 class ScenarioResultDetailMapView(DetailView):

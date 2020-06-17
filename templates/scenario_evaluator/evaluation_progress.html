@@ -1,0 +1,77 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+    <h2>We are evaluating your scenario now.</h2>
+    <p>Name of the scenario: {{ scenario.name }}</p>
+    <p>Depending on the size and complexity of your scenario, this may take a while. The evaluation runs in the
+        background. You can do other things on this site or close your browser and return to this URL later. When
+        the calculations are ready, you will see the result here.</p>
+
+    <div class="row">
+        <div class="col col-8">
+            <hr>
+            <br>
+            <div>
+                <h2>Evaluation progress</h2>
+                <br>
+                <table class="table">
+                    <thead>
+                    <tr>
+                        <th>Algorithm</th>
+                        <th>Status</th>
+                    </tr>
+                    </thead>
+                    <tbody id="tasks">
+                    {% for task in task_list.tasks %}
+                        <tr>
+                            <td id="{{ task.task_id }}">{{ task.algorithm_name }}</td>
+                            <td id="{{ task.task_id }}_status"></td>
+                        </tr>
+                    {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+{% endblock content %}
+
+{% block javascript %}
+    {{ block.super }}
+    {{ task_list|json_script:"task_list" }}
+
+    <script>
+
+        async function getStatus(task_id) {
+            let url = "{% url 'get_evaluation_status' scenario_id=scenario.id task_id=0 %}".replace('0', task_id)
+            let response = await fetch(url);
+            return await response.json()
+        }
+
+        function writeStatus(status) {
+            let element_id = status.task_id + "_status"
+            document.getElementById(element_id).innerHTML = status.task_status
+        }
+
+        function observeTasks(task_list) {
+            if (task_list.length < 1) {
+                return true;
+            }
+            task_list.forEach(async (task) => {
+                let status = await getStatus(task['task_id']);
+                writeStatus(status);
+                if (status.task_status === 'SUCCESS' || status.task_status === 'FAILURE') {
+                    task_list = task_list.filter(t => t.task_id !== status.task_id);
+                }
+            })
+            setTimeout(function () {
+                observeTasks(task_list);
+            }, 1000);
+        }
+
+        window.onload = () => observeTasks(JSON.parse(document.getElementById("task_list").textContent).tasks)
+
+    </script>
+
+{% endblock javascript %}

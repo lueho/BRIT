@@ -58,15 +58,18 @@ class GisInventory(BaseScenario):
             created_layers[layer] = feature_collection
         return created_layers
 
-    def avg_point_yield(self, point_yield: dict = None):
+    @staticmethod
+    def avg_point_yield(**kwargs):
         """
         Assignes a global average and standard deviation to all points that are found within the scenario catchment.
-        :param point_yield: dict
-        :return: result: dict
+        Required keyword arguments:
+        catchment_id
+        point_yield = {'value': <value>, 'standard_deviation': <std>}
         """
-        catchment = self.catchment
+        catchment = Catchment.objects.get(id=kwargs.get('catchment_id'))
         trees_in_catchment = gis_models.HamburgRoadsideTrees.objects.filter(geom__intersects=catchment.geom)
         trees_count = trees_in_catchment.count()
+        point_yield = kwargs.get('point_yield')
         prunings_yield = point_yield['value'] * trees_count
 
         # If result is a gis layer, it must have a list of features under key ['features']. Each feature must have
@@ -94,16 +97,18 @@ class GisInventory(BaseScenario):
             })
         return result
 
-    def avg_area_yield(self, area_yield: dict = None):
+    @staticmethod
+    def avg_area_yield(**kwargs):
         """
         Assignes a global average and standard deviation to park areas that where found in the scenario catchment.
-        :param area_yield:
-        :return:
+        Required keyword arguments:
+        - catchment_id
+        - area_yield: {'value': <value>}
         """
         input_qs = HamburgGreenAreas.objects.all()
-        mask_qs = Catchment.objects.filter(id=self.catchment.id)
+        mask_qs = Catchment.objects.filter(id=kwargs.get('catchment_id'))
         keep_columns = ['anlagenname', 'belegenheit', 'gruenart', 'nutzcode']
-        clipped_polygons = self.clip_polygons(input_qs, mask_qs, keep_columns=keep_columns)
+        clipped_polygons = GisInventory.clip_polygons(input_qs, mask_qs, keep_columns=keep_columns)
         result = {
             'aggregated_values': [
                 {
@@ -119,6 +124,8 @@ class GisInventory(BaseScenario):
             ],
             'features': []
         }
+
+        area_yield = kwargs.get('area_yield')
         for polygon in clipped_polygons:
             result['aggregated_values'][0]['value'] += polygon['area']
             result['aggregated_values'][1]['value'] += polygon['area'] * area_yield['value']

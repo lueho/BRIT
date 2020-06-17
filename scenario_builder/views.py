@@ -1,3 +1,6 @@
+from typing import List, Any
+
+from celery.result import AsyncResult
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect
 from django.urls import reverse, reverse_lazy
@@ -14,6 +17,7 @@ from .forms import (CatchmentForm, ScenarioModelForm, ScenarioInventoryConfigura
 from .models import Catchment, Scenario, ScenarioInventoryConfiguration, Material, GeoDataset, InventoryAlgorithm, \
     InventoryAlgorithmParameter, InventoryAlgorithmParameterValue
 from .serializers import CatchmentSerializer, BaseResultMapSerializer
+from .tasks import run_inventory_algorithm
 
 
 class InventoryMixin(SingleObjectMixin):
@@ -81,6 +85,17 @@ class ScenarioDeleteView(DeleteView):
         return reverse_lazy('scenario_list')
 
 
+def get_evaluation_status(request, scenario_id, task_id):
+    task_result = AsyncResult(task_id)
+    result = {
+        "task_id": task_id,
+        "task_status": task_result.status,
+        "task_result": task_result.result,
+        "task_info": task_result.info
+    }
+    return JsonResponse(result, status=200)
+
+
 class ScenarioDetailView(InventoryMixin, DetailView):
     """Summary of the Scenario with complete configuration. Page for final review, which also contains the
     'run' button."""
@@ -97,9 +112,23 @@ class ScenarioDetailView(InventoryMixin, DetailView):
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
+        scenario = self.object
+        scenario.delete_result_layers()
         inventory = GisInventory(self.object)
-        inventory.run()
-        return redirect('scenario_result', pk=inventory.scenario.id)
+        tasks: List[Any] = []
+        for algorithm_name, kwargs in inventory.config.items():
+            task = run_inventory_algorithm.delay(algorithm_name, **kwargs)
+            algorithm = InventoryAlgorithm.objects.get(function_name=algorithm_name)
+            tasks.append({
+                'task_id': task.id,
+                'algorithm_name': algorithm.name,
+                'task_status': task.state
+            })
+        context = {
+            'scenario': self.object,
+            'task_list': {'tasks': tasks}
+        }
+        return render(request, 'scenario_evaluator/evaluation_progress.html', context)
 
 
 class ScenarioAddInventoryAlgorithmView(TemplateResponseMixin, ModelFormMixin, View):

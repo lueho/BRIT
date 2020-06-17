@@ -341,9 +341,9 @@ class Scenario(models.Model):
         self.delete_configuration()  # TODO: Does this happen automatically through cascading?
         super().delete()
 
-    def delete_results(self):
-        # TODO: Does this happen automatically through cascading?
-        pass
+    def delete_result_layers(self):
+        for layer in self.layer_set.all():
+            layer.delete()
 
     def delete_configuration(self):
         """
@@ -418,6 +418,8 @@ class Scenario(models.Model):
 
             if function not in inventory_config.keys():
                 inventory_config[function] = {}
+                inventory_config[function]['catchment_id'] = self.catchment.id
+                inventory_config[function]['scenario_id'] = self.id
             if parameter not in inventory_config[function]:
                 inventory_config[function][parameter] = {'value': value, 'standard_deviation': standard_deviation}
 

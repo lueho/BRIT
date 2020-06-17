@@ -1,11 +1,13 @@
 from django.test import TestCase
 
+from layer_manager.models import Layer
 from scenario_builder.models import Scenario
+from scenario_builder.views import run_inventory
 from scenario_evaluator.evaluations import ScenarioResult
 
 
 class ScenarioResultTestCase(TestCase):
-    fixtures = ['regions.json', 'catchments.json', 'scenarios.json', 'layers.json']
+    fixtures = ['regions.json', 'catchments.json', 'trees.json', 'parks.json', 'scenarios.json', 'layers.json']
 
     def test_total_annual_production(self):
         scenario = Scenario.objects.get(name='Hamburg standard')
@@ -26,3 +28,13 @@ class ScenarioResultTestCase(TestCase):
         labels, values = result.production_values_for_plot()
         self.assertListEqual(labels, ["Tree prunings (winter)"])
         self.assertListEqual(values, [10996.527193793003])
+
+    def test_async_run_inventory(self):
+        scenario = Scenario.objects.get(id=4)
+        # Must delete layers first because there is no result table connected to it.
+        layers = Layer.objects.filter(scenario=scenario)
+        for layer in layers:
+            layer.delete()
+        self.assertEqual(scenario.name, 'Hamburg standard')
+        result = run_inventory(4)
+        self.assertEqual(result, 'Inventory for scenario 4 completed.')
