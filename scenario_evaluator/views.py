@@ -1,8 +1,10 @@
+from django.shortcuts import render
 from django.views.generic import DetailView, ListView
 
 from layer_manager.models import Layer
 from scenario_builder.models import InventoryAlgorithm, Scenario
 from scenario_evaluator.evaluations import ScenarioResult
+from scenario_evaluator.models import RunningTask
 
 
 class ScenarioListView(ListView):
@@ -32,8 +34,21 @@ class ScenarioResultView(DetailView):
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()
         scenario = self.object
-        context = self.get_context_data()
-        return self.render_to_response(context)
+        if scenario.evaluation_running:
+            context = {
+                'scenario': scenario,
+                'task_list': {'tasks': []}
+            }
+            for task in RunningTask.objects.filter(scenario=scenario):
+                context['task_list']['tasks'].append({
+                    'task_id': task.uuid,
+                    'algorithm_name': task.algorithm.name
+                })
+
+            return render(request, 'scenario_evaluator/evaluation_progress.html', context)
+        else:
+            context = self.get_context_data()
+            return self.render_to_response(context)
 
 
 class ScenarioEvaluationProgressView(DetailView):

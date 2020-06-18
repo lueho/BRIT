@@ -28,7 +28,8 @@ def run_inventory(scenario_id):
 
     # store uuids of running tasks in the database, so we can track the progress from anywhere
     for task in task_chord.tasks:
-        RunningTask.objects.create(scenario=scenario, uuid=task.id)
+        algorithm = InventoryAlgorithm.objects.get(function_name=task.args[0])
+        RunningTask.objects.create(scenario=scenario, uuid=task.id, algorithm=algorithm)
 
     return result
 

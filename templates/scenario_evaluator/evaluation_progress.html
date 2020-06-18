@@ -34,6 +34,11 @@
             </div>
         </div>
     </div>
+    <div class="row">
+        <div class="col col-12">
+            <div id="result-link"></div>
+        </div>
+    </div>
 
 {% endblock content %}
 
@@ -54,8 +59,21 @@
             document.getElementById(element_id).innerHTML = status.task_status
         }
 
+        function addResultLink() {
+            let button = document.createElement("BUTTON")
+            button.innerHTML = "View results"
+            button.onclick = () => {
+                window.location.href = window.location.href;
+            }
+            button.classList.add("btn")
+            button.classList.add("btn-primary")
+            document.getElementById("result-link").appendChild(button);
+        }
+
         function observeTasks(task_list) {
+            console.log(task_list)
             if (task_list.length < 1) {
+                addResultLink();
                 return true;
             }
             task_list.forEach(async (task) => {

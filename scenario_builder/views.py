@@ -110,7 +110,9 @@ class ScenarioDetailView(InventoryMixin, DetailView):
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         scenario = self.object
-        run_inventory.s(scenario.id).delay()
+        scenario.evaluation_running = True
+        scenario.save()
+        run_inventory(scenario.id)
         return redirect('scenario_result', scenario.id)
 
 
