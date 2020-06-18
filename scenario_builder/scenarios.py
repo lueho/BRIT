@@ -3,7 +3,7 @@ from typing import List
 from celery import chord
 
 from scenario_builder.models import InventoryAlgorithm
-from scenario_builder.tasks import run_inventory_algorithm, unblock_scenario
+from scenario_builder.tasks import run_inventory_algorithm, finalize_inventory
 from .models import Catchment, Region, Scenario
 
 
@@ -44,7 +44,7 @@ class GisInventory(BaseScenario):
             signatures.append(run_inventory_algorithm.s(function_name, **kwargs))
             algorithm = InventoryAlgorithm.objects.get(function_name=function_name)
 
-        callback = unblock_scenario.s(self.scenario.id)
+        callback = finalize_inventory.s(self.scenario.id)
         task_chord = chord(signatures, callback)
         result = task_chord.delay()
         for task in task_chord.tasks:

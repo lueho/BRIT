@@ -9,7 +9,7 @@ from django.views.generic.edit import ModelFormMixin
 from rest_framework.views import APIView
 
 from layer_manager.models import Layer
-from scenario_builder.scenarios import GisInventory
+from scenario_builder.tasks import run_inventory
 from .forms import (CatchmentForm, ScenarioModelForm, ScenarioInventoryConfigurationAddForm,
                     ScenarioInventoryConfigurationUpdateForm)
 from .models import Catchment, Scenario, ScenarioInventoryConfiguration, Material, GeoDataset, InventoryAlgorithm, \
@@ -110,14 +110,8 @@ class ScenarioDetailView(InventoryMixin, DetailView):
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         scenario = self.object
-        scenario.delete_result_layers()
-        inventory = GisInventory(self.object)
-        inventory.start_evaluation()
-        context = {
-            'scenario': self.object,
-            'task_list': {'tasks': inventory.running_tasks}
-        }
-        return render(request, 'scenario_evaluator/evaluation_progress.html', context)
+        run_inventory.s(scenario.id).delay()
+        return redirect('scenario_result', scenario.id)
 
 
 class ScenarioAddInventoryAlgorithmView(TemplateResponseMixin, ModelFormMixin, View):
