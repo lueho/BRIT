@@ -1,7 +1,9 @@
 from typing import List
 
+from celery import chord
+
 from scenario_builder.models import InventoryAlgorithm
-from scenario_builder.tasks import run_inventory_algorithm
+from scenario_builder.tasks import run_inventory_algorithm, unblock_scenario
 from .models import Catchment, Region, Scenario
 
 
@@ -33,11 +35,21 @@ class GisInventory(BaseScenario):
         geometric features. The feature_collection can be used to manage the features themselves, which are stored
         in an autimatically created separated table in the database.
         """
+        # block scenario, so it can't be changed during calculations
+        self.scenario.evaluation_running = True
+        self.scenario.save()
 
+        signatures = []
         for function_name, kwargs in self.config.items():
-            task = run_inventory_algorithm.delay(function_name, **kwargs)
+            signatures.append(run_inventory_algorithm.s(function_name, **kwargs))
             algorithm = InventoryAlgorithm.objects.get(function_name=function_name)
+
+        callback = unblock_scenario.s(self.scenario.id)
+        task_chord = chord(signatures, callback)
+        result = task_chord.delay()
+        for task in task_chord.tasks:
             self.running_tasks.append({
                 'task_id': task.id,
-                'algorithm_name': algorithm.name,
+                'algorithm_name': task.args[0],
             })
+        return result

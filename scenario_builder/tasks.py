@@ -1,12 +1,12 @@
-from celery import shared_task, current_task
+from flexibi_dst.celery import app
 
 from layer_manager.models import Layer
 from scenario_builder.inventory_algorithms import InventoryAlgorithms
 from scenario_builder.models import Scenario, InventoryAlgorithm
 
 
-@shared_task
-def run_inventory_algorithm(function_name, **kwargs):
+@app.task(bind=True)
+def run_inventory_algorithm(self, function_name, **kwargs):
     results = getattr(InventoryAlgorithms, function_name)(**kwargs)
     algorithm = InventoryAlgorithm.objects.get(function_name=function_name)
     kwargs = {
@@ -17,6 +17,13 @@ def run_inventory_algorithm(function_name, **kwargs):
     }
     Layer.objects.create_or_replace(**kwargs)
 
-    current_task.update_status(status='PENDING')
-
     return True
+
+
+@app.task
+def unblock_scenario(results, scenario_id):
+    if not all(results):
+        raise Exception
+    scenario = Scenario.objects.get(id=scenario_id)
+    scenario.evaluation_running = False
+    scenario.save()
