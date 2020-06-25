@@ -1,4 +1,5 @@
 from celery.result import AsyncResult
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect
 from django.urls import reverse, reverse_lazy
@@ -20,13 +21,13 @@ class ScenarioListView(ListView):
     model = Scenario
 
 
-class ScenarioCreateView(CreateView):
+class ScenarioCreateView(LoginRequiredMixin, CreateView):
     model = Scenario
     form_class = ScenarioModelForm
     success_url = reverse_lazy('scenarios')
 
 
-class ScenarioUpdateView(UpdateView):
+class ScenarioUpdateView(LoginRequiredMixin, UpdateView):
     model = Scenario
     form_class = ScenarioModelForm
 
@@ -34,7 +35,7 @@ class ScenarioUpdateView(UpdateView):
         return reverse('scenario_detail', kwargs={'pk': self.object.id})
 
 
-class ScenarioDeleteView(DeleteView):
+class ScenarioDeleteView(LoginRequiredMixin, DeleteView):
     template_name = 'scenario_builder/scenario_delete.html'
 
     def get_object(self, **kwargs):
@@ -81,7 +82,7 @@ class ScenarioDetailView(DetailView):
         return redirect('scenario_result', scenario.id)
 
 
-class ScenarioAddInventoryAlgorithmView(TemplateResponseMixin, ModelFormMixin, View):
+class ScenarioAddInventoryAlgorithmView(LoginRequiredMixin, TemplateResponseMixin, ModelFormMixin, View):
     model = ScenarioInventoryConfiguration
     form_class = ScenarioInventoryConfigurationAddForm
     template_name = 'scenario_builder/scenario_configuration_add.html'
@@ -123,7 +124,7 @@ class ScenarioAddInventoryAlgorithmView(TemplateResponseMixin, ModelFormMixin, V
         return self.render_to_response(context)
 
 
-class ScenarioAlgorithmConfigurationUpdateView(TemplateResponseMixin, ModelFormMixin, View):
+class ScenarioAlgorithmConfigurationUpdateView(LoginRequiredMixin, TemplateResponseMixin, ModelFormMixin, View):
     model = ScenarioInventoryConfiguration
     form_class = ScenarioInventoryConfigurationUpdateForm
     template_name = 'scenario_builder/scenario_configuration_update.html'
@@ -220,17 +221,17 @@ def load_parameter_options(request):
         return HttpResponse("")
 
 
-class FeedstockDefinitionView(TemplateView):
+class FeedstockDefinitionView(LoginRequiredMixin, TemplateView):
     template_name = 'feedstock_definition.html'
 
 
-class CatchmentDefinitionView(CreateView):
+class CatchmentDefinitionView(LoginRequiredMixin, CreateView):
     template_name = 'catchment_definition.html'
     form_class = CatchmentForm
     success_url = reverse_lazy('catchment_view')
 
 
-class CatchmentDeleteView(DeleteView):
+class CatchmentDeleteView(LoginRequiredMixin, DeleteView):
     model = Catchment
     success_url = reverse_lazy('catchment_view')
 
