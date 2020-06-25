@@ -55,6 +55,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_gis',
     'leaflet',
+    'users.apps.UsersConfig',
     'bioresource_explorer.apps.BioresourceExplorerConfig',
     'flexibi_dst',
     'scenario_builder',
