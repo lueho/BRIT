@@ -1,6 +1,41 @@
 {% extends 'base.html' %}
 
 {% block content %}
-    <p>user details</p>
+    <!-- Outer Row -->
+    <div class="row justify-content-center">
+
+        <div class="col col-6">
+
+            <div class="card o-hidden border-0 shadow-lg my-5">
+                <div class="card-body p-0">
+                    <!-- Nested Row within Card Body -->
+                    <div class="row justify-content-center">
+                        <div class="col-lg-11">
+                            <div class="pt-5">
+                                <div class="text-center">
+                                    <h1 class="h1 text-gray-900 mb-4">User profile</h1>
+                                </div>
+                                <div>
+                                    User name: {{ user.username }}
+                                </div>
+                            </div>
+                            <div class="p-3">
+                                <div class="text-center">
+                                    <form method="POST" action="{% url 'user_delete' user.pk %}">
+                                        {% csrf_token %}
+                                        <button class="btn btn-primary">
+                                            Delete account
+                                        </button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+
+    </div>
 
 {% endblock content %}
