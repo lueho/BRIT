@@ -21,7 +21,7 @@ from .models import (Catchment,
 class CatchmentForm(ModelForm):
     class Meta:
         model = Catchment
-        fields = ('name', 'region', 'type', 'description', 'geom',)
+        fields = ('name', 'owner', 'region', 'type', 'description', 'geom',)
 
     @staticmethod
     def django_contains(region, catchment):

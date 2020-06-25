@@ -303,7 +303,7 @@ class CatchmentAPIView(APIView):
 
     @staticmethod
     def get(request, *args, **kwargs):
-        catchments = Catchment.objects.filter(owner__in=(request.user, User.objects.get(name='flexibi')))
+        catchments = Catchment.objects.filter(owner__in=(request.user, User.objects.get(username='flexibi')))
 
         serializer = CatchmentSerializer(catchments, many=True)
         data = {

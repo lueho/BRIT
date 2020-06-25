@@ -18,4 +18,4 @@ class CatchmentSerializer(GeoFeatureModelSerializer):
     class Meta:
         model = Catchment
         geo_field = 'geom'
-        fields = ['title', 'type', 'description']
+        fields = ['name', 'type', 'description']
