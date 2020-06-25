@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from django.views.generic import DetailView, ListView
+from django.views.generic import DetailView, TemplateView
 
 from layer_manager.models import Layer
 from scenario_builder.models import InventoryAlgorithm, Scenario
@@ -7,9 +7,23 @@ from scenario_evaluator.evaluations import ScenarioResult
 from scenario_evaluator.models import RunningTask
 
 
-class ScenarioListView(ListView):
+class ScenarioListView(TemplateView):
     model = Scenario
     template_name = 'scenario_evaluator/scenario_list.html'
+    standard_scenarios = None
+    user_scenarios = None
+
+    def get(self, request, *args, **kwargs):
+        self.standard_scenarios = Scenario.objects.filter(owner__username='flexibi')
+        if request.user.is_authenticated:
+            self.user_scenarios = Scenario.objects.filter(owner=self.request.user)
+        else:
+            self.user_scenarios = Scenario.objects.none()
+        context = {
+            'standard_scenarios': self.standard_scenarios,
+            'user_scenarios': self.user_scenarios
+        }
+        return self.render_to_response(context)
 
 
 class ScenarioResultView(DetailView):
@@ -68,6 +82,6 @@ class ScenarioResultDetailMapView(DetailView):
     template_name = 'scenario_builder/result_detail_map.html'
 
     def get_object(self, **kwargs):
-        scenario = Scenario.objects.get(id=self.kwargs.get('pk'))
+        scenario = Scenario.objects.get()
         algorithm = InventoryAlgorithm.objects.get(id=self.kwargs.get('algorithm_pk'))
-        return Layer.objects.get(scenario=scenario, algorithm=algorithm)
+        return Layer.objects.get()
