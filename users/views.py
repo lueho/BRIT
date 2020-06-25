@@ -1,9 +1,14 @@
 from django.contrib.auth.forms import UserCreationForm
 from django.contrib.auth.models import User
-from django.views.generic import CreateView
+from django.views.generic import CreateView, DetailView
 
 
 class UserRegistrationView(CreateView):
     model = User
     form_class = UserCreationForm
     template_name = 'users/register.html'
+
+
+class UserProfileView(DetailView):
+    model = User
+    template_name = 'users/user_profile.html'
