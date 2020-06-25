@@ -15,3 +15,7 @@ class ScriptTestView(TemplateView):
 class DstLoginView(LoginView):
     template_name = 'login.html'
     form_class = AuthenticationForm
+
+
+class HomeView(TemplateView):
+    template_name = 'home.html'
