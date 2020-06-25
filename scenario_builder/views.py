@@ -1,5 +1,6 @@
 from celery.result import AsyncResult
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.models import User
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect
 from django.urls import reverse, reverse_lazy
@@ -27,15 +28,19 @@ class ScenarioCreateView(LoginRequiredMixin, CreateView):
     success_url = reverse_lazy('scenarios')
 
 
-class ScenarioUpdateView(LoginRequiredMixin, UpdateView):
+class ScenarioUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     model = Scenario
     form_class = ScenarioModelForm
 
     def get_success_url(self):
         return reverse('scenario_detail', kwargs={'pk': self.object.id})
 
+    def test_func(self):
+        scenario = Scenario.objects.get(id=self.kwargs.get('pk'))
+        return self.request.user == scenario.owner
 
-class ScenarioDeleteView(LoginRequiredMixin, DeleteView):
+
+class ScenarioDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
     template_name = 'scenario_builder/scenario_delete.html'
 
     def get_object(self, **kwargs):
@@ -44,6 +49,10 @@ class ScenarioDeleteView(LoginRequiredMixin, DeleteView):
 
     def get_success_url(self):
         return reverse_lazy('scenario_list')
+
+    def test_func(self):
+        scenario = Scenario.objects.get(id=self.kwargs.get('pk'))
+        return self.request.user == scenario.owner
 
 
 def get_evaluation_status(request, task_id):
@@ -82,11 +91,16 @@ class ScenarioDetailView(DetailView):
         return redirect('scenario_result', scenario.id)
 
 
-class ScenarioAddInventoryAlgorithmView(LoginRequiredMixin, TemplateResponseMixin, ModelFormMixin, View):
+class ScenarioAddInventoryAlgorithmView(LoginRequiredMixin, UserPassesTestMixin,
+                                        TemplateResponseMixin, ModelFormMixin, View):
     model = ScenarioInventoryConfiguration
     form_class = ScenarioInventoryConfigurationAddForm
     template_name = 'scenario_builder/scenario_configuration_add.html'
     object = None
+
+    def test_func(self):
+        scenario = Scenario.objects.get(id=self.kwargs.get('pk'))
+        return self.request.user == scenario.owner
 
     @staticmethod
     def post(request, *args, **kwargs):
@@ -124,11 +138,16 @@ class ScenarioAddInventoryAlgorithmView(LoginRequiredMixin, TemplateResponseMixi
         return self.render_to_response(context)
 
 
-class ScenarioAlgorithmConfigurationUpdateView(LoginRequiredMixin, TemplateResponseMixin, ModelFormMixin, View):
+class ScenarioAlgorithmConfigurationUpdateView(LoginRequiredMixin, UserPassesTestMixin,
+                                               TemplateResponseMixin, ModelFormMixin, View):
     model = ScenarioInventoryConfiguration
     form_class = ScenarioInventoryConfigurationUpdateForm
     template_name = 'scenario_builder/scenario_configuration_update.html'
     object = None
+
+    def test_func(self):
+        scenario = Scenario.objects.get(id=self.kwargs.get('scenario_pk'))
+        return self.request.user == scenario.owner
 
     @staticmethod
     def post(request, *args, **kwargs):
@@ -167,11 +186,19 @@ class ScenarioAlgorithmConfigurationUpdateView(LoginRequiredMixin, TemplateRespo
         return self.render_to_response(context)
 
 
-def remove_algorithm_from_scenario(request, scenario_pk, algorithm_pk):
-    scenario = Scenario.objects.get(id=scenario_pk)
-    algorithm = InventoryAlgorithm.objects.get(id=algorithm_pk)
-    scenario.remove_inventory_algorithm(algorithm)
-    return redirect('scenario_detail', pk=scenario_pk)
+class ScenarioRemoveInventoryAlgorithmView(LoginRequiredMixin, UserPassesTestMixin, View):
+    scenario = None
+    algorithm = None
+
+    def test_func(self):
+        self.scenario = Scenario.objects.get(id=self.kwargs.get('scenario_pk'))
+        return self.scenario.owner == self.request.user
+
+    def get(self, request, *args, **kwargs):
+        self.scenario = Scenario.objects.get(id=self.kwargs.get('scenario_pk'))
+        self.algorithm = InventoryAlgorithm.objects.get(id=self.kwargs.get('algorithm_pk'))
+        self.scenario.remove_inventory_algorithm(self.algorithm)
+        return redirect('scenario_detail', pk=self.scenario.id)
 
 
 def load_geodataset_options(request):
@@ -231,9 +258,14 @@ class CatchmentDefinitionView(LoginRequiredMixin, CreateView):
     success_url = reverse_lazy('catchment_view')
 
 
-class CatchmentDeleteView(LoginRequiredMixin, DeleteView):
+class CatchmentDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
     model = Catchment
+    catchment = None
     success_url = reverse_lazy('catchment_view')
+
+    def test_func(self):
+        self.catchment = Catchment.objects.get(id=self.kwargs.get('pk'))
+        return self.catchment.owner == self.request.user
 
 
 # class CatchmentView(TemplateView):
@@ -246,10 +278,6 @@ def catchmentView(request):
     catchment_names = Catchment.objects.all().values('name')
 
     return render(request, 'catchment_view.html', {'names': catchment_names})
-
-
-def catchmentDelete(request):
-    return redirect(catchmentView)
 
 
 class ResultMapAPIView(APIView):
@@ -274,11 +302,10 @@ class ResultMapAPIView(APIView):
 class CatchmentAPIView(APIView):
 
     @staticmethod
-    def get(request):
-        name = request.GET.get('function_name')
-        qs = Catchment.objects.filter(name=name)
+    def get(request, *args, **kwargs):
+        catchments = Catchment.objects.filter(owner__in=(request.user, User.objects.get(name='flexibi')))
 
-        serializer = CatchmentSerializer(qs, many=True)
+        serializer = CatchmentSerializer(catchments, many=True)
         data = {
             'geoJson': serializer.data,
         }
