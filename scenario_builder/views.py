@@ -4,7 +4,6 @@ from django.shortcuts import render, redirect
 from django.urls import reverse, reverse_lazy
 from django.views.generic import TemplateView, CreateView, DeleteView, DetailView, ListView, View, UpdateView
 from django.views.generic.base import TemplateResponseMixin
-from django.views.generic.detail import SingleObjectMixin
 from django.views.generic.edit import ModelFormMixin
 from rest_framework.views import APIView
 
@@ -15,42 +14,6 @@ from .forms import (CatchmentForm, ScenarioModelForm, ScenarioInventoryConfigura
 from .models import Catchment, Scenario, ScenarioInventoryConfiguration, Material, GeoDataset, InventoryAlgorithm, \
     InventoryAlgorithmParameter, InventoryAlgorithmParameterValue
 from .serializers import CatchmentSerializer, BaseResultMapSerializer
-
-
-class InventoryMixin(SingleObjectMixin):
-    """
-    A mixin that provides functionality for performing flexibi bioresource inventories
-    """
-    config = None
-    object = None
-
-    def get_inventory_config(self, obj):
-        config_queryset = ScenarioInventoryConfiguration.objects.filter(scenario=self.object)
-
-        inventory_config = {}
-        for entry in config_queryset:
-            function = entry.inventory_algorithm.function_name
-            parameter = entry.inventory_parameter.short_name
-            value = entry.inventory_value.value
-
-            if function not in inventory_config:
-                inventory_config[function] = {}
-            if parameter not in inventory_config[function]:
-                inventory_config[function][parameter] = value
-
-        return inventory_config
-
-    @staticmethod
-    def reformat_inventory_config(inventory_config):
-        inventory_config_list = []
-        for algorithm_name, parameter_dict in inventory_config.items():
-            parameter_list = []
-            for parameter, value in inventory_config[algorithm_name].items():
-                parameter_list.append({'function_name': parameter,
-                                       'value': value})
-            inventory_config_list.append({'algorithm': algorithm_name,
-                                          'parameters': parameter_list})
-        return inventory_config_list
 
 
 class ScenarioListView(ListView):
@@ -82,7 +45,7 @@ class ScenarioDeleteView(DeleteView):
         return reverse_lazy('scenario_list')
 
 
-def get_evaluation_status(request, scenario_id, task_id):
+def get_evaluation_status(request, task_id):
     task_result = AsyncResult(task_id)
     result = {
         "task_id": task_id,
@@ -93,12 +56,14 @@ def get_evaluation_status(request, scenario_id, task_id):
     return JsonResponse(result, status=200)
 
 
-class ScenarioDetailView(InventoryMixin, DetailView):
+class ScenarioDetailView(DetailView):
     """Summary of the Scenario with complete configuration. Page for final review, which also contains the
     'run' button."""
 
     model = Scenario
     template_name = 'scenario_builder/scenario_detail.html'
+    object = None
+    config = None
 
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()
