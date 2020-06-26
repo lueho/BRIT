@@ -1,21 +1,22 @@
-from django.contrib.auth.forms import AuthenticationForm
-from django.contrib.auth.views import LoginView
-from django.shortcuts import render
-from django.views.generic import TemplateView
-
-
-def home(request):
-    return render(request, 'base.html', {})
-
-
-class ScriptTestView(TemplateView):
-    template_name = 'script_test.html'
-
-
-class DstLoginView(LoginView):
-    template_name = 'login.html'
-    form_class = AuthenticationForm
+from django.contrib.auth.models import User
+from django.views.generic import TemplateView, ListView
 
 
 class HomeView(TemplateView):
     template_name = 'home.html'
+
+
+class DualUserListView(ListView):
+    standard_owner = User.objects.get(username='flexibi')
+
+    def get(self, request, *args, **kwargs):
+        standard_objects = self.model.objects.filter(owner=self.standard_owner)
+        if request.user.is_authenticated:
+            user_objects = self.model.objects.filter(owner=self.request.user)
+        else:
+            user_objects = self.model.objects.none()
+        context = {
+            'standard_objects': standard_objects,
+            'user_objects': user_objects
+        }
+        return self.render_to_response(context)

@@ -1,29 +1,16 @@
 from django.shortcuts import render
-from django.views.generic import DetailView, TemplateView
+from django.views.generic import DetailView
 
+from flexibi_dst.views import DualUserListView
 from layer_manager.models import Layer
 from scenario_builder.models import InventoryAlgorithm, Scenario
 from scenario_evaluator.evaluations import ScenarioResult
 from scenario_evaluator.models import RunningTask
 
 
-class ScenarioListView(TemplateView):
+class ScenarioListView(DualUserListView):
     model = Scenario
     template_name = 'scenario_evaluator/scenario_list.html'
-    standard_scenarios = None
-    user_scenarios = None
-
-    def get(self, request, *args, **kwargs):
-        self.standard_scenarios = Scenario.objects.filter(owner__username='flexibi')
-        if request.user.is_authenticated:
-            self.user_scenarios = Scenario.objects.filter(owner=self.request.user)
-        else:
-            self.user_scenarios = Scenario.objects.none()
-        context = {
-            'standard_scenarios': self.standard_scenarios,
-            'user_scenarios': self.user_scenarios
-        }
-        return self.render_to_response(context)
 
 
 class ScenarioResultView(DetailView):
