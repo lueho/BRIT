@@ -1,6 +1,18 @@
+from rest_framework.serializers import ModelSerializer
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
-from .models import Catchment
+from .models import Catchment, Region
+
+
+# ----------- Regions --------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class RegionSerializer(GeoFeatureModelSerializer):
+    class Meta:
+        model = Region
+        geo_field = 'geom'
+        fields = ['country', 'name']
 
 
 class BaseResultMapSerializer(GeoFeatureModelSerializer):
@@ -19,3 +31,9 @@ class CatchmentSerializer(GeoFeatureModelSerializer):
         model = Catchment
         geo_field = 'geom'
         fields = ['name', 'type', 'description']
+
+
+class CatchmentQuerySerializer(ModelSerializer):
+    class Meta:
+        model = Catchment
+        fields = ['owner', 'region', 'type', 'name']

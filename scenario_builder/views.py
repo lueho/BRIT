@@ -1,22 +1,106 @@
 from celery.result import AsyncResult
+from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import User
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect
 from django.urls import reverse, reverse_lazy
-from django.views.generic import TemplateView, CreateView, DeleteView, DetailView, ListView, View, UpdateView
+from django.views.generic import CreateView, DeleteView, DetailView, ListView, View, UpdateView
 from django.views.generic.base import TemplateResponseMixin
-from django.views.generic.edit import ModelFormMixin
+from django.views.generic.edit import FormMixin, ModelFormMixin
 from rest_framework.views import APIView
 
 from layer_manager.models import Layer
-from scenario_builder.tasks import run_inventory
-from .forms import (CatchmentForm, ScenarioModelForm, ScenarioInventoryConfigurationAddForm,
+from .forms import (CatchmentCreationForm,
+                    CatchmentQueryForm,
+                    ScenarioModelForm,
+                    ScenarioInventoryConfigurationAddForm,
                     ScenarioInventoryConfigurationUpdateForm)
-from .models import Catchment, Scenario, ScenarioInventoryConfiguration, Material, GeoDataset, InventoryAlgorithm, \
-    InventoryAlgorithmParameter, InventoryAlgorithmParameterValue
-from .serializers import CatchmentSerializer, BaseResultMapSerializer
+from .models import (Catchment,
+                     Scenario,
+                     ScenarioInventoryConfiguration,
+                     Material,
+                     GeoDataset,
+                     InventoryAlgorithm,
+                     InventoryAlgorithmParameter,
+                     InventoryAlgorithmParameterValue,
+                     Region)
+from .serializers import CatchmentSerializer, BaseResultMapSerializer, RegionSerializer
+from .tasks import run_inventory
 
+
+# ----------- Catchments -----------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+class CatchmentBrowseView(FormMixin, ListView):
+    model = Catchment
+    form_class = CatchmentQueryForm
+
+
+class CatchmentCreateView(LoginRequiredMixin, CreateView):
+    template_name = 'catchment_definition.html'
+    form_class = CatchmentCreationForm
+    success_url = reverse_lazy('catchment_view')
+
+
+class CatchmentDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
+    model = Catchment
+    catchment = None
+    success_url = reverse_lazy('catchment_view')
+
+    def test_func(self):
+        self.catchment = Catchment.objects.get(id=self.kwargs.get('pk'))
+        return self.catchment.owner == self.request.user
+
+
+def load_catchment_options(request):
+    if request.GET.get('region_id'):
+        region = Region.objects.get(id=request.GET.get('region_id'))
+        catchment_owners = []
+        if int(request.GET.get('category_standard')):
+            catchment_owners.append(User.objects.get(username=settings.PUBLIC_OBJECT_OWNER))
+        if int(request.GET.get('category_custom')) and request.user.is_authenticated:
+            catchment_owners.append(request.user)
+        catchments = Catchment.objects.filter(region=region, owner__in=catchment_owners)
+    else:
+        catchments = Catchment.objects.none()
+    return render(request, 'scenario_builder/catchment_dropdown_list_options.html', {'catchments': catchments})
+
+
+class CatchmentGeometryAPI(APIView):
+
+    def get(self, request, *args, **kwargs):
+        print(self.request.GET.get('catchment_id'))
+        catchments = Catchment.objects.filter(id=self.request.GET.get('catchment_id'))
+        serializer = CatchmentSerializer(catchments, many=True)
+        data = {
+            'geoJson': serializer.data,
+        }
+
+        return JsonResponse(data, safe=False)
+
+
+# ----------- Feedstocks -----------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+# ----------- Regions --------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+class RegionGeometryAPI(APIView):
+
+    def get(self, request, *args, **kwargs):
+        regions = Region.objects.filter(id=self.request.GET.get('region_id'))
+        serializer = RegionSerializer(regions, many=True)
+        data = {
+            'geoJson': serializer.data,
+        }
+
+        return JsonResponse(data, safe=False)
+
+
+# ----------- Scenarios ------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
 
 class ScenarioListView(ListView):
     model = Scenario
@@ -248,39 +332,7 @@ def load_parameter_options(request):
         return HttpResponse("")
 
 
-class FeedstockDefinitionView(LoginRequiredMixin, TemplateView):
-    template_name = 'feedstock_definition.html'
-
-
-class CatchmentDefinitionView(LoginRequiredMixin, CreateView):
-    template_name = 'catchment_definition.html'
-    form_class = CatchmentForm
-    success_url = reverse_lazy('catchment_view')
-
-
-class CatchmentDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
-    model = Catchment
-    catchment = None
-    success_url = reverse_lazy('catchment_view')
-
-    def test_func(self):
-        self.catchment = Catchment.objects.get(id=self.kwargs.get('pk'))
-        return self.catchment.owner == self.request.user
-
-
-# class CatchmentView(TemplateView):
-# template_name = 'catchment_view.html'
-# form_class = CatchmentForm
-# success_url = reverse_lazy('catchment_view')
-
-
-def catchmentView(request):
-    catchment_names = Catchment.objects.all().values('name')
-
-    return render(request, 'catchment_view.html', {'names': catchment_names})
-
-
-class ResultMapAPIView(APIView):
+class ResultMapAPI(APIView):
     """Rest API to get features from automatically generated result tables. Endpoint for Leaflet maps"""
 
     @staticmethod
@@ -292,20 +344,6 @@ class ResultMapAPIView(APIView):
         serializer_class.Meta.model = feature_collection
 
         serializer = serializer_class(features, many=True)
-        data = {
-            'geoJson': serializer.data,
-        }
-
-        return JsonResponse(data, safe=False)
-
-
-class CatchmentAPIView(APIView):
-
-    @staticmethod
-    def get(request, *args, **kwargs):
-        catchments = Catchment.objects.filter(owner__in=(request.user, User.objects.get(username='flexibi')))
-
-        serializer = CatchmentSerializer(catchments, many=True)
         data = {
             'geoJson': serializer.data,
         }

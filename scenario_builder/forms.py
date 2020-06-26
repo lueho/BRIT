@@ -1,15 +1,32 @@
 from crispy_forms.helper import FormHelper
-from django.forms import ModelForm, HiddenInput
+from django.forms import (Form,
+                          ModelChoiceField,
+                          ModelForm,
+                          MultipleChoiceField,
+                          HiddenInput)
+from django.forms.widgets import CheckboxSelectMultiple
 from leaflet.forms.widgets import LeafletWidget
 
-from .models import Catchment, ScenarioInventoryConfiguration, GeoDataset, InventoryAlgorithm, Scenario
+from .models import Catchment, ScenarioInventoryConfiguration, GeoDataset, InventoryAlgorithm, Region, Scenario
 
 
-class CatchmentForm(ModelForm):
+class CatchmentCreationForm(ModelForm):
     class Meta:
         model = Catchment
         fields = ['name', 'description', 'geom', ]
         widgets = {'geom': LeafletWidget()}
+
+
+class CatchmentQueryForm(Form):
+    region = ModelChoiceField(queryset=Region.objects.all())
+    category = MultipleChoiceField(
+        choices=(('standard', 'Standard'), ('custom', 'Custom'),),
+        widget=CheckboxSelectMultiple
+    )
+    catchment = ModelChoiceField(queryset=Catchment.objects.all())
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
 
 
 class ScenarioModelForm(ModelForm):

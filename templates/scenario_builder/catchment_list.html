@@ -1,0 +1,142 @@
+{% extends 'base.html' %}
+{% load crispy_forms_filters %}
+{% load leaflet_tags %}
+
+
+{% block content %}
+
+    {% leaflet_js plugins="draw" %}
+    {% leaflet_css plugins="draw" %}
+
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">Catchments</h1>
+    </div>
+
+    <!-- Outer wrapper -->
+    <div class="row h-100">
+        <div class="col-sm-3">
+            <form method="get">
+                {{ form|crispy }}
+            </form>
+            <p>Select a catchment to view it on the map</p>
+            <h4>Name</h4>
+            <p id="catchment-name" style="min-height: 1rem;"></p>
+            <h4>Type</h4>
+            <p id="catchment-type" style="min-height: 1rem;"></p>
+            <h4>Description</h4>
+            <p id="catchment-description" style="min-height: 1rem;"></p>
+            <a href="{% url 'catchment_definition' %}">Create a new catchment</a>
+        </div>
+        <div class="col">
+            {% leaflet_map "main" %}
+        </div>
+    </div>
+{% endblock content %}
+
+{% block javascript %}
+    {{ block.super }}
+
+    <script type="text/javascript">
+
+        let map;
+        let catchment_layer;
+        let region_layer;
+
+        window.addEventListener("map:init", function (event) {
+            map = event.detail.map;
+        });
+
+        async function loadCatchmentOptions() {
+            const url = "{% url 'ajax_catchment_options' %}";
+            let args = new URLSearchParams({
+                region_id: document.getElementById("id_region").value.toString(),
+                category_standard: (document.getElementById("id_category_1").checked ? 1 : 0).toString(),
+                category_custom: (document.getElementById("id_category_2").checked ? 1 : 0).toString()
+            });
+            console.log(url + "?" + args);
+
+            let response = await fetch(url + "?" + args);
+            return await response.text();
+        }
+
+        function setCatchmentOptions() {
+            loadCatchmentOptions()
+                .then(html => document.getElementById("id_catchment").innerHTML = html)
+                .catch((err) => console.log(err))
+        }
+
+        async function fetchRegionGeometry() {
+
+            // Define query string for REST API
+            let params = L.Util.extend({
+                region_id: document.getElementById("id_region").value
+            });
+
+            let url = "{% url 'ajax_region_geometries' %}" + L.Util.getParamString(params);
+
+            // Remove existing layer
+            if (undefined !== region_layer) {
+                map.removeLayer(region_layer);
+            }
+
+            // Fetch data from REST API
+            let response = await fetch(url);
+            let data = await response.json();
+
+            // Render geodata on map
+            let geodata;
+            geodata = data['geoJson'];
+            region_layer = L.geoJson(geodata, {
+                pointToLayer: function (feature, latlng) {
+                    return L.polygon(latlng, {})
+                }
+            })
+            region_layer.addTo(map);
+            map.fitBounds(region_layer.getBounds())
+        }
+
+        async function fetchCatchmentGeometry() {
+
+            // Define query string for REST API
+            let params = L.Util.extend({
+                catchment_id: document.getElementById("id_catchment").value
+            });
+
+            let dataurl = "{% url 'ajax_catchment_geometries' %}" + L.Util.getParamString(params);
+
+            // Remove existing layer
+            if (undefined !== catchment_layer) {
+                map.removeLayer(catchment_layer);
+            }
+
+            // Fetch data from REST API
+            let response = await fetch(dataurl);
+            let data = await response.json();
+
+            // Render geodata on map
+            let geodata;
+            geodata = data['geoJson'];
+            catchment_layer = L.geoJson(geodata, {
+                pointToLayer: function (feature, latlng) {
+                    return L.polygon(latlng, {})
+                }
+            })
+            catchment_layer.addTo(map);
+            map.fitBounds(catchment_layer.getBounds())
+
+            document.getElementById("catchment-name").innerHTML = geodata.features[0].properties.name;
+            document.getElementById("catchment-type").innerHTML = geodata.features[0].properties.type;
+            document.getElementById("catchment-description").innerHTML = geodata.features[0].properties.description;
+        }
+
+        document.getElementById("id_region").onchange = () => {
+            setCatchmentOptions();
+            fetchRegionGeometry();
+        }
+        document.getElementById("id_category_1").onchange = () => setCatchmentOptions();
+        document.getElementById("id_category_2").onchange = () => setCatchmentOptions();
+        document.getElementById("id_catchment").onchange = () => fetchCatchmentGeometry();
+
+    </script>
+{% endblock %}
