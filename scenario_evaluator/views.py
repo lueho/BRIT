@@ -69,6 +69,6 @@ class ScenarioResultDetailMapView(DetailView):
     template_name = 'scenario_builder/result_detail_map.html'
 
     def get_object(self, **kwargs):
-        scenario = Scenario.objects.get()
+        scenario = Scenario.objects.get(id=self.kwargs.get('pk'))
         algorithm = InventoryAlgorithm.objects.get(id=self.kwargs.get('algorithm_pk'))
-        return Layer.objects.get()
+        return Layer.objects.get(scenario=scenario, algorithm=algorithm)
