@@ -5,7 +5,7 @@
     <div class="row">
         <div class="col">
             <ul class="list-group">
-                {% for scenario in standard_scenarios %}
+                {% for scenario in standard_objects %}
                     <li class="list-group-item"><a
                             href="{% url 'scenario_result' scenario.id %}">{{ scenario.name }}</a> <a
                             href="{% url 'scenario_update' scenario.id %}"><i class="fas fa-fw fa-edit"></i></a> <a
@@ -24,7 +24,7 @@
         <div class="row">
             <div class="col">
                 <ul class="list-group">
-                    {% for scenario in user_scenarios %}
+                    {% for scenario in user_objects %}
                         <li class="list-group-item"><a
                                 href="{% url 'scenario_result' scenario.id %}">{{ scenario.name }}</a> <a
                                 href="{% url 'scenario_update' scenario.id %}"><i class="fas fa-fw fa-edit"></i></a> <a
