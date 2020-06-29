@@ -148,10 +148,12 @@ STATIC_ROOT = os.path.join(BASE_DIR, 'static_root')
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 
 LEAFLET_CONFIG = {
-    'DEFAULT_CENTER': (53.559714, 10.004034),
-    'DEFAULT_ZOOM': 10,
-    'MIN_ZOOM': 8,
-    'MAX_ZOOM': 15,
+    'DEFAULT_CENTER': (48.917908, 6.921543),
+    'DEFAULT_ZOOM': 5,
+    'RESET_VIEW': False,
+    'NO_GLOBALS': False,
+    'MIN_ZOOM': 5,
+    'MAX_ZOOM': 18,
     'PLUGINS': {'draw': {'css': 'draw/leaflet.draw.css',
                          'js': 'draw/leaflet.draw.js',
                          'auto-include': True
@@ -162,6 +164,7 @@ LEAFLET_CONFIG = {
 }
 
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
+CRISPY_FAIL_SILENTLY = not DEBUG
 
 LOGIN_REDIRECT_URL = 'home'
 LOGIN_URL = 'login'

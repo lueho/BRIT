@@ -11,7 +11,7 @@ from django.views.generic.edit import FormMixin, ModelFormMixin
 from rest_framework.views import APIView
 
 from layer_manager.models import Layer
-from .forms import (CatchmentCreationForm,
+from .forms import (CatchmentForm,
                     CatchmentQueryForm,
                     ScenarioModelForm,
                     ScenarioInventoryConfigurationAddForm,
@@ -38,15 +38,31 @@ class CatchmentBrowseView(FormMixin, ListView):
 
 
 class CatchmentCreateView(LoginRequiredMixin, CreateView):
-    template_name = 'catchment_definition.html'
-    form_class = CatchmentCreationForm
-    success_url = reverse_lazy('catchment_view')
+    template_name = 'scenario_builder/catchment_create.html'
+    form_class = CatchmentForm
+    success_url = reverse_lazy('catchment_list')
+
+    def form_valid(self, form):
+        form.instance.owner = self.request.user
+        return super().form_valid(form)
+
+
+class CatchmentUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
+    model = Catchment
+    form_class = CatchmentForm
+
+    def get_success_url(self):
+        return reverse('catchment_list')
+
+    def test_func(self):
+        catchment = Catchment.objects.get(id=self.kwargs.get('pk'))
+        return self.request.user == catchment.owner
 
 
 class CatchmentDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
     model = Catchment
     catchment = None
-    success_url = reverse_lazy('catchment_view')
+    success_url = reverse_lazy('catchment_list')
 
     def test_func(self):
         self.catchment = Catchment.objects.get(id=self.kwargs.get('pk'))
@@ -109,7 +125,7 @@ class ScenarioListView(ListView):
 class ScenarioCreateView(LoginRequiredMixin, CreateView):
     model = Scenario
     form_class = ScenarioModelForm
-    success_url = reverse_lazy('scenarios')
+    success_url = reverse_lazy('scenario_list')
 
 
 class ScenarioUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):

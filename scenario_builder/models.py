@@ -26,12 +26,12 @@ class Region(models.Model):
 
 
 class Catchment(models.Model):
-    name = models.CharField(max_length=256, null=True)
-    owner = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
-    region = models.ForeignKey(Region, on_delete=models.CASCADE, null=True)
+    name = models.CharField(max_length=256, default="Custom Catchment")
+    owner = models.ForeignKey(User, on_delete=models.CASCADE)
+    region = models.ForeignKey(Region, on_delete=models.CASCADE)
     description = models.TextField(blank=True, null=True)
-    type = models.CharField(max_length=14, choices=TYPES, default='custom', null=True)
-    geom = MultiPolygonField(null=True)
+    type = models.CharField(max_length=14, choices=TYPES, default='custom')
+    geom = MultiPolygonField()
 
     def __str__(self):
         return self.name

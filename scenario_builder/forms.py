@@ -10,11 +10,37 @@ from leaflet.forms.widgets import LeafletWidget
 from .models import Catchment, ScenarioInventoryConfiguration, GeoDataset, InventoryAlgorithm, Region, Scenario
 
 
-class CatchmentCreationForm(ModelForm):
+# ----------- Catchments -----------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class CatchmentCreateForm(ModelForm):
     class Meta:
         model = Catchment
-        fields = ['name', 'description', 'geom', ]
+        fields = ['region', 'name', 'description', 'geom', ]
         widgets = {'geom': LeafletWidget()}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['geom'].label = ''
+
+
+class CatchmentForm(ModelForm):
+    class Meta:
+        model = Catchment
+        fields = ('region', 'name', 'description', 'geom',)
+        widgets = {'geom': LeafletWidget()}
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['geom'].label = ''
+
+    def clean(self):
+        catchment = super().clean()
+        region = catchment.get('region')
+        if region and catchment:
+            if not region.geom.contains(catchment.get('geom')):
+                self.add_error('geom', 'The catchment must be inside the region.')
 
 
 class CatchmentQueryForm(Form):
