@@ -155,7 +155,7 @@ class ScenarioDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
         return self.request.user == scenario.owner
 
 
-def get_evaluation_status(request, task_id):
+def get_evaluation_status(request, scenario_id=None, task_id=None):
     task_result = AsyncResult(task_id)
     result = {
         "task_id": task_id,
