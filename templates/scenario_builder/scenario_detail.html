@@ -16,12 +16,16 @@
                 <tr>
                     <td class="col-3"><b>Case study region:</b></td>
                     <td>
-                        <a href="{% url 'admin:scenario_builder_region_change' object.region.id %}">{{ object.region }}</a>
+                        <a href="{% url 'admin:scenario_builder_region_change' object.region.id %}">
+                            {{ object.region }}
+                        </a>
                     </td>
                 <tr>
                     <td class="col-3"><b>Catchment:</b></td>
                     <td>
-                        <a href="{% url 'admin:scenario_builder_catchment_change' object.catchment.id %}">{{ object.catchment }}</a>
+                        <a href="{% url 'admin:scenario_builder_catchment_change' object.catchment.id %}">
+                            {{ object.catchment }}
+                        </a>
                     </td>
             </table>
         </div>
