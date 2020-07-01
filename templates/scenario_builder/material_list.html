@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <h2>FLEXIBI standard materials</h2>
+    <div class="row">
+        <div class="col">
+            <ul class="list-group">
+                {% for material in standard_objects %}
+                    <li class="list-group-item">
+                        <a href="{% url 'material_detail' material.id %}">{{ material.name }}</a>
+                        <a href="{% url 'material_update' material.id %}"><i class="fas fa-fw fa-edit"></i></a>
+                        <a href="{% url 'material_delete' material.id %}"><i class="fas fa-fw fa-trash"></i></a></li>
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+    <div class="row mt-3">
+        <div class="col">
+            <h2>Your custom materials</h2>
+        </div>
+    </div>
+
+    {% if user.is_authenticated %}
+        <div class="row">
+            <div class="col">
+                <ul class="list-group">
+                    {% for material in user_objects %}
+                        <li class="list-group-item">
+                            <a href="{% url 'material_detail' material.id %}">{{ material.name }}</a>
+                            <a href="{% url 'material_update' material.id %}"><i class="fas fa-fw fa-edit"></i></a>
+                            <a href="{% url 'material_delete' material.id %}"><i class="fas fa-fw fa-trash"></i></a>
+                        </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    {% else %}
+        <div class="row">
+            <div class="col">
+                You need to be logged in to see your custom materials.
+                <a href="{% url 'login' %}?next={{ request.path | urlencode }}">
+                    Login now.
+                </a>
+            </div>
+        </div>
+    {% endif %}
+    <div class="row mt-3">
+        <div class="col">
+            <a href="{% url 'material_create' %}">
+                <i class="fas fa-fw fa-plus"></i> Create new custom material
+            </a>
+        </div>
+    </div>
+
+{% endblock content %}

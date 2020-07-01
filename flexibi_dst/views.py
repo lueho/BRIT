@@ -13,7 +13,7 @@ class DualUserListView(ListView):
     object_list = None
 
     def get(self, request, *args, **kwargs):
-        standard_objects = self.model.objects.filter(owner=8)
+        standard_objects = self.model.objects.filter(owner=self.standard_owner)
         if request.user.is_authenticated:
             user_objects = self.model.objects.filter(owner=self.request.user)
         else:

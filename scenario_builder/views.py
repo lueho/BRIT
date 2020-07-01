@@ -10,9 +10,11 @@ from django.views.generic.base import TemplateResponseMixin
 from django.views.generic.edit import FormMixin, ModelFormMixin
 from rest_framework.views import APIView
 
+from flexibi_dst.views import DualUserListView
 from layer_manager.models import Layer
 from .forms import (CatchmentForm,
                     CatchmentQueryForm,
+                    MaterialCreateForm,
                     ScenarioModelForm,
                     ScenarioInventoryConfigurationAddForm,
                     ScenarioInventoryConfigurationUpdateForm)
@@ -96,12 +98,47 @@ class CatchmentGeometryAPI(APIView):
         return JsonResponse(data, safe=False)
 
 
-# ----------- Feedstocks -----------------------------------------------------------------------------------------------
+# ----------- Materials/Feedstocks -------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
+
+
+class MaterialListView(DualUserListView):
+    model = Material
+    template_name = 'scenario_builder/material_list.html'
+
+
+class MaterialCreateView(LoginRequiredMixin, CreateView):
+    form_class = MaterialCreateForm
+    template_name = 'scenario_builder/material_create.html'
+    success_url = reverse_lazy('material_list')
+
+    def form_valid(self, form):
+        form.instance.owner = self.request.user
+        return super().form_valid(form)
+
+
+class MaterialDetailView(DetailView):
+    model = Material
+
+
+class MaterialUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
+    model = Material
+    template_name = 'scenario_builder/material_update.html'
+
+    def test_func(self):
+        pass
+
+
+class MaterialDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
+    model = Material
+
+    def test_func(self):
+        pass
 
 
 # ----------- Regions --------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
+
 
 class RegionGeometryAPI(APIView):
 

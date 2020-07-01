@@ -46,6 +46,7 @@ class MaterialManager(models.Manager):
 class Material(models.Model):
     name = models.CharField(max_length=28)
     description = models.TextField(blank=True, null=True)
+    owner = models.ForeignKey(User, on_delete=models.CASCADE)
     is_feedstock = models.BooleanField(default=False)
     stan_flow_id = models.CharField(max_length=5,
                                     validators=[RegexValidator(regex=r'^[0-9]{5}?',

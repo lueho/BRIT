@@ -7,7 +7,13 @@ from django.forms import (Form,
 from django.forms.widgets import CheckboxSelectMultiple
 from leaflet.forms.widgets import LeafletWidget
 
-from .models import Catchment, ScenarioInventoryConfiguration, GeoDataset, InventoryAlgorithm, Region, Scenario
+from .models import (Catchment,
+                     GeoDataset,
+                     InventoryAlgorithm,
+                     Material,
+                     Region,
+                     Scenario,
+                     ScenarioInventoryConfiguration, )
 
 
 # ----------- Catchments -----------------------------------------------------------------------------------------------
@@ -53,6 +59,16 @@ class CatchmentQueryForm(Form):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+
+
+# ----------- Materials/Feedstocks -------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class MaterialCreateForm(ModelForm):
+    class Meta:
+        model = Material
+        fields = ('name', 'description', 'is_feedstock')
 
 
 class ScenarioModelForm(ModelForm):
