@@ -65,7 +65,7 @@
                             <i class="fas fa-fw fa-edit"></i> Edit this catchment
                         </a>
                         <a data-toggle="modal" id="delete-link" href="#" style="display: none;"
-                           data-target="#delete-catchment-confirmation-modal">
+                           data-target="#modal-confirm-delete">
                             <i class="fas fa-fw fa-trash"></i> Delete this catchment
                         </a>
                     </div>
@@ -84,31 +84,7 @@
 
     </div>
 
-    <!-- Delete confirmation modal -->
-    <div class="modal fade" id="delete-catchment-confirmation-modal" tabindex="-1" role="dialog"
-         aria-labelledby="delete-catchment-confirmation-modal-label"
-         aria-hidden="true">
-        <div class="modal-dialog" role="document">
-            <div class="modal-content">
-                <div class="modal-header">
-                    <h5 class="modal-title" id="delete-catchment-confirmation-modal-label">Confirm Deletion</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close">
-                        <span aria-hidden="true">&times;</span>
-                    </button>
-                </div>
-                <div class="modal-body">
-                    Are you sure you want to delete this catchment?
-                </div>
-                <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal">Cancel</button>
-                    <form id="delete-catchment-confirmation-form" method="POST">
-                        {% csrf_token %}
-                        <button type="submit" value="confirm" class="btn btn-primary">Delete</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
+    {% include 'modal_confirm_delete.html' %}
 
 {% endblock content %}
 
@@ -153,7 +129,7 @@
                 updateLink.style.display = "block";
             }
 
-            form = document.getElementById("delete-catchment-confirmation-form")
+            form = document.getElementById("delete-confirmation-form")
             form.action = "{% url 'catchment_delete' pk=0%}".replace("0", catchment_id.toString());
 
             let deleteLink = document.getElementById("delete-link");
