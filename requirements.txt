@@ -3,6 +3,7 @@ asgiref==3.2.8
 billiard==3.6.3.0
 celery==4.4.5
 Django==3.0.7
+django-bootstrap-modal-forms==2.0.0
 django-crispy-forms==1.9.1
 django-filters==0.2.1
 django-geojson==3.0.0

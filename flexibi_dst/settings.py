@@ -63,6 +63,7 @@ INSTALLED_APPS = [
     'gis_source_manager',
     'layer_manager',
     'crispy_forms',
+    'bootstrap_modal_forms',
 ]
 
 MIDDLEWARE = [
