@@ -7,7 +7,7 @@ RUN apt-get install -y --no-install-recommends \
 
 WORKDIR /tmp
 
-ENV CPUS 4
+ENV CPUS 2
 
 ENV WEBP_VERSION 1.0.0
 RUN wget -q https://storage.googleapis.com/downloads.webmproject.org/releases/webp/libwebp-${WEBP_VERSION}.tar.gz && \
