@@ -63,12 +63,11 @@ class CatchmentUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
 
 class CatchmentDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
     model = Catchment
-    catchment = None
     success_url = reverse_lazy('catchment_list')
 
     def test_func(self):
-        self.catchment = Catchment.objects.get(id=self.kwargs.get('pk'))
-        return self.catchment.owner == self.request.user
+        catchment = Catchment.objects.get(id=self.kwargs.get('pk'))
+        return catchment.owner == self.request.user
 
 
 def load_catchment_options(request):
@@ -110,7 +109,7 @@ class MaterialListView(DualUserListView):
 class MaterialCreateView(LoginRequiredMixin, CreateView):
     form_class = MaterialCreateForm
     template_name = 'scenario_builder/material_create.html'
-    success_url = reverse_lazy('material_list')
+    success_url = reverse_lazy('material_detail')
 
     def form_valid(self, form):
         form.instance.owner = self.request.user
@@ -133,7 +132,8 @@ class MaterialDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
     model = Material
 
     def test_func(self):
-        pass
+        material = Material.objects.get(id=self.kwargs.get('pk'))
+        return material.owner == self.request.user
 
 
 # ----------- Regions --------------------------------------------------------------------------------------------------

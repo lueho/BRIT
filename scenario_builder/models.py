@@ -59,6 +59,14 @@ class Material(models.Model):
         return self.name
 
 
+class MaterialComponentGroup(models.Model):
+    name = models.CharField(max_length=56)
+    description = models.TextField(blank=True, null=True)
+
+    def __str__(self):
+        return self.name
+
+
 class MaterialComponent(models.Model):
     name = models.CharField(max_length=20)
     description = models.TextField(blank=True, null=True)
@@ -66,6 +74,7 @@ class MaterialComponent(models.Model):
     standard_deviation = models.FloatField(null=True)
     source = models.CharField(max_length=20)
     material = models.ForeignKey(Material, on_delete=models.CASCADE)
+    groups = models.ManyToManyField(MaterialComponentGroup)
 
     def __str__(self):
         return self.name
