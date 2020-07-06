@@ -28,7 +28,9 @@
                         <li class="list-group-item">
                             <a href="{% url 'material_detail' material.id %}">{{ material.name }}</a>
                             <a href="{% url 'material_update' material.id %}"><i class="fas fa-fw fa-edit"></i></a>
-                            <a href="{% url 'material_delete' material.id %}"><i class="fas fa-fw fa-trash"></i></a>
+                            <a id="delete-material-{{ material.id }}" href="{% url 'material_delete' material.id %}">
+                                <i class="fas fa-fw fa-trash"></i>
+                            </a>
                         </li>
                     {% endfor %}
                 </ul>
@@ -53,3 +55,23 @@
     </div>
 
 {% endblock content %}
+
+{% block javascript %}
+    {{ block.super }}
+
+    <script type="text/javascript">
+
+        $(document).ready(function () {
+
+            $("#create-book").modalForm({
+                formURL: "{% url 'delete_material
+
+
+
+                ' %}"
+            });
+
+        });
+    </script>
+
+{% endblock javascript %}
