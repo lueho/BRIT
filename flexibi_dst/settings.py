@@ -26,7 +26,7 @@ SECRET_KEY = '(%yn0aw%$hxmajy^f=s^1t2v7-=^=vo9)u6ru*ic&=wsx2qs26'
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['*']
+ALLOWED_HOSTS = ['biem.aww.tuhh.de', '134.28.65.102', 'localhost']
 
 if getpass.getuser() == 'luess':
     # GDAL_LIBRARY_PATH = os.path.join(os.path.dirname(os.path.dirname(sys.executable)), 'Lib', 'site-packages', 'osgeo',
@@ -105,7 +105,7 @@ DATABASES = {
         'NAME': 'flexibi_dst',
         'USER': 'flexibi_dst',
         'PASSWORD': 'flexibi',
-        'HOST': 'db',
+        'HOST': 'localhost',
         'PORT': '5432',
     }
 }
@@ -145,7 +145,7 @@ USE_TZ = True
 # https://docs.djangoproject.com/en/3.0/howto/static-files/
 
 STATIC_URL = '/static/'
-STATIC_ROOT = os.path.join(BASE_DIR, 'static_root')
+STATIC_ROOT = os.path.join(BASE_DIR, 'static/')
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 
 LEAFLET_CONFIG = {
@@ -170,7 +170,7 @@ CRISPY_FAIL_SILENTLY = not DEBUG
 LOGIN_REDIRECT_URL = 'home'
 LOGIN_URL = 'login'
 
-CELERY_BROKER_URL = os.environ.get("CELERY_BROKER", "redis://redis:6379/0")
-CELERY_RESULT_BACKEND = os.environ.get("CELERY_BROKER", "redis://redis:6379/0")
+CELERY_BROKER_URL = os.environ.get("CELERY_BROKER", "redis://localhost:6379/0")
+CELERY_RESULT_BACKEND = os.environ.get("CELERY_BROKER", "redis://localhost:6379/0")
 
 PUBLIC_OBJECT_OWNER = 'flexibi'
