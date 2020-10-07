@@ -1,35 +1,19 @@
 version: '3.3'
 
 services:
-  db:
-    image: "postgis/postgis"
-    ports:
-      - "5432:5432"
-    volumes:
-      - flexibi_db/:/var/lib/postgresql/data/
-    environment:
-      POSTGRES_DB: flexibi_dst
-      POSTGRES_USER: flexibi_dst
-      POSTGRES_PASSWORD: flexibi
   web:
     build: .
-    volumes:
-      - ./:/app
-    depends_on:
-      - db
     ports:
       - "8000:8000"
     environment:
       - DEBUG=1
       - SECRET_KEY=(%yn0aw%$hxmajy^f=s^1t2v7-=^=vo9)u6ru*ic&=wsx2qs26
       - DJANGO_ALLOWED_HOSTS=localhost 127.0.0.1 [::1]
-    links:
-      - db
   celery:
     build: .
     command: celery worker --app=flexibi_dst --loglevel=info --logfile=logs/celery.log
     volumes:
-      - ./:/app
+      - ./:/var/www/flexibi_dst
     environment:
       - DEBUG=1
       - SECRET_KEY=(%yn0aw%$hxmajy^f=s^1t2v7-=^=vo9)u6ru*ic&=wsx2qs26
@@ -39,7 +23,6 @@ services:
     depends_on:
       - web
       - redis
-
   redis:
     image: redis:5-alpine
   dashboard:
@@ -57,5 +40,3 @@ services:
       - web
       - redis
       - celery
-volumes:
-  flexibi_db:
