@@ -2,12 +2,13 @@
 
 {% block content %}
 
+    <!-- first row -->
     <div class="row">
 
         <!-- Scenario basics card -->
         <div class="col col-6">
             <h2>Scenario basics:</h2>
-            <div class="card shadow mb-4">
+            <div class="card shadow mb-2">
                 <div class="card-header py-3">
                     <h6 class="m-0 font-weight-bold text-primary">Scenario definition</h6>
                 </div>
@@ -36,31 +37,79 @@
                     </table>
                 </div>
             </div>
+            <div class="ml-4 mb-4">
+                <a href="{% url 'scenario_detail' scenario.id %}">
+                    <i class="fas fa-fw fa-edit"></i> Edit scenario basics
+                </a>
+            </div>
+
         </div>
 
-        <!-- Scenario result summary card -->
+    </div>
+    <!-- End of first row -->
+
+    <!-- second row -->
+    <h2>Scenario result summary:</h2>
+    <div class="row">
+
+        <!-- Annual production per feedstock chart -->
         <div class="col col-6">
-            <h2>Scenario result summary:</h2>
             <div class="card shadow mb-4">
                 <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Total annual feedstock production</h6>
+                    <h6 class="m-0 font-weight-bold text-primary">Annual production per feedstock</h6>
                 </div>
                 <div class="card-body">
                     <div class="chart-bar">
-                        <canvas id="myBarChart"></canvas>
+                        <canvas id="totalProductionBarChart"></canvas>
                     </div>
                 </div>
             </div>
         </div>
-    </div> <!-- End of first row -->
 
-    <div class="row mt-1 mb-3">
-        <div class="col">
-            <a href="{% url 'scenario_detail' scenario.id %}">
-                <i class="fas fa-fw fa-edit"></i> Edit scenario
-            </a>
+        <!-- Annual production per chemical component chart - basics -->
+        <div class="col col-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Annual production per component: Basics</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-bar">
+                        <canvas id="materialBasicsBarChart"></canvas>
+                    </div>
+                </div>
+            </div>
         </div>
+
+        <!-- Annual production per chemical component chart - solids -->
+        <div class="col col-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Annual production per component: Solids</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-bar">
+                        <canvas id="materialSolidsBarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Annual production per chemical component chart - macro components -->
+        <div class="col col-6">
+            <div class="card shadow mb-4">
+                <div class="card-header py-3">
+                    <h6 class="m-0 font-weight-bold text-primary">Annual production per component: Macro Components</h6>
+                </div>
+                <div class="card-body">
+                    <div class="chart-bar">
+                        <canvas id="materialMacrosBarChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+
     </div>
+    <!-- end of second row -->
 
     <h2>Detailed scenario results:</h2>
     {% for layer in layers %}
@@ -69,7 +118,7 @@
                 <div class="card border-left-primary border shadow">
                     <div class="card-header">
                         <h6 class="m-0 font-weight-bold text-primary">
-                            Feedstock: {{ layer.inventory_algorithm.feedstock }} -
+                            Feedstock: {{ layer.feedstock }} -
                             Dataset: {{ layer.inventory_algorithm.geodataset }} -
                             Algorithm: {{ layer.inventory_algorithm.name }}</h6>
                     </div>
@@ -77,7 +126,7 @@
                         {% for aggregate in layer.aggregated_results %}
                             <span>{{ aggregate.name }}: {{ aggregate.value }} {{ aggregate.unit }} - </span>
                         {% endfor %}
-                        <a href="{% url 'scenario_result_map' layer.scenario.pk layer.inventory_algorithm.pk %}">
+                        <a href="{% url 'scenario_result_map' layer.scenario.pk layer.inventory_algorithm.pk layer.feedstock.pk %}">
                             <i class="fas fa-fw fa-map"></i> show map
                         </a>
                     </div>
@@ -93,13 +142,48 @@
     {{ block.super }}
     {% load static %}
     {{ plotdata|json_script:"data" }}
+    {{ plotdata2|json_script:"data2" }}
+    {{ plotdata3|json_script:"data3" }}
+    {{ plotdata4|json_script:"data4" }}
 
     <script src="{% static 'js/charts/feedstock_summary_bar_chart.js' %}"></script>
     <script>
-        const ctx = document.getElementById("myBarChart");
+        const ctx = document.getElementById("totalProductionBarChart");
         let plotdata = JSON.parse(document.getElementById("data").textContent);
+        console.log(plotdata)
+        console.log(plotdata["values"])
+        console.log(Math.max(plotdata["values"]))
         const args = barChartStyle(plotdata["labels"], plotdata["values"])
-        const myBarChart = new Chart(ctx, args);
+        console.log(args)
+        const totalProductionBarChart = new Chart(ctx, args);
+
+        const ctx2 = document.getElementById("materialBasicsBarChart");
+        let plotdata2 = JSON.parse(document.getElementById("data2").textContent);
+        console.log(plotdata2)
+        console.log(plotdata2["values"])
+        console.log(Math.max(plotdata2["values"]))
+        const args2 = barChartStyle(plotdata2["labels"], plotdata2["values"]);
+        console.log(args2)
+        const materialBasicsAnalysisBarChart = new Chart(ctx2, args2);
+
+        const ctx3 = document.getElementById("materialSolidsBarChart");
+        let plotdata3 = JSON.parse(document.getElementById("data3").textContent);
+        console.log(plotdata3)
+        console.log(plotdata3["values"])
+        console.log(Math.max(plotdata3["values"]))
+        const args3 = barChartStyle(plotdata3["labels"], plotdata3["values"]);
+        console.log(args3)
+        const materialSolidsAnalysisBarChart = new Chart(ctx3, args3);
+
+        const ctx4 = document.getElementById("materialMacrosBarChart");
+        let plotdata4 = JSON.parse(document.getElementById("data4").textContent);
+        console.log(plotdata4)
+        console.log(plotdata4["values"])
+        console.log(Math.max(plotdata4["values"]))
+        const args4 = barChartStyle(plotdata4["labels"], plotdata4["values"]);
+        console.log(args4)
+        const materialMacrosAnalysisBarChart = new Chart(ctx4, args4);
+
     </script>
 
 {% endblock javascript %}

@@ -3,7 +3,7 @@ from celery import chord
 from flexibi_dst.celery import app
 from layer_manager.models import Layer
 from scenario_builder.inventory_algorithms import InventoryAlgorithms
-from scenario_builder.models import Scenario, InventoryAlgorithm
+from scenario_builder.models import Scenario, InventoryAlgorithm, Material
 from scenario_evaluator.models import RunningTask
 
 
@@ -18,9 +18,9 @@ def run_inventory(scenario_id):
     scenario.delete_result_layers()
 
     signatures = []
-    config = scenario.configuration_as_dict()
-    for function_name, kwargs in config.items():
-        signatures.append(run_inventory_algorithm.s(function_name, **kwargs))
+    for feedstock_id, config in scenario.configuration_as_dict().items():
+        for function_name, kwargs in config.items():
+            signatures.append(run_inventory_algorithm.s(function_name, **kwargs))
 
     callback = finalize_inventory.s(scenario.id)
     task_chord = chord(signatures, callback)
@@ -41,6 +41,7 @@ def run_inventory_algorithm(self, function_name, **kwargs):
     kwargs = {
         'name': algorithm.function_name,
         'scenario': Scenario.objects.get(id=kwargs.get('scenario_id')),
+        'feedstock': Material.objects.get(id=kwargs.get('feedstock_id')),
         'algorithm': algorithm,
         'results': results
     }

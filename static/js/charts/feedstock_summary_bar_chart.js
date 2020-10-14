@@ -63,12 +63,12 @@ function barChartStyle(labels, values) {
                     ticks: {
                         maxTicksLimit: 6
                     },
-                    maxBarThickness: 25,
+                    maxBarThickness: 100,
                 }],
                 yAxes: [{
                     ticks: {
                         min: 0,
-                        max: Math.max(values) * 1.1,
+                        max: Math.max(...values) * 1.1,
                         maxTicksLimit: 5,
                         padding: 10,
                         // Include a dollar sign in the ticks
@@ -103,10 +103,55 @@ function barChartStyle(labels, values) {
                 callbacks: {
                     label: function (tooltipItem, chart) {
                         var datasetLabel = chart.datasets[tooltipItem.datasetIndex].label || '';
-                        return datasetLabel + ': $' + number_format(tooltipItem.yLabel);
+                        return datasetLabel + ': ' + number_format(tooltipItem.yLabel);
                     }
                 }
             },
         }
+    }
+}
+
+function barChartStyle2(labels, values) {
+
+    return {
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [
+                {
+                    label: "Population (millions)",
+                    backgroundColor: ["#3e95cd", "#8e5ea2"],
+                    data: values
+                }
+            ]
+        },
+        options: {
+            legend: {display: false},
+            title: {
+                display: true,
+                text: 'Chemical components of annual feedstock production'
+            },
+            scales: {
+                yAxes: [{
+                    ticks: {
+                        min: 0,
+                        max: 15000,
+                        maxTicksLimit: 5,
+                        padding: 10,
+                        // Include a dollar sign in the ticks
+                        // callback: function (value, index, values) {
+                        //     return '$' + number_format(value);
+                        // }
+                    },
+                    gridLines: {
+                        color: "rgb(234, 236, 244)",
+                        zeroLineColor: "rgb(234, 236, 244)",
+                        drawBorder: false,
+                        borderDash: [2],
+                        zeroLineBorderDash: [2]
+                    }
+                }],
+            }
+        },
     }
 }

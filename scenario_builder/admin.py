@@ -9,8 +9,10 @@ from .models import (Catchment,
                      InventoryAlgorithm,
                      InventoryAlgorithmParameter,
                      InventoryAlgorithmParameterValue,
+                     LiteratureSource,
                      Material,
                      MaterialComponent,
+                     MaterialComponentGroup,
                      Region,
                      Scenario,
                      ScenarioInventoryConfiguration,
@@ -72,57 +74,67 @@ class RegionAdmin(OSMGeoAdmin):
         return queryset
 
 
+@admin.register(LiteratureSource)
+class LiteratureSourceAdmin(ModelAdmin):
+    list_display = ('authors', 'title', 'abbreviation',)
+
+
 @admin.register(Material)
 class MaterialAdmin(ModelAdmin):
     list_display = ('name', 'stan_flow_id', 'is_feedstock', 'description',)
 
 
+@admin.register(MaterialComponentGroup)
+class MaterialComponentGroupAdmin(ModelAdmin):
+    list_display = ('name', 'description',)
+
+
 @admin.register(InventoryAlgorithm)
 class InventoryAlgorithmAdmin(ModelAdmin):
-    list_display = ('name', 'geodataset_link', 'feedstock_link', 'parameter_list', 'default', 'description',)
+    list_display = ('name', 'geodataset_link', 'default', 'description',)
 
     @staticmethod
     def geodataset_link(obj):
         url = reverse('admin:scenario_builder_geodataset_change', args=(obj.geodataset.id,))
         return format_html("<a href='{}'>{}</a>", url, obj.geodataset.name)
 
-    @staticmethod
-    def feedstock_link(obj):
-        url = reverse('admin:scenario_builder_material_change', args=(obj.feedstock.id,))
-        return format_html("<a href='{}'>{}</a>", url, obj.feedstock.name)
+    # @staticmethod
+    # def feedstock_link(obj):
+    #     url = reverse('admin:scenario_builder_material_change', args=(obj.feedstock.id,))
+    #     return format_html("<a href='{}'>{}</a>", url, obj.feedstock.name)
 
-    @staticmethod
-    def parameter_list(obj):
-        parameter_list = format_html_join(
-            '\n', "<li><a href='{}'>{}</a></li>",
-            ((reverse('admin:scenario_builder_inventoryalgorithmparameter_change', args=(p.id,)), p) for p in
-             InventoryAlgorithmParameter.objects.filter(inventory_algorithm=obj))
-        )
-        return parameter_list
+    # @staticmethod
+    # def parameter_list(obj):
+    #     parameter_list = format_html_join(
+    #         '\n', "<li><a href='{}'>{}</a></li>",
+    #         ((reverse('admin:scenario_builder_inventoryalgorithmparameter_change', args=(p.id,)), p) for p in
+    #          InventoryAlgorithmParameter.objects.filter(inventory_algorithm=obj))
+    #     )
+    #     return parameter_list
 
 
 @admin.register(InventoryAlgorithmParameter)
 class InventoryAlgorithmParameterAdmin(ModelAdmin):
-    list_display = ('descriptive_name', 'unit', 'algorithm', 'is_required', 'description',)
+    list_display = ('descriptive_name', 'unit', 'is_required', 'description',)
 
-    @staticmethod
-    def algorithm(obj):
-        url = reverse('admin:scenario_builder_inventoryalgorithm_change', args=(obj.inventory_algorithm.id,))
-        return format_html("<a href='{}'>{}</a>", url, obj.inventory_algorithm.name)
+    # @staticmethod
+    # def algorithm(obj):
+    #     url = reverse('admin:scenario_builder_inventoryalgorithm_change', args=(obj.inventory_algorithm.id,))
+    #     return format_html("<a href='{}'>{}</a>", url, obj.inventory_algorithm.name)
 
 
 @admin.register(InventoryAlgorithmParameterValue)
 class InventoryAlgorithmParameterValueAdmin(ModelAdmin):
-    list_display = ('name', 'parameter_link', 'value', 'standard_deviation', 'unit', 'default', 'source',)
+    list_display = ('name', 'value', 'standard_deviation', 'default', 'source',)
 
-    @staticmethod
-    def parameter_link(obj):
-        url = reverse('admin:scenario_builder_inventoryalgorithmparameter_change', args=(obj.parameter.id,))
-        return format_html("<a href='{}'>{}</a>", url, obj.parameter.descriptive_name)
+    # @staticmethod
+    # def parameter_link(obj):
+    #     url = reverse('admin:scenario_builder_inventoryalgorithmparameter_change', args=(obj.parameter.id,))
+    #     return format_html("<a href='{}'>{}</a>", url, obj.parameter.descriptive_name)
 
-    @staticmethod
-    def unit(obj):
-        return obj.parameter.unit
+    # @staticmethod
+    # def unit(obj):
+    #     return obj.parameter.unit
 
 
 @admin.register(ScenarioInventoryConfiguration)

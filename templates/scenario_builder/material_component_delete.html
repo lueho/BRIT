@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+
+{% block content %}
+
+    <form method="post">
+        {% csrf_token %}
+        <h1>Do you really want to delete component {{ object.name }}</h1>
+        <p>
+            <button type="submit" class="btn btn-primary">Delete</button>
+            <a href="{% url 'material_detail' object.material.id %}">Cancel</a></p>
+    </form>
+
+{% endblock content %}
