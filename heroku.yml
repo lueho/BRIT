@@ -4,7 +4,7 @@ build:
     worker: Dockerfile
 run:
   web: gunicorn flexibi_dst.wsgi:application --bind 0.0.0.0:$PORT
-  worker: celery worker --app=flexibi_dst --loglevel=info --logfile=logs/celery.log
+  worker: celery worker --app=flexibi_dst
 release:
   image: web
   command:
