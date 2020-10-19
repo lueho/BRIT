@@ -11,6 +11,7 @@ services:
       POSTGRES_DB: flexibi_dst
       POSTGRES_USER: flexibi_dst
       POSTGRES_PASSWORD: flexibi
+
   web:
     build: .
     volumes:
@@ -23,6 +24,7 @@ services:
       - DEBUG=1
       - SECRET_KEY=(%yn0aw%$hxmajy^f=s^1t2v7-=^=vo9)u6ru*ic&=wsx2qs26
       - DJANGO_ALLOWED_HOSTS=localhost 127.0.0.1 [::1]
+      - REDIS_URL=redis://redis:6379/0
     links:
       - db
   celery:
@@ -36,6 +38,7 @@ services:
       - DJANGO_ALLOWED_HOSTS=localhost 127.0.0.1 [::1]
       - CELERY_BROKER=redis://redis:6379/0
       - CELERY_BACKEND=redis://redis:6379/0
+      - REDIS_URL=redis://redis:6379/0
     depends_on:
       - web
       - redis
@@ -53,6 +56,7 @@ services:
       - DJANGO_ALLOWED_HOSTS=localhost 127.0.0.1 [::1]
       - CELERY_BROKER=redis://redis:6379/0
       - CELERY_BACKEND=redis://redis:6379/0
+      - REDIS_URL=redis://redis:6379/0
     depends_on:
       - web
       - redis
