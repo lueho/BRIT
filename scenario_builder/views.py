@@ -397,6 +397,7 @@ class ScenarioAlgorithmConfigurationUpdateView(LoginRequiredMixin, UserPassesTes
 class ScenarioRemoveInventoryAlgorithmView(LoginRequiredMixin, UserPassesTestMixin, View):
     scenario = None
     algorithm = None
+    feedstock = None
 
     def test_func(self):
         self.scenario = Scenario.objects.get(id=self.kwargs.get('scenario_pk'))
@@ -405,7 +406,7 @@ class ScenarioRemoveInventoryAlgorithmView(LoginRequiredMixin, UserPassesTestMix
     def get(self, request, *args, **kwargs):
         self.scenario = Scenario.objects.get(id=self.kwargs.get('scenario_pk'))
         self.algorithm = InventoryAlgorithm.objects.get(id=self.kwargs.get('algorithm_pk'))
-        self.scenario.remove_inventory_algorithm(self.algorithm)
+        self.scenario.remove_inventory_algorithm(algorithm=self.algorithm, feedstock=self.feedstock)
         return redirect('scenario_detail', pk=self.scenario.id)
 
 

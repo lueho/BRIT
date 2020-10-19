@@ -14,6 +14,8 @@ import getpass
 import os
 import sys
 
+import dj_database_url
+
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
@@ -21,28 +23,12 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 # See https://docs.djangoproject.com/en/3.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = '(%yn0aw%$hxmajy^f=s^1t2v7-=^=vo9)u6ru*ic&=wsx2qs26'
+SECRET_KEY = os.environ.get('SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['*']
-
-if getpass.getuser() == 'luess':
-    # GDAL_LIBRARY_PATH = os.path.join(os.path.dirname(os.path.dirname(sys.executable)), 'Lib', 'site-packages', 'osgeo',
-    #                                  'gdal204.dll')
-    host_address = '127.0.0.1'
-    user = 'postgres'
-    password = 'postgre'
-else:
-    # GDAL_LIBRARY_PATH = 'C:/OSGeo4W64/bin/gdal204.dll'
-    # GDAL_LIBRARY_PATH = os.path.join(os.path.dirname(os.path.dirname(sys.executable)), 'Lib', 'site-packages', 'osgeo',
-    #                                  'gdal204.dll')
-    host_address = '134.28.65.102'
-    user = 'flexibi_dst'
-    password = 'flexibi'
-
-# Application definition
+ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'flexibi-dst.herokuapp.com']
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -68,6 +54,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -110,6 +97,10 @@ DATABASES = {
     }
 }
 
+DATABASE_URL = os.environ.get('DATABASE_URL')
+db_from_env = dj_database_url.config(default=DATABASE_URL, conn_max_age=500, ssl_require=True)
+DATABASES['default'].update(db_from_env)
+
 # Password validation
 # https://docs.djangoproject.com/en/3.0/ref/settings/#auth-password-validators
 
@@ -147,6 +138,7 @@ USE_TZ = True
 STATIC_URL = '/static/'
 STATIC_ROOT = os.path.join(BASE_DIR, 'static_root')
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 LEAFLET_CONFIG = {
     'DEFAULT_CENTER': (48.917908, 6.921543),
@@ -170,7 +162,7 @@ CRISPY_FAIL_SILENTLY = not DEBUG
 LOGIN_REDIRECT_URL = 'home'
 LOGIN_URL = 'login'
 
-CELERY_BROKER_URL = os.environ.get("CELERY_BROKER", "redis://redis:6379/0")
-CELERY_RESULT_BACKEND = os.environ.get("CELERY_BROKER", "redis://redis:6379/0")
+CELERY_BROKER_URL = os.environ.get("REDIS_URL")
+CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL")
 
 PUBLIC_OBJECT_OWNER = 'flexibi'

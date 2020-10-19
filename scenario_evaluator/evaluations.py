@@ -11,6 +11,25 @@ class ScenarioResult:
         for layer in scenario.layer_set.all():
             self.layers.append(layer)
 
+    def material_component_groups(self):
+        materials = self.scenario.feedstocks()
+        return set([group_name for material in materials for group_name in material.component_group_names()])
+
+    def get_plot_data(self):
+        plot_data = {}
+        labels, values = self.production_values_for_plot()
+        plot_data['productionPerFeedstockBarChart'] = {}
+        plot_data['productionPerFeedstockBarChart']['chart_name'] = 'Total annual production per feedstock'
+        plot_data['productionPerFeedstockBarChart']['dataset'] = {'labels': labels, 'values': values}
+        groups = self.material_component_groups()
+        for group in groups:
+            labels, values = self.material_values_for_plot(group)
+            chart_id = group.replace(' ', '') + 'BarChart'
+            plot_data[chart_id] = {}
+            plot_data[chart_id]['chart_name'] = 'Production per component: ' + group
+            plot_data[chart_id]['dataset'] = {'labels': labels, 'values': values}
+        return plot_data
+
     def production_values_for_plot(self):
         labels, values = [], []
         for label, value in self.total_production_per_feedstock().items():
@@ -30,7 +49,7 @@ class ScenarioResult:
         for layer in self.layers:
             layer_production_agg = layer.layeraggregatedvalue_set.get(name='Total production')
             total_production += layer_production_agg.value
-        return total_production
+        return total_production / 1000
 
     def total_production_per_feedstock(self):
         production = {}
@@ -38,7 +57,7 @@ class ScenarioResult:
             feedstock = layer.feedstock.name
             if feedstock not in production.keys():
                 production[feedstock] = 0
-            production[feedstock] += layer.layeraggregatedvalue_set.get(name='Total production').value
+            production[feedstock] += layer.layeraggregatedvalue_set.get(name='Total production').value / 1000
         return production
 
     def total_material_components(self):

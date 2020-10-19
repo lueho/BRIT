@@ -57,12 +57,23 @@ class Material(models.Model):
     description = models.TextField(blank=True, null=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE)
     is_feedstock = models.BooleanField(default=False)
+    # seasonal_distribution = SeasonalDistributionField(models.FloatField(), size=12)
     stan_flow_id = models.CharField(max_length=5,
                                     validators=[RegexValidator(regex=r'^[0-9]{5}?',
                                                                message='STAN id must have 5 digits.s',
                                                                code='invalid_stan_id')])
 
     objects = MaterialManager()
+
+    def component_groups(self):
+        return set([
+            group for group_list in [
+                set(c.groups.all()) for c in self.materialcomponent_set.all()
+            ] for group in group_list
+        ])
+
+    def component_group_names(self):
+        return list(self.grouped_components().keys())
 
     def grouped_components(self):
         components = MaterialComponent.objects.filter(material=self)
@@ -260,6 +271,15 @@ class Scenario(models.Model):
     def included_feedstocks(self):
         return Material.objects.filter(
             id__in=ScenarioInventoryConfiguration.objects.filter(scenario=self).values('feedstock'))
+
+    def feedstocks(self):
+        used_feedstock_ids = [
+            a['feedstock'] for a in ScenarioInventoryConfiguration.objects.filter(scenario=self)
+                .order_by()
+                .values('feedstock')
+                .distinct()
+        ]
+        return Material.objects.filter(id__in=used_feedstock_ids)
 
     def add_feedstock(self, feedstock: Material):
         # not needed anymore. Each feedstock is added automatically with an associated inventory_algorithm.

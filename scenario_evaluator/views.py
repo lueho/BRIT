@@ -27,15 +27,8 @@ class ScenarioResultView(DetailView):
         context = super().get_context_data(**kwargs)
         scenario = self.object
         result = ScenarioResult(scenario)
-        context['layers'] = [layer.as_dict() for layer in Layer.objects.filter(scenario=scenario)]
-        labels, values = result.production_values_for_plot()
-        labels2, values2 = result.material_values_for_plot('Basics')
-        labels3, values3 = result.material_values_for_plot('Solids')
-        labels4, values4 = result.material_values_for_plot('Macro Components')
-        context['plotdata'] = {'labels': labels, 'values': values}
-        context['plotdata2'] = {'labels': labels2, 'values': values2}
-        context['plotdata3'] = {'labels': labels3, 'values': values3}
-        context['plotdata4'] = {'labels': labels4, 'values': values4}
+        context['layers'] = [layer.as_dict() for layer in result.layers]
+        context['plot_data'] = result.get_plot_data()
         return context
 
     def get(self, request, *args, **kwargs):
