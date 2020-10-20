@@ -3,7 +3,7 @@ from django.apps import apps
 from django.db import models, connection
 from django.urls import reverse
 
-from scenario_builder.models import Scenario, InventoryAlgorithm
+from scenario_builder.models import Scenario, InventoryAlgorithm, Material
 from .exceptions import InvalidGeometryType, NoFeaturesProvided, TableAlreadyExists
 
 
@@ -65,7 +65,8 @@ class LayerManager(models.Manager):
 
             kwargs['table_name'] = 'result_of_scenario_' + \
                                    str(kwargs['scenario'].id) + '_algorithm_' + \
-                                   str(kwargs['algorithm'].id)
+                                   str(kwargs['algorithm'].id) + '_feedstock_' + \
+                                   str(kwargs['feedstock'].id)
 
             layer, created = super().get_or_create(table_name=kwargs['table_name'], defaults=kwargs)
 
@@ -107,6 +108,7 @@ class Layer(models.Model):
     geom_type = models.CharField(max_length=20)
     table_name = models.CharField(max_length=200)
     scenario = models.ForeignKey(Scenario, on_delete=models.CASCADE)
+    feedstock = models.ForeignKey(Material, on_delete=models.CASCADE)
     algorithm = models.ForeignKey(InventoryAlgorithm, on_delete=models.CASCADE)
     layer_fields = models.ManyToManyField(LayerField)
 
@@ -135,6 +137,7 @@ class Layer(models.Model):
             'geom_type': self.geom_type,
             'table_name': self.table_name,
             'scenario': self.scenario,
+            'feedstock': self.feedstock,
             'inventory_algorithm': self.algorithm,
             'layer_fields': [field for field in self.layer_fields.all()],
             'aggregated_results': [
@@ -215,9 +218,6 @@ class Layer(models.Model):
 
     def delete_aggregated_values(self):
         LayerAggregatedValue.objects.filter(layer=self).delete()
-
-    def feedstock(self):
-        return self.algorithm.feedstock
 
     def get_feature_collection(self):
         """

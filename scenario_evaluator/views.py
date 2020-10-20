@@ -3,7 +3,7 @@ from django.views.generic import DetailView
 
 from flexibi_dst.views import DualUserListView
 from layer_manager.models import Layer
-from scenario_builder.models import InventoryAlgorithm, Scenario
+from scenario_builder.models import InventoryAlgorithm, Scenario, Material
 from scenario_evaluator.evaluations import ScenarioResult
 from scenario_evaluator.models import RunningTask
 
@@ -27,9 +27,8 @@ class ScenarioResultView(DetailView):
         context = super().get_context_data(**kwargs)
         scenario = self.object
         result = ScenarioResult(scenario)
-        context['layers'] = [layer.as_dict() for layer in Layer.objects.filter(scenario=scenario)]
-        labels, values = result.production_values_for_plot()
-        context['plotdata'] = {'labels': labels, 'values': values}
+        context['layers'] = [layer.as_dict() for layer in result.layers]
+        context['plot_data'] = result.get_plot_data()
         return context
 
     def get(self, request, *args, **kwargs):
@@ -71,4 +70,5 @@ class ScenarioResultDetailMapView(DetailView):
     def get_object(self, **kwargs):
         scenario = Scenario.objects.get(id=self.kwargs.get('pk'))
         algorithm = InventoryAlgorithm.objects.get(id=self.kwargs.get('algorithm_pk'))
-        return Layer.objects.get(scenario=scenario, algorithm=algorithm)
+        feedstock = Material.objects.get(id=self.kwargs.get('feedstock_pk'))
+        return Layer.objects.get(scenario=scenario, algorithm=algorithm, feedstock=feedstock)

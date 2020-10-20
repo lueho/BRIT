@@ -1,20 +1,21 @@
 // Set new default font family and font color to mimic Bootstrap's default styling
-Chart.defaults.global.defaultFontFamily = 'Nunito', '-apple-system,system-ui,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif';
+Chart.defaults.global.defaultFontFamily =
+    'Nunito', '-apple-system,system-ui,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif';
 Chart.defaults.global.defaultFontColor = '#858796';
 
 function number_format(number, decimals, dec_point, thousands_sep) {
     // *     example: number_format(1234.56, 2, ',', ' ');
     // *     return: '1 234,56'
     number = (number + '').replace(',', '').replace(' ', '');
-    var n = !isFinite(+number) ? 0 : +number,
-        prec = !isFinite(+decimals) ? 0 : Math.abs(decimals),
-        sep = (typeof thousands_sep === 'undefined') ? ',' : thousands_sep,
-        dec = (typeof dec_point === 'undefined') ? '.' : dec_point,
-        s = '',
-        toFixedFix = function (n, prec) {
-            var k = Math.pow(10, prec);
-            return '' + Math.round(n * k) / k;
-        };
+    let n = !isFinite(+number) ? 0 : +number;
+    let prec = !isFinite(+decimals) ? 0 : Math.abs(decimals);
+    let sep = (typeof thousands_sep === 'undefined') ? ',' : thousands_sep;
+    let dec = (typeof dec_point === 'undefined') ? '.' : dec_point;
+    let s;
+    let toFixedFix = function (n, prec) {
+        let k = Math.pow(10, prec);
+        return '' + Math.round(n * k) / k;
+    };
     // Fix for IE parseFloat(0.55).toFixed(0) = 0;
     s = (prec ? toFixedFix(n, prec) : '' + Math.round(n)).split('.');
     if (s[0].length > 3) {
@@ -53,33 +54,30 @@ function barChartStyle(labels, values) {
             },
             scales: {
                 xAxes: [{
-                    time: {
-                        unit: 'month'
-                    },
                     gridLines: {
                         display: false,
-                        drawBorder: false
+                        drawBorder: true
                     },
                     ticks: {
-                        maxTicksLimit: 6
+                        maxTicksLimit: 10
                     },
-                    maxBarThickness: 25,
+                    maxBarThickness: 100,
                 }],
                 yAxes: [{
+                    scaleLabel: {
+                        display: true,
+                        labelString: 'Mg/a'
+                    },
                     ticks: {
                         min: 0,
-                        max: Math.max(values) * 1.1,
-                        maxTicksLimit: 5,
+                        // max: Math.max(...values) * 1.1,
+                        // maxTicksLimit: 5,
                         padding: 10,
-                        // Include a dollar sign in the ticks
-                        // callback: function (value, index, values) {
-                        //     return '$' + number_format(value);
-                        // }
                     },
                     gridLines: {
                         color: "rgb(234, 236, 244)",
                         zeroLineColor: "rgb(234, 236, 244)",
-                        drawBorder: false,
+                        drawBorder: true,
                         borderDash: [2],
                         zeroLineBorderDash: [2]
                     }
@@ -102,8 +100,8 @@ function barChartStyle(labels, values) {
                 caretPadding: 10,
                 callbacks: {
                     label: function (tooltipItem, chart) {
-                        var datasetLabel = chart.datasets[tooltipItem.datasetIndex].label || '';
-                        return datasetLabel + ': $' + number_format(tooltipItem.yLabel);
+                        const datasetLabel = chart.datasets[tooltipItem.datasetIndex].label || '';
+                        return datasetLabel + ': ' + number_format(tooltipItem.yLabel) + ' Mg/a';
                     }
                 }
             },

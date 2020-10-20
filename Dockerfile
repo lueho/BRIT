@@ -1,30 +1,25 @@
-FROM ubuntu:bionic
+FROM python:3.7
 
-ENV DEBIAN_FRONTEND="noninteractive"
-ENV TZ="Europe/Berlin"
+WORKDIR /app
 
-RUN apt-get update && apt-get install -y \
-    python3 python3-pip libpq-dev postgresql postgresql-contrib binutils libproj-dev gdal-bin nginx curl
+# set environment variables
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+ENV DEBUG 0
 
-RUN apt-get update \
-    && DEBIAN_FRONTEND=noninteractive apt-get install -y locales \
-    && sed -i -e 's/# en_US.UTF-8 UTF-8/en_US.UTF-8 UTF-8/' /etc/locale.gen \
-    && dpkg-reconfigure --frontend=noninteractive locales \
-    && update-locale LANG=en_US.UTF-8
-ENV LANG en_US.UTF-8
-ENV LC_ALL en_US.UTF-8
+RUN apt-get update
+RUN apt-get install -y --fix-missing binutils libproj-dev gdal-bin
 
-RUN ln -s /usr/bin/python3 /usr/bin/python && \
-    ln -s /usr/bin/pip3 /usr/bin/pip
+# By copying over requirements first, we make sure that Docker will cache
+# our installed requirements rather than reinstall them on every build
+COPY ./requirements.txt /app/requirements.txt
+RUN pip install --upgrade pip && pip install -r requirements.txt
 
-WORKDIR /var/www/flexibi_dst
-COPY ./requirements.txt .
-RUN pip install --upgrade pip && pip install -r ./requirements.txt
+# Now copy in our code, and run it
+COPY . /app
+#EXPOSE 8000
 
-COPY . /var/www/flexibi_dst
-EXPOSE 8000
-
-COPY ./entrypoint.sh /var/www/flexibi_dst/entrypoint.sh
+#COPY ./entrypoint.sh /app/entrypoint.sh
 #ENTRYPOINT /app/entrypoint.sh
 
-CMD ["sh", "/var/www/flexibi_dst/entrypoint.sh"]
+#CMD ["sh", "/app/entrypoint.sh"]

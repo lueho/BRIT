@@ -59,19 +59,4 @@
 {% block javascript %}
     {{ block.super }}
 
-    <script type="text/javascript">
-
-        $(document).ready(function () {
-
-            $("#create-book").modalForm({
-                formURL: "{% url 'delete_material
-
-
-
-                ' %}"
-            });
-
-        });
-    </script>
-
 {% endblock javascript %}

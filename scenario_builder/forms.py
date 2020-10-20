@@ -11,6 +11,7 @@ from .models import (Catchment,
                      GeoDataset,
                      InventoryAlgorithm,
                      Material,
+                     MaterialComponent,
                      Region,
                      Scenario,
                      ScenarioInventoryConfiguration, )
@@ -65,10 +66,20 @@ class CatchmentQueryForm(Form):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class MaterialCreateForm(ModelForm):
+class MaterialModelForm(ModelForm):
     class Meta:
         model = Material
         fields = ('name', 'description', 'is_feedstock')
+
+
+class MaterialComponentModelForm(ModelForm):
+    class Meta:
+        model = MaterialComponent
+        fields = ('name', 'description', 'average', 'standard_deviation', 'fraction_of', 'literature_source', 'groups')
+
+
+# ----------- Materials/Feedstocks -------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 class ScenarioModelForm(ModelForm):

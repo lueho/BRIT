@@ -1,0 +1,11 @@
+build:
+  docker:
+    web: Dockerfile
+    worker: Dockerfile
+run:
+  web: gunicorn flexibi_dst.wsgi:application --bind 0.0.0.0:$PORT
+  worker: celery worker --app=flexibi_dst
+release:
+  image: web
+  command:
+    - python manage.py collectstatic --noinput
