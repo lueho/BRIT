@@ -54,7 +54,7 @@ urlpatterns = [
     path('scenarios/<int:scenario_pk>/change_config/<int:algorithm_pk>',
          ScenarioAlgorithmConfigurationUpdateView.as_view(),
          name='scenario_update_config'),
-    path('scenarios/<int:scenario_pk>/configuration/<int:algorithm_pk>/remove/',
+    path('scenarios/<int:scenario_pk>/configuration/<int:feedstock_pk>/<int:algorithm_pk>/remove/',
          ScenarioRemoveInventoryAlgorithmView.as_view(),
          name='remove_algorithm_from_scenario'),
     path('ajax/catchment-options/', load_catchment_options, name='ajax_catchment_options'),
