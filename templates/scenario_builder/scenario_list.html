@@ -8,8 +8,6 @@
                 {% for scenario in standard_objects %}
                     <li class="list-group-item">
                         <a href="{% url 'scenario_detail' scenario.id %}">{{ scenario.name }}</a>
-                        <a href="{% url 'scenario_update' scenario.id %}"><i class="fas fa-fw fa-edit"></i></a>
-                        <a href="{% url 'scenario_delete' scenario.id %}"><i class="fas fa-fw fa-trash"></i></a></li>
                 {% endfor %}
             </ul>
         </div>
