@@ -16,14 +16,14 @@
                 <tr>
                     <td class="col-3"><b>Case study region:</b></td>
                     <td>
-                        <a href="{% url 'admin:scenario_builder_region_change' object.region.id %}">
+                        <a href="{% url 'catchment_list' %}">
                             {{ object.region }}
                         </a>
                     </td>
                 <tr>
                     <td class="col-3"><b>Catchment:</b></td>
                     <td>
-                        <a href="{% url 'admin:scenario_builder_catchment_change' object.catchment.id %}">
+                        <a href="{% url 'catchment_list' %}">
                             {{ object.catchment }}
                         </a>
                     </td>
@@ -37,14 +37,17 @@
                 <button type="submit" name="run" class="btn btn-primary">Run scenario evaluation</button>
             </form>
         </div>
-    </div> <!-- end of general summary row -->
-    <div class="row mt-1">
-        <div class="col">
-            <a href="{% url 'scenario_update' scenario.id %}">
-                <i class="fas fa-fw fa-edit"></i> Edit scenario basics
-            </a>
-        </div>
     </div>
+    <!-- end of general summary row -->
+    {% if not static %}
+        <div class="row mt-1">
+            <div class="col">
+                <a href="{% url 'scenario_update' scenario.id %}">
+                    <i class="fas fa-fw fa-edit"></i> Edit scenario basics
+                </a>
+            </div>
+        </div>
+    {% endif %}
     <h2 class="mt-3">Used Inventory Algorithms:</h2>
     {% for feedstock, algos in config.items %}
         {% for algo, parameters in algos.items %}
@@ -59,22 +62,28 @@
                     {% endfor %}
                 </div>
                 <div class="card-footer">
-                    <a href="{% url 'scenario_update_config' scenario.id algo.id %}" class="mx-2">
-                        <i class="fas fa-fw fa-edit"></i> Edit
-                    </a>
-                    <a href="{% url 'remove_algorithm_from_scenario' scenario.id algo.id %}" class="mx-2">
-                        <i class="fas fa-fw fa-trash"></i> Remove from configuration
-                    </a>
+                    {% if not static and user.is_authenticated %}
+                        <a href="{% url 'scenario_update_config' scenario.id algo.id %}" class="mx-2">
+                            <i class="fas fa-fw fa-edit"></i> Edit
+                        </a>
+                        <a href="{% url 'remove_algorithm_from_scenario' scenario.id feedstock.id algo.id %}"
+                           class="mx-2">
+                            <i class="fas fa-fw fa-trash"></i> Remove from configuration
+                        </a>
+                    {% endif %}
                 </div>
             </div>
         {% endfor %}
     {% endfor %}
-    <div class="row mt-3">
-        <div class="col">
-            <a href="{% url 'add_scenario_configuration' scenario.id %}">
-                <i class="fas fa-fw fa-plus"></i> Add algorithm to configuration
-            </a>
+
+    {% if not static %}
+        <div class="row mt-3">
+            <div class="col">
+                <a href="{% url 'add_scenario_configuration' scenario.id %}">
+                    <i class="fas fa-fw fa-plus"></i> Add algorithm to configuration
+                </a>
+            </div>
         </div>
-    </div>
+    {% endif %}
 
 {% endblock %}
