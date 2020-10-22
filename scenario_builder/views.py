@@ -246,14 +246,9 @@ class ScenarioUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
 
 
 class ScenarioDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
+    model = Scenario
     template_name = 'scenario_builder/scenario_delete.html'
-
-    def get_object(self, **kwargs):
-        scenario_id = self.kwargs.get('pk')
-        return Scenario.objects.get(id=scenario_id)
-
-    def get_success_url(self):
-        return reverse_lazy('scenario_list')
+    success_url = '/scenario_builder/scenarios'
 
     def test_func(self):
         scenario = Scenario.objects.get(id=self.kwargs.get('pk'))
@@ -271,7 +266,7 @@ def get_evaluation_status(request, scenario_id=None, task_id=None):
     return JsonResponse(result, status=200)
 
 
-class ScenarioDetailView(DetailView):
+class ScenarioDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
     """Summary of the Scenario with complete configuration. Page for final review, which also contains the
     'run' button."""
 
@@ -285,6 +280,7 @@ class ScenarioDetailView(DetailView):
         self.config = self.object.configuration_for_template()
         context = self.get_context_data(object=self.object)
         context['config'] = self.config
+        context['static'] = self.object.owner.username == 'flexibi'
         return self.render_to_response(context)
 
     def post(self, request, *args, **kwargs):
@@ -294,6 +290,10 @@ class ScenarioDetailView(DetailView):
         scenario.save()
         run_inventory(scenario.id)
         return redirect('scenario_result', scenario.id)
+
+    def test_func(self):
+        scenario = Scenario.objects.get(id=self.kwargs.get('pk'))
+        return self.request.user == scenario.owner or scenario.owner.username == settings.PUBLIC_OBJECT_OWNER
 
 
 class ScenarioAddInventoryAlgorithmView(LoginRequiredMixin, UserPassesTestMixin,
@@ -406,6 +406,7 @@ class ScenarioRemoveInventoryAlgorithmView(LoginRequiredMixin, UserPassesTestMix
     def get(self, request, *args, **kwargs):
         self.scenario = Scenario.objects.get(id=self.kwargs.get('scenario_pk'))
         self.algorithm = InventoryAlgorithm.objects.get(id=self.kwargs.get('algorithm_pk'))
+        self.feedstock = Material.objects.get(id=self.kwargs.get('feedstock_pk'))
         self.scenario.remove_inventory_algorithm(algorithm=self.algorithm, feedstock=self.feedstock)
         return redirect('scenario_detail', pk=self.scenario.id)
 
