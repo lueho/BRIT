@@ -30,12 +30,19 @@
             </table>
         </div>
         <div class="col col-3">
-            <p>This is a summary of the complete configuration of this scenario. Please check if everything is as it
-                should be. Once you are sure, everything is correct you can run the scenario evaluation from here.</p>
-            <form method="post">
-                {% csrf_token %}
-                <button type="submit" name="run" class="btn btn-primary">Run scenario evaluation</button>
-            </form>
+            {% if not object.evaluated %}
+                <p>This is a summary of the complete configuration of this scenario. Please check if everything is as it
+                    should be. Once you are sure, everything is correct you can run the scenario evaluation from
+                    here.</p>
+                <form method="post">
+                    {% csrf_token %}
+                    <button type="submit" name="run" class="btn btn-primary">Run scenario evaluation</button>
+                </form>
+            {% else %}
+                <p>This is a summary of the complete configuration of this scenario. The scenario has already been
+                    evaluated.</p>
+                <a class="btn btn-primary" href="{% url 'scenario_result' object.id %}">View results</a>
+            {% endif %}
         </div>
     </div>
     <!-- end of general summary row -->
