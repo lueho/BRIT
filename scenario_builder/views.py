@@ -269,7 +269,7 @@ def get_evaluation_status(request, scenario_id=None, task_id=None):
     return JsonResponse(result, status=200)
 
 
-class ScenarioDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
+class ScenarioDetailView(UserPassesTestMixin, DetailView):
     """Summary of the Scenario with complete configuration. Page for final review, which also contains the
     'run' button."""
 
