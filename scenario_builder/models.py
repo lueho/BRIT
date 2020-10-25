@@ -262,6 +262,7 @@ class Scenario(models.Model):
     site = models.ForeignKey(SFBSite, on_delete=models.CASCADE, null=True)  # TODO: make many-to-many?
     catchment = models.ForeignKey(Catchment, on_delete=models.CASCADE, null=True)  # TODO: make many-to-many?
     evaluation_running = models.BooleanField(default=False)
+    evaluated = models.BooleanField(default=False)
 
     objects = ScenarioManager()
 
