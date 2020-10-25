@@ -8,7 +8,7 @@ from django.views.generic import CreateView, DeleteView, TemplateView
 class UserRegistrationView(CreateView):
     model = User
     form_class = UserCreationForm
-    template_name = 'users/register.html'
+    template_name = 'register.html'
     success_url = reverse_lazy('login')
 
 
@@ -19,4 +19,4 @@ class UserDeleteView(LoginRequiredMixin, DeleteView):
 
 class UserProfileView(LoginRequiredMixin, TemplateView):
     model = User
-    template_name = 'users/user_profile.html'
+    template_name = 'user_profile.html'

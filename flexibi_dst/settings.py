@@ -1,6 +1,7 @@
 import getpass
 import os
 import sys
+
 import dj_database_url
 
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -46,10 +47,18 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'flexibi_dst.urls'
 
+TEMPLATE_DIRS = [
+    os.path.join(BASE_DIR, 'flexibi_dst', 'templates'),
+    os.path.join(BASE_DIR, 'users', 'templates'),
+    os.path.join(BASE_DIR, 'scenario_builder', 'templates'),
+    os.path.join(BASE_DIR, 'scenario_evaluator', 'templates'),
+    os.path.join(BASE_DIR, 'bioresource_explorer', 'templates'),
+]
+
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [os.path.join(BASE_DIR, 'templates')],
+        'DIRS': TEMPLATE_DIRS,
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [

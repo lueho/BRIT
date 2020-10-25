@@ -10,7 +10,7 @@ from scenario_evaluator.models import RunningTask
 
 class ScenarioListView(DualUserListView):
     model = Scenario
-    template_name = 'scenario_evaluator/scenario_list.html'
+    template_name = 'scenario_list.html'
 
 
 class ScenarioResultView(DetailView):
@@ -18,7 +18,7 @@ class ScenarioResultView(DetailView):
     View with summaries of the results of each algorithm and a total summary.
     """
 
-    template_name = 'scenario_evaluator/scenario_result_detail.html'
+    template_name = 'scenario_result_detail.html'
     model = Scenario
     context_object_name = 'scenario'
     object = None
@@ -45,7 +45,7 @@ class ScenarioResultView(DetailView):
                     'algorithm_name': task.algorithm.name
                 })
 
-            return render(request, 'scenario_evaluator/evaluation_progress.html', context)
+            return render(request, 'evaluation_progress.html', context)
         else:
             context = self.get_context_data()
             return self.render_to_response(context)
@@ -57,7 +57,7 @@ class ScenarioEvaluationProgressView(DetailView):
     finishing the calculation, the user is redirected to the result page.
     """
 
-    template_name = 'scenario_evaluator/evaluation_progress.html'
+    template_name = 'evaluation_progress.html'
     model = Scenario
 
 
@@ -65,7 +65,7 @@ class ScenarioResultDetailMapView(DetailView):
     """View of an individual result map in large size"""
     model = Layer
     context_object_name = 'layer'
-    template_name = 'scenario_builder/result_detail_map.html'
+    template_name = 'result_detail_map.html'
 
     def get_object(self, **kwargs):
         scenario = Scenario.objects.get(id=self.kwargs.get('pk'))

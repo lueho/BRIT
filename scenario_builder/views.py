@@ -39,10 +39,11 @@ from .tasks import run_inventory
 class CatchmentBrowseView(FormMixin, ListView):
     model = Catchment
     form_class = CatchmentQueryForm
+    template_name = 'catchment_list.html'
 
 
 class CatchmentCreateView(LoginRequiredMixin, CreateView):
-    template_name = 'scenario_builder/catchment_create.html'
+    template_name = 'catchment_create.html'
     form_class = CatchmentForm
     success_url = reverse_lazy('catchment_list')
 
@@ -83,7 +84,7 @@ def load_catchment_options(request):
         catchments = Catchment.objects.filter(region=region, owner__in=catchment_owners)
     else:
         catchments = Catchment.objects.none()
-    return render(request, 'scenario_builder/catchment_dropdown_list_options.html', {'catchments': catchments})
+    return render(request, 'catchment_dropdown_list_options.html', {'catchments': catchments})
 
 
 class CatchmentGeometryAPI(APIView):
@@ -105,12 +106,12 @@ class CatchmentGeometryAPI(APIView):
 
 class MaterialListView(DualUserListView):
     model = Material
-    template_name = 'scenario_builder/material_list.html'
+    template_name = 'material_list.html'
 
 
 class MaterialCreateView(LoginRequiredMixin, CreateView):
     form_class = MaterialModelForm
-    template_name = 'scenario_builder/material_create.html'
+    template_name = 'material_create.html'
 
     def form_valid(self, form):
         form.instance.owner = self.request.user
@@ -122,7 +123,7 @@ class MaterialCreateView(LoginRequiredMixin, CreateView):
 
 class MaterialDetailView(DetailView):
     model = Material
-    template_name = 'scenario_builder/material_detail.html'
+    template_name = 'material_detail.html'
     object = None
 
     def get(self, request, *args, **kwargs):
@@ -135,7 +136,7 @@ class MaterialDetailView(DetailView):
 class MaterialUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     model = Material
     form_class = MaterialModelForm
-    template_name = 'scenario_builder/material_update.html'
+    template_name = 'material_update.html'
     success_url = '/scenario_builder/materials/{id}'
 
     def test_func(self):
@@ -145,7 +146,7 @@ class MaterialUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
 
 class MaterialDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
     model = Material
-    template_name = 'scenario_builder/material_delete.html'
+    template_name = 'material_delete.html'
     success_url = '/scenario_builder/materials'
 
     def test_func(self):
@@ -155,7 +156,7 @@ class MaterialDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
 
 class MaterialComponentCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
     form_class = MaterialComponentModelForm
-    template_name = 'scenario_builder/material_component_create.html'
+    template_name = 'material_component_create.html'
     object = None
 
     def test_func(self):
@@ -171,7 +172,7 @@ class MaterialComponentCreateView(LoginRequiredMixin, UserPassesTestMixin, Creat
 
 class MaterialComponentUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     form_class = MaterialComponentModelForm
-    template_name = 'scenario_builder/material_component_update.html'
+    template_name = 'material_component_update.html'
     object = None
 
     def get_object(self, **kwargs):
@@ -188,7 +189,7 @@ class MaterialComponentUpdateView(LoginRequiredMixin, UserPassesTestMixin, Updat
 
 class MaterialComponentDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
     model = MaterialComponent
-    template_name = 'scenario_builder/material_component_delete.html'
+    template_name = 'material_component_delete.html'
     success_url = '/scenario_builder/materials/{material_id}'
 
     def get_object(self, **kwargs):
@@ -220,12 +221,13 @@ class RegionGeometryAPI(APIView):
 
 class ScenarioListView(DualUserListView):
     model = Scenario
-    template_name = 'scenario_builder/scenario_list.html'
+    template_name = 'scenario_list.html'
 
 
 class ScenarioCreateView(LoginRequiredMixin, CreateView):
     model = Scenario
     form_class = ScenarioModelForm
+    template_name = 'scenario_create.html'
     success_url = reverse_lazy('scenario_list')
 
     def form_valid(self, form):
@@ -235,6 +237,7 @@ class ScenarioCreateView(LoginRequiredMixin, CreateView):
 
 class ScenarioUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     model = Scenario
+    template_name = 'scenario_create.html'
     form_class = ScenarioModelForm
 
     def get_success_url(self):
@@ -247,7 +250,7 @@ class ScenarioUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
 
 class ScenarioDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
     model = Scenario
-    template_name = 'scenario_builder/scenario_delete.html'
+    template_name = 'scenario_delete.html'
     success_url = '/scenario_builder/scenarios'
 
     def test_func(self):
@@ -271,7 +274,7 @@ class ScenarioDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
     'run' button."""
 
     model = Scenario
-    template_name = 'scenario_builder/scenario_detail.html'
+    template_name = 'scenario_detail.html'
     object = None
     config = None
 
@@ -300,7 +303,7 @@ class ScenarioAddInventoryAlgorithmView(LoginRequiredMixin, UserPassesTestMixin,
                                         TemplateResponseMixin, ModelFormMixin, View):
     model = ScenarioInventoryConfiguration
     form_class = ScenarioInventoryConfigurationAddForm
-    template_name = 'scenario_builder/scenario_configuration_add.html'
+    template_name = 'scenario_configuration_add.html'
     object = None
 
     def test_func(self):
@@ -349,7 +352,7 @@ class ScenarioAlgorithmConfigurationUpdateView(LoginRequiredMixin, UserPassesTes
                                                TemplateResponseMixin, ModelFormMixin, View):
     model = ScenarioInventoryConfiguration
     form_class = ScenarioInventoryConfigurationUpdateForm
-    template_name = 'scenario_builder/scenario_configuration_update.html'
+    template_name = 'scenario_configuration_update.html'
     object = None
 
     def test_func(self):
@@ -424,7 +427,7 @@ def load_geodataset_options(request):
             geodatasets = scenario.available_geodatasets()
     else:
         geodatasets = GeoDataset.objects.none()
-    return render(request, 'scenario_builder/geodataset_dropdown_list_options.html', {'geodatasets': geodatasets})
+    return render(request, 'geodataset_dropdown_list_options.html', {'geodatasets': geodatasets})
 
 
 def load_algorithm_options(request):
@@ -442,7 +445,7 @@ def load_algorithm_options(request):
             algorithms = scenario.available_inventory_algorithms()
     else:
         algorithms = InventoryAlgorithm.objects.none()
-    return render(request, 'scenario_builder/algorithm_dropdown_list_options.html', {'algorithms': algorithms})
+    return render(request, 'algorithm_dropdown_list_options.html', {'algorithms': algorithms})
 
 
 def load_parameter_options(request):
@@ -453,7 +456,7 @@ def load_parameter_options(request):
             'parameters': {
                 parameter: InventoryAlgorithmParameterValue.objects.filter(parameter=parameter) for parameter in
                 parameters}}
-        return render(request, 'scenario_builder/parameters_dropdown_list_options.html', context)
+        return render(request, 'parameters_dropdown_list_options.html', context)
     else:
         return HttpResponse("")
 
