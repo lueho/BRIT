@@ -19,7 +19,7 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 COPY . /app
 #EXPOSE 8000
 
-#COPY ./entrypoint.sh /app/entrypoint.sh
-#ENTRYPOINT /app/entrypoint.sh
+COPY ./entrypoint.sh /app/entrypoint.sh
+ENTRYPOINT /app/entrypoint.sh
 
-#CMD ["sh", "/app/entrypoint.sh"]
+CMD ["sh", "/app/entrypoint.sh"]
