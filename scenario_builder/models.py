@@ -247,6 +247,12 @@ class FeedstockNotImplemented(Exception):
         algorithm for it in this region"""
 
 
+SCENARIO_STATUS = (
+    ('administrative', 'administrative'),
+    ('custom', 'custom'),
+)
+
+
 class ScenarioManager(models.Manager):
 
     def create(self, **kwargs):
@@ -255,6 +261,11 @@ class ScenarioManager(models.Manager):
 
 
 class Scenario(models.Model):
+    class Status(models.IntegerChoices):
+        CHANGED = 1
+        RUNNING = 2
+        FINISHED = 3
+
     name = models.CharField(max_length=56, null=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
     description = models.TextField(blank=True, null=True)
@@ -263,6 +274,7 @@ class Scenario(models.Model):
     catchment = models.ForeignKey(Catchment, on_delete=models.CASCADE, null=True)  # TODO: make many-to-many?
     evaluation_running = models.BooleanField(default=False)
     evaluated = models.BooleanField(default=False)
+    status = models.IntegerField(choices=Status.choices, default=1)
 
     objects = ScenarioManager()
 
