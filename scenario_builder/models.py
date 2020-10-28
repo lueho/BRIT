@@ -4,6 +4,8 @@ from django.core.validators import RegexValidator
 from django.db import models
 from django.db.models.query import QuerySet
 from django.urls import reverse
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 TYPES = (
     ('administrative', 'administrative'),
@@ -260,17 +262,8 @@ class ScenarioManager(models.Manager):
         return scenario
 
 
-class ScenarioStatus(models.Model):
-    class Status(models.IntegerChoices):
-        CHANGED = 1
-        RUNNING = 2
-        FINISHED = 3
-
-    status = models.IntegerField(choices=Status.choices, default=Status.CHANGED)
-
-
 class Scenario(models.Model):
-    name = models.CharField(max_length=56, null=True)
+    name = models.CharField(max_length=56, default='Custom Scenario')
     owner = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
     description = models.TextField(blank=True, null=True)
     region = models.ForeignKey(Region, on_delete=models.CASCADE, null=True)
@@ -278,22 +271,11 @@ class Scenario(models.Model):
     catchment = models.ForeignKey(Catchment, on_delete=models.CASCADE, null=True)  # TODO: make many-to-many?
     evaluation_running = models.BooleanField(default=False)
     evaluated = models.BooleanField(default=False)
-    _status = models.OneToOneField(ScenarioStatus, on_delete=models.CASCADE)
 
     objects = ScenarioManager()
 
-    @property
     def status(self):
-        return self._status.status
-
-    @status.setter
-    def status(self, status: ScenarioStatus.Status):
-        self._status.status = status
-        self._status.save()
-
-    def set_status(self, status: ScenarioStatus.Status):
-        self._status.status = status
-        self._status.save()
+        return ScenarioStatus.Status(self.scenariostatus.status)
 
     def available_feedstocks(self):
         return Material.objects.filter(id__in=self.available_inventory_algorithms().values('feedstock'))
@@ -557,6 +539,25 @@ class Scenario(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class ScenarioStatus(models.Model):
+    class Status(models.IntegerChoices):
+        CHANGED = 1
+        RUNNING = 2
+        FINISHED = 3
+
+    scenario = models.OneToOneField(Scenario, on_delete=models.CASCADE, null=True)
+    status = models.IntegerField(choices=Status.choices, default=Status.CHANGED)
+
+
+@receiver(post_save, sender=Scenario)
+def create_favorites(sender, instance, created, **kwargs):
+    """
+    Whenever a new Scenario instance is created, this creates a ScenarioStatus instance for it.
+    """
+    if created:
+        ScenarioStatus.objects.create(scenario=instance)
 
 
 class ScenarioInventoryConfiguration(models.Model):
