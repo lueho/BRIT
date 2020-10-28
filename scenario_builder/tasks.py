@@ -13,6 +13,7 @@ def run_inventory(scenario_id):
 
     # block scenario, so it can't be changed during calculations
     scenario.evaluation_running = True
+    scenario.status = scenario.Status.RUNNING
     scenario.save()
 
     scenario.delete_result_layers()
@@ -59,4 +60,5 @@ def finalize_inventory(results, scenario_id):
     RunningTask.objects.filter(scenario=scenario_id).delete()
     scenario = Scenario.objects.get(id=scenario_id)
     scenario.evaluation_running = False
+    scenario.status = scenario.Status.FINISHED
     scenario.save()

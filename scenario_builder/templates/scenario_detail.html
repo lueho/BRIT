@@ -30,7 +30,8 @@
             </table>
         </div>
         <div class="col col-3">
-            {% if not object.evaluated %}
+            {# status = CHANGED #}
+            {% if object.status == 1 %}
                 <p>This is a summary of the complete configuration of this scenario. Please check if everything is as it
                     should be. Once you are sure, everything is correct you can run the scenario evaluation from
                     here.</p>
@@ -38,7 +39,12 @@
                     {% csrf_token %}
                     <button type="submit" name="run" class="btn btn-primary">Run scenario evaluation</button>
                 </form>
-            {% else %}
+                {# status = RUNNING #}
+            {% elif object.status == 2 %}
+                <p>The scenario evaluation is currently running.</p>
+                <a class="btn btn-primary" href="{% url 'scenario_result' object.id %}">View evaluation progress</a>
+                {# status = FINISHED #}
+            {% elif object.status == 3 %}
                 <p>This is a summary of the complete configuration of this scenario. The scenario has already been
                     evaluated.</p>
                 <a class="btn btn-primary" href="{% url 'scenario_result' object.id %}">View results</a>

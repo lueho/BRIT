@@ -260,12 +260,16 @@ class ScenarioManager(models.Manager):
         return scenario
 
 
-class Scenario(models.Model):
+class ScenarioStatus(models.Model):
     class Status(models.IntegerChoices):
         CHANGED = 1
         RUNNING = 2
         FINISHED = 3
 
+    status = models.IntegerField(choices=Status.choices, default=Status.CHANGED)
+
+
+class Scenario(models.Model):
     name = models.CharField(max_length=56, null=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
     description = models.TextField(blank=True, null=True)
@@ -274,9 +278,22 @@ class Scenario(models.Model):
     catchment = models.ForeignKey(Catchment, on_delete=models.CASCADE, null=True)  # TODO: make many-to-many?
     evaluation_running = models.BooleanField(default=False)
     evaluated = models.BooleanField(default=False)
-    status = models.IntegerField(choices=Status.choices, default=1)
+    _status = models.OneToOneField(ScenarioStatus, on_delete=models.CASCADE)
 
     objects = ScenarioManager()
+
+    @property
+    def status(self):
+        return self._status.status
+
+    @status.setter
+    def status(self, status: ScenarioStatus.Status):
+        self._status.status = status
+        self._status.save()
+
+    def set_status(self, status: ScenarioStatus.Status):
+        self._status.status = status
+        self._status.save()
 
     def available_feedstocks(self):
         return Material.objects.filter(id__in=self.available_inventory_algorithms().values('feedstock'))
@@ -549,6 +566,10 @@ class ScenarioInventoryConfiguration(models.Model):
     inventory_algorithm = models.ForeignKey(InventoryAlgorithm, on_delete=models.CASCADE)
     inventory_parameter = models.ForeignKey(InventoryAlgorithmParameter, on_delete=models.CASCADE)
     inventory_value = models.ForeignKey(InventoryAlgorithmParameterValue, on_delete=models.CASCADE)
+
+    def save(self, *args, **kwargs):
+        self.scenario.set_status(ScenarioStatus.Status.CHANGED)
+        super().save(*args, **kwargs)
 
     # def save(self, *args, **kwargs):
     #     # Only save if there is no previous entry for a parameter in a scenario. Otherwise drop old entry first.

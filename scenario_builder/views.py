@@ -290,6 +290,7 @@ class ScenarioDetailView(UserPassesTestMixin, DetailView):
         self.object = self.get_object()
         scenario = self.object
         scenario.evaluation_running = True
+        scenario.status = scenario.Status.RUNNING
         scenario.save()
         run_inventory(scenario.id)
         return redirect('scenario_result', scenario.id)
