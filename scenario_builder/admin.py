@@ -16,6 +16,7 @@ from .models import (Catchment,
                      Region,
                      Scenario,
                      ScenarioInventoryConfiguration,
+                     ScenarioStatus,
                      SFBSite,
                      GeoDataset, )
 
@@ -175,7 +176,7 @@ class GeoDatasetAdmin(ModelAdmin):
 
 @admin.register(Scenario)
 class ScenarioAdmin(ModelAdmin):
-    list_display = ('name', 'region_link', 'site_link', 'catchment_link', 'description')
+    list_display = ('name', 'region_link', 'catchment_link', 'description', 'status')
 
     @staticmethod
     def region_link(obj):
@@ -183,14 +184,18 @@ class ScenarioAdmin(ModelAdmin):
         return format_html("<a href='{}'>{}</a>", url, obj.region.name)
 
     @staticmethod
-    def site_link(obj):
-        url = reverse('admin:scenario_builder_sfbsite_change', args=(obj.site.id,))
-        return format_html("<a href='{}'>{}</a>", url, obj.site.name)
-
-    @staticmethod
     def catchment_link(obj):
         url = reverse('admin:scenario_builder_catchment_change', args=(obj.catchment.id,))
         return format_html("<a href='{}'>{}</a>", url, obj.catchment.name)
+
+    @staticmethod
+    def status(obj):
+        return obj.status
+
+
+@admin.register(ScenarioStatus)
+class ScenarioStatusAdmin(ModelAdmin):
+    list_display = ('scenario', 'status')
 
 
 admin.site.register(MaterialComponent)

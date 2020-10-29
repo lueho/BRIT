@@ -28,7 +28,9 @@ from .models import (Catchment,
                      InventoryAlgorithm,
                      InventoryAlgorithmParameter,
                      InventoryAlgorithmParameterValue,
-                     Region)
+                     Region,
+                     ScenarioStatus)
+
 from .serializers import CatchmentSerializer, BaseResultMapSerializer, RegionSerializer
 from .tasks import run_inventory
 
@@ -289,9 +291,7 @@ class ScenarioDetailView(UserPassesTestMixin, DetailView):
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         scenario = self.object
-        scenario.evaluation_running = True
-        scenario.status = scenario.Status.RUNNING
-        scenario.save()
+        # scenario.set_status(ScenarioStatus.Status.RUNNING)
         run_inventory(scenario.id)
         return redirect('scenario_result', scenario.id)
 
