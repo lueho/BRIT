@@ -160,6 +160,13 @@
 
             $("#greenhouse-count")[0].innerHTML = analysis['gh_count'].toString();
         }
+
+        function onLoad() {
+            fetchGreenhouseGeometries();
+            map.invalidateSize();
+        }
+
+        window.onload = () => onLoad();
     </script>
 
 {% endblock %}
