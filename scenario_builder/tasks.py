@@ -56,4 +56,4 @@ def finalize_inventory(results, scenario_id):
     # remove finished tasks from db
     RunningTask.objects.filter(scenario=scenario_id).delete()
     scenario = Scenario.objects.get(id=scenario_id)
-    scenario.set_status(ScenarioStatus.Status.CHANGED)
+    scenario.set_status(ScenarioStatus.Status.FINISHED)
