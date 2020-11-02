@@ -3,7 +3,7 @@ from django.contrib.admin import ModelAdmin
 from django.contrib.gis.admin import OSMGeoAdmin
 from django.forms import ModelForm, ValidationError
 from django.urls import reverse
-from django.utils.html import format_html, format_html_join
+from django.utils.html import format_html
 
 from .models import (Catchment,
                      InventoryAlgorithm,
@@ -16,6 +16,7 @@ from .models import (Catchment,
                      Region,
                      Scenario,
                      ScenarioInventoryConfiguration,
+                     ScenarioStatus,
                      SFBSite,
                      GeoDataset, )
 
@@ -52,21 +53,22 @@ class CatchmentAdmin(OSMGeoAdmin):
 
 @admin.register(Region)
 class RegionAdmin(OSMGeoAdmin):
-    list_display = ('name', 'country', 'implemented_algorithms',)
-    readonly_fields = ('implemented_algorithms',)
+    list_display = ('name', 'country',)
 
-    @staticmethod
-    def implemented_algorithms(obj):
-        algorithms = [(reverse('admin:scenario_builder_inventoryalgorithm_change', args=(alg.id,)),
-                       alg.geodataset.name,
-                       reverse('admin:scenario_builder_material_change', args=(alg.feedstock.id,)),
-                       alg.feedstock.name)
-                      for alg in InventoryAlgorithm.objects.filter(geodataset__region=obj)]
-        algorithm_list = format_html_join(
-            '\n', "<li><a href='{}'>{}</a>: <a href='{}'>{}</a></li>",
-            (alg for alg in algorithms)
-        )
-        return algorithm_list
+    # readonly_fields = ('implemented_algorithms',)
+
+    # @staticmethod
+    # def implemented_algorithms(obj):
+    #     algorithms = [(reverse('admin:scenario_builder_inventoryalgorithm_change', args=(alg.id,)),
+    #                    alg.geodataset.name,
+    #                    reverse('admin:scenario_builder_material_change', args=(alg.feedstock.id,)),
+    #                    alg.feedstock.name)
+    #                   for alg in InventoryAlgorithm.objects.filter(geodataset__region=obj)]
+    #     algorithm_list = format_html_join(
+    #         '\n', "<li><a href='{}'>{}</a>: <a href='{}'>{}</a></li>",
+    #         (alg for alg in algorithms)
+    #     )
+    #     return algorithm_list
 
     def get_queryset(self, request):
         queryset = super(RegionAdmin, self).get_queryset(request)
@@ -175,7 +177,7 @@ class GeoDatasetAdmin(ModelAdmin):
 
 @admin.register(Scenario)
 class ScenarioAdmin(ModelAdmin):
-    list_display = ('name', 'region_link', 'site_link', 'catchment_link', 'description')
+    list_display = ('name', 'region_link', 'catchment_link', 'description', 'status')
 
     @staticmethod
     def region_link(obj):
@@ -183,14 +185,18 @@ class ScenarioAdmin(ModelAdmin):
         return format_html("<a href='{}'>{}</a>", url, obj.region.name)
 
     @staticmethod
-    def site_link(obj):
-        url = reverse('admin:scenario_builder_sfbsite_change', args=(obj.site.id,))
-        return format_html("<a href='{}'>{}</a>", url, obj.site.name)
-
-    @staticmethod
     def catchment_link(obj):
         url = reverse('admin:scenario_builder_catchment_change', args=(obj.catchment.id,))
         return format_html("<a href='{}'>{}</a>", url, obj.catchment.name)
+
+    @staticmethod
+    def status(obj):
+        return obj.status
+
+
+@admin.register(ScenarioStatus)
+class ScenarioStatusAdmin(ModelAdmin):
+    list_display = ('scenario', 'status')
 
 
 admin.site.register(MaterialComponent)

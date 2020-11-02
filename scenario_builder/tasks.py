@@ -3,7 +3,7 @@ from celery import chord
 from flexibi_dst.celery import app
 from layer_manager.models import Layer
 from scenario_builder.inventory_algorithms import InventoryAlgorithms
-from scenario_builder.models import Scenario, InventoryAlgorithm, Material
+from scenario_builder.models import InventoryAlgorithm, Material, Scenario, ScenarioStatus
 from scenario_evaluator.models import RunningTask
 
 
@@ -11,9 +11,7 @@ from scenario_evaluator.models import RunningTask
 def run_inventory(scenario_id):
     scenario = Scenario.objects.get(id=scenario_id)
 
-    # block scenario, so it can't be changed during calculations
-    scenario.evaluation_running = True
-    scenario.save()
+    scenario.set_status(ScenarioStatus.Status.RUNNING)
 
     scenario.delete_result_layers()
 
@@ -58,5 +56,4 @@ def finalize_inventory(results, scenario_id):
     # remove finished tasks from db
     RunningTask.objects.filter(scenario=scenario_id).delete()
     scenario = Scenario.objects.get(id=scenario_id)
-    scenario.evaluation_running = False
-    scenario.save()
+    scenario.set_status(ScenarioStatus.Status.FINISHED)

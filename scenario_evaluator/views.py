@@ -34,7 +34,7 @@ class ScenarioResultView(DetailView):
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()
         scenario = self.object
-        if scenario.evaluation_running:
+        if scenario.status == 2:
             context = {
                 'scenario': scenario,
                 'task_list': {'tasks': []}

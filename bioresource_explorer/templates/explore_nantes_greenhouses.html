@@ -1,0 +1,172 @@
+{% extends 'base.html' %}
+{% load crispy_forms_tags %}
+{% load crispy_forms_filters %}
+{% load leaflet_tags %}
+
+{% block content %}
+
+    {% leaflet_js %}
+    {% leaflet_css %}
+
+    <!-- Page Heading -->
+    <div class="d-sm-flex align-items-center justify-content-between mb-4">
+        <h1 class="h3 mb-0 text-gray-800">Nantes Greenhouse Explorer</h1>
+    </div>
+
+    <!-- Outer wrapper -->
+    <div class="row h-100">
+
+        <!-- Left action column -->
+        <div class="col-sm-3">
+
+            <!-- Accordion -->
+            <div class="accordion">
+
+                <!-- Filter Form Card-->
+                <div class="card shadow">
+                    <div class="card-header" role="button" data-toggle="collapse" href="#filter-card-body"
+                         aria-expanded="true" aria-controls="filter-card-body">
+                        <b>Filter</b>
+                    </div>
+                    <div class="card-body collapse show" id="filter-card-body">
+                        <form id="greenhouse-filter-form" method="GET">
+                            {% csrf_token %}
+                            {% crispy form form.helper %}
+                        </form>
+                        <button class="btn btn-primary" id="button_tree_type" onclick="fetchGreenhouseGeometries()">
+                            Filter
+                        </button>
+                    </div>
+                </div>
+                <!-- End Filter Form Card-->
+
+                <!-- Result Card -->
+                <div class="card shadow">
+                    <div class="card-header"><b>Summery</b></div>
+                    <div class="card-body">
+                        <p>Count:</p>
+                        <p id="greenhouse-count" style="min-height: 1rem;">
+                    </div>
+                </div>
+                <!-- End Result Card -->
+
+            </div>
+            <!-- End Accordion -->
+        </div>
+        <!-- End Left Action Column -->
+
+        <!-- Map Column -->
+        <div class="col">
+            <div class="card shadow">
+                <div class="card-body p-0">
+                    {% leaflet_map "main" %}
+                </div>
+            </div>
+        </div>
+        <!-- End Map Column -->
+
+    </div>
+    <!-- End Outer Wrapper -->
+{% endblock content %}
+
+{% block javascript %}
+    {{ block.super }}
+
+    <script type="text/javascript">
+
+        let map;
+        const myRenderer = L.canvas({padding: 0.5});
+        let greenhouse_layer;
+
+        let type, layer;
+        window.addEventListener("map:init", function (event) {
+            map = event.detail.map;
+        });
+
+        async function fetchGreenhouseGeometries() {
+
+            const heatingButtons = document.getElementsByName("heating");
+            let heating;
+            for (let i = 0; i < heatingButtons.length; i++) {
+                if (heatingButtons[i].checked === true) {
+                    heating = heatingButtons[i].value;
+                }
+            }
+
+            const lightingButtons = document.getElementsByName("lighting");
+            let lighting;
+            for (let i = 0; i < lightingButtons.length; i++) {
+                if (lightingButtons[i].checked === true) {
+                    lighting = lightingButtons[i].value;
+                }
+            }
+
+            const prodModeButtons = document.getElementsByName("prod_mode");
+            let prod_mode;
+            for (let i = 0; i < prodModeButtons.length; i++) {
+                if (prodModeButtons[i].checked === true) {
+                    prod_mode = prodModeButtons[i].value;
+                }
+            }
+
+            const cultManButtons = document.getElementsByName("cult_man");
+            let cult_man;
+            for (let i = 0; i < cultManButtons.length; i++) {
+                if (cultManButtons[i].checked === true) {
+                    cult_man = cultManButtons[i].value;
+                }
+            }
+            // Define query string for REST API
+            const params = L.Util.extend({
+                heating: heating,
+                lighting: lighting,
+                prod_mode: prod_mode,
+                cult_man: cult_man,
+                cucumber: document.getElementById("id_crops_1").checked,
+                tomato: document.getElementById("id_crops_2").checked
+            });
+
+            const url = "{% url 'data.nantes_greenhouses' %}" + L.Util.getParamString(params);
+            console.log(url)
+            // Remove existing layer
+            if (greenhouse_layer !== undefined) {
+                map.removeLayer(greenhouse_layer);
+            }
+
+            // Fetch data from REST API
+            let response = await fetch(url);
+            let data = await response.json();
+
+            // Render geodata on map
+            const geodata = data['geoJson']
+            greenhouse_layer = L.geoJson(geodata, {
+                pointToLayer: function (feature, latlng) {
+                    return L.circleMarker(latlng, {
+                        renderer: myRenderer,
+                        color: '#63c36c',
+                        fillOpacity: 1,
+                        radius: 5,
+                        stroke: false
+                    })
+                },
+                onEachFeature: function onEachFeature(feature, layer) {
+                }
+            })
+            greenhouse_layer.addTo(map);
+            map.fitBounds(greenhouse_layer.getBounds())
+
+            // Fill "Results" section with analysis data from the analysis dict
+            const analysis = data['analysis']
+
+            $("#greenhouse-count")[0].innerHTML = analysis['gh_count'].toString();
+        }
+
+        function onLoad() {
+            fetchGreenhouseGeometries();
+            map.invalidateSize();
+        }
+
+        window.onload = () => onLoad();
+    </script>
+
+{% endblock %}

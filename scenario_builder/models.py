@@ -4,6 +4,9 @@ from django.core.validators import RegexValidator
 from django.db import models
 from django.db.models.query import QuerySet
 from django.urls import reverse
+from django.db.models.signals import pre_save, post_save
+from django.dispatch import receiver
+from .exceptions import BlockedRunningScenario
 
 TYPES = (
     ('administrative', 'administrative'),
@@ -247,6 +250,12 @@ class FeedstockNotImplemented(Exception):
         algorithm for it in this region"""
 
 
+SCENARIO_STATUS = (
+    ('administrative', 'administrative'),
+    ('custom', 'custom'),
+)
+
+
 class ScenarioManager(models.Manager):
 
     def create(self, **kwargs):
@@ -254,8 +263,21 @@ class ScenarioManager(models.Manager):
         return scenario
 
 
+class ScenarioStatus(models.Model):
+    class Status(models.IntegerChoices):
+        CHANGED = 1
+        RUNNING = 2
+        FINISHED = 3
+
+    scenario = models.OneToOneField('Scenario', on_delete=models.CASCADE, null=True)
+    status = models.IntegerField(choices=Status.choices, default=Status.CHANGED)
+
+    def __str__(self):
+        return f'Status of Scenario {self.scenario}: {self.status}'
+
+
 class Scenario(models.Model):
-    name = models.CharField(max_length=56, null=True)
+    name = models.CharField(max_length=56, default='Custom Scenario')
     owner = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
     description = models.TextField(blank=True, null=True)
     region = models.ForeignKey(Region, on_delete=models.CASCADE, null=True)
@@ -265,6 +287,20 @@ class Scenario(models.Model):
     evaluated = models.BooleanField(default=False)
 
     objects = ScenarioManager()
+
+    @property
+    def status(self):
+        return ScenarioStatus.Status(self.scenariostatus.status)
+
+    @status.setter
+    def status(self, status: ScenarioStatus.Status):  # TODO: It might be confusing that is saves. Remove?
+        self.scenariostatus.status = status
+        self.scenariostatus.save()
+
+    def set_status(self, status):
+        if isinstance(status, ScenarioStatus.Status):
+            self.scenariostatus.status = status
+            self.scenariostatus.save()
 
     def available_feedstocks(self):
         return Material.objects.filter(id__in=self.available_inventory_algorithms().values('feedstock'))
@@ -530,6 +566,26 @@ class Scenario(models.Model):
         return self.name
 
 
+@receiver(pre_save, sender=Scenario)
+def block_running_scenario(sender, instance, **kwargs):
+    """Checks if a scenario is being evaluated before it can be saved."""
+    if instance.status == ScenarioStatus.Status.RUNNING:
+        raise BlockedRunningScenario
+
+
+@receiver(post_save, sender=Scenario)
+def manage_scenario_status(sender, instance, created, **kwargs):
+    """
+    Whenever a new Scenario instance is created, this creates a ScenarioStatus instance for it.
+    Whenever a Scenario instance has been edited, the status is changed to CHANGED.
+    """
+    if created:
+        ScenarioStatus.objects.create(scenario=instance)
+    else:
+        instance.scenariostatus.status = ScenarioStatus.Status.CHANGED
+        instance.scenariostatus.save()
+
+
 class ScenarioInventoryConfiguration(models.Model):
     scenario = models.ForeignKey(Scenario, on_delete=models.CASCADE)
     feedstock = models.ForeignKey(Material, limit_choices_to={'is_feedstock': True}, on_delete=models.CASCADE)
@@ -537,6 +593,10 @@ class ScenarioInventoryConfiguration(models.Model):
     inventory_algorithm = models.ForeignKey(InventoryAlgorithm, on_delete=models.CASCADE)
     inventory_parameter = models.ForeignKey(InventoryAlgorithmParameter, on_delete=models.CASCADE)
     inventory_value = models.ForeignKey(InventoryAlgorithmParameterValue, on_delete=models.CASCADE)
+
+    def save(self, *args, **kwargs):
+        self.scenario.set_status(ScenarioStatus.Status.CHANGED)
+        super().save(*args, **kwargs)
 
     # def save(self, *args, **kwargs):
     #     # Only save if there is no previous entry for a parameter in a scenario. Otherwise drop old entry first.

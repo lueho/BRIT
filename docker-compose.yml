@@ -4,7 +4,7 @@ services:
   db:
     image: "postgis/postgis"
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - flexibi_db/:/var/lib/postgresql/data/
     environment:

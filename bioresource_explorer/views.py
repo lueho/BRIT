@@ -3,9 +3,9 @@ from django.http import JsonResponse
 from django.views.generic import TemplateView, FormView
 from rest_framework.views import APIView
 
-from gis_source_manager.models import HamburgRoadsideTrees
-from .forms import HamburgRoadsideTreeFilterForm
-from .serializers import HamburgRoadsideTreeGeometrySerializer
+from gis_source_manager.models import HamburgRoadsideTrees, NantesGreenhouses
+from .forms import HamburgRoadsideTreeFilterForm, NantesGreenhousesFilterForm
+from .serializers import HamburgRoadsideTreeGeometrySerializer, NantesGreenhousesGeometrySerializer
 
 
 class BioresourceExplorerHomeView(TemplateView):
@@ -21,8 +21,10 @@ class HamburgExplorerView(LoginRequiredMixin, FormView):
         return form_kwargs
 
 
-class NantesExplorerView(TemplateView):
-    template_name = 'tree_map_json.html'
+class NantesGreenhousesView(FormView):
+    template_name = 'explore_nantes_greenhouses.html'
+    form_class = NantesGreenhousesFilterForm
+    initial = {'heated': 'Yes', 'lighted': 'Yes'}
 
 
 def is_valid_queryparam(param):
@@ -31,7 +33,8 @@ def is_valid_queryparam(param):
 
 class HamburgRoadsideTreeAPIView(APIView):
 
-    def get(self, request):
+    @staticmethod
+    def get(request):
         qs = HamburgRoadsideTrees.objects.all()
         gattung_deutsch_query = request.GET.get('gattung_deutsch')
         pflanzjahr_min_query = request.GET.get('pflanzjahr_min')
@@ -55,6 +58,51 @@ class HamburgRoadsideTreeAPIView(APIView):
             'geoJson': serializer.data,
             'analysis': {
                 'tree_count': len(serializer.data['features'])
+            }
+        }
+
+        return JsonResponse(data, safe=False)
+
+
+class NantesGreenhousesAPIView(APIView):
+
+    @staticmethod
+    def get(request):
+        qs = NantesGreenhouses.objects.all()
+
+        if request.GET.get('lighting') == '2':
+            qs = qs.filter(lighted=True)
+        elif request.GET.get('lighting') == '3':
+            qs = qs.filter(lighted=False)
+
+        if request.GET.get('heating') == '2':
+            qs = qs.filter(heated=True)
+        elif request.GET.get('heating') == '3':
+            qs = qs.filter(heated=False)
+
+        if request.GET.get('prod_mode') == '2':
+            qs = qs.filter(above_ground=False)
+        elif request.GET.get('prod_mode') == '3':
+            qs = qs.filter(above_ground=True)
+
+        if request.GET.get('cult_man') == '2':
+            qs = qs.filter(high_wire=False)
+        elif request.GET.get('cult_man') == '3':
+            qs = qs.filter(heated=True)
+
+        crops = []
+        if request.GET.get('cucumber') == 'true':
+            crops.append('Concombre')
+        if request.GET.get('tomato') == 'true':
+            crops.append('Tomate')
+
+        qs = qs.filter(culture_1__in=crops)
+
+        serializer = NantesGreenhousesGeometrySerializer(qs, many=True)
+        data = {
+            'geoJson': serializer.data,
+            'analysis': {
+                'gh_count': len(serializer.data['features'])
             }
         }
 
