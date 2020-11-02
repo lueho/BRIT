@@ -16,30 +16,50 @@
     <!-- Outer Wrapper -->
     <div class="row h-100">
 
-        <!-- Filter Form -->
+        <!-- Left Action Column -->
         <div class="col-sm-3">
-            <h3>Search Filter:</h3>
-            <div>
-                <form method="get">
-                    {{ form|crispy }}
-                </form>
-                <button class="btn btn-primary" id="button_tree_type" onclick="queryDatasets()">Submit</button>
+
+            <!-- Accordion -->
+            <div class="accordion">
+
+                <!-- Filter Form Card -->
+                <div class="card shadow">
+                    <div class="card-header" role="button" data-toggle="collapse" href="#filter-card-body"
+                         aria-expanded="true" aria-controls="filter-card-body">
+                        <b>Filter</b>
+                    </div>
+                    <div class="card-body collapse show" id="filter-card-body">
+                        <form id="tree-filter-form" method="GET">
+                            {{ form|crispy }}
+                        </form>
+                        <button class="btn btn-primary" id="button_tree_type" onclick="queryDatasets()">Submit</button>
+                    </div>
+
+                </div>
+                <!-- End Filter Form Card -->
+
+                <!-- Result Card -->
+                <div class="card shadow">
+                    <div class="card-header"><b>Summary</b></div>
+                    <div class="card-body">
+                        <p>Number of trees:</p>
+                        <p id="result-tree-count" style="min-height: 1rem;">
+                    </div>
+                </div>
+                <!-- End Result Card -->
+
             </div>
-            <div>
-                <h3>Summary:</h3>
-                <table>
-                    <tr>
-                        <td>Tree count:</td>
-                        <td id="result-tree-count"></td>
-                    </tr>
-                </table>
-            </div>
+            <!-- End Accordion -->
         </div>
-        <!-- End Filter Form -->
+        <!-- End Left Action Column -->
 
         <!-- Map Column -->
-        <div class="col col-sm-9">
-        {% leaflet_map "main" %}
+        <div class="col">
+            <div class="card shadow">
+                <div class="card-body p-0">
+                    {% leaflet_map "main" %}
+                </div>
+            </div>
         </div>
         <!-- End Map Column -->
 
