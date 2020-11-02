@@ -3,7 +3,7 @@ from django.contrib.admin import ModelAdmin
 from django.contrib.gis.admin import OSMGeoAdmin
 from django.forms import ModelForm, ValidationError
 from django.urls import reverse
-from django.utils.html import format_html, format_html_join
+from django.utils.html import format_html
 
 from .models import (Catchment,
                      InventoryAlgorithm,
@@ -53,21 +53,22 @@ class CatchmentAdmin(OSMGeoAdmin):
 
 @admin.register(Region)
 class RegionAdmin(OSMGeoAdmin):
-    list_display = ('name', 'country', 'implemented_algorithms',)
-    readonly_fields = ('implemented_algorithms',)
+    list_display = ('name', 'country',)
 
-    @staticmethod
-    def implemented_algorithms(obj):
-        algorithms = [(reverse('admin:scenario_builder_inventoryalgorithm_change', args=(alg.id,)),
-                       alg.geodataset.name,
-                       reverse('admin:scenario_builder_material_change', args=(alg.feedstock.id,)),
-                       alg.feedstock.name)
-                      for alg in InventoryAlgorithm.objects.filter(geodataset__region=obj)]
-        algorithm_list = format_html_join(
-            '\n', "<li><a href='{}'>{}</a>: <a href='{}'>{}</a></li>",
-            (alg for alg in algorithms)
-        )
-        return algorithm_list
+    # readonly_fields = ('implemented_algorithms',)
+
+    # @staticmethod
+    # def implemented_algorithms(obj):
+    #     algorithms = [(reverse('admin:scenario_builder_inventoryalgorithm_change', args=(alg.id,)),
+    #                    alg.geodataset.name,
+    #                    reverse('admin:scenario_builder_material_change', args=(alg.feedstock.id,)),
+    #                    alg.feedstock.name)
+    #                   for alg in InventoryAlgorithm.objects.filter(geodataset__region=obj)]
+    #     algorithm_list = format_html_join(
+    #         '\n', "<li><a href='{}'>{}</a>: <a href='{}'>{}</a></li>",
+    #         (alg for alg in algorithms)
+    #     )
+    #     return algorithm_list
 
     def get_queryset(self, request):
         queryset = super(RegionAdmin, self).get_queryset(request)
