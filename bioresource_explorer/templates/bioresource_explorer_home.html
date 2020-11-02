@@ -1,29 +1,28 @@
 {% extends 'base.html' %}
 
 {% block content %}
-
-    <script>
-        function choose() {
-        var sel = document.getElementById("select-case-study-region");
-        var region = sel.options[sel.selectedIndex].value;
-        window.location.href = window.location.href + region;
-        }
-    </script>
-    
-    <!-- Page Heading -->
-    <div class="d-sm-flex align-items-center justify-content-between mb-4">
-      <h1 class="h3 mb-0 text-gray-800">Bioresource Explorer</h1>
-    </div>
-    <div class="row h-100">
+    <h2>Geodatasets holding information about Bioresources</h2>
+    <p>The following list contains georeferenced datasets that are used within the FLEXIBI
+    Decision Support Tool (DST) to retrieve information for the bioresource inventories.
+    In the bioresource explorer you can get familiar with the resources in the respective
+    case study regions. If you want to build an inventory for a specific scenario, you can
+    do so using the <a href="{% url 'scenario_list' %}">Scenario Builder</a>.</p>
+    <div class="row">
         <div class="col">
-            <p>This is the bioresource explorer. It allows you to freely explore the available datasets and get some information about the case study regions of the FLEXIBI project.</p>
-            <label for="select-case-study-region">Please choose a case study region:</label>
-
-            <select id="select-case-study-region">
-              <option value="nantes">Nantes</option>
-              <option value="hamburg">Hamburg</option>
-            </select>
-            <button onclick=choose()>Go explore!</button>
+            <ul class="list-group">
+                {% for geodataset in object_list %}
+                    <li class="list-group-item">
+                        <p><a href="{{ geodataset.get_absolute_url }}">{{ geodataset.name }}</a></p>
+                        <p>{{ geodataset.description }}</p>
+                    </li>
+                {% endfor %}
+            </ul>
         </div>
     </div>
-    {% endblock %}
+
+{% endblock %}
+
+{% block javascript %}
+    {{ block.super }}
+
+{% endblock %}

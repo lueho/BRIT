@@ -12,5 +12,8 @@ urlpatterns = [
     path('data.hamburg_roadside_trees/', HamburgRoadsideTreeAPIView.as_view(), name='data.hamburg_roadside_trees'),
     path('data.nantes_greenhouses/', NantesGreenhousesAPIView.as_view(), name='data.nantes_greenhouses'),
     path('hamburg/', HamburgExplorerView.as_view(), name='hamburg_explorer'),
-    path('nantes/', NantesGreenhousesView.as_view(), name='nantes_greenhouses'),
+    path('hamburg/', HamburgExplorerView.as_view(), name='HamburgGreenAreas'),
+    path('hamburg/', HamburgExplorerView.as_view(), name='HamburgRoadsideTrees'),
+    path('nantes/', NantesGreenhousesView.as_view(), name='nantes_explorer'),
+    path('nantes_greenhouses/', NantesGreenhousesView.as_view(), name='NantesGreenhouses'),
 ]
