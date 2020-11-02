@@ -1,4 +1,5 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db.models import Sum
 from django.http import JsonResponse
 from django.views.generic import TemplateView, FormView
 from rest_framework.views import APIView
@@ -102,7 +103,8 @@ class NantesGreenhousesAPIView(APIView):
         data = {
             'geoJson': serializer.data,
             'analysis': {
-                'gh_count': len(serializer.data['features'])
+                'gh_count': len(serializer.data['features']),
+                'gh_surface': round(qs.aggregate(Sum('surface_ha'))['surface_ha__sum'], 1)
             }
         }
 
