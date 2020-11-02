@@ -44,8 +44,10 @@
                 <div class="card shadow">
                     <div class="card-header"><b>Summery</b></div>
                     <div class="card-body">
-                        <p>Count:</p>
+                        <p>Number of greenhouses:</p>
                         <p id="greenhouse-count" style="min-height: 1rem;">
+                        <p>Total greenhouse area:</p>
+                        <p id="greenhouse-area" style="min-height: 1rem;">
                     </div>
                 </div>
                 <!-- End Result Card -->
@@ -77,11 +79,40 @@
         let map;
         const myRenderer = L.canvas({padding: 0.5});
         let greenhouse_layer;
+        let region_layer;
 
         let type, layer;
         window.addEventListener("map:init", function (event) {
             map = event.detail.map;
         });
+
+         async function fetchRegionGeometry() {
+
+            // Define query string for REST API
+            let params = L.Util.extend({
+                region_id: 9
+            });
+
+            let url = "{% url 'ajax_region_geometries' %}" + L.Util.getParamString(params);
+
+            // Remove existing layer
+            if (region_layer !== undefined) {
+                map.removeLayer(region_layer);
+            }
+
+            // Fetch data from REST API
+            let response = await fetch(url);
+            let data = await response.json();
+
+            // Render geodata on map
+            let geodata;
+            geodata = data['geoJson'];
+            region_layer = L.geoJson(geodata, {
+                style: region_layer_style
+            })
+            region_layer.addTo(map);
+            map.fitBounds(region_layer.getBounds())
+        }
 
         async function fetchGreenhouseGeometries() {
 
@@ -127,7 +158,6 @@
             });
 
             const url = "{% url 'data.nantes_greenhouses' %}" + L.Util.getParamString(params);
-            console.log(url)
             // Remove existing layer
             if (greenhouse_layer !== undefined) {
                 map.removeLayer(greenhouse_layer);
@@ -143,7 +173,7 @@
                 pointToLayer: function (feature, latlng) {
                     return L.circleMarker(latlng, {
                         renderer: myRenderer,
-                        color: '#63c36c',
+                        color: '#4061d2',
                         fillOpacity: 1,
                         radius: 5,
                         stroke: false
@@ -153,15 +183,16 @@
                 }
             })
             greenhouse_layer.addTo(map);
-            map.fitBounds(greenhouse_layer.getBounds())
 
             // Fill "Results" section with analysis data from the analysis dict
             const analysis = data['analysis']
 
             $("#greenhouse-count")[0].innerHTML = analysis['gh_count'].toString();
+            $("#greenhouse-area")[0].innerHTML = analysis['gh_surface'].toString() + " ha";
         }
 
         function onLoad() {
+            fetchRegionGeometry();
             fetchGreenhouseGeometries();
             map.invalidateSize();
         }
