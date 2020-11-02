@@ -1,20 +1,22 @@
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Sum
 from django.http import JsonResponse
-from django.views.generic import TemplateView, FormView
+from django.views.generic import ListView, FormView
 from rest_framework.views import APIView
 
 from gis_source_manager.models import HamburgRoadsideTrees, NantesGreenhouses
 from .forms import HamburgRoadsideTreeFilterForm, NantesGreenhousesFilterForm
+from scenario_builder.models import GeoDataset
 from .serializers import HamburgRoadsideTreeGeometrySerializer, NantesGreenhousesGeometrySerializer
 
 
-class BioresourceExplorerHomeView(TemplateView):
+class BioresourceExplorerHomeView(ListView):
+    queryset = GeoDataset.objects.all()
     template_name = 'bioresource_explorer_home.html'
 
 
 class HamburgExplorerView(LoginRequiredMixin, FormView):
-    template_name = 'tree_map_json.html'
+    template_name = 'explore_hamburg_roadsidetrees.html'
     form_class = HamburgRoadsideTreeFilterForm
 
     def get_form_kwargs(self):
