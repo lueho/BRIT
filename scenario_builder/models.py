@@ -15,7 +15,8 @@ TYPES = (
 
 GIS_SOURCE_MODELS = (
     ('HamburgRoadsideTrees', 'HamburgRoadsideTrees'),
-    ('HamburgGreenAreas', 'HamburgGreenAreas')
+    ('HamburgGreenAreas', 'HamburgGreenAreas'),
+    ('NantesGreenhouses', 'NantesGreenhouses')
 )
 
 
@@ -127,6 +128,9 @@ class GeoDataset(models.Model):
     description = models.TextField(blank=True, null=True)
     region = models.ForeignKey(Region, on_delete=models.CASCADE, null=False)
     model_name = models.CharField(max_length=56, choices=GIS_SOURCE_MODELS, null=True)
+
+    def get_absolute_url(self):
+        return reverse(self.model_name)
 
     def __str__(self):
         return self.name
