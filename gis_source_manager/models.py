@@ -52,7 +52,7 @@ class NantesGreenhouses(models.Model):
     id_serre = models.CharField(max_length=255, blank=True, null=True)
     lat = models.FloatField(blank=True, null=True)
     lon = models.FloatField(blank=True, null=True)
-    surface_ha = models.CharField(max_length=255, blank=True, null=True)
+    surface_ha = models.FloatField(max_length=255, blank=True, null=True)
     nb_cycles = models.IntegerField(blank=True, null=True)
     culture_1 = models.CharField(max_length=20, blank=True, null=True)
     start_cycle_1 = models.CharField(max_length=20, blank=True, null=True)
