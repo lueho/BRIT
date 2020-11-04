@@ -17,32 +17,76 @@ class ScenarioResult:
 
     def get_plot_data(self):
         plot_data = {}
-        labels, values = self.production_values_for_plot()
+
+        # Total annual production per feedstock
+        xlabels, data = self.production_values_for_plot()
         plot_data['productionPerFeedstockBarChart'] = {}
         plot_data['productionPerFeedstockBarChart']['chart_name'] = 'Total annual production per feedstock'
-        plot_data['productionPerFeedstockBarChart']['dataset'] = {'labels': labels, 'values': values}
+        plot_data['productionPerFeedstockBarChart']['chart_type'] = 'stacked_barchart'
+        plot_data['productionPerFeedstockBarChart']['dataset'] = {'labels': xlabels, 'values': data}
+        plot_data['productionPerFeedstockBarChart']['unit'] = 'Mg/a'
+        plot_data['productionPerFeedstockBarChart']['show_legend'] = False
+
+        # Composition of total production by component group
         groups = self.material_component_groups()
         for group in groups:
-            labels, values = self.material_values_for_plot(group)
+            xlabels, data = self.material_values_for_plot(group)
             chart_id = group.replace(' ', '') + 'BarChart'
             plot_data[chart_id] = {}
             plot_data[chart_id]['chart_name'] = 'Production per component: ' + group
-            plot_data[chart_id]['dataset'] = {'labels': labels, 'values': values}
+            plot_data[chart_id]['chart_type'] = 'stacked_barchart'
+            plot_data[chart_id]['dataset'] = {'labels': xlabels, 'values': data}
+            plot_data[chart_id]['unit'] = 'Mg/a'
+            plot_data[chart_id]['show_legend'] = False
+
+        # Seasonal distribution of total production
+        xlabels, data = self.seasonal_production_values_for_plot()
+        plot_data['seasonalFeedstockBarChart'] = {}
+        plot_data['seasonalFeedstockBarChart']['chart_name'] = 'Seasonal distribution of feedstocks'
+        plot_data['seasonalFeedstockBarChart']['chart_type'] = 'stacked_barchart'
+        plot_data['seasonalFeedstockBarChart']['dataset'] = {'labels': xlabels, 'values': data}
+        plot_data['seasonalFeedstockBarChart']['unit'] = 'Mg'
+        plot_data['seasonalFeedstockBarChart']['show_legend'] = True
+
         return plot_data
 
-    def production_values_for_plot(self):
+    def production_values_for_plot2(self):
         labels, values = [], []
         for label, value in self.total_production_per_feedstock().items():
             labels.append(label)
             values.append(value)
         return labels, values
 
+    def production_values_for_plot(self):
+        xlabels = []
+        data = [{
+            'label': 'Total',
+            'data': []
+        }]
+        for label, value in self.total_production_per_feedstock().items():
+            xlabels.append(label)
+            data[0]['data'].append(value)
+        return xlabels, data
+
     def material_values_for_plot(self, group):
-        labels, values = [], []
+        xlabels = []
+        data = [{
+            'label': 'Total',
+            'data': []
+        }]
         for label, value in self.total_material_components()[group].items():
-            labels.append(label)
-            values.append(value)
-        return labels, values
+            xlabels.append(label)
+            data[0]['data'].append(value)
+        return xlabels, data
+
+    def seasonal_production_values_for_plot(self):
+        xlabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+        data = [{'label': 'Feedstock 1',
+                 'data': [1.2, 1.3, 1.2, 1.3, 1.2, 1.3, 1.2, 1.3, 1.2, 1.3, 1.2, 1.3]},
+                {'label': 'Feedstock 2',
+                 'data': [2.5, 0.9, 2.5, 0.9, 2.5, 0.9, 2.5, 0.9, 2.5, 0.9, 2.5, 0.9]},
+                ]
+        return xlabels, data
 
     def total_annual_production(self):
         total_production = 0
