@@ -107,7 +107,13 @@
         let plot_data = JSON.parse(document.getElementById("plot_data").textContent);
         for (const [chart_id, content] of Object.entries(plot_data)) {
             let ctx = document.getElementById(chart_id)
-            const args = barChartStyle(content["dataset"]["labels"], content["dataset"]["values"]);
+            const args = chartDefinition(
+                content["chart_type"],
+                content["dataset"]["labels"],
+                content["dataset"]["values"],
+                content["unit"],
+                content["show_legend"],
+            );
             new Chart(ctx, args);
         }
     </script>
