@@ -20,7 +20,7 @@ class BaseScenario:
         self.running_tasks = []
 
 
-class GisInventory(BaseScenario):
+class GisInventory(BaseScenario):  # TODO: Is this obsolete?
     config: dict = None
     results: dict = None
 
@@ -33,7 +33,7 @@ class GisInventory(BaseScenario):
         Runs all algorithms that have been set up in self.config and creates layers in the database. Returns the
         instance of Layer and a feature_collection model that is dynamically generated in case the results contain
         geometric features. The feature_collection can be used to manage the features themselves, which are stored
-        in an autimatically created separated table in the database.
+        in an automatically created separated table in the database.
         """
         # block scenario, so it can't be changed during calculations
         self.scenario.evaluation_running = True

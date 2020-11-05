@@ -50,13 +50,6 @@ class ScenarioResult:
 
         return plot_data
 
-    def production_values_for_plot2(self):
-        labels, values = [], []
-        for label, value in self.total_production_per_feedstock().items():
-            labels.append(label)
-            values.append(value)
-        return labels, values
-
     def production_values_for_plot(self):
         xlabels = []
         data = [{
@@ -103,6 +96,9 @@ class ScenarioResult:
                 production[feedstock] = 0
             production[feedstock] += layer.layeraggregatedvalue_set.get(name='Total production').value / 1000
         return production
+
+    def seasonal_production_per_feedstock(self):
+        pass
 
     def total_material_components(self):
         total_production_per_feedstock = self.total_production_per_feedstock()
