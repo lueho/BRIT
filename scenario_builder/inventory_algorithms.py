@@ -91,6 +91,34 @@ class InventoryAlgorithms(object):
         return result
 
     @staticmethod
+    def nantes_greenhouse_yield(**kwargs):
+        catchment = Catchment.objects.get(id=kwargs.get('catchment_id'))
+        greenhouses_in_catchment = gis_models.NantesGreenhouses.objects.filter(geom__intersects=catchment.geom)
+
+        result = {
+            'aggregated_values': [
+                {
+                    'name': 'Number of greenhouses',
+                    'value': trees_count,
+                    'unit': ''
+                },
+                {
+                    'name': 'Total production',
+                    'value': prunings_yield,
+                    'unit': 'kg'
+                }
+            ],
+            'features': []
+        }
+        for greenhouse in greenhouses_in_catchment:
+            result['features'].append({
+                'geom': greenhouse.geom,
+                'point_yield_average': point_yield['value'],
+                'point_yield_standard_deviation': point_yield['standard_deviation']
+            })
+        return result
+
+    @staticmethod
     def clip_polygons(input_qs: QuerySet, mask_qs: QuerySet, keep_columns: [str] = None):
 
         if not input_qs:
