@@ -1,6 +1,7 @@
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
-from gis_source_manager.models import HamburgRoadsideTrees, NantesGreenhouses
+from gis_source_manager.models import HamburgRoadsideTrees
+from case_study_nantes.models import NantesGreenhouses
 
 
 class HamburgRoadsideTreeGeometrySerializer(GeoFeatureModelSerializer):

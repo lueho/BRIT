@@ -4,7 +4,8 @@ from django.http import JsonResponse
 from django.views.generic import ListView, FormView
 from rest_framework.views import APIView
 
-from gis_source_manager.models import HamburgRoadsideTrees, NantesGreenhouses
+from gis_source_manager.models import HamburgRoadsideTrees
+from case_study_nantes.models import NantesGreenhouses
 from .forms import HamburgRoadsideTreeFilterForm, NantesGreenhousesFilterForm
 from scenario_builder.models import GeoDataset
 from .serializers import HamburgRoadsideTreeGeometrySerializer, NantesGreenhousesGeometrySerializer
