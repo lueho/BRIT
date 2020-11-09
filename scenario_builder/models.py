@@ -3,9 +3,10 @@ from django.contrib.gis.db.models import MultiPolygonField, PointField
 from django.core.validators import RegexValidator
 from django.db import models
 from django.db.models.query import QuerySet
-from django.urls import reverse
 from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
+from django.urls import reverse
+
 from .exceptions import BlockedRunningScenario
 
 TYPES = (
@@ -192,12 +193,12 @@ class InventoryAlgorithm(models.Model):
 
 
 class InventoryAlgorithmParameter(models.Model):
+    descriptive_name = models.CharField(max_length=56)
     short_name = models.CharField(max_length=28,
                                   validators=[RegexValidator(regex=r'^\w{1,28}$',
                                                              message='Invalid parameter short_name. Do not use space'
                                                                      'or special characters.',
                                                              code='invalid_parameter_name')])
-    descriptive_name = models.CharField(max_length=56)
     description = models.TextField(blank=True, null=True)
     inventory_algorithm = models.ManyToManyField(InventoryAlgorithm)
     unit = models.CharField(max_length=20, blank=True, null=True)
@@ -213,30 +214,37 @@ class InventoryAlgorithmParameter(models.Model):
 class InventoryAlgorithmParameterValue(models.Model):
     name = models.CharField(max_length=56)
     description = models.TextField(blank=True, null=True)
-    parameter = models.ManyToManyField(InventoryAlgorithmParameter)
+    parameter = models.ForeignKey(InventoryAlgorithmParameter, on_delete=models.CASCADE, null=True)
     value = models.FloatField()
     standard_deviation = models.FloatField(null=True)
     source = models.CharField(max_length=200, blank=True, null=True)
     default = models.BooleanField(default=False)
 
-    def save(self, *args, **kwargs):
-        """
-        There can only be one default value for each parameter. This method checks if the default value has changed
-        and enforces uniqueness.
-        """
-        if not self.default:
-            for param in self.parameter.all():
-                if not param.inventoryalgorithmparametervalue_set.filter(default=True):
-                    self.default = True
-            return super(InventoryAlgorithmParameterValue, self).save(*args, **kwargs)
-        for param in self.parameter.all():
-            for val in param.inventoryalgorithmparametervalue_set.filter(default=True):
-                val.default = False
-                val.save()
-        return super(InventoryAlgorithmParameterValue, self).save(*args, **kwargs)
-
     def __str__(self):
         return self.name
+
+
+@receiver(pre_save, sender=InventoryAlgorithmParameterValue)
+def auto_default(sender, instance, **kwargs):
+    """
+    Makes sure that defaults are always set correctly, even if the user provides incoherent input.
+    """
+    # If there is no default, yet, make the new instance default
+    if not instance.default:
+        if not instance.parameter.inventoryalgorithmparametervalue_set.exclude(id=instance.id).filter(default=True):
+            instance.default = True
+
+
+@receiver(post_save, sender=InventoryAlgorithmParameterValue)
+def manage_scenario_status(sender, instance, created, **kwargs):
+    """
+    Makes sure that defaults are always set correctly, even if the user provides incoherent input.
+    """
+    # If the new instance is set to default and there are other old defaults, override them.
+    if instance.default:
+        for val in instance.parameter.inventoryalgorithmparametervalue_set.exclude(id=instance.id).filter(default=True):
+            val.default = False
+            val.save()
 
 
 class ScenarioConfigurationError(Exception):
@@ -573,8 +581,9 @@ class Scenario(models.Model):
 @receiver(pre_save, sender=Scenario)
 def block_running_scenario(sender, instance, **kwargs):
     """Checks if a scenario is being evaluated before it can be saved."""
-    if instance.status == ScenarioStatus.Status.RUNNING:
-        raise BlockedRunningScenario
+    if hasattr(instance, 'status'):
+        if instance.status == ScenarioStatus.Status.RUNNING:
+            raise BlockedRunningScenario
 
 
 @receiver(post_save, sender=Scenario)

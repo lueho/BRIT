@@ -10,6 +10,7 @@ django-geojson==3.0.0
 django-leaflet==0.26.0
 djangorestframework==3.11.0
 djangorestframework-gis==0.15
+django-model-utils
 flower==0.9.4
 future==0.18.2
 humanize==0.5.1

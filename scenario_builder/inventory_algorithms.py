@@ -94,20 +94,28 @@ class InventoryAlgorithms(object):
     def nantes_greenhouse_yield(**kwargs):
         catchment = Catchment.objects.get(id=kwargs.get('catchment_id'))
         greenhouses_in_catchment = gis_models.NantesGreenhouses.objects.filter(geom__intersects=catchment.geom)
+        greenhouses_count = greenhouses_in_catchment.count()
+
+        point_yield = kwargs.get('point_yield')
+        total_production = point_yield['value'] * greenhouses_count
+
+        component_list = ['Cucumber leaves', 'Cucumber stems', 'Cucumber fruit']
+        distribution = [1.2, 1.3, 1.2, 1.3, 1.2, 1.3, 1.2, 1.3, 1.2, 1.3, 1.2, 1.3]
 
         result = {
             'aggregated_values': [
                 {
                     'name': 'Number of greenhouses',
-                    'value': trees_count,
+                    'value': greenhouses_count,
                     'unit': ''
                 },
                 {
                     'name': 'Total production',
-                    'value': prunings_yield,
+                    'value': total_production,
                     'unit': 'kg'
                 }
             ],
+            'aggregated_distributions': [],
             'features': []
         }
         for greenhouse in greenhouses_in_catchment:
@@ -116,6 +124,13 @@ class InventoryAlgorithms(object):
                 'point_yield_average': point_yield['value'],
                 'point_yield_standard_deviation': point_yield['standard_deviation']
             })
+        for component in component_list:
+            result['aggregated_distributions'].append({
+                'name': component,
+                'type': 'seasonal',
+                'distribution': distribution
+            })
+
         return result
 
     @staticmethod

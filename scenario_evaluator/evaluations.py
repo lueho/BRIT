@@ -74,11 +74,13 @@ class ScenarioResult:
 
     def seasonal_production_values_for_plot(self):
         xlabels = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-        data = [{'label': 'Feedstock 1',
-                 'data': [1.2, 1.3, 1.2, 1.3, 1.2, 1.3, 1.2, 1.3, 1.2, 1.3, 1.2, 1.3]},
-                {'label': 'Feedstock 2',
-                 'data': [2.5, 0.9, 2.5, 0.9, 2.5, 0.9, 2.5, 0.9, 2.5, 0.9, 2.5, 0.9]},
-                ]
+        data = []
+        for layer in self.layers:
+            for distribution in layer.layeraggregateddistribution_set.filter(type='seasonal'):
+                data.append({
+                    'label': distribution.name,
+                    'data': distribution.distribution
+                })
         return xlabels, data
 
     def total_annual_production(self):

@@ -44,7 +44,6 @@ def run_inventory_algorithm(self, function_name, **kwargs):
         'results': results
     }
     Layer.objects.create_or_replace(**kwargs)
-
     return True
 
 

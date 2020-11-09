@@ -1,5 +1,6 @@
 import django.contrib.gis.db.models as gis_models
 from django.apps import apps
+from django.contrib.postgres.fields import ArrayField
 from django.db import models, connection
 from django.urls import reverse
 
@@ -91,6 +92,7 @@ class LayerManager(models.Manager):
                 feature_collection.objects.create(**feature)
 
         layer.add_aggregated_values(results['aggregated_values'])
+        layer.add_aggregated_distributions(results['aggregated_distributions'])
 
         return layer, feature_collection
 
@@ -125,6 +127,13 @@ class Layer(models.Model):
                                                 value=aggregate['value'],
                                                 unit=aggregate['unit'],
                                                 layer=self)
+
+    def add_aggregated_distributions(self, distributions):
+        for distribution in distributions:
+            LayerAggregatedDistribution.objects.create(name=distribution['name'],
+                                                       type=distribution['type'],
+                                                       distribution=distribution['distribution'],
+                                                       layer=self)
 
     def add_layer_fields(self, fields: dict):
         for field_name, data_type in fields.items():
@@ -253,3 +262,20 @@ class LayerAggregatedValue(models.Model):
     value = models.FloatField()
     unit = models.CharField(max_length=15, blank=True, null=True, default='')
     layer = models.ForeignKey(Layer, on_delete=models.CASCADE)
+
+
+DISTRIBUTION_TYPES = (
+    ('seasonal', 'seasonal'),  # Assumes array with length 12 for each month of the year
+)
+
+
+class LayerAggregatedDistribution(models.Model):
+    """
+    Holds desired aggregated distributions for a layer. Intended for seasonal distributions broken down to feedstock
+    components but any other distribution works as well.
+    """
+
+    name = models.CharField(max_length=255, null=True)
+    type = models.CharField(max_length=255, choices=DISTRIBUTION_TYPES, null=True)
+    distribution = ArrayField(models.FloatField(), null=True)
+    layer = models.ForeignKey(Layer, on_delete=models.CASCADE, null=True)
