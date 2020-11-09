@@ -1,5 +1,6 @@
 from django.contrib.auth.models import User
 from django.contrib.gis.db.models import MultiPolygonField, PointField
+from django.contrib.postgres.fields import ArrayField
 from django.core.validators import RegexValidator
 from django.db import models
 from django.db.models.query import QuerySet
@@ -626,3 +627,18 @@ class ScenarioInventoryConfiguration(models.Model):
 
     def get_absolute_url(self):
         return reverse('scenario_detail', kwargs={'pk': self.scenario.pk})
+
+
+class SeasonalDistribution(models.Model):
+    """
+    Model to deal with different types of input data that represent seasonal distribution of any kind. Input and output
+    with differing time steps and start-stop-cycles can be managed. All entries are with reference to one year.
+    """
+    # Into how many timesteps is the full year devided? e.g. 12 months, 365 days etc
+    # The values array must have the same length, filled with zeros, of not applicable to whole year
+    timesteps = models.IntegerField(null=True)
+    # Within one year, how many cycles are represented by the given data?
+    cycles = models.IntegerField(null=True)
+    # In which timestep does each cycle start and end? array must have form [start1, end1, start2, end2, ...]
+    start_stop = ArrayField(models.IntegerField, null=True)
+    values = ArrayField(models.FloatField, null=True)

@@ -30,6 +30,7 @@ INSTALLED_APPS = [
     'scenario_evaluator',
     'gis_source_manager',
     'layer_manager',
+    'case_study_nantes',
     'crispy_forms',
     'bootstrap_modal_forms',
 ]

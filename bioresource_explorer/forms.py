@@ -5,7 +5,8 @@ from django.forms import (ChoiceField, CheckboxSelectMultiple, MultipleChoiceFie
                           ModelForm,
                           TextInput)
 
-from gis_source_manager.models import HamburgRoadsideTrees, NantesGreenhouses
+from gis_source_manager.models import HamburgRoadsideTrees
+from case_study_nantes.models import NantesGreenhouses
 
 
 class HamburgRoadsideTreeFilterForm(ModelForm):

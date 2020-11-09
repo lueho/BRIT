@@ -3,6 +3,7 @@ from django.db import connection
 from django.db.models import QuerySet
 
 import gis_source_manager.models as gis_models
+from case_study_nantes.models import NantesGreenhouses
 from gis_source_manager.models import HamburgGreenAreas
 from scenario_builder.models import Catchment
 from .exceptions import EmptyQueryset
@@ -93,7 +94,7 @@ class InventoryAlgorithms(object):
     @staticmethod
     def nantes_greenhouse_yield(**kwargs):
         catchment = Catchment.objects.get(id=kwargs.get('catchment_id'))
-        greenhouses_in_catchment = gis_models.NantesGreenhouses.objects.filter(geom__intersects=catchment.geom)
+        greenhouses_in_catchment = NantesGreenhouses.objects.filter(geom__intersects=catchment.geom)
         greenhouses_count = greenhouses_in_catchment.count()
 
         point_yield = kwargs.get('point_yield')
@@ -143,6 +144,7 @@ class InventoryAlgorithms(object):
             raise EmptyQueryset
 
         # Clean up column names and remove any non existing column names
+        # noinspection PyProtectedMember
         input_fields_names = [field.name for field in input_qs.model._meta.get_fields()]
         columns = []
         if keep_columns is not None:
@@ -155,8 +157,10 @@ class InventoryAlgorithms(object):
         else:
             columns_str = ''
 
+        # noinspection PyProtectedMember
         input_table_name = input_qs.model._meta.db_table
         input_ids = '(' + ', '.join(str(id_) for id_ in input_qs.values_list('id', flat=True)) + ')'
+        # noinspection PyProtectedMember
         mask_table_name = mask_qs.model._meta.db_table
         mask_ids = '(' + ', '.join(str(id_) for id_ in mask_qs.values_list('id', flat=True)) + ')'
 
