@@ -2,7 +2,7 @@ from celery import chord
 
 from flexibi_dst.celery import app
 from layer_manager.models import Layer
-from scenario_builder.inventory_algorithms import InventoryAlgorithms
+from scenario_builder.inventory_algorithms import InventoryAlgorithmsBase
 from scenario_builder.models import InventoryAlgorithm, Material, Scenario, ScenarioStatus
 from scenario_evaluator.models import RunningTask
 
@@ -34,7 +34,7 @@ def run_inventory(scenario_id):
 
 @app.task(bind=True)
 def run_inventory_algorithm(self, function_name, **kwargs):
-    results = getattr(InventoryAlgorithms, function_name)(**kwargs)
+    results = getattr(InventoryAlgorithmsBase, function_name)(**kwargs)
     algorithm = InventoryAlgorithm.objects.get(function_name=function_name)
     kwargs = {
         'name': algorithm.function_name,

@@ -28,9 +28,10 @@ INSTALLED_APPS = [
     'flexibi_dst',
     'scenario_builder',
     'scenario_evaluator',
-    'gis_source_manager',
     'layer_manager',
-    'case_study_nantes',
+    'case_studies',
+    'case_studies.flexibi_nantes',
+    'case_studies.flexibi_hamburg',
     'crispy_forms',
     'bootstrap_modal_forms',
 ]
@@ -158,3 +159,7 @@ CELERY_BROKER_URL = os.environ.get("REDIS_URL")
 CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL")
 
 PUBLIC_OBJECT_OWNER = 'flexibi'
+
+IMPORTED_CASE_STUDIES = [
+    'flexibi_nantes',
+]

@@ -3,6 +3,7 @@ from django.db import models
 
 from scenario_builder.models import SeasonalDistribution
 
+
 class NantesGreenhouses(models.Model):
     geom = PointField(blank=True, null=True)
     id_exp = models.CharField(max_length=255, blank=True, null=True)

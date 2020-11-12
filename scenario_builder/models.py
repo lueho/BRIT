@@ -1,3 +1,6 @@
+import importlib
+import sys
+
 from django.contrib.auth.models import User
 from django.contrib.gis.db.models import MultiPolygonField, PointField
 from django.contrib.postgres.fields import ArrayField
@@ -163,6 +166,15 @@ class InventoryAlgorithm(models.Model):
 
     def __str__(self):
         return self.name
+
+    @staticmethod
+    def available_modules():
+        return [key.split('.')[0] for key in sys.modules.keys() if key.endswith('.algorithms')]
+
+    @staticmethod
+    def available_functions(module_name):
+        module = importlib.import_module(module_name + '.algorithms')
+        return [alg for alg in module.InventoryAlgorithms.__dict__ if not alg.startswith('__')]
 
     def default_values(self):
         """
@@ -640,5 +652,5 @@ class SeasonalDistribution(models.Model):
     # Within one year, how many cycles are represented by the given data?
     cycles = models.IntegerField(null=True)
     # In which timestep does each cycle start and end? array must have form [start1, end1, start2, end2, ...]
-    start_stop = ArrayField(models.IntegerField, null=True)
-    values = ArrayField(models.FloatField, null=True)
+    start_stop = ArrayField(models.IntegerField(), null=True)
+    values = ArrayField(models.FloatField(), null=True)
