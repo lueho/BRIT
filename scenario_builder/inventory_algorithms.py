@@ -2,14 +2,13 @@ from django.contrib.gis.geos import GEOSGeometry
 from django.db import connection
 from django.db.models import QuerySet
 
-import gis_source_manager.models as gis_models
-from case_study_nantes.models import NantesGreenhouses
-from gis_source_manager.models import HamburgGreenAreas
+from case_studies.flexibi_hamburg.models import HamburgGreenAreas, HamburgRoadsideTrees
+from case_studies.flexibi_nantes.models import NantesGreenhouses
 from scenario_builder.models import Catchment
 from .exceptions import EmptyQueryset
 
 
-class InventoryAlgorithms(object):
+class InventoryAlgorithmsBase(object):
 
     @staticmethod
     def avg_point_yield(**kwargs):
@@ -20,7 +19,7 @@ class InventoryAlgorithms(object):
         point_yield = {'value': <value>, 'standard_deviation': <std>}
         """
         catchment = Catchment.objects.get(id=kwargs.get('catchment_id'))
-        trees_in_catchment = gis_models.HamburgRoadsideTrees.objects.filter(geom__intersects=catchment.geom)
+        trees_in_catchment = HamburgRoadsideTrees.objects.filter(geom__intersects=catchment.geom)
         trees_count = trees_in_catchment.count()
         point_yield = kwargs.get('point_yield')
         prunings_yield = point_yield['value'] * trees_count
@@ -61,7 +60,7 @@ class InventoryAlgorithms(object):
         input_qs = HamburgGreenAreas.objects.all()
         mask_qs = Catchment.objects.filter(id=kwargs.get('catchment_id'))
         keep_columns = ['anlagenname', 'belegenheit', 'gruenart', 'nutzcode']
-        clipped_polygons = InventoryAlgorithms.clip_polygons(input_qs, mask_qs, keep_columns=keep_columns)
+        clipped_polygons = InventoryAlgorithmsBase.clip_polygons(input_qs, mask_qs, keep_columns=keep_columns)
         result = {
             'aggregated_values': [
                 {

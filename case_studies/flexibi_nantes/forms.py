@@ -1,37 +1,13 @@
 from crispy_forms.helper import FormHelper, Layout
 from crispy_forms.layout import Div, Field
-from django.forms import (ChoiceField, CheckboxSelectMultiple, MultipleChoiceField, RadioSelect, IntegerField,
+from django.forms import (CheckboxSelectMultiple,
+                          ChoiceField,
                           Form,
-                          ModelForm,
-                          TextInput)
+                          MultipleChoiceField,
+                          RadioSelect,
+                          )
 
-from gis_source_manager.models import HamburgRoadsideTrees
-from case_study_nantes.models import NantesGreenhouses
-
-
-class HamburgRoadsideTreeFilterForm(ModelForm):
-    pflanzjahr_min = IntegerField(required=False, label='Planted earliest in')
-    pflanzjahr_max = IntegerField(required=False, label='Planged latest in')
-
-    def __init__(self, *args, **kwargs):
-        super(HamburgRoadsideTreeFilterForm, self).__init__(*args, **kwargs)
-        self.fields.pop("pflanzjahr")
-        self.fields['pflanzjahr_min'].initial = 1801
-
-    class Meta:
-        model = HamburgRoadsideTrees
-        fields = ['gattung_deutsch', 'bezirk', 'pflanzjahr']
-        widgets = {
-            'pflanzjahr_min': TextInput(attrs={'id': 'input_pflanzjahr_min', 'function_name': 'input_pflanzjahr_min'}),
-            'bezirk': TextInput(attrs={'function_name': 'input_bezirk', 'id': 'input_bezirk'})
-        }
-        labels = {
-            'gattung_deutsch': 'Tree type',
-            'bezirk': 'City district',
-            'pflanzjahr_min': 'Planted earliest',
-            'pflanzjahr_max': 'Planted latest',
-        }
-
+from case_studies.flexibi_nantes.models import NantesGreenhouses
 
 CROP_CHOICES = (
     (1, "Cucumber"),
