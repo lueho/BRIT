@@ -40,11 +40,21 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
                     absolute_distribution = [value * total_group_surface for value in specific_distribution]
                     total_production += sum(absolute_distribution)
                     specific_annual_component_production[component] = sum(specific_distribution)
-                    result['aggregated_distributions'].append({
-                        'name': component,
-                        'type': 'seasonal',
-                        'distribution': absolute_distribution
-                    })
+                    current_distribution = None
+                    for dist in result['aggregated_distributions']:
+                        if dist['name'] == component:
+                            current_distribution = dist
+                            break
+                    if not current_distribution:
+                        current_distribution = {
+                            'name': component,
+                            'type': 'seasonal',
+                            'distribution': [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+                        }
+                        result['aggregated_distributions'].append(current_distribution)
+
+                    current_distribution['distribution'] = [sum(x) for x in
+                                            zip(current_distribution['distribution'], absolute_distribution)]
 
                 for feature in greenhouse_group:
                     fields = {f'total_{key}_production': feature.surface_ha * value for (key, value) in
@@ -54,7 +64,7 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
 
         result['aggregated_values'].append({
             'name': 'Total production',
-            'value': total_production,
+            'value': total_production * 1000,
             'unit': 'Mg/a'
         })
 
