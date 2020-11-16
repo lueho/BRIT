@@ -42,9 +42,9 @@ class NantesGreenhousesAPIView(APIView):
 
         crops = []
         if request.GET.get('cucumber') == 'true':
-            crops.append('Concombre')
+            crops.append('Cucumber')
         if request.GET.get('tomato') == 'true':
-            crops.append('Tomate')
+            crops.append('Tomato')
 
         qs = qs.filter(culture_1__in=crops)
 

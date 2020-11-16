@@ -2,8 +2,6 @@ from django.contrib.gis.geos import GEOSGeometry
 from django.db import connection
 from django.db.models import QuerySet
 
-from case_studies.flexibi_hamburg.models import HamburgGreenAreas, HamburgRoadsideTrees
-from case_studies.flexibi_nantes.models import NantesGreenhouses
 from scenario_builder.models import Catchment
 from .exceptions import EmptyQueryset
 
@@ -16,37 +14,44 @@ class InventoryAlgorithmsBase(object):
         Assignes a global average and standard deviation to all points that are found within the scenario catchment.
         Required keyword arguments:
         catchment_id
+        source_model
         point_yield = {'value': <value>, 'standard_deviation': <std>}
         """
         catchment = Catchment.objects.get(id=kwargs.get('catchment_id'))
-        trees_in_catchment = HamburgRoadsideTrees.objects.filter(geom__intersects=catchment.geom)
-        trees_count = trees_in_catchment.count()
+        model = kwargs.get('source_model')
+        clipped = model.objects.filter(geom__intersects=catchment.geom)
+        count = clipped.count()
         point_yield = kwargs.get('point_yield')
-        prunings_yield = point_yield['value'] * trees_count
+        total_production = point_yield['value'] * count
 
         # If result is a gis layer, it must have a list of features under key ['features']. Each feature must have
         # an entry for the key 'geom'
         result = {
-            'aggregated_values': [
-                {
-                    'name': 'Number of trees',
-                    'value': trees_count,
-                    'unit': ''
-                },
-                {
-                    'name': 'Total production',
-                    'value': prunings_yield,
-                    'unit': 'kg'
-                }
-            ],
+            'aggregated_values': [],
+            'aggregated_distributions': [],
             'features': []
         }
-        for tree in trees_in_catchment:
+
+        result['aggregated_values'].append({
+            'name': 'Count',
+            'value': count,
+            'unit': ''
+        })
+
+        result['aggregated_values'].append({
+            'name': 'Total production',
+            'value': total_production,
+            'unit': 'kg'
+        })
+
+        for feature in clipped:
             result['features'].append({
-                'geom': tree.geom,
+                'geom': feature.geom,
                 'point_yield_average': point_yield['value'],
                 'point_yield_standard_deviation': point_yield['standard_deviation']
             })
+        result['aggregated_distributions'] = []
+
         return result
 
     @staticmethod
@@ -55,27 +60,37 @@ class InventoryAlgorithmsBase(object):
         Assignes a global average and standard deviation to park areas that where found in the scenario catchment.
         Required keyword arguments:
         - catchment_id
+        - source_model
+        - keep_columns: [str]
         - area_yield: {'value': <value>}
         """
-        input_qs = HamburgGreenAreas.objects.all()
+        model = kwargs.get('source_model')
+        input_qs = model.objects.all()
         mask_qs = Catchment.objects.filter(id=kwargs.get('catchment_id'))
-        keep_columns = ['anlagenname', 'belegenheit', 'gruenart', 'nutzcode']
+        keep_columns = kwargs.get('keep_columns')
         clipped_polygons = InventoryAlgorithmsBase.clip_polygons(input_qs, mask_qs, keep_columns=keep_columns)
+
         result = {
-            'aggregated_values': [
-                {
-                    'name': 'Total area',
-                    'value': 0,
-                    'unit': 'm²'
-                },
-                {
-                    'name': 'Total production',
-                    'value': 0,
-                    'unit': 'kg'
-                }
-            ],
+            'aggregated_values': [],
+            'aggregated_distributions': [],
             'features': []
         }
+
+        result['aggregated_values'].append(
+            {
+                'name': 'Total area',
+                'value': 0,
+                'unit': 'm²'
+            }
+        )
+
+        result['aggregated_values'].append(
+            {
+                'name': 'Total production',
+                'value': 0,
+                'unit': 'kg'
+            }
+        )
 
         area_yield = kwargs.get('area_yield')
         for polygon in clipped_polygons:
@@ -85,45 +100,48 @@ class InventoryAlgorithmsBase(object):
                 'geom': polygon['geom'],
                 'area': polygon['area'],
                 'yield_average': polygon['area'] * area_yield['value'],
-                'name': polygon['anlagenname'],
-                'usage': polygon['gruenart']})
+            })
 
         return result
 
     @staticmethod
     def nantes_greenhouse_yield(**kwargs):
         catchment = Catchment.objects.get(id=kwargs.get('catchment_id'))
-        greenhouses_in_catchment = NantesGreenhouses.objects.filter(geom__intersects=catchment.geom)
-        greenhouses_count = greenhouses_in_catchment.count()
+        model = kwargs.get('source_model')
+        clipped = model.objects.filter(geom__intersects=catchment.geom)
+        count = clipped.count()
 
         point_yield = kwargs.get('point_yield')
-        total_production = point_yield['value'] * greenhouses_count
-
-        component_list = ['Cucumber leaves', 'Cucumber stems', 'Cucumber fruit']
-        distribution = [1.2, 1.3, 1.2, 1.3, 1.2, 1.3, 1.2, 1.3, 1.2, 1.3, 1.2, 1.3]
+        total_production = point_yield['value'] * count
 
         result = {
-            'aggregated_values': [
-                {
-                    'name': 'Number of greenhouses',
-                    'value': greenhouses_count,
-                    'unit': ''
-                },
-                {
-                    'name': 'Total production',
-                    'value': total_production,
-                    'unit': 'kg'
-                }
-            ],
+            'aggregated_values': [],
             'aggregated_distributions': [],
             'features': []
         }
-        for greenhouse in greenhouses_in_catchment:
+
+        result['aggregated_values'].append({
+            'name': 'Count',
+            'value': count,
+            'unit': ''
+        })
+
+        result['aggregated_values'].append({
+            'name': 'Total production',
+            'value': total_production,
+            'unit': 'kg'
+        })
+
+        for feature in clipped:
             result['features'].append({
-                'geom': greenhouse.geom,
+                'geom': feature.geom,
                 'point_yield_average': point_yield['value'],
                 'point_yield_standard_deviation': point_yield['standard_deviation']
             })
+
+        component_list = kwargs.get('component_list')
+        distribution = kwargs.get('seasonal_distribution')
+
         for component in component_list:
             result['aggregated_distributions'].append({
                 'name': component,

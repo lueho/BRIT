@@ -1,8 +1,9 @@
+import importlib
+
 from celery import chord
 
 from flexibi_dst.celery import app
 from layer_manager.models import Layer
-from scenario_builder.inventory_algorithms import InventoryAlgorithmsBase
 from scenario_builder.models import InventoryAlgorithm, Material, Scenario, ScenarioStatus
 from scenario_evaluator.models import RunningTask
 
@@ -26,16 +27,21 @@ def run_inventory(scenario_id):
 
     # store uuids of running tasks in the database, so we can track the progress from anywhere
     for task in task_chord.tasks:
-        algorithm = InventoryAlgorithm.objects.get(function_name=task.args[0])
+        source_module = task.args[0].split('.')[1]
+        function_name = task.args[0].split(':')[1]
+        algorithm = InventoryAlgorithm.objects.get(source_module=source_module, function_name=function_name)
         RunningTask.objects.create(scenario=scenario, uuid=task.id, algorithm=algorithm)
 
     return result
 
 
 @app.task(bind=True)
-def run_inventory_algorithm(self, function_name, **kwargs):
-    results = getattr(InventoryAlgorithmsBase, function_name)(**kwargs)
-    algorithm = InventoryAlgorithm.objects.get(function_name=function_name)
+def run_inventory_algorithm(self, module_function, **kwargs):
+    source_module = module_function.split(':')[0]
+    function_name = module_function.split(':')[1]
+    module = importlib.import_module(source_module)
+    results = getattr(module.InventoryAlgorithms, function_name)(**kwargs)
+    algorithm = InventoryAlgorithm.objects.get(source_module=source_module.split('.')[1], function_name=function_name)
     kwargs = {
         'name': algorithm.function_name,
         'scenario': Scenario.objects.get(id=kwargs.get('scenario_id')),
