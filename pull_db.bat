@@ -1,5 +1,6 @@
 cd ./db_dump
-heroku pg:backups:capture -a flexibi-dst HEROKU_POSTGRESQL_COPPER_URL
-heroku pg:backups:download -a flexibi-dst
+aws s3 cp s3://flexibi-dst/latest.dump latest.dump
 SET PGPASSWORD=flexibi
-pg_restore --clean --no-acl --no-owner -h localhost -p 5433 -U flexibi_dst -d flexibi_dst latest.dump
+SET POSTGRE_SQL_12_HOME=C:\Programme\PostgreSQL\12\bin
+%POSTGRE_SQL_12_HOME%/pg_restore -Fc --no-acl --clean --no-owner -h localhost -d flexibi_dst -p 5433 -U flexibi_dst latest.dump
+cd..
