@@ -1,7 +1,7 @@
 from django.contrib.gis.db.models import PointField
 from django.db import models
 
-from scenario_builder.models import SeasonalDistribution
+from scenario_builder.models import Material, SeasonalDistribution
 
 
 class NantesGreenhouses(models.Model):
@@ -37,4 +37,8 @@ class Greenhouse(models.Model):
     lighted = models.BooleanField(blank=True, null=True)
     high_wire = models.BooleanField(blank=True, null=True)
     above_ground = models.BooleanField(blank=True, null=True)
-    seasonal_distribution = models.ForeignKey(SeasonalDistribution, on_delete=models.CASCADE, null=True)
+    nb_cycles = models.IntegerField(null=True)
+    culture_1 = models.CharField(max_length=20, blank=True, null=True)
+    culture_2 = models.CharField(max_length=20, blank=True, null=True)
+    culture_3 = models.CharField(max_length=20, blank=True, null=True)
+    seasonal_distributions = models.ManyToManyField(SeasonalDistribution)

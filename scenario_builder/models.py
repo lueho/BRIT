@@ -1,5 +1,4 @@
 import importlib
-import sys
 
 from django.contrib.auth.models import User
 from django.contrib.gis.db.models import MultiPolygonField, PointField
@@ -11,6 +10,7 @@ from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
 from django.urls import reverse
 
+import case_studies
 from .exceptions import BlockedRunningScenario
 
 TYPES = (
@@ -157,6 +157,7 @@ class InventoryAlgorithm(models.Model):
     be done in InventoryAlgorithmParameter and InventoryAlgorithmParameterValue.
     """
     name = models.CharField(max_length=56)
+    source_module = models.CharField(max_length=255, null=True)
     function_name = models.CharField(max_length=56, null=True)
     description = models.TextField(blank=True, null=True)
     geodataset = models.ForeignKey(GeoDataset, on_delete=models.CASCADE)
@@ -169,11 +170,11 @@ class InventoryAlgorithm(models.Model):
 
     @staticmethod
     def available_modules():
-        return [key.split('.')[0] for key in sys.modules.keys() if key.endswith('.algorithms')]
+        return [name for name in dir(case_studies) if not name.startswith('__')]
 
     @staticmethod
     def available_functions(module_name):
-        module = importlib.import_module(module_name + '.algorithms')
+        module = importlib.import_module('case_studies.' + module_name + '.algorithms')
         return [alg for alg in module.InventoryAlgorithms.__dict__ if not alg.startswith('__')]
 
     def default_values(self):
@@ -545,7 +546,10 @@ class Scenario(models.Model):
         inventory_config = {}
         for entry in ScenarioInventoryConfiguration.objects.filter(scenario=self):
             feedstock = entry.feedstock.id
-            function = entry.inventory_algorithm.function_name
+            function = 'case_studies.' + \
+                       entry.inventory_algorithm.source_module + \
+                       '.algorithms:' + \
+                       entry.inventory_algorithm.function_name
             parameter = entry.inventory_parameter.short_name
             value = entry.inventory_value.value
             standard_deviation = entry.inventory_value.standard_deviation
@@ -654,3 +658,5 @@ class SeasonalDistribution(models.Model):
     # In which timestep does each cycle start and end? array must have form [start1, end1, start2, end2, ...]
     start_stop = ArrayField(models.IntegerField(), null=True)
     values = ArrayField(models.FloatField(), null=True)
+    material = models.ForeignKey(Material, null=True, on_delete=models.CASCADE)
+    component = models.ForeignKey(MaterialComponent, blank=True, null=True, on_delete=models.CASCADE)
