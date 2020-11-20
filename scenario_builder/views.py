@@ -12,24 +12,29 @@ from rest_framework.views import APIView
 
 from flexibi_dst.views import DualUserListView
 from layer_manager.models import Layer
-from .forms import (CatchmentForm,
-                    CatchmentQueryForm,
-                    MaterialModelForm,
-                    MaterialComponentModelForm,
-                    ScenarioModelForm,
-                    ScenarioInventoryConfigurationAddForm,
-                    ScenarioInventoryConfigurationUpdateForm)
-from .models import (Catchment,
-                     Scenario,
-                     ScenarioInventoryConfiguration,
-                     Material,
-                     MaterialComponent,
-                     GeoDataset,
-                     InventoryAlgorithm,
-                     InventoryAlgorithmParameter,
-                     InventoryAlgorithmParameterValue,
-                     Region,
-                     ScenarioStatus)
+from .forms import (
+    CatchmentForm,
+    CatchmentQueryForm,
+    MaterialModelForm,
+    MaterialComponentModelForm,
+    ScenarioModelForm,
+    ScenarioInventoryConfigurationAddForm,
+    ScenarioInventoryConfigurationUpdateForm,
+    SeasonalDistributionModelForm,
+)
+from .models import (
+    Catchment,
+    Scenario,
+    ScenarioInventoryConfiguration,
+    Material,
+    MaterialComponent,
+    GeoDataset,
+    InventoryAlgorithm,
+    InventoryAlgorithmParameter,
+    InventoryAlgorithmParameterValue,
+    Region,
+    ScenarioStatus,
+)
 from .serializers import CatchmentSerializer, BaseResultMapSerializer, RegionSerializer
 from .tasks import run_inventory
 
@@ -199,6 +204,12 @@ class MaterialComponentDeleteView(LoginRequiredMixin, UserPassesTestMixin, Delet
     def test_func(self):
         component = MaterialComponent.objects.get(id=self.kwargs.get('component_pk'))
         return self.request.user == component.owner
+
+
+class SeasonalDistributionCreateView(LoginRequiredMixin, CreateView):
+    form_class = SeasonalDistributionModelForm
+    template_name = 'seasonal_distribution_create.html'
+    success_url = '/scenario_builder/materials/{material_id}'
 
 
 # ----------- Regions --------------------------------------------------------------------------------------------------

@@ -89,7 +89,7 @@ class MaterialAdmin(ModelAdmin):
 
 @admin.register(MaterialComponentGroup)
 class MaterialComponentGroupAdmin(ModelAdmin):
-    list_display = ('name', 'description',)
+    list_display = ('name', 'description', 'static')
 
 
 @admin.register(InventoryAlgorithm)

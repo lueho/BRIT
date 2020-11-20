@@ -84,6 +84,19 @@ class Material(models.Model):
     def component_group_names(self):
         return list(self.grouped_components().keys())
 
+    # def grouped_components(self):
+    #     components = MaterialComponent.objects.filter(material=self)
+    #
+    #     grouped_components = {}
+    #     for component in components:
+    #         for group in component.groups.all():
+    #             if group.name not in grouped_components:
+    #                 grouped_components[group.name] = [component]
+    #             else:
+    #                 grouped_components[group.name].append(component)
+    #
+    #     return grouped_components
+
     def grouped_components(self):
         components = MaterialComponent.objects.filter(material=self)
 
@@ -91,9 +104,12 @@ class Material(models.Model):
         for component in components:
             for group in component.groups.all():
                 if group.name not in grouped_components:
-                    grouped_components[group.name] = [component]
+                    grouped_components[group.name] = {
+                        'static': group.static,
+                        'components': [component]
+                    }
                 else:
-                    grouped_components[group.name].append(component)
+                    grouped_components[group.name]['components'].append(component)
 
         return grouped_components
 
@@ -105,6 +121,8 @@ class MaterialComponentGroup(models.Model):
     name = models.CharField(max_length=56)
     description = models.TextField(blank=True, null=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE)
+    static = models.BooleanField(default=True)
+    fractions_of = models.ForeignKey('MaterialComponent', on_delete=models.CASCADE, default=1)
 
     def __str__(self):
         return self.name

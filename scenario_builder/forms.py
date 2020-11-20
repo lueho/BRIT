@@ -7,14 +7,17 @@ from django.forms import (Form,
 from django.forms.widgets import CheckboxSelectMultiple
 from leaflet.forms.widgets import LeafletWidget
 
-from .models import (Catchment,
-                     GeoDataset,
-                     InventoryAlgorithm,
-                     Material,
-                     MaterialComponent,
-                     Region,
-                     Scenario,
-                     ScenarioInventoryConfiguration, )
+from .models import (
+    Catchment,
+    GeoDataset,
+    InventoryAlgorithm,
+    Material,
+    MaterialComponent,
+    Region,
+    Scenario,
+    ScenarioInventoryConfiguration,
+    SeasonalDistribution,
+)
 
 
 # ----------- Catchments -----------------------------------------------------------------------------------------------
@@ -75,7 +78,13 @@ class MaterialModelForm(ModelForm):
 class MaterialComponentModelForm(ModelForm):
     class Meta:
         model = MaterialComponent
-        fields = ('name', 'description', 'average', 'standard_deviation', 'fraction_of', 'literature_source', 'groups')
+        fields = ('name', 'description', 'average', 'standard_deviation', 'fraction_of', 'literature_source', 'groups',)
+
+
+class SeasonalDistributionModelForm(ModelForm):
+    class Meta:
+        model = SeasonalDistribution
+        fields = ('values',)
 
 
 # ----------- Materials/Feedstocks -------------------------------------------------------------------------------------
