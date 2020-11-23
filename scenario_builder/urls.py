@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import include, path
 
 from .views import (CatchmentCreateView,
                     CatchmentBrowseView,
@@ -45,7 +45,8 @@ urlpatterns = [
          name='material_component_update'),
     path('materials/<int:pk>/delete_component/<int:component_pk>', MaterialComponentDeleteView.as_view(),
          name='material_component_delete'),
-    path('materials/<int:material_pk>/<int:component_pk>/create', SeasonalDistributionCreateView.as_view(),
+    path('materials/<int:material_pk>/<int:component_pk>/seasonal_distributions/create',
+         SeasonalDistributionCreateView.as_view(),
          name='seasonal_distribution_create'),
     path('scenarios/', ScenarioListView.as_view(), name='scenario_list'),
     path('scenarios/create', ScenarioCreateView.as_view(), name='create_scenario'),
@@ -67,4 +68,5 @@ urlpatterns = [
     path('ajax/load-algorithms/', load_algorithm_options, name='ajax_load_inventory_algorithms'),
     path('ajax/load-inventory-parameters/', load_parameter_options, name='ajax_load_inventory_parameters'),
     path('ajax/result_layer/<layer_name>/', ResultMapAPI.as_view(), name='data.result_layer'),
+    path('nantes/', include('case_studies.flexibi_nantes.urls')),
 ]

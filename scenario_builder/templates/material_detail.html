@@ -24,11 +24,18 @@
         </div>
     </div>
     <h2 class="mt-3">Components</h2>
-    {% for group, component_list in object.grouped_components.items %}
+    {% for group_name, group_content in object.grouped_components.items %}
         <div class="row">
             <div class="col">
                 <div class="card shadow border-left-primary border">
-                    <div class="card-header"><b>{{ group }}</b></div>
+                    <div class="card-header">
+                        <b>{{ group_name }}</b> -
+                        {% if group_content.static %}
+                            static composition
+                        {% else %}
+                            variable composition
+                        {% endif %}
+                    </div>
                     <div class="card-body p-0">
                         <table class="table m-0">
                             <thead>
@@ -41,15 +48,18 @@
                             </tr>
                             </thead>
                             <tbody>
-                            {% for component in component_list %}
+                            {% for component in group_content.components %}
                                 <tr class="row m-0">
                                     <td class="d-inline-block col-2">
                                         {{ component.name }}
-
                                     </td>
-                                    <td class="d-inline-block col-2">{{ component.average }}
-                                        +- {{ component.standard_deviation }}</td>
-                                    <td class="d-inline-block col-2">{{ component.fraction_of.name }}</td>
+
+                                    {% if group_content.static %}
+                                        <td class="d-inline-block col-2">{{ component.average }}
+                                            +- {{ component.standard_deviation }}</td>
+                                        <td class="d-inline-block col-2">{{ component.fraction_of.name }}</td>
+                                    {% endif %}
+
                                     <td class="d-inline-block col-3">{{ component.literature_source.abbreviation }}</td>
                                     <td class="d-inline-block col-3">
                                         <a href="{% url 'material_component_update' component.material.id component.id %}">
@@ -61,6 +71,22 @@
                                         </a>
                                     </td>
                                 </tr>
+                                {% if not group_content.static %}
+                                    <tr class="d-flex">
+                                        <td class="d-inline-block col-1">Jan</td>
+                                        <td class="d-inline-block col-1">Feb</td>
+                                        <td class="d-inline-block col-1">Mar</td>
+                                        <td class="d-inline-block col-1">Apr</td>
+                                        <td class="d-inline-block col-1">May</td>
+                                        <td class="d-inline-block col-1">Jun</td>
+                                        <td class="d-inline-block col-1">Jul</td>
+                                        <td class="d-inline-block col-1">Aug</td>
+                                        <td class="d-inline-block col-1">Sep</td>
+                                        <td class="d-inline-block col-1">Oct</td>
+                                        <td class="d-inline-block col-1">Nov</td>
+                                        <td class="d-inline-block col-1">Dec</td>
+                                    </tr>
+                                {% endif %}
                             {% endfor %}
                             </tbody>
                         </table>

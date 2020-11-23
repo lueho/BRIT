@@ -3,11 +3,12 @@ from crispy_forms.layout import Div, Field
 from django.forms import (CheckboxSelectMultiple,
                           ChoiceField,
                           Form,
+                          ModelForm,
                           MultipleChoiceField,
                           RadioSelect,
                           )
 
-from case_studies.flexibi_nantes.models import NantesGreenhouses
+from .models import Greenhouse, NantesGreenhouses
 
 CROP_CHOICES = (
     (1, "Cucumber"),
@@ -37,6 +38,12 @@ CULT_MANAGEMENT_CHOICES = (
     (2, "Classic"),
     (3, "High-Wire")
 )
+
+
+class GreenhouseModelForm(ModelForm):
+    class Meta:
+        model = Greenhouse
+        fields = ('heated', 'lighted', 'above_ground', 'high_wire', 'nb_cycles', 'culture_1', 'culture_2', 'culture_3')
 
 
 class Row(Div):

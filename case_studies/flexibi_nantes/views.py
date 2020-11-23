@@ -1,11 +1,65 @@
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db.models import Sum
 from django.http import JsonResponse
-from django.views.generic import FormView
+from django.urls import reverse
+from django.views.generic import CreateView, DeleteView, DetailView, FormView, UpdateView
 from rest_framework.views import APIView
 
-from .forms import NantesGreenhousesFilterForm
-from .models import NantesGreenhouses
+from flexibi_dst.views import DualUserListView
+from .forms import GreenhouseModelForm, NantesGreenhousesFilterForm
+from .models import Greenhouse, NantesGreenhouses
 from .serializers import NantesGreenhousesGeometrySerializer
+
+
+class GreenhouseListView(DualUserListView):
+    model = Greenhouse
+    template_name = 'greenhouse_list.html'
+
+
+class GreenhouseCreateView(LoginRequiredMixin, CreateView):
+    form_class = GreenhouseModelForm
+    template_name = 'greenhouse_create.html'
+
+    def form_valid(self, form):
+        form.instance.owner = self.request.user
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse('greenhouse_detail', kwargs={'pk': self.object.pk})
+
+
+class GreenhouseDetailView(DetailView):
+    model = Greenhouse
+    template_name = 'greenhouse_detail.html'
+    object = None
+
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        context = self.get_context_data(object=self.object)
+        context['grouped_distributions'] = self.object.grouped_distributions()
+        context['growth_cycles'] = self.object.growth_cycles()
+        return self.render_to_response(context)
+
+
+class GreenhouseUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
+    model = Greenhouse
+    form_class = GreenhouseModelForm
+    template_name = 'greenhouse_update.html'
+    success_url = '/scenario_builder/nantes/greenhouses/{id}'
+
+    def test_func(self):
+        material = Greenhouse.objects.get(id=self.kwargs.get('pk'))
+        return material.owner == self.request.user
+
+
+class GreenhouseDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
+    model = Greenhouse
+    template_name = 'greenhouse_delete.html'
+    success_url = '/scenario_builder/nantes/greenhouses'
+
+    def test_func(self):
+        material = Greenhouse.objects.get(id=self.kwargs.get('pk'))
+        return material.owner == self.request.user
 
 
 class NantesGreenhousesView(FormView):
