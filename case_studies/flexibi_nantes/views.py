@@ -1,12 +1,17 @@
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db.models import Sum
 from django.http import JsonResponse
+from django.shortcuts import redirect
 from django.urls import reverse
-from django.views.generic import CreateView, DeleteView, DetailView, FormView, UpdateView
+from django.views.generic import CreateView, DeleteView, DetailView, FormView, TemplateView, UpdateView, View
 from rest_framework.views import APIView
 
 from flexibi_dst.views import DualUserListView
-from .forms import GreenhouseModelForm, NantesGreenhousesFilterForm
+from scenario_builder.models import Material
+
+from .forms import GreenhouseModelForm, GreenhouseGrowthCycle, GreenhouseGrowthCycleModelForm, \
+    UpdateGreenhouseGrowthCycleValuesForm, \
+    NantesGreenhousesFilterForm
 from .models import Greenhouse, NantesGreenhouses
 from .serializers import NantesGreenhousesGeometrySerializer
 
@@ -36,8 +41,8 @@ class GreenhouseDetailView(DetailView):
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()
         context = self.get_context_data(object=self.object)
-        context['grouped_distributions'] = self.object.grouped_distributions()
-        context['growth_cycles'] = self.object.growth_cycles()
+        context['growth_cycle_range'] = range(1, self.object.number_of_growth_cycles() + 1)
+        context['grouped_growth_cycles'] = self.object.grouped_growth_cycles()
         return self.render_to_response(context)
 
 
@@ -60,6 +65,69 @@ class GreenhouseDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
     def test_func(self):
         material = Greenhouse.objects.get(id=self.kwargs.get('pk'))
         return material.owner == self.request.user
+
+
+class GreenhouseAddGrowthCycleView(LoginRequiredMixin, UpdateView):
+    model = Greenhouse
+    form_class = GreenhouseGrowthCycleModelForm
+    template_name = 'greenhouse_add_growth_cycle.html'
+    object = None
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        material = Material.objects.get(id=request.POST.get('material'))
+        self.object.add_growth_cycle(material)
+        form = self.get_form()
+        if form.is_valid():
+            return self.form_valid(form)
+        else:
+            return self.form_invalid(form)
+
+
+class GreenhouseRemoveGrowthCycleView(LoginRequiredMixin, UserPassesTestMixin, View):
+    greenhouse = None
+    cycle_number = None
+
+    def get(self, request, *args, **kwargs):
+        self.greenhouse = Greenhouse.objects.get(id=self.kwargs.get('greenhouse_pk'))
+        self.cycle_number = self.kwargs.get('cycle_number')
+        self.greenhouse.remove_growth_cycle(self.cycle_number)
+        return redirect('greenhouse_detail', pk=self.greenhouse.id)
+
+    def test_func(self):
+        self.greenhouse = Greenhouse.objects.get(id=self.kwargs.get('greenhouse_pk'))
+        return self.greenhouse.owner == self.request.user
+
+
+class GreenhouseGrowthCycleCreateView(LoginRequiredMixin, CreateView):
+    form_class = GreenhouseGrowthCycleModelForm
+    template_name = 'greenhouse_growth_cycle_create.html'
+
+    def form_valid(self, form):
+        form.instance.owner = self.request.user
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse('greenhouse_detail', kwargs={'pk': self.object.pk})
+
+
+class UpdateGreenhouseGrowthCycleValuesView(LoginRequiredMixin, UpdateView):
+    model = GreenhouseGrowthCycle
+    form_class = UpdateGreenhouseGrowthCycleValuesForm
+    template_name = 'greenhouse_growth_cycle_update_values.html'
+
+    def form_valid(self, form):
+        form.instance.owner = self.request.user
+        return super().form_valid(form)
+
+    def get_success_url(self):
+        return reverse('greenhouse_detail', kwargs={'pk': self.object.pk})
+
+    def get_initial(self):
+        return {
+            'material': self.object.material,
+            'component': self.object.component
+        }
 
 
 class NantesGreenhousesView(FormView):

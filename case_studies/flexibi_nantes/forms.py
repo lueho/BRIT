@@ -3,12 +3,13 @@ from crispy_forms.layout import Div, Field
 from django.forms import (CheckboxSelectMultiple,
                           ChoiceField,
                           Form,
+                          HiddenInput,
                           ModelForm,
                           MultipleChoiceField,
                           RadioSelect,
                           )
 
-from .models import Greenhouse, NantesGreenhouses
+from .models import Greenhouse, GreenhouseGrowthCycle, NantesGreenhouses
 
 CROP_CHOICES = (
     (1, "Cucumber"),
@@ -44,6 +45,23 @@ class GreenhouseModelForm(ModelForm):
     class Meta:
         model = Greenhouse
         fields = ('heated', 'lighted', 'above_ground', 'high_wire', 'nb_cycles', 'culture_1', 'culture_2', 'culture_3')
+
+
+class GreenhouseGrowthCycleModelForm(ModelForm):
+    class Meta:
+        model = GreenhouseGrowthCycle
+        fields = ('material',)
+
+
+class UpdateGreenhouseGrowthCycleValuesForm(GreenhouseGrowthCycleModelForm):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        initial = kwargs.get('initial')
+        self.fields['material'].initial = initial['material'].id
+        self.fields['material'].widget = HiddenInput()
+        self.fields['component'].initial = initial['component'].id
+        self.fields['component'].widget = HiddenInput()
 
 
 class Row(Div):

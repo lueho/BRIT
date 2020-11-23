@@ -670,11 +670,9 @@ class SeasonalDistribution(models.Model):
     """
     # Into how many timesteps is the full year devided? e.g. 12 months, 365 days etc
     # The values array must have the same length, filled with zeros, of not applicable to whole year
-    timesteps = models.IntegerField(null=True)
+    timesteps = models.IntegerField(default=12)
     # Within one year, how many cycles are represented by the given data?
-    cycles = models.IntegerField(null=True)
+    cycles = models.IntegerField(default=1)
     # In which timestep does each cycle start and end? array must have form [start1, end1, start2, end2, ...]
-    start_stop = ArrayField(models.IntegerField(), null=True)
-    values = ArrayField(models.FloatField(), null=True)
-    material = models.ForeignKey(Material, null=True, on_delete=models.CASCADE)
-    component = models.ForeignKey(MaterialComponent, blank=True, null=True, on_delete=models.CASCADE)
+    start_stop = ArrayField(models.IntegerField(), default=list([1,12]))
+    values = ArrayField(models.FloatField(), default=list([0,0,0,0,0,0,0,0,0,0,0,0]))

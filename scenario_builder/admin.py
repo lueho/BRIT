@@ -200,9 +200,9 @@ class ScenarioStatusAdmin(ModelAdmin):
     list_display = ('scenario', 'status')
 
 
-@admin.register(SeasonalDistribution)
-class LiteratureSourceAdmin(ModelAdmin):
-    list_display = ('id', 'timesteps', 'cycles', 'start_stop', 'values', 'material', 'component')
+# @admin.register(SeasonalDistribution)
+# class LiteratureSourceAdmin(ModelAdmin):
+#     list_display = ('id', 'timesteps', 'cycles', 'start_stop', 'values', 'material', 'component')
 
 
 admin.site.register(MaterialComponent)
