@@ -36,6 +36,7 @@ class NantesGreenhouses(models.Model):
 
 class GreenhouseGrowthCycle(SeasonalDistribution):
     cycle_number = models.IntegerField(default=1)
+    culture = models.CharField(max_length=255, blank=True, default='')
     material = models.ForeignKey(Material, null=True, on_delete=models.CASCADE)
     component = models.ForeignKey(MaterialComponent, blank=True, null=True, on_delete=models.CASCADE)
 
@@ -54,15 +55,23 @@ class Greenhouse(models.Model):
 
     def add_growth_cycle(self, material):
         cycle_number = self.number_of_growth_cycles() + 1
-        for component in MaterialComponentGroup.objects.get(name='Macro Components').materialcomponent_set.filter(material=material):
-            cycle = GreenhouseGrowthCycle.objects.create(cycle_number=cycle_number, material=material, component=component)
+        for component in MaterialComponentGroup.objects.get(name='Macro Components').materialcomponent_set.filter(
+                material=material):
+            cycle = GreenhouseGrowthCycle.objects.create(cycle_number=cycle_number, material=material,
+                                                         component=component)
             self.growth_cycles.add(cycle)
+
+    def cultures(self):
+        cultures = {}
+        for growth_cycle in self.growth_cycles.all():
+            name = f'culture_{growth_cycle.cycle_number}'
+            cultures[name] = growth_cycle.material.name
+        return cultures
 
     def remove_growth_cycle(self, cycle_number):
         for distribution in self.growth_cycles.filter(cycle_number=cycle_number):
             self.growth_cycles.remove(distribution)
             distribution.delete()
-
 
     def number_of_growth_cycles(self):
         return self.growth_cycles.all().aggregate(models.Max('cycle_number'))['cycle_number__max']

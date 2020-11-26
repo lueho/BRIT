@@ -16,9 +16,9 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
 
         component_list = []
         for feedstock in scenario.feedstocks():
-            for component in feedstock.grouped_components()['Macro Components']:
-                if component.name not in component_list:
-                    component_list.append(component.name)
+            for component in feedstock.grouped_components()['Macro Components']['components']:
+                if component not in component_list:
+                    component_list.append(component)
 
         result = {
             'aggregated_values': [],
@@ -32,8 +32,8 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
                                                          'culture_1', 'culture_2', 'culture_3'):
             greenhouse_group = clipped.filter(**greenhouse_type)
             if greenhouse_group.exists():
-                greenhouse = Greenhouse.objects.get(**greenhouse_type)
                 total_group_surface = greenhouse_group.aggregate(Sum('surface_ha'))['surface_ha__sum']
+                greenhouse = Greenhouse.objects.get(**greenhouse_type)
                 specific_annual_component_production = {}
                 for component in component_list:
                     specific_distribution = greenhouse.seasonal_distributions.get(component__name=component).values
