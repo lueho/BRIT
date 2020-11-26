@@ -44,16 +44,16 @@
 
     <h2 class="mt-3">Growth cycles:</h2>
     {% for cycle_number, group in grouped_growth_cycles.items %}
-        {% for feedstock, components in group.items %}
+        {% for feedstock, component_cycles in group.items %}
             <div class="card border-left-primary border shadow">
                 <div class="card-header">
                     <h6 class="m-0 font-weight-bold text-primary">Cycle {{ cycle_number }}: {{ feedstock.name }}</h6>
                 </div>
                 <div class="card-body">
-                    {% for component in components %}
+                    {% for component_cycle in component_cycles %}
                         <div>
-                            <b>{{ component.component.name }}</b>
-                            <a href="{% url 'greenhouse_growth_cycle_update_values' object.id feedstock.id component.component.id %}">
+                            <b>{{ component_cycle.component.name }}</b>
+                            <a href="{% url 'greenhouse_growth_cycle_update_values' object.id component_cycle.id %}">
                                 <i class="fas fa-fw fa-edit"></i> Edit this distribution
                             </a>
                         </div>
@@ -78,7 +78,7 @@
                                 </thead>
                                 <tbody>
                                 <tr>
-                                    {% for value in component.distribution.values %}
+                                    {% for value in component_cycle.values %}
                                         <td>{{ value }}</td>
                                     {% endfor %}
                                 </tr>

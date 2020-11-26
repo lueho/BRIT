@@ -26,6 +26,6 @@ urlpatterns = [
     path('greenhouses/<int:greenhouse_pk>/growth_cycles/<int:cycle_number>/remove',
          GreenhouseRemoveGrowthCycleView.as_view(),
          name='greenhouse_remove_growth_cycle'),
-    path('greenhouses/<int:pk>/growth_cycles/<int:material_pk>/<int:component_pk>/update/',
+    path('greenhouses/<int:pk>/growth_cycles/<int:cycle_pk>/update/',
          UpdateGreenhouseGrowthCycleValuesView.as_view(), name='greenhouse_growth_cycle_update_values'),
 ]

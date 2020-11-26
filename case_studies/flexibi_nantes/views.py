@@ -3,15 +3,18 @@ from django.db.models import Sum
 from django.http import JsonResponse
 from django.shortcuts import redirect
 from django.urls import reverse
-from django.views.generic import CreateView, DeleteView, DetailView, FormView, TemplateView, UpdateView, View
+from django.views.generic import CreateView, DeleteView, DetailView, FormView, UpdateView, View
 from rest_framework.views import APIView
 
 from flexibi_dst.views import DualUserListView
 from scenario_builder.models import Material
 
-from .forms import GreenhouseModelForm, GreenhouseGrowthCycle, GreenhouseGrowthCycleModelForm, \
-    UpdateGreenhouseGrowthCycleValuesForm, \
-    NantesGreenhousesFilterForm
+from .forms import (GreenhouseModelForm,
+                    GreenhouseGrowthCycle,
+                    GreenhouseGrowthCycleModelForm,
+                    AddGreenhouseGrowthCycleModelForm,
+                    UpdateGreenhouseGrowthCycleValuesForm,
+                    NantesGreenhousesFilterForm)
 from .models import Greenhouse, NantesGreenhouses
 from .serializers import NantesGreenhousesGeometrySerializer
 
@@ -69,7 +72,7 @@ class GreenhouseDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
 
 class GreenhouseAddGrowthCycleView(LoginRequiredMixin, UpdateView):
     model = Greenhouse
-    form_class = GreenhouseGrowthCycleModelForm
+    form_class = AddGreenhouseGrowthCycleModelForm
     template_name = 'greenhouse_add_growth_cycle.html'
     object = None
 
@@ -115,13 +118,17 @@ class UpdateGreenhouseGrowthCycleValuesView(LoginRequiredMixin, UpdateView):
     model = GreenhouseGrowthCycle
     form_class = UpdateGreenhouseGrowthCycleValuesForm
     template_name = 'greenhouse_growth_cycle_update_values.html'
+    object = None
 
     def form_valid(self, form):
         form.instance.owner = self.request.user
         return super().form_valid(form)
 
+    def get_object(self, **kwargs):
+        return GreenhouseGrowthCycle.objects.get(id=self.kwargs.get('cycle_pk'))
+
     def get_success_url(self):
-        return reverse('greenhouse_detail', kwargs={'pk': self.object.pk})
+        return reverse('greenhouse_detail', kwargs={'pk': self.kwargs.get('pk')})
 
     def get_initial(self):
         return {

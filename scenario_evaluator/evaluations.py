@@ -105,12 +105,12 @@ class ScenarioResult:
     def total_material_components(self):
         total_production_per_feedstock = self.total_production_per_feedstock()
         components = {}
-        for feedstock in total_production_per_feedstock:
+        for feedstock in total_production_per_feedstock.keys():
             material = Material.objects.get(name=feedstock)
             for group_name, group_content in material.grouped_components().items():
                 if group_name not in components:
                     components[group_name] = {}
-                for component in group_content:
+                for component in group_content['components']:
                     if component.name not in components[group_name]:
                         components[group_name][component.name] = 0
                     components[group_name][component.name] += component.average * total_production_per_feedstock[

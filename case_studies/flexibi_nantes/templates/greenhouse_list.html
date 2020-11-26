@@ -8,6 +8,10 @@
                 {% for greenhouse in standard_objects %}
                     <li class="list-group-item">
                         <a href="{% url 'greenhouse_detail' greenhouse.id %}">{{ greenhouse.id }}</a>
+                        {{ greenhouse.heated }}
+                        {{ greenhouse.lighted }}
+                        {{ greenhouse.high_wire }}
+                        {{ greenhouse.above_ground }}
                         <a href="{% url 'greenhouse_update' greenhouse.id %}"><i class="fas fa-fw fa-edit"></i></a>
                         <a href="{% url 'greenhouse_delete' greenhouse.id %}"><i class="fas fa-fw fa-trash"></i></a>
                     </li>
@@ -28,6 +32,12 @@
                     {% for greenhouse in user_objects %}
                         <li class="list-group-item">
                             <a href="{% url 'greenhouse_detail' greenhouse.id %}">{{ greenhouse.id }}</a>
+                            {% for property in greenhouse.configuration %}
+                                {{ property }}
+                            {% endfor %}
+                            {% for cycle, culture in greenhouse.cultures.items %}
+                                {{ cycle }}: {{ culture }}
+                            {% endfor %}
                             <a href="{% url 'greenhouse_update' greenhouse.id %}"><i class="fas fa-fw fa-edit"></i></a>
                             <a id="delete-greenhouse-{{ greenhouse.id }}"
                                href="{% url 'greenhouse_delete' greenhouse.id %}">
@@ -50,7 +60,7 @@
     {% endif %}
     <div class="row mt-3">
         <div class="col">
-            <a href="{% url 'material_create' %}">
+            <a href="{% url 'greenhouse_create' %}">
                 <i class="fas fa-fw fa-plus"></i> Create new custom greenhouse type
             </a>
         </div>

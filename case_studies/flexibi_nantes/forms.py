@@ -48,10 +48,15 @@ class GreenhouseModelForm(ModelForm):
 
 
 class GreenhouseGrowthCycleModelForm(ModelForm):
+
     class Meta:
         model = GreenhouseGrowthCycle
-        fields = ('material',)
+        fields = ('material', 'component', 'values')
 
+class AddGreenhouseGrowthCycleModelForm(ModelForm):
+    class Meta:
+        model = GreenhouseGrowthCycle
+        fields = ('material', )
 
 class UpdateGreenhouseGrowthCycleValuesForm(GreenhouseGrowthCycleModelForm):
 
