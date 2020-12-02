@@ -13,6 +13,7 @@ from .models import (
     InventoryAlgorithm,
     Material,
     MaterialComponent,
+    MaterialComponentGroup,
     Region,
     Scenario,
     ScenarioInventoryConfiguration,
@@ -78,7 +79,13 @@ class MaterialModelForm(ModelForm):
 class MaterialComponentModelForm(ModelForm):
     class Meta:
         model = MaterialComponent
-        fields = ('name', 'description', 'average', 'standard_deviation', 'fraction_of', 'literature_source', 'groups',)
+        fields = ('name', 'description',)
+
+
+class MaterialComponentGroupModelForm(ModelForm):
+    class Meta:
+        model = MaterialComponentGroup
+        fields = ('name', 'description', 'static', 'fractions_of',)
 
 
 class SeasonalDistributionModelForm(ModelForm):

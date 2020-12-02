@@ -25,6 +25,21 @@ GIS_SOURCE_MODELS = (
 )
 
 
+class SeasonalDistribution(models.Model):
+    """
+    Model to deal with different types of input data that represent seasonal distribution of any kind. Input and output
+    with differing time steps and start-stop-cycles can be managed. All entries are with reference to one year.
+    """
+    # Into how many timesteps is the full year devided? e.g. 12 months, 365 days etc
+    # The values array must have the same length, filled with zeros, of not applicable to whole year
+    timesteps = models.IntegerField(default=12)
+    # Within one year, how many cycles are represented by the given data?
+    cycles = models.IntegerField(default=1)
+    # In which timestep does each cycle start and end? array must have form [start1, end1, start2, end2, ...]
+    start_stop = ArrayField(models.IntegerField(), default=list([1, 12]))
+    values = ArrayField(models.FloatField(), default=list([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]))
+
+
 class Region(models.Model):
     name = models.CharField(max_length=56, null=False)
     country = models.CharField(max_length=56, null=False)
@@ -55,6 +70,9 @@ class LiteratureSource(models.Model):
         return self.abbreviation
 
 
+# ----------- Materials ------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
 class MaterialManager(models.Manager):
 
     def feedstocks(self):
@@ -66,7 +84,6 @@ class Material(models.Model):
     description = models.TextField(blank=True, null=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE)
     is_feedstock = models.BooleanField(default=False)
-    # seasonal_distribution = SeasonalDistributionField(models.FloatField(), size=12)
     stan_flow_id = models.CharField(max_length=5,
                                     validators=[RegexValidator(regex=r'^[0-9]{5}?',
                                                                message='STAN id must have 5 digits.s',
@@ -74,44 +91,26 @@ class Material(models.Model):
 
     objects = MaterialManager()
 
-    def component_groups(self):
-        return set([
-            group for group_list in [
-                set(c.groups.all()) for c in self.materialcomponent_set.all()
-            ] for group in group_list
-        ])
+    def component_groups(self, scenario_id=0):
+        return [group for group in self.grouped_component_shares(scenario_id=scenario_id).keys()]
 
-    def component_group_names(self):
-        return list(self.grouped_components().keys())
+    def component_group_names(self, scenario_id=0):
+        return [group.name for group in self.grouped_component_shares(scenario_id=scenario_id).keys()]
 
-    # def grouped_components(self):
-    #     components = MaterialComponent.objects.filter(material=self)
-    #
-    #     grouped_components = {}
-    #     for component in components:
-    #         for group in component.groups.all():
-    #             if group.name not in grouped_components:
-    #                 grouped_components[group.name] = [component]
-    #             else:
-    #                 grouped_components[group.name].append(component)
-    #
-    #     return grouped_components
+    def grouped_component_shares(self, scenario_id=0):
+        shares = MaterialComponentGroupShare.objects.filter(material=self, scenario_id=scenario_id)
 
-    def grouped_components(self):
-        components = MaterialComponent.objects.filter(material=self)
+        grouped_shares = {}
+        for share in shares:
+            if share.group not in grouped_shares:
+                grouped_shares[share.group] = {
+                    'static': share.group.static,
+                    'shares': [share]
+                }
+            else:
+                grouped_shares[share.group]['shares'].append(share)
 
-        grouped_components = {}
-        for component in components:
-            for group in component.groups.all():
-                if group.name not in grouped_components:
-                    grouped_components[group.name] = {
-                        'static': group.static,
-                        'components': [component]
-                    }
-                else:
-                    grouped_components[group.name]['components'].append(component)
-
-        return grouped_components
+        return grouped_shares
 
     def __str__(self):
         return self.name
@@ -132,19 +131,35 @@ class MaterialComponent(models.Model):
     name = models.CharField(max_length=20)
     description = models.TextField(blank=True, null=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE)
-    average = models.FloatField()
-    standard_deviation = models.FloatField(null=True)
-    fraction_of = models.ForeignKey('self', on_delete=models.CASCADE, default=1)
-    literature_source = models.ForeignKey(LiteratureSource, on_delete=models.CASCADE, default=1)
-    material = models.ForeignKey(Material, on_delete=models.CASCADE)
-    groups = models.ManyToManyField(MaterialComponentGroup)
 
-    def get_absolute_url(self):
-        return reverse('material_detail', kwargs={'pk': self.material.pk})
+    # def get_absolute_url(self):
+    #     return reverse('material_detail', kwargs={'material_pk': self.material.pk, 'scenario_pk': 0})
+
+    def groups(self):
+        return MaterialComponentGroup.objects.filter(
+            materialcomponentgroupshare__in=MaterialComponentGroupShare.objects.filter(component=self))
 
     def __str__(self):
         return self.name
 
+
+class MaterialComponentGroupShare(models.Model):
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, default=8)
+    scenario = models.ForeignKey('Scenario', on_delete=models.CASCADE, null=True)
+    material = models.ForeignKey(Material, null=True, on_delete=models.CASCADE)
+    component = models.ForeignKey(MaterialComponent, null=True, on_delete=models.CASCADE)
+    group = models.ForeignKey(MaterialComponentGroup, null=True, on_delete=models.CASCADE)
+    average = models.FloatField(null=True)
+    standard_deviation = models.FloatField(null=True)
+    distribution = models.ForeignKey(SeasonalDistribution, null=True, on_delete=models.CASCADE)
+    source = models.ForeignKey(LiteratureSource, on_delete=models.CASCADE, null=True)
+
+    def __str__(self):
+        return f'Share of {self.component.name} in {self.material.name}'
+
+
+# ----------- Geodata --------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
 
 class GeoDataset(models.Model):
     name = models.CharField(max_length=56, null=False)
@@ -661,18 +676,3 @@ class ScenarioInventoryConfiguration(models.Model):
 
     def get_absolute_url(self):
         return reverse('scenario_detail', kwargs={'pk': self.scenario.pk})
-
-
-class SeasonalDistribution(models.Model):
-    """
-    Model to deal with different types of input data that represent seasonal distribution of any kind. Input and output
-    with differing time steps and start-stop-cycles can be managed. All entries are with reference to one year.
-    """
-    # Into how many timesteps is the full year devided? e.g. 12 months, 365 days etc
-    # The values array must have the same length, filled with zeros, of not applicable to whole year
-    timesteps = models.IntegerField(default=12)
-    # Within one year, how many cycles are represented by the given data?
-    cycles = models.IntegerField(default=1)
-    # In which timestep does each cycle start and end? array must have form [start1, end1, start2, end2, ...]
-    start_stop = ArrayField(models.IntegerField(), default=list([1,12]))
-    values = ArrayField(models.FloatField(), default=list([0,0,0,0,0,0,0,0,0,0,0,0]))

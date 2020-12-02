@@ -24,13 +24,13 @@
         </div>
     </div>
     <h2 class="mt-3">Components</h2>
-    {% for group_name, group_content in object.grouped_components.items %}
+    {% for group, content in object.grouped_component_shares.items %}
         <div class="row">
             <div class="col">
                 <div class="card shadow border-left-primary border">
                     <div class="card-header">
-                        <b>{{ group_name }}</b> -
-                        {% if group_content.static %}
+                        <b>{{ group.name }}</b> -
+                        {% if content.static %}
                             static composition
                         {% else %}
                             variable composition
@@ -48,25 +48,25 @@
                             </tr>
                             </thead>
                             <tbody>
-                            {% for component in group_content.components %}
+                            {% for share in content.shares %}
                                 <tr class="row m-0">
                                     <td class="d-inline-block col-2">
-                                        {{ component.name }}
+                                        {{ share.component.name }}
                                     </td>
 
-                                    {% if group_content.static %}
-                                        <td class="d-inline-block col-2">{{ component.average }}
-                                            +- {{ component.standard_deviation }}</td>
-                                        <td class="d-inline-block col-2">{{ component.fraction_of.name }}</td>
+                                    {% if content.static %}
+                                        <td class="d-inline-block col-2">{{ share.average }}
+                                            +- {{ share.standard_deviation }}</td>
+                                        <td class="d-inline-block col-2">{{ share.group.fractions_of.name }}</td>
                                     {% endif %}
 
-                                    <td class="d-inline-block col-3">{{ component.literature_source.abbreviation }}</td>
+                                    <td class="d-inline-block col-3">{{ share.source.abbreviation }}</td>
                                     <td class="d-inline-block col-3">
-                                        <a href="{% url 'material_component_update' component.material.id component.id %}">
+                                        <a href="{% url 'material_component_update' 0 share.material.id share.component.id %}">
                                             edit <i class="fas fa-fw fa-edit"></i>
                                         </a>
-                                        <a id="delete-component-{{ component.id }}"
-                                           href="{% url 'material_component_delete' component.material.id component.id %}">
+                                        <a id="delete-component-{{ share.component.id }}"
+                                           href="{% url 'material_component_delete' 0 share.material.id share.component.id %}">
                                             delete <i class="fas fa-fw fa-trash"></i>
                                         </a>
                                     </td>
@@ -82,7 +82,7 @@
     {% endfor %}
     <div class="row mt-3">
         <div class="col">
-            <a href="{% url 'material_component_create' material.id %}">
+            <a href="{% url 'material_component_create' 0 material.id %}">
                 <i class="fas fa-fw fa-plus"></i> Add component
             </a>
         </div>

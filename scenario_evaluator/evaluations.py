@@ -13,7 +13,7 @@ class ScenarioResult:
 
     def material_component_groups(self):
         materials = self.scenario.feedstocks()
-        return set([group_name for material in materials for group_name in material.component_group_names()])
+        return set([group for material in materials for group in material.component_groups()])
 
     def get_plot_data(self):
         plot_data = {}
@@ -31,9 +31,9 @@ class ScenarioResult:
         groups = self.material_component_groups()
         for group in groups:
             xlabels, data = self.material_values_for_plot(group)
-            chart_id = group.replace(' ', '') + 'BarChart'
+            chart_id = group.name.replace(' ', '') + 'BarChart'
             plot_data[chart_id] = {}
-            plot_data[chart_id]['chart_name'] = 'Production per component: ' + group
+            plot_data[chart_id]['chart_name'] = 'Production per component: ' + group.name
             plot_data[chart_id]['chart_type'] = 'stacked_barchart'
             plot_data[chart_id]['dataset'] = {'labels': xlabels, 'values': data}
             plot_data[chart_id]['unit'] = 'Mg/a'
@@ -107,13 +107,13 @@ class ScenarioResult:
         components = {}
         for feedstock in total_production_per_feedstock.keys():
             material = Material.objects.get(name=feedstock)
-            for group_name, group_content in material.grouped_components().items():
-                if group_name not in components:
-                    components[group_name] = {}
-                for component in group_content['components']:
-                    if component.name not in components[group_name]:
-                        components[group_name][component.name] = 0
-                    components[group_name][component.name] += component.average * total_production_per_feedstock[
+            for group, content in material.grouped_component_shares().items():
+                if group not in components:
+                    components[group] = {}
+                for share in content['shares']:
+                    if share.component.name not in components[group]:
+                        components[group][share.component.name] = 0
+                    components[group][share.component.name] += share.average * total_production_per_feedstock[
                         feedstock]
         return components
 
