@@ -1,18 +1,28 @@
 {% extends 'base.html' %}
+{% load crispy_forms_tags %}
+{% load crispy_forms_filters %}
 
 {% block content %}
-    <h2>Material component group detail</h2>
+
     <div class="row">
         <div class="col col-6">
             <div class="card shadow">
                 <div class="card-header">
-                    <b>Group basics</b>
+                    <b>Group definition</b>
                 </div>
                 <div class="card-body p-0">
                     <table class="table">
                         <tr>
                             <td class="col-3"><strong>Name:</strong></td>
                             <td>{{ object.name }}</td>
+                        </tr>
+                        <tr>
+                            <td class="col-3"><strong>Of material:</strong></td>
+                            <td>{{ material.name }}</td>
+                        </tr>
+                        <tr>
+                            <td class="col-3"><strong>In scenario:</strong></td>
+                            <td>{{ scenario.name }}</td>
                         </tr>
                         <tr>
                             <td class="col-3"><strong>Description:</strong></td>
@@ -28,29 +38,78 @@
                         </tr>
                     </table>
                 </div>
+                <div class="card-footer">
+                    {% if not static %}
+                        <a href="{% url 'material_component_group_update' object.id %}">
+                            <i class="fas fa-fw fa-edit"></i> Edit
+                        </a>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </div>
-    {% if not static %}
-        <div class="row mt-1">
-            <div class="col">
-                <a href="{% url 'material_component_group_update' object.id %}">
-                    <i class="fas fa-fw fa-edit"></i> Edit component group
-                </a>
-            </div>
-        </div>
-    {% endif %}
-    <h2>Composition</h2>
-    <div class="row">
+
+    <div class="row mt-2">
         <div class="col">
             <div class="card shadow">
-                <div class="card-header"></div>
+                <div class="card-header"><b>Composition</b></div>
+                <div class="card-body p-0">
+                    <table class="table m-0">
+                        <thead>
+                        <tr class="row m-0">
+                            <th class="d-inline-block col-2">Component name</th>
+                            <th class="d-inline-block col-2">Fraction</th>
+                            <th class="d-inline-block col-2">of</th>
+                            <th class="d-inline-block col-3">Source</th>
+                            <th class="d-inline-block col-3"></th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for share in composition %}
+                            <tr class="row m-0">
+                                <td class="d-inline-block col-2">
+                                    {{ share.component.name }}
+                                </td>
+
+                                {% if object.static %}
+                                    <td class="d-inline-block col-2">{{ share.average }}
+                                        +- {{ share.standard_deviation }}</td>
+                                    <td class="d-inline-block col-2">{{ share.group.fractions_of.name }}</td>
+                                {% else %}
+                                    <td class="d-inline-block col-2"></td>
+                                    <td class="d-inline-block col-2">{{ share.group.fractions_of.name }}</td>
+                                {% endif %}
+
+                                <td class="d-inline-block col-3">{{ share.source.abbreviation }}</td>
+                                <td class="d-inline-block col-3">
+                                    <a href="{% url 'material_component_group_share_update' share.id %}?next={{ request.path }}">
+                                        <i class="fas fa-fw fa-edit"></i> edit
+                                    </a>
+                                    <a href="{% url 'material_component_group_share_remove_component' share.id %}?next={{ request.path }}">
+                                        <i class="fas fa-fw fa-trash"></i> remove
+                                    </a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+                <div class="card-footer">
+
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row mt-2">
+        <div class="col">
+            <div class="card shadow">
+                <div class="card-header"><b>Options</b></div>
                 <div class="card-body">
-                    {% for share in composition %}
-                        <div>{{ share.component.name }}</div>
-                        <div>{{ share.average }}</div>
-                        <div>+-{{ share.standard_deviation }}</div>
-                    {% endfor %}
+                    <form method="POST">
+                        {% csrf_token %}
+                        {% crispy form form.helper %}
+                    </form>
                 </div>
                 <div class="card-footer"></div>
             </div>

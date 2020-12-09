@@ -149,10 +149,15 @@ class MaterialComponentGroupShare(models.Model):
     material = models.ForeignKey(Material, null=True, on_delete=models.CASCADE)
     component = models.ForeignKey(MaterialComponent, null=True, on_delete=models.CASCADE)
     group = models.ForeignKey(MaterialComponentGroup, null=True, on_delete=models.CASCADE)
-    average = models.FloatField(null=True)
-    standard_deviation = models.FloatField(null=True)
-    distribution = models.ForeignKey(SeasonalDistribution, null=True, on_delete=models.CASCADE)
+    average = models.FloatField(blank=True, null=True)
+    standard_deviation = models.FloatField(blank=True, null=True)
+    distribution = models.ForeignKey(SeasonalDistribution, blank=True, null=True, on_delete=models.CASCADE)
     source = models.ForeignKey(LiteratureSource, on_delete=models.CASCADE, null=True)
+
+    def get_absolute_url(self):
+        return reverse('material_component_group_composition', kwargs={'scenario_pk': self.scenario.id,
+                                                                       'material_pk': self.material.id,
+                                                                       'group_pk': self.group.id})
 
     def __str__(self):
         return f'Share of {self.component.name} in {self.material.name}'

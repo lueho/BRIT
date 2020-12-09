@@ -29,12 +29,15 @@
             <div class="col">
                 <div class="card shadow border-left-primary border">
                     <div class="card-header">
-                        <b>{{ group.name }}</b> -
+                        <a href="{% url 'material_component_group_update' group.id %}"><b>{{ group.name }}</b></a> -
                         {% if content.static %}
                             static composition
                         {% else %}
                             variable composition
                         {% endif %}
+                        <a href="{% url 'material_component_group_composition' scenario.id object.id group.id %}">
+                            edit <i class="fas fa-fw fa-edit"></i>
+                        </a>
                     </div>
                     <div class="card-body p-0">
                         <table class="table m-0">
