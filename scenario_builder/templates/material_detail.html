@@ -1,8 +1,10 @@
 {% extends 'base.html' %}
 
 {% block content %}
-    <h2>Material Detail</h2>
-    <div class="row">
+
+
+    <div class="row mb-2">
+        <!-- start material overview card -->
         <div class="col col-6">
             <div class="card shadow">
                 <div class="card-header">
@@ -22,63 +24,185 @@
                 </div>
             </div>
         </div>
+        <!-- end material overview card -->
+
+        <!-- start info box -->
+        <div class="col col-6">
+            <div class="card shadow">
+                <div class="card-header">
+                    <b>Info</b>
+                </div>
+                <div class="card-body">
+                    <p>On this page you can see all aspects of how a material is defined.</p>
+                    <p><b>Groups: </b>When analysing a material, it can be devided in differert component groups
+                        (e.g. macro components or chemical elements). All components of each group must add up to 1 i.e.
+                        100%.
+                        A group can refer to the whole material or to a component of the material. E.g. most
+                        measurements are
+                        made with respect to the total solid content of a material.</p>
+                    <p><b>Components: </b>Any component of a material can be measured with analytical methods. On this
+                        page,
+                        the compositions are given by weight fractions of the components the material consists of.</p>
+                </div>
+            </div>
+        </div>
+        <!-- end info box -->
     </div>
-    <h2 class="mt-3">Components</h2>
+
     {% for group, content in object.grouped_component_shares.items %}
-        <div class="row">
+        <div class="row mt-2">
             <div class="col">
                 <div class="card shadow border-left-primary border">
-                    <div class="card-header">
-                        <a href="{% url 'material_component_group_update' group.id %}"><b>{{ group.name }}</b></a> -
-                        {% if content.static %}
-                            static composition
-                        {% else %}
-                            variable composition
-                        {% endif %}
-                        <a href="{% url 'material_component_group_composition' scenario.id object.id group.id %}">
-                            edit <i class="fas fa-fw fa-edit"></i>
-                        </a>
-                    </div>
-                    <div class="card-body p-0">
-                        <table class="table m-0">
-                            <thead>
-                            <tr class="row m-0">
-                                <th class="d-inline-block col-2">Component name</th>
-                                <th class="d-inline-block col-2">Fraction</th>
-                                <th class="d-inline-block col-2">of</th>
-                                <th class="d-inline-block col-3">Source</th>
-                                <th class="d-inline-block col-3"></th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            {% for share in content.shares %}
-                                <tr class="row m-0">
-                                    <td class="d-inline-block col-2">
-                                        {{ share.component.name }}
-                                    </td>
+                    {% if content.type == 1 %}
+                        <div class="card-header">
+                            <div class="row">
+                                <div class="col col-6">
+                                    <b>Group: </b><a
+                                        href="{% url 'material_component_group_update' group.id %}"><b>{{ group.name }}</b></a>
+                                    -
+                                    <a href="{% url 'material_component_group_composition' scenario.id object.id group.id %}">
+                                        edit <i class="fas fa-fw fa-edit"></i>
+                                    </a>
+                                </div>
+                                <div class="col col-6">
+                                    <ul class="nav nav-tabs card-header-tabs justify-content-end" id="bologna-list"
+                                        role="tablist">
+                                        <li class="nav-item">
+                                            <a class="nav-link active" href="#composition" role="tab"
+                                               aria-controls="description" aria-selected="true">Composition</a>
+                                        </li>
+                                        <li class="nav-item">
+                                            <a class="nav-link" href="#details" role="tab" aria-controls="history"
+                                               aria-selected="false">Details</a>
+                                        </li>
+                                        <li class="nav-item">
+                                            <a class="nav-link" href="#options" role="tab" aria-controls="deals"
+                                               aria-selected="false">Options</a>
+                                        </li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-body p-0">
+                            <div class="tab-content mt-3">
+                                <div class="tab-pane active" id="composition" role="tabpanel">
+                                    <table class="table m-0">
+                                        <thead>
+                                        <tr class="row m-0">
+                                            <th class="d-inline-block col-2">Component name</th>
+                                            <th class="d-inline-block col-2">Fraction</th>
+                                            <th class="d-inline-block col-2">of</th>
+                                            <th class="d-inline-block col-3">Source</th>
+                                            <th class="d-inline-block col-3"></th>
+                                        </tr>
+                                        </thead>
+                                        <tbody>
+                                        {% for share in content.shares %}
+                                            <tr class="row m-0">
+                                                <td class="d-inline-block col-2">
+                                                    {{ share.component.name }}
+                                                </td>
+                                                <td class="d-inline-block col-2">{{ share.average }}
+                                                    +- {{ share.standard_deviation }}</td>
+                                                <td class="d-inline-block col-2">{{ share.group.fractions_of.name }}</td>
 
-                                    {% if content.static %}
-                                        <td class="d-inline-block col-2">{{ share.average }}
-                                            +- {{ share.standard_deviation }}</td>
-                                        <td class="d-inline-block col-2">{{ share.group.fractions_of.name }}</td>
-                                    {% endif %}
+                                                <td class="d-inline-block col-3">{{ share.source.abbreviation }}</td>
+                                                <td class="d-inline-block col-3">
+                                                    <a href="{% url 'material_component_update' 0 share.material.id share.component.id %}">
+                                                        edit <i class="fas fa-fw fa-edit"></i>
+                                                    </a>
+                                                    <a id="delete-component-{{ share.component.id }}"
+                                                       href="{% url 'material_component_delete' 0 share.material.id share.component.id %}">
+                                                        delete <i class="fas fa-fw fa-trash"></i>
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="tab-pane" id="details" role="tabpanel">
+                                    <div class="card-text">
+                                        This ist the info of the group
+                                    </div>
+                                </div>
+                                <div class="tab-pane" id="options" role="tabpanel">
+                                    <div class="card-text">
+                                        Options
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="card-footer">
 
-                                    <td class="d-inline-block col-3">{{ share.source.abbreviation }}</td>
-                                    <td class="d-inline-block col-3">
-                                        <a href="{% url 'material_component_update' 0 share.material.id share.component.id %}">
-                                            edit <i class="fas fa-fw fa-edit"></i>
-                                        </a>
-                                        <a id="delete-component-{{ share.component.id }}"
-                                           href="{% url 'material_component_delete' 0 share.material.id share.component.id %}">
-                                            delete <i class="fas fa-fw fa-trash"></i>
-                                        </a>
-                                    </td>
-                                </tr>
-                            {% endfor %}
-                            </tbody>
-                        </table>
-                    </div>
+                        </div>
+                    {% elif content.type == 2 %}
+                        <div class="card-header">
+                            <b>Group: </b><a
+                                href="{% url 'material_component_group_update' group.id %}"><b>{{ group.name }}</b></a>
+                            -
+                            <a href="{% url 'material_component_group_composition' scenario.id object.id group.id %}">
+                                edit <i class="fas fa-fw fa-edit"></i>
+                            </a>
+                        </div>
+                        <div class="card-body p-0">
+                            <table class="table m-0" style="border:0px">
+                                {% for share in content.shares %}
+                                    <tr>
+                                        <td>
+                                            <b>Component: {{ share.component.name }}</b>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="m-0 p-0">
+                                            <div class="table-responsive m-0 p-0">
+                                                <table class="table table-bordered m-0 p-0">
 
+                                                    <thead>
+                                                    <tr>
+                                                        <th>Jan</th>
+                                                        <th>Feb</th>
+                                                        <th>Mar</th>
+                                                        <th>Apr</th>
+                                                        <th>May</th>
+                                                        <th>Jun</th>
+                                                        <th>Jul</th>
+                                                        <th>Aug</th>
+                                                        <th>Sep</th>
+                                                        <th>Oct</th>
+                                                        <th>Nov</th>
+                                                        <th>Dec</th>
+                                                    </tr>
+                                                    </thead>
+                                                    <tbody>
+                                                    <tr>
+                                                        {% for value in share.distribution.values %}
+                                                            <td>{{ value }}</td>
+                                                        {% endfor %}
+                                                    </tr>
+                                                    </tbody>
+                                                </table>
+
+                                            </div>
+                                        </td>
+                                    </tr>
+                                    <tr>
+                                        <td class="m-0 py-0">
+                                            <a href="{% url 'material_component_group_share_remove_component' share.id %}?next={{ request.path }}">
+                                                <i class="fas fa-fw fa-trash"></i> remove
+                                            </a>
+                                        </td>
+                                    </tr>
+
+                                {% endfor %}
+                            </table>
+                        </div>
+                        <div class="card-body p-0">This is a second body.</div>
+                        <div class="card-footer">
+
+                        </div>
+
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -86,9 +210,20 @@
     <div class="row mt-3">
         <div class="col">
             <a href="{% url 'material_component_create' 0 material.id %}">
-                <i class="fas fa-fw fa-plus"></i> Add component
+                <i class="fas fa-fw fa-plus"></i> Add component group
             </a>
         </div>
     </div>
 
 {% endblock content %}
+
+{% block javascript %}
+
+    <script>
+        $('#bologna-list a').on('click', function (e) {
+            e.preventDefault()
+            $(this).tab('show')
+        })
+    </script>
+
+{% endblock javascript %}

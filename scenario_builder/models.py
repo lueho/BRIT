@@ -85,6 +85,7 @@ class Material(models.Model):
     owner = models.ForeignKey(User, on_delete=models.CASCADE)
     is_feedstock = models.BooleanField(default=False)
     stan_flow_id = models.CharField(max_length=5,
+                                    blank=True,
                                     validators=[RegexValidator(regex=r'^[0-9]{5}?',
                                                                message='STAN id must have 5 digits.s',
                                                                code='invalid_stan_id')])
@@ -104,7 +105,7 @@ class Material(models.Model):
         for share in shares:
             if share.group not in grouped_shares:
                 grouped_shares[share.group] = {
-                    'static': share.group.static,
+                    'type': share.fraction_type,
                     'shares': [share]
                 }
             else:
@@ -115,13 +116,21 @@ class Material(models.Model):
     def __str__(self):
         return self.name
 
-
 class MaterialComponentGroup(models.Model):
+    class FractionType(models.IntegerChoices):
+        STATIC_AVERAGE = 1
+        STATIC_DISTRIBUTION = 2
+        DYNAMIC_DISTRIBUTION = 3
+
     name = models.CharField(max_length=56)
     description = models.TextField(blank=True, null=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE)
-    static = models.BooleanField(default=True)
+    fraction_type = models.IntegerField(choices=FractionType.choices, default=FractionType.STATIC_AVERAGE)
     fractions_of = models.ForeignKey('MaterialComponent', on_delete=models.CASCADE, default=1)
+
+    def f_type(self, scenario, material):
+        first_found_share = MaterialComponentGroupShare.objects.filter(scenario=scenario, material=material, group=self)[0]
+        return first_found_share.fraction_type
 
     def __str__(self):
         return self.name
@@ -144,14 +153,20 @@ class MaterialComponent(models.Model):
 
 
 class MaterialComponentGroupShare(models.Model):
+    class FractionType(models.IntegerChoices):
+        STATIC_AVERAGE = 1
+        STATIC_DISTRIBUTION = 2
+        DYNAMIC_DISTRIBUTION = 3
+
     owner = models.ForeignKey(User, on_delete=models.CASCADE, default=8)
     scenario = models.ForeignKey('Scenario', on_delete=models.CASCADE, null=True)
     material = models.ForeignKey(Material, null=True, on_delete=models.CASCADE)
     component = models.ForeignKey(MaterialComponent, null=True, on_delete=models.CASCADE)
     group = models.ForeignKey(MaterialComponentGroup, null=True, on_delete=models.CASCADE)
-    average = models.FloatField(blank=True, null=True)
-    standard_deviation = models.FloatField(blank=True, null=True)
+    average = models.FloatField(default=0.0)
+    standard_deviation = models.FloatField(default=0.0)
     distribution = models.ForeignKey(SeasonalDistribution, blank=True, null=True, on_delete=models.CASCADE)
+    fraction_type = models.IntegerField(choices=FractionType.choices, default=FractionType.STATIC_AVERAGE)
     source = models.ForeignKey(LiteratureSource, on_delete=models.CASCADE, null=True)
 
     def get_absolute_url(self):
@@ -161,6 +176,18 @@ class MaterialComponentGroupShare(models.Model):
 
     def __str__(self):
         return f'Share of {self.component.name} in {self.material.name}'
+
+
+@receiver(post_save, sender=MaterialComponentGroupShare)
+def create_seasonal_distribution(sender, instance, created, **kwargs):
+    """
+    Whenever a new GroupShare instance is created, this creates an empty Distribution.
+    """
+    if created:
+        dist = SeasonalDistribution.objects.create()
+        instance.distribution = dist
+        instance.save()
+
 
 
 # ----------- Geodata --------------------------------------------------------------------------------------------------
@@ -345,10 +372,8 @@ class Scenario(models.Model):
     owner = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
     description = models.TextField(blank=True, null=True)
     region = models.ForeignKey(Region, on_delete=models.CASCADE, null=True)
-    site = models.ForeignKey(SFBSite, on_delete=models.CASCADE, null=True)  # TODO: make many-to-many?
+    # site = models.ForeignKey(SFBSite, on_delete=models.CASCADE, null=True)  # TODO: make many-to-many?
     catchment = models.ForeignKey(Catchment, on_delete=models.CASCADE, null=True)  # TODO: make many-to-many?
-    evaluation_running = models.BooleanField(default=False)
-    evaluated = models.BooleanField(default=False)
 
     objects = ScenarioManager()
 

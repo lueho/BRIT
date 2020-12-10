@@ -93,7 +93,7 @@ class MaterialComponentModelForm(ModelForm):
 class MaterialComponentGroupModelForm(ModelForm):
     class Meta:
         model = MaterialComponentGroup
-        fields = ('name', 'description', 'static', 'fractions_of',)
+        fields = ('name', 'description', 'fractions_of',)
 
 
 class MaterialComponentGroupShareModelForm(ModelForm):

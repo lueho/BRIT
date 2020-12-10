@@ -13,6 +13,7 @@ from .models import (Catchment,
                      Material,
                      MaterialComponent,
                      MaterialComponentGroup,
+                     MaterialComponentGroupShare,
                      Region,
                      Scenario,
                      ScenarioInventoryConfiguration,
@@ -86,11 +87,9 @@ class LiteratureSourceAdmin(ModelAdmin):
 class MaterialAdmin(ModelAdmin):
     list_display = ('name', 'stan_flow_id', 'is_feedstock', 'description',)
 
-
-@admin.register(MaterialComponentGroup)
-class MaterialComponentGroupAdmin(ModelAdmin):
-    list_display = ('name', 'description', 'static')
-
+admin.site.register(MaterialComponent)
+admin.site.register(MaterialComponentGroup)
+admin.site.register(MaterialComponentGroupShare)
 
 @admin.register(InventoryAlgorithm)
 class InventoryAlgorithmAdmin(ModelAdmin):
@@ -178,17 +177,23 @@ class GeoDatasetAdmin(ModelAdmin):
 
 @admin.register(Scenario)
 class ScenarioAdmin(ModelAdmin):
-    list_display = ('name', 'region_link', 'catchment_link', 'description', 'status')
+    list_display = ('name', 'owner', 'region_link', 'catchment_link', 'description', 'status')
 
     @staticmethod
     def region_link(obj):
-        url = reverse('admin:scenario_builder_region_change', args=(obj.region.id,))
-        return format_html("<a href='{}'>{}</a>", url, obj.region.name)
+        try:
+            url = reverse('admin:scenario_builder_region_change', args=(obj.region.id,))
+            return format_html("<a href='{}'>{}</a>", url, obj.region.name)
+        except:
+            return format_html("")
 
     @staticmethod
     def catchment_link(obj):
-        url = reverse('admin:scenario_builder_catchment_change', args=(obj.catchment.id,))
-        return format_html("<a href='{}'>{}</a>", url, obj.catchment.name)
+        try:
+            url = reverse('admin:scenario_builder_catchment_change', args=(obj.catchment.id,))
+            return format_html("<a href='{}'>{}</a>", url, obj.catchment.name)
+        except:
+            return format_html("")
 
     @staticmethod
     def status(obj):
@@ -204,6 +209,6 @@ class ScenarioStatusAdmin(ModelAdmin):
 # class LiteratureSourceAdmin(ModelAdmin):
 #     list_display = ('id', 'timesteps', 'cycles', 'start_stop', 'values', 'material', 'component')
 
+admin.site.register(SeasonalDistribution)
 
-admin.site.register(MaterialComponent)
 admin.site.register(SFBSite)

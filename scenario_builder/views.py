@@ -213,7 +213,7 @@ class MaterialComponentGroupCompositionDetailView(DetailView):
 
 
 class MaterialComponentGroupUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
-    form_class = MaterialComponentModelForm
+    form_class = MaterialComponentGroupModelForm
     template_name = 'material_component_group_update.html'
     object = None
 
@@ -267,6 +267,7 @@ class MaterialComponentGroupCompositionView(TemplateResponseMixin, FormMixin, Vi
             'object': self.group,
             'material': self.material,
             'scenario': self.scenario,
+            'fraction_type': self.group.f_type(self.scenario, self.material),
             'composition': MaterialComponentGroupShare.objects.filter(scenario=self.scenario,
                                                                       material=self.material,
                                                                       group=self.group),
