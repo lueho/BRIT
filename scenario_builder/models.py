@@ -80,7 +80,10 @@ class MaterialManager(models.Manager):
 
 
 class Material(models.Model):
-    name = models.CharField(max_length=28)
+    """
+    Holds all materials used
+    """
+    name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE)
     is_feedstock = models.BooleanField(default=False)
@@ -91,24 +94,24 @@ class Material(models.Model):
 
     objects = MaterialManager()
 
-    def component_groups(self, scenario_id=0):
-        return [group for group in self.grouped_component_shares(scenario_id=scenario_id).keys()]
+    def component_groups(self, scenario=None):
+        """
+        :param scenario:
+        :return: [MaterialComponentGroup]
+        """
+        return [group for group in self.grouped_component_shares(scenario=scenario).keys()]
 
-    def component_group_names(self, scenario_id=0):
-        return [group.name for group in self.grouped_component_shares(scenario_id=scenario_id).keys()]
-
-    def grouped_component_shares(self, scenario_id=0):
-        shares = MaterialComponentGroupShare.objects.filter(material=self, scenario_id=scenario_id)
+    def grouped_component_shares(self, scenario=None):
+        group_settings = MaterialComponentGroupSettings.objects.filter(material=self, scenario=scenario)
 
         grouped_shares = {}
-        for share in shares:
-            if share.group not in grouped_shares:
-                grouped_shares[share.group] = {
-                    'static': share.group.static,
-                    'shares': [share]
-                }
-            else:
-                grouped_shares[share.group]['shares'].append(share)
+        for setting in group_settings:
+            grouped_shares[setting.group] = {
+                'dynamic': setting.dynamic,
+                'shares': []
+            }
+            for share in MaterialComponentShare.objects.filter(group_settings=setting):
+                grouped_shares[setting.group]['shares'].append(share)
 
         return grouped_shares
 
@@ -116,51 +119,67 @@ class Material(models.Model):
         return self.name
 
 
-class MaterialComponentGroup(models.Model):
-    name = models.CharField(max_length=56)
-    description = models.TextField(blank=True, null=True)
-    owner = models.ForeignKey(User, on_delete=models.CASCADE)
-    static = models.BooleanField(default=True)
-    fractions_of = models.ForeignKey('MaterialComponent', on_delete=models.CASCADE, default=1)
-
-    def __str__(self):
-        return self.name
-
-
 class MaterialComponent(models.Model):
-    name = models.CharField(max_length=20)
+    """
+    Represents any kind of component that a material can consists of (e.g. water, any kind of chemical element
+    or more complex components, such as carbohydrates)
+    """
+    name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE)
-
-    # def get_absolute_url(self):
-    #     return reverse('material_detail', kwargs={'material_pk': self.material.pk, 'scenario_pk': 0})
-
-    def groups(self):
-        return MaterialComponentGroup.objects.filter(
-            materialcomponentgroupshare__in=MaterialComponentGroupShare.objects.filter(component=self))
 
     def __str__(self):
         return self.name
 
 
-class MaterialComponentGroupShare(models.Model):
-    owner = models.ForeignKey(User, on_delete=models.CASCADE, default=8)
-    scenario = models.ForeignKey('Scenario', on_delete=models.CASCADE, null=True)
-    material = models.ForeignKey(Material, null=True, on_delete=models.CASCADE)
-    component = models.ForeignKey(MaterialComponent, null=True, on_delete=models.CASCADE)
+class MaterialComponentGroup(models.Model):
+    """
+    Container model to group MaterialComponent instances
+    """
+    name = models.CharField(max_length=255)
+    description = models.TextField(blank=True, null=True)
+    owner = models.ForeignKey(User, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return self.name
+
+
+class MaterialComponentGroupSettings(models.Model):
+    """
+    Utility model to store the settings for component groups for each material in each scenario. This model is not
+    supposed to be edited directly by a user. It depends on user objects and must be deleted, when any of the user
+    objects it depends on is deleted.
+    """
+
     group = models.ForeignKey(MaterialComponentGroup, null=True, on_delete=models.CASCADE)
+    material = models.ForeignKey(Material, null=True, on_delete=models.CASCADE)
+    scenario = models.ForeignKey('Scenario', null=True, on_delete=models.CASCADE)
+    dynamic = models.BooleanField(default=False)
+    fractions_of = models.ForeignKey(MaterialComponent, on_delete=models.CASCADE, default=1)
+
+    # TODO: Restrain fractions_of:
+    #  ==> component must be configured for the material-scenario combination
+    #  ==> component must not be included in the same group (no circular reference)
+
+    def __str__(self):
+        return f'Group: {self.group.name}, material: {self.material.name}, scenario: {self.scenario.name}'
+
+
+class MaterialComponentShare(models.Model):
+    """
+    Utility model used to assign values to components for different group settings. This model is not
+    supposed to be edited directly by a user. It depends on user objects and must be deleted, when any of the user
+    objects it depends on is deleted.
+    """
+    component = models.ForeignKey(MaterialComponent, null=True, on_delete=models.CASCADE)
+    group_settings = models.ForeignKey(MaterialComponentGroupSettings, null=True, on_delete=models.CASCADE)
     average = models.FloatField(blank=True, null=True)
     standard_deviation = models.FloatField(blank=True, null=True)
     distribution = models.ForeignKey(SeasonalDistribution, blank=True, null=True, on_delete=models.CASCADE)
     source = models.ForeignKey(LiteratureSource, on_delete=models.CASCADE, null=True)
 
-    def get_absolute_url(self):
-        return reverse('material_component_group_composition', kwargs={'scenario_pk': self.scenario.id,
-                                                                       'material_pk': self.material.id,
-                                                                       'group_pk': self.group.id})
-
     def __str__(self):
-        return f'Share of {self.component.name} in {self.material.name}'
+        return f'Material {self.group_settings.material.name}, scenario: {self.group_settings.scenario.name}, component: {self.component.name}'
 
 
 # ----------- Geodata --------------------------------------------------------------------------------------------------
@@ -347,8 +366,6 @@ class Scenario(models.Model):
     region = models.ForeignKey(Region, on_delete=models.CASCADE, null=True)
     site = models.ForeignKey(SFBSite, on_delete=models.CASCADE, null=True)  # TODO: make many-to-many?
     catchment = models.ForeignKey(Catchment, on_delete=models.CASCADE, null=True)  # TODO: make many-to-many?
-    evaluation_running = models.BooleanField(default=False)
-    evaluated = models.BooleanField(default=False)
 
     objects = ScenarioManager()
 

@@ -17,7 +17,6 @@ from .models import (Catchment,
                      Scenario,
                      ScenarioInventoryConfiguration,
                      ScenarioStatus,
-                     SeasonalDistribution,
                      SFBSite,
                      GeoDataset, )
 
@@ -89,7 +88,7 @@ class MaterialAdmin(ModelAdmin):
 
 @admin.register(MaterialComponentGroup)
 class MaterialComponentGroupAdmin(ModelAdmin):
-    list_display = ('name', 'description', 'static')
+    list_display = ('name', 'description',)
 
 
 @admin.register(InventoryAlgorithm)

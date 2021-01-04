@@ -13,7 +13,7 @@ class ScenarioResult:
 
     def material_component_groups(self):
         materials = self.scenario.feedstocks()
-        return set([group for material in materials for group in material.component_groups()])
+        return set([group for material in materials for group in material.component_groups(scenario=self.scenario)])
 
     def get_plot_data(self):
         plot_data = {}
@@ -107,7 +107,7 @@ class ScenarioResult:
         components = {}
         for feedstock in total_production_per_feedstock.keys():
             material = Material.objects.get(name=feedstock)
-            for group, content in material.grouped_component_shares().items():
+            for group, content in material.grouped_component_shares(scenario=self.scenario).items():
                 if group not in components:
                     components[group] = {}
                 for share in content['shares']:

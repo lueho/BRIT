@@ -158,8 +158,6 @@ LOGIN_URL = 'login'
 CELERY_BROKER_URL = os.environ.get("REDIS_URL")
 CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL")
 
-PUBLIC_OBJECT_OWNER = 'flexibi'
-
 IMPORTED_CASE_STUDIES = [
     'flexibi_nantes',
 ]

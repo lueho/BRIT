@@ -1,7 +1,6 @@
 from crispy_forms.bootstrap import StrictButton, FieldWithButtons
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Row, Field
-from django.contrib.auth.models import User
 from django.forms import (Form,
                           ModelChoiceField,
                           ModelForm,
@@ -17,7 +16,8 @@ from .models import (
     Material,
     MaterialComponent,
     MaterialComponentGroup,
-    MaterialComponentGroupShare,
+    MaterialComponentGroupSettings,
+    MaterialComponentShare,
     Region,
     Scenario,
     ScenarioInventoryConfiguration,
@@ -81,7 +81,7 @@ class CatchmentQueryForm(Form):
 class MaterialModelForm(ModelForm):
     class Meta:
         model = Material
-        fields = ('name', 'description', 'is_feedstock')
+        fields = ('name', 'description', 'is_feedstock', 'stan_flow_id',)
 
 
 class MaterialComponentModelForm(ModelForm):
@@ -93,33 +93,55 @@ class MaterialComponentModelForm(ModelForm):
 class MaterialComponentGroupModelForm(ModelForm):
     class Meta:
         model = MaterialComponentGroup
-        fields = ('name', 'description', 'static', 'fractions_of',)
+        fields = ('name', 'description',)
 
 
-class MaterialComponentGroupShareModelForm(ModelForm):
+class MaterialAddComponentGroupForm(ModelForm):
+    initial = {}
+
     class Meta:
-        model = MaterialComponentGroupShare
+        model = MaterialComponentGroupSettings
+        fields = ('scenario', 'material', 'group', 'fractions_of',)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.initial = kwargs.get('initial')
+        self.fields['scenario'].queryset = Scenario.objects.all()
+        self.fields['scenario'].initial = self.initial.get('scenario')
+        self.fields['material'].queryset = Material.objects.all()
+        self.fields['material'].initial = self.initial.get('material')
+
+    @property
+    def helper(self):
+        helper = FormHelper()
+        helper.form_method = 'POST'
+        helper.layout = Layout(
+            Field('scenario', type='hidden'),
+            Field('material', type='hidden'),
+            Row(
+                Field('group', type='select'),
+                FieldWithButtons('fractions_of',
+                                 StrictButton("Add", type="submit", name="add_group", css_class="btn-primary")),
+            )
+        )
+        return helper
+
+
+class MaterialComponentShareModelForm(ModelForm):
+    class Meta:
+        model = MaterialComponentShare
         fields = '__all__'
 
 
-class MaterialComponentGroupAddComponentForm(MaterialComponentGroupShareModelForm):
+class MaterialComponentGroupAddComponentForm(MaterialComponentShareModelForm):
     initial = {}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.initial = kwargs.get('initial')
-        self.fields['owner'].queryset = User.objects.all()
-        self.fields['owner'].initial = self.initial.get('owner')
-        self.fields['owner'].widget = HiddenInput()
-        self.fields['scenario'].queryset = Scenario.objects.all()
-        self.fields['scenario'].initial = self.initial.get('scenario')
-        self.fields['scenario'].widget = HiddenInput()
-        self.fields['material'].queryset = Material.objects.filter(is_feedstock=True)
-        self.fields['material'].initial = self.initial.get('material')
-        self.fields['material'].widget = HiddenInput()
-        self.fields['group'].queryset = MaterialComponentGroup.objects.all()
-        self.fields['group'].initial = self.initial.get('group')
-        self.fields['group'].widget = HiddenInput()
+        self.fields['group_settings'].queryset = MaterialComponentGroupSettings.objects.all()
+        self.fields['group_settings'].initial = self.initial.get('group_settings')
+        self.fields['group_settings'].widget = HiddenInput()
         self.fields['component'].label = 'Add component'
 
     @property
@@ -132,10 +154,7 @@ class MaterialComponentGroupAddComponentForm(MaterialComponentGroupShareModelFor
         #                                           'group_pk': self.instance.group}
         #                                   )
         helper.layout = Layout(
-            Field('owner', type='hidden'),
-            Field('scenario', type='hidden'),
-            Field('material', type='hidden'),
-            Field('group', type='hidden'),
+            Field('group_settings', type='hidden'),
             Row(
                 FieldWithButtons('component',
                                  StrictButton("Add", type="submit", name="add_component", css_class="btn-primary")),
@@ -144,8 +163,8 @@ class MaterialComponentGroupAddComponentForm(MaterialComponentGroupShareModelFor
         return helper
 
     class Meta:
-        model = MaterialComponentGroupShare
-        fields = ('owner', 'scenario', 'material', 'group', 'component',)
+        model = MaterialComponentShare
+        fields = ('group_settings', 'component',)
 
 
 class SeasonalDistributionModelForm(ModelForm):
