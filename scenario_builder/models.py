@@ -40,6 +40,25 @@ class SeasonalDistribution(models.Model):
     values = ArrayField(models.FloatField(), default=list([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]))
 
 
+class TemporalDistribution(models.Model):
+    """
+    Model to organize timesteps into named distributions (e.g. months are timesteps of the temporal distribution 'months
+    of the year').
+    """
+    name = models.CharField(max_length=255, blank=True, null=True)
+    owner = models.ForeignKey(User, on_delete=models.CASCADE)
+    description = models.TextField(blank=True, null=True)
+
+
+class Timestep(models.Model):
+    """
+    Defines a timestep for organisation of seasonal distributions
+    """
+    name = models.CharField(max_length=255, blank=True, null=True)
+    owner = models.ForeignKey(User, on_delete=models.CASCADE)
+    distribution = models.ForeignKey(TemporalDistribution, default=1, on_delete=models.CASCADE)
+
+
 class Region(models.Model):
     name = models.CharField(max_length=56, null=False)
     country = models.CharField(max_length=56, null=False)
@@ -88,6 +107,8 @@ class Material(models.Model):
     owner = models.ForeignKey(User, on_delete=models.CASCADE)
     is_feedstock = models.BooleanField(default=False)
     stan_flow_id = models.CharField(max_length=5,
+                                    blank=True,
+                                    null=True,
                                     validators=[RegexValidator(regex=r'^[0-9]{5}?',
                                                                message='STAN id must have 5 digits.s',
                                                                code='invalid_stan_id')])
@@ -155,6 +176,7 @@ class MaterialComponentGroupSettings(models.Model):
     material = models.ForeignKey(Material, null=True, on_delete=models.CASCADE)
     scenario = models.ForeignKey('Scenario', null=True, on_delete=models.CASCADE)
     dynamic = models.BooleanField(default=False)
+    temporal_distribution = models.ForeignKey(TemporalDistribution, default=1, on_delete=models.CASCADE)
     fractions_of = models.ForeignKey(MaterialComponent, on_delete=models.CASCADE, default=1)
 
     # TODO: Restrain fractions_of:
@@ -176,6 +198,7 @@ class MaterialComponentShare(models.Model):
     average = models.FloatField(blank=True, null=True)
     standard_deviation = models.FloatField(blank=True, null=True)
     distribution = models.ForeignKey(SeasonalDistribution, blank=True, null=True, on_delete=models.CASCADE)
+    timestep = models.ForeignKey(Timestep, blank=True, null=True, on_delete=models.CASCADE)
     source = models.ForeignKey(LiteratureSource, on_delete=models.CASCADE, null=True)
 
     def __str__(self):

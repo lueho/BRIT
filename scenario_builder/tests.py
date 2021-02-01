@@ -1,4 +1,4 @@
-from django.test import TestCase
+from django.test import RequestFactory, tag, TestCase
 
 from .models import (Catchment,
                      GeoDataset,
@@ -6,21 +6,61 @@ from .models import (Catchment,
                      InventoryAlgorithmParameter,
                      InventoryAlgorithmParameterValue,
                      Material,
+                     MaterialComponentGroup,
+                     MaterialComponentShare,
                      Region,
                      Scenario,
                      ScenarioInventoryConfiguration,
                      WrongParameterForInventoryAlgorithm)
+from .views import MaterialAddComponentGroupView
 
 
+# ----------- Materials ------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+@tag('material', 'model')
 class MaterialTestCase(TestCase):
-    fixtures = ['regions.json', 'scenarios.json', 'catchments.json']
+    fixtures = ['material_fixtures.json']
 
     def setUp(self):
         pass
 
     def test_create(self):
-        material = Material.objects.get(name='Tree prunings (winter)')
-        self.assertEqual(material.name, 'Tree prunings (winter)')
+        feedstock = Material.objects.get(is_feedstock=True)
+        self.assertEqual(feedstock.name, 'Test Feedstock')
+
+        # Feedstock filter
+        # self.assertQuerysetEqual(Material.objects.feedstocks(), Material.objects.filter(is_feedstock=True)) # TODO
+
+        pass
+
+    def test_grouped_component_shares(self):
+        scenario = Scenario.objects.get(id=1)
+        material = Material.objects.get(id=1)
+        group = MaterialComponentGroup.objects.get(id=1)
+        share = MaterialComponentShare.objects.get(id=1)
+        grouped_shares = {
+            group: {
+                'dynamic': False,
+                'shares': [
+                    share
+                ]
+            }
+        }
+        self.assertDictEqual(grouped_shares, material.grouped_component_shares(scenario=scenario))
+
+
+@tag('view', 'material')
+class MaterialAddComponentGroupViewTestCase(TestCase):
+    fixtures = ['material_fixtures']
+
+    def test_environment_set_in_context(self):
+        request = RequestFactory().get('/')
+        view = MaterialAddComponentGroupView()
+        view.setup(request)
+
+        context = view.get_context_data()
+        self.assertIn('form', context)
 
 
 class RegionTestCase(TestCase):

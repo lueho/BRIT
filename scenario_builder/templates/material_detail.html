@@ -23,6 +23,11 @@
                         </tr>
                     </table>
                 </div>
+                <div class="card-footer">
+                    <a href="{% url 'material_update' scenario.id object.id %}">
+                        edit definition <i class="fas fa-fw fa-edit"></i>
+                    </a>
+                </div>
             </div>
         </div>
     </div>
@@ -48,9 +53,6 @@
                                         {% else %}
                                             static composition
                                         {% endif %}
-                                        <a href="{% url 'material_component_group_composition' scenario.id object.id group.id %}">
-                                            edit <i class="fas fa-fw fa-edit"></i>
-                                        </a>
                                     </div>
                                     <div class="card-body p-0">
                                         <table class="table m-0">
@@ -86,7 +88,7 @@
                                                         </a>
                                                         <a id="delete-component-{{ share.component.id }}"
                                                            href="{% url 'material_component_group_share_remove_component' share.id %}?next={{ request.path }}">
-                                                            delete <i class="fas fa-fw fa-trash"></i>
+                                                            remove <i class="fas fa-fw fa-trash"></i>
                                                         </a>
                                                     </td>
                                                 </tr>
@@ -101,30 +103,32 @@
                                             </tbody>
                                         </table>
                                     </div>
-                                    <div class="card-footer"></div>
+                                    <div class="card-footer">
+                                        <a href="{% url 'material_component_group_update' group.id %}?next={{ request.path }}">
+                                            edit <i class="fas fa-fw fa-edit"></i>
+                                        </a>
+                                        <a id="remove-group-{{ group.id }}"
+                                           href="{% url 'material_component_group_remove' scenario.id material.id group.id %}?next={{ request.path }}">
+                                            remove <i class="fas fa-fw fa-trash"></i>
+                                        </a>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                     {% endfor %}
+                    <div class="card border-left-primary border">
+                        <div class="card-header"></div>
+                        <div class="card-body">
+                            <a href="{% url 'material_add_component_group' scenario.id material.id %}">
+                                <i class="fas fa-fw fa-plus"></i> add component group
+                            </a>
+                        </div>
+                        <div class="card-footer"></div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
     <!-- end material composition -->
-
-    <div class="row mt-2">
-        <div class="col">
-            <div class="card shadow">
-                <div class="card-header"><b>Options</b></div>
-                <div class="card-body">
-                    <form method="POST">
-                        {% csrf_token %}
-                        {% crispy form form.helper %}
-                    </form>
-                </div>
-                <div class="card-footer"></div>
-            </div>
-        </div>
-    </div>
 
 {% endblock content %}

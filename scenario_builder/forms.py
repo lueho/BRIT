@@ -1,7 +1,9 @@
 from crispy_forms.bootstrap import StrictButton, FieldWithButtons
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Row, Field
+from django import forms
 from django.forms import (Form,
+                          modelformset_factory,
                           ModelChoiceField,
                           ModelForm,
                           MultipleChoiceField,
@@ -131,6 +133,22 @@ class MaterialComponentShareModelForm(ModelForm):
     class Meta:
         model = MaterialComponentShare
         fields = '__all__'
+
+
+#
+# class MaterialComponentShareBaseFormSet(BaseFormSet):
+#     def __init__(self, *args, **kwargs):
+#         super().__init__(*args, **kwargs)
+
+class MaterialComponentShareForm(Form):
+    name = forms.CharField()
+
+
+MaterialComponentShareFormSet = modelformset_factory(
+    MaterialComponentShare,
+    exclude=('scenario', 'distribution', 'group_settings',),
+    extra=2
+)
 
 
 class MaterialComponentGroupAddComponentForm(MaterialComponentShareModelForm):

@@ -18,6 +18,8 @@ from .models import (Catchment,
                      ScenarioInventoryConfiguration,
                      ScenarioStatus,
                      SFBSite,
+                     TemporalDistribution,
+                     Timestep,
                      GeoDataset, )
 
 
@@ -206,3 +208,5 @@ class ScenarioStatusAdmin(ModelAdmin):
 
 admin.site.register(MaterialComponent)
 admin.site.register(SFBSite)
+admin.site.register(TemporalDistribution)
+admin.site.register(Timestep)
