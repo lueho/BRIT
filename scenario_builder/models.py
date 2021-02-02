@@ -30,7 +30,7 @@ class SeasonalDistribution(models.Model):
     Model to deal with different types of input data that represent seasonal distribution of any kind. Input and output
     with differing time steps and start-stop-cycles can be managed. All entries are with reference to one year.
     """
-    # Into how many timesteps is the full year devided? e.g. 12 months, 365 days etc
+    # Into how many timesteps is the full year divided? e.g. 12 months, 365 days etc
     # The values array must have the same length, filled with zeros, of not applicable to whole year
     timesteps = models.IntegerField(default=12)
     # Within one year, how many cycles are represented by the given data?
@@ -49,6 +49,9 @@ class TemporalDistribution(models.Model):
     owner = models.ForeignKey(User, on_delete=models.CASCADE)
     description = models.TextField(blank=True, null=True)
 
+    def __str__(self):
+        return self.name
+
 
 class Timestep(models.Model):
     """
@@ -57,6 +60,9 @@ class Timestep(models.Model):
     name = models.CharField(max_length=255, blank=True, null=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE)
     distribution = models.ForeignKey(TemporalDistribution, default=1, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return self.name
 
 
 class Region(models.Model):
@@ -136,6 +142,40 @@ class Material(models.Model):
 
         return grouped_shares
 
+    def grouped_component_shares_settings(self, scenario=None):
+        group_settings = MaterialComponentGroupSettings.objects.filter(material=self, scenario=scenario)
+
+        grouped_shares = {}
+        for setting in group_settings:
+            grouped_shares[setting] = {
+                'dynamic': setting.dynamic,
+                'averages': [],
+                'distribution': []
+            }
+            for share in MaterialComponentShare.objects.filter(group_settings=setting,
+                                                               timestep=Timestep.objects.get(name='Average')):
+                grouped_shares[setting]['averages'].append(share)
+
+            timesteps = setting.temporal_distribution.timestep_set.all()
+            header = ['Component']
+            for timestep in timesteps:
+                header.append(timestep.name)
+
+            grouped_shares[setting]['distribution'] = [header]
+
+            components = [share.component for share in
+                          setting.materialcomponentshare_set.filter(timestep=Timestep.objects.get(name='Average'))]
+            for component in components:
+                value_row = [component.name]
+                # noinspection LongLine
+                for share in MaterialComponentShare.objects.filter(group_settings=setting,
+                                                                   component=component,
+                                                                   timestep__distribution=setting.temporal_distribution):
+                    value_row.append(share.average)
+                grouped_shares[setting]['distribution'].append(value_row)
+
+        return grouped_shares
+
     def __str__(self):
         return self.name
 
@@ -183,8 +223,49 @@ class MaterialComponentGroupSettings(models.Model):
     #  ==> component must be configured for the material-scenario combination
     #  ==> component must not be included in the same group (no circular reference)
 
+    def manage_temporal_distribution_shares(self):
+
+        # check, whether the distribution exists already
+        if self.materialcomponentshare_set.filter(
+                timestep__distribution=self.temporal_distribution).exists():
+            return
+
+        # Delete old entries
+        self.materialcomponentshare_set.exclude(timestep__name='Average').delete()
+
+        # Initialize new set of entries with annual average as starting values
+        components = [share.component for share in self.materialcomponentshare_set.all()]
+        timesteps = self.temporal_distribution.timestep_set.all()
+        for component in components:
+            share = MaterialComponentShare.objects.get(component=component, group_settings=self,
+                                                       timestep=Timestep.objects.get(name='Average'))
+            for timestep in timesteps:
+                MaterialComponentShare.objects.create(component=component, group_settings=self, timestep=timestep,
+                                                      average=share.average,
+                                                      standard_deviation=share.standard_deviation)
+
+    def add_component(self, share):
+        timesteps = self.temporal_distribution.timestep_set.all()
+        for timestep in timesteps:
+            MaterialComponentShare.objects.create(component=share.component,
+                                                  group_settings=self,
+                                                  timestep=timestep,
+                                                  average=share.average,
+                                                  standard_deviation=share.standard_deviation)
+
+    def remove_component(self, component):
+        MaterialComponentShare.objects.filter(component=component, group_settings=self).delete()
+
     def __str__(self):
         return f'Group: {self.group.name}, material: {self.material.name}, scenario: {self.scenario.name}'
+
+
+@receiver(post_save, sender=MaterialComponentGroupSettings)
+def manage_distributions(sender, instance, created, **kwargs):
+    instance.manage_temporal_distribution_shares()
+    if created:
+        return
+    return
 
 
 class MaterialComponentShare(models.Model):
@@ -195,14 +276,23 @@ class MaterialComponentShare(models.Model):
     """
     component = models.ForeignKey(MaterialComponent, null=True, on_delete=models.CASCADE)
     group_settings = models.ForeignKey(MaterialComponentGroupSettings, null=True, on_delete=models.CASCADE)
-    average = models.FloatField(blank=True, null=True)
-    standard_deviation = models.FloatField(blank=True, null=True)
-    distribution = models.ForeignKey(SeasonalDistribution, blank=True, null=True, on_delete=models.CASCADE)
+    average = models.FloatField(null=True, default=0.0)
+    standard_deviation = models.FloatField(null=True, default=0.0)
     timestep = models.ForeignKey(Timestep, blank=True, null=True, on_delete=models.CASCADE)
     source = models.ForeignKey(LiteratureSource, on_delete=models.CASCADE, null=True)
 
     def __str__(self):
-        return f'Material {self.group_settings.material.name}, scenario: {self.group_settings.scenario.name}, component: {self.component.name}'
+        return f'Material: {self.group_settings.material.name},\
+         scenario: {self.group_settings.scenario.name}, component: {self.component.name}'
+
+
+@receiver(post_save, sender=MaterialComponentShare)
+def manage_distribution_shares(sender, instance, created, **kwargs):
+    if created:
+        if instance.timestep.name == 'Average':
+            instance.group_settings.add_component(instance)
+        return
+    return
 
 
 # ----------- Geodata --------------------------------------------------------------------------------------------------
@@ -424,7 +514,7 @@ class Scenario(models.Model):
 
     def add_feedstock(self, feedstock: Material):
         # not needed anymore. Each feedstock is added automatically with an associated inventory_algorithm.
-        # No feedstocks should be added witout inventory_algorihtm
+        # No feedstocks should be added without inventory_algorithm
         pass
 
     def remaining_feedstock_options(self):
@@ -560,7 +650,7 @@ class Scenario(models.Model):
     def delete_configuration(self):
         """
         Removes all entries from the configuration that are associated with this scenario. Handle with care!
-        An unconfigured scenario will lead to unexpected behaviour.
+        An improperly configured scenario will lead to unexpected behaviour.
         """
         for config_entry in ScenarioInventoryConfiguration.objects.filter(scenario=self):
             config_entry.delete()

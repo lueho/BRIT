@@ -1,4 +1,5 @@
 from celery.result import AsyncResult
+from crispy_forms.layout import Submit
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import User
 from django.http import JsonResponse, HttpResponse, HttpResponseRedirect
@@ -20,6 +21,8 @@ from .forms import (
     MaterialComponentGroupModelForm,
     MaterialComponentGroupAddComponentForm,
     MaterialComponentGroupSettings,
+    MaterialComponentGroupShareDistributionFormSet,
+    MaterialComponentDistributionFormSetHelper,
     MaterialComponentShareFormSet,
     MaterialComponentShareModelForm,
     ScenarioModelForm,
@@ -41,6 +44,7 @@ from .models import (
     InventoryAlgorithmParameterValue,
     Region,
     ScenarioStatus,
+    Timestep,
 )
 from .serializers import CatchmentSerializer, BaseResultMapSerializer, RegionSerializer
 from .tasks import run_inventory
@@ -154,7 +158,7 @@ class MaterialDetailView(TemplateResponseMixin, FormMixin, View):
             'object': self.material,
             'material': self.material,
             'scenario': self.scenario,
-            'composition': self.material.grouped_component_shares(scenario=self.scenario),
+            'composition': self.material.grouped_component_shares_settings(scenario=self.scenario),
             'form': self.get_form
         }
         return self.render_to_response(context)
@@ -499,14 +503,35 @@ class MaterialComponentGroupShareCreateView(FormView):
         return super().get_context_data(**kwargs)
 
 
-class MaterialComponentGroupShareUpdateView(FormView):
-    template_name = 'share_formset_test_vew.html'
-    form_class = MaterialComponentShareFormSet
-    success_url = '/'
+class MaterialComponentGroupShareDistributionUpdateView(FormView):
+    template_name = 'material_component_group_share_distribution_update.html'
+    form_class = MaterialComponentGroupShareDistributionFormSet
+    group_settings = None
 
     def get_context_data(self, **kwargs):
-        kwargs['formset'] = MaterialComponentShareFormSet(queryset=MaterialComponentShare.objects.none())
+        self.get_objects()
+        queryset = MaterialComponentShare.objects.filter(
+            group_settings=self.group_settings,
+            timestep=Timestep.objects.get(name='Jan'))
+        kwargs['formset'] = MaterialComponentGroupShareDistributionFormSet(queryset=queryset)
+        helper = MaterialComponentDistributionFormSetHelper()
+        helper.add_input(Submit('submit', 'Save'))
+        kwargs['helper'] = helper
         return super().get_context_data(**kwargs)
+
+    def get_objects(self):
+        self.group_settings = MaterialComponentGroupSettings.objects.get(
+            scenario=self.kwargs.get('scenario_pk'),
+            material=self.kwargs.get('material_pk'),
+            group=self.kwargs.get('group_pk')
+        )
+
+    def get_success_url(self):
+        next_url = self.request.GET.get('next')
+        if next_url:
+            return next_url
+        else:
+            return reverse('material_list')
 
 
 class ShareFormsetTestView(FormView):
@@ -527,7 +552,7 @@ class MaterialComponentGroupRemoveComponentView(LoginRequiredMixin, UserPassesTe
 
     def get(self, request, *args, **kwargs):
         self.object = MaterialComponentShare.objects.get(id=self.kwargs.get('pk'))
-        self.object.delete()
+        self.object.group_settings.remove_component(self.object.component)
         return HttpResponseRedirect(self.get_success_url())
 
     def get_success_url(self):

@@ -41,12 +41,12 @@
                     <b>Material composition</b>
                 </div>
                 <div class="card-body">
-                    {% for group, content in composition.items %}
+                    {% for group_settings, content in composition.items %}
                         <div class="row mt-1">
                             <div class="col">
                                 <div class="card border-left-primary border">
                                     <div class="card-header">
-                                        <a href="{% url 'material_component_group_update' group.id %}"><b>{{ group.name }}</b></a>
+                                        <a href="{% url 'material_component_group_update' group_settings.group.id %}"><b>{{ group_settings.group.name }}</b></a>
                                         -
                                         {% if content.dynamic %}
                                             dynamic composition
@@ -66,8 +66,9 @@
                                             </tr>
                                             </thead>
                                             <tbody>
-                                            {% for share in content.shares %}
-                                                <tr class="row m-0">
+                                            {% for share in content.averages %}
+                                                <tr class="row m-0 accordion-toggle" data-toggle="collapse"
+                                                    data-target="#temporalDistribution">
                                                     <td class="d-inline-block col-2">
                                                         {{ share.component.name }}
                                                     </td>
@@ -92,10 +93,34 @@
                                                         </a>
                                                     </td>
                                                 </tr>
+
                                             {% endfor %}
                                             <tr>
+                                                <td colspan="4" class="hiddenRow">
+                                                    <div class="accordion-body collapse p-3"
+                                                         id="temporalDistribution">
+                                                        <table>
+                                                            {% for line in content.distribution %}
+                                                                <tr>
+                                                                    {% for column in line %}
+                                                                        <td>
+                                                                            {{ column }}
+                                                                        </td>
+                                                                    {% endfor %}
+                                                                </tr>
+                                                            {% endfor %}
+                                                        </table>
+                                                    </div>
+                                                </td>
                                                 <td>
-                                                    <a href="{% url 'material_component_group_add_component' scenario.id material.id group.id %}">
+                                                    <a href="{% url 'material_component_group_shares_update' scenario.id material.id group_settings.group.id %}?next={{ request.path }}">
+                                                        edit <i class="fas fa-fw fa-edit"></i>
+                                                    </a>
+                                                </td>
+                                            </tr>
+                                            <tr>
+                                                <td>
+                                                    <a href="{% url 'material_component_group_add_component' scenario.id material.id group_settings.group.id %}">
                                                         <i class="fas fa-fw fa-plus"></i> add component
                                                     </a>
                                                 </td>
@@ -104,11 +129,11 @@
                                         </table>
                                     </div>
                                     <div class="card-footer">
-                                        <a href="{% url 'material_component_group_update' group.id %}?next={{ request.path }}">
+                                        <a href="{% url 'material_component_group_update' group_settings.group.id %}?next={{ request.path }}">
                                             edit <i class="fas fa-fw fa-edit"></i>
                                         </a>
                                         <a id="remove-group-{{ group.id }}"
-                                           href="{% url 'material_component_group_remove' scenario.id material.id group.id %}?next={{ request.path }}">
+                                           href="{% url 'material_component_group_remove' scenario.id material.id group_settings.group.id %}?next={{ request.path }}">
                                             remove <i class="fas fa-fw fa-trash"></i>
                                         </a>
                                     </div>
@@ -116,6 +141,9 @@
                             </div>
                         </div>
                     {% endfor %}
+
+
+
                     <div class="card border-left-primary border">
                         <div class="card-header"></div>
                         <div class="card-body">
@@ -132,3 +160,12 @@
     <!-- end material composition -->
 
 {% endblock content %}
+
+{% block javascript %}
+    <script>
+        $('.accordion-toggle').click(function () {
+            $('.hiddenRow').hide();
+            $(this).next('tr').find('.hiddenRow').show();
+        });
+    </script>
+{% endblock javascript %}

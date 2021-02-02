@@ -24,11 +24,8 @@ from .models import (
     Scenario,
     ScenarioInventoryConfiguration,
     SeasonalDistribution,
+    Timestep,
 )
-
-
-# class Row(Div):
-#     css_class = "form-row"
 
 
 # ----------- Catchments -----------------------------------------------------------------------------------------------
@@ -151,7 +148,34 @@ MaterialComponentShareFormSet = modelformset_factory(
 )
 
 
-class MaterialComponentGroupAddComponentForm(MaterialComponentShareModelForm):
+class MaterialComponentDistributionFormSetHelper(FormHelper):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.form_method = 'post'
+        self.layout = Layout(
+            Row(
+                Field('component'),
+                Field('average'),
+                Field('standard_deviation'),
+            ),
+        )
+        self.render_required_fields = True
+
+
+class MaterialComponentGroupShareDistributionUpdateForm(ModelForm):
+    class Meta:
+        model = MaterialComponentShare
+        fields = ('component', 'average', 'standard_deviation',)
+
+
+MaterialComponentGroupShareDistributionFormSet = modelformset_factory(
+    MaterialComponentShare,
+    form=MaterialComponentGroupShareDistributionUpdateForm,
+    extra=0
+)
+
+
+class MaterialComponentGroupAddComponentForm(ModelForm):
     initial = {}
 
     def __init__(self, *args, **kwargs):
@@ -160,19 +184,18 @@ class MaterialComponentGroupAddComponentForm(MaterialComponentShareModelForm):
         self.fields['group_settings'].queryset = MaterialComponentGroupSettings.objects.all()
         self.fields['group_settings'].initial = self.initial.get('group_settings')
         self.fields['group_settings'].widget = HiddenInput()
+        self.fields['timestep'].queryset = Timestep.objects.filter(name='Average')
+        self.fields['timestep'].initial = Timestep.objects.get(name='Average')
+        self.fields['timestep'].widget = HiddenInput()
         self.fields['component'].label = 'Add component'
 
     @property
     def helper(self):
         helper = FormHelper()
         helper.form_method = 'POST'
-        # self.helper.form_action = reverse('material_component_group_composition',
-        #                                   kwargs={'scenario_pk': self.instance.scenario,
-        #                                           'material_pk': self.instance.material,
-        #                                           'group_pk': self.instance.group}
-        #                                   )
         helper.layout = Layout(
             Field('group_settings', type='hidden'),
+            Field('timestep', type='hidden'),
             Row(
                 FieldWithButtons('component',
                                  StrictButton("Add", type="submit", name="add_component", css_class="btn-primary")),
@@ -182,7 +205,7 @@ class MaterialComponentGroupAddComponentForm(MaterialComponentShareModelForm):
 
     class Meta:
         model = MaterialComponentShare
-        fields = ('group_settings', 'component',)
+        fields = ('group_settings', 'component', 'timestep',)
 
 
 class SeasonalDistributionModelForm(ModelForm):

@@ -12,6 +12,7 @@ from .models import (Catchment,
                      LiteratureSource,
                      Material,
                      MaterialComponent,
+                     MaterialComponentShare,
                      MaterialComponentGroup,
                      Region,
                      Scenario,
@@ -207,6 +208,7 @@ class ScenarioStatusAdmin(ModelAdmin):
 
 
 admin.site.register(MaterialComponent)
+admin.site.register(MaterialComponentShare)
 admin.site.register(SFBSite)
 admin.site.register(TemporalDistribution)
 admin.site.register(Timestep)
