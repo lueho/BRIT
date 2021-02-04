@@ -8,6 +8,7 @@ from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView, DeleteView, DetailView, ListView, View, UpdateView, FormView
 from django.views.generic.base import TemplateResponseMixin
 from django.views.generic.edit import FormMixin, ModelFormMixin
+from extra_views import ModelFormSetView
 from rest_framework.views import APIView
 
 from flexibi_dst.views import DualUserListView
@@ -20,8 +21,8 @@ from .forms import (
     MaterialComponentModelForm,
     MaterialComponentGroupModelForm,
     MaterialComponentGroupAddComponentForm,
+    MaterialComponentGroupAddTemporalDistributionForm,
     MaterialComponentGroupSettings,
-    MaterialComponentGroupShareDistributionFormSet,
     MaterialComponentDistributionFormSetHelper,
     MaterialComponentShareFormSet,
     MaterialComponentShareModelForm,
@@ -44,7 +45,6 @@ from .models import (
     InventoryAlgorithmParameterValue,
     Region,
     ScenarioStatus,
-    Timestep,
 )
 from .serializers import CatchmentSerializer, BaseResultMapSerializer, RegionSerializer
 from .tasks import run_inventory
@@ -159,7 +159,7 @@ class MaterialDetailView(TemplateResponseMixin, FormMixin, View):
             'material': self.material,
             'scenario': self.scenario,
             'composition': self.material.grouped_component_shares_settings(scenario=self.scenario),
-            'form': self.get_form
+            'form': self.get_form,
         }
         return self.render_to_response(context)
 
@@ -289,21 +289,6 @@ class MaterialComponentGroupDetailView(DetailView):
     template_name = 'material_component_group_detail.html'
 
 
-class MaterialComponentGroupCompositionDetailView(DetailView):
-    model = MaterialComponentGroup
-    template_name = 'material_component_group_composition.html'
-    object = None
-
-    def get_object(self, **kwargs):
-        return self.model.objects.get(id=self.kwargs.get('group_pk'))
-
-    def get(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        context = self.get_context_data(object=self.object)
-        context['grouped_component_shares'] = self.object.grouped_component_shares()
-        return self.render_to_response(context)
-
-
 class MaterialComponentGroupUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     form_class = MaterialComponentModelForm
     template_name = 'material_component_group_update.html'
@@ -322,10 +307,6 @@ class MaterialComponentGroupUpdateView(LoginRequiredMixin, UserPassesTestMixin, 
     def test_func(self):
         self.object = self.get_object()
         return self.request.user == self.object.owner
-
-    # def form_valid(self, form):
-    #     self.object = form.save()
-    #     return redirect('material_component_group_detail', pk=self.kwargs.get('pk'))
 
 
 class MaterialComponentGroupDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
@@ -362,65 +343,6 @@ class MaterialComponentGroupRemoveView(LoginRequiredMixin, UserPassesTestMixin, 
         return self.request.user == Scenario.objects.get(id=self.kwargs.get('scenario_pk')).owner
 
 
-class MaterialComponentGroupCompositionView(TemplateResponseMixin, FormMixin, View):
-    model = MaterialComponentGroup
-    template_name = 'material_component_group_composition.html'
-    form_class = MaterialComponentGroupAddComponentForm
-    initial = {}
-    group = None
-    scenario = None
-    material = None
-
-    def get(self, request, *args, **kwargs):
-        self.get_objects()
-        self.initial = {
-            'owner': self.request.user,
-            'scenario': self.scenario,
-            'material': self.material,
-            'group': self.group
-        }
-        context = {
-            'view': self,
-            'object': self.group,
-            'material': self.material,
-            'scenario': self.scenario,
-            'composition': MaterialComponentShare.objects.filter(scenario=self.scenario,
-                                                                 material=self.material,
-                                                                 group=self.group),
-            'form': self.get_form
-        }
-        return self.render_to_response(context)
-
-    def get_objects(self):
-        self.group = MaterialComponentGroup.objects.get(id=self.kwargs.get('group_pk'))
-        self.scenario = Scenario.objects.get(id=self.kwargs.get('scenario_pk'))
-        self.material = Material.objects.get(id=self.kwargs.get('material_pk'))
-
-    def get_success_url(self):
-        return reverse('material_component_group_composition',
-                       kwargs={'group_pk': self.group.id,
-                               'material_pk': self.material.id,
-                               'scenario_pk': self.scenario.id
-                               }
-                       )
-
-    def post(self, request, *args, **kwargs):
-        self.get_objects()
-        if 'add_component' in self.request.POST:
-            form = self.get_form()
-            if form.is_valid():
-                form.save()
-                return HttpResponseRedirect(self.get_success_url())
-            else:
-                return self.form_invalid(form)
-        elif 'remove_component' in self.request.POST:
-            share = MaterialComponentShare.objects.get(id=self.request.POST['remove_component'])
-            share.delete()
-            return HttpResponseRedirect(self.get_success_url())
-        else:
-            return HttpResponseRedirect(self.get_success_url())
-
-
 class MaterialComponentShareUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     model = MaterialComponentShare
     form_class = MaterialComponentShareModelForm
@@ -431,7 +353,10 @@ class MaterialComponentShareUpdateView(LoginRequiredMixin, UserPassesTestMixin, 
         if next_url:
             return next_url
         else:
-            return reverse('material_component_group_list')
+            return reverse('material_detail', kwargs={
+                'scenario_pk': self.object.scenario.id,
+                'material_pk': self.object.material.id
+            })
 
     def test_func(self):
         return True
@@ -493,6 +418,27 @@ class MaterialComponentGroupAddComponentView(LoginRequiredMixin, UserPassesTestM
         return self.request.user == group.owner
 
 
+class MaterialComponentGroupAddTemporalDistributionView(LoginRequiredMixin, UpdateView):
+    model = MaterialComponentGroupSettings
+    form_class = MaterialComponentGroupAddTemporalDistributionForm
+    template_name = 'material_component_group_add_temporal_distribution.html'
+    object = None
+
+    def get_object(self, **kwargs):
+        self.object = MaterialComponentGroupSettings.objects.get(id=self.kwargs.get('group_pk'))
+        return self.object
+
+    def get_success_url(self):
+        next_url = self.request.GET.get('next')
+        if next_url:
+            return next_url
+        else:
+            return reverse('material_detail', kwargs={
+                'scenario_pk': self.kwargs.get('scenario_pk'),
+                'material_pk': self.kwargs.get('material_pk')
+            })
+
+
 class MaterialComponentGroupShareCreateView(FormView):
     template_name = 'share_formset_test_vew.html'
     form_class = MaterialComponentShareFormSet
@@ -503,45 +449,44 @@ class MaterialComponentGroupShareCreateView(FormView):
         return super().get_context_data(**kwargs)
 
 
-class MaterialComponentGroupShareDistributionUpdateView(FormView):
-    template_name = 'material_component_group_share_distribution_update.html'
-    form_class = MaterialComponentGroupShareDistributionFormSet
-    group_settings = None
+class MaterialComponentGroupShareDistributionUpdateView(ModelFormSetView):
+    model = MaterialComponentShare
+    fields = ['component', 'average', 'standard_deviation']
+    template_name = 'model_formset_test_view.html'
+    factory_kwargs = {'extra': 0}
 
     def get_context_data(self, **kwargs):
-        self.get_objects()
-        queryset = MaterialComponentShare.objects.filter(
-            group_settings=self.group_settings,
-            timestep=Timestep.objects.get(name='Jan'))
-        kwargs['formset'] = MaterialComponentGroupShareDistributionFormSet(queryset=queryset)
         helper = MaterialComponentDistributionFormSetHelper()
         helper.add_input(Submit('submit', 'Save'))
-        kwargs['helper'] = helper
-        return super().get_context_data(**kwargs)
+        context = {
+            'helper': helper
+        }
+        context.update(kwargs)
+        kwargs = super().get_context_data(**context)
+        return kwargs
 
-    def get_objects(self):
-        self.group_settings = MaterialComponentGroupSettings.objects.get(
+    def get_queryset(self, *args, **kwargs):
+        group_settings = MaterialComponentGroupSettings.objects.get(
             scenario=self.kwargs.get('scenario_pk'),
             material=self.kwargs.get('material_pk'),
             group=self.kwargs.get('group_pk')
         )
+        queryset = MaterialComponentShare.objects.filter(
+            group_settings=group_settings,
+            timestep=self.kwargs.get('timestep_pk')
+        )
+        return queryset
 
     def get_success_url(self):
         next_url = self.request.GET.get('next')
         if next_url:
             return next_url
         else:
-            return reverse('material_list')
-
-
-class ShareFormsetTestView(FormView):
-    template_name = 'share_formset_test_vew.html'
-    form_class = MaterialComponentShareFormSet
-    success_url = '/'
-
-    def get_context_data(self, **kwargs):
-        kwargs['formset'] = MaterialComponentShareFormSet(queryset=MaterialComponentShare.objects.none())
-        return super().get_context_data(**kwargs)
+            return reverse('material_detail',
+                           kwargs={
+                               'scenario_pk': self.kwargs.get('scenario_pk'),
+                               'material_pk': self.kwargs.get('material_pk')
+                           })
 
 
 class MaterialComponentGroupRemoveComponentView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):

@@ -21,6 +21,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.gis',
     'extra_views',
+    'django_tables2',
     'rest_framework',
     'rest_framework_gis',
     'leaflet',
@@ -73,6 +74,8 @@ TEMPLATES = [
         },
     },
 ]
+
+DJANGO_TABLES2_TEMPLATE = "django_tables2/bootstrap4.html"
 
 WSGI_APPLICATION = 'flexibi_dst.wsgi.application'
 

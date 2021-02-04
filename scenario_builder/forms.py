@@ -24,6 +24,7 @@ from .models import (
     Scenario,
     ScenarioInventoryConfiguration,
     SeasonalDistribution,
+    TemporalDistribution,
     Timestep,
 )
 
@@ -110,20 +111,20 @@ class MaterialAddComponentGroupForm(ModelForm):
         self.fields['material'].queryset = Material.objects.all()
         self.fields['material'].initial = self.initial.get('material')
 
-    @property
-    def helper(self):
-        helper = FormHelper()
-        helper.form_method = 'POST'
-        helper.layout = Layout(
-            Field('scenario', type='hidden'),
-            Field('material', type='hidden'),
-            Row(
-                Field('group', type='select'),
-                FieldWithButtons('fractions_of',
-                                 StrictButton("Add", type="submit", name="add_group", css_class="btn-primary")),
-            )
-        )
-        return helper
+    # @property
+    # def helper(self):
+    #     helper = FormHelper()
+    #     helper.form_method = 'POST'
+    #     helper.layout = Layout(
+    #         Field('scenario', type='hidden'),
+    #         Field('material', type='hidden'),
+    #         Row(
+    #             Field('group', type='select'),
+    #             FieldWithButtons('fractions_of',
+    #                              StrictButton("Add", type="submit", name="add_group", css_class="btn-primary")),
+    #         )
+    #     )
+    #     return helper
 
 
 class MaterialComponentShareModelForm(ModelForm):
@@ -206,6 +207,19 @@ class MaterialComponentGroupAddComponentForm(ModelForm):
     class Meta:
         model = MaterialComponentShare
         fields = ('group_settings', 'component', 'timestep',)
+
+
+class MaterialComponentGroupAddTemporalDistributionForm(forms.ModelForm):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        used_ids = kwargs.get('instance').temporal_distribution_ids
+        used_ids.append(2)  # TODO: Find better way to avoid the "Averages" from given choices
+        self.fields['temporal_distributions'].queryset = TemporalDistribution.objects.exclude(id__in=used_ids)
+
+    class Meta:
+        model = MaterialComponentGroupSettings
+        fields = '__all__'
 
 
 class SeasonalDistributionModelForm(ModelForm):

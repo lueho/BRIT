@@ -1,6 +1,7 @@
 {% extends 'base.html' %}
 {% load crispy_forms_tags %}
 {% load crispy_forms_filters %}
+{% load render_table from django_tables2 %}
 
 {% block content %}
 
@@ -9,7 +10,7 @@
         <div class="col col-6">
             <div class="card shadow">
                 <div class="card-header">
-                    <b>Material definition</b>
+                    <b>Material description</b>
                 </div>
                 <div class="card-body p-0">
                     <table class="table">
@@ -25,7 +26,7 @@
                 </div>
                 <div class="card-footer">
                     <a href="{% url 'material_update' scenario.id object.id %}">
-                        edit definition <i class="fas fa-fw fa-edit"></i>
+                        Edit <i class="fas fa-fw fa-edit"></i>
                     </a>
                 </div>
             </div>
@@ -42,89 +43,43 @@
                 </div>
                 <div class="card-body">
                     {% for group_settings, content in composition.items %}
-                        <div class="row mt-1">
+                        <div class="row mb-3">
                             <div class="col">
                                 <div class="card border-left-primary border">
                                     <div class="card-header">
                                         <a href="{% url 'material_component_group_update' group_settings.group.id %}"><b>{{ group_settings.group.name }}</b></a>
-                                        -
-                                        {% if content.dynamic %}
-                                            dynamic composition
-                                        {% else %}
-                                            static composition
-                                        {% endif %}
                                     </div>
                                     <div class="card-body p-0">
+
                                         <table class="table m-0">
-                                            <thead>
-                                            <tr class="row m-0">
-                                                <th class="d-inline-block col-2">Component name</th>
-                                                <th class="d-inline-block col-2">Fraction</th>
-                                                <th class="d-inline-block col-2">of</th>
-                                                <th class="d-inline-block col-3">Source</th>
-                                                <th class="d-inline-block col-3"></th>
-                                            </tr>
-                                            </thead>
                                             <tbody>
-                                            {% for share in content.averages %}
-                                                <tr class="row m-0 accordion-toggle" data-toggle="collapse"
-                                                    data-target="#temporalDistribution">
-                                                    <td class="d-inline-block col-2">
-                                                        {{ share.component.name }}
-                                                    </td>
-
-                                                    {% if content.dynamic %}
-                                                        <td></td>
-                                                        <td></td>
-                                                    {% else %}
-                                                        <td class="d-inline-block col-2">{{ share.average }}
-                                                            +- {{ share.standard_deviation }}</td>
-                                                        <td class="d-inline-block col-2">{{ share.group_settings.fractions_of.name }}</td>
-                                                    {% endif %}
-
-                                                    <td class="d-inline-block col-3">{{ share.source.abbreviation }}</td>
-                                                    <td class="d-inline-block col-3">
-                                                        <a href="{% url 'material_component_group_share_update' share.id %}?next={{ request.path }}">
-                                                            edit <i class="fas fa-fw fa-edit"></i>
-                                                        </a>
-                                                        <a id="delete-component-{{ share.component.id }}"
-                                                           href="{% url 'material_component_group_share_remove_component' share.id %}?next={{ request.path }}">
-                                                            remove <i class="fas fa-fw fa-trash"></i>
-                                                        </a>
+                                            <tr>
+                                                <td>
+                                                    {% render_table content.averages_table %}
+                                                </td>
+                                            </tr>
+                                            {% for table in content.distribution_tables %}
+                                                <tr class="accordion-toggle"
+                                                    data-toggle="collapse"
+                                                    data-target="#distribution-table-group-{{ group_settings.id }}">
+                                                    <td>
+                                                        <a href="javascript:void(0);">Show seasonal distribution</a>
                                                     </td>
                                                 </tr>
-
+                                                <tr class="accordion-body collapse" id="{{ table.id }}">
+                                                    <td>
+                                                        {% render_table table %}
+                                                    </td>
+                                                </tr>
                                             {% endfor %}
                                             <tr>
-                                                <td colspan="4" class="hiddenRow">
-                                                    <div class="accordion-body collapse p-3"
-                                                         id="temporalDistribution">
-                                                        <table>
-                                                            {% for line in content.distribution %}
-                                                                <tr>
-                                                                    {% for column in line %}
-                                                                        <td>
-                                                                            {{ column }}
-                                                                        </td>
-                                                                    {% endfor %}
-                                                                </tr>
-                                                            {% endfor %}
-                                                        </table>
-                                                    </div>
-                                                </td>
                                                 <td>
-                                                    <a href="{% url 'material_component_group_shares_update' scenario.id material.id group_settings.group.id %}?next={{ request.path }}">
-                                                        edit <i class="fas fa-fw fa-edit"></i>
+                                                    <a href="{% url 'material_component_group_add_temporal_distribution' scenario.id material.id group_settings.id %}">
+                                                        <i class="fas fa-fw fa-plus"></i> add seasonal distribution
                                                     </a>
                                                 </td>
                                             </tr>
-                                            <tr>
-                                                <td>
-                                                    <a href="{% url 'material_component_group_add_component' scenario.id material.id group_settings.group.id %}">
-                                                        <i class="fas fa-fw fa-plus"></i> add component
-                                                    </a>
-                                                </td>
-                                            </tr>
+
                                             </tbody>
                                         </table>
                                     </div>
@@ -162,10 +117,4 @@
 {% endblock content %}
 
 {% block javascript %}
-    <script>
-        $('.accordion-toggle').click(function () {
-            $('.hiddenRow').hide();
-            $(this).next('tr').find('.hiddenRow').show();
-        });
-    </script>
 {% endblock javascript %}
