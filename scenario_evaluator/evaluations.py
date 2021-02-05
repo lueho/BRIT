@@ -107,7 +107,8 @@ class ScenarioResult:
         components = {}
         for feedstock in total_production_per_feedstock.keys():
             material = Material.objects.get(name=feedstock)
-            for group, content in material.grouped_component_shares(scenario=self.scenario).items():
+            settings = material.settings(scenario=self.scenario)
+            for group, content in settings.composition().items():
                 if group not in components:
                     components[group] = {}
                 for share in content['shares']:

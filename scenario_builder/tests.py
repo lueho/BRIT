@@ -6,13 +6,14 @@ from .models import (Catchment,
                      InventoryAlgorithmParameter,
                      InventoryAlgorithmParameterValue,
                      Material,
+                     MaterialSettings,
                      MaterialComponentGroup,
                      MaterialComponentShare,
                      Region,
                      Scenario,
                      ScenarioInventoryConfiguration,
                      WrongParameterForInventoryAlgorithm)
-from .views import MaterialAddComponentGroupView
+from .views import MaterialComponentGroupAddComponentView
 
 
 # ----------- Materials ------------------------------------------------------------------------------------------------
@@ -37,6 +38,7 @@ class MaterialTestCase(TestCase):
     def test_grouped_component_shares(self):
         scenario = Scenario.objects.get(id=1)
         material = Material.objects.get(id=1)
+        settings = MaterialSettings.get(scenario=scenario, material=material)
         group = MaterialComponentGroup.objects.get(id=1)
         share = MaterialComponentShare.objects.get(id=1)
         grouped_shares = {
@@ -47,7 +49,7 @@ class MaterialTestCase(TestCase):
                 ]
             }
         }
-        self.assertDictEqual(grouped_shares, material.grouped_component_shares(scenario=scenario))
+        self.assertDictEqual(grouped_shares, settings.composition())
 
 
 @tag('view', 'material')
@@ -56,7 +58,7 @@ class MaterialAddComponentGroupViewTestCase(TestCase):
 
     def test_environment_set_in_context(self):
         request = RequestFactory().get('/')
-        view = MaterialAddComponentGroupView()
+        view = MaterialComponentGroupAddComponentView()
         view.setup(request)
 
         context = view.get_context_data()

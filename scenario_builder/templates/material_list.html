@@ -7,9 +7,9 @@
             <ul class="list-group">
                 {% for material in standard_objects %}
                     <li class="list-group-item">
-                        <a href="{% url 'material_detail' 0 material.id %}">{{ material.name }}</a>
-                        <a href="{% url 'material_update' 0 material.id %}"><i class="fas fa-fw fa-edit"></i></a>
-                        <a href="{% url 'material_delete' 0 material.id %}"><i class="fas fa-fw fa-trash"></i></a></li>
+                        <a href="{% url 'material_detail' material.id %}">{{ material.name }}</a>
+                        <a href="{% url 'material_update' material.id %}"><i class="fas fa-fw fa-edit"></i></a>
+                        <a href="{% url 'material_delete' material.id %}"><i class="fas fa-fw fa-trash"></i></a></li>
                 {% endfor %}
             </ul>
         </div>
@@ -26,9 +26,9 @@
                 <ul class="list-group">
                     {% for material in user_objects %}
                         <li class="list-group-item">
-                            <a href="{% url 'material_detail' 0 material.id %}">{{ material.name }}</a>
-                            <a href="{% url 'material_update' 0 material.id %}"><i class="fas fa-fw fa-edit"></i></a>
-                            <a id="delete-material-{{ material.id }}" href="{% url 'material_delete' 0 material.id %}">
+                            <a href="{% url 'material_detail' material.id %}">{{ material.name }}</a>
+                            <a href="{% url 'material_update' material.id %}"><i class="fas fa-fw fa-edit"></i></a>
+                            <a id="delete-material-{{ material.id }}" href="{% url 'material_delete' material.id %}">
                                 <i class="fas fa-fw fa-trash"></i>
                             </a>
                         </li>
@@ -48,7 +48,7 @@
     {% endif %}
     <div class="row mt-3">
         <div class="col">
-            <a href="{% url 'material_create' 0 %}">
+            <a href="{% url 'material_create' %}">
                 <i class="fas fa-fw fa-plus"></i> Create new custom material
             </a>
         </div>

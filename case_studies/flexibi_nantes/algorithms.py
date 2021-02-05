@@ -1,7 +1,7 @@
 from django.db.models import Sum
 
 from scenario_builder.algorithms import InventoryAlgorithmsBase
-from scenario_builder.models import Catchment, Material, MaterialComponentGroup
+from scenario_builder.models import Catchment, Material, MaterialComponentGroup, Scenario
 from .models import NantesGreenhouses, Greenhouse
 
 
@@ -17,11 +17,12 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
 
         catchment = Catchment.objects.get(id=kwargs.get('catchment_id'))
         clipped = NantesGreenhouses.objects.filter(geom__intersects=catchment.geom)
+        scenario = Scenario.objects.get(id=kwargs.get('scenario_id'))
         feedstock = Material.objects.get(id=kwargs.get('feedstock_id'))
 
         group = MaterialComponentGroup.objects.get(name='Macro Components')
         component_list = []
-        for component in feedstock.grouped_component_shares()[group]['components']:
+        for component in feedstock.settings(scenario).composition()[group]['components']:
             if component not in component_list:
                 component_list.append(component)
 

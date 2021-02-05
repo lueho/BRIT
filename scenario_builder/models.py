@@ -123,32 +123,76 @@ class Material(models.Model):
 
     objects = MaterialManager()
 
-    def component_groups(self, scenario=None):
+    def settings(self, scenario):
+        return self.materialsettings_set.get(scenario=scenario)
+
+    def add_standard_configuration(self):
+        MaterialSettings.objects.create(
+            owner=self.owner,
+            material=self,
+            scenario_id=0
+        )
+
+    def add_custom_configuration(self, scenario):
+        MaterialSettings.objects.create(
+            owner=scenario.owner,
+            material=self,
+            scenario=scenario
+        )
+
+    def get_absolute_url(self):
+        return reverse('material_detail', kwargs={'pk': self.id})
+
+    def __str__(self):
+        return self.name
+
+
+@receiver(post_save, sender=Material)
+def initialize_material_settings(sender, instance, created, **kwargs):
+    if created:
+        instance.add_standard_configuration()
+
+
+class MaterialSettings(models.Model):
+    owner = models.ForeignKey(User, on_delete=models.CASCADE)
+    material = models.ForeignKey(Material, on_delete=models.CASCADE)
+    scenario = models.ForeignKey('Scenario', on_delete=models.CASCADE)
+
+    def add_component_group(self, group, **kwargs):
+        if 'component_group_settings' not in kwargs:
+            kwargs['component_group_settings'] = MaterialComponentGroupSettings.objects.create(
+                owner=self.owner,
+                group=group,
+                material_settings=self,
+                fractions_of=kwargs.setdefault('fractions_of', 1)
+            )
+
+        return kwargs['component_group_settings']
+
+    @property
+    def component_ids(self):
         """
-        :param scenario:
-        :return: [MaterialComponentGroup]
+        Ids of components of groups that are assigned to this material.
         """
-        return [group for group in self.grouped_component_shares(scenario=scenario).keys()]
+        return [pk for setting in self.materialcomponentgroupsettings_set.all() for pk in setting.component_ids]
 
-    def grouped_component_shares(self, scenario=None):
-        group_settings = MaterialComponentGroupSettings.objects.filter(material=self, scenario=scenario)
+    @property
+    def group_ids(self):
+        """
+        Ids of component groups that have been assigned to this material.
+        """
+        return [setting['group'] for setting in self.materialcomponentgroupsettings_set.values('group').distinct()]
 
-        grouped_shares = {}
-        for setting in group_settings:
-            grouped_shares[setting.group] = {
-                'shares': []
-            }
-            for share in MaterialComponentShare.objects.filter(group_settings=setting):
-                grouped_shares[setting.group]['shares'].append(share)
+    @property
+    def blocked_ids(self):
+        """
+        Returns a list of group ids that cannot be added to the material because they are already assigned.
+        """
+        ids = self.group_ids
+        return ids
 
-        return grouped_shares
-
-    def grouped_component_shares_settings(self, scenario=None):
-        if scenario is None:
-            scenario = Scenario.objects.get(id=0)
-
-        group_settings = MaterialComponentGroupSettings.objects.filter(material=self, scenario=scenario)
-
+    def composition(self):
+        group_settings = self.materialcomponentgroupsettings_set.all()
         grouped_shares = {}
         for setting in group_settings:
             grouped_shares[setting] = {
@@ -159,20 +203,13 @@ class Material(models.Model):
             for share in MaterialComponentShare.objects.filter(group_settings=setting,
                                                                timestep=Timestep.objects.get(name='Average')):
                 grouped_shares[setting]['averages'].append(share)
-
         return grouped_shares
 
-    def distribution_tables_data(self, scenario=None):
-        if scenario is None:
-            scenario = Scenario.objects.get(id=0)
-        table_list = []
-        group_settings = MaterialComponentGroupSettings.objects.filter(scenario=scenario, material=self)
-        for setting in group_settings:
-            table_list.append(setting.distribution_table_data())
-        return table_list
+    def get_absolute_url(self):
+        return reverse('material_settings', kwargs={'pk': self.id})
 
     def __str__(self):
-        return self.name
+        return f'Settings for material: {self.material.name} in scenario: {self.scenario.name}'
 
 
 class MaterialComponent(models.Model):
@@ -183,6 +220,9 @@ class MaterialComponent(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE)
+
+    def get_absolute_url(self):
+        return reverse('material_component_detail', kwargs={'pk': self.id})
 
     def __str__(self):
         return self.name
@@ -196,6 +236,9 @@ class MaterialComponentGroup(models.Model):
     description = models.TextField(blank=True, null=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE)
 
+    def get_absolute_url(self):
+        return reverse('material_component_group_detail', kwargs={'pk': self.id})
+
     def __str__(self):
         return self.name
 
@@ -207,20 +250,63 @@ class MaterialComponentGroupSettings(models.Model):
     objects it depends on is deleted.
     """
 
+    owner = models.ForeignKey(User, default=8, on_delete=models.CASCADE)
     group = models.ForeignKey(MaterialComponentGroup, null=True, on_delete=models.CASCADE)
     material = models.ForeignKey(Material, null=True, on_delete=models.CASCADE)
+    material_settings = models.ForeignKey(MaterialSettings, null=True, on_delete=models.CASCADE)
     scenario = models.ForeignKey('Scenario', null=True, on_delete=models.CASCADE)
     temporal_distributions = models.ManyToManyField(TemporalDistribution)
     fractions_of = models.ForeignKey(MaterialComponent, on_delete=models.CASCADE, default=1)
 
-    # TODO: Restrain fractions_of:
-    #  ==> component must be configured for the material-scenario combination
-    #  ==> component must not be included in the same group (no circular reference)
-
     def components(self):
+        """
+        Queryset of all components that have been assigned to this group.
+        """
         component_ids = [share['component'] for share in
                          self.materialcomponentshare_set.values('component').distinct()]
         return MaterialComponent.objects.filter(id__in=component_ids)
+
+    @property
+    def component_ids(self):
+        """
+        Ids of all material components that have been assigned to this group.
+        """
+        return [share['component'] for share in self.materialcomponentshare_set.values('component').distinct()]
+
+    @property
+    def blocked_ids(self):
+        """
+        Returns a list of ids that cannot be added to the group because they are either already assigned to the group
+        or would create a circular reference.
+        """
+        ids = self.component_ids
+        ids.append(self.fractions_of.id)
+        return ids
+
+    def add_component(self, component, **kwargs):
+        """
+        Takes care of all setup that is necessary to integrate a new material component into a component group.
+        Can be called either by providing an already created MaterialComponentShare with the keyword argument 'share'
+        or by passing keyword arguments for the creation of a new share.
+        :param component:
+        :param kwargs: average, standard_deviation, source
+        :return:
+        """
+        if 'share' not in kwargs:
+            kwargs['share'] = MaterialComponentShare.objects.create(
+                component=component,
+                group_settings=self,
+                average=kwargs.setdefault('average', 0.0),
+                standard_deviation=kwargs.setdefault('standard_deviation', 0.0),
+                timestep=Timestep.objects.get(name='Average'),
+                source=kwargs.setdefault('source', None)
+            )
+
+        self.add_component_to_distributions(kwargs['share'])
+        return kwargs['share']
+
+    def remove_component(self, component):
+        self.materialcomponentshare_set.filter(component=component).delete()
 
     def add_component_to_distributions(self, share):
         for distribution in self.temporal_distributions.all():
@@ -231,9 +317,6 @@ class MaterialComponentGroupSettings(models.Model):
                                                       timestep=timestep,
                                                       average=share.average,
                                                       standard_deviation=share.standard_deviation)
-
-    def remove_component(self, component):
-        self.materialcomponentshare_set.filter(component=component).delete()
 
     @property
     def temporal_distribution_ids(self):
@@ -293,7 +376,10 @@ class MaterialComponentGroupSettings(models.Model):
                     <i class="fas fa-fw fa-trash"></i>
                 </a>
                 ''',
-                reverse('material_component_group_share_remove_component', kwargs={'pk': share.id})
+                reverse('material_component_group_remove_component', kwargs={
+                    'pk': self.id,
+                    'component_pk': component.id
+                })
             )
             table_row = {
                 'component': component.name,
@@ -320,11 +406,7 @@ class MaterialComponentGroupSettings(models.Model):
                 <i class="fas fa-fw fa-plus"></i> Add component
             </a>
             ''',
-            reverse('material_component_group_add_component', kwargs={
-                'scenario_pk': self.scenario.id,
-                'material_pk': self.material.id,
-                'group_pk': self.group.id
-            })
+            reverse('material_component_group_add_component', kwargs={'pk': self.id})
         )
         if len(table_data) > 0:
             columns = {name: (tables.Column(footer=add_component_html) if name == 'component' else tables.Column()) for
@@ -355,14 +437,10 @@ class MaterialComponentGroupSettings(models.Model):
         table_data = self.distribution_table_data(distribution)
 
         class EditableColumn(tables.Column):
-            scenario = None
-            material = None
-            group = None
+            group_settings = None
 
             def __init__(self, *args, **kwargs):
-                self.scenario = kwargs.pop('scenario')
-                self.material = kwargs.pop('material')
-                self.group = kwargs.pop('group')
+                self.group_settings = kwargs.pop('group_settings')
                 super().__init__(*args, **kwargs)
 
             def render_footer(self, bound_column, table):
@@ -374,15 +452,13 @@ class MaterialComponentGroupSettings(models.Model):
                     ''',
                     reverse('material_component_group_share_distribution_update',
                             kwargs={
-                                'scenario_pk': self.scenario.id,
-                                'material_pk': self.material.id,
-                                'group_pk': self.group.id,
+                                'pk': self.group_settings.id,
                                 'timestep_pk': Timestep.objects.get(name=bound_column.accessor).id
                             }),
                 )
 
         if len(table_data) > 0:
-            columns = {name: EditableColumn(scenario=self.scenario, material=self.material, group=self.group) for name
+            columns = {name: EditableColumn(group_settings=self) for name
                        in list(table_data[0].keys())}
             columns['id'] = f'distribution-table-group-{self.id}'
         else:
@@ -393,6 +469,11 @@ class MaterialComponentGroupSettings(models.Model):
     def distribution_table_classes(self):
         return [self.distribution_table_class(distribution) for distribution in
                 self.temporal_distributions.exclude(name='Average')]
+
+    def get_absolute_url(self):
+        return reverse('material_settings', kwargs={
+            'pk': self.material_settings.id,
+        })
 
     def __str__(self):
         return f'Group: {self.group.name}, material: {self.material.name}, scenario: {self.scenario.name}'
@@ -413,12 +494,12 @@ class MaterialComponentShare(models.Model):
     supposed to be edited directly by a user. It depends on user objects and must be deleted, when any of the user
     objects it depends on is deleted.
     """
-    component = models.ForeignKey(MaterialComponent, null=True, on_delete=models.CASCADE)
-    group_settings = models.ForeignKey(MaterialComponentGroupSettings, null=True, on_delete=models.CASCADE)
-    average = models.FloatField(null=True, default=0.0)
-    standard_deviation = models.FloatField(null=True, default=0.0)
-    timestep = models.ForeignKey(Timestep, blank=True, null=True, on_delete=models.CASCADE)
-    source = models.ForeignKey(LiteratureSource, on_delete=models.CASCADE, null=True)
+    component = models.ForeignKey(MaterialComponent, on_delete=models.CASCADE)
+    group_settings = models.ForeignKey(MaterialComponentGroupSettings, on_delete=models.CASCADE)
+    average = models.FloatField(default=0.0)
+    standard_deviation = models.FloatField(default=0.0)
+    timestep = models.ForeignKey(Timestep, on_delete=models.CASCADE)
+    source = models.ForeignKey(LiteratureSource, on_delete=models.CASCADE, blank=True, null=True)
 
     @property
     def scenario(self):
@@ -441,10 +522,14 @@ class MaterialComponentShare(models.Model):
 
 
 @receiver(post_save, sender=MaterialComponentShare)
-def manage_distribution_shares(sender, instance, created, **kwargs):
+def catch_new_component(sender, instance, created, **kwargs):
+    """
+    Receives a signal, when a new share is created and calls all function that are required for a complete component
+    group setup.
+    """
     if created:
         if instance.timestep.name == 'Average':
-            instance.group_settings.add_component_to_distributions(instance)
+            instance.group_settings.add_component(instance.component, share=instance)
         return
     return
 
@@ -649,6 +734,17 @@ class Scenario(models.Model):
         if isinstance(status, ScenarioStatus.Status):
             self.scenariostatus.status = status
             self.scenariostatus.save()
+
+    def add_material_customization(self, material):
+        setting = MaterialSettings.objects.create(
+            owner=self.owner,
+            material=material,
+            scenario=self
+        )
+        return setting
+
+    def material_customizations(self):
+        return self.materialsettings_set.all()
 
     def available_feedstocks(self):
         return Material.objects.filter(id__in=self.available_inventory_algorithms().values('feedstock'))

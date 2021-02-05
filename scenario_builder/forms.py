@@ -96,50 +96,56 @@ class MaterialComponentGroupModelForm(ModelForm):
         fields = ('name', 'description',)
 
 
-class MaterialAddComponentGroupForm(ModelForm):
-    initial = {}
-
-    class Meta:
-        model = MaterialComponentGroupSettings
-        fields = ('scenario', 'material', 'group', 'fractions_of',)
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.initial = kwargs.get('initial')
-        self.fields['scenario'].queryset = Scenario.objects.all()
-        self.fields['scenario'].initial = self.initial.get('scenario')
-        self.fields['material'].queryset = Material.objects.all()
-        self.fields['material'].initial = self.initial.get('material')
-
-    # @property
-    # def helper(self):
-    #     helper = FormHelper()
-    #     helper.form_method = 'POST'
-    #     helper.layout = Layout(
-    #         Field('scenario', type='hidden'),
-    #         Field('material', type='hidden'),
-    #         Row(
-    #             Field('group', type='select'),
-    #             FieldWithButtons('fractions_of',
-    #                              StrictButton("Add", type="submit", name="add_group", css_class="btn-primary")),
-    #         )
-    #     )
-    #     return helper
-
-
-class MaterialComponentShareModelForm(ModelForm):
-    class Meta:
-        model = MaterialComponentShare
-        fields = '__all__'
-
-
+# class MaterialAddComponentGroupForm(ModelForm):
+#     initial = {}
 #
-# class MaterialComponentShareBaseFormSet(BaseFormSet):
+#     class Meta:
+#         model = MaterialComponentGroupSettings
+#         fields = ('scenario', 'material', 'group', 'fractions_of',)
+#
 #     def __init__(self, *args, **kwargs):
 #         super().__init__(*args, **kwargs)
+#         self.initial = kwargs.get('initial')
+#         self.fields['scenario'].queryset = Scenario.objects.all()
+#         self.fields['scenario'].initial = self.initial.get('scenario')
+#         self.fields['material'].queryset = Material.objects.all()
+#         self.fields['material'].initial = self.initial.get('material')
 
-class MaterialComponentShareForm(Form):
-    name = forms.CharField()
+# @property
+# def helper(self):
+#     helper = FormHelper()
+#     helper.form_method = 'POST'
+#     helper.layout = Layout(
+#         Field('scenario', type='hidden'),
+#         Field('material', type='hidden'),
+#         Row(
+#             Field('group', type='select'),
+#             FieldWithButtons('fractions_of',
+#                              StrictButton("Add", type="submit", name="add_group", css_class="btn-primary")),
+#         )
+#     )
+#     return helper
+
+class MaterialAddComponentGroupForm(ModelForm):
+    class Meta:
+        model = MaterialComponentGroupSettings
+        fields = ('material_settings', 'group', 'fractions_of',)
+
+
+class AddComponentForm(ModelForm):
+    class Meta:
+        model = MaterialComponentShare
+        fields = ('component',)
+
+
+# class AddComponentForm(Form):
+#     component = ModelChoiceField(queryset=MaterialComponent.objects.all())
+
+
+class MaterialComponentShareUpdateForm(ModelForm):
+    class Meta:
+        model = MaterialComponentShare
+        fields = ('average', 'standard_deviation', 'source')
 
 
 MaterialComponentShareFormSet = modelformset_factory(
@@ -182,13 +188,17 @@ class MaterialComponentGroupAddComponentForm(ModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.initial = kwargs.get('initial')
-        self.fields['group_settings'].queryset = MaterialComponentGroupSettings.objects.all()
-        self.fields['group_settings'].initial = self.initial.get('group_settings')
-        self.fields['group_settings'].widget = HiddenInput()
+        group_settings = self.initial.get('group_settings')
+        self.fields['group_settings'].queryset = MaterialComponentGroupSettings.objects.filter(id=group_settings.id)
+        self.fields['group_settings'].initial = group_settings
+        self.fields['group_settings'].empty_label = None
+        # self.fields['group_settings'].widget = HiddenInput()
         self.fields['timestep'].queryset = Timestep.objects.filter(name='Average')
         self.fields['timestep'].initial = Timestep.objects.get(name='Average')
-        self.fields['timestep'].widget = HiddenInput()
+        self.fields['timestep'].empty_label = None
+        # self.fields['timestep'].widget = HiddenInput()
         self.fields['component'].label = 'Add component'
+        self.fields['component'].queryset = MaterialComponent.objects.exclude(id__in=group_settings.component_ids)
 
     @property
     def helper(self):
