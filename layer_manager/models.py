@@ -4,7 +4,8 @@ from django.contrib.postgres.fields import ArrayField
 from django.db import models, connection
 from django.urls import reverse
 
-from scenario_builder.models import Scenario, InventoryAlgorithm, Material
+from material_manager.models import Material
+from scenario_builder.models import Scenario, InventoryAlgorithm
 from .exceptions import InvalidGeometryType, NoFeaturesProvided, TableAlreadyExists
 
 

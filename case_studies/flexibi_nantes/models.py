@@ -5,7 +5,8 @@ from django.db.models.signals import pre_save
 from django.dispatch import receiver
 from django.urls import reverse
 
-from scenario_builder.models import Material, MaterialComponent, MaterialComponentGroup, SeasonalDistribution
+from material_manager.models import Material, MaterialComponent, MaterialComponentGroup
+from scenario_builder.models import SeasonalDistribution
 
 
 class NantesGreenhouses(models.Model):

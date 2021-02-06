@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     'users.apps.UsersConfig',
     'bioresource_explorer.apps.BioresourceExplorerConfig',
     'flexibi_dst',
+    'material_manager',
     'scenario_builder',
     'scenario_evaluator',
     'layer_manager',

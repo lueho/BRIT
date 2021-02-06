@@ -1,19 +1,23 @@
 from django.test import RequestFactory, tag, TestCase
 
+from material_manager.models import (
+    Material,
+    MaterialSettings,
+    MaterialComponentGroup,
+    MaterialComponentShare,
+
+)
+from material_manager.views import MaterialComponentGroupAddComponentView
 from .models import (Catchment,
                      GeoDataset,
                      InventoryAlgorithm,
                      InventoryAlgorithmParameter,
                      InventoryAlgorithmParameterValue,
-                     Material,
-                     MaterialSettings,
-                     MaterialComponentGroup,
-                     MaterialComponentShare,
+
                      Region,
                      Scenario,
                      ScenarioInventoryConfiguration,
                      WrongParameterForInventoryAlgorithm)
-from .views import MaterialComponentGroupAddComponentView
 
 
 # ----------- Materials ------------------------------------------------------------------------------------------------

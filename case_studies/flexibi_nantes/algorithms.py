@@ -1,7 +1,8 @@
 from django.db.models import Sum
 
+from material_manager.models import Material, MaterialComponentGroup
 from scenario_builder.algorithms import InventoryAlgorithmsBase
-from scenario_builder.models import Catchment, Material, MaterialComponentGroup, Scenario
+from scenario_builder.models import Catchment, Scenario
 from .models import NantesGreenhouses, Greenhouse
 
 

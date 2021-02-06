@@ -7,8 +7,7 @@ from django.views.generic import CreateView, DeleteView, DetailView, FormView, U
 from rest_framework.views import APIView
 
 from flexibi_dst.views import DualUserListView
-from scenario_builder.models import Material
-
+from material_manager.models import Material
 from .forms import (GreenhouseModelForm,
                     GreenhouseGrowthCycle,
                     GreenhouseGrowthCycleModelForm,

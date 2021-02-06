@@ -1,4 +1,4 @@
-from scenario_builder.models import Material
+from material_manager.models import Material
 
 
 class ScenarioResult:
