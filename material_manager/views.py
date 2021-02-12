@@ -1,75 +1,90 @@
-from crispy_forms.layout import Submit
+from bootstrap_modal_forms.generic import BSModalFormView, BSModalCreateView, BSModalReadView, BSModalUpdateView, \
+    BSModalDeleteView
+from crispy_forms.helper import FormHelper
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.http import HttpResponseRedirect
-from django.urls import reverse, reverse_lazy
-from django.views.generic import CreateView, DeleteView, DetailView, View, UpdateView
-from extra_views import ModelFormSetView
+from django.urls import reverse_lazy
+from django.views.generic import CreateView, DeleteView, DetailView, View
+from extra_views import UpdateWithInlinesView
 
-from flexibi_dst.views import DualUserListView
+from flexibi_dst.models import TemporalDistribution
+from flexibi_dst.views import DualUserListView, UserOwnsObjectMixin, NextOrSuccessUrlMixin
 from .forms import (
     AddComponentForm,
-    MaterialAddComponentGroupForm,
+    AddComponentGroupForm,
+    AddLiteratureSourceForm,
+    AddSeasonalVariationForm,
     MaterialModelForm,
-    MaterialComponentModelForm,
-    MaterialComponentGroupModelForm,
-    MaterialComponentGroupAddTemporalDistributionForm,
+    ComponentModelForm,
+    ComponentGroupModelForm,
     MaterialComponentGroupSettings,
-    MaterialComponentDistributionFormSetHelper,
-    MaterialComponentShareUpdateForm,
+    ComponentShareDistributionFormSetHelper,
+    InlineComponentShare
 )
 from .models import (
     Material,
     MaterialSettings,
     MaterialComponent,
     MaterialComponentGroup,
-    MaterialComponentShare,
+    CompositionSet
 )
-
-
-# ----------- Materials/Feedstocks -------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------------------------
 
 
 # ----------- Materials CRUD -------------------------------------------------------------------------------------------
 
 class MaterialListView(DualUserListView):
     model = Material
-    template_name = 'material_list.html'
+    template_name = 'dual_user_item_list.html'
 
 
-class MaterialCreateView(LoginRequiredMixin, CreateView):
+class MaterialCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, BSModalCreateView):
     form_class = MaterialModelForm
-    template_name = 'material_create.html'
+    template_name = 'modal_form.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'form_title': 'Create new material',
+            'submit_button_text': 'Create'
+        })
+        return context
 
     def form_valid(self, form):
         form.instance.owner = self.request.user
         return super().form_valid(form)
 
 
-class MaterialDetailView(UserPassesTestMixin, DetailView):
+class MaterialDetailView(UserOwnsObjectMixin, BSModalReadView):
     model = Material
-    template_name = 'material_detail.html'
+    template_name = 'modal_detail.html'
 
-    def test_func(self):
-        return self.request.user == self.get_object().owner
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'modal_title': 'Material details',
+        })
+        return context
 
 
-class MaterialUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
+class MaterialUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
     model = Material
     form_class = MaterialModelForm
-    template_name = 'material_update.html'
+    template_name = 'modal_form.html'
 
-    def test_func(self):
-        return self.request.user == self.get_object().owner
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'form_title': 'Edit material description',
+            'submit_button_text': 'Edit'
+        })
+        return context
 
 
-class MaterialDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
+class MaterialDeleteView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalDeleteView):
     model = Material
-    template_name = 'material_delete.html'
+    template_name = 'modal_delete.html'
+    success_message = 'Successfully deleted.'
     success_url = reverse_lazy('material_list')
-
-    def test_func(self):
-        return self.request.user == self.get_object().owner
 
 
 # ----------- Material Components CRUD ---------------------------------------------------------------------------------
@@ -77,97 +92,123 @@ class MaterialDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
 
 class MaterialComponentListView(DualUserListView):
     model = MaterialComponent
-    template_name = 'material_component_list.html'
+    template_name = 'dual_user_item_list.html'
 
 
-class MaterialComponentCreateView(LoginRequiredMixin, CreateView):
-    form_class = MaterialComponentModelForm
-    template_name = 'material_component_create.html'
+class MaterialComponentCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, BSModalCreateView):
+    form_class = ComponentModelForm
+    template_name = 'modal_form.html'
+    success_url = reverse_lazy('component_list')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'form_title': 'Create new material component',
+            'submit_button_text': 'Create'
+        })
+        return context
 
     def form_valid(self, form):
         form.instance.owner = self.request.user
         return super().form_valid(form)
 
 
-class MaterialComponentDetailView(UserPassesTestMixin, DetailView):
+class MaterialComponentDetailView(UserOwnsObjectMixin, DetailView):
     model = MaterialComponent
-    template_name = 'material_component_detail.html'
+    template_name = 'item_detail.html'
 
-    def test_func(self):
-        return self.request.user == self.get_object().owner
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'modal_title': 'Component details',
+        })
+        return context
 
 
-class MaterialComponentUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
+class MaterialComponentUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
     model = MaterialComponent
-    form_class = MaterialComponentModelForm
-    template_name = 'material_component_update.html'
+    form_class = ComponentModelForm
+    template_name = 'modal_form.html'
 
-    def test_func(self):
-        return self.request.user == self.get_object().owner
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'form_title': 'Edit material component',
+            'submit_button_text': 'Edit'
+        })
+        return context
 
 
-class MaterialComponentDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
+class MaterialComponentDeleteView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalDeleteView):
     model = MaterialComponent
-    template_name = 'material_component_delete.html'
-    success_url = reverse_lazy('material_component_list')
-
-    def test_func(self):
-        return self.request.user == self.get_object().owner
+    template_name = 'modal_delete.html'
+    success_message = 'Successfully deleted.'
+    success_url = reverse_lazy('component_list')
 
 
 # ----------- Material Component Groups CRUD----------------------------------------------------------------------------
 
 
-class MaterialComponentGroupListView(DualUserListView):
+class ComponentGroupListView(DualUserListView):
     model = MaterialComponentGroup
-    template_name = 'material_component_group_list.html'
+    template_name = 'dual_user_item_list.html'
 
 
-class MaterialComponentGroupCreateView(LoginRequiredMixin, CreateView):
-    form_class = MaterialComponentGroupModelForm
-    template_name = 'material_component_group_create.html'
+class ComponentGroupCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, BSModalCreateView):
+    form_class = ComponentGroupModelForm
+    template_name = 'modal_form.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'form_title': 'Create new component group',
+            'submit_button_text': 'Create'
+        })
+        return context
 
     def form_valid(self, form):
         form.instance.owner = self.request.user
         return super().form_valid(form)
 
 
-class MaterialComponentGroupDetailView(UserPassesTestMixin, DetailView):
+class ComponentGroupDetailView(UserOwnsObjectMixin, DetailView):
     model = MaterialComponentGroup
-    template_name = 'material_component_group_detail.html'
+    template_name = 'modal_detail.html'
 
-    def test_func(self):
-        return self.request.user == self.get_object().owner
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'modal_title': 'Component group details',
+        })
+        return context
 
 
-class MaterialComponentGroupUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
+class ComponentGroupUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
     model = MaterialComponentGroup
-    form_class = MaterialComponentGroupModelForm
-    template_name = 'material_component_group_update.html'
+    form_class = ComponentGroupModelForm
+    template_name = 'modal_form.html'
 
-    def test_func(self):
-        return self.request.user == self.get_object().owner
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'form_title': 'Edit component group description',
+            'submit_button_text': 'Edit'
+        })
+        return context
 
 
-class MaterialComponentGroupDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
+class ComponentGroupDeleteView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalDeleteView):
     model = MaterialComponentGroup
-    template_name = 'material_component_group_delete.html'
+    template_name = 'modal_delete.html'
+    success_message = 'Successfully deleted.'
     success_url = reverse_lazy('material_component_group_list')
 
-    def test_func(self):
-        return self.request.user == self.get_object().owner
 
-
-# ----------- Materials/Components/Groups Organisation -----------------------------------------------------------------
-
-
-class MaterialSettingsListView(DualUserListView):
-    model = MaterialSettings
-    template_name = 'material_setting_list.html'
+# ----------- Materials/Components/Groups Relation -----------------------------------------------------------------
 
 
 # TODO: This view can be used to create customized materials for user's scenarios. But where and how should it be used?
-class MaterialSettingsCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
+class MaterialSettingsCreateView(LoginRequiredMixin, UserPassesTestMixin, NextOrSuccessUrlMixin, CreateView):
     model = MaterialSettings
     template_name = 'material_settings_create.html'
 
@@ -177,147 +218,209 @@ class MaterialSettingsCreateView(LoginRequiredMixin, UserPassesTestMixin, Create
 
     def test_func(self):
         # TODO: test if user is owner of scenario
-        return True
+        return False
 
 
-class MaterialSettingsDetailView(LoginRequiredMixin, UserPassesTestMixin, DetailView):
+class MaterialSettingsDetailView(LoginRequiredMixin, UserOwnsObjectMixin, DetailView):
     model = MaterialSettings
-    template_name = 'material_configuration.html'
+    template_name = 'material_composition.html'
 
     def get_context_data(self, **kwargs):
         kwargs['composition'] = self.object.composition()
         return super().get_context_data(**kwargs)
 
-    def test_func(self):
-        return self.request.user == self.get_object().owner
 
-
-class MaterialSettingsDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
+class MaterialSettingsDeleteView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, DeleteView):
     model = MaterialSettings
     template_name = 'material_settings_delete.html'
     success_url = reverse_lazy('material_setting_list')
 
-    def test_func(self):
-        return self.request.user == self.get_object().owner
 
+class AddComponentGroupView(LoginRequiredMixin, UserOwnsObjectMixin, BSModalFormView):
+    form_class = AddComponentGroupForm
+    template_name = 'modal_form.html'
 
-class MaterialAddComponentGroupView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
-    model = MaterialSettings
-    form_class = MaterialAddComponentGroupForm
-    template_name = 'material_add_component_group.html'
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'form_title': 'Select a component group to add',
+            'submit_button_text': 'Add'
+        })
+        return context
 
     def get_form(self, **kwargs):
         form = super().get_form(**kwargs)
-        form.fields['group'].queryset = MaterialComponentGroup.objects.exclude(id__in=self.get_object().blocked_ids)
-        form.fields['fractions_of'].queryset = MaterialComponent.objects.filter(id__in=self.get_object().component_ids)
+        form.fields['group'].queryset = MaterialComponentGroup.objects.exclude(
+            id__in=self.get_object().blocked_ids)
+        form.fields['fractions_of'].queryset = MaterialComponent.objects.filter(
+            id__in=self.get_object().component_ids)
+        form.fields['fractions_of'].empty_label = None
         return form
 
+    def get_object(self):
+        return MaterialSettings.objects.get(id=self.kwargs.get('pk'))
+
     def form_valid(self, form):
-        self.get_object().add_component_group(form.cleaned_data['group'],
-                                              fractions_of=form.cleaned_data['fractions_of'])
-        return HttpResponseRedirect(self.get_object().get_absolute_url())
-
-    def test_func(self):
-        return self.request.user == self.get_object().owner
-
-
-class MaterialRemoveComponentGroupView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
-    model = MaterialComponentGroupSettings
-    template_name = 'material_component_group_remove.html'
+        # Due to the way the django-bootstrap modal-forms package is built, the post request and this method are
+        # executed twice.
+        # See: https://github.com/trco/django-bootstrap-modal-forms/issues/14
+        if not self.request.is_ajax():
+            self.get_object().add_component_group(form.cleaned_data['group'],
+                                                  fractions_of=form.cleaned_data['fractions_of'])
+        return HttpResponseRedirect(self.get_success_url())
 
     def get_success_url(self):
         return self.get_object().get_absolute_url()
 
-    def test_func(self):
-        return self.request.user == self.get_object().owner
 
-
-class MaterialComponentGroupAddComponentView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
+class RemoveComponentGroupView(LoginRequiredMixin, UserOwnsObjectMixin, BSModalDeleteView):
     model = MaterialComponentGroupSettings
+    template_name = 'modal_delete.html'
+    success_message = 'Successfully removed'
+
+    def get_success_url(self):
+        return self.get_object().get_absolute_url()
+
+
+class AddComponentView(LoginRequiredMixin, UserOwnsObjectMixin, BSModalFormView):
     form_class = AddComponentForm
-    template_name = 'material_component_group_add_component.html'
+    template_name = 'modal_form.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'form_title': 'Select a component to add',
+            'submit_button_text': 'Add'
+        })
+        return context
 
     def get_form(self, **kwargs):
         form = super().get_form(**kwargs)
-        form.fields['component'].queryset = MaterialComponent.objects.exclude(id__in=self.get_object().blocked_ids)
+        form.fields['component'].queryset = MaterialComponent.objects.exclude(
+            id__in=self.get_object().blocked_component_ids)
         return form
 
+    def get_object(self):
+        return MaterialComponentGroupSettings.objects.get(id=self.kwargs.get('pk'))
+
     def form_valid(self, form):
-        self.object.add_component(form.cleaned_data['component'])
+        # Due to the way the django-bootstrap modal-forms package is built, the post request and this method are
+        # executed twice.
+        # See: https://github.com/trco/django-bootstrap-modal-forms/issues/14
+        if not self.request.is_ajax():
+            self.get_object().add_component(form.cleaned_data['component'])
         return HttpResponseRedirect(self.get_success_url())
-
-    def test_func(self):
-        return self.request.user == self.get_object().owner
-
-
-class MaterialComponentGroupRemoveComponentView(LoginRequiredMixin, UserPassesTestMixin, View):
-    component = None
-    group_settings = None
-
-    def get(self, request, *args, **kwargs):
-        self.get_objects()
-        self.group_settings.remove_component(self.component)
-        return HttpResponseRedirect(self.get_success_url())
-
-    def get_objects(self):
-        self.component = MaterialComponent.objects.get(id=self.kwargs.get('component_pk'))
-        self.group_settings = MaterialComponentGroupSettings.objects.get(id=self.kwargs.get('pk'))
 
     def get_success_url(self):
-        self.get_objects()
-        return self.group_settings.get_absolute_url()
-
-    def test_func(self):
-        self.get_objects()
-        return self.request.user == self.group_settings.owner
+        return self.get_object().get_absolute_url()
 
 
-class MaterialComponentShareUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
-    model = MaterialComponentShare
-    form_class = MaterialComponentShareUpdateForm
-    template_name = 'material_component_group_share_update.html'
+class AddSourceView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalFormView):
+    form_class = AddLiteratureSourceForm
+    template_name = 'modal_form.html'
 
-    def test_func(self):
-        return self.request.user == self.get_object().group_settings.owner
-
-
-class MaterialComponentGroupAddTemporalDistributionView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
-    model = MaterialComponentGroupSettings
-    form_class = MaterialComponentGroupAddTemporalDistributionForm
-    template_name = 'material_component_group_add_temporal_distribution.html'
-
-    def test_func(self):
-        return self.request.user == self.get_object().owner
-
-
-class MaterialComponentGroupShareDistributionUpdateView(ModelFormSetView):
-    model = MaterialComponentShare
-    fields = ['component', 'average', 'standard_deviation']
-    template_name = 'model_formset_test_view.html'
-    factory_kwargs = {'extra': 0}
+    def get_object(self):
+        return MaterialComponentGroupSettings.objects.get(id=self.kwargs.get('pk'))
 
     def get_context_data(self, **kwargs):
-        helper = MaterialComponentDistributionFormSetHelper()
-        helper.add_input(Submit('submit', 'Save'))
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'form_title': 'Select a source to add',
+            'submit_button_text': 'Add'
+        })
+        return context
+
+    def form_valid(self, form):
+        if not self.request.is_ajax():
+            self.get_object().sources.add(form.cleaned_data['source'])
+        return HttpResponseRedirect(self.get_success_url())
+
+    def get_success_url(self):
+        return self.get_object().get_absolute_url()
+
+
+class AddSeasonalVariationView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalFormView):
+    form_class = AddSeasonalVariationForm
+    template_name = 'modal_form.html'
+
+    def get_object(self):
+        return MaterialComponentGroupSettings.objects.get(id=self.kwargs.get('pk'))
+
+    def get_form(self, **kwargs):
+        form = super().get_form(**kwargs)
+        form.fields['temporal_distribution'].queryset = TemporalDistribution.objects.exclude(
+            id__in=self.get_object().blocked_distribution_ids)
+        return form
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'form_title': 'Select a distribution to add',
+            'submit_button_text': 'Add'
+        })
+        return context
+
+    def form_valid(self, form):
+        if not self.request.is_ajax():
+            self.get_object().add_temporal_distribution(form.cleaned_data['temporal_distribution'])
+        return HttpResponseRedirect(self.get_success_url())
+
+    def get_success_url(self):
+        return self.get_object().get_absolute_url()
+
+
+class RemoveComponentView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, View):
+
+    def get(self, request, *args, **kwargs):
+        self.get_object().remove_component(self.get_component())
+        return HttpResponseRedirect(self.get_success_url())
+
+    def get_object(self):
+        return MaterialComponentGroupSettings.objects.get(id=self.kwargs.get('pk'))
+
+    def get_component(self):
+        return MaterialComponent.objects.get(id=self.kwargs.get('component_pk'))
+
+    def get_success_url(self):
+        return self.get_object().get_absolute_url()
+
+
+class CompositionSetUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, UpdateWithInlinesView):
+    model = CompositionSet
+    inlines = [InlineComponentShare, ]
+    fields = ['group_settings', 'timestep']
+    template_name = 'item_formset.html'
+
+    def get_context_data(self, **kwargs):
+        inline_helper = ComponentShareDistributionFormSetHelper()
+        inline_helper.form_tag = False
+        form_helper = FormHelper()
+        form_helper.form_tag = False
         context = {
-            'helper': helper
+            'inline_helper': inline_helper,
+            'form_helper': form_helper
         }
         context.update(kwargs)
         return super().get_context_data(**context)
 
-    def get_queryset(self, *args, **kwargs):
-        group_settings = MaterialComponentGroupSettings.objects.get(id=self.kwargs.get('pk'))
-        queryset = MaterialComponentShare.objects.filter(
-            group_settings=group_settings,
-            timestep=self.kwargs.get('timestep_pk')
-        )
-        return queryset
 
-    def get_success_url(self):
-        next_url = self.request.GET.get('next')
-        if next_url:
-            return next_url
-        else:
-            group_settings = MaterialComponentGroupSettings.objects.get(id=self.kwargs.get('pk'))
-            material_settings = group_settings.material_settings
-            return reverse('material_settings', kwargs={'pk': material_settings.id})
+class CompositionSetModalUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin,
+                                    UpdateWithInlinesView):
+    model = CompositionSet
+    inlines = [InlineComponentShare, ]
+    fields = []
+    template_name = 'modal_item_formset.html'
+
+    def get_context_data(self, **kwargs):
+        inline_helper = ComponentShareDistributionFormSetHelper()
+        inline_helper.form_tag = False
+        form_helper = FormHelper()
+        form_helper.form_tag = False
+        context = {
+            'form_title': 'Change the composition',
+            'submit_button_text': 'Save',
+            'inline_helper': inline_helper,
+            'form_helper': form_helper
+        }
+        context.update(kwargs)
+        return super().get_context_data(**context)

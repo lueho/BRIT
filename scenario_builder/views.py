@@ -129,7 +129,7 @@ class RegionGeometryAPI(APIView):
 
 class ScenarioListView(DualUserListView):
     model = Scenario
-    template_name = 'scenario_list.html'
+    template_name = 'dual_user_item_list.html'
 
 
 class ScenarioCreateView(LoginRequiredMixin, CreateView):

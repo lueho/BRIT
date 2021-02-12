@@ -2,15 +2,6 @@ from django.contrib.auth.models import User
 from django.db import models
 
 
-class LiteratureSource(models.Model):
-    authors = models.CharField(max_length=500, null=True)
-    title = models.CharField(max_length=500, null=True)
-    abbreviation = models.CharField(max_length=50, null=True)
-
-    def __str__(self):
-        return self.abbreviation
-
-
 class TemporalDistribution(models.Model):
     """
     Model to organize timesteps into named distributions (e.g. months are timesteps of the temporal distribution 'months

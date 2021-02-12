@@ -7,7 +7,7 @@ from material_manager.models import (
     MaterialComponentShare,
 
 )
-from material_manager.views import MaterialComponentGroupAddComponentView
+from material_manager.views import AddComponentView
 from .models import (Catchment,
                      GeoDataset,
                      InventoryAlgorithm,
@@ -42,7 +42,7 @@ class MaterialTestCase(TestCase):
     def test_grouped_component_shares(self):
         scenario = Scenario.objects.get(id=1)
         material = Material.objects.get(id=1)
-        settings = MaterialSettings.get(scenario=scenario, material=material)
+        settings = MaterialSettings.objects.get(scenario=scenario, material=material)
         group = MaterialComponentGroup.objects.get(id=1)
         share = MaterialComponentShare.objects.get(id=1)
         grouped_shares = {
@@ -62,7 +62,7 @@ class MaterialAddComponentGroupViewTestCase(TestCase):
 
     def test_environment_set_in_context(self):
         request = RequestFactory().get('/')
-        view = MaterialComponentGroupAddComponentView()
+        view = AddComponentView()
         view.setup(request)
 
         context = view.get_context_data()
