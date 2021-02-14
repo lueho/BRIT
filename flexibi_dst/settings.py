@@ -20,16 +20,22 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'django.contrib.gis',
+    'extra_views',
+    'django_tables2',
     'rest_framework',
     'rest_framework_gis',
     'leaflet',
     'users.apps.UsersConfig',
     'bioresource_explorer.apps.BioresourceExplorerConfig',
     'flexibi_dst',
+    'library',
+    'material_manager',
     'scenario_builder',
     'scenario_evaluator',
-    'gis_source_manager',
     'layer_manager',
+    'case_studies',
+    'case_studies.flexibi_nantes',
+    'case_studies.flexibi_hamburg',
     'crispy_forms',
     'bootstrap_modal_forms',
 ]
@@ -70,6 +76,8 @@ TEMPLATES = [
         },
     },
 ]
+
+DJANGO_TABLES2_TEMPLATE = "django_tables2/bootstrap4.html"
 
 WSGI_APPLICATION = 'flexibi_dst.wsgi.application'
 
@@ -156,4 +164,6 @@ LOGIN_URL = 'login'
 CELERY_BROKER_URL = os.environ.get("REDIS_URL")
 CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL")
 
-PUBLIC_OBJECT_OWNER = 'flexibi'
+IMPORTED_CASE_STUDIES = [
+    'flexibi_nantes',
+]

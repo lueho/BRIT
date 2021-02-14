@@ -3,7 +3,8 @@ from django.views.generic import DetailView
 
 from flexibi_dst.views import DualUserListView
 from layer_manager.models import Layer
-from scenario_builder.models import InventoryAlgorithm, Scenario, Material
+from material_manager.models import Material
+from scenario_builder.models import InventoryAlgorithm, Scenario
 from scenario_evaluator.evaluations import ScenarioResult
 from scenario_evaluator.models import RunningTask
 

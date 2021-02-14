@@ -9,10 +9,6 @@ from .models import (Catchment,
                      InventoryAlgorithm,
                      InventoryAlgorithmParameter,
                      InventoryAlgorithmParameterValue,
-                     LiteratureSource,
-                     Material,
-                     MaterialComponent,
-                     MaterialComponentGroup,
                      Region,
                      Scenario,
                      ScenarioInventoryConfiguration,
@@ -76,19 +72,7 @@ class RegionAdmin(OSMGeoAdmin):
         return queryset
 
 
-@admin.register(LiteratureSource)
-class LiteratureSourceAdmin(ModelAdmin):
-    list_display = ('authors', 'title', 'abbreviation',)
 
-
-@admin.register(Material)
-class MaterialAdmin(ModelAdmin):
-    list_display = ('name', 'stan_flow_id', 'is_feedstock', 'description',)
-
-
-@admin.register(MaterialComponentGroup)
-class MaterialComponentGroupAdmin(ModelAdmin):
-    list_display = ('name', 'description',)
 
 
 @admin.register(InventoryAlgorithm)
@@ -199,5 +183,8 @@ class ScenarioStatusAdmin(ModelAdmin):
     list_display = ('scenario', 'status')
 
 
-admin.site.register(MaterialComponent)
+# @admin.register(SeasonalDistribution)
+# class LiteratureSourceAdmin(ModelAdmin):
+#     list_display = ('id', 'timesteps', 'cycles', 'start_stop', 'values', 'material', 'component')
+
 admin.site.register(SFBSite)
