@@ -40,9 +40,10 @@ class LiteratureSourceCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, Crea
         return super().form_valid(form)
 
 
-class LiteratureSourceDetailView(UserOwnsObjectMixin, BSModalReadView):
+class LiteratureSourceDetailView(BSModalReadView):
     model = LiteratureSource
-    template_name = 'modal_detail.html'
+    template_name = 'modal_source_detail.html'
+    object = None
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

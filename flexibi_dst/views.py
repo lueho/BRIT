@@ -23,9 +23,8 @@ class UserOwnsObjectMixin(UserPassesTestMixin):
     access to objects owned by other users.
     """
 
-    # TODO: Implement free access to objects owned by the standard user
     def test_func(self):
-        return self.get_object().owner in (self.request.user, User.objects.get(username='flexibi'))
+        return self.get_object().owner == self.request.user
 
 
 class HomeView(TemplateView):

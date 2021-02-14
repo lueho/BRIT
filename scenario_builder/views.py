@@ -1,3 +1,4 @@
+from bootstrap_modal_forms.generic import BSModalCreateView, BSModalUpdateView, BSModalDeleteView
 from celery.result import AsyncResult
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import User
@@ -9,13 +10,13 @@ from django.views.generic.base import TemplateResponseMixin
 from django.views.generic.edit import FormMixin, ModelFormMixin
 from rest_framework.views import APIView
 
-from flexibi_dst.views import DualUserListView
+from flexibi_dst.views import DualUserListView, UserOwnsObjectMixin, NextOrSuccessUrlMixin
 from layer_manager.models import Layer
 from material_manager.models import Material
 from .forms import (
     CatchmentForm,
     CatchmentQueryForm,
-    ScenarioModelForm,
+    ScenarioModalModelForm,
     ScenarioInventoryConfigurationAddForm,
     ScenarioInventoryConfigurationUpdateForm,
     SeasonalDistributionModelForm,
@@ -127,54 +128,40 @@ class RegionGeometryAPI(APIView):
 # ----------- Scenarios ------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
+# ----------- Scenarios CRUD -------------------------------------------------------------------------------------------
+
 class ScenarioListView(DualUserListView):
     model = Scenario
     template_name = 'dual_user_item_list.html'
 
 
-class ScenarioCreateView(LoginRequiredMixin, CreateView):
-    model = Scenario
-    form_class = ScenarioModelForm
-    template_name = 'scenario_create.html'
+# class ScenarioCreateView(LoginRequiredMixin, CreateView):
+#     model = Scenario
+#     form_class = ScenarioModelForm
+#     template_name = 'scenario_create.html'
+#     success_url = reverse_lazy('scenario_list')
+#
+#     def form_valid(self, form):
+#         form.instance.owner = self.request.user
+#         return super().form_valid(form)
+
+
+class ScenarioCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, BSModalCreateView):
+    form_class = ScenarioModalModelForm
+    template_name = 'modal_form.html'
     success_url = reverse_lazy('scenario_list')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'form_title': 'Create new scenario',
+            'submit_button_text': 'Create'
+        })
+        return context
 
     def form_valid(self, form):
         form.instance.owner = self.request.user
         return super().form_valid(form)
-
-
-class ScenarioUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
-    model = Scenario
-    template_name = 'scenario_create.html'
-    form_class = ScenarioModelForm
-
-    def get_success_url(self):
-        return reverse('scenario_detail', kwargs={'pk': self.object.id})
-
-    def test_func(self):
-        scenario = Scenario.objects.get(id=self.kwargs.get('pk'))
-        return self.request.user == scenario.owner
-
-
-class ScenarioDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
-    model = Scenario
-    template_name = 'scenario_delete.html'
-    success_url = '/scenario_builder/scenarios'
-
-    def test_func(self):
-        scenario = Scenario.objects.get(id=self.kwargs.get('pk'))
-        return self.request.user == scenario.owner
-
-
-def get_evaluation_status(request, task_id=None):
-    task_result = AsyncResult(task_id)
-    result = {
-        "task_id": task_id,
-        "task_status": task_result.status,
-        "task_result": task_result.result,
-        "task_info": task_result.info
-    }
-    return JsonResponse(result, status=200)
 
 
 class ScenarioDetailView(UserPassesTestMixin, DetailView):
@@ -191,7 +178,6 @@ class ScenarioDetailView(UserPassesTestMixin, DetailView):
         self.config = self.object.configuration_for_template()
         context = self.get_context_data(object=self.object)
         context['config'] = self.config
-        context['static'] = self.object.owner.username == 'flexibi'
         return self.render_to_response(context)
 
     def post(self, request, *args, **kwargs):
@@ -204,6 +190,46 @@ class ScenarioDetailView(UserPassesTestMixin, DetailView):
     def test_func(self):
         scenario = Scenario.objects.get(id=self.kwargs.get('pk'))
         return self.request.user == scenario.owner or scenario.owner.username == 'flexibi'
+
+
+class ScenarioUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
+    model = Scenario
+    form_class = ScenarioModalModelForm
+    template_name = 'modal_form.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'form_title': 'Edit scenario basics',
+            'submit_button_text': 'Save'
+        })
+        return context
+
+
+class ScenarioDeleteView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalDeleteView):
+    model = Scenario
+    template_name = 'modal_delete.html'
+    success_message = 'Successfully deleted.'
+    success_url = reverse_lazy('scenario_list')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'form_title': 'Delete scenario',
+            'submit_button_text': 'Delete'
+        })
+        return context
+
+
+def get_evaluation_status(request, task_id=None):
+    task_result = AsyncResult(task_id)
+    result = {
+        "task_id": task_id,
+        "task_status": task_result.status,
+        "task_result": task_result.result,
+        "task_info": task_result.info
+    }
+    return JsonResponse(result, status=200)
 
 
 class ScenarioAddInventoryAlgorithmView(LoginRequiredMixin, UserPassesTestMixin,

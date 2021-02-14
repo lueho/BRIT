@@ -26,8 +26,15 @@
     <!-- Custom styles for leaflet maps-->
     <link href="{% static 'css/map-style.css' %}" rel="stylesheet">
 
+    <!-- Other custom styles-->
+    <link href="{% static 'css/flexibi_dst.css' %}" rel="stylesheet">
+
 
 </head>
+
+{% block style %}
+{% endblock style %}
+
 
 <body id="page-top">
 
@@ -52,7 +59,7 @@
             <div class="container-fluid">
                 {% block content %}
 
-                {% endblock %}
+                {% endblock content %}
             </div>
 
         </div>
@@ -110,7 +117,7 @@
 <!-- Custom scripts for all pages-->
 <script src="{% static 'js/sb-admin-2.min.js' %}"></script>
 {#<script src="{% static 'js/utils/dst_rest_api.js' %}"></script>#}
-<script src="{% static 'js/jquery.bootstrap.modal.forms.min.js' %}"></script>
+<script src="{% static 'js/jquery.bootstrap.modal.forms.js' %}"></script>
 
 
 <!-- Page level plugins -->

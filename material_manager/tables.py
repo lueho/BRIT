@@ -9,7 +9,7 @@ def averages_table_factory(group_settings):
     for share in composition_set.materialcomponentshare_set.all():
         remove_html = format_html(
             '''
-            <a href="{0}">
+            <a href="{0}" class="toggle-edit">
                 <i class="fas fa-fw fa-trash"></i>
             </a>
             ''',
@@ -33,7 +33,7 @@ def averages_table_factory(group_settings):
     footers = {
         'component': format_html(
             '''
-            <a href="javascript:void(0);" class="modal-link" data-link="{0}">
+            <a href="javascript:void(0);" class="modal-link toggle-edit" data-link="{0}">
                 <i class="fas fa-fw fa-plus"></i> Add component
             </a>
             ''',
@@ -41,18 +41,25 @@ def averages_table_factory(group_settings):
         ),
         'weight fraction': format_html(
             '''
-            <a href="javascript:void(0);" class="modal-link" data-link="{0}">
+            <a href="javascript:void(0);" class="modal-link toggle-edit" data-link="{0}">
                 <i class="fas fa-fw fa-edit"></i> Change composition
             </a>
             ''',
             reverse('composition_set_update', kwargs={'pk': group_settings.average_composition.id})
         )
     }
-    if len(table_data) > 0:
-        columns = {name: (Column(footer=footers[name]) if name in footers else Column()) for
-                   name in list(table_data[0].keys())}
-    else:
-        columns = {}
+    columns = {
+        'component': Column(footer=footers['component']),
+        'weight fraction': Column(footer=footers['weight fraction']),
+        'remove': Column(attrs={"td": {"class": "toggle-edit"}, "th": {"class": "toggle-edit"}})
+    }
+    # for name in list(table_data[0].keys()):
+    #     columns[name]
+    # if len(table_data) > 0:
+    #     columns = {name: (Column(footer=footers[name]) if name in footers else Column()) for
+    #                name in list(table_data[0].keys())}
+    # else:
+    #     columns = {}
     table_class = type(f'AveragesTable{group_settings.id}', (Table,), columns)
     return table_class(table_data)
 
@@ -77,7 +84,7 @@ def distribution_table_factory(group_settings, distribution):
     def footer(cs):
         return format_html(
             '''
-            <a href="javascript:void(0);" class="modal-link", data-link="{0}">
+            <a href="javascript:void(0);" class="modal-link toggle-edit", data-link="{0}">
                 <i class="fas fa-fw fa-edit"></i>
             </a>
             ''',
@@ -91,8 +98,13 @@ def distribution_table_factory(group_settings, distribution):
                 columns[name] = Column(footer=footer(composition_set))
             else:
                 columns[name] = Column()
-        columns['id'] = f'distribution-table-group-{group_settings.id}'
+        columns['id'] = f'distribution-table-group-{group_settings.id}-dist-{distribution.id}'
     else:
         columns = {}
+    sequence = ['component']
+    for timestep in distribution.timestep_set.all().order_by('id'):
+        sequence.append(timestep.name)
+    inner_meta = type('Meta', (), {'sequence': tuple(sequence)})
+    columns.update({'Meta': inner_meta})
     table_class = type(f'DistributionTable-{group_settings.id}-{distribution.id}', (Table,), columns)
     return table_class(table_data)

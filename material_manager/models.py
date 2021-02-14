@@ -204,12 +204,6 @@ class MaterialSettings(models.Model):
             return f'Customization of material {self.material.name} by user {self.owner.username}'
 
 
-# @receiver(post_save, sender=MaterialSettings)
-# def initialize_material_settings(sender, instance, created, **kwargs):
-#     if created:
-#         instance.add_base_group_and_component()
-
-
 class MaterialComponent(models.Model):
     """
     Represents any kind of component that a material can consists of (e.g. water, any kind of chemical element
@@ -372,8 +366,8 @@ class MaterialComponentGroupSettings(models.Model):
         return averages_table_factory(self)
 
     def distribution_tables(self):
-        return [distribution_table_factory(self, distribution) for distribution in
-                self.temporal_distributions.exclude(name='Average')]
+        return {distribution: distribution_table_factory(self, distribution) for distribution in
+                self.temporal_distributions.exclude(name='Average')}
 
     def get_absolute_url(self):
         return self.material_settings.get_absolute_url()

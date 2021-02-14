@@ -31,7 +31,7 @@ urlpatterns = [
          SeasonalDistributionCreateView.as_view(),
          name='seasonal_distribution_create'),
     path('scenarios/', ScenarioListView.as_view(), name='scenario_list'),
-    path('scenarios/create/', ScenarioCreateView.as_view(), name='create_scenario'),
+    path('scenarios/create/', ScenarioCreateView.as_view(), name='scenario_create'),
     path('scenarios/<int:pk>/', ScenarioDetailView.as_view(), name='scenario_detail'),
     path('scenarios/<int:pk>/update/', ScenarioUpdateView.as_view(), name='scenario_update'),
     path('scenarios/<int:pk>/delete/', ScenarioDeleteView.as_view(), name='scenario_delete'),

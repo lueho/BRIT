@@ -52,15 +52,13 @@
         </div>
     </div>
     <!-- end of general summary row -->
-    {% if not static %}
-        <div class="row mt-1">
-            <div class="col">
-                <a href="{% url 'scenario_update' scenario.id %}">
-                    <i class="fas fa-fw fa-edit"></i> Edit scenario basics
-                </a>
-            </div>
+    <div class="row mt-1">
+        <div class="col">
+            <a href="{% url 'scenario_update' scenario.id %}">
+                <i class="fas fa-fw fa-edit"></i> Edit scenario basics
+            </a>
         </div>
-    {% endif %}
+    </div>
     <h2 class="mt-3">Used Inventory Algorithms:</h2>
     {% for feedstock, algos in config.items %}
         {% for algo, parameters in algos.items %}
@@ -75,28 +73,24 @@
                     {% endfor %}
                 </div>
                 <div class="card-footer">
-                    {% if not static and user.is_authenticated %}
-                        <a href="{% url 'scenario_update_config' scenario.id algo.id %}" class="mx-2">
-                            <i class="fas fa-fw fa-edit"></i> Edit
-                        </a>
-                        <a href="{% url 'remove_algorithm_from_scenario' scenario.id feedstock.id algo.id %}"
-                           class="mx-2">
-                            <i class="fas fa-fw fa-trash"></i> Remove from configuration
-                        </a>
-                    {% endif %}
+                    <a href="{% url 'scenario_update_config' scenario.id algo.id %}" class="mx-2">
+                        <i class="fas fa-fw fa-edit"></i> Edit
+                    </a>
+                    <a href="{% url 'remove_algorithm_from_scenario' scenario.id feedstock.id algo.id %}"
+                       class="mx-2">
+                        <i class="fas fa-fw fa-trash"></i> Remove from configuration
+                    </a>
                 </div>
             </div>
         {% endfor %}
     {% endfor %}
 
-    {% if not static %}
-        <div class="row mt-3">
-            <div class="col">
-                <a href="{% url 'add_scenario_configuration' scenario.id %}">
-                    <i class="fas fa-fw fa-plus"></i> Add algorithm to configuration
-                </a>
-            </div>
+    <div class="row mt-3">
+        <div class="col">
+            <a href="{% url 'add_scenario_configuration' scenario.id %}">
+                <i class="fas fa-fw fa-plus"></i> Add algorithm to configuration
+            </a>
         </div>
-    {% endif %}
+    </div>
 
 {% endblock %}

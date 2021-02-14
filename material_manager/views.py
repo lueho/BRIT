@@ -2,6 +2,7 @@ from bootstrap_modal_forms.generic import BSModalFormView, BSModalCreateView, BS
     BSModalDeleteView
 from crispy_forms.helper import FormHelper
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.models import User
 from django.http import HttpResponseRedirect
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, DeleteView, DetailView, View
@@ -86,6 +87,14 @@ class MaterialDeleteView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessU
     success_message = 'Successfully deleted.'
     success_url = reverse_lazy('material_list')
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'form_title': 'Delete material',
+            'submit_button_text': 'Delete'
+        })
+        return context
+
 
 # ----------- Material Components CRUD ---------------------------------------------------------------------------------
 
@@ -145,6 +154,14 @@ class MaterialComponentDeleteView(LoginRequiredMixin, UserOwnsObjectMixin, NextO
     success_message = 'Successfully deleted.'
     success_url = reverse_lazy('component_list')
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'form_title': 'Delete component',
+            'submit_button_text': 'Delete'
+        })
+        return context
+
 
 # ----------- Material Component Groups CRUD----------------------------------------------------------------------------
 
@@ -203,6 +220,14 @@ class ComponentGroupDeleteView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSu
     success_message = 'Successfully deleted.'
     success_url = reverse_lazy('material_component_group_list')
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'form_title': 'Delete component group',
+            'submit_button_text': 'Delete'
+        })
+        return context
+
 
 # ----------- Materials/Components/Groups Relation -----------------------------------------------------------------
 
@@ -221,13 +246,33 @@ class MaterialSettingsCreateView(LoginRequiredMixin, UserPassesTestMixin, NextOr
         return False
 
 
-class MaterialSettingsDetailView(LoginRequiredMixin, UserOwnsObjectMixin, DetailView):
+# TODO: beautify 'show seasonal variation' button
+# TODO: possibility to upload image of a material
+
+
+class MaterialSettingsDetailView(UserPassesTestMixin, DetailView):
     model = MaterialSettings
     template_name = 'material_composition.html'
+    allow_edit = False
+    object = None
 
     def get_context_data(self, **kwargs):
         kwargs['composition'] = self.object.composition()
+        kwargs['allow_edit'] = self.allow_edit
         return super().get_context_data(**kwargs)
+
+    def test_func(self):
+        self.object = self.get_object()
+        flexibi = User.objects.get(username='flexibi')
+        if self.object.owner == flexibi:
+            if self.request.user == flexibi:
+                self.allow_edit = True
+            return True
+        elif self.object.owner == self.request.user:
+            self.allow_edit = True
+            return True
+        else:
+            return False
 
 
 class MaterialSettingsDeleteView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, DeleteView):
@@ -278,6 +323,14 @@ class RemoveComponentGroupView(LoginRequiredMixin, UserOwnsObjectMixin, BSModalD
     template_name = 'modal_delete.html'
     success_message = 'Successfully removed'
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'form_title': 'Remove group',
+            'submit_button_text': 'Remove'
+        })
+        return context
+
     def get_success_url(self):
         return self.get_object().get_absolute_url()
 
@@ -310,6 +363,22 @@ class AddComponentView(LoginRequiredMixin, UserOwnsObjectMixin, BSModalFormView)
         if not self.request.is_ajax():
             self.get_object().add_component(form.cleaned_data['component'])
         return HttpResponseRedirect(self.get_success_url())
+
+    def get_success_url(self):
+        return self.get_object().get_absolute_url()
+
+
+class RemoveComponentView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, View):
+
+    def get(self, request, *args, **kwargs):
+        self.get_object().remove_component(self.get_component())
+        return HttpResponseRedirect(self.get_success_url())
+
+    def get_object(self):
+        return MaterialComponentGroupSettings.objects.get(id=self.kwargs.get('pk'))
+
+    def get_component(self):
+        return MaterialComponent.objects.get(id=self.kwargs.get('component_pk'))
 
     def get_success_url(self):
         return self.get_object().get_absolute_url()
@@ -369,17 +438,50 @@ class AddSeasonalVariationView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSu
         return self.get_object().get_absolute_url()
 
 
-class RemoveComponentView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, View):
+class RemoveSeasonalVariationView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalReadView):
+    template_name = 'modal_delete.html'
+    model = MaterialComponentGroupSettings
 
-    def get(self, request, *args, **kwargs):
-        self.get_object().remove_component(self.get_component())
-        return HttpResponseRedirect(self.get_success_url())
+    def get_distribution(self):
+        return TemporalDistribution.objects.get(id=self.kwargs.get('distribution_pk'))
 
-    def get_object(self):
-        return MaterialComponentGroupSettings.objects.get(id=self.kwargs.get('pk'))
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'form_title': 'Remove seasonal variation',
+            'submit_button_text': 'Remove'
+        })
+        return context
 
-    def get_component(self):
-        return MaterialComponent.objects.get(id=self.kwargs.get('component_pk'))
+    def get_success_url(self):
+        return self.get_object().get_absolute_url()
+
+    def post(self, request, *args, **kwargs):
+        success_url = self.get_success_url()
+        self.get_object().remove_temporal_distribution(self.get_distribution())
+        return HttpResponseRedirect(success_url)
+
+
+class RemoveSeasonalVariationViewILD(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalDeleteView):
+    model = MaterialComponentGroupSettings
+    template_name = 'modal_delete.html'
+    success_message = 'Successfully deleted.'
+
+    def delete(self, request, *args, **kwargs):
+        success_url = self.get_success_url()
+        self.get_object().remove_temporal_distribution(self.get_distribution())
+        return HttpResponseRedirect(success_url)
+
+    def get_distribution(self):
+        return TemporalDistribution.objects.get(id=self.kwargs.get('distribution_pk'))
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'form_title': 'Remove seasonal variation',
+            'submit_button_text': 'Remove'
+        })
+        return context
 
     def get_success_url(self):
         return self.get_object().get_absolute_url()

@@ -1,3 +1,4 @@
+from bootstrap_modal_forms.forms import BSModalModelForm
 from crispy_forms.helper import FormHelper
 from django.forms import (Form,
                           ModelChoiceField,
@@ -74,6 +75,12 @@ class SeasonalDistributionModelForm(ModelForm):
 
 
 class ScenarioModelForm(ModelForm):
+    class Meta:
+        model = Scenario
+        fields = ['name', 'description', 'region', 'catchment']
+
+
+class ScenarioModalModelForm(BSModalModelForm):
     class Meta:
         model = Scenario
         fields = ['name', 'description', 'region', 'catchment']

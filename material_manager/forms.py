@@ -2,6 +2,9 @@ from bootstrap_modal_forms.forms import BSModalModelForm, BSModalForm
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Row, Field
 from django import forms
+from django.core.exceptions import ValidationError
+from django.forms.models import BaseInlineFormSet
+from django.utils.safestring import mark_safe
 from extra_views import InlineFormSetFactory
 
 from flexibi_dst.models import TemporalDistribution
@@ -89,13 +92,34 @@ class ItemForm(BSModalModelForm):
         fields = ('component', 'average', 'standard_deviation')
 
 
+class BaseCompositionFormSet(BaseInlineFormSet):
+    def clean(self):
+        """Checks that the sum of all weight fractions is 1."""
+        if any(self.errors):
+            return
+        if sum([form.cleaned_data.get('average') for form in self.forms]) != 1.0:
+            raise ValidationError("The weight fractions must sum up to 1.")
+
+
+class PlainTextComponentWidget(forms.Widget):
+    def render(self, name, value, attrs=None, renderer=None):
+        if hasattr(self, 'initial'):
+            value = self.initial
+        object_name = MaterialComponent.objects.get(id=value).name
+
+        return mark_safe("<div style=\"min-width: 7em; padding-right: 12px;\">" + (str(
+            object_name) if value is not None else '-') + "</div>" + f"<input type='hidden' name='{name}' value='{value}'>")
+
+
 class InlineComponentShare(InlineFormSetFactory):
     model = MaterialComponentShare
     fields = ('component', 'average', 'standard_deviation')
     factory_kwargs = {
+        'formset': BaseCompositionFormSet,
         'extra': 0,
         'can_delete': False,
         'widgets': {
+            'component': PlainTextComponentWidget(),
             'average': forms.NumberInput(attrs={'min': 0, 'max': 1.0, 'step': 0.01}),
             'standard_deviation': forms.NumberInput(attrs={'min': 0, 'max': 1.0, 'step': 0.01})
         }
@@ -103,27 +127,15 @@ class InlineComponentShare(InlineFormSetFactory):
 
 
 class AddTemporalDistributionForm(BSModalModelForm):
-    # def __init__(self, *args, **kwargs):
-    #     super().__init__(*args, **kwargs)
-    #     used_ids = kwargs.get('instance').temporal_distribution_ids
-    #     used_ids.append(2)  # TODO: Find better way to avoid the "Averages" from given choices
-    #     self.fields['temporal_distributions'].queryset = TemporalDistribution.objects.exclude(id__in=used_ids)
-
     class Meta:
         model = MaterialComponentGroupSettings
         fields = '__all__'
 
 
-MaterialComponentShareFormSet = forms.modelformset_factory(
-    MaterialComponentShare,
-    exclude=('scenario', 'distribution', 'group_settings',),
-    extra=2
-)
-
-
 class ComponentShareDistributionFormSetHelper(FormHelper):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.template = 'bootstrap4/table_inline_formset.html'
         self.form_method = 'post'
         self.layout = Layout(
             Row(

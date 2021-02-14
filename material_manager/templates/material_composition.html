@@ -3,7 +3,17 @@
 {% load crispy_forms_filters %}
 {% load render_table from django_tables2 %}
 
+{% block style %}
+    <style>
+        .toggle-edit {
+            display: none
+        }
+    </style>
+{% endblock style %}
+
 {% block content %}
+
+
 
     <!-- start basic material definition -->
     <div class="row">
@@ -26,7 +36,7 @@
                 </div>
                 <div class="card-footer">
                     <a href="javascript:void(0);"
-                       class="modal-link"
+                       class="modal-link toggle-edit"
                        data-link="{% url 'material_update' object.material.id %}?next={{ request.path }}">
                         Edit <i class="fas fa-fw fa-edit"></i>
                     </a>
@@ -42,6 +52,14 @@
             <div class="card shadow">
                 <div class="card-header">
                     <b>Material composition</b>
+                    {#                    <div class="switch-container" id="toggle-edit-button">#}
+                    {#                        <div class="switch-label">edit</div>#}
+                    {#                        <label class="switch " id="toggle-edit-button">#}
+                    {#                            <input type="checkbox" class="default" onclick="toggle_edit()">#}
+                    {#                            <span class="slider round"></span>#}
+                    {#                        </label>#}
+                    {#                        <div class="switch-label">read</div>#}
+                    {#                    </div>#}
                 </div>
                 <div class="card-body">
                     {% for group_settings, content in composition.items %}
@@ -89,16 +107,9 @@
                                                 </table>
                                                 <div>
                                                     <a href="javascript:void(0)"
-                                                       class="modal-link"
+                                                       class="modal-link toggle-edit"
                                                        data-link="{% url 'add_source' group_settings.id %}">
                                                         <i class="fas fa-fw fa-plus"></i> Add source
-                                                    </a>
-                                                </div>
-                                                <div>
-                                                    <a href="javascript:void(0)"
-                                                       class="modal-link"
-                                                       data-link="{% url 'add_seasonal_variation' group_settings.id %}">
-                                                        <i class="fas fa-fw fa-plus"></i> Add seasonal variation
                                                     </a>
                                                 </div>
                                             </div>
@@ -107,22 +118,43 @@
                                             <div class="col">
                                                 <table class="table m-0 p-0">
                                                     <tbody>
-                                                    {% for table in content.distribution_tables %}
-                                                        <tr class="accordion-toggle"
-                                                            data-toggle="collapse"
-                                                            data-target="#distribution-table-group-{{ group_settings.id }}">
+                                                    <tr>
+                                                        <td><b>Seasonality</b></td>
+                                                    </tr>
+                                                    {% for distribution, table in content.distribution_tables.items %}
+                                                        <tr>
                                                             <td>
-                                                                <a href="javascript:void(0);">
-                                                                    Show seasonal variation
+                                                                <a href="javascript:void(0);"
+                                                                   class="accordion-toggle"
+                                                                   data-toggle="collapse"
+                                                                   data-target="#distribution-table-group-{{ group_settings.id }}-dist-{{ distribution.id }}">
+                                                                    Show variation "{{ distribution.name }}"
+                                                                </a>
+                                                            </td>
+                                                            <td>
+                                                                <a href="javascript:void(0);"
+                                                                   class="modal-link toggle-edit"
+                                                                   data-link="{% url 'remove_seasonal_variation' group_settings.id distribution.id %}">
+                                                                    <i class="fas fa-fw fa-trash"></i> Remove this
+                                                                    variation
                                                                 </a>
                                                             </td>
                                                         </tr>
                                                         <tr class="accordion-body collapse" id="{{ table.id }}">
-                                                            <td class="p-0">
+                                                            <td class="p-0" colspan="2">
                                                                 {% render_table table %}
                                                             </td>
                                                         </tr>
                                                     {% endfor %}
+                                                    <tr>
+                                                        <td colspan="2">
+                                                            <a href="javascript:void(0)"
+                                                               class="modal-link toggle-edit"
+                                                               data-link="{% url 'add_seasonal_variation' group_settings.id %}">
+                                                                <i class="fas fa-fw fa-plus"></i> Add seasonal variation
+                                                            </a>
+                                                        </td>
+                                                    </tr>
                                                     </tbody>
                                                 </table>
                                             </div>
@@ -131,27 +163,28 @@
                                     </div>
                                     <div class="card-footer">
                                         <a id="remove-group-{{ group.id }}"
-                                           class="modal-link"
+                                           class="modal-link toggle-edit"
                                            data-link="{% url 'material_component_group_remove' group_settings.id %}"
                                            href="javascript:void(0);">
-                                            Remove <i class="fas fa-fw fa-trash"></i>
+                                            <i class="fas fa-fw fa-trash"></i> Remove group
                                         </a>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     {% endfor %}
-
-                    <div class="card border-left-primary border">
-                        <div class="card-header"></div>
-                        <div class="card-body">
-                            <a href="javascript:void(0);"
-                               class="modal-link"
-                               data-link="{% url 'material_add_component_group' object.id %}">
-                                <i class="fas fa-fw fa-plus"></i> Add component group
-                            </a>
+                    <div class="toggle-edit">
+                        <div class="card border-left-primary border">
+                            <div class="card-header"></div>
+                            <div class="card-body">
+                                <a href="javascript:void(0);"
+                                   class="modal-link"
+                                   data-link="{% url 'material_add_component_group' object.id %}">
+                                    <i class="fas fa-fw fa-plus"></i> Add component group
+                                </a>
+                            </div>
+                            <div class="card-footer"></div>
                         </div>
-                        <div class="card-footer"></div>
                     </div>
                 </div>
             </div>
@@ -159,13 +192,20 @@
     </div>
     <!-- end material composition -->
 
+    <div id="allow-edit" style="display: none" data-editable="{{ allow_edit }}"></div>
+
 {% endblock content %}
 
 {% block javascript %}
     {{ block.super }}
 
     <script type="text/javascript">
+
         $(document).ready(function () {
+
+            if ($("#allow-edit").data()['editable'] === "True") {
+                $(".toggle-edit").show()
+            }
 
             $(".modal-link").each(function () {
                 $(this).modalForm({
@@ -175,6 +215,11 @@
             });
 
         });
+
+        function toggle_edit() {
+            $(".toggle-edit").toggle()
+        }
+
     </script>
 
 {% endblock javascript %}

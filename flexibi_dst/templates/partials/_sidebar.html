@@ -15,7 +15,7 @@
         <a class="nav-link" href="{% url 'home' %}">
             <i class="fas fa-fw fa-tachometer-alt"></i>
             <span>Start</span></a>
-      </li>
+    </li>
 
     <!-- Divider -->
     <hr class="sidebar-divider">
@@ -34,6 +34,13 @@
             <span>Bioresource Explorer</span></a>
     </li>
 
+    <!-- Material manager -->
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'material_list' %}">
+            <i class="fas fa-fw fa-leaf"></i>
+            <span>Material Manager</span></a>
+    </li>
+
     <!-- Scenario builder -->
     <li class="nav-item">
         <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseOne" aria-expanded="true"
@@ -45,10 +52,9 @@
             <div class="bg-white py-2 collapse-inner rounded">
                 <h6 class="collapse-header">Scenario components:</h6>
                 <a class="collapse-item" href="{% url 'catchment_list' %}">Catchments</a>
-                <a class="collapse-item" href="{% url 'material_list' %}">Materials</a>
                 <a class="collapse-item" href="{% url 'greenhouse_list' %}">Greenhouses</a>
                 <a class="collapse-item" href="{% url 'scenario_list' %}">Browse scenarios</a>
-                <a class="collapse-item" href="{% url 'create_scenario' %}">Create a new scenario</a>
+                <a class="collapse-item" href="{% url 'scenario_create' %}">Create a new scenario</a>
             </div>
         </div>
     </li>
@@ -75,9 +81,9 @@
     {#    <hr class="sidebar-divider">#}
 
     <!-- Heading -->
-    {#    <div class="sidebar-heading">#}
-    {#        Addons#}
-    {#    </div>#}
+    {#        <div class="sidebar-heading">#}
+    {#            Addons#}
+    {#        </div>#}
 
     <!-- Divider -->
     <hr class="sidebar-divider d-none d-md-block">

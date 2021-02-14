@@ -31,8 +31,8 @@ class UserItemTable(tables.Table):
         edit = tables.TemplateColumn(
             '<a href="javascript:void(0);" class="modal-link" data-link="{{ record.update_url }}"><i class="fas fa-fw fa-edit"></i></a>')
         delete = tables.TemplateColumn(
-            '<a href="javascript:void(0);" class="modal-link" data-link="{{ record.delete_url}}"><i class="fas fa-fw fa-trash"></i></a>')
-        kwargs['extra_columns'] = [('name', name), ('description', description), ('edit', edit), ('delete', delete), ]
+            '<a href="javascript:void(0);" class="modal-link" data-link="{{ record.delete_url }}"><i class="fas fa-fw fa-trash"></i></a>')
+        kwargs['extra_columns'] = [('name', name), ('description', description), ('edit', edit), ('delete', delete)]
         super().__init__(*args, **kwargs)
 
     def get_create_url(self):

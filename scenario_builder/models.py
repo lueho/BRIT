@@ -277,9 +277,6 @@ class Scenario(models.Model):
         )
         return setting
 
-    def material_customizations(self):
-        return self.materialsettings_set.all()
-
     def available_feedstocks(self):
         return Material.objects.filter(id__in=self.available_inventory_algorithms().values('feedstock'))
 
@@ -423,9 +420,9 @@ class Scenario(models.Model):
                                                                           feedstock=feedstock):
             config_entry.delete()
 
-    def delete(self, **kwargs):
-        self.delete_configuration()  # TODO: Does this happen automatically through cascading?
-        super().delete()
+    # def delete(self, **kwargs):
+    #     self.delete_configuration()  # TODO: Does this happen automatically through cascading?
+    #     super().delete()
 
     def delete_result_layers(self):
         for layer in self.layer_set.all():
@@ -540,8 +537,20 @@ class Scenario(models.Model):
     def result_features_collections(self):
         return [layer.get_feature_collection() for layer in self.layer_set()]
 
+    @property
+    def detail_url(self):
+        return self.get_absolute_url()
+
+    @property
+    def update_url(self):
+        return reverse('scenario_update', kwargs={'pk': self.id})
+
+    @property
+    def delete_url(self):
+        return reverse('scenario_delete', kwargs={'pk': self.id})
+
     def get_absolute_url(self):
-        return reverse('scenario_detail', kwargs={'pk': self.pk})
+        return reverse('scenario_detail', kwargs={'pk': self.id})
 
     def __str__(self):
         return self.name
