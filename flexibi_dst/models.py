@@ -14,6 +14,9 @@ class TemporalDistribution(models.Model):
     def __str__(self):
         return self.name
 
+    class Meta:
+        unique_together = [['name', 'owner']]
+
 
 class Timestep(models.Model):
     """
@@ -25,3 +28,6 @@ class Timestep(models.Model):
 
     def __str__(self):
         return self.name
+
+    class Meta:
+        unique_together = [['name', 'owner']]

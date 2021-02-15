@@ -1,5 +1,7 @@
 from django.contrib.auth.models import User
+from django.db import transaction
 from django.db.models import signals
+from django.db.utils import IntegrityError
 from django.test import TestCase
 from factory.django import mute_signals
 
@@ -12,13 +14,85 @@ from material_manager.models import (
     MaterialComponentGroupSettings,
     MaterialComponentShare,
     CompositionSet,
+    BaseObjects
 )
+
+
+class BaseObjectsTestCase(TestCase):
+
+    def setUp(self):
+        self.standard_owner = User.objects.create(username='flexibi')
+        self.base_distribution = TemporalDistribution.objects.create(
+            name='Average',
+            owner=self.standard_owner
+        )
+        pass
+
+    def test_base_objects(self):
+        standard_owner = BaseObjects.get.standard_owner()
+        self.assertIsInstance(standard_owner, User)
+        self.assertEqual(User.objects.all().count(), 1)
+        self.assertEqual(standard_owner.username, 'flexibi')
+        standard_owner = BaseObjects.get.standard_owner()
+        self.assertIsInstance(standard_owner, User)
+        self.assertEqual(User.objects.all().count(), 1)
+        self.assertEqual(standard_owner.username, 'flexibi')
+
+        base_group = BaseObjects.get.base_group()
+        self.assertIsInstance(base_group, MaterialComponentGroup)
+        self.assertEqual(MaterialComponentGroup.objects.all().count(), 1)
+        self.assertEqual(base_group.name, 'Total Material')
+        self.assertEqual(base_group.owner, standard_owner)
+        base_group = BaseObjects.get.base_group()
+        self.assertIsInstance(base_group, MaterialComponentGroup)
+        self.assertEqual(MaterialComponentGroup.objects.all().count(), 1)
+        self.assertEqual(base_group.name, 'Total Material')
+
+        base_component = BaseObjects.get.base_component()
+        self.assertIsInstance(base_component, MaterialComponent)
+        self.assertEqual(MaterialComponent.objects.all().count(), 1)
+        self.assertEqual(base_component.name, 'Fresh Matter (FM)')
+        self.assertEqual(base_component.owner, standard_owner)
+        base_component = BaseObjects.get.base_component()
+        self.assertIsInstance(base_component, MaterialComponent)
+        self.assertEqual(MaterialComponent.objects.all().count(), 1)
+        self.assertEqual(base_component.name, 'Fresh Matter (FM)')
+
+        base_distribution = BaseObjects.get.base_distribution()
+        self.assertIsInstance(base_distribution, TemporalDistribution)
+        self.assertEqual(TemporalDistribution.objects.all().count(), 1)
+        self.assertEqual(base_distribution.name, 'Average')
+        self.assertEqual(base_distribution.owner, standard_owner)
+        base_distribution = BaseObjects.get.base_distribution()
+        self.assertIsInstance(base_distribution, TemporalDistribution)
+        self.assertEqual(TemporalDistribution.objects.all().count(), 1)
+        self.assertEqual(base_distribution.name, 'Average')
+
+        base_timestep = BaseObjects.get.base_timestep()
+        self.assertIsInstance(base_timestep, Timestep)
+        self.assertEqual(Timestep.objects.all().count(), 1)
+        self.assertEqual(base_timestep.name, 'Average')
+        self.assertEqual(base_timestep.owner, standard_owner)
+        base_timestep = BaseObjects.get.base_timestep()
+        self.assertIsInstance(base_timestep, Timestep)
+        self.assertEqual(Timestep.objects.all().count(), 1)
+        self.assertEqual(base_timestep.name, 'Average')
+
+        with self.assertRaises(IntegrityError):
+            with transaction.atomic():
+                TemporalDistribution.objects.create(
+                    name='Average',
+                    owner=standard_owner
+                )
+        first_base_distribution = BaseObjects.get.base_distribution()
+        second_base_distribution = TemporalDistribution.objects.get(name='Average')
+        self.assertEqual(first_base_distribution, second_base_distribution)
 
 
 class MaterialTestCase(TestCase):
 
     def setUp(self):
-        self.superuser = User.objects.create_superuser(username='superuser')
+        self.superuser = User.objects.create_superuser(username='flexibi')
         self.user = User.objects.create(username='standard_user')
         self.base_distribution = TemporalDistribution.objects.create(
             name='Average',

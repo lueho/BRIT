@@ -53,13 +53,6 @@ def averages_table_factory(group_settings):
         'weight fraction': Column(footer=footers['weight fraction']),
         'remove': Column(attrs={"td": {"class": "toggle-edit"}, "th": {"class": "toggle-edit"}})
     }
-    # for name in list(table_data[0].keys()):
-    #     columns[name]
-    # if len(table_data) > 0:
-    #     columns = {name: (Column(footer=footers[name]) if name in footers else Column()) for
-    #                name in list(table_data[0].keys())}
-    # else:
-    #     columns = {}
     table_class = type(f'AveragesTable{group_settings.id}', (Table,), columns)
     return table_class(table_data)
 

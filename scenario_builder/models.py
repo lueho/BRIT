@@ -41,13 +41,18 @@ class SeasonalDistribution(models.Model):
     values = ArrayField(models.FloatField(), default=list([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]))
 
 
-
+# ----------- Geodata --------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 class Region(models.Model):
     name = models.CharField(max_length=56, null=False)
     country = models.CharField(max_length=56, null=False)
     geom = MultiPolygonField(null=True)
+
+    @staticmethod
+    def get_absolute_url():
+        return reverse('catchment_list')
 
     def __str__(self):
         return self.name
@@ -61,24 +66,9 @@ class Catchment(models.Model):
     type = models.CharField(max_length=14, choices=TYPES, default='custom')
     geom = MultiPolygonField()
 
-    def __str__(self):
-        return self.name
-
-
-
-
-
-# ----------- Geodata --------------------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------------------------
-
-class GeoDataset(models.Model):
-    name = models.CharField(max_length=56, null=False)
-    description = models.TextField(blank=True, null=True)
-    region = models.ForeignKey(Region, on_delete=models.CASCADE, null=False)
-    model_name = models.CharField(max_length=56, choices=GIS_SOURCE_MODELS, null=True)
-
-    def get_absolute_url(self):
-        return reverse(self.model_name)
+    @staticmethod
+    def get_absolute_url():
+        return reverse('catchment_list')
 
     def __str__(self):
         return self.name
@@ -88,6 +78,19 @@ class SFBSite(models.Model):
     name = models.CharField(max_length=20, null=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
     geom = PointField(null=True)
+
+    def __str__(self):
+        return self.name
+
+
+class GeoDataset(models.Model):
+    """
+    Holds meta information about datasets from the core module or scenario extensions.
+    """
+    name = models.CharField(max_length=56, null=False)
+    description = models.TextField(blank=True, null=True)
+    region = models.ForeignKey(Region, on_delete=models.CASCADE, null=False)
+    model_name = models.CharField(max_length=56, choices=GIS_SOURCE_MODELS, null=True)
 
     def __str__(self):
         return self.name
@@ -103,10 +106,10 @@ class InventoryAlgorithm(models.Model):
     source_module = models.CharField(max_length=255, null=True)
     function_name = models.CharField(max_length=56, null=True)
     description = models.TextField(blank=True, null=True)
-    geodataset = models.ForeignKey(GeoDataset, on_delete=models.CASCADE)
-    feedstock = models.ManyToManyField(Material, limit_choices_to={'is_feedstock': True})
+    geodataset = models.ForeignKey(GeoDataset, on_delete=models.CASCADE)  # TODO: Make many2many?
+    feedstock = models.ManyToManyField(Material, limit_choices_to={'is_feedstock': True})  # TODO: rename to plural
     default = models.BooleanField('Default for this combination of geodataset and feedstock', default=False)
-    source = models.CharField(max_length=200, blank=True, null=True)
+    source = models.CharField(max_length=200, blank=True, null=True)  # TODO: connect to library
 
     def __str__(self):
         return self.name
