@@ -24,7 +24,7 @@ class Timestep(models.Model):
     """
     name = models.CharField(max_length=255, blank=True, null=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE)
-    distribution = models.ForeignKey(TemporalDistribution, default=1, on_delete=models.CASCADE)
+    distribution = models.ForeignKey(TemporalDistribution, on_delete=models.CASCADE)
 
     def __str__(self):
         return self.name

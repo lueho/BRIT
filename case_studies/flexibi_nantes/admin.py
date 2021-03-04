@@ -1,13 +1,14 @@
 from django.contrib import admin
 
-from .models import Greenhouse, GreenhouseGrowthCycle
+from .models import Greenhouse, GreenhouseGrowthCycle, GrowthTimeStepSet, GrowthShare
 
 
 @admin.register(Greenhouse)
 class GreenhouseAdmin(admin.ModelAdmin):
     list_display = (
-        'heated', 'lighted', 'high_wire', 'above_ground', 'nb_cycles', 'culture_1', 'culture_2', 'culture_3')
+        'heated', 'lighted', 'high_wire', 'above_ground',)
 
-@admin.register(GreenhouseGrowthCycle)
-class GreenhouseAdmin(admin.ModelAdmin):
-    list_display = ('id', 'cycle_number', 'culture', 'material', 'component')
+
+admin.site.register(GreenhouseGrowthCycle)
+admin.site.register(GrowthTimeStepSet)
+admin.site.register(GrowthShare)

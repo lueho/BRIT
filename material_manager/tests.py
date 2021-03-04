@@ -16,64 +16,51 @@ from material_manager.models import (
     CompositionSet,
     BaseObjects
 )
+from users.models import ReferenceUsers
 
 
 class BaseObjectsTestCase(TestCase):
 
-    def setUp(self):
-        self.standard_owner = User.objects.create(username='flexibi')
-        self.base_distribution = TemporalDistribution.objects.create(
-            name='Average',
-            owner=self.standard_owner
-        )
-        pass
-
     def test_base_objects(self):
-        standard_owner = BaseObjects.get.standard_owner()
-        self.assertIsInstance(standard_owner, User)
-        self.assertEqual(User.objects.all().count(), 1)
-        self.assertEqual(standard_owner.username, 'flexibi')
-        standard_owner = BaseObjects.get.standard_owner()
-        self.assertIsInstance(standard_owner, User)
-        self.assertEqual(User.objects.all().count(), 1)
-        self.assertEqual(standard_owner.username, 'flexibi')
 
-        base_group = BaseObjects.get.base_group()
+        standard_owner = ReferenceUsers.objects.get.standard_owner
+
+        base_group = BaseObjects.objects.get.base_group
         self.assertIsInstance(base_group, MaterialComponentGroup)
         self.assertEqual(MaterialComponentGroup.objects.all().count(), 1)
         self.assertEqual(base_group.name, 'Total Material')
         self.assertEqual(base_group.owner, standard_owner)
-        base_group = BaseObjects.get.base_group()
+        base_group = BaseObjects.objects.get.base_group
         self.assertIsInstance(base_group, MaterialComponentGroup)
         self.assertEqual(MaterialComponentGroup.objects.all().count(), 1)
         self.assertEqual(base_group.name, 'Total Material')
 
-        base_component = BaseObjects.get.base_component()
+        base_component = BaseObjects.objects.get.base_component
         self.assertIsInstance(base_component, MaterialComponent)
         self.assertEqual(MaterialComponent.objects.all().count(), 1)
         self.assertEqual(base_component.name, 'Fresh Matter (FM)')
         self.assertEqual(base_component.owner, standard_owner)
-        base_component = BaseObjects.get.base_component()
+        base_component = BaseObjects.objects.get.base_component
         self.assertIsInstance(base_component, MaterialComponent)
         self.assertEqual(MaterialComponent.objects.all().count(), 1)
         self.assertEqual(base_component.name, 'Fresh Matter (FM)')
 
-        base_distribution = BaseObjects.get.base_distribution()
+        base_distribution = BaseObjects.objects.get.base_distribution
         self.assertIsInstance(base_distribution, TemporalDistribution)
         self.assertEqual(TemporalDistribution.objects.all().count(), 1)
         self.assertEqual(base_distribution.name, 'Average')
         self.assertEqual(base_distribution.owner, standard_owner)
-        base_distribution = BaseObjects.get.base_distribution()
+        base_distribution = BaseObjects.objects.get.base_distribution
         self.assertIsInstance(base_distribution, TemporalDistribution)
         self.assertEqual(TemporalDistribution.objects.all().count(), 1)
         self.assertEqual(base_distribution.name, 'Average')
 
-        base_timestep = BaseObjects.get.base_timestep()
+        base_timestep = BaseObjects.objects.get.base_timestep
         self.assertIsInstance(base_timestep, Timestep)
         self.assertEqual(Timestep.objects.all().count(), 1)
         self.assertEqual(base_timestep.name, 'Average')
         self.assertEqual(base_timestep.owner, standard_owner)
-        base_timestep = BaseObjects.get.base_timestep()
+        base_timestep = BaseObjects.objects.get.base_timestep
         self.assertIsInstance(base_timestep, Timestep)
         self.assertEqual(Timestep.objects.all().count(), 1)
         self.assertEqual(base_timestep.name, 'Average')
@@ -84,9 +71,23 @@ class BaseObjectsTestCase(TestCase):
                     name='Average',
                     owner=standard_owner
                 )
-        first_base_distribution = BaseObjects.get.base_distribution()
+        first_base_distribution = BaseObjects.objects.get.base_distribution
         second_base_distribution = TemporalDistribution.objects.get(name='Average')
         self.assertEqual(first_base_distribution, second_base_distribution)
+        self.assertEqual(base_timestep.distribution, base_distribution)
+
+
+class MaterialSetupTestCase(TestCase):
+
+    def setUp(self):
+        self.material = Material.objects.create(
+            name='Test material',
+            owner=ReferenceUsers.objects.get.standard_owner,
+            is_feedstock=True
+        )
+
+    def test_true(self):
+        self.assertTrue(True)
 
 
 class MaterialTestCase(TestCase):

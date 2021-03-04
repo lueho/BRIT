@@ -1,10 +1,10 @@
 import django.contrib.gis.db.models as gis_models
 from django.apps import apps
-from django.contrib.postgres.fields import ArrayField
 from django.db import models, connection
 from django.urls import reverse
 
-from material_manager.models import Material
+from flexibi_dst.models import TemporalDistribution, Timestep
+from material_manager.models import MaterialSettings, MaterialComponentShare, CompositionSet, MaterialComponent
 from scenario_builder.models import Scenario, InventoryAlgorithm
 from .exceptions import InvalidGeometryType, NoFeaturesProvided, TableAlreadyExists
 
@@ -111,7 +111,7 @@ class Layer(models.Model):
     geom_type = models.CharField(max_length=20)
     table_name = models.CharField(max_length=200)
     scenario = models.ForeignKey(Scenario, on_delete=models.CASCADE)
-    feedstock = models.ForeignKey(Material, on_delete=models.CASCADE)
+    feedstock = models.ForeignKey(MaterialSettings, on_delete=models.CASCADE)
     algorithm = models.ForeignKey(InventoryAlgorithm, on_delete=models.CASCADE)
     layer_fields = models.ManyToManyField(LayerField)
 
@@ -131,10 +131,23 @@ class Layer(models.Model):
 
     def add_aggregated_distributions(self, distributions):
         for distribution in distributions:
-            LayerAggregatedDistribution.objects.create(name=distribution['name'],
-                                                       type=distribution['type'],
-                                                       distribution=distribution['distribution'],
-                                                       layer=self)
+            dist = TemporalDistribution.objects.get(id=distribution['distribution'])
+            aggdist = LayerAggregatedDistribution.objects.create(name=distribution['name'],
+                                                                 distribution=dist,
+                                                                 layer=self)
+
+            for dset in distribution['sets']:
+                distset = DistributionSet.objects.create(
+                    aggregated_distribution=aggdist,
+                    timestep_id=dset['timestep']
+                )
+                for share in dset['shares']:
+                    DistributionShare.objects.create(
+                        component_id=share['component'],
+                        average=share['average'],
+                        standard_deviation=0.0,  # TODO
+                        distribution_set=distset
+                    )
 
     def add_layer_fields(self, fields: dict):
         for field_name, data_type in fields.items():
@@ -278,5 +291,41 @@ class LayerAggregatedDistribution(models.Model):
 
     name = models.CharField(max_length=255, null=True)
     type = models.CharField(max_length=255, choices=DISTRIBUTION_TYPES, null=True)
-    distribution = ArrayField(models.FloatField(), null=True)
+    distribution = models.ForeignKey(TemporalDistribution, on_delete=models.CASCADE, null=True)
     layer = models.ForeignKey(Layer, on_delete=models.CASCADE, null=True)
+
+    @property
+    def shares(self):
+        return DistributionShare.objects.filter(distribution_set__aggregated_distribution=self)
+
+    @property
+    def components(self):
+        return MaterialComponent.objects.filter(
+            id__in=[share['component'] for share in self.shares.values('component').distinct()]
+        )
+
+    @property
+    def serialized(self):
+        dist = []
+        for component in self.components:
+            component_dist = {
+                'label': component.name,
+                'data': []
+            }
+            for timestep in self.distribution.timestep_set.all():
+                share = self.shares.get(component=component, distribution_set__timestep=timestep)
+                component_dist['data'].append(share.average)
+            dist.append(component_dist)
+        return dist
+
+
+class DistributionSet(models.Model):
+    timestep = models.ForeignKey(Timestep, on_delete=models.CASCADE, null=True)
+    aggregated_distribution = models.ForeignKey(LayerAggregatedDistribution, on_delete=models.CASCADE, null=True)
+
+
+class DistributionShare(models.Model):
+    distribution_set = models.ForeignKey(DistributionSet, on_delete=models.CASCADE)
+    component = models.ForeignKey(MaterialComponent, on_delete=models.CASCADE, null=True)
+    average = models.FloatField()
+    standard_deviation = models.DecimalField(decimal_places=2, max_digits=5)

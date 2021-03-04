@@ -9,6 +9,7 @@ from extra_views import UpdateWithInlinesView
 
 from flexibi_dst.models import TemporalDistribution
 from flexibi_dst.views import DualUserListView, UserOwnsObjectMixin, NextOrSuccessUrlMixin
+from users.models import ReferenceUsers
 from .forms import (
     AddComponentForm,
     AddComponentGroupForm,
@@ -22,7 +23,6 @@ from .forms import (
     InlineComponentShare
 )
 from .models import (
-    BaseObjects,
     Material,
     MaterialSettings,
     MaterialComponent,
@@ -263,7 +263,7 @@ class MaterialSettingsDetailView(UserPassesTestMixin, DetailView):
 
     def test_func(self):
         self.object = self.get_object()
-        standard_owner = BaseObjects.get.standard_owner()
+        standard_owner = ReferenceUsers.objects.get.standard_owner
         if self.object.owner == standard_owner:
             if self.request.user == standard_owner:
                 self.allow_edit = True

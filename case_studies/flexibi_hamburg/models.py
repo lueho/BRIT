@@ -1,5 +1,6 @@
 from django.contrib.gis.db.models import PointField, MultiPolygonField
 from django.db import models
+from django.urls import reverse
 
 
 class HamburgRoadsideTrees(models.Model):
@@ -23,9 +24,6 @@ class HamburgRoadsideTrees(models.Model):
     stadtteil = models.CharField(max_length=63, blank=True, null=True)
     bezirk = models.CharField(max_length=63, blank=True, null=True)
 
-    class Meta:
-        db_table = 'gis_source_manager_hamburgroadsidetrees'
-
 
 class HamburgGreenAreas(models.Model):
     geom = MultiPolygonField(srid=4326, blank=True, null=True)
@@ -43,5 +41,6 @@ class HamburgGreenAreas(models.Model):
     nutzcode = models.IntegerField(blank=True, null=True)
     stand = models.CharField(max_length=63, blank=True, null=True)
 
-    class Meta:
-        db_table = 'gis_source_manager_hamburggreenareas'
+    @staticmethod
+    def get_absolute_url():
+        return reverse('HamburgGreenAreas')

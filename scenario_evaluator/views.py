@@ -3,7 +3,7 @@ from django.views.generic import DetailView
 
 from flexibi_dst.views import DualUserListView
 from layer_manager.models import Layer
-from material_manager.models import Material
+from material_manager.models import MaterialSettings
 from scenario_builder.models import InventoryAlgorithm, Scenario
 from scenario_evaluator.evaluations import ScenarioResult
 from scenario_evaluator.models import RunningTask
@@ -71,5 +71,5 @@ class ScenarioResultDetailMapView(DetailView):
     def get_object(self, **kwargs):
         scenario = Scenario.objects.get(id=self.kwargs.get('pk'))
         algorithm = InventoryAlgorithm.objects.get(id=self.kwargs.get('algorithm_pk'))
-        feedstock = Material.objects.get(id=self.kwargs.get('feedstock_pk'))
+        feedstock = MaterialSettings.objects.get(id=self.kwargs.get('feedstock_pk'))
         return Layer.objects.get(scenario=scenario, algorithm=algorithm, feedstock=feedstock)

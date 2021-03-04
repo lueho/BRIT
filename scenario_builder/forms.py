@@ -8,6 +8,7 @@ from django.forms import (Form,
 from django.forms.widgets import CheckboxSelectMultiple
 from leaflet.forms.widgets import LeafletWidget
 
+from flexibi_dst.models import TemporalDistribution
 from .models import (
     Catchment,
     GeoDataset,
@@ -15,7 +16,6 @@ from .models import (
     Region,
     Scenario,
     ScenarioInventoryConfiguration,
-    SeasonalDistribution,
 )
 
 
@@ -66,8 +66,8 @@ class CatchmentQueryForm(Form):
 
 class SeasonalDistributionModelForm(ModelForm):
     class Meta:
-        model = SeasonalDistribution
-        fields = ('values',)
+        model = TemporalDistribution
+        fields = ()
 
 
 # ----------- Inventories -------------------------------------------------------------------------------------

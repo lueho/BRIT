@@ -9,6 +9,7 @@ from factory.django import mute_signals
 
 from flexibi_dst.models import Timestep, TemporalDistribution
 from library.models import LiteratureSource
+from users.models import ReferenceUsers
 from .tables import averages_table_factory, distribution_table_factory
 
 
@@ -25,7 +26,7 @@ class Material(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE)
-    is_feedstock = models.BooleanField(default=False)
+    is_feedstock = models.BooleanField(default=True)
     stan_flow_id = models.CharField(max_length=5,
                                     blank=True,
                                     null=True,
@@ -43,8 +44,8 @@ class Material(models.Model):
         return self.materialsettings_set.get(standard=True)
 
     def initialize_standard_settings(self):
-        base_group = BaseObjects.get.base_group()
-        base_component = BaseObjects.get.base_component()
+        base_group = BaseObjects.objects.get.base_group
+        base_component = BaseObjects.objects.get.base_component
 
         settings = MaterialSettings.objects.create(
             material=self,
@@ -102,8 +103,8 @@ class MaterialSettings(models.Model):
         Initializes a first component group 'Total Material', which contains the component 'Fresh matter (FM)'. These
         are the starting point with a total of 1 that all other weight fractions can refer to.
         """
-        base_group = BaseObjects.get.base_group()
-        base_component = BaseObjects.get.base_component()
+        base_group = BaseObjects.objects.get.base_group
+        base_component = BaseObjects.objects.get.base_component
         group_settings = MaterialComponentGroupSettings.objects.create(
             material_settings=self,
             owner=self.owner,
@@ -113,7 +114,7 @@ class MaterialSettings(models.Model):
         CompositionSet.objects.create(
             owner=self.owner,
             group_settings=group_settings,
-            timestep=BaseObjects.get.base_timestep()
+            timestep=BaseObjects.objects.get.base_timestep
         )
         group_settings.add_component(base_component)
 
@@ -123,7 +124,7 @@ class MaterialSettings(models.Model):
                 owner=self.owner,
                 group=group,
                 material_settings=self,
-                fractions_of=kwargs.setdefault('fractions_of', BaseObjects.get.base_component())
+                fractions_of=kwargs.setdefault('fractions_of', BaseObjects.objects.get.base_component)
             )
 
         return kwargs['component_group_settings']
@@ -134,6 +135,26 @@ class MaterialSettings(models.Model):
         Ids of components of groups that are assigned to this material.
         """
         return [pk for setting in self.materialcomponentgroupsettings_set.all() for pk in setting.component_ids]
+
+    @property
+    def components(self):
+        """
+        Queryset of all components that have been assigned to this group.
+        """
+        return MaterialComponent.objects.filter(id__in=self.component_ids)
+
+    @property
+    def grouped_components(self):
+        """
+        Dictionary with group objects as keys and lists with according components as values.
+        """
+        group_settings = self.materialcomponentgroupsettings_set.all()
+        result = {}
+        for gs in group_settings:
+            group = gs.group
+            components = [component for component in gs.components()]
+            result[group] = components
+        return result
 
     @property
     def group_ids(self):
@@ -175,8 +196,7 @@ class MaterialSettings(models.Model):
         return material_settings_copy
 
     def composition(self):
-        base_group = BaseObjects.get.base_group()
-        group_settings = self.materialcomponentgroupsettings_set.exclude(group=base_group)
+        group_settings = self.materialcomponentgroupsettings_set.exclude(group=BaseObjects.objects.get.base_group)
         grouped_shares = {}
         for setting in group_settings:
             grouped_shares[setting] = {
@@ -302,7 +322,7 @@ class MaterialComponentGroupSettings(models.Model):
 
     @property
     def average_composition(self):
-        return self.compositionset_set.get(timestep=BaseObjects.get.base_timestep())
+        return self.compositionset_set.get(timestep=BaseObjects.objects.get.base_timestep)
 
     @property
     def blocked_component_ids(self):
@@ -363,7 +383,7 @@ class MaterialComponentGroupSettings(models.Model):
 
     def distribution_tables(self):
         return {distribution: distribution_table_factory(self, distribution) for distribution in
-                self.temporal_distributions.exclude(id=BaseObjects.get.base_distribution().id)}
+                self.temporal_distributions.exclude(id=BaseObjects.objects.get.base_distribution.id)}
 
     def get_absolute_url(self):
         return self.material_settings.get_absolute_url()
@@ -379,7 +399,7 @@ class MaterialComponentGroupSettings(models.Model):
 @receiver(post_save, sender=MaterialComponentGroupSettings)
 def initialize_group_settings(sender, instance, created, **kwargs):
     if created:
-        base_distribution = BaseObjects.get.base_distribution()
+        base_distribution = BaseObjects.objects.get.base_distribution
         instance.add_temporal_distribution(base_distribution)
 
 
@@ -404,7 +424,7 @@ class CompositionSet(models.Model):
 
     def remove_component(self, component):
         self.materialcomponentshare_set.get(component=component).delete()
-        if not self.timestep == BaseObjects.get.base_timestep():
+        if not self.timestep == BaseObjects.objects.get.base_timestep:
             if not self.materialcomponentshare_set.all().exists():
                 self.delete()
 
@@ -451,57 +471,31 @@ class MaterialComponentShare(models.Model):
 
 
 class BaseObjectManager(models.Manager):
-    STANDARD_OWNER_NAME = 'flexibi'
-    BASE_GROUP_NAME = 'Total Material'
-    BASE_COMPONENT_NAME = 'Fresh Matter (FM)'
-    BASE_DISTRIBUTION_NAME = 'Average'
-    BASE_TIMESTEP_NAME = 'Average'
+    BASE_GROUP = 'Total Material'
+    BASE_COMPONENT = 'Fresh Matter (FM)'
+    BASE_DISTRIBUTION = 'Average'
+    BASE_TIMESTEP = 'Average'
 
     def initialize(self):
-        standard_owner, created = User.objects.get_or_create(username=self.STANDARD_OWNER_NAME)
-        group, created = MaterialComponentGroup.objects.get_or_create(name=self.BASE_GROUP_NAME, owner=standard_owner)
-        component, created = MaterialComponent.objects.get_or_create(name=self.BASE_COMPONENT_NAME,
-                                                                     owner=standard_owner)
-        distribution, created = TemporalDistribution.objects.get_or_create(name=self.BASE_DISTRIBUTION_NAME,
-                                                                           owner=standard_owner)
-        timestep, created = Timestep.objects.get_or_create(name=self.BASE_TIMESTEP_NAME, owner=standard_owner)
+        owner = ReferenceUsers.objects.get.standard_owner
+        group, created = MaterialComponentGroup.objects.get_or_create(name=self.BASE_GROUP, owner=owner)
+        component, created = MaterialComponent.objects.get_or_create(name=self.BASE_COMPONENT, owner=owner)
+        distribution, created = TemporalDistribution.objects.get_or_create(name=self.BASE_DISTRIBUTION, owner=owner)
+        timestep, created = Timestep.objects.get_or_create(name=self.BASE_TIMESTEP, distribution=distribution,
+                                                           owner=owner)
         return super().create(
             base_group=group,
             base_component=component,
             base_distribution=distribution,
             base_timestep=timestep,
-            standard_owner=standard_owner
         )
 
-    def standard_owner(self):
+    @property
+    def get(self):
         if not super().first():
-            return self.initialize().standard_owner
+            return self.initialize()
         else:
-            return super().first().standard_owner
-
-    def base_group(self):
-        if not super().first():
-            return self.initialize().base_group
-        else:
-            return super().first().base_group
-
-    def base_component(self):
-        if not super().first():
-            return self.initialize().base_component
-        else:
-            return super().first().base_component
-
-    def base_distribution(self):
-        if not super().first():
-            return self.initialize().base_distribution
-        else:
-            return super().first().base_distribution
-
-    def base_timestep(self):
-        if not super().first():
-            return self.initialize().base_timestep
-        else:
-            return super().first().base_timestep
+            return super().first()
 
 
 class BaseObjects(models.Model):
@@ -510,10 +504,9 @@ class BaseObjects(models.Model):
     are missing (e.g. if a fresh database is used in a new instance of this tool), this model takes care that they are
     created.
     """
-    standard_owner = models.ForeignKey(User, on_delete=models.PROTECT, null=True)
     base_group = models.ForeignKey(MaterialComponentGroup, on_delete=models.PROTECT, null=True)
     base_component = models.ForeignKey(MaterialComponent, on_delete=models.PROTECT, null=True)
     base_distribution = models.ForeignKey(TemporalDistribution, on_delete=models.PROTECT, null=True)
     base_timestep = models.ForeignKey(Timestep, on_delete=models.PROTECT, null=True)
 
-    get = BaseObjectManager()
+    objects = BaseObjectManager()
