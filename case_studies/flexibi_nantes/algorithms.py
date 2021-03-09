@@ -98,10 +98,10 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
     @classmethod
     def nantes_greenhouse_production(cls, **kwargs):
         """
-
-        :param kwargs: catchment_id, scenario_id
-        :return:
+        Here all the algorithms that are specific to the case study of the greenhouses in Nantes region are implemented.
         """
+        scenario = Scenario.objects.get(id=kwargs.get('scenario_id'))
+        catchment = scenario.catchment
 
         result = {
             'aggregated_values': [],
@@ -109,21 +109,10 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
             'features': []
         }
 
-        scenario = Scenario.objects.get(id=kwargs.get('scenario_id'))
-        catchment = scenario.catchment
+        # Get all greenhouse data within the scenario catchment
         clipped = NantesGreenhouses.objects.filter(geom__intersects=catchment.geom)
 
-        # reference_distribution = CaseStudyBaseObjects.objects.get.reference_distribution
-        feedstocks = scenario.feedstocks()
-        # result['aggregated_values'].append({'name': 'feedstocks', 'value': [f.material.name for f in feedstocks], 'unit': ''})
-        components = []
-        for feedstock in feedstocks:
-            macro_components = feedstock.materialcomponentgroupsettings_set.get(group__name='Macro Components')
-            for component in macro_components.components():
-                components.append(component)
-        # result['aggregated_values'].append({'name': 'components', 'value': set([component.name for component in components]), 'unit': ''})
-
-        # Which greenhouses are considered?
+        # Filter the greenhouse types
         filter_kwargs = {}  # TODO: add filter functionality here
         greenhouse_types = Greenhouse.objects.filter(**filter_kwargs)
 
@@ -132,17 +121,18 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
         for greenhouse_type in greenhouse_types:
             clipped_filtered = clipped_filtered.union(NantesGreenhouses.objects.filter(**greenhouse_type.filter_kwargs))
 
-        for feature in clipped_filtered:
-            fields = {'geom': feature.geom}
-            # fields = {f'total_{key}_production': feature.surface_ha * value for (key, value) in
-            #           specific_annual_component_production.items()}
-            result['features'].append(fields)
+        # Create the distribution for the stacked barchart seasonal production per component
+        distribution = Distribution(
+            TemporalDistribution.objects.get(name='Months of the year'),
+            name='Seasonal distribution by component'
+        )
 
-        distribution = Distribution(TemporalDistribution.objects.get(name='Months of the year'), name='Macro Components')
-
+        # Initialize aggregated values
         total_surface = 0
         total_production = 0
         greenhouse_count = 0
+
+        # Filter the greenhouse dataset by type of greenhouse and apply specific values
         for greenhouse_type in greenhouse_types:
             greenhouse_group = clipped.filter(**greenhouse_type.filter_kwargs)
             if greenhouse_group.exists():
@@ -150,24 +140,29 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
                 total_surface += total_group_surface
                 greenhouse_count += greenhouse_group.count()
                 for share in greenhouse_type.shares:
-                    distribution.add_share(share.timestepset.timestep, share.component, total_group_surface * share.average)
+                    distribution.add_share(share.timestepset.timestep, share.component,
+                                           total_group_surface * share.average)
                     total_production += total_group_surface * share.average
         result['aggregated_distributions'].append(distribution.serialize())
 
         result['aggregated_values'].append({
-            'name': 'greenhouse_count',
+            'name': 'Number of considered greenhouses',
             'value': greenhouse_count,
             'unit': ''})
 
         result['aggregated_values'].append({
-            'name': 'total_surface',
+            'name': 'Total growth area',
             'value': total_surface,
             'unit': 'ha'})
 
         result['aggregated_values'].append({
-            'name': 'Total production',
+            'name': 'Total annual production',
             'value': total_production,
             'unit': 'Mg/a'
         })
+
+        for feature in clipped_filtered:
+            fields = {'geom': feature.geom}
+            result['features'].append(fields)
 
         return result

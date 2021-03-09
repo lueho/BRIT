@@ -11,8 +11,8 @@ class StandardGreenhouseTable(Table):
 
     def __init__(self, *args, **kwargs):
         name = Column(linkify=lambda record: record.detail_url)
-        growth_cycles = Column()
-        kwargs['extra_columns'] = [('name', name), ('growth_cycles', growth_cycles), ]
+        growth_cycle_list = Column()
+        kwargs['extra_columns'] = [('name', name), ('growth_cycle_list', growth_cycle_list), ]
         super().__init__(*args, **kwargs)
 
     class Meta:

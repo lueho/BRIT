@@ -407,6 +407,8 @@ class ResultMapAPI(APIView):
 
         serializer = serializer_class(features, many=True)
         data = {
+            'catchment_id': layer.scenario.catchment_id,
+            'region_id': layer.scenario.region_id,
             'geoJson': serializer.data,
         }
 
