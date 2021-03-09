@@ -3,7 +3,7 @@ from django.contrib.gis.geos import GEOSGeometry
 from django.db import connection
 from django.test import TestCase
 
-from gis_source_manager.models import HamburgGreenAreas
+from case_studies.flexibi_hamburg.models import HamburgGreenAreas
 from scenario_builder.models import Scenario, InventoryAlgorithm
 from .models import Layer, LayerField
 

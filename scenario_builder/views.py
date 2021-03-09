@@ -12,7 +12,7 @@ from rest_framework.views import APIView
 
 from flexibi_dst.views import DualUserListView, UserOwnsObjectMixin, NextOrSuccessUrlMixin
 from layer_manager.models import Layer
-from material_manager.models import Material
+from material_manager.models import MaterialSettings
 from .forms import (
     CatchmentForm,
     CatchmentQueryForm,
@@ -247,7 +247,7 @@ class ScenarioAddInventoryAlgorithmView(LoginRequiredMixin, UserPassesTestMixin,
     def post(request, *args, **kwargs):
         scenario_id = request.POST.get('scenario')
         scenario = Scenario.objects.get(id=scenario_id)
-        feedstock = Material.objects.get(id=request.POST.get('feedstock'))
+        feedstock = MaterialSettings.objects.get(id=request.POST.get('feedstock'))
         algorithm_id = request.POST.get('inventory_algorithm')
         algorithm = InventoryAlgorithm.objects.get(id=algorithm_id)
         parameters = algorithm.inventoryalgorithmparameter_set.all()
@@ -296,7 +296,7 @@ class ScenarioAlgorithmConfigurationUpdateView(LoginRequiredMixin, UserPassesTes
     def post(request, *args, **kwargs):
         scenario = Scenario.objects.get(id=request.POST.get('scenario'))
         current_algorithm = InventoryAlgorithm.objects.get(id=request.POST.get('current_algorithm'))
-        feedstock = Material.objects.get(id=request.POST.get('feedstock'))
+        feedstock = MaterialSettings.objects.get(id=request.POST.get('feedstock'))
         scenario.remove_inventory_algorithm(current_algorithm, feedstock)
         new_algorithm = InventoryAlgorithm.objects.get(id=request.POST.get('inventory_algorithm'))
         parameters = new_algorithm.inventoryalgorithmparameter_set.all()
@@ -342,7 +342,7 @@ class ScenarioRemoveInventoryAlgorithmView(LoginRequiredMixin, UserPassesTestMix
     def get(self, request, *args, **kwargs):
         self.scenario = Scenario.objects.get(id=self.kwargs.get('scenario_pk'))
         self.algorithm = InventoryAlgorithm.objects.get(id=self.kwargs.get('algorithm_pk'))
-        self.feedstock = Material.objects.get(id=self.kwargs.get('feedstock_pk'))
+        self.feedstock = MaterialSettings.objects.get(id=self.kwargs.get('feedstock_pk'))
         self.scenario.remove_inventory_algorithm(algorithm=self.algorithm, feedstock=self.feedstock)
         return redirect('scenario_detail', pk=self.scenario.id)
 
@@ -350,12 +350,12 @@ class ScenarioRemoveInventoryAlgorithmView(LoginRequiredMixin, UserPassesTestMix
 def load_geodataset_options(request):
     scenario = Scenario.objects.get(id=request.GET.get('scenario'))
     if request.GET.get('feedstock'):
-        feedstock = Material.objects.get(id=request.GET.get('feedstock'))
+        feedstock = MaterialSettings.objects.get(id=request.GET.get('feedstock'))
         if request.GET.get('options') == 'create':
-            geodatasets = scenario.remaining_geodataset_options(feedstock=feedstock)
+            geodatasets = scenario.remaining_geodataset_options(feedstock=feedstock.material)
         elif request.GET.get('options') == 'update':
             current = GeoDataset.objects.filter(id=request.GET.get('current_geodataset'))
-            geodatasets = scenario.remaining_geodataset_options(feedstock=feedstock).union(current)
+            geodatasets = scenario.remaining_geodataset_options(feedstock=feedstock.material).union(current)
         else:
             geodatasets = scenario.available_geodatasets()
     else:
@@ -366,13 +366,13 @@ def load_geodataset_options(request):
 def load_algorithm_options(request):
     scenario = Scenario.objects.get(id=request.GET.get('scenario'))
     if request.GET.get('feedstock') and request.GET.get('geodataset'):
-        feedstock = Material.objects.get(id=request.GET.get('feedstock'))
+        feedstock = MaterialSettings.objects.get(id=request.GET.get('feedstock'))
         geodataset = GeoDataset.objects.get(id=request.GET.get('geodataset'))
         if request.GET.get('options') == 'create':
             algorithms = scenario.remaining_inventory_algorithm_options(feedstock, geodataset)
         elif request.GET.get('options') == 'update':
             current_algorithm = InventoryAlgorithm.objects.filter(id=request.GET.get('current_inventory_algorithm'),
-                                                                  feedstock=feedstock, geodataset=geodataset)
+                                                                  feedstock=feedstock.material, geodataset=geodataset)
             algorithms = scenario.remaining_inventory_algorithm_options(feedstock, geodataset).union(current_algorithm)
         else:
             algorithms = scenario.available_inventory_algorithms()
@@ -407,6 +407,8 @@ class ResultMapAPI(APIView):
 
         serializer = serializer_class(features, many=True)
         data = {
+            'catchment_id': layer.scenario.catchment_id,
+            'region_id': layer.scenario.region_id,
             'geoJson': serializer.data,
         }
 

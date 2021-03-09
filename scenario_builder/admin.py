@@ -130,7 +130,7 @@ class ScenarioInventoryConfigurationAdmin(ModelAdmin):
 
     @staticmethod
     def feedstock_link(obj):
-        url = reverse('admin:scenario_builder_material_change', args=(obj.feedstock.id,))
+        url = reverse('admin:material_manager_materialsettings_change', args=(obj.feedstock.id,))
         return format_html("<a href='{}'>{}</a>", url, obj.feedstock.name)
 
     @staticmethod

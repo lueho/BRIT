@@ -2,7 +2,6 @@ import importlib
 
 from django.contrib.auth.models import User
 from django.contrib.gis.db.models import MultiPolygonField, PointField
-from django.contrib.postgres.fields import ArrayField
 from django.core.validators import RegexValidator
 from django.db import models
 from django.db.models.query import QuerySet
@@ -26,28 +25,18 @@ GIS_SOURCE_MODELS = (
 )
 
 
-class SeasonalDistribution(models.Model):
-    """
-    Model to deal with different types of input data that represent seasonal distribution of any kind. Input and output
-    with differing time steps and start-stop-cycles can be managed. All entries are with reference to one year.
-    """
-    # Into how many timesteps is the full year divided? e.g. 12 months, 365 days etc
-    # The values array must have the same length, filled with zeros, of not applicable to whole year
-    timesteps = models.IntegerField(default=12)
-    # Within one year, how many cycles are represented by the given data?
-    cycles = models.IntegerField(default=1)
-    # In which timestep does each cycle start and end? array must have form [start1, end1, start2, end2, ...]
-    start_stop = ArrayField(models.IntegerField(), default=list([1, 12]))
-    values = ArrayField(models.FloatField(), default=list([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]))
-
-
-
+# ----------- Geodata --------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 class Region(models.Model):
     name = models.CharField(max_length=56, null=False)
     country = models.CharField(max_length=56, null=False)
     geom = MultiPolygonField(null=True)
+
+    @staticmethod
+    def get_absolute_url():
+        return reverse('catchment_list')
 
     def __str__(self):
         return self.name
@@ -61,24 +50,9 @@ class Catchment(models.Model):
     type = models.CharField(max_length=14, choices=TYPES, default='custom')
     geom = MultiPolygonField()
 
-    def __str__(self):
-        return self.name
-
-
-
-
-
-# ----------- Geodata --------------------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------------------------
-
-class GeoDataset(models.Model):
-    name = models.CharField(max_length=56, null=False)
-    description = models.TextField(blank=True, null=True)
-    region = models.ForeignKey(Region, on_delete=models.CASCADE, null=False)
-    model_name = models.CharField(max_length=56, choices=GIS_SOURCE_MODELS, null=True)
-
-    def get_absolute_url(self):
-        return reverse(self.model_name)
+    @staticmethod
+    def get_absolute_url():
+        return reverse('catchment_list')
 
     def __str__(self):
         return self.name
@@ -88,6 +62,22 @@ class SFBSite(models.Model):
     name = models.CharField(max_length=20, null=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
     geom = PointField(null=True)
+
+    def __str__(self):
+        return self.name
+
+
+class GeoDataset(models.Model):
+    """
+    Holds meta information about datasets from the core module or scenario extensions.
+    """
+    name = models.CharField(max_length=56, null=False)
+    description = models.TextField(blank=True, null=True)
+    region = models.ForeignKey(Region, on_delete=models.CASCADE, null=False)
+    model_name = models.CharField(max_length=56, choices=GIS_SOURCE_MODELS, null=True)
+
+    def get_absolute_url(self):
+        return reverse(f'{self.model_name}')
 
     def __str__(self):
         return self.name
@@ -103,13 +93,12 @@ class InventoryAlgorithm(models.Model):
     source_module = models.CharField(max_length=255, null=True)
     function_name = models.CharField(max_length=56, null=True)
     description = models.TextField(blank=True, null=True)
-    geodataset = models.ForeignKey(GeoDataset, on_delete=models.CASCADE)
-    feedstock = models.ManyToManyField(Material, limit_choices_to={'is_feedstock': True})
+    geodataset = models.ForeignKey(GeoDataset, on_delete=models.CASCADE)  # TODO: Make many2many?
+    feedstock = models.ManyToManyField(Material, limit_choices_to={'is_feedstock': True})  # TODO: rename to plural
     default = models.BooleanField('Default for this combination of geodataset and feedstock', default=False)
-    source = models.CharField(max_length=200, blank=True, null=True)
+    source = models.CharField(max_length=200, blank=True, null=True)  # TODO: connect to library
 
-    def __str__(self):
-        return self.name
+    # TODO: How are default values controlled?
 
     @staticmethod
     def available_modules():
@@ -132,21 +121,8 @@ class InventoryAlgorithm(models.Model):
                 values[parameter].append(value)
         return values
 
-    # def save(self, *args, **kwargs):
-    #     """
-    #     There can only be one default algorithm per geodataset/feedstock combination. This method adds a corresponding
-    #     check when a record is saved. It gets rid of any previous default entry with the same geodataset/feedstock
-    #     combination when the new algorithm is marked as default.
-    #     """
-    #     if not self.default:
-    #         if not InventoryAlgorithm.objects.filter(geodataset=self.geodataset, feedstock=self.feedstock,
-    #                                                  default=True):
-    #             self.default = True
-    #         return super(InventoryAlgorithm, self).save(*args, **kwargs)
-    #     with transaction.atomic():
-    #         InventoryAlgorithm.objects.filter(geodataset=self.geodataset, feedstock=self.feedstock, default=True) \
-    #             .update(default=False)
-    #         return super(InventoryAlgorithm, self).save(*args, **kwargs)
+    def __str__(self):
+        return self.name
 
 
 class InventoryAlgorithmParameter(models.Model):
@@ -157,15 +133,15 @@ class InventoryAlgorithmParameter(models.Model):
                                                                      'or special characters.',
                                                              code='invalid_parameter_name')])
     description = models.TextField(blank=True, null=True)
-    inventory_algorithm = models.ManyToManyField(InventoryAlgorithm)
+    inventory_algorithm = models.ManyToManyField(InventoryAlgorithm)  # TODO: convert to foreign key
     unit = models.CharField(max_length=20, blank=True, null=True)
     is_required = models.BooleanField(default=False)
 
-    def __str__(self):
-        return self.short_name
-
     def default_value(self):
         return InventoryAlgorithmParameterValue.objects.get(parameter=self, default=True)
+
+    def __str__(self):
+        return self.short_name
 
 
 class InventoryAlgorithmParameterValue(models.Model):
@@ -174,7 +150,7 @@ class InventoryAlgorithmParameterValue(models.Model):
     parameter = models.ForeignKey(InventoryAlgorithmParameter, on_delete=models.CASCADE, null=True)
     value = models.FloatField()
     standard_deviation = models.FloatField(null=True)
-    source = models.CharField(max_length=200, blank=True, null=True)
+    source = models.CharField(max_length=200, blank=True, null=True)  # TODO: connect to library
     default = models.BooleanField(default=False)
 
     def __str__(self):
@@ -225,13 +201,6 @@ SCENARIO_STATUS = (
 )
 
 
-class ScenarioManager(models.Manager):
-
-    def create(self, **kwargs):
-        scenario = super().create(**kwargs)
-        return scenario
-
-
 class ScenarioStatus(models.Model):
     class Status(models.IntegerChoices):
         CHANGED = 1
@@ -253,8 +222,6 @@ class Scenario(models.Model):
     site = models.ForeignKey(SFBSite, on_delete=models.CASCADE, null=True)  # TODO: make many-to-many?
     catchment = models.ForeignKey(Catchment, on_delete=models.CASCADE, null=True)  # TODO: make many-to-many?
 
-    objects = ScenarioManager()
-
     @property
     def status(self):
         return ScenarioStatus.Status(self.scenariostatus.status)
@@ -269,37 +236,18 @@ class Scenario(models.Model):
             self.scenariostatus.status = status
             self.scenariostatus.save()
 
-    def add_material_customization(self, material):
-        setting = MaterialSettings.objects.create(
-            owner=self.owner,
-            material=material,
-            scenario=self
-        )
-        return setting
-
     def available_feedstocks(self):
-        return Material.objects.filter(id__in=self.available_inventory_algorithms().values('feedstock'))
-
-    def included_feedstocks(self):
-        return Material.objects.filter(
-            id__in=ScenarioInventoryConfiguration.objects.filter(scenario=self).values('feedstock'))
+        """
+        Returns all materials that can be included in this scenario.
+        """
+        materials = Material.objects.filter(id__in=self.available_inventory_algorithms().values('feedstock'))
+        return MaterialSettings.objects.filter(material__in=materials)
 
     def feedstocks(self):
-        used_feedstock_ids = [
-            a['feedstock'] for a in ScenarioInventoryConfiguration.objects.filter(scenario=self)
-                .order_by()
-                .values('feedstock')
-                .distinct()
-        ]
-        return Material.objects.filter(id__in=used_feedstock_ids)
-
-    def add_feedstock(self, feedstock: Material):
-        # not needed anymore. Each feedstock is added automatically with an associated inventory_algorithm.
-        # No feedstocks should be added without inventory_algorithm
-        pass
-
-    def remaining_feedstock_options(self):
-        pass
+        """
+        Returns all materials (MaterialSettings) that have been included in this scenario.
+        """
+        return MaterialSettings.objects.filter(id__in=self.scenarioinventoryconfiguration_set.all().values('feedstock'))
 
     def available_geodatasets(self, feedstock: Material = None, feedstocks: QuerySet = None):
         """
@@ -323,7 +271,7 @@ class Scenario(models.Model):
             feedstocks = Material.objects.filter(id=feedstock.id)
         return GeoDataset.objects.filter(
             id__in=ScenarioInventoryConfiguration.objects.filter(
-                scenario=self, feedstock__in=feedstocks).values('geodataset'))
+                scenario=self, feedstock__material__in=feedstocks).values('geodataset'))
 
     def remaining_geodataset_options(self, feedstock: Material = None, feedstocks: QuerySet = None):
         if feedstocks is None and feedstock is None:
@@ -362,7 +310,7 @@ class Scenario(models.Model):
         if ScenarioInventoryConfiguration.objects.filter(scenario=self, feedstock=feedstock, geodataset=geodataset):
             return InventoryAlgorithm.objects.none()
         else:
-            return InventoryAlgorithm.objects.filter(feedstock=feedstock, geodataset=geodataset)
+            return InventoryAlgorithm.objects.filter(feedstock=feedstock.material, geodataset=geodataset)
 
     def default_inventory_algorithms(self):
         return InventoryAlgorithm.objects.filter(geodataset__region=self.region,
@@ -399,6 +347,16 @@ class Scenario(models.Model):
         else:
             values = algorithm.default_values()
 
+        if not values:
+            config = {
+                'scenario': self,
+                'feedstock': feedstock,
+                'geodataset': algorithm.geodataset,
+                'inventory_algorithm': algorithm,
+            }
+            ScenarioInventoryConfiguration.objects.create(**config)
+            return
+
         for parameter, value_list in values.items():
             for value in value_list:
                 config = {
@@ -411,7 +369,7 @@ class Scenario(models.Model):
                 }
                 ScenarioInventoryConfiguration.objects.create(**config)
 
-    def remove_inventory_algorithm(self, algorithm: InventoryAlgorithm, feedstock: Material):
+    def remove_inventory_algorithm(self, algorithm: InventoryAlgorithm, feedstock: MaterialSettings):
         """
         Remove all entries from the configuration that are associated with the given algorithm.
         """
@@ -499,9 +457,10 @@ class Scenario(models.Model):
                        entry.inventory_algorithm.source_module + \
                        '.algorithms:' + \
                        entry.inventory_algorithm.function_name
-            parameter = entry.inventory_parameter.short_name
-            value = entry.inventory_value.value
-            standard_deviation = entry.inventory_value.standard_deviation
+            parameter = entry.inventory_parameter.short_name if entry.inventory_parameter else None
+            if entry.inventory_value:
+                value = entry.inventory_value.value
+                standard_deviation = entry.inventory_value.standard_deviation
 
             if feedstock not in inventory_config.keys():
                 inventory_config[feedstock] = {}
@@ -510,7 +469,7 @@ class Scenario(models.Model):
                 inventory_config[feedstock][function]['catchment_id'] = self.catchment.id
                 inventory_config[feedstock][function]['scenario_id'] = self.id
                 inventory_config[feedstock][function]['feedstock_id'] = feedstock
-            if parameter not in inventory_config[feedstock][function]:
+            if parameter and parameter not in inventory_config[feedstock][function]:
                 inventory_config[feedstock][function][parameter] = {'value': value,
                                                                     'standard_deviation': standard_deviation}
 
@@ -579,13 +538,14 @@ def manage_scenario_status(sender, instance, created, **kwargs):
 
 class ScenarioInventoryConfiguration(models.Model):
     scenario = models.ForeignKey(Scenario, on_delete=models.CASCADE)
-    feedstock = models.ForeignKey(Material, limit_choices_to={'is_feedstock': True}, on_delete=models.CASCADE)
+    feedstock = models.ForeignKey(MaterialSettings, on_delete=models.CASCADE, null=True)
     geodataset = models.ForeignKey(GeoDataset, on_delete=models.CASCADE)
     inventory_algorithm = models.ForeignKey(InventoryAlgorithm, on_delete=models.CASCADE)
-    inventory_parameter = models.ForeignKey(InventoryAlgorithmParameter, on_delete=models.CASCADE)
-    inventory_value = models.ForeignKey(InventoryAlgorithmParameterValue, on_delete=models.CASCADE)
+    inventory_parameter = models.ForeignKey(InventoryAlgorithmParameter, on_delete=models.CASCADE, null=True)
+    inventory_value = models.ForeignKey(InventoryAlgorithmParameterValue, on_delete=models.CASCADE, null=True)
 
     def save(self, *args, **kwargs):
+        # TODO: The status must also be changed, when any of the referenced foreign key objects change
         self.scenario.set_status(ScenarioStatus.Status.CHANGED)
         super().save(*args, **kwargs)
 

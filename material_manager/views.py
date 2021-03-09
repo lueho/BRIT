@@ -2,7 +2,6 @@ from bootstrap_modal_forms.generic import BSModalFormView, BSModalCreateView, BS
     BSModalDeleteView
 from crispy_forms.helper import FormHelper
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.contrib.auth.models import User
 from django.http import HttpResponseRedirect
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, DeleteView, DetailView, View
@@ -10,6 +9,7 @@ from extra_views import UpdateWithInlinesView
 
 from flexibi_dst.models import TemporalDistribution
 from flexibi_dst.views import DualUserListView, UserOwnsObjectMixin, NextOrSuccessUrlMixin
+from users.models import ReferenceUsers
 from .forms import (
     AddComponentForm,
     AddComponentGroupForm,
@@ -263,9 +263,9 @@ class MaterialSettingsDetailView(UserPassesTestMixin, DetailView):
 
     def test_func(self):
         self.object = self.get_object()
-        flexibi = User.objects.get(username='flexibi')
-        if self.object.owner == flexibi:
-            if self.request.user == flexibi:
+        standard_owner = ReferenceUsers.objects.get.standard_owner
+        if self.object.owner == standard_owner:
+            if self.request.user == standard_owner:
                 self.allow_edit = True
             return True
         elif self.object.owner == self.request.user:

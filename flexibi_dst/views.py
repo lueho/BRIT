@@ -1,8 +1,8 @@
 from django.contrib.auth.mixins import UserPassesTestMixin
-from django.contrib.auth.models import User
 from django.views.generic import TemplateView
 from django_tables2 import table_factory
 
+from users.models import ReferenceUsers
 from .tables import StandardItemTable, UserItemTable
 
 
@@ -36,11 +36,10 @@ class DualUserListView(TemplateView):
 
     def get_context_data(self, **kwargs):
         kwargs['item_name_plural'] = self.model._meta.verbose_name_plural
-        standard_owner = User.objects.get(username='flexibi')
         kwargs['standard_item_table'] = table_factory(
             self.model,
             table=StandardItemTable
-        )(self.model.objects.filter(owner=standard_owner))
+        )(self.model.objects.filter(owner=ReferenceUsers.objects.get.standard_owner))
         if not self.request.user.is_anonymous:
             kwargs['custom_item_table'] = table_factory(
                 self.model,

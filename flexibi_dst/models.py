@@ -14,6 +14,9 @@ class TemporalDistribution(models.Model):
     def __str__(self):
         return self.name
 
+    class Meta:
+        unique_together = [['name', 'owner']]
+
 
 class Timestep(models.Model):
     """
@@ -21,7 +24,10 @@ class Timestep(models.Model):
     """
     name = models.CharField(max_length=255, blank=True, null=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE)
-    distribution = models.ForeignKey(TemporalDistribution, default=1, on_delete=models.CASCADE)
+    distribution = models.ForeignKey(TemporalDistribution, on_delete=models.CASCADE)
 
     def __str__(self):
         return self.name
+
+    class Meta:
+        unique_together = [['name', 'owner']]
