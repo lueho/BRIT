@@ -21,7 +21,7 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DEBUG=1
+      - DEBUG=0
       - SECRET_KEY=(%yn0aw%$hxmajy^f=s^1t2v7-=^=vo9)u6ru*ic&=wsx2qs26
       - DJANGO_ALLOWED_HOSTS=localhost 127.0.0.1 [::1]
       - REDIS_URL=redis://redis:6379/0
