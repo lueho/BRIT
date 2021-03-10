@@ -51,4 +51,6 @@ LOGGING = {
 
 DEBUG_PROPAGATE_EXCEPTIONS = True
 
+WHITENOISE_MANIFEST_STRICT = False
+
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
