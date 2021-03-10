@@ -7,7 +7,7 @@ env = environ.Env(
     DEBUG=(bool, False)
 )
 
-DEBUG = True
+DEBUG = env('DEBUG')
 SECRET_KEY = env('SECRET_KEY')
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS')
 
@@ -16,5 +16,39 @@ db_from_env = dj_database_url.config(default=DATABASE_URL, conn_max_age=500, ssl
 DATABASES['default'].update(db_from_env)
 DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
 
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': ('%(asctime)s [%(process)d] [%(levelname)s] ' +
+                       'pathname=%(pathname)s lineno=%(lineno)s ' +
+                       'funcname=%(funcName)s %(message)s'),
+            'datefmt': '%Y-%m-%d %H:%M:%S'
+        },
+        'simple': {
+            'format': '%(levelname)s %(message)s'
+        }
+    },
+    'handlers': {
+        'null': {
+            'level': 'DEBUG',
+            'class': 'logging.NullHandler',
+        },
+        'console': {
+            'level': 'DEBUG',
+            'class': 'logging.StreamHandler',
+            'formatter': 'verbose'
+        }
+    },
+    'loggers': {
+        'testlogger': {
+            'handlers': ['console'],
+            'level': 'INFO',
+        }
+    }
+}
 
+DEBUG_PROPAGATE_EXCEPTIONS = True
+
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
