@@ -17,3 +17,7 @@ DATABASES['default'].update(db_from_env)
 DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
 
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
+import django_heroku
+
+django_heroku.settings(locals())
