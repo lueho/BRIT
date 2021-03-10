@@ -7,7 +7,7 @@ env = environ.Env(
     DEBUG=(bool, False)
 )
 
-DEBUG = env('DEBUG')
+DEBUG = True
 SECRET_KEY = env('SECRET_KEY')
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS')
 
@@ -18,6 +18,3 @@ DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
 
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
-import django_heroku
-
-django_heroku.settings(locals())
