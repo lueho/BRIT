@@ -157,54 +157,9 @@ IMPORTED_CASE_STUDIES = [
     'flexibi_nantes',
 ]
 
-# ADMINS = [('Phillipp Lüssenhop', 'phillipp.luessenhop@tuhh.de')]
-# EMAIL_HOST = os.environ.get('EMAIL_HOST')
-# EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER')
-# EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
-# EMAIL_PORT = 465
-# EMAIL_USE_SSL = True
-# DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL')
-#
-# LOGGING = {
-#     'version': 1,
-#     'disable_existing_loggers': True,
-#     'formatters': {
-#         'verbose': {
-#             'format': '%(levelname)s [%(asctime)s] %(module)s %(message)s'
-#         },
-#     },
-#     'handlers': {
-#         # 'console': {
-#         #     'level': 'DEBUG',
-#         #     'class': 'logging.StreamHandler',
-#         #     'formatter': 'simple'
-#         # },
-#         'file': {
-#             'class': 'logging.handlers.RotatingFileHandler',
-#             'formatter': 'verbose',
-#             'filename': os.path.join(BASE_DIR, 'logs', 'main.log'),
-#             'maxBytes': 1024000,
-#             'backupCount': 3,
-#         },
-#         'mail_admins': {
-#             'level': 'ERROR',
-#             'class': 'django.utils.log.AdminEmailHandler'
-#         }
-#     },
-#     'loggers': {
-#         'django': {
-#             'handlers': ['file', 'mail_admins'],
-#             'propagate': True,
-#             'level': 'WARNING',
-#         },
-#     }
-# }
-
-# Static files (CSS, JavaScript, Images)
-# https://docs.djangoproject.com/en/3.0/howto/static-files/
-
 STATIC_URL = '/static/'
 # STATIC_URL = os.path.join(BASE_DIR, 'static/')
 STATIC_ROOT = os.path.join(BASE_DIR, 'static_root')
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+# STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+STATICFILES_STORAGE = "django.contrib.staticfiles.storage.ManifestStaticFilesStorage"
