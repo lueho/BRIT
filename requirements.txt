@@ -6,6 +6,7 @@ dj-database-url==0.5.0
 Django==3.0.7
 django-bootstrap-modal-forms==2.0.0
 django-crispy-forms==1.9.1
+django-environ==0.4.5
 django-extra-views==0.13.0
 django-filter==2.4.0
 django-geojson==3.0.0

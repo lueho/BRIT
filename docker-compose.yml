@@ -7,11 +7,8 @@ services:
       - "5433:5432"
     volumes:
       - flexibi_db/:/var/lib/postgresql/data/
-    environment:
-      POSTGRES_DB: flexibi_dst
-      POSTGRES_USER: flexibi_dst
-      POSTGRES_PASSWORD: flexibi
-
+    env_file:
+      - flexibi_dst/settings/.env
   web:
     build: .
     volumes:
@@ -20,11 +17,8 @@ services:
       - db
     ports:
       - "8000:8000"
-    environment:
-      - DEBUG=0
-      - SECRET_KEY=(%yn0aw%$hxmajy^f=s^1t2v7-=^=vo9)u6ru*ic&=wsx2qs26
-      - DJANGO_ALLOWED_HOSTS=localhost 127.0.0.1 [::1]
-      - REDIS_URL=redis://redis:6379/0
+    env_file:
+      - flexibi_dst/settings/.env
     links:
       - db
   celery:
@@ -32,34 +26,24 @@ services:
     command: celery worker --app=flexibi_dst --loglevel=info --logfile=logs/celery.log
     volumes:
       - ./:/app
-    environment:
-      - DEBUG=1
-      - SECRET_KEY=(%yn0aw%$hxmajy^f=s^1t2v7-=^=vo9)u6ru*ic&=wsx2qs26
-      - DJANGO_ALLOWED_HOSTS=localhost 127.0.0.1 [::1]
-      - CELERY_BROKER=redis://redis:6379/0
-      - CELERY_BACKEND=redis://redis:6379/0
-      - REDIS_URL=redis://redis:6379/0
+    env_file:
+      - flexibi_dst/settings/.env
     depends_on:
       - web
       - redis
-
   redis:
     image: redis:5-alpine
   dashboard:
     build: .
-    command:  flower -A flexibi_dst --port=5555 --broker=redis://redis:6379/0
+    command: flower -A flexibi_dst --port=5555 --broker=redis://redis:6379/0
     ports:
       - 5555:5555
-    environment:
-      - DEBUG=1
-      - SECRET_KEY=(%yn0aw%$hxmajy^f=s^1t2v7-=^=vo9)u6ru*ic&=wsx2qs26
-      - DJANGO_ALLOWED_HOSTS=localhost 127.0.0.1 [::1]
-      - CELERY_BROKER=redis://redis:6379/0
-      - CELERY_BACKEND=redis://redis:6379/0
-      - REDIS_URL=redis://redis:6379/0
+    env_file:
+      - flexibi_dst/settings/.env
     depends_on:
       - web
       - redis
       - celery
+
 volumes:
   flexibi_db:

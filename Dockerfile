@@ -4,7 +4,7 @@ WORKDIR /app
 
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
-ENV DEBUG 0
+#ENV DEBUG 0
 
 RUN apt-get update
 RUN apt-get install -y --fix-missing binutils libproj-dev gdal-bin

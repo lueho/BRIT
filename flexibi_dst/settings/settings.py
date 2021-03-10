@@ -1,16 +1,17 @@
-import getpass
 import os
-import sys
+from pathlib import Path
 
 import dj_database_url
+import environ
 
-BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+env = environ.Env()
+environ.Env.read_env()
+
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 SECRET_KEY = os.environ.get('SECRET_KEY')
-
-DEBUG = os.environ.get('DEBUG', default=0)
-
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', 'flexibi-dst.herokuapp.com']
+DEBUG = os.environ.get('DEBUG') != '0'
+ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS').split(',')
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -54,11 +55,11 @@ MIDDLEWARE = [
 ROOT_URLCONF = 'flexibi_dst.urls'
 
 TEMPLATE_DIRS = [
-    os.path.join(BASE_DIR, 'flexibi_dst', 'templates'),
-    os.path.join(BASE_DIR, 'users', 'templates'),
-    os.path.join(BASE_DIR, 'scenario_builder', 'templates'),
-    os.path.join(BASE_DIR, 'scenario_evaluator', 'templates'),
-    os.path.join(BASE_DIR, 'bioresource_explorer', 'templates'),
+    os.path.join(BASE_DIR, '..', 'templates'),
+    os.path.join(BASE_DIR, '../../users', 'templates'),
+    os.path.join(BASE_DIR, '../../scenario_builder', 'templates'),
+    os.path.join(BASE_DIR, '../../scenario_evaluator', 'templates'),
+    os.path.join(BASE_DIR, '../../bioresource_explorer', 'templates'),
 ]
 
 TEMPLATES = [
@@ -134,7 +135,8 @@ USE_TZ = True
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.0/howto/static-files/
 
-STATIC_URL = '/static/'
+# STATIC_URL = '/static/'
+STATIC_URL = os.path.join(BASE_DIR, 'static/')
 STATIC_ROOT = os.path.join(BASE_DIR, 'static_root')
 STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
 STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
