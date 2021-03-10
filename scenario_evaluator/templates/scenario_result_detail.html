@@ -99,7 +99,6 @@
 {% block javascript %}
 
     {{ block.super }}
-    {% load static %}
     {{ plot_data|json_script:"plot_data" }}
 
     <script src="{% static 'js/charts/feedstock_summary_bar_chart.js' %}"></script>
