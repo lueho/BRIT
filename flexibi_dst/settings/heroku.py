@@ -4,6 +4,7 @@ from .settings import *
 
 DEBUG = False
 ALLOWED_HOSTS = ALLOWED_HOSTS.append('flexibi-dst.herokuapp.com')
+DEBUG_PROPAGATE_EXCEPTIONS = True
 django_heroku.settings(locals())
 
 # env = environ.Env(
@@ -53,7 +54,6 @@ django_heroku.settings(locals())
 #     }
 # }
 
-# DEBUG_PROPAGATE_EXCEPTIONS = True
 
 # STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 # STATIC_URL = '/static/'
