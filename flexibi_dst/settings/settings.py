@@ -2,11 +2,11 @@ import os
 from pathlib import Path
 
 import dj_database_url
-import environ
+# import environ
 from django.core.management.utils import get_random_secret_key
 
-env = environ.Env()
-environ.Env.read_env()
+# env = environ.Env()
+# environ.Env.read_env()
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
@@ -95,21 +95,10 @@ WSGI_APPLICATION = 'flexibi_dst.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/3.0/ref/settings/#databases
 
-DATABASES = {
-    'default': {
-        'ENGINE': 'django.contrib.gis.db.backends.postgis',
-        'NAME': 'flexibi_dst',
-        'USER': 'flexibi_dst',
-        'PASSWORD': 'flexibi',
-        'HOST': 'db',
-        'PORT': '5432',
-    }
-}
-
-DATABASE_URL = os.environ.get('HEROKU_POSTGRESQL_COPPER_URL')
-db_from_env = dj_database_url.config(default=DATABASE_URL, conn_max_age=500, ssl_require=True)
-DATABASES['default'].update(db_from_env)
-DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
+# DATABASE_URL = os.environ.get('HEROKU_POSTGRESQL_COPPER_URL')
+# db_from_env = dj_database_url.config(default=DATABASE_URL, conn_max_age=500, ssl_require=True)
+# DATABASES['default'].update(db_from_env)
+# DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
 
 # Password validation
 # https://docs.djangoproject.com/en/3.0/ref/settings/#auth-password-validators
