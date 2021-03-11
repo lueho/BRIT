@@ -95,6 +95,17 @@ WSGI_APPLICATION = 'flexibi_dst.wsgi.application'
 # Database
 # https://docs.djangoproject.com/en/3.0/ref/settings/#databases
 
+DATABASES = {
+    'default': {
+        'ENGINE': 'django.contrib.gis.db.backends.postgis',
+        'NAME': 'flexibi_dst',
+        'USER': 'flexibi_dst',
+        'PASSWORD': 'flexibi',
+        'HOST': 'db',
+        'PORT': '5432',
+    }
+}
+
 # DATABASE_URL = os.environ.get('HEROKU_POSTGRESQL_COPPER_URL')
 # db_from_env = dj_database_url.config(default=DATABASE_URL, conn_max_age=500, ssl_require=True)
 # DATABASES['default'].update(db_from_env)
