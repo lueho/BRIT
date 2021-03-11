@@ -6,7 +6,7 @@ env = environ.Env(
     DEBUG=(bool, False)
 )
 
-DEBUG = env('DEBUG')
+# DEBUG = env('DEBUG')
 # SECRET_KEY = env('SECRET_KEY', default=SECRET_KEY)
 # ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=ALLOWED_HOSTS)
 # try:
@@ -52,10 +52,10 @@ DEBUG = env('DEBUG')
 
 # DEBUG_PROPAGATE_EXCEPTIONS = True
 
-STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-STATIC_URL = '/static/'
-STATICFILES_DIRS = (
-    os.path.join(BASE_DIR, 'static'),
-)
+# STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+# STATIC_URL = '/static/'
+# STATICFILES_DIRS = (
+#     os.path.join(BASE_DIR, 'static'),
+# )
 
 django_heroku.settings(locals())
