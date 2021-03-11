@@ -10,7 +10,6 @@ environ.Env.read_env()
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-...
 SECRET_KEY = os.environ.get('SECRET_KEY', default=get_random_secret_key())
 DEBUG = True
 ALLOWED_HOSTS = ['flexibi-dst.herokuapp.com']
@@ -142,8 +141,6 @@ USE_I18N = True
 USE_L10N = True
 
 USE_TZ = True
-
-
 
 LEAFLET_CONFIG = {
     'DEFAULT_CENTER': (48.917908, 6.921543),

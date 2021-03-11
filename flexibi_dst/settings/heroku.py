@@ -1,5 +1,8 @@
 import django_heroku
 
+from settings import *
+
+BASE_DIR = BASE_DIR
 DEBUG = False
 django_heroku.settings(locals())
 
