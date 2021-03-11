@@ -7,7 +7,7 @@ env = environ.Env(
 )
 
 DEBUG = env('DEBUG')
-SECRET_KEY = env('SECRET_KEY')
+SECRET_KEY = env('SECRET_KEY', default=get_random_secret_key())
 ALLOWED_HOSTS = env.list('ALLOWED_HOSTS')
 
 DATABASE_URL = os.environ.get('HEROKU_POSTGRESQL_COPPER_URL')
