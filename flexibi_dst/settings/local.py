@@ -1,5 +1,7 @@
 from .settings import *
 
+DEBUG = True
+
 DATABASES['default'] = {
     'ENGINE': 'django.contrib.gis.db.backends.postgis',
     'NAME': os.environ.get('POSTGRES_DB'),
@@ -10,7 +12,5 @@ DATABASES['default'] = {
 }
 
 STATIC_ROOT = os.path.join(BASE_DIR, 'static_root')
-STATIC_URL = '/static/'
-STATICFILES_DIRS = (
-    os.path.join(BASE_DIR, 'static'),
-)
+
+CRISPY_FAIL_SILENTLY = False

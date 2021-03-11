@@ -1,25 +1,13 @@
 import os
 from pathlib import Path
 
-# import environ
 from django.core.management.utils import get_random_secret_key
-
-# env = environ.Env()
-# environ.Env.read_env()
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
 SECRET_KEY = os.environ.get('SECRET_KEY', default=get_random_secret_key())
-DEBUG = True
-ALLOWED_HOSTS = []
 
-# AWS_ACCESS_KEY_ID = os.environ.get('AWS_ACCESS_KEY_ID')
-# AWS_SECRET_ACCESS_KEY = os.environ.get('AWS_SECRET_ACCESS_KEY')
-# AWS_STORAGE_BUCKET_NAME = os.environ.get('AWS_STORAGE_BUCKET_NAME')
-# AWS_URL = os.environ.get('AWS_URL')
-# AWS_DEFAULT_ACL = None
-# AWS_S3_REGION_NAME = 'eu-central-1'
-# AWS_S3_SIGNATURE_VERSION = 's3v4'
+ALLOWED_HOSTS = []
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -87,12 +75,7 @@ TEMPLATES = [
     },
 ]
 
-DJANGO_TABLES2_TEMPLATE = "django_tables2/bootstrap4.html"
-
 WSGI_APPLICATION = 'flexibi_dst.wsgi.application'
-
-# Database
-# https://docs.djangoproject.com/en/3.0/ref/settings/#databases
 
 DATABASES = {}
 
@@ -127,6 +110,11 @@ USE_L10N = True
 
 USE_TZ = True
 
+STATIC_URL = '/static/'
+STATICFILES_DIRS = (
+    os.path.join(BASE_DIR, 'static'),
+)
+
 LEAFLET_CONFIG = {
     'DEFAULT_CENTER': (48.917908, 6.921543),
     'DEFAULT_ZOOM': 5,
@@ -143,21 +131,11 @@ LEAFLET_CONFIG = {
                 }
 }
 
-CRISPY_TEMPLATE_PACK = 'bootstrap4'
-CRISPY_FAIL_SILENTLY = not DEBUG
-
 LOGIN_REDIRECT_URL = 'home'
 LOGIN_URL = 'login'
 
 CELERY_BROKER_URL = os.environ.get("REDIS_URL")
 CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL")
 
-IMPORTED_CASE_STUDIES = [
-    'flexibi_nantes',
-]
-
-# STATICFILES_DIRS = [os.path.join(BASE_DIR, 'static')]
-# STATIC_URL = AWS_URL + '/static/'
-# STATICFILES_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
-# MEDIA_URL = AWS_URL + '/media/'
-# DEFAULT_FILE_STORAGE = 'storages.backends.s3boto3.S3Boto3Storage'
+CRISPY_TEMPLATE_PACK = 'bootstrap4'
+DJANGO_TABLES2_TEMPLATE = "django_tables2/bootstrap4.html"

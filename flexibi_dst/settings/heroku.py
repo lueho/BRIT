@@ -12,5 +12,6 @@ DATABASES['default'] = dj_database_url.config(default=DATABASE_URL, conn_max_age
 DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
 
 DEBUG_PROPAGATE_EXCEPTIONS = True
+CRISPY_FAIL_SILENTLY = True
 
 django_heroku.settings(locals())
