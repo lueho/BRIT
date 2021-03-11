@@ -7,8 +7,8 @@ env = environ.Env(
 )
 
 DEBUG = env('DEBUG')
-SECRET_KEY = env('SECRET_KEY', default=SECRET_KEY)
-ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=ALLOWED_HOSTS)
+# SECRET_KEY = env('SECRET_KEY', default=SECRET_KEY)
+# ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=ALLOWED_HOSTS)
 # try:
 #     DATABASE_URL = os.environ.get('HEROKU_POSTGRESQL_COPPER_URL')
 #     db_from_env = dj_database_url.config(default=DATABASE_URL, conn_max_age=500, ssl_require=True)
