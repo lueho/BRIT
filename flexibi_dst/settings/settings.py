@@ -3,13 +3,15 @@ from pathlib import Path
 
 import dj_database_url
 import environ
+from django.core.management.utils import get_random_secret_key
 
 env = environ.Env()
 environ.Env.read_env()
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 
-SECRET_KEY = os.environ.get('SECRET_KEY')
+...
+SECRET_KEY = os.environ.get('SECRET_KEY', default=get_random_secret_key())
 DEBUG = True
 ALLOWED_HOSTS = os.environ.get('ALLOWED_HOSTS').split(',')
 
