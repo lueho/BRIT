@@ -1,12 +1,12 @@
 import django_heroku
 
-from .settings import *
+DEBUG = False
+django_heroku.settings(locals())
 
-env = environ.Env(
-    DEBUG=(bool, False)
-)
+# env = environ.Env(
+#     DEBUG=(bool, False)
+# )
 
-# DEBUG = env('DEBUG')
 # SECRET_KEY = env('SECRET_KEY', default=SECRET_KEY)
 # ALLOWED_HOSTS = env.list('ALLOWED_HOSTS', default=ALLOWED_HOSTS)
 # try:
@@ -58,4 +58,3 @@ env = environ.Env(
 #     os.path.join(BASE_DIR, 'static'),
 # )
 
-django_heroku.settings(locals())
