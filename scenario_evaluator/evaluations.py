@@ -143,7 +143,7 @@ class ScenarioResult:
     def total_annual_production(self):
         total_production = 0
         for layer in self.layers:
-            layer_production_agg = layer.layeraggregatedvalue_set.get(name='Total production')
+            layer_production_agg = layer.layeraggregatedvalue_set.get(name='Total annual production')
             total_production += layer_production_agg.value
         return total_production / 1000
 
@@ -153,7 +153,7 @@ class ScenarioResult:
             feedstock = layer.feedstock
             if feedstock not in production.keys():
                 production[feedstock] = 0
-            production[feedstock] += layer.layeraggregatedvalue_set.get(name='Total production').value / 1000
+            production[feedstock] += layer.layeraggregatedvalue_set.get(name='Total annual production').value / 1000
         return production
 
     def seasonal_production_per_feedstock(self):
