@@ -8,4 +8,4 @@ run:
 release:
   image: web
   command:
-    - ./release-commands.sh
+    - bash release-commands.sh
