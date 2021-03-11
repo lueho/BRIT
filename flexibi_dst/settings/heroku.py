@@ -2,8 +2,8 @@ import django_heroku
 
 from .settings import *
 
-BASE_DIR = BASE_DIR
 DEBUG = False
+ALLOWED_HOSTS = ALLOWED_HOSTS.append('flexibi-dst.herokuapp.com')
 django_heroku.settings(locals())
 
 # env = environ.Env(
