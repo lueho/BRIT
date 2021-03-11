@@ -8,3 +8,9 @@ DATABASES['default'] = {
     'HOST': os.environ.get('POSTGRES_HOST'),
     'PORT': os.environ.get('POSTGRES_PORT'),
 }
+
+STATIC_ROOT = os.path.join(BASE_DIR, 'static_root')
+STATIC_URL = '/static/'
+STATICFILES_DIRS = (
+    os.path.join(BASE_DIR, 'static'),
+)
