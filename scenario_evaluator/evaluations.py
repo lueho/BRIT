@@ -1,52 +1,8 @@
+from distributions.plots import BarChart, DataSet
+from flexibi_dst.exceptions import UnitMismatchError
 from flexibi_dst.models import TemporalDistribution
 from layer_manager.models import LayerAggregatedDistribution
 from material_manager.models import BaseObjects
-
-
-class Plot:
-    name = None
-    chart_id = None
-    chart_type = None
-    dataset = None
-    unit = None
-    show_legend = None
-
-    def __init__(self, chart_id='newPlot', name='New Plot', dataset=None, chart_type='stacked_barchart', unit='Mg/a',
-                 show_legend=False):
-        self.name = name
-        self.chart_id = chart_id
-        self.chart_type = chart_type
-        self.unit = unit
-        self.show_legend = show_legend
-        self.dataset = {} if not dataset else dataset
-
-    @property
-    def serialized(self):
-        return {
-            self.chart_id: {
-                'chart_name': self.name,
-                'chart_type': self.chart_type,
-                'unit': self.unit,
-                'show_legend': self.show_legend,
-                'dataset': self.dataset
-            }
-        }
-
-    @property
-    def labels(self):
-        return self.dataset['labels']
-
-    @labels.setter
-    def labels(self, labels):
-        self.dataset['labels'] = labels
-
-    @property
-    def values(self):
-        return self.dataset['values']
-
-    @values.setter
-    def values(self, values):
-        self.dataset['values'] = values
 
 
 class ScenarioResult:
@@ -72,41 +28,75 @@ class ScenarioResult:
                                                                layer__in=self.layers).values(
                                                                'distribution').distinct()])
 
-    def get_plot_data(self):
-        plot_data = {}
+    def total_production(self):
+        production_value = 0
+        unit = None
+        for layer in self.layers:
+            agg_value = layer.layeraggregatedvalue_set.get(name='Total production')
+            if unit is None:
+                unit = agg_value.unit
+            if agg_value.unit != unit:
+                raise UnitMismatchError
+            production_value += agg_value.value
+        total_production = DataSet(label='Total production', data=[production_value], unit=unit)
+        return total_production
+
+    def total_production_per_feedstock(self):
+        # production = {}
+        # for layer in self.layers:
+        #     feedstock = layer.feedstock
+        #     if feedstock not in production.keys():
+        #         production[feedstock] = 0
+        #     production[feedstock] += layer.layeraggregatedvalue_set.get(name='Total annual production').value / 1000
+        data = []
+        unit = None
+        for layer in self.layers:
+            agg_value = layer.layeraggregatedvalue_set.first()
+            unit = agg_value.unit
+            data.append(agg_value.value)
+        production = DataSet(label='Total production per feedstock', data=data, unit=unit)
+        return production
+
+    def get_charts(self):
+        charts = {}
 
         # Total annual production per feedstock
         xlabels, data = self.production_values_for_plot()
-        plot = Plot(
-            chart_id='productionPerFeedstockBarChart',
-            name='Total annual production per feedstock',
-            dataset={'labels': xlabels, 'values': data}
-        )
-        plot_data.update(plot.serialized)
+        charts.update({
+            'productionPerFeedstockBarChart': BarChart(
+                id='productionPerFeedstockBarChart',
+                title='Total annual production per feedstock',
+                data=data,
+                labels=xlabels
+            ).as_dict()
+        })
 
         # Composition of total production by component group
         group_settings = self.material_component_groups()
         for group_setting in group_settings:
             xlabels, data = self.material_values_for_plot(group_setting)
             chart_id = group_setting.group.name.replace(' ', '') + 'BarChart'
-            plot = Plot(
-                chart_id=chart_id,
-                name='Production per component: ' + group_setting.group.name,
-                dataset={'labels': xlabels, 'values': data}
-            )
-            plot_data.update(plot.serialized)
+            charts.update({
+                chart_id: BarChart(
+                    id=chart_id,
+                    title='Production per component: ' + group_setting.group.name,
+                    data=data
+                ).as_dict()
+            })
 
         # Seasonal distribution of total production
         xlabels, data = self.seasonal_production_for_plot()
-        plot = Plot(
-            chart_id='seasonalFeedstockBarChart',
-            name='Seasonal distribution of feedstocks',
-            dataset={'labels': xlabels, 'values': data[0]},  # TODO: allow several distributions
-            show_legend=True
-        )
-        plot_data.update(plot.serialized)
+        charts.update({
+            'seasonalFeedstockBarChart': BarChart(
+                id='seasonalFeedstockBarChart',
+                title='Seasonal distribution of feedstocks',
+                data=data[0],
+                labels=xlabels,
+                show_legend=True
+            ).as_dict()
+        })
 
-        return plot_data
+        return charts
 
     def production_values_for_plot(self):
         xlabels = []
@@ -131,30 +121,14 @@ class ScenarioResult:
         return xlabels, data
 
     def seasonal_production_for_plot(self):
-        distribution = TemporalDistribution.objects.get(name='Months of the year')  # FIXME: allow more than one distribution
+        distribution = TemporalDistribution.objects.get(
+            name='Months of the year')  # FIXME: allow more than one distribution
         xlabels = [timestep.name for timestep in distribution.timestep_set.all()]
         data = []
         for layer in self.layers:
             for aggdist in layer.layeraggregateddistribution_set.filter(distribution=distribution):
                 data.append(aggdist.serialized)
-        print(data)
         return xlabels, data
-
-    def total_annual_production(self):
-        total_production = 0
-        for layer in self.layers:
-            layer_production_agg = layer.layeraggregatedvalue_set.get(name='Total annual production')
-            total_production += layer_production_agg.value
-        return total_production / 1000
-
-    def total_production_per_feedstock(self):
-        production = {}
-        for layer in self.layers:
-            feedstock = layer.feedstock
-            if feedstock not in production.keys():
-                production[feedstock] = 0
-            production[feedstock] += layer.layeraggregatedvalue_set.get(name='Total annual production').value / 1000
-        return production
 
     def seasonal_production_per_feedstock(self):
         pass

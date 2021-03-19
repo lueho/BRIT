@@ -29,7 +29,7 @@ class ScenarioResultView(DetailView):
         scenario = self.object
         result = ScenarioResult(scenario)
         context['layers'] = [layer.as_dict() for layer in result.layers]
-        context['plot_data'] = result.get_plot_data()
+        context['charts'] = result.get_charts()
         return context
 
     def get(self, request, *args, **kwargs):

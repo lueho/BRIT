@@ -28,9 +28,11 @@ function number_format(number, decimals, dec_point, thousands_sep) {
     return s.join(dec);
 }
 
-function chartDefinition(chart_type, labels, values, unit, show_legend) {
+function chartDefinition(type, labels, values, unit, show_legend) {
 
-    switch (chart_type) {
+    console.log(values)
+
+    switch (type) {
         case 'barchart':
             return barChartDefinition(labels, values, unit, show_legend);
         case 'stacked_barchart':

@@ -1,9 +1,13 @@
+from unittest import TestCase as NativeTestCase
+
 from django.contrib.auth.models import User
 from django.db import transaction
 from django.db.models import signals
 from django.db.utils import IntegrityError
-from django.test import TestCase
+from django.test import TestCase as DjangoTestCase, tag
+from django.urls import reverse
 from factory.django import mute_signals
+from mock import Mock, patch, PropertyMock, MagicMock
 
 from flexibi_dst.models import TemporalDistribution, Timestep
 from material_manager.models import (
@@ -19,10 +23,10 @@ from material_manager.models import (
 from users.models import ReferenceUsers
 
 
-class BaseObjectsTestCase(TestCase):
+@tag('db')
+class BaseObjectsTestCase(DjangoTestCase):
 
     def test_base_objects(self):
-
         standard_owner = ReferenceUsers.objects.get.standard_owner
 
         base_group = BaseObjects.objects.get.base_group
@@ -77,7 +81,8 @@ class BaseObjectsTestCase(TestCase):
         self.assertEqual(base_timestep.distribution, base_distribution)
 
 
-class MaterialSetupTestCase(TestCase):
+@tag('db')
+class MaterialSetupTestCase(DjangoTestCase):
 
     def setUp(self):
         self.material = Material.objects.create(
@@ -90,7 +95,8 @@ class MaterialSetupTestCase(TestCase):
         self.assertTrue(True)
 
 
-class MaterialTestCase(TestCase):
+@tag('db')
+class MaterialTestCase(DjangoTestCase):
 
     def setUp(self):
         self.superuser = User.objects.create_superuser(username='flexibi')
@@ -398,9 +404,7 @@ class MaterialTestCase(TestCase):
         self.assertEqual(CompositionSet.objects.all().count(), 4)
         self.assertEqual(MaterialComponentShare.objects.all().count(), 4)
         self.assertEqual(main_group_settings.average_composition.timestep.name, 'Average')
-        material_settings_copy = material.standard_settings.create_copy(self.user)
         self.assertEqual(MaterialSettings.objects.all().count(), 3)
-        print(MaterialComponentGroupSettings.objects.all())
         self.assertEqual(MaterialComponentGroupSettings.objects.all().count(), 4)
         self.assertEqual(CompositionSet.objects.all().count(), 8)
         self.assertEqual(MaterialComponentShare.objects.all().count(), 8)
@@ -413,3 +417,108 @@ class MaterialTestCase(TestCase):
 
     def test_shares(self):
         pass
+
+
+@tag('db')
+class CompositionSetTestCaseDB(DjangoTestCase):
+    def test_add_component(self):
+        self.assertTrue(True)
+
+
+class CompositionSetTestCase(NativeTestCase):
+
+    def test_get_absolute_url(self):
+        composition_set = CompositionSet()
+        group_settings = Mock(spec=MaterialComponentGroupSettings)
+        group_settings._state = Mock()
+        group_settings.get_absolute_url = MagicMock(return_value='test_url')
+        composition_set.group_settings = group_settings
+        self.assertEqual(composition_set.get_absolute_url(), 'test_url')
+
+
+class MaterialComponentShareTestCase(NativeTestCase):
+
+    @patch('material_manager.models.MaterialComponentShare.material_settings', new_callable=PropertyMock)
+    def test_property_material(self, mock_material_settings):
+        material = Mock(spec=Material)
+        material.name = 'Test material'
+        material._state = Mock()
+        material_settings = Mock(spec=MaterialSettings)
+        material_settings._state = Mock()
+        material_settings.material = material
+        mock_material_settings.return_value = material_settings
+        share = MaterialComponentShare()
+        self.assertEqual(share.material.name, 'Test material')
+
+    @patch('material_manager.models.MaterialComponentShare.group_settings', new_callable=PropertyMock)
+    def test_property_material_settings(self, mock_group_settings):
+        material_settings = Mock(spec=MaterialSettings)
+        material_settings.name = 'Test settings'
+        material_settings._state = Mock()
+        group_settings = Mock(spec=MaterialComponentGroupSettings)
+        group_settings.material_settings = material_settings
+        group_settings._state = Mock()
+        mock_group_settings.return_value = group_settings
+        share = MaterialComponentShare()
+        self.assertEqual(share.material_settings.name, 'Test settings')
+
+    @patch('material_manager.models.MaterialComponentShare.group_settings', new_callable=PropertyMock)
+    def test_property_group(self, mock_group_settings):
+        group = Mock(spec=MaterialComponentGroup)
+        group.name = 'Test group'
+        group._status = Mock()
+        group_settings = Mock(spec=MaterialComponentGroupSettings)
+        group_settings.group = group
+        group_settings._status = Mock()
+        mock_group_settings.return_value = group_settings
+        share = MaterialComponentShare()
+        self.assertEqual(share.group.name, 'Test group')
+
+    @patch('material_manager.models.MaterialComponentShare.composition_set', new_callable=PropertyMock)
+    def test_property_group_settings(self, mock_composition_set):
+        group_settings = Mock(spec=MaterialComponentGroupSettings)
+        group_settings.id = 5
+        group_settings._status = Mock()
+        composition_set = Mock(spec=CompositionSet)
+        composition_set.group_settings = group_settings
+        composition_set._status = Mock()
+        mock_composition_set.return_value = composition_set
+        share = MaterialComponentShare()
+        self.assertEqual(share.group_settings.id, 5)
+
+    @patch('material_manager.models.MaterialComponentShare.composition_set', new_callable=PropertyMock)
+    def test_property_timestep(self, mock_composition_set):
+        timestep = Mock(spec=Timestep)
+        timestep.name = 'Test timestep'
+        timestep._status = Mock()
+        composition_set = Mock(spec=CompositionSet)
+        composition_set.timestep = timestep
+        composition_set._status = Mock()
+        mock_composition_set.return_value = composition_set
+        share = MaterialComponentShare()
+        self.assertEqual(share.timestep.name, 'Test timestep')
+
+    @patch('material_manager.models.MaterialComponentShare.material_settings', new_callable=PropertyMock)
+    def test_get_absolute_url(self, mock_material_settings):
+        material_settings = Mock(spec=MaterialSettings)
+        material_settings.id = 4
+        material_settings._status = Mock()
+        mock_material_settings.return_value = material_settings
+        share = MaterialComponentShare()
+        self.assertEqual(share.get_absolute_url(), reverse('material_settings', kwargs={'pk': 4}))
+
+    @patch('material_manager.models.MaterialComponentShare.material', new_callable=PropertyMock)
+    def test_str(self, mock_material):
+        component = Mock(spec=MaterialComponent)
+        component.name = 'Test component'
+        component._state = Mock()
+        material = Mock(spec=Material)
+        material.name = 'Test material'
+        material._state = Mock()
+        mock_material.return_value = material
+        share = MaterialComponentShare()
+        share.component = component
+        self.assertEqual(
+            share.__str__(),
+            'Component share of material: Test material, component: Test component'
+        )

@@ -15,6 +15,7 @@ django-geojson==3.0.0
 django-heroku==0.3.1
 django-js-reverse==0.9.1
 django-leaflet==0.26.0
+django-mock-queries==2.1.6
 django-model-utils==4.1.1
 django-storages==1.11.1
 django-tables2==2.3.4
@@ -30,6 +31,8 @@ humanize==0.5.1
 importlib-metadata==3.1.1
 jmespath==0.10.0
 kombu==4.6.10
+mock==4.0.3
+model-bakery==1.1.1
 psycopg2==2.8.5
 python-dateutil==2.8.1
 pytz==2020.1

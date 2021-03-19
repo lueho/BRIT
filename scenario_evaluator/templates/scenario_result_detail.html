@@ -52,15 +52,15 @@
     <!-- second row -->
     <h2>Scenario result summary:</h2>
     <div class="row">
-        {% for chart_id, content in plot_data.items %}
+        {% for id, c in charts.items %}
             <div class="col col-6">
                 <div class="card shadow mb-4">
                     <div class="card-header py-3">
-                        <h6 class="m-0 font-weight-bold text-primary">{{ content.chart_name }}</h6>
+                        <h6 class="m-0 font-weight-bold text-primary">{{ c.title }}</h6>
                     </div>
                     <div class="card-body">
                         <div class="chart-bar">
-                            <canvas id="{{ chart_id }}"></canvas>
+                            <canvas id="{{ id }}"></canvas>
                         </div>
                     </div>
                 </div>
@@ -101,18 +101,21 @@
 
     {{ block.super }}
     {{ plot_data|json_script:"plot_data" }}
+    {{ charts|json_script:"charts" }}
 
     <script src="{% static 'js/charts/feedstock_summary_bar_chart.js' %}"></script>
     <script>
-        let plot_data = JSON.parse(document.getElementById("plot_data").textContent);
-        for (const [chart_id, content] of Object.entries(plot_data)) {
-            let ctx = document.getElementById(chart_id)
+        let charts = JSON.parse(document.getElementById("charts").textContent);
+        console.log(charts)
+        for (const [id, chart] of Object.entries(charts)) {
+            let ctx = document.getElementById(id)
+            console.log(ctx)
             const args = chartDefinition(
-                content["chart_type"],
-                content["dataset"]["labels"],
-                content["dataset"]["values"],
-                content["unit"],
-                content["show_legend"],
+                chart["type"],
+                chart["labels"],
+                chart["data"],
+                chart["unit"],
+                chart["show_legend"],
             );
             new Chart(ctx, args);
         }
