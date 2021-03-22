@@ -1,35 +1,21 @@
+from collections import UserDict
+
 from flexibi_dst.exceptions import UnitMismatchError
 
 
-class BaseDataSet:
+class BaseDataSet(UserDict):
     bg_color = None
     label = None
     unit = None
-    _data = None
 
-    def __init__(self, **attrs):
-        for key, value in attrs.items():
-            setattr(self, key, value)
+    def __init__(self, data=None, label=None, unit=None):
+        super().__init__(data)
+        self.label = label if label is not None else None
+        self.unit = unit if unit is not None else None
 
     @property
-    def data(self):
-        return self._data
-
-    @data.setter
-    def data(self, data):
-        if data is not None and type(data) is not list:
-            raise TypeError
-        self._data = data
-
-    def as_dict(self):
-        return {
-            'label': self.label,
-            'data': self.data,
-            'unit': self.unit
-        }
-
-    def __len__(self):
-        return len(self.data)
+    def xlabels(self):
+        return list(self.keys())
 
     def __str__(self):
         return self.label
@@ -61,7 +47,12 @@ class BaseChart:
         self.unit = kwargs.get('unit', '')
         self.show_legend = kwargs.get('show_legend', False)
         self.labels = kwargs.get('labels')
-        self.data = [BaseDataSet(**d) for d in kwargs.get('data', [])]
+        self.data = []
+        for d in kwargs.get('data', []):
+            ds = BaseDataSet(dict(zip(kwargs.get('labels'), d['data'])))
+            ds.label = d['label']
+            ds.unit = d['unit']
+            self.data.append(ds)
 
     @property
     def has_labels(self):
@@ -94,7 +85,7 @@ class BaseChart:
             'type': self.type,
             'title': self.title,
             'labels': self.labels,
-            'data': [d.as_dict() for d in self.data],
+            'data': [{'data': list(d.data.values()), 'label': d.label, 'unit': d.unit} for d in self.data],
             'unit': self.unit,
             'show_legend': self.show_legend
         }

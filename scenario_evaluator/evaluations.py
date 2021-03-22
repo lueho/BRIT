@@ -51,7 +51,7 @@ class ScenarioResult:
         data = []
         unit = None
         for layer in self.layers:
-            agg_value = layer.layeraggregatedvalue_set.first()
+            agg_value = layer.layeraggregatedvalue_set.get(name='Total production')
             unit = agg_value.unit
             data.append(agg_value.value)
         production = DataSet(label='Total production per feedstock', data=data, unit=unit)
