@@ -154,6 +154,11 @@ class BasePlotTestCase(NativeTestCase):
         with self.assertRaises(UnitMismatchError):
             self.chart.add_dataset(**ds_kwargs)
 
+    def test_add_dataset_stores_labels(self):
+        self.chart.unit = self.unit
+        self.chart.add_dataset(**self.dataset2_kwargs)
+        self.assertListEqual(self.chart.labels, ['Column 1', 'Column 2', 'Column 3'])
+
     def test_as_dict(self):
         self.chart.unit = self.unit
         self.chart.add_dataset(self.dataset1)

@@ -55,7 +55,7 @@ class ScenarioResultTestCase(NativeTestCase):
         self.assertEqual(production.label, 'Total production')
         self.assertEqual(production.unit, unit)
         self.assertEqual(len(production.data), 1)
-        self.assertEqual(production.data[0], value1 + value2)
+        self.assertEqual(production.data['Total'], value1 + value2)
 
     def test_total_production_with_different_unit(self):
         value = 100
@@ -85,17 +85,29 @@ class ScenarioResultTestCase(NativeTestCase):
         value3 = 13
         name = 'Total production'
         layers = MockSet(
-            MockModel(layeraggregatedvalue_set=MockSet(MockModel(name=name, value=value1, unit=unit))),
-            MockModel(layeraggregatedvalue_set=MockSet(MockModel(name=name, value=value2, unit=unit))),
-            MockModel(layeraggregatedvalue_set=MockSet(MockModel(name=name, value=value3, unit=unit))),
+            MockModel(
+                feedstock=MockModel(name="Feedstock 1"),
+                layeraggregatedvalue_set=MockSet(MockModel(name=name, value=value1, unit=unit))
+            ),
+            MockModel(
+                feedstock=MockModel(name="Feedstock 2"),
+                layeraggregatedvalue_set=MockSet(MockModel(name=name, value=value2, unit=unit))
+            ),
+            MockModel(
+                feedstock=MockModel(name="Feedstock 3"),
+                layeraggregatedvalue_set=MockSet(MockModel(name=name, value=value3, unit=unit))),
         )
         scenario = MockModel(layer_set=layers)
         result = ScenarioResult(scenario)
         production = result.total_production_per_feedstock()
         self.assertIsInstance(production, DataSet)
         self.assertEqual(production.unit, unit)
-        self.assertEqual(len(production.data), 3)
-        self.assertListEqual(production.data, [value1, value2, value3])
+        self.assertDictEqual(production.data,
+                             {
+                                 'Feedstock 1': value1,
+                                 'Feedstock 2': value2,
+                                 'Feedstock 3': value3
+                             })
         self.assertEqual(production.label, 'Total production per feedstock')
 
     def test_total_production_per_feedstock_with_two_layers_and_other_unit(self):
@@ -104,16 +116,24 @@ class ScenarioResultTestCase(NativeTestCase):
         value2 = 1700
         name = 'Total production'
         layers = MockSet(
-            MockModel(layeraggregatedvalue_set=MockSet(MockModel(name=name, value=value1, unit=unit))),
-            MockModel(layeraggregatedvalue_set=MockSet(MockModel(name=name, value=value2, unit=unit))),
+            MockModel(
+                feedstock=MockModel(name="Feedstock 1"),
+                layeraggregatedvalue_set=MockSet(MockModel(name=name, value=value1, unit=unit))
+            ),
+            MockModel(
+                feedstock=MockModel(name="Feedstock 2"),
+                layeraggregatedvalue_set=MockSet(MockModel(name=name, value=value2, unit=unit))
+            ),
         )
         scenario = MockModel(layer_set=layers)
         result = ScenarioResult(scenario)
         production = result.total_production_per_feedstock()
         self.assertIsInstance(production, DataSet)
         self.assertEqual(production.unit, unit)
-        self.assertEqual(len(production.data), 2)
-        self.assertListEqual(production.data, [value1, value2])
+        self.assertDictEqual(production.data, {
+            'Feedstock 1': value1,
+            'Feedstock 2': value2,
+        })
         self.assertEqual(production.label, 'Total production per feedstock')
 
     def test_total_production_per_feedstock_with_multiple_aggregated_values(self):
@@ -121,18 +141,19 @@ class ScenarioResultTestCase(NativeTestCase):
         value1 = 100
         name = 'Total production'
         layers = MockSet(
-            MockModel(layeraggregatedvalue_set=MockSet(
-                MockModel(name=name, value=value1, unit=unit),
-                MockModel(name='Imposter', value=value1, unit=unit)
-            )),
+            MockModel(
+                feedstock=MockModel(name="Feedstock 1"),
+                layeraggregatedvalue_set=MockSet(
+                    MockModel(name=name, value=value1, unit=unit),
+                    MockModel(name='Imposter', value=value1, unit=unit)
+                )),
         )
         scenario = MockModel(layer_set=layers)
         result = ScenarioResult(scenario)
         production = result.total_production_per_feedstock()
         self.assertIsInstance(production, DataSet)
         self.assertEqual(production.unit, unit)
-        self.assertEqual(len(production.data), 1)
-        self.assertListEqual(production.data, [value1])
+        self.assertDictEqual(production.data, {'Feedstock 1': value1})
         self.assertEqual(production.label, 'Total production per feedstock')
 
     def test_total_production_per_feedstock_with_two_feedstocks(self):
@@ -152,7 +173,7 @@ class ScenarioResultTestCase(NativeTestCase):
         result = ScenarioResult(scenario)
         production = result.total_production_per_feedstock()
         self.assertEqual(len(production.data), 2)
-        self.assertListEqual(production.data, [value1, value2])
+        self.assertDictEqual(production.data, {'Feedstock 1': value1, 'Feedstock 2': value2})
 
 
 @tag('db')

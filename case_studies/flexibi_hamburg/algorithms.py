@@ -31,4 +31,11 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
                 distribution_set['shares'].append({'component': component.id, 'average': 2.5})
             aggdist['sets'].append(distribution_set)
         result['aggregated_distributions'].append(aggdist)
+
+        result['aggregated_values'].append({
+            'name': 'Total annual production',
+            'value': 8000,
+            'unit': 'Mg/a'
+        })
+
         return result

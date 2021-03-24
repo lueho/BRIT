@@ -46,7 +46,7 @@ class BaseChart:
         self.type = kwargs.get('type')
         self.unit = kwargs.get('unit', '')
         self.show_legend = kwargs.get('show_legend', False)
-        self.labels = kwargs.get('labels')
+        self.labels = kwargs.get('labels', [])
         self.data = []
         for d in kwargs.get('data', []):
             ds = BaseDataSet(dict(zip(kwargs.get('labels'), d['data'])))
@@ -56,7 +56,7 @@ class BaseChart:
 
     @property
     def has_labels(self):
-        return self._labels is not None
+        return bool(self._labels) is not False
 
     @property
     def labels(self):
@@ -73,10 +73,15 @@ class BaseChart:
             if dataset.unit != self.unit:
                 raise UnitMismatchError
             self.data.append(dataset)
+            for label in dataset.xlabels:
+                self.labels.append(label)
         else:
             if kwargs.get('unit') != self.unit:
                 raise UnitMismatchError
-            self.data.append(BaseDataSet(**kwargs))
+            dataset = BaseDataSet(**kwargs)
+            self.data.append(dataset)
+            for label in dataset.xlabels:
+                self.labels.append(label)
         self.has_data = True
 
     def as_dict(self):

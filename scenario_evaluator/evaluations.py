@@ -38,22 +38,16 @@ class ScenarioResult:
             if agg_value.unit != unit:
                 raise UnitMismatchError
             production_value += agg_value.value
-        total_production = DataSet(label='Total production', data=[production_value], unit=unit)
+        total_production = DataSet(label='Total production', data={'Total': production_value}, unit=unit)
         return total_production
 
     def total_production_per_feedstock(self):
-        # production = {}
-        # for layer in self.layers:
-        #     feedstock = layer.feedstock
-        #     if feedstock not in production.keys():
-        #         production[feedstock] = 0
-        #     production[feedstock] += layer.layeraggregatedvalue_set.get(name='Total annual production').value / 1000
-        data = []
+        data = {}
         unit = None
         for layer in self.layers:
             agg_value = layer.layeraggregatedvalue_set.get(name='Total production')
             unit = agg_value.unit
-            data.append(agg_value.value)
+            data[layer.feedstock.name] = agg_value.value
         production = DataSet(label='Total production per feedstock', data=data, unit=unit)
         return production
 
@@ -61,14 +55,15 @@ class ScenarioResult:
         charts = {}
 
         # Total annual production per feedstock
-        xlabels, data = self.production_values_for_plot()
+        production = self.total_production_per_feedstock()
+        chart = BarChart(
+            id='productionPerFeedstockBarChart',
+            title='Total annual production per feedstock',
+            unit=production.unit
+        )
+        chart.add_dataset(production)
         charts.update({
-            'productionPerFeedstockBarChart': BarChart(
-                id='productionPerFeedstockBarChart',
-                title='Total annual production per feedstock',
-                data=data,
-                labels=xlabels
-            ).as_dict()
+            'productionPerFeedstockBarChart': chart.as_dict()
         })
 
         # Composition of total production by component group
