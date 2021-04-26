@@ -157,6 +157,15 @@ class MaterialSettings(models.Model):
         return result
 
     @property
+    def component_groups(self):
+        return MaterialComponentGroup.objects.filter(
+            id__in=[setting['group'] for setting in
+                    self.materialcomponentgroupsettings_set
+                        .exclude(group=BaseObjects.objects.get.base_group)
+                        .values('group').distinct()]
+        )
+
+    @property
     def group_ids(self):
         """
         Ids of component groups that have been assigned to this material.
@@ -170,6 +179,10 @@ class MaterialSettings(models.Model):
         """
         ids = self.group_ids
         return ids
+
+    @property
+    def shares(self):
+        return MaterialComponentShare.objects.filter(composition_set__group_settings__material_settings=self)
 
     def create_copy(self, owner, name='Customization', description=''):
         material_settings_copy = MaterialSettings.objects.create(
@@ -195,10 +208,13 @@ class MaterialSettings(models.Model):
                 group_settings_copy.add_component(component)
         return material_settings_copy
 
+    @property
+    def group_settings(self):
+        return self.materialcomponentgroupsettings_set.exclude(group=BaseObjects.objects.get.base_group)
+
     def composition(self):
-        group_settings = self.materialcomponentgroupsettings_set.exclude(group=BaseObjects.objects.get.base_group)
         grouped_shares = {}
-        for setting in group_settings:
+        for setting in self.group_settings:
             grouped_shares[setting] = {
                 'averages': [],
                 'averages_composition': setting.average_composition,

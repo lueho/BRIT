@@ -3,7 +3,7 @@ from unittest import TestCase as NativeTestCase
 from django.db.models.query import QuerySet
 from django.test import TestCase as DjangoTestCase, tag
 from django_mock_queries.query import MockSet, MockModel
-from mock import Mock, patch, PropertyMock
+from mock import Mock, patch, PropertyMock, MagicMock
 
 from distributions.plots import DataSet
 from flexibi_dst.exceptions import UnitMismatchError
@@ -16,17 +16,26 @@ from users.models import ReferenceUsers
 
 class ScenarioResultTestCase(NativeTestCase):
 
+    def setUp(self):
+        self.scenario = MockModel(name='Test scenario', layer_set=MockSet())
+        self.scenario.feedstocks = MagicMock(return_value=MockSet())
+
     def test_init_scenario(self):
-        scenario = MockModel(name='Test scenario', layer_set=MockSet())
-        result = ScenarioResult(scenario)
+        result = ScenarioResult(self.scenario)
         self.assertEqual(result.scenario.name, 'Test scenario')
 
     def test_init_layers(self):
-        layer = MockModel(mock_name='layer1')
-        layers = MockSet(layer)
-        scenario = MockModel(mock_name='scenario1', layer_set=layers)
-        result = ScenarioResult(scenario)
+        layer = MockModel(name='layer1', feedstock=MockModel())
+        self.scenario.layer_set = MockSet(layer)
+        result = ScenarioResult(self.scenario)
         self.assertEqual(result.layers.first(), layer)
+
+    def test_init_feedstocks(self):
+        feedstock = MockModel(id=5)
+        scenario = MockModel(layer_set=MockSet())
+        scenario.feedstocks = MagicMock(return_value=MockSet(feedstock))
+        result = ScenarioResult(scenario)
+        self.assertEqual(result.feedstocks.first(), feedstock)
 
     @patch('scenario_evaluator.evaluations.ScenarioResult.layers', new_callable=PropertyMock)
     def test_property_layers(self, mock_layers):
@@ -41,15 +50,19 @@ class ScenarioResultTestCase(NativeTestCase):
         value2 = 87.3
         unit = 'kg/a'
         layers = MockSet(
-            MockModel(layeraggregatedvalue_set=MockSet(MockModel(name='Total production', value=value1, unit=unit))),
-            MockModel(layeraggregatedvalue_set=MockSet(
-                MockModel(name='Total production', value=value2, unit=unit),
-                MockModel(name='Imposter', value=value2, unit=unit)
-            )
+            MockModel(
+                feedstock=MockModel(),
+                layeraggregatedvalue_set=MockSet(MockModel(name='Total production', value=value1, unit=unit))),
+            MockModel(
+                feedstock=MockModel(),
+                layeraggregatedvalue_set=MockSet(
+                    MockModel(name='Total production', value=value2, unit=unit),
+                    MockModel(name='Imposter', value=value2, unit=unit)
+                )
             )
         )
-        scenario = MockModel(layer_set=layers)
-        result = ScenarioResult(scenario)
+        self.scenario.layer_set = layers
+        result = ScenarioResult(self.scenario)
         production = result.total_production()
         self.assertIsInstance(production, DataSet)
         self.assertEqual(production.label, 'Total production')
@@ -61,20 +74,26 @@ class ScenarioResultTestCase(NativeTestCase):
         value = 100
         unit = 'Mg/a'
         layers = MockSet(
-            MockModel(layeraggregatedvalue_set=MockSet(MockModel(name='Total production', value=value, unit=unit)))
+            MockModel(
+                feedstock=MockModel(),
+                layeraggregatedvalue_set=MockSet(MockModel(name='Total production', value=value, unit=unit)))
         )
-        scenario = MockModel(layer_set=layers)
-        result = ScenarioResult(scenario)
+        self.scenario.layer_set = layers
+        result = ScenarioResult(self.scenario)
         production = result.total_production()
         self.assertEqual(production.unit, unit)
 
     def test_total_production_raises_error_on_unit_mismatch(self):
         layers = MockSet(
-            MockModel(layeraggregatedvalue_set=MockSet(MockModel(name='Total production', value=1, unit='kg/a'))),
-            MockModel(layeraggregatedvalue_set=MockSet(MockModel(name='Total production', value=1, unit='Imposter')))
+            MockModel(
+                feedstock=MockModel(),
+                layeraggregatedvalue_set=MockSet(MockModel(name='Total production', value=1, unit='kg/a'))),
+            MockModel(
+                feedstock=MockModel(),
+                layeraggregatedvalue_set=MockSet(MockModel(name='Total production', value=1, unit='Imposter')))
         )
-        scenario = MockModel(layer_set=layers)
-        result = ScenarioResult(scenario)
+        self.scenario.layer_set = layers
+        result = ScenarioResult(self.scenario)
         with self.assertRaises(UnitMismatchError):
             result.total_production()
 
@@ -97,8 +116,8 @@ class ScenarioResultTestCase(NativeTestCase):
                 feedstock=MockModel(name="Feedstock 3"),
                 layeraggregatedvalue_set=MockSet(MockModel(name=name, value=value3, unit=unit))),
         )
-        scenario = MockModel(layer_set=layers)
-        result = ScenarioResult(scenario)
+        self.scenario.layer_set = layers
+        result = ScenarioResult(self.scenario)
         production = result.total_production_per_feedstock()
         self.assertIsInstance(production, DataSet)
         self.assertEqual(production.unit, unit)
@@ -125,8 +144,8 @@ class ScenarioResultTestCase(NativeTestCase):
                 layeraggregatedvalue_set=MockSet(MockModel(name=name, value=value2, unit=unit))
             ),
         )
-        scenario = MockModel(layer_set=layers)
-        result = ScenarioResult(scenario)
+        self.scenario.layer_set = layers
+        result = ScenarioResult(self.scenario)
         production = result.total_production_per_feedstock()
         self.assertIsInstance(production, DataSet)
         self.assertEqual(production.unit, unit)
@@ -148,8 +167,8 @@ class ScenarioResultTestCase(NativeTestCase):
                     MockModel(name='Imposter', value=value1, unit=unit)
                 )),
         )
-        scenario = MockModel(layer_set=layers)
-        result = ScenarioResult(scenario)
+        self.scenario.layer_set = layers
+        result = ScenarioResult(self.scenario)
         production = result.total_production_per_feedstock()
         self.assertIsInstance(production, DataSet)
         self.assertEqual(production.unit, unit)
@@ -169,11 +188,23 @@ class ScenarioResultTestCase(NativeTestCase):
                 layeraggregatedvalue_set=MockSet(MockModel(name='Total production', value=value2))
             ),
         )
-        scenario = MockModel(layer_set=layers)
-        result = ScenarioResult(scenario)
+        self.scenario.layer_set = layers
+        result = ScenarioResult(self.scenario)
         production = result.total_production_per_feedstock()
         self.assertEqual(len(production.data), 2)
         self.assertDictEqual(production.data, {'Feedstock 1': value1, 'Feedstock 2': value2})
+
+    def test_total_production_per_material_component(self):
+        feedstock1 = MockModel(component_groups=MockSet(MockModel(name='Group 1')))
+        composition = {
+            MockModel(name='Group 1'): 1
+        }
+        feedstock1.composition = MagicMock(return_value=composition)
+        self.scenario.feedstocks = MockSet(feedstock1)
+        result = ScenarioResult(self.scenario)
+        datasets = result.total_production_per_material_component()
+        self.assertIsInstance(datasets, dict)
+        self.assertListEqual(list(datasets.keys()), ['Group 1'])
 
 
 @tag('db')

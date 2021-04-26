@@ -8,10 +8,12 @@ from material_manager.models import BaseObjects
 class ScenarioResult:
     scenario = None
     layers = None
+    feedstocks = None
 
     def __init__(self, scenario):
         self.scenario = scenario
         self.layers = scenario.layer_set.all()
+        self.feedstocks = scenario.feedstocks()
 
     def material_component_groups(self):
         group_settings = []
@@ -50,6 +52,22 @@ class ScenarioResult:
             data[layer.feedstock.name] = agg_value.value
         production = DataSet(label='Total production per feedstock', data=data, unit=unit)
         return production
+
+    def total_production_per_material_component(self):
+        # This should not depend on the material definition but should be fetched directly from layer. Calculation
+        # should happen directly in the model algorithm.
+        total_production_per_feedstock = self.total_production_per_feedstock()
+        components = {}
+        for feedstock in self.feedstocks:
+            for group, content in feedstock.composition().items():
+                if group not in components:
+                    components[group] = {}
+                for share in content['averages']:
+                    if share.component.name not in components[group]:
+                        components[group][share.component.name] = 0
+                    components[group][share.component.name] += share.average * total_production_per_feedstock[
+                        feedstock]
+        return components
 
     def get_charts(self):
         charts = {}
@@ -93,24 +111,13 @@ class ScenarioResult:
 
         return charts
 
-    def production_values_for_plot(self):
-        xlabels = []
-        data = [{
-            'label': 'Total',
-            'data': []
-        }]
-        for material_settings, value in self.total_production_per_feedstock().items():
-            xlabels.append(material_settings.material.name)
-            data[0]['data'].append(value)
-        return xlabels, data
-
     def material_values_for_plot(self, group):
         xlabels = []
         data = [{
             'label': 'Total',
             'data': []
         }]
-        for label, value in self.total_material_components()[group].items():
+        for label, value in self.total_production_per_material_component()[group].items():
             xlabels.append(label)
             data[0]['data'].append(value)
         return xlabels, data
@@ -127,20 +134,6 @@ class ScenarioResult:
 
     def seasonal_production_per_feedstock(self):
         pass
-
-    def total_material_components(self):
-        total_production_per_feedstock = self.total_production_per_feedstock()
-        components = {}
-        for feedstock in total_production_per_feedstock.keys():
-            for group, content in feedstock.composition().items():
-                if group not in components:
-                    components[group] = {}
-                for share in content['averages']:
-                    if share.component.name not in components[group]:
-                        components[group][share.component.name] = 0
-                    components[group][share.component.name] += share.average * total_production_per_feedstock[
-                        feedstock]
-        return components
 
     def layer_summaries(self):
         layer_summaries = {}
