@@ -40,8 +40,8 @@ class InventoryAlgorithmsBase(object):
 
         result['aggregated_values'].append({
             'name': 'Total production',
-            'value': total_production,
-            'unit': 'kg'
+            'value': total_production/1000,  # TODO: Add dynamic unit management
+            'unit': 'Mg/a'
         })
 
         for feature in clipped:

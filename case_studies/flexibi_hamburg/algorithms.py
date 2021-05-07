@@ -32,10 +32,4 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
             aggdist['sets'].append(distribution_set)
         result['aggregated_distributions'].append(aggdist)
 
-        result['aggregated_values'].append({
-            'name': 'Total annual production',
-            'value': 8000,
-            'unit': 'Mg/a'
-        })
-
         return result

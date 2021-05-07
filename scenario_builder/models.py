@@ -496,6 +496,20 @@ class Scenario(models.Model):
     def result_features_collections(self):
         return [layer.get_feature_collection() for layer in self.layer_set()]
 
+    def summary_dict(self):
+        summary = {
+            'Name': self.name,
+            'Case study region': {
+                'Name': self.region.name,
+            },
+            'Catchment': {
+                'Name': self.catchment.name,
+                'Description': self.catchment.description
+            },
+            'Description': self.description,
+        }
+        return summary
+
     @property
     def detail_url(self):
         return self.get_absolute_url()

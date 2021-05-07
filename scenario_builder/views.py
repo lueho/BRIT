@@ -9,6 +9,8 @@ from django.views.generic import CreateView, DeleteView, DetailView, ListView, V
 from django.views.generic.base import TemplateResponseMixin
 from django.views.generic.edit import FormMixin, ModelFormMixin
 from rest_framework.views import APIView
+import json
+import io
 
 from flexibi_dst.views import DualUserListView, UserOwnsObjectMixin, NextOrSuccessUrlMixin
 from layer_manager.models import Layer
@@ -345,6 +347,15 @@ class ScenarioRemoveInventoryAlgorithmView(LoginRequiredMixin, UserPassesTestMix
         self.feedstock = MaterialSettings.objects.get(id=self.kwargs.get('feedstock_pk'))
         self.scenario.remove_inventory_algorithm(algorithm=self.algorithm, feedstock=self.feedstock)
         return redirect('scenario_detail', pk=self.scenario.id)
+
+
+def download_scenario_summary(request, scenario_pk):
+    file_name = f'scenario_{scenario_pk}_summary.json'
+    scenario = Scenario.objects.get(id=scenario_pk)
+    with io.StringIO(json.dumps(scenario.summary_dict(), indent=4)) as file:
+        response = HttpResponse(file, content_type='application/json')
+        response['Content-Disposition'] = 'attachment; filename=%s' % file_name
+        return response
 
 
 def load_geodataset_options(request):

@@ -1,5 +1,6 @@
 from django.shortcuts import render
 from django.views.generic import DetailView
+from django.http import HttpResponse
 
 from flexibi_dst.views import DualUserListView
 from layer_manager.models import Layer
@@ -7,6 +8,9 @@ from material_manager.models import MaterialSettings
 from scenario_builder.models import InventoryAlgorithm, Scenario
 from scenario_evaluator.evaluations import ScenarioResult
 from scenario_evaluator.models import RunningTask
+
+import io
+import json
 
 
 class ScenarioListView(DualUserListView):
@@ -73,3 +77,12 @@ class ScenarioResultDetailMapView(DetailView):
         algorithm = InventoryAlgorithm.objects.get(id=self.kwargs.get('algorithm_pk'))
         feedstock = MaterialSettings.objects.get(id=self.kwargs.get('feedstock_pk'))
         return Layer.objects.get(scenario=scenario, algorithm=algorithm, feedstock=feedstock)
+
+
+def download_scenario_result_summary(request, scenario_pk):
+    scenario = Scenario.objects.get(id=scenario_pk)
+    result = ScenarioResult(scenario)
+    with io.StringIO(json.dumps(result.summary_dict(), indent=4)) as file:
+        response = HttpResponse(file, content_type='application/json')
+        response['Content-Disposition'] = f'attachment; filename=scenario_{scenario_pk}_result_summary.json'
+        return response

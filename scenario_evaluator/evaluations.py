@@ -84,30 +84,30 @@ class ScenarioResult:
             'productionPerFeedstockBarChart': chart.as_dict()
         })
 
-        # Composition of total production by component group
-        group_settings = self.material_component_groups()
-        for group_setting in group_settings:
-            xlabels, data = self.material_values_for_plot(group_setting)
-            chart_id = group_setting.group.name.replace(' ', '') + 'BarChart'
-            charts.update({
-                chart_id: BarChart(
-                    id=chart_id,
-                    title='Production per component: ' + group_setting.group.name,
-                    data=data
-                ).as_dict()
-            })
+        # # Composition of total production by component group
+        # group_settings = self.material_component_groups()
+        # for group_setting in group_settings:
+        #     xlabels, data = self.material_values_for_plot(group_setting)
+        #     chart_id = group_setting.group.name.replace(' ', '') + 'BarChart'
+        #     charts.update({
+        #         chart_id: BarChart(
+        #             id=chart_id,
+        #             title='Production per component: ' + group_setting.group.name,
+        #             data=data
+        #         ).as_dict()
+        #     })
 
         # Seasonal distribution of total production
-        xlabels, data = self.seasonal_production_for_plot()
-        charts.update({
-            'seasonalFeedstockBarChart': BarChart(
-                id='seasonalFeedstockBarChart',
-                title='Seasonal distribution of feedstocks',
-                data=data[0],
-                labels=xlabels,
-                show_legend=True
-            ).as_dict()
-        })
+        # xlabels, data = self.seasonal_production_for_plot()
+        # charts.update({
+        #     'seasonalFeedstockBarChart': BarChart(
+        #         id='seasonalFeedstockBarChart',
+        #         title='Seasonal distribution of feedstocks',
+        #         data=data[0],
+        #         labels=xlabels,
+        #         show_legend=True
+        #     ).as_dict()
+        # })
 
         return charts
 
@@ -145,3 +145,12 @@ class ScenarioResult:
                 'map_link': layer.feature_table_url
             }
         return layer_summaries
+
+    def summary_dict(self):
+        summary = {
+            'Scenario': {
+                'Name': self.scenario.name,
+                'Description': self.scenario.description
+            }
+        }
+        return summary
