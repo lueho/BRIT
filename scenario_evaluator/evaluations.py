@@ -9,11 +9,17 @@ class ScenarioResult:
     scenario = None
     layers = None
     feedstocks = None
+    timesteps = None
 
     def __init__(self, scenario):
         self.scenario = scenario
         self.layers = scenario.layer_set.all()
         self.feedstocks = scenario.feedstocks()
+        self.timesteps = self.homogenize_timesteps()
+
+    def homogenize_timesteps(self):
+        dist_name = 'Summer/Winter'
+        return [timestep for timestep in TemporalDistribution.objects.get(name=dist_name).timestep_set.all()]
 
     def material_component_groups(self):
         group_settings = []
@@ -50,7 +56,7 @@ class ScenarioResult:
             agg_value = layer.layeraggregatedvalue_set.get(name='Total production')
             unit = agg_value.unit
             data[layer.feedstock.name] = agg_value.value
-        production = DataSet(label='Total production per feedstock', data=data, unit=unit)
+        production = DataSet(label='Total production per feedstocks', data=data, unit=unit)
         return production
 
     def total_production_per_material_component(self):
@@ -148,9 +154,19 @@ class ScenarioResult:
 
     def summary_dict(self):
         summary = {
-            'Scenario': {
-                'Name': self.scenario.name,
-                'Description': self.scenario.description
-            }
+            'scenario': {
+                'name': self.scenario.name,
+                'description': self.scenario.description
+            },
+            'timesteps': [{
+                'name': timestep.name,
+                'composition': {
+                    'materials': [{
+                        'name': feedstock.material.name,
+                        'amount': 1000,
+                        'unit': 'Mg/a'
+                    } for feedstock in self.feedstocks]
+                }
+            } for timestep in self.timesteps]
         }
         return summary

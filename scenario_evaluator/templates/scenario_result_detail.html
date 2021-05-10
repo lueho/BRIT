@@ -42,10 +42,28 @@
             </div>
 
         </div>
-        <div class="col col-3">
-            <a class="btn btn-primary" href="{% url 'download_result_summary' object.id %}">Download summary</a>
-        </div>
 
+        <!-- Options card -->
+        <div class="col col-6">
+            <div class="card shadow">
+                <div class="card-header"><b>Options</b></div>
+                <div class="card-body p-0">
+                    <table class="table">
+                        <tr>
+                            <td class="col-2">
+                                <a class="btn btn-primary" href="{% url 'download_result_summary' object.id %}">
+                                    Download</a>
+                            </td>
+                            <td>
+                                Download .json file with result summary. Use this file to feed results into the
+                                Process simulation tool.
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="card-footer"></div>
+            </div>
+        </div>
     </div>
     <!-- End of first row -->
 

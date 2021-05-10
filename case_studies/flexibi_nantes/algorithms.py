@@ -156,7 +156,7 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
             'unit': 'ha'})
 
         result['aggregated_values'].append({
-            'name': 'Total annual production',
+            'name': 'Total production',
             'value': total_production,
             'unit': 'Mg/a'
         })
