@@ -93,7 +93,8 @@ def initialize_material(sender, instance, created, **kwargs):
 
 class MaterialSettings(models.Model):
     material = models.ForeignKey(Material, on_delete=models.CASCADE)
-    name = models.CharField(max_length=255, default='Customization')
+    full_name = models.CharField(max_length=255, blank=True, null=True)
+    customization_name = models.CharField(max_length=255, default='Customization')
     description = models.TextField(blank=True, null=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE)
     standard = models.BooleanField(default=True)
@@ -209,6 +210,16 @@ class MaterialSettings(models.Model):
         return material_settings_copy
 
     @property
+    def name(self):
+        if self.standard:
+            return self.material.name
+        else:
+            if self.full_name:
+                return self.full_name
+            else:
+                return f'{self.material.name} ({self.customization_name})'
+
+    @property
     def group_settings(self):
         return self.materialcomponentgroupsettings_set.exclude(group=BaseObjects.objects.get.base_group)
 
@@ -229,10 +240,7 @@ class MaterialSettings(models.Model):
         return reverse('material_settings', kwargs={'pk': self.id})
 
     def __str__(self):
-        if self.standard:
-            return f'Standard settings for material {self.material.name}'
-        else:
-            return f'Customization of material {self.material.name} by user {self.owner.username}'
+        return self.name
 
 
 class MaterialComponent(models.Model):

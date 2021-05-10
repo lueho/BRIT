@@ -162,7 +162,7 @@ class ScenarioResult:
                 'name': timestep.name,
                 'composition': {
                     'materials': [{
-                        'name': feedstock.material.name,
+                        'name': feedstock.name,
                         'amount': 1000,
                         'unit': 'Mg/a'
                     } for feedstock in self.feedstocks]
