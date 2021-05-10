@@ -18,7 +18,6 @@ def run_inventory(scenario_id):
     scenario.delete_result_layers()
 
     signatures = []
-    print(scenario.configuration_as_dict().items())
     for feedstock_id, config in scenario.configuration_as_dict().items():
         for function_name, kwargs in config.items():
             signatures.append(run_inventory_algorithm.s(function_name, **kwargs))

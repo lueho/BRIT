@@ -106,7 +106,7 @@
     <div class="row mt-2">
         <div class="col">
             <div class="card shadow">
-                <div class="card-header"><b>Inventory definition</b></div>
+                <div class="card-header"><b>Inventories</b></div>
                 <div class="card-body">
                     {% for feedstock, algos in config.items %}
                         {% for algo, parameters in algos.items %}
@@ -117,10 +117,16 @@
                                             <h6 class="m-0 font-weight-bold text-primary">Feedstock: {{ feedstock.name }} - Dataset: {{ algo.geodataset }} - Algorithm: {{ algo.name }}</h6>
                                         </div>
                                         <div class="card-body">
-                                            {% for parameter, value in parameters.items %}
-                                                {{ parameter.descriptive_name }}: {{ value.value }}
-                                                {{ parameter.unit }} source: ({{ value.source }})
-                                            {% endfor %}
+                                            <table class="table">
+                                                <tr><th>Parameters:</th></tr>
+                                                {% for parameter, value in parameters.items %}
+                                                    <tr>
+                                                        <td>
+                                                            {{ parameter.descriptive_name }}: {{ value }}
+                                                        </td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </table>
                                         </div>
                                         <div class="card-footer">
                                             <a href="{% url 'scenario_update_config' scenario.id algo.id %}"

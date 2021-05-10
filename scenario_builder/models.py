@@ -145,7 +145,12 @@ class InventoryAlgorithmParameter(models.Model):
 
 
 class InventoryAlgorithmParameterValue(models.Model):
+    class ValueType(models.IntegerChoices):
+        NUMERIC = 1
+        SELECTION = 2
+
     name = models.CharField(max_length=56)
+    type = models.IntegerField(choices=ValueType.choices, default=ValueType.NUMERIC)
     description = models.TextField(blank=True, null=True)
     parameter = models.ForeignKey(InventoryAlgorithmParameter, on_delete=models.CASCADE, null=True)
     value = models.FloatField()
@@ -154,6 +159,10 @@ class InventoryAlgorithmParameterValue(models.Model):
     default = models.BooleanField(default=False)
 
     def __str__(self):
+        if self.type == 1:
+            return f'{self.value} ({self.source})'
+        elif self.type == 2:
+            return f'{self.name}'
         return self.name
 
 

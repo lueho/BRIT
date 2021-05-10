@@ -3,6 +3,7 @@ from django.db.models import Sum
 from flexibi_dst.models import TemporalDistribution
 from scenario_builder.algorithms import InventoryAlgorithmsBase
 from scenario_builder.models import Scenario
+from material_manager.models import MaterialSettings
 from .models import NantesGreenhouses, Greenhouse
 
 
@@ -101,6 +102,7 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
         Here all the algorithms that are specific to the case study of the greenhouses in Nantes region are implemented.
         """
         scenario = Scenario.objects.get(id=kwargs.get('scenario_id'))
+        feedstock = MaterialSettings.objects.get(id=kwargs.get('feedstock_id'))
         catchment = scenario.catchment
 
         result = {
@@ -114,6 +116,19 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
 
         # Filter the greenhouse types
         filter_kwargs = {}  # TODO: add filter functionality here
+        heated = kwargs.get('heated')['value']
+        if heated < 2:
+            filter_kwargs['heated'] = bool(heated)
+        lit = kwargs.get('lit')['value']
+        if lit < 2:
+            filter_kwargs['lighted'] = bool(lit)
+        high_wire = kwargs.get('high_wire')['value']
+        if high_wire < 2:
+            filter_kwargs['high_wire'] = bool(high_wire)
+        above_ground = kwargs.get('above_ground')['value']
+        if above_ground < 2:
+            filter_kwargs['above_ground'] = bool(above_ground)
+
         greenhouse_types = Greenhouse.objects.filter(**filter_kwargs)
 
         # filter the clipped layer
@@ -134,15 +149,19 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
 
         # Filter the greenhouse dataset by type of greenhouse and apply specific values
         for greenhouse_type in greenhouse_types:
-            greenhouse_group = clipped.filter(**greenhouse_type.filter_kwargs)
-            if greenhouse_group.exists():
-                total_group_surface = greenhouse_group.aggregate(Sum('surface_ha'))['surface_ha__sum']
-                total_surface += total_group_surface
-                greenhouse_count += greenhouse_group.count()
-                for share in greenhouse_type.shares:
-                    distribution.add_share(share.timestepset.timestep, share.component,
-                                           total_group_surface * share.average)
-                    total_production += total_group_surface * share.average
+            if feedstock.culture_set.first().name in list(greenhouse_type.cultures().values()):
+                greenhouse_group = clipped.filter(**greenhouse_type.filter_kwargs)
+                if greenhouse_group.exists():
+                    greenhouse_group.filter(culture_1=greenhouse_type.filter_kwargs['culture_1'])
+                    total_group_surface = greenhouse_group.aggregate(Sum('surface_ha'))['surface_ha__sum']
+                    total_surface += total_group_surface
+                    greenhouse_count += greenhouse_group.count()
+                    for share in greenhouse_type.shares:
+                        if share.timestepset.growth_cycle.culture.residue == feedstock:
+                            distribution.add_share(share.timestepset.timestep, share.component,
+                                                   total_group_surface * share.average)
+                            total_production += total_group_surface * share.average
+
         result['aggregated_distributions'].append(distribution.serialize())
 
         result['aggregated_values'].append({

@@ -18,7 +18,7 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
     def hamburg_roadside_tree_production(cls, **kwargs):
         kwargs.update({'source_model': HamburgRoadsideTrees})
         result = super().avg_point_yield(**kwargs)
-        distribution = TemporalDistribution.objects.get(name='Months of the year')
+        distribution = TemporalDistribution.objects.get(name='Summer/Winter')  # TODO: FIX me!!!!
         components = [BaseObjects.objects.get.base_component]
         aggdist = {
             'name': 'Super name',

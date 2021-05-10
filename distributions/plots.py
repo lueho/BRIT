@@ -72,9 +72,11 @@ class BaseChart:
         if dataset is not None:
             if dataset.unit != self.unit:
                 raise UnitMismatchError
+            if not self.data:
+                for label in dataset.xlabels:
+                    self.labels.append(label)
             self.data.append(dataset)
-            for label in dataset.xlabels:
-                self.labels.append(label)
+
         else:
             if kwargs.get('unit') != self.unit:
                 raise UnitMismatchError

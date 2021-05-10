@@ -194,17 +194,18 @@ class ScenarioResultTestCase(NativeTestCase):
         self.assertEqual(len(production.data), 2)
         self.assertDictEqual(production.data, {'Feedstock 1': value1, 'Feedstock 2': value2})
 
-    def test_total_production_per_material_component(self):
-        feedstock1 = MockModel(component_groups=MockSet(MockModel(name='Group 1')))
-        composition = {
-            MockModel(name='Group 1'): 1
-        }
-        feedstock1.composition = MagicMock(return_value=composition)
-        self.scenario.feedstocks = MockSet(feedstock1)
-        result = ScenarioResult(self.scenario)
-        datasets = result.total_production_per_material_component()
-        self.assertIsInstance(datasets, dict)
-        self.assertListEqual(list(datasets.keys()), ['Group 1'])
+    # TODO: delete when ready
+    # def test_total_production_per_material_component(self):
+    #     feedstock1 = MockModel(component_groups=MockSet(MockModel(name='Group 1')))
+    #     composition = {
+    #         MockModel(name='Group 1'): 1
+    #     }
+    #     feedstock1.composition = MagicMock(return_value=composition)
+    #     self.scenario.feedstocks = MockSet(feedstock1)
+    #     result = ScenarioResult(self.scenario)
+    #     datasets = result.total_production_per_material_component()
+    #     self.assertIsInstance(datasets, dict)
+    #     self.assertListEqual(list(datasets.keys()), ['Group 1'])
 
 
 @tag('db')
