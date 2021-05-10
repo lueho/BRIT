@@ -149,7 +149,7 @@ class InventoryAlgorithmParameterValue(models.Model):
     description = models.TextField(blank=True, null=True)
     parameter = models.ForeignKey(InventoryAlgorithmParameter, on_delete=models.CASCADE, null=True)
     value = models.FloatField()
-    standard_deviation = models.FloatField(null=True)
+    standard_deviation = models.FloatField(blank=True, null=True)
     source = models.CharField(max_length=200, blank=True, null=True)  # TODO: connect to library
     default = models.BooleanField(default=False)
 
