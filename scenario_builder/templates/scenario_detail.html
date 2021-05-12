@@ -20,15 +20,17 @@
                         <tr>
                             <td class="col-3"><b>Case study region:</b></td>
                             <td>
+                                {{ object.region }}
                                 <a href="{% url 'catchment_list' %}">
-                                    {{ object.region }}
+                                    <i class="fas fa-fw fa-eye"></i>
                                 </a>
                             </td>
                         <tr>
                             <td class="col-3"><b>Catchment:</b></td>
                             <td>
+                                {{ object.catchment }}
                                 <a href="{% url 'catchment_list' %}">
-                                    {{ object.catchment }}
+                                    <i class="fas fa-fw fa-eye"></i>
                                 </a>
                             </td>
                     </table>
@@ -87,7 +89,7 @@
                             {% endif %}
                         </tr>
                         <tr>
-                            <td>
+                            <td class="col-2">
                                 <a class="btn btn-primary" href="{% url 'download_scenario_summary' object.id %}">
                                     Download
                                 </a>
@@ -166,17 +168,6 @@
 {% block javascript %}
     {{ block.super }}
 
-    <script type="text/javascript">
-        $(document).ready(function () {
 
-            $(".modal-link").each(function () {
-                $(this).modalForm({
-                    formURL: $(this).data()["link"],
-                    errorClass: ".is-invalid"
-                })
-            });
-
-        });
-    </script>
 
 {% endblock javascript %}
