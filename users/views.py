@@ -26,7 +26,7 @@ class UserProfileView(LoginRequiredMixin, TemplateView):
 
 class ModalLoginView(BSModalLoginView):
     authentication_form = CustomAuthenticationForm
-    template_name = 'login_modal.html'
+    template_name = 'modal_form.html'
     success_message = 'Success: You were successfully logged in.'
     extra_context = dict(success_url=reverse_lazy('login'))
 
