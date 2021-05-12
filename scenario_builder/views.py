@@ -207,6 +207,13 @@ class ScenarioUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessU
         })
         return context
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs.update({
+            'region_id': self.object.region.id
+        })
+        return kwargs
+
 
 class ScenarioDeleteView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalDeleteView):
     model = Scenario
