@@ -10,6 +10,7 @@ from django.dispatch import receiver
 from django.urls import reverse
 
 import case_studies
+from flexibi_dst.models import Timestep
 from material_manager.models import Material, MaterialSettings
 from .exceptions import BlockedRunningScenario
 
@@ -536,6 +537,15 @@ class Scenario(models.Model):
 
     def __str__(self):
         return self.name
+
+
+class InventoryAmountShare(models.Model):
+    owner = models.ForeignKey(User, default=1, on_delete=models.CASCADE)
+    scenario = models.ForeignKey(Scenario, null=True, on_delete=models.CASCADE)
+    feedstock = models.ForeignKey(MaterialSettings, null=True, on_delete=models.CASCADE)
+    timestep = models.ForeignKey(Timestep, null=True, on_delete=models.CASCADE)
+    average = models.FloatField(default=0.0)
+    standard_deviation = models.FloatField(default=0.0)
 
 
 @receiver(pre_save, sender=Scenario)
