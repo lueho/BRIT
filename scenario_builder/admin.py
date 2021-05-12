@@ -9,6 +9,7 @@ from .models import (Catchment,
                      InventoryAlgorithm,
                      InventoryAlgorithmParameter,
                      InventoryAlgorithmParameterValue,
+                     InventoryAmountShare,
                      Region,
                      Scenario,
                      ScenarioInventoryConfiguration,
@@ -70,9 +71,6 @@ class RegionAdmin(OSMGeoAdmin):
         queryset = super(RegionAdmin, self).get_queryset(request)
         queryset = queryset.order_by('name')
         return queryset
-
-
-
 
 
 @admin.register(InventoryAlgorithm)
@@ -188,3 +186,4 @@ class ScenarioStatusAdmin(ModelAdmin):
 #     list_display = ('id', 'timesteps', 'cycles', 'start_stop', 'values', 'material', 'component')
 
 admin.site.register(SFBSite)
+admin.site.register(InventoryAmountShare)
