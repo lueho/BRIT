@@ -127,6 +127,34 @@
 <script src="{% static 'js/flexibi-map-styles.js' %}"></script>
 
 {% block javascript %}
+    <script type="text/javascript">
+
+    $(function () {
+        $("#login-btn").modalForm({
+            formURL: "{% url 'login' %}?next={{ request.path }}",
+            errorClass: ".is-invalid"
+        });
+    });
+
+    function toggle_edit() {
+        $(".toggle-edit").toggle()
+    }
+
+    $(document).ready(function () {
+
+        if ($("#show-edit-buttons").data()['editable'] === "True") {
+            $(".toggle-edit").show()
+        }
+
+        $(".modal-link").each(function () {
+            $(this).modalForm({
+                formURL: $(this).data()["link"],
+                errorClass: ".is-invalid"
+            })
+        });
+    });
+
+    </script>
 {% endblock javascript %}
 
 </body>
