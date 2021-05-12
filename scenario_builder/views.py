@@ -9,6 +9,7 @@ from django.views.generic import CreateView, DeleteView, DetailView, ListView, V
 from django.views.generic.base import TemplateResponseMixin
 from django.views.generic.edit import FormMixin, ModelFormMixin
 from rest_framework.views import APIView
+from users.views import ModalLoginRequiredMixin
 import json
 import io
 
@@ -194,7 +195,7 @@ class ScenarioDetailView(UserPassesTestMixin, DetailView):
         return self.request.user == scenario.owner or scenario.owner.username == 'flexibi'
 
 
-class ScenarioUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
+class ScenarioUpdateView(ModalLoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
     model = Scenario
     form_class = ScenarioModalModelForm
     template_name = 'modal_form.html'
