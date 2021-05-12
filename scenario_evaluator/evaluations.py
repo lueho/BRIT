@@ -60,31 +60,6 @@ class ScenarioResult:
         production = DataSet(label='Total production per feedstocks', data=data, unit=unit)
         return production
 
-    def seasonal_production_per_component(self):
-        datasets = []
-        # One dataset per component
-        for component in self.layers[0].feedstock.components:
-            datasets.append(DataSet(label=component.name, data={'Timestep 1': 1, 'Timestep 2': 2.1, 'Timestep 3': 0.7}, unit='Mg/a'))
-            datasets.append(DataSet(label=component.name, data={'Timestep 1': 2.5, 'Timestep 2': 0.2, 'Timestep 3': 1.1}, unit='Mg/a'))
-        return datasets
-
-    # TODO: Delete when ready
-    # def total_production_per_material_component(self):
-    #     # This should not depend on the material definition but should be fetched directly from layer. Calculation
-    #     # should happen directly in the model algorithm.
-    #     total_production_per_feedstock = self.total_production_per_feedstock()
-    #     components = {}
-    #     for feedstock in self.feedstocks:
-    #         for group, content in feedstock.composition().items():
-    #             if group not in components:
-    #                 components[group] = {}
-    #             for share in content['averages']:
-    #                 if share.component.name not in components[group]:
-    #                     components[group][share.component.name] = 0
-    #                 components[group][share.component.name] += share.average * total_production_per_feedstock[
-    #                     feedstock]
-    #     return components
-
     def get_charts(self):
         charts = {}
 
@@ -116,7 +91,7 @@ class ScenarioResult:
         except:
             pass
 
-        # Seasonal distribution of total production
+        # Seasonal production by component
         chart = BarChart(
             id='seasonalFeedstockBarChart',
             title='Seasonal distribution of feedstocks',
@@ -131,30 +106,31 @@ class ScenarioResult:
 
         return charts
 
+    # TODO: Delete when ready
+    # def total_production_per_material_component(self):
+    #     # This should not depend on the material definition but should be fetched directly from layer. Calculation
+    #     # should happen directly in the model algorithm.
+    #     total_production_per_feedstock = self.total_production_per_feedstock()
+    #     components = {}
+    #     for feedstock in self.feedstocks:
+    #         for group, content in feedstock.composition().items():
+    #             if group not in components:
+    #                 components[group] = {}
+    #             for share in content['averages']:
+    #                 if share.component.name not in components[group]:
+    #                     components[group][share.component.name] = 0
+    #                 components[group][share.component.name] += share.average * total_production_per_feedstock[
+    #                     feedstock]
+    #     return components
 
-    # TODO: This is just a remindes how things used to be done. Delete when not needed anymore
-    # def material_values_for_plot(self, group):
-    #     xlabels = []
-    #     data = [{
-    #         'label': 'Total',
-    #         'data': []
-    #     }]
-    #     for label, value in self.total_production_per_material_component()[group].items():
-    #         xlabels.append(label)
-    #         data[0]['data'].append(value)
-    #     return xlabels, data
-
-    def seasonal_production_for_plot(self):
-        xlabels = [timestep.name for timestep in self.timesteps]
-        data = []
+    def seasonal_production_per_component(self):
+        datasets = []
         for layer in self.layers:
-            for aggdist in layer.layeraggregateddistribution_set.all():
-                aggdist = LayerAggregatedDistribution.objects.filter(layer=layer)[0]
-                data.append(aggdist.serialized)
-        return xlabels, data
-
-    def seasonal_production_per_feedstock(self):
-        pass
+            agg_dist = layer.layeraggregateddistribution_set.filter(name='Seasonal production per component')[0]
+            for d in agg_dist.serialized:
+                d['label'] = f'{layer.feedstock.name}: {d["label"]}'
+                datasets.append(DataSet(**d))
+        return datasets
 
     def layer_summaries(self):
         layer_summaries = {}
