@@ -1,7 +1,9 @@
 from case_studies.flexibi_hamburg.models import HamburgGreenAreas, HamburgRoadsideTrees
+from distributions.plots import Distribution
 from flexibi_dst.models import TemporalDistribution
-from material_manager.models import BaseObjects
+from material_manager.models import MaterialComponentGroup, MaterialSettings
 from scenario_builder.algorithms import InventoryAlgorithmsBase
+from scenario_builder.models import Scenario
 
 
 class InventoryAlgorithms(InventoryAlgorithmsBase):
@@ -18,18 +20,32 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
     def hamburg_roadside_tree_production(cls, **kwargs):
         kwargs.update({'source_model': HamburgRoadsideTrees})
         result = super().avg_point_yield(**kwargs)
-        distribution = TemporalDistribution.objects.get(name='Summer/Winter')  # TODO: FIX me!!!!
-        components = [BaseObjects.objects.get.base_component]
-        aggdist = {
-            'name': 'Super name',
-            'distribution': distribution.id,
-            'sets': []
-        }
-        for timestep in distribution.timestep_set.all():
-            distribution_set = {'timestep': timestep.id, 'shares': []}
-            for component in components:
-                distribution_set['shares'].append({'component': component.id, 'average': 2.5})
-            aggdist['sets'].append(distribution_set)
-        result['aggregated_distributions'].append(aggdist)
+
+        scenario = Scenario.objects.get(id=kwargs.get('scenario_id'))
+        feedstock = MaterialSettings.objects.get(id=kwargs.get('feedstock_id'))
+
+        result['aggregated_distributions'] = []
+
+        temporal_distribution = TemporalDistribution.objects.get(name='Summer/Winter')
+
+        # Create the distribution for the stacked barchart seasonal production per component
+        group = MaterialComponentGroup.objects.get(name='Macro Components')
+        distribution = Distribution(
+            TemporalDistribution.objects.get(name='Summer/Winter'),  # TODO: FIX me!!!!
+            name='Seasonal production per component'
+        )
+
+        for agg_val in result['aggregated_values']:
+            if agg_val['name'] == 'Total production':
+                total_production = agg_val['value']
+        inv_shares = feedstock.inventoryamountshare_set.filter(scenario=scenario)
+        temp_dist = {timestep: inv_shares.get(timestep=timestep).average for timestep in temporal_distribution.timestep_set.all()}
+        for share in feedstock.shares:
+            if share.group_settings.group == group:
+                if share.timestep.distribution == temporal_distribution:
+                    value = share.average * temp_dist[share.timestep] * total_production
+                    distribution.add_share(share.timestep, share.component, value)
+
+        result['aggregated_distributions'].append(distribution.serialize())
 
         return result
