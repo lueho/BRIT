@@ -1,97 +1,11 @@
 from django.db.models import Sum
 
+from distributions.plots import Distribution
 from flexibi_dst.models import TemporalDistribution
 from scenario_builder.algorithms import InventoryAlgorithmsBase
 from scenario_builder.models import Scenario
 from material_manager.models import MaterialSettings
 from .models import NantesGreenhouses, Greenhouse
-
-
-class Distribution:
-    name = ''
-    temporal_distribution = None
-    _components = None
-    _shares = None
-
-    def __init__(self, temporal_distribution, components=None, name=None):
-        self.temporal_distribution = temporal_distribution
-        self._components = components if components else []
-        if name is not None:
-            self.name = name
-        self._shares = []
-
-    class Share:
-        _timestep = None
-        _component = None
-        _value = None
-
-        def __init__(self, timestep, component):
-            self._timestep = timestep
-            self._component = component
-
-        @property
-        def timestep(self):
-            return self._timestep
-
-        @property
-        def component(self):
-            return self._component
-
-        @property
-        def value(self):
-            return self._value
-
-        @value.setter
-        def value(self, value):
-            self._value = value
-
-    @property
-    def shares(self):
-        return self._shares
-
-    @shares.setter
-    def shares(self, qs):
-        for share in qs:
-            self.add_share(share.timestepset.timestep, share.component, share.average)
-
-    def add_shares(self, qs):
-        for share in qs:
-            self.add_share(share.timestepset.timestep, share.component, share.average)
-
-    def add_share(self, timestep, component, value):
-        for s in self.shares:
-            if s.timestep == timestep and s.component == component:
-                s.value += value
-                return
-        share = self.Share(timestep, component)
-        share.value = value
-        self._shares.append(share)
-
-    @property
-    def timesteps(self):
-        return self.temporal_distribution.timestep_set.all()
-
-    @property
-    def components(self):
-        return self._components
-
-    def serialize(self):
-        dist = {
-            'name': self.name,
-            'distribution': self.temporal_distribution.id,
-            'sets': []
-        }
-        sets = {}
-        for share in self.shares:
-            if share.timestep.id not in sets:
-                sets[share.timestep.id] = {}
-            sets[share.timestep.id][share.component.id] = share.value
-        for timestep_id, set_content in sets.items():
-            new_set = {'timestep': timestep_id, 'shares': []}
-            for component_id, value in set_content.items():
-                new_set['shares'].append({'component': component_id, 'average': value})
-            dist['sets'].append(new_set)
-        return dist
 
 
 class InventoryAlgorithms(InventoryAlgorithmsBase):
@@ -115,7 +29,7 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
         clipped = NantesGreenhouses.objects.filter(geom__intersects=catchment.geom)
 
         # Filter the greenhouse types
-        filter_kwargs = {}  # TODO: add filter functionality here
+        filter_kwargs = {}
         heated = kwargs.get('heated')['value']
         if heated < 2:
             filter_kwargs['heated'] = bool(heated)
@@ -139,7 +53,7 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
         # Create the distribution for the stacked barchart seasonal production per component
         distribution = Distribution(
             TemporalDistribution.objects.get(name='Months of the year'),
-            name='Seasonal distribution by component'
+            name='Seasonal production per component'
         )
 
         # Initialize aggregated values
