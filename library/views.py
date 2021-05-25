@@ -56,7 +56,7 @@ class LiteratureSourceDetailView(BSModalReadView):
 class LiteratureSourceUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
     model = LiteratureSource
     form_class = LitSourceModelForm
-    template_name = 'modal_form.html'
+    template_name = '../flexibi_dst/templates/modal_form.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

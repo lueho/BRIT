@@ -39,7 +39,7 @@ class CultureListView(DualUserListView):
 
 class CultureCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, BSModalCreateView):
     form_class = CultureModelForm
-    template_name = 'modal_form.html'
+    template_name = '../../flexibi_dst/templates/modal_form.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -69,7 +69,7 @@ class CultureDetailView(UserOwnsObjectMixin, BSModalReadView):
 class CultureUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
     model = Culture
     form_class = CultureModelForm
-    template_name = 'modal_form.html'
+    template_name = '../../flexibi_dst/templates/modal_form.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -121,7 +121,7 @@ class GreenhouseListView(DualUserListView):
 
 class GreenhouseCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, BSModalCreateView):
     form_class = GreenhouseModalModelForm
-    template_name = 'modal_form.html'
+    template_name = '../../flexibi_dst/templates/modal_form.html'
     success_url = reverse_lazy('greenhouse_list')
 
     def get_context_data(self, **kwargs):
@@ -150,7 +150,7 @@ class GreenhouseDetailView(UserOwnsObjectMixin, DetailView):
 class GreenhouseUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
     model = Greenhouse
     form_class = GreenhouseModalModelForm
-    template_name = 'modal_form.html'
+    template_name = '../../flexibi_dst/templates/modal_form.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -192,7 +192,7 @@ class GreenhouseGrowthCycleCreateView(LoginRequiredMixin, CreateWithInlinesView)
 class GrowthCycleCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, BSModalCreateView):
     model = GreenhouseGrowthCycle
     form_class = GrowthCycleCreateForm
-    template_name = 'modal_form.html'
+    template_name = '../../flexibi_dst/templates/modal_form.html'
     object = None
 
     def get_context_data(self, **kwargs):

@@ -151,7 +151,7 @@ class ScenarioListView(DualUserListView):
 
 class ScenarioCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, BSModalCreateView):
     form_class = ScenarioModalModelForm
-    template_name = 'modal_form.html'
+    template_name = '../flexibi_dst/templates/modal_form.html'
     success_url = reverse_lazy('scenario_list')
 
     def get_context_data(self, **kwargs):
@@ -198,7 +198,7 @@ class ScenarioDetailView(UserPassesTestMixin, DetailView):
 class ScenarioUpdateView(ModalLoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
     model = Scenario
     form_class = ScenarioModalModelForm
-    template_name = 'modal_form.html'
+    template_name = '../../flexibi_dst/templates/modal_form.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
