@@ -206,14 +206,6 @@
             if ($("#allow-edit").data()['editable'] === "True") {
                 $(".toggle-edit").show()
             }
-
-            $(".modal-link").each(function () {
-                $(this).modalForm({
-                    formURL: $(this).data()["link"],
-                    errorClass: ".is-invalid"
-                })
-            });
-
         });
 
         function toggle_edit() {
