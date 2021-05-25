@@ -47,6 +47,17 @@ class CatchmentBrowseView(FormMixin, ListView):
     form_class = CatchmentQueryForm
     template_name = 'catchment_list.html'
 
+    def get_initial(self):
+        initial = {}
+        region_id = self.request.GET.get('region')
+        catchment_id = self.request.GET.get('catchment')
+        if catchment_id:
+            catchment = Catchment.objects.get(id=catchment_id)
+            initial['region'] = catchment.region.id
+            initial['catchment'] = catchment.id
+        elif region_id:
+            initial['region'] = region_id
+        return initial
 
 class CatchmentCreateView(LoginRequiredMixin, CreateView):
     template_name = 'catchment_create.html'
