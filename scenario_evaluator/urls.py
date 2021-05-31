@@ -5,6 +5,7 @@ from .views import (ScenarioEvaluationProgressView,
                     ScenarioListView,
                     ScenarioResultView,
                     ScenarioResultDetailMapView,
+                    download_scenario_result_summary
                     )
 
 urlpatterns = [
@@ -14,5 +15,6 @@ urlpatterns = [
          name='scenario_result_map'),
     path('scenarios/<int:pk>/evaluating/', ScenarioEvaluationProgressView.as_view(),
          name='scenario_evaluation_progress'),
-    path('scenarios/<int:scenario_id>/evaluating/<str:task_id>/', get_evaluation_status, name='get_evaluation_status'),
+    path('scenarios/evaluating/<str:task_id>/', get_evaluation_status, name='get_evaluation_status'),
+    path('scenarios/<int:scenario_pk>/download_result_summary/', download_scenario_result_summary, name='download_result_summary')
 ]

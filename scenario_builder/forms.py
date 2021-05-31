@@ -1,3 +1,4 @@
+from bootstrap_modal_forms.forms import BSModalModelForm
 from crispy_forms.helper import FormHelper
 from django.forms import (Form,
                           ModelChoiceField,
@@ -7,14 +8,15 @@ from django.forms import (Form,
 from django.forms.widgets import CheckboxSelectMultiple
 from leaflet.forms.widgets import LeafletWidget
 
-from .models import (Catchment,
-                     GeoDataset,
-                     InventoryAlgorithm,
-                     Material,
-                     MaterialComponent,
-                     Region,
-                     Scenario,
-                     ScenarioInventoryConfiguration, )
+from flexibi_dst.models import TemporalDistribution
+from .models import (
+    Catchment,
+    GeoDataset,
+    InventoryAlgorithm,
+    Region,
+    Scenario,
+    ScenarioInventoryConfiguration,
+)
 
 
 # ----------- Catchments -----------------------------------------------------------------------------------------------
@@ -62,27 +64,30 @@ class CatchmentQueryForm(Form):
         super().__init__(*args, **kwargs)
 
 
-# ----------- Materials/Feedstocks -------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-class MaterialModelForm(ModelForm):
+class SeasonalDistributionModelForm(ModelForm):
     class Meta:
-        model = Material
-        fields = ('name', 'description', 'is_feedstock')
+        model = TemporalDistribution
+        fields = ()
 
 
-class MaterialComponentModelForm(ModelForm):
-    class Meta:
-        model = MaterialComponent
-        fields = ('name', 'description', 'average', 'standard_deviation', 'fraction_of', 'literature_source', 'groups')
-
-
-# ----------- Materials/Feedstocks -------------------------------------------------------------------------------------
+# ----------- Inventories -------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 
 class ScenarioModelForm(ModelForm):
+    class Meta:
+        model = Scenario
+        fields = ['name', 'description', 'region', 'catchment']
+
+
+class ScenarioModalModelForm(BSModalModelForm):
+
+    def __init__(self, *args, **kwargs):
+        region_id = kwargs.pop('region_id')
+        super().__init__(*args, **kwargs)
+        self.fields['region'].queryset = Region.objects.filter(id=region_id)
+        self.fields['catchment'].queryset = Catchment.objects.filter(region_id=region_id)
+
     class Meta:
         model = Scenario
         fields = ['name', 'description', 'region', 'catchment']

@@ -1,5 +1,5 @@
+from bootstrap_modal_forms.generic import BSModalCreateView, BSModalUpdateView, BSModalDeleteView
 from celery.result import AsyncResult
-from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import User
 from django.http import JsonResponse, HttpResponse
@@ -9,28 +9,32 @@ from django.views.generic import CreateView, DeleteView, DetailView, ListView, V
 from django.views.generic.base import TemplateResponseMixin
 from django.views.generic.edit import FormMixin, ModelFormMixin
 from rest_framework.views import APIView
+from users.views import ModalLoginRequiredMixin
+import json
+import io
 
-from flexibi_dst.views import DualUserListView
+from flexibi_dst.views import DualUserListView, UserOwnsObjectMixin, NextOrSuccessUrlMixin
 from layer_manager.models import Layer
-from .forms import (CatchmentForm,
-                    CatchmentQueryForm,
-                    MaterialModelForm,
-                    MaterialComponentModelForm,
-                    ScenarioModelForm,
-                    ScenarioInventoryConfigurationAddForm,
-                    ScenarioInventoryConfigurationUpdateForm)
-from .models import (Catchment,
-                     Scenario,
-                     ScenarioInventoryConfiguration,
-                     Material,
-                     MaterialComponent,
-                     GeoDataset,
-                     InventoryAlgorithm,
-                     InventoryAlgorithmParameter,
-                     InventoryAlgorithmParameterValue,
-                     Region,
-                     ScenarioStatus)
-
+from material_manager.models import MaterialSettings
+from .forms import (
+    CatchmentForm,
+    CatchmentQueryForm,
+    ScenarioModalModelForm,
+    ScenarioInventoryConfigurationAddForm,
+    ScenarioInventoryConfigurationUpdateForm,
+    SeasonalDistributionModelForm,
+)
+from .models import (
+    Catchment,
+    Scenario,
+    ScenarioInventoryConfiguration,
+    GeoDataset,
+    InventoryAlgorithm,
+    InventoryAlgorithmParameter,
+    InventoryAlgorithmParameterValue,
+    Region,
+    ScenarioStatus,
+)
 from .serializers import CatchmentSerializer, BaseResultMapSerializer, RegionSerializer
 from .tasks import run_inventory
 
@@ -43,6 +47,17 @@ class CatchmentBrowseView(FormMixin, ListView):
     form_class = CatchmentQueryForm
     template_name = 'catchment_list.html'
 
+    def get_initial(self):
+        initial = {}
+        region_id = self.request.GET.get('region')
+        catchment_id = self.request.GET.get('catchment')
+        if catchment_id:
+            catchment = Catchment.objects.get(id=catchment_id)
+            initial['region'] = catchment.region.id
+            initial['catchment'] = catchment.id
+        elif region_id:
+            initial['region'] = region_id
+        return initial
 
 class CatchmentCreateView(LoginRequiredMixin, CreateView):
     template_name = 'catchment_create.html'
@@ -80,7 +95,7 @@ def load_catchment_options(request):
         region = Region.objects.get(id=request.GET.get('region_id'))
         catchment_owners = []
         if int(request.GET.get('category_standard')):
-            catchment_owners.append(User.objects.get(username=settings.PUBLIC_OBJECT_OWNER))
+            catchment_owners.append(User.objects.get(username='flexibi'))
         if int(request.GET.get('category_custom')) and request.user.is_authenticated:
             catchment_owners.append(request.user)
         catchments = Catchment.objects.filter(region=region, owner__in=catchment_owners)
@@ -102,104 +117,10 @@ class CatchmentGeometryAPI(APIView):
         return JsonResponse(data, safe=False)
 
 
-# ----------- Materials/Feedstocks -------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-class MaterialListView(DualUserListView):
-    model = Material
-    template_name = 'material_list.html'
-
-
-class MaterialCreateView(LoginRequiredMixin, CreateView):
-    form_class = MaterialModelForm
-    template_name = 'material_create.html'
-
-    def form_valid(self, form):
-        form.instance.owner = self.request.user
-        return super().form_valid(form)
-
-    def get_success_url(self):
-        return reverse('material_detail', kwargs={'pk': self.object.pk})
-
-
-class MaterialDetailView(DetailView):
-    model = Material
-    template_name = 'material_detail.html'
-    object = None
-
-    def get(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        context = self.get_context_data(object=self.object)
-        context['grouped_components'] = self.object.grouped_components()
-        return self.render_to_response(context)
-
-
-class MaterialUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
-    model = Material
-    form_class = MaterialModelForm
-    template_name = 'material_update.html'
-    success_url = '/scenario_builder/materials/{id}'
-
-    def test_func(self):
-        material = Material.objects.get(id=self.kwargs.get('pk'))
-        return material.owner == self.request.user
-
-
-class MaterialDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
-    model = Material
-    template_name = 'material_delete.html'
-    success_url = '/scenario_builder/materials'
-
-    def test_func(self):
-        material = Material.objects.get(id=self.kwargs.get('pk'))
-        return material.owner == self.request.user
-
-
-class MaterialComponentCreateView(LoginRequiredMixin, UserPassesTestMixin, CreateView):
-    form_class = MaterialComponentModelForm
-    template_name = 'material_component_create.html'
-    object = None
-
-    def test_func(self):
-        material = Material.objects.get(id=self.kwargs.get('pk'))
-        return self.request.user == material.owner
-
-    def form_valid(self, form):
-        form.instance.owner = self.request.user
-        form.instance.material = Material.objects.get(id=self.kwargs.get('pk'))
-        self.object = form.save()
-        return redirect('material_detail', pk=self.kwargs.get('pk'))
-
-
-class MaterialComponentUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
-    form_class = MaterialComponentModelForm
-    template_name = 'material_component_update.html'
-    object = None
-
-    def get_object(self, **kwargs):
-        return MaterialComponent.objects.get(id=self.kwargs.get('component_pk'))
-
-    def test_func(self):
-        component = MaterialComponent.objects.get(id=self.kwargs.get('component_pk'))
-        return self.request.user == component.owner
-
-    def form_valid(self, form):
-        self.object = form.save()
-        return redirect('material_detail', pk=self.kwargs.get('pk'))
-
-
-class MaterialComponentDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
-    model = MaterialComponent
-    template_name = 'material_component_delete.html'
+class SeasonalDistributionCreateView(LoginRequiredMixin, CreateView):
+    form_class = SeasonalDistributionModelForm
+    template_name = 'seasonal_distribution_create.html'
     success_url = '/scenario_builder/materials/{material_id}'
-
-    def get_object(self, **kwargs):
-        return MaterialComponent.objects.get(id=self.kwargs.get('component_pk'))
-
-    def test_func(self):
-        component = MaterialComponent.objects.get(id=self.kwargs.get('component_pk'))
-        return self.request.user == component.owner
 
 
 # ----------- Regions --------------------------------------------------------------------------------------------------
@@ -221,54 +142,40 @@ class RegionGeometryAPI(APIView):
 # ----------- Scenarios ------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
+# ----------- Scenarios CRUD -------------------------------------------------------------------------------------------
+
 class ScenarioListView(DualUserListView):
     model = Scenario
-    template_name = 'scenario_list.html'
+    template_name = 'dual_user_item_list.html'
 
 
-class ScenarioCreateView(LoginRequiredMixin, CreateView):
-    model = Scenario
-    form_class = ScenarioModelForm
-    template_name = 'scenario_create.html'
+# class ScenarioCreateView(LoginRequiredMixin, CreateView):
+#     model = Scenario
+#     form_class = ScenarioModelForm
+#     template_name = 'scenario_create.html'
+#     success_url = reverse_lazy('scenario_list')
+#
+#     def form_valid(self, form):
+#         form.instance.owner = self.request.user
+#         return super().form_valid(form)
+
+
+class ScenarioCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, BSModalCreateView):
+    form_class = ScenarioModalModelForm
+    template_name = 'modal_form.html'
     success_url = reverse_lazy('scenario_list')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'form_title': 'Create new scenario',
+            'submit_button_text': 'Create'
+        })
+        return context
 
     def form_valid(self, form):
         form.instance.owner = self.request.user
         return super().form_valid(form)
-
-
-class ScenarioUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
-    model = Scenario
-    template_name = 'scenario_create.html'
-    form_class = ScenarioModelForm
-
-    def get_success_url(self):
-        return reverse('scenario_detail', kwargs={'pk': self.object.id})
-
-    def test_func(self):
-        scenario = Scenario.objects.get(id=self.kwargs.get('pk'))
-        return self.request.user == scenario.owner
-
-
-class ScenarioDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
-    model = Scenario
-    template_name = 'scenario_delete.html'
-    success_url = '/scenario_builder/scenarios'
-
-    def test_func(self):
-        scenario = Scenario.objects.get(id=self.kwargs.get('pk'))
-        return self.request.user == scenario.owner
-
-
-def get_evaluation_status(request, scenario_id=None, task_id=None):
-    task_result = AsyncResult(task_id)
-    result = {
-        "task_id": task_id,
-        "task_status": task_result.status,
-        "task_result": task_result.result,
-        "task_info": task_result.info
-    }
-    return JsonResponse(result, status=200)
 
 
 class ScenarioDetailView(UserPassesTestMixin, DetailView):
@@ -285,19 +192,65 @@ class ScenarioDetailView(UserPassesTestMixin, DetailView):
         self.config = self.object.configuration_for_template()
         context = self.get_context_data(object=self.object)
         context['config'] = self.config
-        context['static'] = self.object.owner.username == 'flexibi'
         return self.render_to_response(context)
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         scenario = self.object
-        # scenario.set_status(ScenarioStatus.Status.RUNNING)
+        scenario.set_status(ScenarioStatus.Status.RUNNING)
         run_inventory(scenario.id)
         return redirect('scenario_result', scenario.id)
 
     def test_func(self):
         scenario = Scenario.objects.get(id=self.kwargs.get('pk'))
-        return self.request.user == scenario.owner or scenario.owner.username == settings.PUBLIC_OBJECT_OWNER
+        return self.request.user == scenario.owner or scenario.owner.username == 'flexibi'
+
+
+class ScenarioUpdateView(ModalLoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
+    model = Scenario
+    form_class = ScenarioModalModelForm
+    template_name = '../../flexibi_dst/templates/modal_form.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'form_title': 'Edit scenario basics',
+            'submit_button_text': 'Save'
+        })
+        return context
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs.update({
+            'region_id': self.object.region.id
+        })
+        return kwargs
+
+
+class ScenarioDeleteView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalDeleteView):
+    model = Scenario
+    template_name = 'modal_delete.html'
+    success_message = 'Successfully deleted.'
+    success_url = reverse_lazy('scenario_list')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'form_title': 'Delete scenario',
+            'submit_button_text': 'Delete'
+        })
+        return context
+
+
+def get_evaluation_status(request, task_id=None):
+    task_result = AsyncResult(task_id)
+    result = {
+        "task_id": task_id,
+        "task_status": task_result.status,
+        "task_result": task_result.result,
+        "task_info": task_result.info
+    }
+    return JsonResponse(result, status=200)
 
 
 class ScenarioAddInventoryAlgorithmView(LoginRequiredMixin, UserPassesTestMixin,
@@ -315,7 +268,7 @@ class ScenarioAddInventoryAlgorithmView(LoginRequiredMixin, UserPassesTestMixin,
     def post(request, *args, **kwargs):
         scenario_id = request.POST.get('scenario')
         scenario = Scenario.objects.get(id=scenario_id)
-        feedstock = Material.objects.get(id=request.POST.get('feedstock'))
+        feedstock = MaterialSettings.objects.get(id=request.POST.get('feedstock'))
         algorithm_id = request.POST.get('inventory_algorithm')
         algorithm = InventoryAlgorithm.objects.get(id=algorithm_id)
         parameters = algorithm.inventoryalgorithmparameter_set.all()
@@ -364,7 +317,7 @@ class ScenarioAlgorithmConfigurationUpdateView(LoginRequiredMixin, UserPassesTes
     def post(request, *args, **kwargs):
         scenario = Scenario.objects.get(id=request.POST.get('scenario'))
         current_algorithm = InventoryAlgorithm.objects.get(id=request.POST.get('current_algorithm'))
-        feedstock = Material.objects.get(id=request.POST.get('feedstock'))
+        feedstock = MaterialSettings.objects.get(id=request.POST.get('feedstock'))
         scenario.remove_inventory_algorithm(current_algorithm, feedstock)
         new_algorithm = InventoryAlgorithm.objects.get(id=request.POST.get('inventory_algorithm'))
         parameters = new_algorithm.inventoryalgorithmparameter_set.all()
@@ -410,20 +363,29 @@ class ScenarioRemoveInventoryAlgorithmView(LoginRequiredMixin, UserPassesTestMix
     def get(self, request, *args, **kwargs):
         self.scenario = Scenario.objects.get(id=self.kwargs.get('scenario_pk'))
         self.algorithm = InventoryAlgorithm.objects.get(id=self.kwargs.get('algorithm_pk'))
-        self.feedstock = Material.objects.get(id=self.kwargs.get('feedstock_pk'))
+        self.feedstock = MaterialSettings.objects.get(id=self.kwargs.get('feedstock_pk'))
         self.scenario.remove_inventory_algorithm(algorithm=self.algorithm, feedstock=self.feedstock)
         return redirect('scenario_detail', pk=self.scenario.id)
+
+
+def download_scenario_summary(request, scenario_pk):
+    file_name = f'scenario_{scenario_pk}_summary.json'
+    scenario = Scenario.objects.get(id=scenario_pk)
+    with io.StringIO(json.dumps(scenario.summary_dict(), indent=4)) as file:
+        response = HttpResponse(file, content_type='application/json')
+        response['Content-Disposition'] = 'attachment; filename=%s' % file_name
+        return response
 
 
 def load_geodataset_options(request):
     scenario = Scenario.objects.get(id=request.GET.get('scenario'))
     if request.GET.get('feedstock'):
-        feedstock = Material.objects.get(id=request.GET.get('feedstock'))
+        feedstock = MaterialSettings.objects.get(id=request.GET.get('feedstock'))
         if request.GET.get('options') == 'create':
-            geodatasets = scenario.remaining_geodataset_options(feedstock=feedstock)
+            geodatasets = scenario.remaining_geodataset_options(feedstock=feedstock.material)
         elif request.GET.get('options') == 'update':
             current = GeoDataset.objects.filter(id=request.GET.get('current_geodataset'))
-            geodatasets = scenario.remaining_geodataset_options(feedstock=feedstock).union(current)
+            geodatasets = scenario.remaining_geodataset_options(feedstock=feedstock.material).union(current)
         else:
             geodatasets = scenario.available_geodatasets()
     else:
@@ -434,13 +396,13 @@ def load_geodataset_options(request):
 def load_algorithm_options(request):
     scenario = Scenario.objects.get(id=request.GET.get('scenario'))
     if request.GET.get('feedstock') and request.GET.get('geodataset'):
-        feedstock = Material.objects.get(id=request.GET.get('feedstock'))
+        feedstock = MaterialSettings.objects.get(id=request.GET.get('feedstock'))
         geodataset = GeoDataset.objects.get(id=request.GET.get('geodataset'))
         if request.GET.get('options') == 'create':
             algorithms = scenario.remaining_inventory_algorithm_options(feedstock, geodataset)
         elif request.GET.get('options') == 'update':
             current_algorithm = InventoryAlgorithm.objects.filter(id=request.GET.get('current_inventory_algorithm'),
-                                                                  feedstock=feedstock, geodataset=geodataset)
+                                                                  feedstock=feedstock.material, geodataset=geodataset)
             algorithms = scenario.remaining_inventory_algorithm_options(feedstock, geodataset).union(current_algorithm)
         else:
             algorithms = scenario.available_inventory_algorithms()
@@ -475,6 +437,8 @@ class ResultMapAPI(APIView):
 
         serializer = serializer_class(features, many=True)
         data = {
+            'catchment_id': layer.scenario.catchment_id,
+            'region_id': layer.scenario.region_id,
             'geoJson': serializer.data,
         }
 

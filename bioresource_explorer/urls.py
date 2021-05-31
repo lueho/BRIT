@@ -1,16 +1,10 @@
-from django.urls import path
+from django.urls import include, path
 
-from .views import (BioresourceExplorerHomeView,
-                    HamburgExplorerView,
-                    HamburgRoadsideTreeAPIView,
-                    NantesGreenhousesView,
-                    NantesGreenhousesAPIView,
-                    )
+from .views import BioresourceExplorerHomeView
 
 urlpatterns = [
     path('', BioresourceExplorerHomeView.as_view(), name='bioresource_explorer_home'),
-    path('data.hamburg_roadside_trees/', HamburgRoadsideTreeAPIView.as_view(), name='data.hamburg_roadside_trees'),
-    path('data.nantes_greenhouses/', NantesGreenhousesAPIView.as_view(), name='data.nantes_greenhouses'),
-    path('hamburg/', HamburgExplorerView.as_view(), name='hamburg_explorer'),
-    path('nantes/', NantesGreenhousesView.as_view(), name='nantes_greenhouses'),
+    # TODO: Can case study urls be detected and added automatically?
+    path('nantes/', include('case_studies.flexibi_nantes.urls')),
+    path('hamburg/', include('case_studies.flexibi_hamburg.urls')),
 ]

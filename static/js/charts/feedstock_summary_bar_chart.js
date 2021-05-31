@@ -28,22 +28,45 @@ function number_format(number, decimals, dec_point, thousands_sep) {
     return s.join(dec);
 }
 
-function barChartStyle(labels, values) {
+function chartDefinition(type, labels, values, unit, show_legend) {
+
+    console.log(values)
+
+    switch (type) {
+        case 'barchart':
+            return barChartDefinition(labels, values, unit, show_legend);
+        case 'stacked_barchart':
+            return barChartDefinition(labels, values, unit, show_legend);
+    }
+
+}
+
+
+function barChartDefinition(xlabels, data, unit, show_legend) {
+
+    const bg_colors = [
+        "#04555e",
+        "#943329",
+        "#63a33c",
+        "#f49a33",
+        "#826937",
+        "#fcc767"
+    ]
+
+    for (let i = 0; i < data.length; i++) {
+        data[i]['backgroundColor'] = bg_colors[i]
+        data[i]['backgroundColor'] = bg_colors[i]
+        // data[i]['hoverBackgroundColor'] = TODO
+        // data[i]['borderColor'] = TODO
+    }
 
     return {
         type: 'bar',
         data: {
-            labels: labels,
-            datasets: [{
-                label: "Annual production",
-                backgroundColor: "#4e73df",
-                hoverBackgroundColor: "#2e59d9",
-                borderColor: "#4e73df",
-                data: values,
-            }],
+            labels: xlabels,
+            datasets: data,
         },
         options: {
-            maintainAspectRatio: false,
             layout: {
                 padding: {
                     left: 10,
@@ -52,39 +75,42 @@ function barChartStyle(labels, values) {
                     bottom: 0
                 }
             },
+            legend: {
+                display: show_legend
+            },
+            maintainAspectRatio: false,
             scales: {
-                xAxes: [{
-                    gridLines: {
-                        display: false,
-                        drawBorder: true
-                    },
-                    ticks: {
-                        maxTicksLimit: 10
-                    },
-                    maxBarThickness: 100,
-                }],
                 yAxes: [{
-                    scaleLabel: {
-                        display: true,
-                        labelString: 'Mg/a'
-                    },
-                    ticks: {
-                        min: 0,
-                        // max: Math.max(...values) * 1.1,
-                        // maxTicksLimit: 5,
-                        padding: 10,
-                    },
                     gridLines: {
                         color: "rgb(234, 236, 244)",
                         zeroLineColor: "rgb(234, 236, 244)",
                         drawBorder: true,
                         borderDash: [2],
                         zeroLineBorderDash: [2]
+                    },
+                    scaleLabel: {
+                        display: true,
+                        labelString: unit
+                    },
+                    stacked: true,
+                    ticks: {
+                        beginAtZero: true,
+                        padding: 10
                     }
                 }],
-            },
-            legend: {
-                display: false
+                xAxes: [{
+                    gridLines: {
+                        display: false,
+                        drawBorder: true
+                    },
+                    maxBarThickness: 100,
+                    stacked: true,
+                    ticks: {
+                        beginAtZero: true,
+                        maxTicksLimit: 12
+                    }
+                }]
+
             },
             tooltips: {
                 titleMarginBottom: 10,
@@ -101,7 +127,7 @@ function barChartStyle(labels, values) {
                 callbacks: {
                     label: function (tooltipItem, chart) {
                         const datasetLabel = chart.datasets[tooltipItem.datasetIndex].label || '';
-                        return datasetLabel + ': ' + number_format(tooltipItem.yLabel) + ' Mg/a';
+                        return datasetLabel + ': ' + number_format(tooltipItem.yLabel) + ' ' + unit;
                     }
                 }
             },
