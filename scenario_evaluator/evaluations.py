@@ -1,79 +1,136 @@
-from scenario_builder.models import Material
+from distributions.plots import BarChart, DataSet
+from flexibi_dst.exceptions import UnitMismatchError
+from flexibi_dst.models import TemporalDistribution
+from layer_manager.models import LayerAggregatedDistribution
+from material_manager.models import BaseObjects
 
 
 class ScenarioResult:
     scenario = None
     layers = None
+    feedstocks = None
+    timesteps = None
 
     def __init__(self, scenario):
         self.scenario = scenario
-        self.layers = []
-        for layer in scenario.layer_set.all():
-            self.layers.append(layer)
+        self.layers = scenario.layer_set.all()
+        self.feedstocks = scenario.feedstocks()
+        self.timesteps = self.homogenize_timesteps()
+
+    def homogenize_timesteps(self):
+        layer = self.layers.first()  # TODO: Fix this!!!
+        dist = layer.layeraggregateddistribution_set.first().distribution
+        return [timestep for timestep in dist.timestep_set.all()]
 
     def material_component_groups(self):
-        materials = self.scenario.feedstocks()
-        return set([group_name for material in materials for group_name in material.component_group_names()])
+        group_settings = []
+        material_settings = self.scenario.feedstocks()
+        for material_setting in material_settings:
+            for group_setting in material_setting.materialcomponentgroupsettings_set.all():
+                if not group_setting.group == BaseObjects.objects.get.base_group:
+                    group_settings.append(group_setting)
+        return list(set(group_settings))
 
-    def get_plot_data(self):
-        plot_data = {}
-        labels, values = self.production_values_for_plot()
-        plot_data['productionPerFeedstockBarChart'] = {}
-        plot_data['productionPerFeedstockBarChart']['chart_name'] = 'Total annual production per feedstock'
-        plot_data['productionPerFeedstockBarChart']['dataset'] = {'labels': labels, 'values': values}
-        groups = self.material_component_groups()
-        for group in groups:
-            labels, values = self.material_values_for_plot(group)
-            chart_id = group.replace(' ', '') + 'BarChart'
-            plot_data[chart_id] = {}
-            plot_data[chart_id]['chart_name'] = 'Production per component: ' + group
-            plot_data[chart_id]['dataset'] = {'labels': labels, 'values': values}
-        return plot_data
+    def distributions(self):
+        return TemporalDistribution.objects.filter(id__in=[ad['distribution'] for ad in
+                                                           LayerAggregatedDistribution.objects.filter(
+                                                               layer__in=self.layers).values(
+                                                               'distribution').distinct()])
 
-    def production_values_for_plot(self):
-        labels, values = [], []
-        for label, value in self.total_production_per_feedstock().items():
-            labels.append(label)
-            values.append(value)
-        return labels, values
-
-    def material_values_for_plot(self, group):
-        labels, values = [], []
-        for label, value in self.total_material_components()[group].items():
-            labels.append(label)
-            values.append(value)
-        return labels, values
-
-    def total_annual_production(self):
-        total_production = 0
+    def total_production(self):
+        production_value = 0
+        unit = None
         for layer in self.layers:
-            layer_production_agg = layer.layeraggregatedvalue_set.get(name='Total production')
-            total_production += layer_production_agg.value
-        return total_production / 1000
+            agg_value = layer.layeraggregatedvalue_set.get(name='Total production')
+            if unit is None:
+                unit = agg_value.unit
+            if agg_value.unit != unit:
+                raise UnitMismatchError
+            production_value += agg_value.value
+        total_production = DataSet(label='Total production', data={'Total': production_value}, unit=unit)
+        return total_production
 
     def total_production_per_feedstock(self):
-        production = {}
+        data = {}
+        unit = None
         for layer in self.layers:
-            feedstock = layer.feedstock.name
-            if feedstock not in production.keys():
-                production[feedstock] = 0
-            production[feedstock] += layer.layeraggregatedvalue_set.get(name='Total production').value / 1000
+            agg_value = layer.layeraggregatedvalue_set.get(name='Total production')
+            unit = agg_value.unit
+            data[layer.feedstock.name] = agg_value.value
+        production = DataSet(label='Total production per feedstocks', data=data, unit=unit)
         return production
 
-    def total_material_components(self):
-        total_production_per_feedstock = self.total_production_per_feedstock()
-        components = {}
-        for feedstock in total_production_per_feedstock:
-            material = Material.objects.get(name=feedstock)
-            for group_name, group_content in material.grouped_components().items():
-                if group_name not in components:
-                    components[group_name] = {}
-                for component in group_content:
-                    if component.name not in components[group_name]:
-                        components[group_name][component.name] = 0
-                    components[group_name][component.name] += component.average * total_production_per_feedstock[
-                        feedstock]
-        return components
+    def get_charts(self):
+        charts = {}
+
+        # Total annual production per feedstock
+        production = self.total_production_per_feedstock()
+        chart = BarChart(
+            id='productionPerFeedstockBarChart',
+            title='Total annual production per feedstock',
+            unit=production.unit
+        )
+        chart.add_dataset(production)
+        charts.update({
+            'productionPerFeedstockBarChart': chart.as_dict()
+        })
+
+        # Composition of total production by component group
+        try:
+            group_settings = self.material_component_groups()
+            for group_setting in group_settings:
+                xlabels, data = self.material_values_for_plot(group_setting)
+                chart_id = group_setting.group.name.replace(' ', '') + 'BarChart'
+                charts.update({
+                    chart_id: BarChart(
+                        id=chart_id,
+                        title='Production per component: ' + group_setting.group.name,
+                        data=data
+                    ).as_dict()
+                })
+        except:
+            pass
+
+        # Seasonal production by component
+        chart = BarChart(
+            id='seasonalFeedstockBarChart',
+            title='Seasonal distribution of feedstocks',
+            unit='Mg/a',
+            show_legend=True
+        )
+        for ds in self.seasonal_production_per_component():
+            chart.add_dataset(ds)
+        charts.update({
+            'seasonalFeedstockBarChart': chart.as_dict()
+        })
+
+        return charts
+
+    # TODO: Delete when ready
+    # def total_production_per_material_component(self):
+    #     # This should not depend on the material definition but should be fetched directly from layer. Calculation
+    #     # should happen directly in the model algorithm.
+    #     total_production_per_feedstock = self.total_production_per_feedstock()
+    #     components = {}
+    #     for feedstock in self.feedstocks:
+    #         for group, content in feedstock.composition().items():
+    #             if group not in components:
+    #                 components[group] = {}
+    #             for share in content['averages']:
+    #                 if share.component.name not in components[group]:
+    #                     components[group][share.component.name] = 0
+    #                 components[group][share.component.name] += share.average * total_production_per_feedstock[
+    #                     feedstock]
+    #     return components
+
+    def seasonal_production_per_component(self):
+        datasets = []
+        for layer in self.layers:
+            agg_dist = layer.layeraggregateddistribution_set.filter(name='Seasonal production per component')[0]
+            for d in agg_dist.serialized:
+                d['label'] = f'{layer.feedstock.name}: {d["label"]}'
+                datasets.append(DataSet(**d))
+        return datasets
 
     def layer_summaries(self):
         layer_summaries = {}
@@ -85,3 +142,22 @@ class ScenarioResult:
                 'map_link': layer.feature_table_url
             }
         return layer_summaries
+
+    def summary_dict(self):
+        summary = {
+            'scenario': {
+                'name': self.scenario.name,
+                'description': self.scenario.description
+            },
+            'timesteps': [{
+                'name': timestep.name,
+                'composition': {
+                    'materials': [{
+                        'name': feedstock,
+                        'amount': amount,
+                        'unit': 'Mg/a'
+                    } for feedstock, amount in self.total_production_per_feedstock().items()]
+                }
+            } for timestep in self.timesteps]
+        }
+        return summary

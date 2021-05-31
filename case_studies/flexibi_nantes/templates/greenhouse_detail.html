@@ -1,0 +1,122 @@
+{% extends 'base.html' %}
+{% load render_table from django_tables2 %}
+
+{% block content %}
+
+    <!-- start basic greenhouse definition -->
+    <div class="row">
+        <div class="col col-6">
+            <div class="card shadow">
+                <div class="card-header">
+                    <b>Greenhouse configuration</b>
+                </div>
+                <div class="card-body p-0">
+                    <table class="table">
+                        <tr>
+                            <td class="col-3"><b>Heating:</b></td>
+                            <td>{{ object.heated }}</td>
+                        </tr>
+                        <tr>
+                            <td class="col-3"><b>Lighting:</b></td>
+                            <td>{{ object.lighted }}</td>
+                        </tr>
+                        <tr>
+                            <td class="col-3"><b>Aboveground:</b></td>
+                            <td>{{ object.above_ground }}</td>
+                        </tr>
+                        <tr>
+                            <td class="col-3"><b>High-wire:</b></td>
+                            <td>{{ object.high_wire }}</td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="card-footer">
+                    <a href="javascript:void(0);"
+                       class="modal-link toggle-edit"
+                       data-link="{% url 'greenhouse_update' object.id %}?next={{ request.path }}">
+                        Edit <i class="fas fa-fw fa-edit"></i>
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- end basic greenhouse definition -->
+
+    <!-- start growth cycles -->
+    <div class="row mt-2">
+        <div class="col">
+            <div class="card shadow">
+                <div class="card-header">
+                    <b>Growth cycles</b>
+                </div>
+                <div class="card-body">
+                    {% for cycle, content in growth_cycles.items %}
+                        <div class="card border-left-primary border shadow">
+                            <div class="card-header">
+                                <h6 class="m-0 font-weight-bold text-primary">
+                                    {{ cycle.cycle_number }}: {{ content.culture.name }}</h6>
+                            </div>
+                            <div class="card-body">
+                                {% render_table content.table %}
+                            </div>
+                            <div class="card-footer">
+                                <a href="javascript:void(0);"
+                                   class="modal-link toggle-edit"
+                                   data-link="{% url 'growth_cycle_delete' cycle.id %}?next={{ request.path }}">
+                                    <i class="fas fa-fw fa-trash"></i> Remove this cycle
+                                </a>
+                            </div>
+                        </div>
+                    {% endfor %}
+                    <div class="toggle-edit">
+                        <div class="card border-left-primary border">
+                            <div class="card-header"></div>
+                            <div class="card-body">
+                                <a href="javascript:void(0);"
+                                   class="modal-link"
+                                   data-link="{% url 'growth_cycle_create' object.id %}?next={{ request.path }}">
+                                    <i class="fas fa-fw fa-plus"></i> Add growth cycle
+                                </a>
+                            </div>
+                            <div class="card-footer"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="card-footer"></div>
+            </div>
+        </div>
+    </div>
+    <!-- end growth cycles -->
+
+
+    <div id="allow-edit" style="display: none" data-editable="{{ allow_edit }}"></div>
+
+{% endblock %}
+
+{% block javascript %}
+    {{ block.super }}
+
+    <script type="text/javascript">
+
+        $(document).ready(function () {
+
+            if ($("#allow-edit").data()['editable'] === "True") {
+                $(".toggle-edit").show()
+            }
+
+            $(".modal-link").each(function () {
+                $(this).modalForm({
+                    formURL: $(this).data()["link"],
+                    errorClass: ".is-invalid"
+                })
+            });
+
+        });
+
+        function toggle_edit() {
+            $(".toggle-edit").toggle()
+        }
+
+    </script>
+
+{% endblock javascript %}

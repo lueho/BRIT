@@ -6,9 +6,71 @@
     {% leaflet_js %}
     {% leaflet_css %}
 
-    <div class="col">
-        {% leaflet_map "main" %}
+    <!-- Outer wrapper -->
+    <div class="row h-100">
+
+        <!-- Left action column -->
+        <div class="col-sm-3">
+
+            <!-- Accordion -->
+            <div class="accordion">
+
+                <!-- Filter Form Card-->
+                <div class="card shadow">
+                    <div class="card-header" role="button" data-toggle="collapse" href="#filter-card-body"
+                         aria-expanded="true" aria-controls="filter-card-body">
+                        <b>Source information</b>
+                    </div>
+                    <div class="card-body collapse show" id="filter-card-body">
+                        <table>
+                            <tr>
+                                <td>Feedstock: {{ object.feedstock.material.name }}</td>
+                            </tr>
+                            <tr>
+                                <td>Dataset: {{ object.algorithm.geodataset.name }}</td>
+                            </tr>
+                            <tr>
+                                <td>Algorithm: {{ object.algorithm.name }}</td>
+                            </tr>
+                        </table>
+                    </div>
+                </div>
+                <!-- End Filter Form Card-->
+
+                <!-- Result Card -->
+                <div class="card shadow">
+                    <div class="card-header"><b>Results</b></div>
+                    <div class="card-body">
+                        <table>
+                            {% for aggval in object.layeraggregatedvalue_set.all %}
+                                <tr>
+                                    <td>{{ aggval.name }}</td>
+                                    <td>{{ aggval.value }}</td>
+                                    <td>{{ aggval.unit }}</td>
+                                </tr>
+                            {% endfor %}
+                        </table>
+                    </div>
+                </div>
+                <!-- End Result Card -->
+
+            </div>
+            <!-- End Accordion -->
+        </div>
+        <!-- End Left Action Column -->
+
+        <!-- Map Column -->
+        <div class="col">
+            <div class="card shadow">
+                <div class="card-body p-0">
+                    {% leaflet_map "main" %}
+                </div>
+            </div>
+        </div>
+        <!-- End Map Column -->
+
     </div>
+    <!-- End Outer Wrapper -->
 
 {% endblock content %}
 
@@ -19,6 +81,8 @@
 
         let map;
         let pointLayer;
+        let region_layer;
+        let catchment_layer;
 
         const resultRenderer = L.canvas({padding: 0.5});
 
@@ -26,17 +90,76 @@
             map = event.detail.map;
         });
 
+        async function fetchRegionGeometry(region_id) {
+
+            // Define query string for REST API
+            let params = L.Util.extend({
+                region_id: region_id
+            });
+
+            const url = "{% url 'ajax_region_geometries' %}" + L.Util.getParamString(params);
+
+            // Remove existing layer
+            if (region_layer !== undefined) {
+                map.removeLayer(region_layer);
+            }
+
+            // Fetch data from REST API
+            let response = await fetch(url);
+            let data = await response.json();
+
+            // Render geodata on map
+            let geodata;
+            geodata = data['geoJson'];
+            region_layer = L.geoJson(geodata, {
+                style: region_layer_style
+            })
+            region_layer.addTo(map);
+        }
+
+        async function fetchCatchmentGeometry(catchment_id) {
+
+            // Define query string for REST API
+            let params = L.Util.extend({
+                catchment_id: catchment_id
+            });
+
+            let url = "{% url 'ajax_catchment_geometries' %}" + L.Util.getParamString(params);
+
+            // Remove existing layer
+            if (catchment_layer !== undefined) {
+                map.removeLayer(catchment_layer);
+            }
+
+            // Fetch data from REST API
+            let response = await fetch(url);
+            let data = await response.json();
+
+            // Render geodata on map
+            let geodata;
+            geodata = data['geoJson'];
+            catchment_layer = L.geoJson(geodata, {
+                style: catchment_layer_style
+            })
+            catchment_layer.addTo(map);
+            map.fitBounds(catchment_layer.getBounds())
+        }
+
         async function queryDatasets() {
 
             const dataurl = "{% url 'data.result_layer' layer.table_name %}";
-            console.log(dataurl)
 
             // Fetch data from REST API
             let response = await fetch(dataurl);
             let data = await response.json();
 
             // Render geodata on map
-            let geodata = data['geoJson']
+            let geodata = data['geoJson'];
+            let region_id = data['region_id'];
+            await fetchRegionGeometry(region_id);
+            let catchment_id = data['catchment_id']
+            await fetchCatchmentGeometry(catchment_id)
+
             pointLayer = L.geoJson(geodata, {
                 pointToLayer: function (feature, latlng) {
                     return L.circleMarker(latlng, {
@@ -53,7 +176,12 @@
 
         }
 
-        queryDatasets()
+        function onLoad() {
+            queryDatasets()
+            map.invalidateSize();
+        }
+
+        window.onload = () => onLoad();
 
     </script>
 {% endblock %}

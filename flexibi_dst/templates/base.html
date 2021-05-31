@@ -14,7 +14,7 @@
     <title>FLEXIBI DST</title>
 
     <!-- Custom fonts for this template-->
-    <link href="{% static 'vendor/fontawesome-free/css/all.min.css' %}" rel="stylesheet" type="text/css">
+    <link href="{% static 'vendor/fontawesome-free/css/all.min.css' %}" rel="stylesheet">
     <link
             href="https://fonts.googleapis.com/css?
                 family=Nunito:200,200i,300,300i,400,400i,600,600i,700,700i,800,800i,900,900i"
@@ -26,8 +26,15 @@
     <!-- Custom styles for leaflet maps-->
     <link href="{% static 'css/map-style.css' %}" rel="stylesheet">
 
+    <!-- Other custom styles-->
+    <link href="{% static 'css/flexibi_dst.css' %}" rel="stylesheet">
+
 
 </head>
+
+{% block style %}
+{% endblock style %}
+
 
 <body id="page-top">
 
@@ -52,7 +59,7 @@
             <div class="container-fluid">
                 {% block content %}
 
-                {% endblock %}
+                {% endblock content %}
             </div>
 
         </div>
@@ -93,6 +100,13 @@
     </div>
 </div>
 
+<!-- Modal Container -->
+<div class="modal fade" tabindex="-1" role="dialog" id="modal">
+    <div class="modal-dialog" role="document">
+        <div class="modal-content"></div>
+    </div>
+</div>
+
 <!-- Bootstrap core JavaScript-->
 <script src="{% static 'vendor/jquery/jquery.min.js' %}"></script>
 <script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
@@ -102,19 +116,30 @@
 
 <!-- Custom scripts for all pages-->
 <script src="{% static 'js/sb-admin-2.min.js' %}"></script>
-{#<script src="{% static 'js/utils/dst_rest_api.js' %}"></script>#}
-<script src="{% static 'js/jquery.bootstrap.modal.forms.min.js' %}"></script>
+<script src="{% static 'js/jquery.bootstrap.modal.forms.js' %}"></script>
+
 
 <!-- Page level plugins -->
 <script src="{% static 'vendor/chart.js/Chart.min.js' %}"></script>
 {#<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.4.0/Chart.min.js"></script>#}
 
 <!-- Page level custom scripts -->
-{#<!-- <script src="{% static 'js/demo/chart-area-demo.js' %}"></script> -->#}
-{#<!-- <script src="{% static 'js/demo/chart-pie-demo.js' %}"></script> -->#}
 <script src="{% static 'js/flexibi-map-styles.js' %}"></script>
 
 {% block javascript %}
+    <script type="text/javascript">
+
+    $(document).ready(function () {
+
+        $(".modal-link").each(function () {
+            $(this).modalForm({
+                formURL: $(this).data()["link"],
+                errorClass: ".is-invalid"
+            })
+        });
+    });
+
+    </script>
 {% endblock javascript %}
 
 </body>

@@ -1,4 +1,5 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block content %}
 
@@ -7,107 +8,149 @@
 
         <!-- Scenario basics card -->
         <div class="col col-6">
-            <h2>Scenario basics:</h2>
-            <div class="card shadow mb-2">
-                <div class="card-header py-3">
-                    <h6 class="m-0 font-weight-bold text-primary">Scenario definition</h6>
-                </div>
-                <div class="card-body">
-                    <table class="table-boderless">
+            <div class="card shadow">
+                <div class="card-header"><b>Scenario basics</b></div>
+                <div class="card-body p-0">
+                    <table class="table">
                         <tr>
-                            <td class="col-4"><b>Name:</b></td>
+                            <td class="col-3"><b>Name:</b></td>
                             <td>{{ object.name }}</td>
                         <tr>
-                            <td class="col-4"><b>Description:</b></td>
+                            <td class="col-3"><b>Description:</b></td>
                             <td>{{ object.description }}</td>
                         <tr>
-                            <td class="col-4"><b>Region:</b></td>
+                            <td class="col-3"><b>Case study region:</b></td>
                             <td>
-                                <a href="{% url 'admin:scenario_builder_region_change' object.region.id %}">
+                                <a href="{% url 'catchment_list' %}">
                                     {{ object.region }}
                                 </a>
                             </td>
                         <tr>
-                            <td class="col-4"><b>Catchment:</b></td>
+                            <td class="col-3"><b>Catchment:</b></td>
                             <td>
-                                <a href="{% url 'admin:scenario_builder_catchment_change' object.catchment.id %}">
+                                <a href="{% url 'catchment_list' %}">
                                     {{ object.catchment }}
                                 </a>
                             </td>
                     </table>
                 </div>
-            </div>
-            <div class="ml-4 mb-4">
-                <a href="{% url 'scenario_detail' scenario.id %}">
-                    <i class="fas fa-fw fa-edit"></i> Edit scenario basics
-                </a>
+                <div class="card-footer">
+                    <a href="{% url 'scenario_detail' scenario.id %}">
+                        <i class="fas fa-fw fa-edit"></i> Edit scenario basics
+                    </a>
+                </div>
             </div>
 
         </div>
 
+        <!-- Options card -->
+        <div class="col col-6">
+            <div class="card shadow">
+                <div class="card-header"><b>Options</b></div>
+                <div class="card-body p-0">
+                    <table class="table">
+                        <tr>
+                            <td class="col-2">
+                                <a class="btn btn-primary" href="{% url 'download_result_summary' object.id %}">
+                                    Download</a>
+                            </td>
+                            <td>
+                                Download .json file with result summary. Use this file to feed results into the
+                                Process simulation tool.
+                            </td>
+                        </tr>
+                    </table>
+                </div>
+                <div class="card-footer"></div>
+            </div>
+        </div>
     </div>
     <!-- End of first row -->
 
     <!-- second row -->
-    <h2>Scenario result summary:</h2>
-    <div class="row">
-        {% for chart_id, content in plot_data.items %}
-            <div class="col col-6">
-                <div class="card shadow mb-4">
-                    <div class="card-header py-3">
-                        <h6 class="m-0 font-weight-bold text-primary">{{ content.chart_name }}</h6>
-                    </div>
-                    <div class="card-body">
-                        <div class="chart-bar">
-                            <canvas id="{{ chart_id }}"></canvas>
+    <div class="row mt-2">
+        <div class="col">
+            <div class="card shadow">
+                <div class="card-header"><b>Aggregated results</b></div>
+                <div class="card-body">
+                    {% for id, c in charts.items %}
+                        <div class="col col-6">
+                            <div class="card mb-4">
+                                <div class="card-header py-3">
+                                    <h6 class="m-0 font-weight-bold text-primary">{{ c.title }}</h6>
+                                </div>
+                                <div class="card-body">
+                                    <div class="chart-bar">
+                                        <canvas id="{{ id }}"></canvas>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                </div>
-            </div>
-        {% endfor %}
-    </div>
-    <!-- end of second row -->
-
-    <h2>Detailed scenario results:</h2>
-    {% for layer in layers %}
-        <div class="row">
-            <div class="col col-12">
-                <div class="card border-left-primary border shadow">
-                    <div class="card-header">
-                        <h6 class="m-0 font-weight-bold text-primary">
-                            Feedstock: {{ layer.feedstock }} -
-                            Dataset: {{ layer.inventory_algorithm.geodataset }} -
-                            Algorithm: {{ layer.inventory_algorithm.name }}</h6>
-                    </div>
-                    <div class="card-body">
-                        {% for aggregate in layer.aggregated_results %}
-                            <span>{{ aggregate.name }}: {{ aggregate.value }} {{ aggregate.unit }} - </span>
-                        {% endfor %}
-                        <a href="{% url 'scenario_result_map' layer.scenario.pk layer.inventory_algorithm.pk layer.feedstock.pk %}">
-                            <i class="fas fa-fw fa-map"></i> show map
-                        </a>
-                    </div>
-                    <div class="card-footer">
-                    </div>
+                    {% endfor %}
                 </div>
             </div>
         </div>
-    {% endfor %}
+    </div>
+    <!-- end of second row -->
+
+    <!-- third row -->
+    <div class="row mt-2">
+        <div class="col">
+            <div class="card shadow">
+                <div class="card-header"><b>Results by inventory</b></div>
+                <div class="card-body">
+                    {% for layer in layers %}
+                        <div class="row">
+                            <div class="col col-12">
+                                <div class="card border-left-primary border">
+                                    <div class="card-header">
+                                        <h6 class="m-0 font-weight-bold text-primary">
+                                            Feedstock: {{ layer.feedstock.name }} -
+                                            Dataset: {{ layer.inventory_algorithm.geodataset }} -
+                                            Algorithm: {{ layer.inventory_algorithm.name }}</h6>
+                                    </div>
+                                    <div class="card-body">
+                                        {% for aggregate in layer.aggregated_results %}
+                                            <span>{{ aggregate.name }}: {{ aggregate.value }} {{ aggregate.unit }} - </span>
+                                        {% endfor %}
+                                        <a href="{% url 'scenario_result_map' layer.scenario.pk layer.inventory_algorithm.pk layer.feedstock.pk %}">
+                                            <i class="fas fa-fw fa-map"></i> show map
+                                        </a>
+                                    </div>
+                                    <div class="card-footer">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- end of third row -->
 
 {% endblock content %}
 
 {% block javascript %}
 
     {{ block.super }}
-    {% load static %}
     {{ plot_data|json_script:"plot_data" }}
+    {{ charts|json_script:"charts" }}
 
     <script src="{% static 'js/charts/feedstock_summary_bar_chart.js' %}"></script>
     <script>
-        let plot_data = JSON.parse(document.getElementById("plot_data").textContent);
-        for (const [chart_id, content] of Object.entries(plot_data)) {
-            let ctx = document.getElementById(chart_id)
-            const args = barChartStyle(content["dataset"]["labels"], content["dataset"]["values"]);
+        let charts = JSON.parse(document.getElementById("charts").textContent);
+        console.log(charts)
+        for (const [id, chart] of Object.entries(charts)) {
+            let ctx = document.getElementById(id)
+            console.log(ctx)
+            const args = chartDefinition(
+                chart["type"],
+                chart["labels"],
+                chart["data"],
+                chart["unit"],
+                chart["show_legend"],
+            );
             new Chart(ctx, args);
         }
     </script>

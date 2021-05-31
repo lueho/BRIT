@@ -12,8 +12,11 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('users/', include('users.urls')),
     path('bioresource_explorer/', include('bioresource_explorer.urls')),
+    path('material_manager/', include('material_manager.urls')),
     path('scenario_builder/', include('scenario_builder.urls')),
     path('scenario_evaluator/', include('scenario_evaluator.urls')),
+    path('case_studies/nantes/', include('case_studies.flexibi_nantes.urls')),
+    path('library/', include('library.urls')),
 ]
 
 if settings.DEBUG:

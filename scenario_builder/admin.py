@@ -9,10 +9,7 @@ from .models import (Catchment,
                      InventoryAlgorithm,
                      InventoryAlgorithmParameter,
                      InventoryAlgorithmParameterValue,
-                     LiteratureSource,
-                     Material,
-                     MaterialComponent,
-                     MaterialComponentGroup,
+                     InventoryAmountShare,
                      Region,
                      Scenario,
                      ScenarioInventoryConfiguration,
@@ -76,21 +73,6 @@ class RegionAdmin(OSMGeoAdmin):
         return queryset
 
 
-@admin.register(LiteratureSource)
-class LiteratureSourceAdmin(ModelAdmin):
-    list_display = ('authors', 'title', 'abbreviation',)
-
-
-@admin.register(Material)
-class MaterialAdmin(ModelAdmin):
-    list_display = ('name', 'stan_flow_id', 'is_feedstock', 'description',)
-
-
-@admin.register(MaterialComponentGroup)
-class MaterialComponentGroupAdmin(ModelAdmin):
-    list_display = ('name', 'description',)
-
-
 @admin.register(InventoryAlgorithm)
 class InventoryAlgorithmAdmin(ModelAdmin):
     list_display = ('name', 'geodataset_link', 'default', 'description',)
@@ -146,7 +128,7 @@ class ScenarioInventoryConfigurationAdmin(ModelAdmin):
 
     @staticmethod
     def feedstock_link(obj):
-        url = reverse('admin:scenario_builder_material_change', args=(obj.feedstock.id,))
+        url = reverse('admin:material_manager_materialsettings_change', args=(obj.feedstock.id,))
         return format_html("<a href='{}'>{}</a>", url, obj.feedstock.name)
 
     @staticmethod
@@ -199,5 +181,9 @@ class ScenarioStatusAdmin(ModelAdmin):
     list_display = ('scenario', 'status')
 
 
-admin.site.register(MaterialComponent)
+# @admin.register(SeasonalDistribution)
+# class LiteratureSourceAdmin(ModelAdmin):
+#     list_display = ('id', 'timesteps', 'cycles', 'start_stop', 'values', 'material', 'component')
+
 admin.site.register(SFBSite)
+admin.site.register(InventoryAmountShare)

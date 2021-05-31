@@ -7,9 +7,7 @@
                     name="parameter_{{ parameter.id }}">
                 <option value="">---------</option>
                 {% for value in values %}
-                    <option value="{{ value.pk }}">{{ value.name }}: {{ value.value }}+-{{ value.standard_deviation }} {{ parameter.unit }}
-                        source: ({{ value.source }})
-                    </option>
+                    <option value="{{ value.pk }}">{{ value }}</option>
                 {% endfor %}
             </select>
         </div>
