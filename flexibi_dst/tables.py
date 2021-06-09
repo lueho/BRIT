@@ -29,16 +29,16 @@ class UserItemTable(tables.Table):
         name = tables.Column(footer=self.get_create_url(), linkify=lambda record: record.detail_url)
         description = tables.Column()
         edit = tables.TemplateColumn(
-            '<a href="javascript:void(0);" class="modal-link" data-link="{{ record.update_url }}"><i class="fas fa-fw fa-edit"></i></a>')
+            '<a href="{{ record.update_url }}" class="modal-link"><i class="fas fa-fw fa-edit"></i></a>')
         delete = tables.TemplateColumn(
-            '<a href="javascript:void(0);" class="modal-link" data-link="{{ record.delete_url }}"><i class="fas fa-fw fa-trash"></i></a>')
+            '<a href="{{ record.delete_url }}" class="modal-link"><i class="fas fa-fw fa-trash"></i></a>')
         kwargs['extra_columns'] = [('name', name), ('description', description), ('edit', edit), ('delete', delete)]
         super().__init__(*args, **kwargs)
 
     def get_create_url(self):
         return format_html(
             '''
-            <a href="javascript:void(0);" class="modal-link" data-link="{0}">
+            <a href="{0}" class="modal-link">
                 <i class="fas fa-fw fa-plus"></i> Create new {1}
             </a>
             ''',
