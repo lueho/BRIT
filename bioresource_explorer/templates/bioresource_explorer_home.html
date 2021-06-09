@@ -1,22 +1,21 @@
 {% extends 'base.html' %}
+{% load render_table from django_tables2 %}
 
 {% block content %}
-    <h2>Geodatasets holding information about Bioresources</h2>
-    <p>The following list contains georeferenced datasets that are used within the FLEXIBI
-    Decision Support Tool (DST) to retrieve information for the bioresource inventories.
-    In the bioresource explorer you can get familiar with the resources in the respective
-    case study regions. If you want to build an inventory for a specific scenario, you can
-    do so using the <a href="{% url 'scenario_list' %}">Scenario Builder</a>.</p>
+
     <div class="row">
         <div class="col">
-            <ul class="list-group">
-                {% for geodataset in object_list %}
-                    <li class="list-group-item">
-                        <p><a href="{{ geodataset.get_absolute_url }}">{{ geodataset.name }}</a></p>
-                        <p>{{ geodataset.description }}</p>
-                    </li>
-                {% endfor %}
-            </ul>
+            <div class="card shadow">
+                <div class="card-header"><b>Datasets</b></div>
+                <div class="card-body">
+                    <p>This table contains georeferenced datasets with information about potential sources of
+                        bioresources. You can explore the datasets and their content by clicking on the name.
+                        If you want to perform an inventory on any of the datasets, you can include them in a scenario
+                        in the <a href="{% url 'scenario_list' %}">Scenario Builder</a>.</p>
+                    <div>{% render_table dataset_table %}</div>
+                </div>
+                <div class="card-footer"></div>
+            </div>
         </div>
     </div>
 
