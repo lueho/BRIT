@@ -35,9 +35,8 @@
                     </table>
                 </div>
                 <div class="card-footer">
-                    <a href="javascript:void(0);"
-                       class="modal-link toggle-edit"
-                       data-link="{% url 'material_update' object.material.id %}?next={{ request.path }}">
+                    <a href="{% url 'material_update' object.material.id %}?next={{ request.path }}"
+                       class="modal-link toggle-edit">
                         Edit <i class="fas fa-fw fa-edit"></i>
                     </a>
                 </div>
@@ -67,9 +66,8 @@
                             <div class="col">
                                 <div class="card border-left-primary border">
                                     <div class="card-header">
-                                        <a href="javascript:void(0);"
-                                           class="modal-link"
-                                           data-link="{% url 'material_component_group_detail' group_settings.group.id %}">
+                                        <a href="{% url 'material_component_group_detail' group_settings.group.id %}"
+                                           class="modal-link">
                                             <b>{{ group_settings.group.name }}</b>
                                         </a>
                                     </div>
@@ -94,9 +92,8 @@
                                                         <td>
                                                             {% for source in group_settings.sources.all %}
                                                                 <p>
-                                                                    <a href="javascript:void(0)"
-                                                                       class="modal-link"
-                                                                       data-link="{% url 'literature source_detail' source.id %}">
+                                                                    <a href="{% url 'literature source_detail' source.id %}"
+                                                                       class="modal-link">
                                                                         {{ source.abbreviation }}
                                                                     </a>
                                                                 </p>
@@ -106,9 +103,8 @@
                                                     </tbody>
                                                 </table>
                                                 <div>
-                                                    <a href="javascript:void(0)"
-                                                       class="modal-link toggle-edit"
-                                                       data-link="{% url 'add_source' group_settings.id %}">
+                                                    <a href="{% url 'add_source' group_settings.id %}"
+                                                       class="modal-link toggle-edit">
                                                         <i class="fas fa-fw fa-plus"></i> Add source
                                                     </a>
                                                 </div>
@@ -132,9 +128,8 @@
                                                                 </a>
                                                             </td>
                                                             <td>
-                                                                <a href="javascript:void(0);"
-                                                                   class="modal-link toggle-edit"
-                                                                   data-link="{% url 'remove_seasonal_variation' group_settings.id distribution.id %}">
+                                                                <a href="{% url 'remove_seasonal_variation' group_settings.id distribution.id %}"
+                                                                   class="modal-link toggle-edit">
                                                                     <i class="fas fa-fw fa-trash"></i> Remove this
                                                                     variation
                                                                 </a>
@@ -148,9 +143,8 @@
                                                     {% endfor %}
                                                     <tr>
                                                         <td colspan="2">
-                                                            <a href="javascript:void(0)"
-                                                               class="modal-link toggle-edit"
-                                                               data-link="{% url 'add_seasonal_variation' group_settings.id %}">
+                                                            <a href="{% url 'add_seasonal_variation' group_settings.id %}"
+                                                               class="modal-link toggle-edit">
                                                                 <i class="fas fa-fw fa-plus"></i> Add seasonal variation
                                                             </a>
                                                         </td>
@@ -164,8 +158,7 @@
                                     <div class="card-footer">
                                         <a id="remove-group-{{ group.id }}"
                                            class="modal-link toggle-edit"
-                                           data-link="{% url 'material_component_group_remove' group_settings.id %}"
-                                           href="javascript:void(0);">
+                                           href="{% url 'material_component_group_remove' group_settings.id %}">
                                             <i class="fas fa-fw fa-trash"></i> Remove group
                                         </a>
                                     </div>
@@ -177,9 +170,8 @@
                         <div class="card border-left-primary border">
                             <div class="card-header"></div>
                             <div class="card-body">
-                                <a href="javascript:void(0);"
-                                   class="modal-link"
-                                   data-link="{% url 'material_add_component_group' object.id %}">
+                                <a href="{% url 'material_add_component_group' object.id %}"
+                                   class="modal-link">
                                     <i class="fas fa-fw fa-plus"></i> Add component group
                                 </a>
                             </div>

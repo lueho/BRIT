@@ -33,7 +33,7 @@ def averages_table_factory(group_settings):
     footers = {
         'component': format_html(
             '''
-            <a href="javascript:void(0);" class="modal-link toggle-edit" data-link="{0}">
+            <a href="{0}" class="modal-link toggle-edit">
                 <i class="fas fa-fw fa-plus"></i> Add component
             </a>
             ''',
@@ -41,7 +41,7 @@ def averages_table_factory(group_settings):
         ),
         'weight fraction': format_html(
             '''
-            <a href="javascript:void(0);" class="modal-link toggle-edit" data-link="{0}">
+            <a href="{0}" class="modal-link toggle-edit">
                 <i class="fas fa-fw fa-edit"></i> Change composition
             </a>
             ''',
@@ -77,7 +77,7 @@ def distribution_table_factory(group_settings, distribution):
     def footer(cs):
         return format_html(
             '''
-            <a href="javascript:void(0);" class="modal-link toggle-edit", data-link="{0}">
+            <a href="{0}" class="modal-link toggle-edit">
                 <i class="fas fa-fw fa-edit"></i>
             </a>
             ''',
