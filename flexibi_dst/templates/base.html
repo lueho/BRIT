@@ -129,15 +129,16 @@
 {% block javascript %}
     <script type="text/javascript">
 
-    $(document).ready(function () {
+        $(document).ready(function () {
 
-        $(".modal-link").each(function () {
-            $(this).modalForm({
-                formURL: $(this).data()["link"],
-                errorClass: ".is-invalid"
-            })
+            $(".modal-link").each(function () {
+                $(this).modalForm({
+                    formURL: $(this).attr("href"),
+                    errorClass: ".is-invalid"
+                })
+                $(this).attr("href", "javascript:void(0)")
+            });
         });
-    });
 
     </script>
 {% endblock javascript %}
