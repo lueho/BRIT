@@ -40,7 +40,7 @@ class MaterialListView(DualUserListView):
 
 class MaterialCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, BSModalCreateView):
     form_class = MaterialModelForm
-    template_name = '../flexibi_dst/templates/modal_form.html'
+    template_name = 'modal_form.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -70,7 +70,7 @@ class MaterialDetailView(UserOwnsObjectMixin, BSModalReadView):
 class MaterialUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
     model = Material
     form_class = MaterialModelForm
-    template_name = '../flexibi_dst/templates/modal_form.html'
+    template_name = 'modal_form.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -106,7 +106,7 @@ class MaterialComponentListView(DualUserListView):
 
 class MaterialComponentCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, BSModalCreateView):
     form_class = ComponentModelForm
-    template_name = '../flexibi_dst/templates/modal_form.html'
+    template_name = 'modal_form.html'
     success_url = reverse_lazy('component_list')
 
     def get_context_data(self, **kwargs):
@@ -137,7 +137,7 @@ class MaterialComponentDetailView(UserOwnsObjectMixin, DetailView):
 class MaterialComponentUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
     model = MaterialComponent
     form_class = ComponentModelForm
-    template_name = '../flexibi_dst/templates/modal_form.html'
+    template_name = 'modal_form.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -173,7 +173,7 @@ class ComponentGroupListView(DualUserListView):
 
 class ComponentGroupCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, BSModalCreateView):
     form_class = ComponentGroupModelForm
-    template_name = '../flexibi_dst/templates/modal_form.html'
+    template_name = 'modal_form.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -203,7 +203,7 @@ class ComponentGroupDetailView(UserOwnsObjectMixin, DetailView):
 class ComponentGroupUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
     model = MaterialComponentGroup
     form_class = ComponentGroupModelForm
-    template_name = '../flexibi_dst/templates/modal_form.html'
+    template_name = 'modal_form.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -283,7 +283,7 @@ class MaterialSettingsDeleteView(LoginRequiredMixin, UserOwnsObjectMixin, NextOr
 
 class AddComponentGroupView(LoginRequiredMixin, UserOwnsObjectMixin, BSModalFormView):
     form_class = AddComponentGroupForm
-    template_name = '../flexibi_dst/templates/modal_form.html'
+    template_name = 'modal_form.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -337,7 +337,7 @@ class RemoveComponentGroupView(LoginRequiredMixin, UserOwnsObjectMixin, BSModalD
 
 class AddComponentView(LoginRequiredMixin, UserOwnsObjectMixin, BSModalFormView):
     form_class = AddComponentForm
-    template_name = '../flexibi_dst/templates/modal_form.html'
+    template_name = 'modal_form.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -386,7 +386,7 @@ class RemoveComponentView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccess
 
 class AddSourceView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalFormView):
     form_class = AddLiteratureSourceForm
-    template_name = '../flexibi_dst/templates/modal_form.html'
+    template_name = 'modal_form.html'
 
     def get_object(self):
         return MaterialComponentGroupSettings.objects.get(id=self.kwargs.get('pk'))
@@ -410,7 +410,7 @@ class AddSourceView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMix
 
 class AddSeasonalVariationView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalFormView):
     form_class = AddSeasonalVariationForm
-    template_name = '../flexibi_dst/templates/modal_form.html'
+    template_name = 'modal_form.html'
 
     def get_object(self):
         return MaterialComponentGroupSettings.objects.get(id=self.kwargs.get('pk'))
