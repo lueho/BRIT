@@ -8,7 +8,7 @@ from django.urls import reverse
 from factory.django import mute_signals
 
 from flexibi_dst.models import Timestep, TemporalDistribution
-from library.models import LiteratureSource
+from library.models import Source
 from users.models import ReferenceUsers
 from .tables import averages_table_factory, distribution_table_factory
 
@@ -321,7 +321,7 @@ class MaterialComponentGroupSettings(models.Model):
     material_settings = models.ForeignKey(MaterialSettings, null=True, on_delete=models.CASCADE)
     temporal_distributions = models.ManyToManyField(TemporalDistribution)
     fractions_of = models.ForeignKey(MaterialComponent, on_delete=models.CASCADE, default=1)
-    sources = models.ManyToManyField(LiteratureSource)
+    sources = models.ManyToManyField(Source)
 
     @property
     def material(self):

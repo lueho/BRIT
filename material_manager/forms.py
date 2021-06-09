@@ -8,7 +8,7 @@ from django.utils.safestring import mark_safe
 from extra_views import InlineFormSetFactory
 
 from flexibi_dst.models import TemporalDistribution
-from library.models import LiteratureSource
+from library.models import Source
 from .models import (
     Material,
     MaterialComponent,
@@ -39,7 +39,7 @@ class AddComponentForm(BSModalForm):
 
 
 class AddLiteratureSourceForm(BSModalForm):
-    source = forms.ModelChoiceField(queryset=LiteratureSource.objects.all())
+    source = forms.ModelChoiceField(queryset=Source.objects.all())
 
     class Meta:
         fields = ('source',)
