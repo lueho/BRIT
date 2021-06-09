@@ -83,10 +83,11 @@ class ScenarioModelForm(ModelForm):
 class ScenarioModalModelForm(BSModalModelForm):
 
     def __init__(self, *args, **kwargs):
-        region_id = kwargs.pop('region_id')
+        region_id = kwargs.pop('region_id', None)
         super().__init__(*args, **kwargs)
-        self.fields['region'].queryset = Region.objects.filter(id=region_id)
-        self.fields['catchment'].queryset = Catchment.objects.filter(region_id=region_id)
+        if region_id is not None:
+            self.fields['region'].queryset = Region.objects.filter(id=region_id)
+            self.fields['catchment'].queryset = Catchment.objects.filter(region_id=region_id)
 
     class Meta:
         model = Scenario
