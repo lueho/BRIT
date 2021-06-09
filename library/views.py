@@ -5,16 +5,16 @@ from django.views.generic import ListView, CreateView
 
 from flexibi_dst.views import UserOwnsObjectMixin, NextOrSuccessUrlMixin
 from .forms import LitSourceModelForm
-from .models import LiteratureSource
+from .models import Source
 from .tables import SourceTable
 
 
 # ----------- LiteratureSource CRUD ------------------------------------------------------------------------------------
 
 class LiteratureSourceListView(ListView):
-    model = LiteratureSource
+    model = Source
     template_name = 'source_list.html'
-    queryset = LiteratureSource.objects.all()
+    queryset = Source.objects.all()
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -41,7 +41,7 @@ class LiteratureSourceCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, Crea
 
 
 class LiteratureSourceDetailView(BSModalReadView):
-    model = LiteratureSource
+    model = Source
     template_name = 'modal_source_detail.html'
     object = None
 
@@ -54,7 +54,7 @@ class LiteratureSourceDetailView(BSModalReadView):
 
 
 class LiteratureSourceUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
-    model = LiteratureSource
+    model = Source
     form_class = LitSourceModelForm
     template_name = '../flexibi_dst/templates/modal_form.html'
 
@@ -68,7 +68,7 @@ class LiteratureSourceUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOr
 
 
 class LiteratureSourceDeleteView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalDeleteView):
-    model = LiteratureSource
+    model = Source
     template_name = 'modal_delete.html'
     success_message = 'Successfully deleted.'
     success_url = reverse_lazy('litsource_list')

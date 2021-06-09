@@ -1,9 +1,9 @@
 from django.forms import ModelForm
 
-from .models import LiteratureSource
+from .models import Source
 
 
 class LitSourceModelForm(ModelForm):
     class Meta:
-        model = LiteratureSource
+        model = Source
         fields = '__all__'
