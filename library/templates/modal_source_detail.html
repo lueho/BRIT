@@ -18,6 +18,22 @@
             <td class="col-3"><strong>Abstract:</strong></td>
             <td>{{ object.abstract }}</td>
         </tr>
+        <tr>
+            <td class="col-3"><strong>Url:</strong></td>
+            <td>{{ object.url }}</td>
+        </tr>
+        <tr>
+            <td class="col-3"><strong>Last accessed:</strong></td>
+            <td>{{ object.last_accessed }}</td>
+        </tr>
+        <tr>
+            <td class="col-3"><strong>Licence:</strong></td>
+            <td><a href="{{ object.licence.reference_url }}">{{ object.licence.name }}</a></td>
+        </tr>
+        <tr>
+            <td class="col-3"><strong>Attributions:</strong></td>
+            <td>{{ object.attributions }}</td>
+        </tr>
     </table>
 </div>
 
