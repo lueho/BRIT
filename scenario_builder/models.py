@@ -11,6 +11,7 @@ from django.urls import reverse
 
 import case_studies
 from flexibi_dst.models import Timestep
+from library.models import Source
 from material_manager.models import Material, MaterialSettings
 from .exceptions import BlockedRunningScenario
 
@@ -76,6 +77,7 @@ class GeoDataset(models.Model):
     description = models.TextField(blank=True, null=True)
     region = models.ForeignKey(Region, on_delete=models.CASCADE, null=False)
     model_name = models.CharField(max_length=56, choices=GIS_SOURCE_MODELS, null=True)
+    sources = models.ManyToManyField(Source)
 
     def get_absolute_url(self):
         return reverse(f'{self.model_name}')
