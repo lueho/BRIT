@@ -10,6 +10,8 @@ SECRET_KEY = os.environ.get('SECRET_KEY', default=get_random_secret_key())
 ALLOWED_HOSTS = []
 
 INSTALLED_APPS = [
+    'django.contrib.sites',
+    'registration',
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
@@ -52,18 +54,12 @@ MIDDLEWARE = [
 
 ROOT_URLCONF = 'flexibi_dst.urls'
 
-TEMPLATE_DIRS = [
-    os.path.join(BASE_DIR, 'templates'),
-    os.path.join(BASE_DIR, 'users', 'templates'),
-    os.path.join(BASE_DIR, 'scenario_builder', 'templates'),
-    os.path.join(BASE_DIR, 'scenario_evaluator', 'templates'),
-    os.path.join(BASE_DIR, 'bioresource_explorer', 'templates'),
-]
-
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': TEMPLATE_DIRS,
+        'DIRS': [
+            os.path.join(BASE_DIR, 'users', 'templates'),
+        ],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -116,6 +112,11 @@ STATICFILES_DIRS = (
     os.path.join(BASE_DIR, 'static'),
 )
 
+# Settings for django-registration-redux
+ACCOUNT_ACTIVATION_DAYS = 2
+REGISTRATION_AUTO_LOGIN = True
+REGISTRATION_DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL')
+
 LEAFLET_CONFIG = {
     'DEFAULT_CENTER': (48.917908, 6.921543),
     'DEFAULT_ZOOM': 5,
@@ -133,10 +134,18 @@ LEAFLET_CONFIG = {
 }
 
 LOGIN_REDIRECT_URL = 'home'
-LOGIN_URL = 'login'
+LOGIN_URL = 'users/login'
 
 CELERY_BROKER_URL = os.environ.get("REDIS_URL")
 CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL")
 
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
 DJANGO_TABLES2_TEMPLATE = "django_tables2/bootstrap4.html"
+
+EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
+EMAIL_HOST = os.environ.get('EMAIL_HOST')
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD')
+EMAIL_PORT = os.environ.get('EMAIL_PORT')
+EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL')
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL')
