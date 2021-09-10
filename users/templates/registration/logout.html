@@ -1,0 +1,21 @@
+{% extends "registration/registration_base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Logged out" %}{% endblock %}
+
+{% block card_header %}Logout successfull{% endblock %}
+
+{% block card_body %}
+
+    <div class="text-center">
+        <p>
+            {% trans "You have successfully logged out." %}
+        </p>
+        <p>
+            <a href="{% url 'auth_login' %}">
+                {% trans "Log back in" %}
+            </a>
+        </p>
+    </div>
+
+{% endblock %}

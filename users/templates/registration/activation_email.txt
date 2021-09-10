@@ -1,0 +1,22 @@
+{% load i18n %}
+{% blocktrans with site_name=site.name %}
+You have asked to register an account at
+{{ site_name }}.
+
+{% endblocktrans %}
+{% blocktrans %}
+To activate this account, please click the following link within the next
+{{ expiration_days }} days:
+{% endblocktrans %}
+
+http://{{site.domain}}{% url 'registration_activate' activation_key %}
+
+{% blocktrans with site_name=site.name %}
+
+Your chosen username: {{ user.name }}
+
+If you did not sign up, please ignore this email and your address will be removed from our records.
+
+Sincerely, your
+{{ site_name }} Team
+{% endblocktrans %}

@@ -1,0 +1,12 @@
+{% extends "registration/registration_base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Activation Failure" %}{% endblock %}
+
+{% block card_header %}{% trans 'Registration Error' %}{% endblock card_header %}
+
+{% block card_body %}
+    <div class="text-center">
+        <p>{% trans "Account activation failed." %}</p>
+    </div>
+{% endblock card_body %}

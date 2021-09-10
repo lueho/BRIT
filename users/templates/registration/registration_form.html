@@ -1,0 +1,26 @@
+{% extends "registration/registration_base.html" %}
+{% load crispy_forms_filters %}
+{% load i18n %}
+
+{% block title %}{% trans "BRIT User registration" %}{% endblock title %}
+
+{% block card_header %}Create User Account{% endblock card_header %}
+
+{% block card_body %}
+
+    <div>
+        <form method="post" action="">
+            {% csrf_token %}
+            {{ form|crispy }}
+            <input type="submit" class="btn btn-primary btn-user btn-block" value="{% trans 'Submit' %}"/>
+        </form>
+    </div>
+    <div class="p-3">
+        <div class="text-center">
+            <small class="text-muted text-center">
+                Already have an account? <a href="{% url 'auth_login' %}">Login</a>
+            </small>
+        </div>
+    </div>
+
+{% endblock card_body %}

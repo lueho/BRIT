@@ -1,0 +1,32 @@
+{% extends "registration/registration_base.html" %}
+{% load i18n %}
+
+{% block title %}{% trans "Account Activated" %}{% endblock %}
+
+{% block card_header %}{% trans "Account Activated" %}{% endblock %}
+
+{% block card_body %}
+
+    <div class="text-center">
+        <p>
+            {% trans "Your account is now activated." %}
+        </p>
+        {% if not user.is_authenticated %}
+            <p>
+                <a href="{% url 'auth_login' %}">
+                    {% trans "Log in." %}
+                </a>
+            </p>
+        {% endif %}
+    </div>
+
+{% endblock %}
+
+
+{% comment %}
+**registration/activation_complete.html**
+
+Used after successful account activation. This template has no context
+variables of its own, and should simply inform the user that their
+account is now active.
+{% endcomment %}
