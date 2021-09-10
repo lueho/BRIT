@@ -12,6 +12,8 @@ from .forms import CustomAuthenticationForm
 
 class UserDeleteView(LoginRequiredMixin, DeleteView):
     model = User
+    template_name = 'modal_user_delete.html'
+    success_message = 'Successfully deleted.'
     success_url = reverse_lazy('home')
 
 
