@@ -1,20 +1,13 @@
-from django.contrib.auth.forms import UserCreationForm
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.contrib.auth.models import User
-from django.urls import reverse_lazy
-from django.views.generic import TemplateView, CreateView, DeleteView, TemplateView
 from bootstrap_modal_forms.generic import BSModalLoginView
 from django.contrib.auth.mixins import AccessMixin
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.models import User
 from django.http import HttpResponseRedirect
 from django.urls import reverse
+from django.urls import reverse_lazy
+from django.views.generic import DeleteView, TemplateView
+
 from .forms import CustomAuthenticationForm
-
-
-class UserRegistrationView(CreateView):
-    model = User
-    form_class = UserCreationForm
-    template_name = 'register.html'
-    success_url = reverse_lazy('login')
 
 
 class UserDeleteView(LoginRequiredMixin, DeleteView):
