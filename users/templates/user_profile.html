@@ -1,41 +1,45 @@
-{% extends 'base.html' %}
+{% extends 'base_single_card.html' %}
 
-{% block content %}
-    <!-- Outer Row -->
-    <div class="row justify-content-center">
+{% block title %}BRIT user profile{% endblock %}
 
-        <div class="col col-6">
+{% block card_header %}Your User Profile{% endblock %}
 
-            <div class="card o-hidden border-0 shadow-lg my-5">
-                <div class="card-body p-0">
-                    <!-- Nested Row within Card Body -->
-                    <div class="row justify-content-center">
-                        <div class="col-lg-11">
-                            <div class="pt-5">
-                                <div class="text-center">
-                                    <h1 class="h1 text-gray-900 mb-4">User profile</h1>
-                                </div>
-                                <div>
-                                    User name: {{ user.username }}
-                                </div>
-                            </div>
-                            <div class="p-3">
-                                <div class="text-center">
-                                    <form method="POST" action="{% url 'user_delete' user.pk %}">
-                                        {% csrf_token %}
-                                        <button class="btn btn-primary">
-                                            Delete account
-                                        </button>
-                                    </form>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+{% block card_body %}
 
-        </div>
-
+    <div>
+        <p><b>Username:</b> {{ user.username }}</p>
+        <p><b>E-Mail:</b> {{ user.email }}</p>
+        <p><b>Account management:</b></p>
     </div>
 
-{% endblock content %}
+    <div class="pt-3">
+        <a href="{% url 'auth_password_change' %}" class="btn btn-primary btn-block">
+            Change password
+        </a>
+    </div>
+
+    <div class="pt-3">
+        <a href="{% url 'user_delete' pk=user.pk %}" class="btn btn-danger btn-block modal-link">
+            Delete Account
+        </a>
+    </div>
+
+{% endblock card_body %}
+
+{% block javascript %}
+    {{ block.super }}
+
+    <script type="text/javascript">
+        $(document).ready(function () {
+
+            $(".modal-link").each(function () {
+                $(this).modalForm({
+                    formURL: $(this).data()["link"],
+                    errorClass: ".is-invalid"
+                })
+            });
+
+        });
+    </script>
+
+{% endblock javascript %}
