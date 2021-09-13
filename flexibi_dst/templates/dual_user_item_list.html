@@ -20,7 +20,7 @@
                     <div class="card-body">{% render_table custom_item_table %}</div>
                 {% else %}
                     <div class="card-body">
-                        <a href="{% url 'login' %}?next={{ request.path | urlencode }}">Login</a>
+                        <a href="{% url 'auth_login' %}?next={{ request.path | urlencode }}">Login</a>
                         to see your custom {{ item_name_plural }}.
                     </div>
                 {% endif %}

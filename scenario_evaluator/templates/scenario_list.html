@@ -38,7 +38,7 @@
         <div class="row">
             <div class="col">
                 You need to be logged in to see your scenarios.
-                <a href="{% url 'login' %}?next={{ request.path | urlencode }}">
+                <a href="{% url 'auth_login' %}?next={{ request.path | urlencode }}">
                     Login now.
                 </a>
             </div>
