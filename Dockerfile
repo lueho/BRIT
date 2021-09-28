@@ -11,7 +11,11 @@ RUN apt-get update \
 FROM prod as dev
 
 RUN apt-get update \
-    && apt-get install -y --fix-missing gnupg curl groff less postgresql-13 \
+    && apt-get install -y --fix-missing lsb-release gnupg curl groff less  \
+    && sh -c 'echo "deb http://apt.postgresql.org/pub/repos/apt $(lsb_release -cs)-pgdg main" > /etc/apt/sources.list.d/pgdg.list'\
+    && wget --quiet -O - https://www.postgresql.org/media/keys/ACCC4CF8.asc | apt-key add - \
+    && apt-get update \
+    && apt-get install -y --fix-missing postgresql-12 \
     && curl https://cli-assets.heroku.com/install-ubuntu.sh | sh \
     && curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" \
     && unzip awscliv2.zip \
