@@ -10,7 +10,11 @@ services:
     env_file:
       - flexibi_dst/settings/.env
   web:
-    build: .
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        HOST_ENVIRONMENT: "${HOST_ENVIRONMENT}"
     volumes:
       - ./:/app
     depends_on:
