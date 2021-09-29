@@ -31,6 +31,10 @@ class HomeView(TemplateView):
     template_name = 'home.html'
 
 
+class ContributorsView(TemplateView):
+    template_name = 'contributors.html'
+
+
 class DualUserListView(TemplateView):
     model = None
 
