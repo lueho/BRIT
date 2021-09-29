@@ -1,5 +1,7 @@
 from django.urls import path
 
+from flexibi_dst.views import ModalMessageView
+
 from .views import (AddComponentView,
                     AddComponentGroupView,
                     AddSourceView,
@@ -29,7 +31,11 @@ from .views import (AddComponentView,
 
 urlpatterns = [
     path('materials/', MaterialListView.as_view(), name='material_list'),
-    path('materials/create/', MaterialCreateView.as_view(), name='material_create'),
+    # path('materials/create/', MaterialCreateView.as_view(), name='material_create'),
+    path('materials/create/', ModalMessageView.as_view(
+        title='Future feature',
+        message='This feature will be available in the future. Please check again, soon.'
+    ), name='material_create'),
     path('materials/<int:pk>/', MaterialDetailView.as_view(), name='material_detail'),
     path('materials/<int:pk>/update/', MaterialUpdateView.as_view(), name='material_update'),
     path('materials/<int:pk>/delete/', MaterialDeleteView.as_view(), name='material_delete'),
