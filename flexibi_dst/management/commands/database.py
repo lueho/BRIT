@@ -28,8 +28,7 @@ class Command(BaseCommand):
         Creates a dump file from the local development database.
         """
         user = os.environ.get('POSTGRES_USER')
-        password = os.environ.get('POSTGRES_PASSWORD')
-        os.system(f'export PGPASSWORD={password}')
+        os.environ['PGPASSWORD'] = os.environ.get('POSTGRES_PASSWORD')
         os.system(f'pg_dump -Fc --no-acl --no-owner -h db -p 5432 -U {user} > {file_name}')
 
     @staticmethod
@@ -41,6 +40,7 @@ class Command(BaseCommand):
         host = os.environ.get('POSTGRES_HOST')
         port = os.environ.get('POSTGRES_PORT')
         user = os.environ.get('POSTGRES_USER')
+        os.environ['PGPASSWORD'] = os.environ.get('POSTGRES_PASSWORD')
         os.system(f'pg_restore --clean --no-acl --no-owner -h {host} -p {port} -U {user} -d {database} {file_name}')
 
     def restore_production_db(self, file_name):
