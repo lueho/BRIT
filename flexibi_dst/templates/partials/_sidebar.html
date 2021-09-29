@@ -31,32 +31,37 @@
     <li class="nav-item">
         <a class="nav-link" href="{% url 'bioresource_explorer_home' %}">
             <i class="fas fa-fw fa-globe-europe"></i>
-            <span>Bioresource Explorer</span></a>
+            <span>Maps</span></a>
     </li>
 
     <!-- Material manager -->
     <li class="nav-item">
         <a class="nav-link" href="{% url 'material_list' %}">
             <i class="fas fa-fw fa-leaf"></i>
-            <span>Material Manager</span></a>
+            <span>Materials</span></a>
     </li>
 
     <!-- Scenario builder -->
     <li class="nav-item">
-        <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseOne" aria-expanded="true"
-           aria-controls="collapseOne">
-            <i class="fas fa-fw fa-cog"></i>
-            <span>Scenario Builder</span>
-        </a>
-        <div id="collapseOne" class="collapse" aria-labelledby="headingTwo" data-parent="#accordionSidebar">
-            <div class="bg-white py-2 collapse-inner rounded">
-                <h6 class="collapse-header">Scenario components:</h6>
-                <a class="collapse-item" href="{% url 'catchment_list' %}">Catchments</a>
-                <a class="collapse-item" href="{% url 'greenhouse_list' %}">Greenhouses</a>
-                <a class="collapse-item" href="{% url 'scenario_list' %}">Scenarios</a>
-            </div>
-        </div>
+        <a class="nav-link" href="{% url 'scenario_list' %}">
+            <i class="fas fa-fw fa-chart-bar"></i>
+            <span>Scenarios</span></a>
     </li>
+    {#    <li class="nav-item">#}
+    {#        <a class="nav-link collapsed" href="#" data-toggle="collapse" data-target="#collapseOne" aria-expanded="true"#}
+    {#           aria-controls="collapseOne">#}
+    {#            <i class="fas fa-fw fa-cog"></i>#}
+    {#            <span>Inventories</span>#}
+    {#        </a>#}
+    {#        <div id="collapseOne" class="collapse" aria-labelledby="headingTwo" data-parent="#accordionSidebar">#}
+    {#            <div class="bg-white py-2 collapse-inner rounded">#}
+    {#                <h6 class="collapse-header">Scenario components:</h6>#}
+    {#                <a class="collapse-item" href="{% url 'catchment_list' %}">Catchments</a>#}
+    {#                <a class="collapse-item" href="{% url 'greenhouse_list' %}">Greenhouses</a>#}
+    {#                <a class="collapse-item" href="{% url 'scenario_list' %}">Scenarios</a>#}
+    {#            </div>#}
+    {#        </div>#}
+    {#    </li>#}
 
     <!-- Nav Item - Charts -->
 
