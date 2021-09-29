@@ -46,3 +46,17 @@ class DualUserListView(TemplateView):
                 table=UserItemTable
             )(self.model.objects.filter(owner=self.request.user))
         return super().get_context_data(**kwargs)
+
+
+class ModalMessageView(TemplateView):
+    template_name = 'modal_message.html'
+    title = 'Title'
+    message = 'Message'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'title': self.title,
+            'message': self.message
+        })
+        return context
