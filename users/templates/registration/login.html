@@ -16,11 +16,11 @@
             <input type="hidden" name="next" value="{{ next }}"/>
         </form>
     </div>
-    <div class="mt-5">
+    <div class="mt-4">
         <p>
-            {% trans "Forgot your password?" %} <a
-                href="{% url 'auth_password_reset' %}">{% trans "Reset it" %}</a>.<br>
-            {% trans "No account, yet?" %} <a href="{% url 'registration_register' %}">{% trans "Register" %}</a>.
+             <a
+                href="{% url 'auth_password_reset' %}">{% trans "Reset password" %}</a><br>
+             <a href="{% url 'registration_register' %}">{% trans "Register" %}</a>
         </p>
     </div>
 
