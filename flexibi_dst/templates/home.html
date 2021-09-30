@@ -1,79 +1,85 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}FLEXIBI DST Home{% endblock %}
+{% block title %}BRIT | Bioresource Information Tool{% endblock %}
 
 {% block content %}
-    <div class="row">
+    <div class="row row-cols-1 row-cols-md-2 row-cols-xl-4">
         <div class="col">
             <div class="card">
                 <div class="card-header"><b>Welcome</b></div>
                 <div class="card-body">
-                    <p>Welcome to the FLEXIBI Decision Support Tool!</p>
+                    <p>Welcome to the Bioresource Information Tool!</p>
                     <p>
-                        This tool is designed to provide you with information about bioresources. These information can
-                        be expected amounts of different materials in your region of interest or material compositions.
+                        This tool is part of the FLEXIBI Decision Support Tool for small-scale flexi-feed biorefineries.
+                        You can find information about sources, quantities and properties of residue-based bioresources.
+                        You explore the case studies that have been created in the FLEXIBI project, change parameters
+                        and assumptions to create your own scenarios. This site is the prototype of the system that
+                        is still actively developed. If you find any bugs or have feedback, please let us know and
+                        write a short note to <a
+                            href="mailto:info@bioresource-tools.net">info@bioresource<span>&#8209;</span>tools.net</a>
                     </p>
                 </div>
             </div>
         </div>
     </div>
-    <div class="row equal mt-4">
-        <div class="col d-flex">
+    <div class="row mt-4 row-cols-1">
+        {#    <div class="card-deck mt-4 row-cols-1 row-cols-md-2 row-cols-xl-4">#}
+        <div class="col">
             <div class="card">
-                <div class="card-header"><b>Maps</b></div>
-                <div class="card-body">
-                    <p>
-                        Explore maps of sources of bioresources found in the implemented case studies. You can filter
-                        and find out more about the spatial distribution of potential resources.
-                    </p>
+                <div class="card-header"><a href="{% url 'bioresource_explorer_home' %}"><b>Maps</b></a></div>
+                <div class="card-img-top">
                     <a class="d-flex align-items-center justify-content-center"
                        href="{% url 'bioresource_explorer_home' %}">
                         <img class="w-100 m-0" src="{% static 'img/cover_card_maps.png' %}"
                              alt="Maps Module Cover Image">
                     </a>
                 </div>
+                <div class="card-body">
+                    Explore maps of sources of bioresources found in the implemented case studies. You can filter
+                    and find out more about the spatial distribution of potential resources.
+                </div>
             </div>
         </div>
-        <div class="col d-flex">
+        <div class="col">
             <div class="card">
-                <div class="card-header"><b>Materials</b></div>
-                <div class="card-body">
-                    <p>
-                        This is a database of materials that are bioresources found in the implemented case studies.
-                        It characterizes the material composition and its seasonal change.
-                    </p>
+                <div class="card-header"><a href="{% url 'material_list' %}"><b>Materials</b></a></div>
+                <div class="card-img">
                     <a class="d-flex align-items-center justify-content-center"
                        href="{% url 'material_list' %}">
                         <img class="w-100 m-0" src="{% static 'img/cover_card_materials.jpg' %}"
                              alt="Materials Module Cover Image">
                     </a>
                 </div>
-            </div>
-        </div>
-        <div class="col d-flex">
-            <div class="card">
-                <div class="card-header"><b>Inventories</b></div>
                 <div class="card-body">
-                    <p>
-                        Inventories are case studies about which bioresources are available in a given region. Explore
-                        ready case studies from our research projects or create your own scenarios.
-                    </p>
-                    <img class="w-100 m-0" src="{% static 'img/cover_card_coming.png' %}"
-                         alt="Inventories Module Cover Image">
+                    This is a database of materials that are bioresources found in the implemented case studies.
+                    It characterizes the material composition and its seasonal change.
                 </div>
             </div>
         </div>
-        <div class="col d-flex">
+        <div class="col">
+            <div class="card">
+                <div class="card-header"><b>Inventories</b></div>
+                <div class="card-img">
+                    <img class="w-100 m-0 p-1" src="{% static 'img/coming_soon.png' %}"
+                         alt="Inventories Module Cover Image">
+                </div>
+                <div class="card-body">
+                    Inventories are case studies about which bioresources are available in a given region. Explore
+                    ready case studies from our research projects or create your own scenarios.
+                </div>
+            </div>
+        </div>
+        <div class="col">
             <div class="card">
                 <div class="card-header"><b>Stakeholders</b></div>
+                <div class="card-img">
+                    <img class="w-100 m-0 p-1" src="{% static 'img/coming_soon.png' %}"
+                         alt="Inventories Module Cover Image">
+                </div>
                 <div class="card-body">
-                    <p>
-                        Find out who are the main stakeholders for the management of the bioresources you are interested
-                        in. The may be producing, collecting, transporting or treating organisations.
-                    </p>
-                    <img class="w-100 m-0" src="{% static 'img/cover_card_coming.png' %}"
-                         alt="Stakeholders Module Cover Image">
+                    Find out who are the main stakeholders for the management of the bioresources you are interested
+                    in. The may be producing, collecting, transporting or treating organisations.
                 </div>
             </div>
         </div>
