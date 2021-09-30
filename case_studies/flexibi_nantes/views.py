@@ -292,7 +292,7 @@ class UpdateGreenhouseGrowthCycleValuesView(LoginRequiredMixin, UpdateView):
 
 
 class NantesGreenhousesView(FormView):
-    template_name = 'explore_nantes_greenhouses.html'
+    template_name = 'maps_base.html'
     form_class = NantesGreenhousesFilterForm
     initial = {'heated': 'Yes', 'lighted': 'Yes'}
 
