@@ -1,0 +1,14 @@
+{% load static %}
+
+<div class="card shadow h-100">
+    <div class="card-header"><a href="{{ map.get_absolute_url }}"><b>{{ map.name }}</b></a></div>
+    <div class="card-img-top">
+        <img class="w-100 m-0" src="{{ map.preview.url }}"
+                             alt="Maps Module Cover Image">
+    </div>
+    <div class="card-body">
+        <p>
+            {{ map.description }}
+        </p>
+    </div>
+</div>

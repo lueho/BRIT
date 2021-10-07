@@ -11,6 +11,17 @@
     <!-- Outer wrapper -->
     <div class="row h-100">
 
+    <!-- Map Column -->
+        <div class="col">
+            <div class="card shadow">
+                <div class="card-header"><b>Map</b></div>
+                <div class="card-body p-0">
+                    {% leaflet_map "main" %}
+                </div>
+            </div>
+        </div>
+        <!-- End Map Column -->
+
         <!-- Left action column -->
         <div class="col-sm-3">
 
@@ -52,16 +63,7 @@
         </div>
         <!-- End Left Action Column -->
 
-        <!-- Map Column -->
-        <div class="col">
-            <div class="card shadow">
-                <div class="card-header">Map</div>
-                <div class="card-body p-0">
-                    {% leaflet_map "main" %}
-                </div>
-            </div>
-        </div>
-        <!-- End Map Column -->
+
 
     </div>
     <!-- End Outer Wrapper -->

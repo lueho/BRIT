@@ -1,0 +1,36 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}BRIT | Maps{% endblock title %}
+
+{% block content %}
+
+    <div class="row">
+        <div class="col col-12 col-md-6">
+            <div class="card shadow">
+                <div class="card-header"><b>Maps</b></div>
+                <div class="card-body">
+                    <p>
+                        This section contains maps with geodata that represents sources for any type of geodata.
+                        You can explore the original dataset, zoom and filter. As soon as the Inventory module is
+                        released,
+                        you will be able to perform automated inventories with these datasets to conduct case studies
+                        that reveal the potential in catchment areas that are of interest for you.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+
+        {% for map in object_list %}
+            {% if map.publish %}
+                <div class="col col-12 col-md-6 col-lg-3 mt-4">
+                    {% include 'maps_card.html' %}
+                </div>
+            {% endif %}
+        {% endfor %}
+
+    </div>
+
+{% endblock content %}
