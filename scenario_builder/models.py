@@ -74,6 +74,8 @@ class GeoDataset(models.Model):
     Holds meta information about datasets from the core module or scenario extensions.
     """
     name = models.CharField(max_length=56, null=False)
+    preview = models.ImageField(upload_to='images', blank=True)
+    publish = models.BooleanField(default=False)
     description = models.TextField(blank=True, null=True)
     region = models.ForeignKey(Region, on_delete=models.CASCADE, null=False)
     model_name = models.CharField(max_length=56, choices=GIS_SOURCE_MODELS, null=True)
