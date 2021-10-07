@@ -4,10 +4,10 @@
 {% block title %}BRIT | Bioresource Information Tool{% endblock %}
 
 {% block content %}
-    <div class="row row-cols-1 row-cols-md-2 row-cols-xl-4">
-        <div class="col">
-            <div class="card">
-                <div class="card-header"><b>Welcome</b></div>
+    <div class="row">
+        <div class="col col-12 col-md-6">
+            <div class="card h-100">
+                <div class="card-header"><b>Welcome!</b></div>
                 <div class="card-body">
                     <p>Welcome to the Bioresource Information Tool!</p>
                     <p>
@@ -22,11 +22,21 @@
                 </div>
             </div>
         </div>
+        <div class="col d-none d-md-block">
+            <div class="card h-100">
+                <div class="card-header"><b>Updates</b></div>
+                <div class="card-body">
+                    <p>
+                        This tool is designed to provide you with information about bioresources. These information can
+                        be expected amounts of different materials in your region of interest or material compositions.
+                    </p>
+                </div>
+            </div>
+        </div>
     </div>
-    <div class="row mt-4 row-cols-1">
-        {#    <div class="card-deck mt-4 row-cols-1 row-cols-md-2 row-cols-xl-4">#}
-        <div class="col">
-            <div class="card">
+    <div class="row">
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card h-100">
                 <div class="card-header"><a href="{% url 'bioresource_explorer_home' %}"><b>Maps</b></a></div>
                 <div class="card-img-top">
                     <a class="d-flex align-items-center justify-content-center"
@@ -41,8 +51,8 @@
                 </div>
             </div>
         </div>
-        <div class="col">
-            <div class="card">
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card h-100">
                 <div class="card-header"><a href="{% url 'material_list' %}"><b>Materials</b></a></div>
                 <div class="card-img">
                     <a class="d-flex align-items-center justify-content-center"
@@ -57,8 +67,8 @@
                 </div>
             </div>
         </div>
-        <div class="col">
-            <div class="card">
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card h-100">
                 <div class="card-header"><b>Inventories</b></div>
                 <div class="card-img">
                     <img class="w-100 m-0 p-1" src="{% static 'img/coming_soon.png' %}"
@@ -70,8 +80,8 @@
                 </div>
             </div>
         </div>
-        <div class="col">
-            <div class="card">
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card h-100">
                 <div class="card-header"><b>Stakeholders</b></div>
                 <div class="card-img">
                     <img class="w-100 m-0 p-1" src="{% static 'img/coming_soon.png' %}"
@@ -84,15 +94,23 @@
             </div>
         </div>
     </div>
-    <div class="row equal mt-4">
-        <div class="col">
+    <div class="row mt-4">
+        <div class="col d-md-none">
             <div class="card">
                 <div class="card-header"><b>Updates</b></div>
                 <div class="card-body">
-                    <p>
-                        This tool is designed to provide you with information about bioresources. These information can
-                        be expected amounts of different materials in your region of interest or material compositions.
-                    </p>
+                    <table class="table-boderless">
+                        <tr>
+                            <td><b>04.10.2021</b></td>
+                            <td>
+                                <b>Release 0.1</b>
+                                <ul>
+                                    <li>Main menu</li>
+                                    <li>Registration</li>
+                                </ul>
+                            </td>
+                        </tr>
+                    </table>
                 </div>
             </div>
         </div>
