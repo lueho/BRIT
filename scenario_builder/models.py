@@ -7,7 +7,6 @@ from django.db import models
 from django.db.models.query import QuerySet
 from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
-from django.templatetags.static import static
 from django.urls import reverse
 
 import case_studies
