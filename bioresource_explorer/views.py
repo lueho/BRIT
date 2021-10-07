@@ -1,4 +1,4 @@
-from django.views.generic import ListView
+from django.views.generic import ListView, TemplateView
 
 from scenario_builder.models import GeoDataset
 from .tables import DatasetTable
@@ -13,3 +13,8 @@ class BioresourceExplorerHomeView(ListView):
         table = DatasetTable(data=self.queryset)
         context.update({'dataset_table': table})
         return context
+
+
+class MapsListView(ListView):
+    queryset = GeoDataset.objects.all()
+    template_name = 'maps_list.html'
