@@ -110,18 +110,9 @@
             map.fitBounds(region_layer.getBounds())
         }
 
-
         async function queryDatasets() {
 
-            // Define query string for REST API
-            let params = L.Util.extend({
-                gattung_deutsch: document.getElementById("id_gattung_deutsch").value,
-                bezirk: document.getElementById("input_bezirk").value,
-                pflanzjahr_min: document.getElementById("id_pflanzjahr_min").value,
-                pflanzjahr_max: document.getElementById("id_pflanzjahr_max").value,
-            });
-
-            let dataurl = "{% url 'data.hamburg_roadside_trees' %}" + L.Util.getParamString(params);
+            let dataurl = "{% url 'data.hamburg_roadside_trees' %}?" + $.param(params);
 
             // Remove existing layer
             if (tree_layer !== undefined) {
@@ -131,7 +122,6 @@
             // Fetch data from REST API
             let response = await fetch(dataurl);
             let data = await response.json();
-            console.log(data);
 
             // Render geodata on map
             let geodata = data['geoJson'];

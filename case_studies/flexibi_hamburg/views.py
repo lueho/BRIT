@@ -2,6 +2,7 @@ from django.http import JsonResponse
 from django.views.generic import FormView
 from rest_framework.views import APIView
 
+from scenario_builder.models import Catchment
 from .forms import HamburgRoadsideTreeFilterForm
 from .models import HamburgRoadsideTrees
 from .serializers import HamburgRoadsideTreeGeometrySerializer
@@ -28,7 +29,8 @@ class HamburgRoadsideTreeAPIView(APIView):
         gattung_deutsch_query = request.GET.get('gattung_deutsch')
         pflanzjahr_min_query = request.GET.get('pflanzjahr_min')
         pflanzjahr_max_query = request.GET.get('pflanzjahr_max')
-        district_query = request.GET.get('bezirk')
+        district_query = [int(x) for x in request.query_params.getlist('bezirk[]')]
+        district_names = [Catchment.objects.get(id=fid).name for fid in district_query]
 
         if is_valid_queryparam(gattung_deutsch_query):
             qs = qs.filter(gattung_deutsch__icontains=gattung_deutsch_query)
@@ -39,8 +41,8 @@ class HamburgRoadsideTreeAPIView(APIView):
         if is_valid_queryparam(pflanzjahr_max_query):
             qs = qs.filter(pflanzjahr__lt=pflanzjahr_max_query)
 
-        if is_valid_queryparam(district_query) and district_query != 'Bitte wählen...':
-            qs = qs.filter(bezirk__icontains=district_query)
+        if is_valid_queryparam(district_query):
+            qs = qs.filter(bezirk__in=district_names)
 
         serializer = HamburgRoadsideTreeGeometrySerializer(qs, many=True)
         data = {
