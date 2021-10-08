@@ -29,12 +29,13 @@
     <!-- Other custom styles-->
     <link href="{% static 'css/flexibi_dst.css' %}" rel="stylesheet">
 
+    {% block style_sheets %}{% endblock style_sheets %}
+
+    <style>{% block style %}{% endblock style %}</style>
+
     {% include 'partials/_analytics.html' %}
 
 </head>
-
-{% block style %}
-{% endblock style %}
 
 
 <body id="page-top">
