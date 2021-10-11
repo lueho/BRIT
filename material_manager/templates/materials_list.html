@@ -1,0 +1,35 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}BRIT | Materials{% endblock title %}
+
+{% block content %}
+
+    <div class="row">
+        <div class="col col-12 col-md-6">
+            <div class="card shadow">
+                <div class="card-header"><b>Materials</b></div>
+                <div class="card-body">
+                    <p class="card-text">
+                        BRIT Materials is a module to define and analyze heterogeneous materials from biogeneous
+                        residues. You can find out more about the composition of materials with respect to different
+                        separation methods. The materials can be included in inventories in the soon to come
+                        inventories module.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+
+        {% for material in object_list %}
+            {% if material.publish %}
+                <div class="col col-12 col-md-6 col-lg-3 mt-4">
+                    {% include 'material_card.html' %}
+                </div>
+            {% endif %}
+        {% endfor %}
+
+    </div>
+
+{% endblock content %}
