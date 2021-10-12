@@ -40,6 +40,8 @@ INSTALLED_APPS = [
     'case_studies',
     'case_studies.flexibi_nantes',
     'case_studies.flexibi_hamburg',
+    'django.forms',
+    'django_filters',
     'crispy_forms',
     'bootstrap_modal_forms',
 ]
@@ -120,6 +122,8 @@ STATICFILES_DIRS = (
 )
 MEDIA_URL = '/media/'
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
+
+FORM_RENDERER = 'django.forms.renderers.TemplatesSetting'
 
 # Settings for django-registration-redux
 ACCOUNT_ACTIVATION_DAYS = 2
