@@ -296,6 +296,11 @@ class NantesGreenhousesView(FormView):
     form_class = NantesGreenhousesFilterForm
     initial = {'heated': 'Yes', 'lighted': 'Yes'}
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({'map_title': 'Nantes Greenhouses'})
+        return context
+
 
 class NantesGreenhousesAPIView(APIView):
 
