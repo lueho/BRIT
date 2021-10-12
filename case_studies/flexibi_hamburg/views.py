@@ -1,20 +1,21 @@
 from django.http import JsonResponse
-from django.views.generic import FormView
+from django.views.generic import TemplateView
 from rest_framework.views import APIView
 
-from scenario_builder.models import Catchment
-from .forms import HamburgRoadsideTreeFilterForm
+from .filters import TreeFilter
 from .models import HamburgRoadsideTrees
 from .serializers import HamburgRoadsideTreeGeometrySerializer
 
 
-class HamburgExplorerView(FormView):
+class TreeFilterView(TemplateView):
     template_name = 'explore_hamburg_roadsidetrees.html'
-    form_class = HamburgRoadsideTreeFilterForm
 
-    def get_form_kwargs(self):
-        form_kwargs = super(HamburgExplorerView, self).get_form_kwargs()
-        return form_kwargs
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'tree_filter': TreeFilter(self.request.GET),
+        })
+        return context
 
 
 def is_valid_queryparam(param):
@@ -29,8 +30,7 @@ class HamburgRoadsideTreeAPIView(APIView):
         gattung_deutsch_query = request.GET.get('gattung_deutsch')
         pflanzjahr_min_query = request.GET.get('pflanzjahr_min')
         pflanzjahr_max_query = request.GET.get('pflanzjahr_max')
-        district_query = [int(x) for x in request.query_params.getlist('bezirk[]')]
-        district_names = [Catchment.objects.get(id=fid).name for fid in district_query]
+        district_query = request.query_params.getlist('bezirk[]')
 
         if is_valid_queryparam(gattung_deutsch_query):
             qs = qs.filter(gattung_deutsch__icontains=gattung_deutsch_query)
@@ -39,10 +39,10 @@ class HamburgRoadsideTreeAPIView(APIView):
             qs = qs.filter(pflanzjahr__gte=pflanzjahr_min_query)
 
         if is_valid_queryparam(pflanzjahr_max_query):
-            qs = qs.filter(pflanzjahr__lt=pflanzjahr_max_query)
+            qs = qs.filter(pflanzjahr__lte=pflanzjahr_max_query)
 
         if is_valid_queryparam(district_query):
-            qs = qs.filter(bezirk__in=district_names)
+            qs = qs.filter(bezirk__in=district_query)
 
         serializer = HamburgRoadsideTreeGeometrySerializer(qs, many=True)
         data = {

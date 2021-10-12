@@ -1,9 +1,17 @@
 {% extends 'base.html' %}
 {% load crispy_forms_filters %}
+{% load static %}
+
+{% block style_sheets %}
+    <link rel="stylesheet" href="{% static 'css/slider.css' %}">
+{% endblock style_sheets %}
+
+
 
 {% block content %}
     {% load leaflet_tags %}
     {% load crispy_forms_tags %}
+
 
     {% leaflet_js plugins="draw" %}
     {% leaflet_css plugins="draw" %}
@@ -28,9 +36,10 @@
                          aria-expanded="true" aria-controls="filter-card-body">
                         <b>Filter</b>
                     </div>
-                    <div class="card-body collapse show" id="filter-card-body">
+                    <div class="card-body">
                         <form id="tree-filter-form" method="GET">
-                            {{ form|crispy }}
+                            {#                            {{ bezirk_filter|crispy }}#}
+                            {% crispy tree_filter.form %}
                         </form>
                         <button class="btn btn-primary" id="button_tree_type" onclick="queryDatasets()">Submit</button>
                     </div>
@@ -70,7 +79,7 @@
 
 {% block javascript %}
     {{ block.super }}
-
+    <script src="{% static 'js/slider.js' %}"></script>
     <script type="text/javascript">
 
         let map;
@@ -111,6 +120,19 @@
         }
 
         async function queryDatasets() {
+            let ids = []
+            let inputs = document.getElementsByName('bezirk')
+            for (i = 0; i < inputs.length; i++) {
+                if (inputs[i].checked === true) {
+                    ids.push(inputs[i].value)
+                }
+            }
+            let params = {
+                {#'gattung_deutsch': document.getElementById("id_gattung_deutsch").value,#}
+                'bezirk': ids,
+                'pflanzjahr_min': document.getElementById("id_pflanzjahr_min").value,
+                'pflanzjahr_max': document.getElementById("id_pflanzjahr_max").value,
+            };
 
             let dataurl = "{% url 'data.hamburg_roadside_trees' %}?" + $.param(params);
 
