@@ -8,11 +8,12 @@ from .serializers import HamburgRoadsideTreeGeometrySerializer
 
 
 class TreeFilterView(TemplateView):
-    template_name = 'explore_hamburg_roadsidetrees.html'
+    template_name = 'map_hamburg_roadsidetrees.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update({
+            'map_header': 'Hamburg Roadside Trees',
             'tree_filter': TreeFilter(self.request.GET),
         })
         return context
@@ -27,13 +28,13 @@ class HamburgRoadsideTreeAPIView(APIView):
     @staticmethod
     def get(request):
         qs = HamburgRoadsideTrees.objects.all()
-        gattung_deutsch_query = request.GET.get('gattung_deutsch')
+        gattung_deutsch_query = request.query_params.getlist('gattung_deutsch[]')
         pflanzjahr_min_query = request.GET.get('pflanzjahr_min')
         pflanzjahr_max_query = request.GET.get('pflanzjahr_max')
         district_query = request.query_params.getlist('bezirk[]')
 
         if is_valid_queryparam(gattung_deutsch_query):
-            qs = qs.filter(gattung_deutsch__icontains=gattung_deutsch_query)
+            qs = qs.filter(gattung_deutsch__in=gattung_deutsch_query)
 
         if is_valid_queryparam(pflanzjahr_min_query):
             qs = qs.filter(pflanzjahr__gte=pflanzjahr_min_query)
@@ -48,7 +49,10 @@ class HamburgRoadsideTreeAPIView(APIView):
         data = {
             'geoJson': serializer.data,
             'analysis': {
-                'tree_count': len(serializer.data['features'])
+                'tree_count': {
+                    'label': 'Number of trees',
+                    'value': len(serializer.data['features'])
+                },
             }
         }
 

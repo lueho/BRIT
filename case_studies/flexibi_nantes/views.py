@@ -292,13 +292,13 @@ class UpdateGreenhouseGrowthCycleValuesView(LoginRequiredMixin, UpdateView):
 
 
 class NantesGreenhousesView(FormView):
-    template_name = 'maps_base.html'
+    template_name = 'map_nantes_greenhouses.html'
     form_class = NantesGreenhousesFilterForm
     initial = {'heated': 'Yes', 'lighted': 'Yes'}
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update({'map_title': 'Nantes Greenhouses'})
+        context.update({'map_header': 'Nantes Greenhouses'})
         return context
 
 
@@ -337,11 +337,22 @@ class NantesGreenhousesAPIView(APIView):
         qs = qs.filter(culture_1__in=crops)
 
         serializer = NantesGreenhousesGeometrySerializer(qs, many=True)
+        greenhouse_count = len(serializer.data['features'])
+        greenhouse_area_qs = qs.aggregate(Sum('surface_ha'))['surface_ha__sum']
+        greenhouse_area = 0
+        if greenhouse_area_qs is not None:
+            greenhouse_area = round(greenhouse_area_qs, 1)
         data = {
             'geoJson': serializer.data,
             'analysis': {
-                'gh_count': len(serializer.data['features']),
-                'gh_surface': round(qs.aggregate(Sum('surface_ha'))['surface_ha__sum'], 1)
+                'gh_count': {
+                    'label': 'Number of greenhouses',
+                    'value': str(greenhouse_count),
+                },
+                'gh_surface': {
+                    'label': 'Total growth surface',
+                    'value': str(greenhouse_area) + ' ha'
+                }
             }
         }
 
