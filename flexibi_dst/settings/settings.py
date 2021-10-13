@@ -21,7 +21,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'cloudinary_storage',
     'cloudinary',
-    'fontawesomefree',
+    'fontawesome-free',
     'django.contrib.gis',
     'extra_views',
     'django_tables2',
@@ -30,17 +30,16 @@ INSTALLED_APPS = [
     'leaflet',
     'users.apps.UsersConfig',
     'bioresource_explorer.apps.BioresourceExplorerConfig',
-    'flexibi_dst.apps.FlexibiDstConfig',
-    'distributions.apps.DistributionsConfig',
-    'library.apps.LibraryConfig',
-    'material_manager.apps.MaterialManagerConfig',
-    'scenario_builder.apps.ScenarioBuilderConfig',
-    'scenario_evaluator.apps.ScenarioEvaluationConfig',
-    'layer_manager.apps.LayerManagerConfig',
-    'case_studies.flexibi_nantes.apps.CaseStudyNantesConfig',
-    'case_studies.flexibi_hamburg.apps.FlexibiHamburgConfig',
-    'django.forms',
-    'django_filters',
+    'flexibi_dst',
+    'distributions',
+    'library',
+    'material_manager',
+    'scenario_builder',
+    'scenario_evaluator',
+    'layer_manager',
+    'case_studies',
+    'case_studies.flexibi_nantes',
+    'case_studies.flexibi_hamburg',
     'crispy_forms',
     'bootstrap_modal_forms',
 ]
@@ -120,9 +119,10 @@ STATICFILES_DIRS = (
     os.path.join(BASE_DIR, 'static'),
 )
 MEDIA_URL = '/media/'
-DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
-FORM_RENDERER = 'django.forms.renderers.TemplatesSetting'
+
+
+DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
 # Settings for django-registration-redux
 ACCOUNT_ACTIVATION_DAYS = 2
