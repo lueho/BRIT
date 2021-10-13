@@ -27,7 +27,7 @@ services:
       - db
   celery:
     build: .
-    command: celery worker --app=flexibi_dst --loglevel=info --logfile=logs/celery.log
+    command: celery --app=flexibi_dst worker --loglevel=info --logfile=logs/celery.log
     volumes:
       - ./:/app
     env_file:
@@ -37,17 +37,17 @@ services:
       - redis
   redis:
     image: redis:5-alpine
-  dashboard:
-    build: .
-    command: flower -A flexibi_dst --port=5555 --broker=redis://redis:6379/0
-    ports:
-      - 5555:5555
-    env_file:
-      - flexibi_dst/settings/.env
-    depends_on:
-      - web
-      - redis
-      - celery
+#  dashboard:
+#    build: .
+#    command: flower -A flexibi_dst --port=5555 --broker=redis://redis:6379/0
+#    ports:
+#      - 5555:5555
+#    env_file:
+#      - flexibi_dst/settings/.env
+#    depends_on:
+#      - web
+#      - redis
+#      - celery
 
 volumes:
   flexibi_db:
