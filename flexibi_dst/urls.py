@@ -9,7 +9,7 @@ from .views import HomeView, ContributorsView
 
 urlpatterns = [
     path('', RedirectView.as_view(url='/home'), name='entry'),
-    path('favicon.ico', RedirectView.as_view(url=staticfiles_storage.url("favicon.ico")), ),
+    # path('favicon.ico', RedirectView.as_view(url=staticfiles_storage.url("favicon.ico")), ),
     path('home/', HomeView.as_view(), name='home'),
     path('admin/', admin.site.urls),
     path('users/', include('users.urls')),
