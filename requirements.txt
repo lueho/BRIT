@@ -16,6 +16,7 @@ Django==3.2.8
 django-appconf==1.0.5
 django-bootstrap-modal-forms==2.2.0
 django-cloudinary-storage==0.3.0
+django-cookie-consent==0.2.6
 django-crispy-forms==1.13.0
 django-environ==0.7.0
 django-extra-views==0.14.0
@@ -24,6 +25,7 @@ django-geojson==3.2.0
 django-heroku==0.3.1
 django-js-reverse==0.9.1
 django-leaflet==0.28.1
+django-mock-queries==2.1.7
 django-model-utils==4.1.1
 django-registration-redux==2.9
 django-storages==1.12.1
@@ -31,6 +33,8 @@ django-tables2==2.4.1
 djangorestframework==3.12.4
 djangorestframework-gis==0.17
 factory-boy==3.2.0
+Faker==9.3.1
+flower==1.0.0
 fontawesomefree==5.15.4
 future==0.18.2
 gunicorn==20.1.0
@@ -39,6 +43,8 @@ idna==3.3
 importlib-metadata==4.8.1
 jmespath==0.10.0
 kombu==5.1.0
+mock==4.0.3
+model-bakery==1.3.3
 Pillow==8.3.2
 prometheus-client==0.11.0
 prompt-toolkit==3.0.20
@@ -47,6 +53,7 @@ python-dateutil==2.8.2
 pytz==2021.3
 redis==3.5.3
 requests==2.26.0
+s3transfer==0.5.0
 six==1.16.0
 sqlparse==0.4.2
 text-unidecode==1.3
