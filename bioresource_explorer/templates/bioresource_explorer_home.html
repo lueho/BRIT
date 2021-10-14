@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+{% load render_table from django_tables2 %}
+
+{% block content %}
+
+    <div class="row">
+        <div class="col">
+            <div class="card shadow">
+                <div class="card-header"><b>Datasets</b></div>
+                <div class="card-body">
+                    <p>This table contains georeferenced datasets with information about potential sources of
+                        bioresources. You can explore the datasets and their content by clicking on the name.
+                        If you want to perform an inventory on any of the datasets, you can include them in a scenario
+                        in the <a href="{% url 'scenario_list' %}">Scenario Builder</a>.</p>
+                    <div>{% render_table dataset_table %}</div>
+                </div>
+                <div class="card-footer"></div>
+            </div>
+        </div>
+    </div>
+
+{% endblock %}
+
+{% block javascript %}
+    {{ block.super }}
+
+{% endblock %}
