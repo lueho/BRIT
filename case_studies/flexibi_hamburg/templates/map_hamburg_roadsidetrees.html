@@ -1,0 +1,52 @@
+{% extends 'maps_base.html' %}
+{% load crispy_forms_tags %}
+{% load static %}
+
+{% block style_sheets %}
+    <link rel="stylesheet" href="{% static 'css/slider.css' %}">
+{% endblock style_sheets %}
+
+{% block title %}Maps | Hamburg Roadside Trees{% endblock %}
+
+{% block map_header %}{{ map_header }}{% endblock %}
+
+{% block filter_form %}
+    <form id="tree-filter-form" method="GET">
+{#        {% crispy tree_filter.form %}#}
+    </form>
+{% endblock filter_form %}
+
+{% block javascript %}
+    {{ block.super }}
+    <script src="{% static 'js/custom-slider.js' %}"></script>
+    <script type="text/javascript">
+
+        const mapConfig = {
+            'base_url': "{% url 'ajax_region_geometries' %}",
+            'region_id': 3,
+            'load_features': false,
+            'markerStyle': {
+                color: '#63c36c',
+                fillOpacity: 1,
+                radius: 5,
+                stroke: false
+            }
+        }
+
+        async function filterFeatures() {
+
+            let params = {
+                'gattung_deutsch': readMultiChoiceCheckboxes('gattung_deutsch'),
+                'bezirk': readMultiChoiceCheckboxes('bezirk'),
+                'pflanzjahr_min': document.getElementById("id_pflanzjahr_min").value,
+                'pflanzjahr_max': document.getElementById("id_pflanzjahr_max").value,
+            };
+            let summary = await fetchFeatureGeometries("{% url 'data.hamburg_roadside_trees' %}?", params, mapConfig);
+            await renderSummary(summary)
+        }
+
+
+        window.onload = () => loadMap(mapConfig);
+
+    </script>
+{% endblock javascript %}

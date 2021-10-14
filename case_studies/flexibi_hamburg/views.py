@@ -1,5 +1,5 @@
 from django.http import JsonResponse
-from django.views.generic import FormView
+from django.views.generic import TemplateView
 from rest_framework.views import APIView
 
 from .forms import HamburgRoadsideTreeFilterForm
@@ -7,13 +7,16 @@ from .models import HamburgRoadsideTrees
 from .serializers import HamburgRoadsideTreeGeometrySerializer
 
 
-class HamburgExplorerView(FormView):
-    template_name = 'explore_hamburg_roadsidetrees.html'
-    form_class = HamburgRoadsideTreeFilterForm
+class TreeFilterView(TemplateView):
+    template_name = 'map_hamburg_roadsidetrees.html'
 
-    def get_form_kwargs(self):
-        form_kwargs = super(HamburgExplorerView, self).get_form_kwargs()
-        return form_kwargs
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'map_header': 'Hamburg Roadside Trees',
+            # 'tree_filter': TreeFilter(self.request.GET),
+        })
+        return context
 
 
 def is_valid_queryparam(param):
