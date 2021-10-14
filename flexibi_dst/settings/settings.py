@@ -125,6 +125,8 @@ MEDIA_URL = '/media/'
 
 DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 
+FORM_RENDERER = 'django.forms.renderers.TemplatesSetting'
+
 # Settings for django-registration-redux
 ACCOUNT_ACTIVATION_DAYS = 2
 REGISTRATION_AUTO_LOGIN = True
