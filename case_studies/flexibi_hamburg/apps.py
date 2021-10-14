@@ -2,4 +2,4 @@ from django.apps import AppConfig
 
 
 class FlexibiHamburgConfig(AppConfig):
-    name = 'flexibi_hamburg'
+    name = 'case_studies.flexibi_hamburg'
