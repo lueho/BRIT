@@ -1,54 +1,19 @@
-{% extends 'base.html' %}
-{% load static %}
-{% load leaflet_tags %}
+{% extends 'maps_base.html' %}
+{% load crispy_forms_tags %}
 
-{% block content %}
+{% block title %}Maps | Nantes Greenhouses{% endblock %}
 
-    {% leaflet_js %}
-    {% leaflet_css %}
+{% block map_header %}{{ map_header }}{% endblock %}
 
-    <div class="row">
-
-        <div class="col">
-            <div class="card shadow">
-                <div class="card-header"><b>
-                    {% block map_header %}{% endblock %}
-                </b></div>
-                <div class="card-body p-0">
-                    {% leaflet_map "main" %}
-                </div>
-            </div>
-        </div>
-
-        <div class="col-sm-3">
-            <div class="accordion">
-                <div class="card shadow">
-                    <div class="card-header" role="button" data-toggle="collapse" href="#filter-card-body"
-                         aria-expanded="true" aria-controls="filter-card-body">
-                        <b>Filter</b>
-                    </div>
-                    <div class="card-body collapse show" id="filter-card-body">
-                        {% block filter_form %}{% endblock %}
-                        <button class="btn btn-primary" id="button_tree_type" onclick="fetchGreenhouseGeometries()">
-                            Filter
-                        </button>
-                    </div>
-                </div>
-                <div class="card shadow">
-                    <div class="card-header"><b>Summary</b></div>
-                    <div class="card-body">
-                        <div id="summary-container"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-{% endblock content %}
+{% block filter_form %}
+    <form id="greenhouse-filter-form" method="GET">
+        {% csrf_token %}
+        {% crispy form form.helper %}
+    </form>
+{% endblock filter_form %}
 
 {% block javascript %}
     {{ block.super }}
-
     <script type="text/javascript">
 
         let map;
@@ -61,7 +26,7 @@
             map = event.detail.map;
         });
 
-        async function fetchRegionGeometry() {
+         async function fetchRegionGeometry() {
 
             // Define query string for REST API
             let params = L.Util.extend({
@@ -128,8 +93,8 @@
                 lighting: lighting,
                 prod_mode: prod_mode,
                 cult_man: cult_man,
-                cucumber: document.getElementById("id_crops_1").checked,
-                tomato: document.getElementById("id_crops_2").checked
+                cucumber: document.getElementById("id_crops_0").checked,
+                tomato: document.getElementById("id_crops_1").checked
             });
 
             const url = "{% url 'data.nantes_greenhouses' %}" + L.Util.getParamString(params);
@@ -174,5 +139,4 @@
 
         window.onload = () => onLoad();
     </script>
-
-{% endblock %}
+{% endblock javascript %}

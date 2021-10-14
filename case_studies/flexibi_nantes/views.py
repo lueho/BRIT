@@ -292,9 +292,14 @@ class UpdateGreenhouseGrowthCycleValuesView(LoginRequiredMixin, UpdateView):
 
 
 class NantesGreenhousesView(FormView):
-    template_name = 'maps_base.html'
+    template_name = 'map_nantes_greenhouses.html'
     form_class = NantesGreenhousesFilterForm
     initial = {'heated': 'Yes', 'lighted': 'Yes'}
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({'map_header': 'Nantes Greenhouses'})
+        return context
 
 
 class NantesGreenhousesAPIView(APIView):
