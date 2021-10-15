@@ -2,9 +2,9 @@ from django.http import JsonResponse
 from django.views.generic import TemplateView
 from rest_framework.views import APIView
 
-from .filters import TreeFilter
 from .models import HamburgRoadsideTrees
 from .serializers import HamburgRoadsideTreeGeometrySerializer
+from .filters import TreeFilter
 
 
 class TreeFilterView(TemplateView):
@@ -29,18 +29,18 @@ class HamburgRoadsideTreeAPIView(APIView):
     def get(request):
         qs = HamburgRoadsideTrees.objects.all()
         gattung_deutsch_query = request.query_params.getlist('gattung_deutsch[]')
-        pflanzjahr_min_query = request.GET.get('pflanzjahr_min')
-        pflanzjahr_max_query = request.GET.get('pflanzjahr_max')
+        # pflanzjahr_min_query = request.GET.get('pflanzjahr_min')
+        # pflanzjahr_max_query = request.GET.get('pflanzjahr_max')
         district_query = request.query_params.getlist('bezirk[]')
 
         if is_valid_queryparam(gattung_deutsch_query):
             qs = qs.filter(gattung_deutsch__in=gattung_deutsch_query)
 
-        if is_valid_queryparam(pflanzjahr_min_query):
-            qs = qs.filter(pflanzjahr__gte=pflanzjahr_min_query)
+        # if is_valid_queryparam(pflanzjahr_min_query):
+        #     qs = qs.filter(pflanzjahr__gte=pflanzjahr_min_query)
 
-        if is_valid_queryparam(pflanzjahr_max_query):
-            qs = qs.filter(pflanzjahr__lte=pflanzjahr_max_query)
+        # if is_valid_queryparam(pflanzjahr_max_query):
+        #     qs = qs.filter(pflanzjahr__lte=pflanzjahr_max_query)
 
         if is_valid_queryparam(district_query):
             qs = qs.filter(bezirk__in=district_query)
