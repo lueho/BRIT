@@ -4,11 +4,13 @@ from django.contrib import admin
 from django.contrib.staticfiles.storage import staticfiles_storage
 from django.urls import path, include
 from django.views.generic import RedirectView
+# import debug_toolbar
 
-from .views import HomeView, ContributorsView
+from .views import HomeView, ContributorsView, DoughnutView
 
 urlpatterns = [
     path('', RedirectView.as_view(url='/home'), name='entry'),
+    # path('__debug__/', include(debug_toolbar.urls)),
     path('favicon.ico', RedirectView.as_view(url=staticfiles_storage.url("favicon.ico")), ),
     path('home/', HomeView.as_view(), name='home'),
     path('admin/', admin.site.urls),
@@ -21,6 +23,7 @@ urlpatterns = [
     path('case_studies/nantes/', include('case_studies.flexibi_nantes.urls')),
     path('library/', include('library.urls')),
     path('cookies/', include('cookie_consent.urls')),
+    path('doughnut/', DoughnutView.as_view(), name='doughnut_view')
 ]
 
 if settings.DEBUG:

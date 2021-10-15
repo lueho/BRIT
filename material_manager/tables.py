@@ -20,7 +20,7 @@ def averages_table_factory(group_settings):
         )
         table_row = {
             'component': share.component.name,
-            'weight fraction': f'{share.average} +- {share.standard_deviation}',
+            'weight fraction': f'{share.as_percentage}',
             'remove': remove_html
         }
         table_data.append(table_row)

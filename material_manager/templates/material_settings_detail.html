@@ -55,14 +55,7 @@
                     </div>
                     <div class="row">
                         <div class="col">
-                            {{ group_settings.averages_chart }}
-                        </div>
-                    </div>
-                    <div class="row">
-                        <div class="col">
-                            <div class="chart-doughnut">
-                                <canvas id="{{ group_settings.averages_chart.id }}"></canvas>
-                            </div>
+                            <div id="composition-chart-{{ group_settings.id }}"></div>
                         </div>
                     </div>
                     <div class="row">
@@ -177,22 +170,21 @@
     {{ block.super }}
     {{ charts|json_script:"charts" }}
 
-    <script src="{% static 'js/charts/feedstock_summary_bar_chart.js' %}"></script>
-    <script type="text/javascript">
+    <script>
 
-        let charts = JSON.parse(document.getElementById("charts").textContent);
-        console.log(charts)
-        for (const [id, chart] of Object.entries(charts)) {
-            let ctx = document.getElementById(id)
-            const args = chartDefinition(
-                chart["type"],
-                chart["labels"],
-                chart["data"],
-                chart["unit"],
-                chart["show_legend"],
-            );
-            new Chart(ctx, args);
-        }
+        const charts = JSON.parse(document.getElementById("charts").textContent);
+
+        Object.keys(charts).forEach(key => {
+            let container = document.getElementById(key)
+            let canvas = document.createElement('canvas')
+            canvas.setAttribute('id', key)
+            container.appendChild(canvas)
+            new Chart(canvas.getContext('2d'), charts[key]);
+        })
+
+    </script>
+
+    <script type="text/javascript">
 
         $(document).ready(function () {
 

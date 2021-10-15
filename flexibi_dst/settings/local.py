@@ -4,6 +4,14 @@ SITE_ID = 1
 
 DEBUG = True
 
+DEBUG_TOOLBAR_CONFIG = {
+    'SHOW_TOOLBAR_CALLBACK': lambda request: DEBUG
+}
+
+INTERNAL_IPS = [
+    '127.0.0.1',
+]
+
 DATABASES['default'] = {
     'ENGINE': 'django.contrib.gis.db.backends.postgis',
     'NAME': os.environ.get('POSTGRES_DB'),
