@@ -4,7 +4,7 @@ from crispy_forms.helper import FormHelper
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.http import HttpResponseRedirect
 from django.urls import reverse_lazy
-from django.views.generic import CreateView, DeleteView, DetailView, View
+from django.views.generic import CreateView, DeleteView, DetailView, View, ListView
 from extra_views import UpdateWithInlinesView
 
 from flexibi_dst.models import TemporalDistribution
@@ -33,9 +33,13 @@ from .models import (
 
 # ----------- Materials CRUD -------------------------------------------------------------------------------------------
 
-class MaterialListView(DualUserListView):
-    model = Material
-    template_name = 'dual_user_item_list.html'
+# class MaterialListView(DualUserListView):
+#     model = Material
+#     template_name = 'dual_user_item_list.html'
+
+class MaterialListView(ListView):
+    model = MaterialSettings
+    template_name = 'materials_list.html'
 
 
 class MaterialCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, BSModalCreateView):
@@ -252,12 +256,50 @@ class MaterialSettingsCreateView(LoginRequiredMixin, UserPassesTestMixin, NextOr
 
 class MaterialSettingsDetailView(UserPassesTestMixin, DetailView):
     model = MaterialSettings
-    template_name = 'material_composition.html'
+    template_name = 'material_settings_detail.html'
     allow_edit = False
     object = None
 
     def get_context_data(self, **kwargs):
         kwargs['composition'] = self.object.composition()
+        charts = {}
+        for group_settings in kwargs['composition'].keys():
+            charts[f'composition-chart-{group_settings.id}'] = {
+                'type': 'doughnut',
+                'data': {
+                    'labels': ['Red', 'Blue', 'Yellow', 'Green', 'Purple', 'Orange'],
+                    'datasets': [{
+                        'label': '# of Votes',
+                        'data': [12, 19, 3, 5, 2, 3],
+                        'backgroundColor': [
+                            'rgba(255, 99, 132, 0.2)',
+                            'rgba(54, 162, 235, 0.2)',
+                            'rgba(255, 206, 86, 0.2)',
+                            'rgba(75, 192, 192, 0.2)',
+                            'rgba(153, 102, 255, 0.2)',
+                            'rgba(255, 159, 64, 0.2)'
+                        ],
+                        'borderColor': [
+                            'rgba(255, 99, 132, 1)',
+                            'rgba(54, 162, 235, 1)',
+                            'rgba(255, 206, 86, 1)',
+                            'rgba(75, 192, 192, 1)',
+                            'rgba(153, 102, 255, 1)',
+                            'rgba(255, 159, 64, 1)'
+                        ],
+                        'borderWidth': 1,
+                        'hoverOffset': 4
+                    }]
+                },
+                'options': {
+                    'scales': {
+                        'y': {
+                            'beginAtZero': 'true'
+                        }
+                    }
+                }
+            }
+        kwargs['charts'] = charts
         kwargs['allow_edit'] = self.allow_edit
         return super().get_context_data(**kwargs)
 

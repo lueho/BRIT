@@ -6,6 +6,7 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.urls import reverse
 from factory.django import mute_signals
+from distributions.plots import DataSet, DoughnutChart
 
 from flexibi_dst.models import Timestep, TemporalDistribution
 from bibliography.models import Source
@@ -93,10 +94,12 @@ def initialize_material(sender, instance, created, **kwargs):
 
 class MaterialSettings(models.Model):
     material = models.ForeignKey(Material, on_delete=models.CASCADE)
+    preview = models.ImageField(default='img/generic_material.jpg', null=False)
     full_name = models.CharField(max_length=255, blank=True, null=True)
     customization_name = models.CharField(max_length=255, default='Customization')
     description = models.TextField(blank=True, null=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE)
+    publish = models.BooleanField(default=False)
     standard = models.BooleanField(default=True)
 
     def add_base_group_and_component(self):
@@ -230,7 +233,8 @@ class MaterialSettings(models.Model):
                 'averages': [],
                 'averages_composition': setting.average_composition,
                 'averages_table': setting.averages_table(),
-                'distribution_tables': setting.distribution_tables()
+                'averages_chart': setting.averages_chart(),
+                'distribution_tables': setting.distribution_tables(),
             }
             for share in setting.average_composition.materialcomponentshare_set.all():
                 grouped_shares[setting]['averages'].append(share)
@@ -405,6 +409,9 @@ class MaterialComponentGroupSettings(models.Model):
     def averages_table(self):
         return averages_table_factory(self)
 
+    def averages_chart(self):
+        return self.average_composition.get_chart()
+
     def distribution_tables(self):
         return {distribution: distribution_table_factory(self, distribution) for distribution in
                 self.temporal_distributions.exclude(id=BaseObjects.objects.get.base_distribution.id)}
@@ -452,6 +459,26 @@ class CompositionSet(models.Model):
             if not self.materialcomponentshare_set.all().exists():
                 self.delete()
 
+    def get_chart(self):
+        data = {}
+        for share in self.materialcomponentshare_set.all():
+            data[share.component.name] = share.average
+
+        dataset = DataSet(
+            label='Composition of',
+            data=data,
+            unit='%'
+        )
+
+        chart = DoughnutChart(
+            id=f'materialCompositionChart-{self.id}',
+            title='Composition',
+            unit='%'
+        )
+        chart.add_dataset(dataset)
+
+        return chart.as_dict()
+
     def get_absolute_url(self):
         return self.group_settings.get_absolute_url()
 
@@ -466,6 +493,10 @@ class MaterialComponentShare(models.Model):
     composition_set = models.ForeignKey(CompositionSet, on_delete=models.CASCADE, null=True)
     average = models.FloatField(default=0.0)
     standard_deviation = models.FloatField(default=0.0)
+
+    @property
+    def as_percentage(self):
+        return f'{round(self.average*100, 1)} ± {round(self.standard_deviation*100, 1)}%'
 
     @property
     def material(self):
