@@ -3,7 +3,7 @@
 {% load static %}
 
 {% block style_sheets %}
-    <link rel="stylesheet" href="{% static 'css/slider.css' %}">
+    <link rel="stylesheet" href="{% static 'css/custom-slider.css' %}">
 {% endblock style_sheets %}
 
 {% block title %}Maps | Hamburg Roadside Trees{% endblock %}
@@ -18,7 +18,7 @@
 
 {% block javascript %}
     {{ block.super }}
-    <script src="{% static 'js/slider.js' %}"></script>
+    <script src="{% static 'js/custom-slider.js' %}"></script>
     <script type="text/javascript">
 
         const mapConfig = {
@@ -38,8 +38,8 @@
             let params = {
                 'gattung_deutsch': readMultiChoiceCheckboxes('gattung_deutsch'),
                 'bezirk': readMultiChoiceCheckboxes('bezirk'),
-                'pflanzjahr_min': document.getElementById("id_pflanzjahr_min").value,
-                'pflanzjahr_max': document.getElementById("id_pflanzjahr_max").value,
+                {#'pflanzjahr_min': document.getElementById("id_pflanzjahr_min").value,#}
+                {#'pflanzjahr_max': document.getElementById("id_pflanzjahr_max").value,#}
             };
             let summary = await fetchFeatureGeometries("{% url 'data.hamburg_roadside_trees' %}?", params, mapConfig);
             await renderSummary(summary)

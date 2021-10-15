@@ -35,8 +35,8 @@
                 lighting: readSingleChoiceCheckbox('lighting'),
                 prod_mode: readSingleChoiceCheckbox('prod_mode'),
                 cult_man: readSingleChoiceCheckbox('cult_man'),
-                cucumber: document.getElementById("id_crops_1").checked,
-                tomato: document.getElementById("id_crops_2").checked
+                cucumber: document.getElementById("id_crops_0").checked,
+                tomato: document.getElementById("id_crops_1").checked
             });
             let summary = await fetchFeatureGeometries("{% url 'data.nantes_greenhouses' %}?", params, mapConfig)
             await renderSummary(summary)
@@ -44,6 +44,5 @@
         }
 
         window.onload = () => loadMap(mapConfig);
-
     </script>
 {% endblock javascript %}
