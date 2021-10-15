@@ -18,9 +18,9 @@ from .models import HamburgRoadsideTrees
 
 
 GATTUNG_CHOICES = (
-    ('Linde', 'Linde'),
-    ('Eiche', 'Eiche'),
-    ('Ahorn', 'Ahorn'),
+    ('Linde', 'Linden'),
+    ('Eiche', 'Oak'),
+    ('Ahorn', 'Maple'),
     ('Other', 'Other')
 )
 
