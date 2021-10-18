@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_gis',
     'leaflet',
+    'cookie_consent',
     'users.apps.UsersConfig',
     'maps.apps.MapsConfig',
     'flexibi_dst.apps.FlexibiDstConfig',
