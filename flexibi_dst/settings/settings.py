@@ -28,7 +28,7 @@ INSTALLED_APPS = [
     'rest_framework_gis',
     'leaflet',
     'users.apps.UsersConfig',
-    'bioresource_explorer.apps.BioresourceExplorerConfig',
+    'maps.apps.MapsConfig',
     'flexibi_dst.apps.FlexibiDstConfig',
     'distributions.apps.DistributionsConfig',
     'library.apps.LibraryConfig',
