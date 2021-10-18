@@ -7,6 +7,9 @@ from django.views.generic import RedirectView
 
 from .views import HomeView, ContributorsView
 
+admin.autodiscover()
+admin.site.enable_nav_sidebar = False
+
 urlpatterns = [
     path('', RedirectView.as_view(url='/home'), name='entry'),
     path('favicon.ico', RedirectView.as_view(url=staticfiles_storage.url("favicon.ico")), ),
