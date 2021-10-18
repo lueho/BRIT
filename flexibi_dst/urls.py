@@ -22,7 +22,8 @@ urlpatterns = [
     path('scenario_builder/', include('scenario_builder.urls')),
     path('scenario_evaluator/', include('scenario_evaluator.urls')),
     path('case_studies/nantes/', include('case_studies.flexibi_nantes.urls')),
-    path('library/', include('library.urls')),
+    path('bibliography/', include('bibliography.urls')),
+    path('cookies/', include('cookie_consent.urls')),
 ]
 
 if settings.DEBUG:

@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('library', '0002_auto_20211007_1350'),
+        ('bibliography', '0002_auto_20211007_1350'),
         ('material_manager', '0005_auto_20210510_1142'),
     ]
 
@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='materialcomponentgroupsettings',
             name='sources',
-            field=models.ManyToManyField(to='library.Source'),
+            field=models.ManyToManyField(to='bibliography.Source'),
         ),
     ]

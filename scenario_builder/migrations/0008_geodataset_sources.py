@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('library', '0003_delete_literaturesource'),
+        ('bibliography', '0003_delete_literaturesource'),
         ('scenario_builder', '0007_auto_20211007_1350'),
     ]
 
@@ -14,6 +14,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='geodataset',
             name='sources',
-            field=models.ManyToManyField(to='library.Source'),
+            field=models.ManyToManyField(to='bibliography.Source'),
         ),
     ]

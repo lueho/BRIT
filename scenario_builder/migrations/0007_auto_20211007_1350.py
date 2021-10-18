@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('library', '0002_auto_20211007_1350'),
+        ('bibliography', '0002_auto_20211007_1350'),
         ('scenario_builder', '0006_inventoryamountshare_scenario'),
     ]
 
