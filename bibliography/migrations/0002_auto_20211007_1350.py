@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
     dependencies = [
         ('material_manager', '0005_auto_20210510_1142'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ('library', '0001_initial'),
+        ('bibliography', '0001_initial'),
     ]
 
     operations = [
@@ -34,7 +34,7 @@ class Migration(migrations.Migration):
                 ('attributions', models.TextField(blank=True, null=True)),
                 ('url', models.URLField(blank=True, null=True)),
                 ('last_accessed', models.DateField(blank=True, null=True)),
-                ('licence', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, to='library.Licence')),
+                ('licence', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, to='bibliography.Licence')),
                 ('owner', models.ForeignKey(default=8, on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
             ],
         ),

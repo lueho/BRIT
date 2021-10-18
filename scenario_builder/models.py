@@ -11,7 +11,7 @@ from django.urls import reverse
 
 import case_studies
 from flexibi_dst.models import Timestep
-from library.models import Source
+from bibliography.models import Source
 from material_manager.models import Material, MaterialSettings
 from .exceptions import BlockedRunningScenario
 
@@ -101,7 +101,7 @@ class InventoryAlgorithm(models.Model):
     geodataset = models.ForeignKey(GeoDataset, on_delete=models.CASCADE)  # TODO: Make many2many?
     feedstock = models.ManyToManyField(Material, limit_choices_to={'is_feedstock': True})  # TODO: rename to plural
     default = models.BooleanField('Default for this combination of geodataset and feedstock', default=False)
-    source = models.CharField(max_length=200, blank=True, null=True)  # TODO: connect to library
+    source = models.CharField(max_length=200, blank=True, null=True)  # TODO: connect to bibliography
 
     # TODO: How are default values controlled?
 
@@ -160,7 +160,7 @@ class InventoryAlgorithmParameterValue(models.Model):
     parameter = models.ForeignKey(InventoryAlgorithmParameter, on_delete=models.CASCADE, null=True)
     value = models.FloatField()
     standard_deviation = models.FloatField(blank=True, null=True)
-    source = models.CharField(max_length=200, blank=True, null=True)  # TODO: connect to library
+    source = models.CharField(max_length=200, blank=True, null=True)  # TODO: connect to bibliography
     default = models.BooleanField(default=False)
 
     def __str__(self):

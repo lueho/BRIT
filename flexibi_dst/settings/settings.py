@@ -32,7 +32,7 @@ INSTALLED_APPS = [
     'maps.apps.MapsConfig',
     'flexibi_dst.apps.FlexibiDstConfig',
     'distributions.apps.DistributionsConfig',
-    'library.apps.LibraryConfig',
+    'bibliography.apps.BibliographyConfig',
     'material_manager.apps.MaterialManagerConfig',
     'scenario_builder.apps.ScenarioBuilderConfig',
     'scenario_evaluator.apps.ScenarioEvaluationConfig',

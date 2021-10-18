@@ -8,7 +8,7 @@ from django.utils.safestring import mark_safe
 from extra_views import InlineFormSetFactory
 
 from flexibi_dst.models import TemporalDistribution
-from library.models import Source
+from bibliography.models import Source
 from .models import (
     Material,
     MaterialComponent,

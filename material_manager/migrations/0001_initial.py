@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         ('flexibi_dst', '0001_initial'),
-        ('library', '0001_initial'),
+        ('bibliography', '0001_initial'),
     ]
 
     operations = [
@@ -94,7 +94,7 @@ class Migration(migrations.Migration):
                 ('group', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='material_manager.MaterialComponentGroup')),
                 ('material_settings', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='material_manager.MaterialSettings')),
                 ('owner', models.ForeignKey(default=8, on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
-                ('sources', models.ManyToManyField(to='library.LiteratureSource')),
+                ('sources', models.ManyToManyField(to='bibliography.LiteratureSource')),
                 ('temporal_distributions', models.ManyToManyField(to='flexibi_dst.TemporalDistribution')),
             ],
         ),

@@ -8,7 +8,7 @@ from django.urls import reverse
 from factory.django import mute_signals
 
 from flexibi_dst.models import Timestep, TemporalDistribution
-from library.models import Source
+from bibliography.models import Source
 from users.models import ReferenceUsers
 from .tables import averages_table_factory, distribution_table_factory
 
