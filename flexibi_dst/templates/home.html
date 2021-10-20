@@ -37,7 +37,7 @@
     <div class="row">
         <div class="col col-12 col-md-6 col-lg-3 mt-4">
             <div class="card h-100">
-                <div class="card-header"><b>Maps</b></div>
+                <div class="card-header"><a href="{% url 'maps_list' %}"><b>Maps</b></a></div>
                 <div class="card-img-top">
                     <a class="d-flex align-items-center justify-content-center stretched-link"
                        href="{% url 'maps_list' %}">
@@ -73,10 +73,13 @@
         </div>
         <div class="col col-12 col-md-6 col-lg-3 mt-4">
             <div class="card h-100">
-                <div class="card-header"><b>Inventories</b></div>
+                <div class="card-header"><a href="{% url 'scenario_list' %}"><b>Inventories</b></a></div>
                 <div class="card-img">
-                    <img class="w-100 m-0 p-1" src="{% static 'img/coming_soon.png' %}"
-                         alt="Inventories Module Cover Image">
+                    <a class="d-flex align-items-center justify-content-center stretched-link"
+                       href="{% url 'scenario_list' %}">
+                        <img class="w-100 m-0 p-1" src="{% static 'img/cover_card_inventories.png' %}"
+                             alt="Inventories Module Cover Image">
+                    </a>
                 </div>
                 <div class="card-body">
                     <p class="card-text">

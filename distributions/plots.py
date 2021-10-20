@@ -204,16 +204,20 @@ class BaseChart:
                 self.labels.append(label)
         self.has_data = True
 
+    def as_old_dict(self):
+
+        return {
+            'id': self.id,
+            'type': self.type,
+            'title': self.title,
+            'labels': self.labels,
+            'data': [{'data': list(d.data.values()), 'label': d.label, 'unit': d.unit} for d in self.data],
+            'unit': self.unit,
+            'show_legend': self.show_legend
+        }
+
     def as_dict(self):
-        # return {
-        #     'id': self.id,
-        #     'type': self.type,
-        #     'title': self.title,
-        #     'labels': self.labels,
-        #     'data': [{'data': list(d.data.values()), 'label': d.label, 'unit': d.unit} for d in self.data],
-        #     'unit': self.unit,
-        #     'show_legend': self.show_legend
-        # }
+
         chart_dict = {
             'type': self.type,
             'data': {

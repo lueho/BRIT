@@ -21,23 +21,36 @@
                         <tr>
                             <td class="col-3"><b>Case study region:</b></td>
                             <td>
-                                <a href="{% url 'catchment_list' %}">
-                                    {{ object.region }}
-                                </a>
+                                {#                                <a href="{% url 'catchment_list' %}">#}
+                                {{ object.region }}
+                                {#                                </a>#}
                             </td>
                         <tr>
                             <td class="col-3"><b>Catchment:</b></td>
                             <td>
-                                <a href="{% url 'catchment_list' %}">
-                                    {{ object.catchment }}
-                                </a>
+                                {#                                <a href="{% url 'catchment_list' %}">#}
+                                {{ object.catchment }}
+                                {#                                </a>#}
                             </td>
                     </table>
+                    <div class="collapse multi-collapse">
+                        <a href="{% url 'scenario_detail' scenario.id %}">
+                            <i class="fas fa-fw fa-edit"></i> Edit scenario basics
+                        </a>
+                    </div>
                 </div>
                 <div class="card-footer">
-                    <a href="{% url 'scenario_detail' scenario.id %}">
-                        <i class="fas fa-fw fa-edit"></i> Edit scenario basics
-                    </a>
+                    {% if allow_edit %}
+                        <button
+                                class="btn btn-primary"
+                                type="button"
+                                data-toggle="collapse"
+                                data-target=".multi-collapse"
+                                aria-expanded="false"
+                                aria-controls="add-component-group">
+                            Edit
+                        </button>
+                    {% endif %}
                 </div>
             </div>
 
@@ -94,35 +107,37 @@
     <!-- end of second row -->
 
     <!-- third row -->
-    <div class="row mt-2">
-        <div class="col">
-            <div class="card shadow">
-                <div class="card-header"><b>Results by inventory</b></div>
-                <div class="card-body">
-                    {% for layer in layers %}
-                        <div class="row">
-                            <div class="col col-12">
-                                <div class="card border-left-primary border">
-                                    <div class="card-header">
-                                        <h6 class="m-0 font-weight-bold text-primary">
-                                            Feedstock: {{ layer.feedstock.name }} -
-                                            Dataset: {{ layer.inventory_algorithm.geodataset }} -
-                                            Algorithm: {{ layer.inventory_algorithm.name }}</h6>
-                                    </div>
-                                    <div class="card-body">
-                                        {% for aggregate in layer.aggregated_results %}
-                                            <span>{{ aggregate.name }}: {{ aggregate.value }} {{ aggregate.unit }} - </span>
-                                        {% endfor %}
-                                        <a href="{% url 'scenario_result_map' layer.scenario.pk layer.inventory_algorithm.pk layer.feedstock.pk %}">
-                                            <i class="fas fa-fw fa-map"></i> show map
-                                        </a>
-                                    </div>
-                                    <div class="card-footer">
+    <div class="collapse multi-collapse">
+        <div class="row mt-2">
+            <div class="col">
+                <div class="card shadow">
+                    <div class="card-header"><b>Results by inventory</b></div>
+                    <div class="card-body">
+                        {% for layer in layers %}
+                            <div class="row">
+                                <div class="col col-12">
+                                    <div class="card border-left-primary border">
+                                        <div class="card-header">
+                                            <h6 class="m-0 font-weight-bold text-primary">
+                                                Feedstock: {{ layer.feedstock.name }} -
+                                                Dataset: {{ layer.inventory_algorithm.geodataset }} -
+                                                Algorithm: {{ layer.inventory_algorithm.name }}</h6>
+                                        </div>
+                                        <div class="card-body">
+                                            {% for aggregate in layer.aggregated_results %}
+                                                <span>{{ aggregate.name }}: {{ aggregate.value }} {{ aggregate.unit }} - </span>
+                                            {% endfor %}
+                                            <a href="{% url 'scenario_result_map' layer.scenario.pk layer.inventory_algorithm.pk layer.feedstock.pk %}">
+                                                <i class="fas fa-fw fa-map"></i> show map
+                                            </a>
+                                        </div>
+                                        <div class="card-footer">
+                                        </div>
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    {% endfor %}
+                        {% endfor %}
+                    </div>
                 </div>
             </div>
         </div>

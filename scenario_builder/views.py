@@ -1,3 +1,6 @@
+import io
+import json
+
 from bootstrap_modal_forms.generic import BSModalCreateView, BSModalUpdateView, BSModalDeleteView
 from celery.result import AsyncResult
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
@@ -9,13 +12,12 @@ from django.views.generic import CreateView, DeleteView, DetailView, ListView, V
 from django.views.generic.base import TemplateResponseMixin
 from django.views.generic.edit import FormMixin, ModelFormMixin
 from rest_framework.views import APIView
-from users.views import ModalLoginRequiredMixin
-import json
-import io
 
 from flexibi_dst.views import DualUserListView, UserOwnsObjectMixin, NextOrSuccessUrlMixin
 from layer_manager.models import Layer
 from material_manager.models import MaterialSettings
+from users.models import ReferenceUsers
+from users.views import ModalLoginRequiredMixin
 from .forms import (
     CatchmentForm,
     CatchmentQueryForm,
@@ -186,12 +188,14 @@ class ScenarioDetailView(UserPassesTestMixin, DetailView):
     template_name = 'scenario_detail.html'
     object = None
     config = None
+    allow_edit = False
 
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()
         self.config = self.object.configuration_for_template()
         context = self.get_context_data(object=self.object)
         context['config'] = self.config
+        context['allow_edit'] = self.allow_edit
         return self.render_to_response(context)
 
     def post(self, request, *args, **kwargs):
@@ -202,8 +206,17 @@ class ScenarioDetailView(UserPassesTestMixin, DetailView):
         return redirect('scenario_result', scenario.id)
 
     def test_func(self):
-        scenario = Scenario.objects.get(id=self.kwargs.get('pk'))
-        return self.request.user == scenario.owner or scenario.owner.username == 'flexibi'
+        self.object = self.get_object()
+        standard_owner = ReferenceUsers.objects.get.standard_owner
+        if self.object.owner == standard_owner:
+            if self.request.user == standard_owner:
+                self.allow_edit = True
+            return True
+        elif self.object.owner == self.request.user:
+            self.allow_edit = True
+            return True
+        else:
+            return False
 
 
 class ScenarioUpdateView(ModalLoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalUpdateView):

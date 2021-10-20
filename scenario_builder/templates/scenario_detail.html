@@ -35,12 +35,25 @@
                                         {{ object.catchment }}
                                     </td>
                             </table>
+                            <div class="collapse multi-collapse">
+                                <a href="javascript:void(0);" class="modal-link"
+                                   data-link="{% url 'scenario_update' scenario.id %}">
+                                    <i class="fas fa-fw fa-edit"></i> Edit scenario definition
+                                </a>
+                            </div>
                         </div>
                         <div class="card-footer">
-                            <a href="javascript:void(0);" class="modal-link"
-                               data-link="{% url 'scenario_update' scenario.id %}">
-                                <i class="fas fa-fw fa-edit"></i> Edit scenario definition
-                            </a>
+                            {% if allow_edit %}
+                                <button
+                                        class="btn btn-primary"
+                                        type="button"
+                                        data-toggle="collapse"
+                                        data-target=".multi-collapse"
+                                        aria-expanded="false"
+                                        aria-controls="add-component-group">
+                                    Edit
+                                </button>
+                            {% endif %}
                         </div>
                     </div>
                 </div>
@@ -162,33 +175,37 @@
                                             </table>
                                         </div>
                                         <div class="card-footer">
-                                            <a href="{% url 'scenario_update_config' scenario.id algo.id %}"
-                                               class="mx-2">
-                                                <i class="fas fa-fw fa-edit"></i> Edit
-                                            </a>
-                                            <a href="{% url 'remove_algorithm_from_scenario' scenario.id feedstock.id algo.id %}"
-                                               class="mx-2">
-                                                <i class="fas fa-fw fa-trash"></i> Remove from configuration
-                                            </a>
+                                            <div class="collapse multi-collapse">
+                                                <a href="{% url 'scenario_update_config' scenario.id algo.id %}"
+                                                   class="mx-2">
+                                                    <i class="fas fa-fw fa-edit"></i> Edit
+                                                </a>
+                                                <a href="{% url 'remove_algorithm_from_scenario' scenario.id feedstock.id algo.id %}"
+                                                   class="mx-2">
+                                                    <i class="fas fa-fw fa-trash"></i> Remove from configuration
+                                                </a>
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                         {% endfor %}
                     {% endfor %}
-                    <div class="card border-left-primary border">
-                        <div class="card-header">
-                        </div>
-                        <div class="card-body">
-                            <a href="{% url 'add_scenario_configuration' scenario.id %}">
-                                <i class="fas fa-fw fa-plus"></i> Add inventory
-                            </a>
-                        </div>
-                        <div class="card-footer">
+                    <div class="collapse multi-collapse">
+                        <div class="card border-left-primary border">
+                            <div class="card-header">
+                            </div>
+                            <div class="card-body">
+                                <a href="{% url 'add_scenario_configuration' scenario.id %}">
+                                    <i class="fas fa-fw fa-plus"></i> Add inventory
+                                </a>
+                            </div>
+                            <div class="card-footer">
+                            </div>
                         </div>
                     </div>
+                    <div class="card-footer"></div>
                 </div>
-                <div class="card-footer"></div>
             </div>
         </div>
     </div>

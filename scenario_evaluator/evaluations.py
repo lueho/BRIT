@@ -72,7 +72,7 @@ class ScenarioResult:
         )
         chart.add_dataset(production)
         charts.update({
-            'productionPerFeedstockBarChart': chart.as_dict()
+            'productionPerFeedstockBarChart': chart.as_old_dict()
         })
 
         # Composition of total production by component group
@@ -86,7 +86,7 @@ class ScenarioResult:
                         id=chart_id,
                         title='Production per component: ' + group_setting.group.name,
                         data=data
-                    ).as_dict()
+                    ).as_old_dict()
                 })
         except:
             pass
@@ -101,7 +101,7 @@ class ScenarioResult:
         for ds in self.seasonal_production_per_component():
             chart.add_dataset(ds)
         charts.update({
-            'seasonalFeedstockBarChart': chart.as_dict()
+            'seasonalFeedstockBarChart': chart.as_old_dict()
         })
 
         return charts

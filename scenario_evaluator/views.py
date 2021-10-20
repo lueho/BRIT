@@ -1,6 +1,9 @@
+import io
+import json
+
+from django.http import HttpResponse
 from django.shortcuts import render
 from django.views.generic import DetailView
-from django.http import HttpResponse
 
 from flexibi_dst.views import DualUserListView
 from layer_manager.models import Layer
@@ -8,9 +11,7 @@ from material_manager.models import MaterialSettings
 from scenario_builder.models import InventoryAlgorithm, Scenario
 from scenario_evaluator.evaluations import ScenarioResult
 from scenario_evaluator.models import RunningTask
-
-import io
-import json
+from users.models import ReferenceUsers
 
 
 class ScenarioListView(DualUserListView):
@@ -27,6 +28,7 @@ class ScenarioResultView(DetailView):
     model = Scenario
     context_object_name = 'scenario'
     object = None
+    allow_edit = False
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -34,6 +36,7 @@ class ScenarioResultView(DetailView):
         result = ScenarioResult(scenario)
         context['layers'] = [layer.as_dict() for layer in result.layers]
         context['charts'] = result.get_charts()
+        context['allow_edit'] = self.allow_edit
         return context
 
     def get(self, request, *args, **kwargs):
@@ -54,6 +57,19 @@ class ScenarioResultView(DetailView):
         else:
             context = self.get_context_data()
             return self.render_to_response(context)
+
+    def test_func(self):
+        self.object = self.get_object()
+        standard_owner = ReferenceUsers.objects.get.standard_owner
+        if self.object.owner == standard_owner:
+            if self.request.user == standard_owner:
+                self.allow_edit = True
+            return True
+        elif self.object.owner == self.request.user:
+            self.allow_edit = True
+            return True
+        else:
+            return False
 
 
 class ScenarioEvaluationProgressView(DetailView):
