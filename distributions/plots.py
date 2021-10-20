@@ -90,8 +90,39 @@ class Distribution:
         return dist
 
 
+BACKGROUND_COLORS = [
+    'rgba(4, 85, 94, 0.4)',
+    'rgba(148, 51, 41, 0.4)',
+    'rgba(99, 163, 60, 0.4)',
+    'rgba(244, 154, 51, 0.4)',
+    'rgba(130, 105, 55, 0.4)',
+    'rgba(252, 199, 103, 0.4)',
+    'rgba(255, 99, 132, 0.4)',
+    'rgba(54, 162, 235, 0.4)',
+    'rgba(255, 206, 86, 0.4)',
+    'rgba(75, 192, 192, 0.4)',
+    'rgba(153, 102, 255, 0.4)',
+    'rgba(255, 159, 64, 0.4)',
+]
+
+BORDER_COLORS = [
+    'rgba(4, 85, 94, 1)',
+    'rgba(148, 51, 41, 1)',
+    'rgba(99, 163, 60, 1)',
+    'rgba(244, 154, 51, 1)',
+    'rgba(130, 105, 55, 1)',
+    'rgba(252, 199, 103, 1)',
+    'rgba(255, 99, 132, 1)',
+    'rgba(54, 162, 235, 1)',
+    'rgba(255, 206, 86, 1)',
+    'rgba(75, 192, 192, 1)',
+    'rgba(153, 102, 255, 1)',
+    'rgba(255, 159, 64, 1)'
+]
+
+
 class BaseDataSet(UserDict):
-    bg_color = None
+    background_colors = BACKGROUND_COLORS
     label = None
     unit = None
 
@@ -174,15 +205,39 @@ class BaseChart:
         self.has_data = True
 
     def as_dict(self):
-        return {
-            'id': self.id,
+        # return {
+        #     'id': self.id,
+        #     'type': self.type,
+        #     'title': self.title,
+        #     'labels': self.labels,
+        #     'data': [{'data': list(d.data.values()), 'label': d.label, 'unit': d.unit} for d in self.data],
+        #     'unit': self.unit,
+        #     'show_legend': self.show_legend
+        # }
+        chart_dict = {
             'type': self.type,
-            'title': self.title,
-            'labels': self.labels,
-            'data': [{'data': list(d.data.values()), 'label': d.label, 'unit': d.unit} for d in self.data],
-            'unit': self.unit,
-            'show_legend': self.show_legend
+            'data': {
+                'labels': self.labels,
+                'datasets': [],
+            },
+            'options': {
+                'legend': {
+                    'display': True,
+                    'position': 'bottom',
+                },
+                'aspectRatio': 0.8
+            },
         }
+        for ds in self.data:
+            chart_dict['data']['datasets'].append({
+                'label': ds.label,
+                'data': list(ds.values()),
+                'backgroundColor': BACKGROUND_COLORS,
+                'borderColor': BORDER_COLORS,
+                'borderWidth': 1,
+                'hoverOffset': 4
+            })
+        return chart_dict
 
 
 class BarChart(BaseChart):
@@ -195,5 +250,6 @@ class BarChart(BaseChart):
 class DoughnutChart(BaseChart):
 
     def __init__(self, **kwargs):
-        kwargs.update({'type': 'doughnut_chart'})
+        print(kwargs)
+        kwargs.update({'type': 'doughnut'})
         super().__init__(**kwargs)
