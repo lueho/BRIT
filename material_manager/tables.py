@@ -20,14 +20,14 @@ def averages_table_factory(group_settings):
         )
         table_row = {
             'component': share.component.name,
-            'weight fraction': f'{share.as_percentage}',
+            'fraction': f'{share.as_percentage}',
             'remove': remove_html
         }
         table_data.append(table_row)
     if len(table_data) == 0:
         table_data.append({
             'component': None,
-            'weight fraction': None,
+            'fraction': None,
         })
 
     footers = {
@@ -39,7 +39,7 @@ def averages_table_factory(group_settings):
             ''',
             reverse('add_component', kwargs={'pk': group_settings.id})
         ),
-        'weight fraction': format_html(
+        'fraction': format_html(
             '''
             <a href="{0}" class="modal-link toggle-edit">
                 <i class="fas fa-fw fa-edit"></i> Change composition
@@ -50,8 +50,8 @@ def averages_table_factory(group_settings):
     }
     columns = {
         'component': Column(footer=footers['component']),
-        'weight fraction': Column(footer=footers['weight fraction']),
-        'remove': Column(attrs={"td": {"class": "toggle-edit"}, "th": {"class": "toggle-edit"}})
+        'fraction': Column(footer=footers['fraction']),
+        'remove': Column(attrs={"td": {"class": "collapse multi-collapse"}, "th": {"class": "collapse multi-collapse"}})
     }
     table_class = type(f'AveragesTable{group_settings.id}', (Table,), columns)
     return table_class(table_data)
