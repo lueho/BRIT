@@ -4,14 +4,6 @@
 {% load crispy_forms_filters %}
 {% load render_table from django_tables2 %}
 
-{% block style %}
-    <style>
-        .toggle-edit {
-            display: none
-        }
-    </style>
-{% endblock style %}
-
 {% block content %}
     <div class="row">
         <div class="col col-12 col-md-6 col-lg-3 mt-4">
@@ -26,12 +18,25 @@
                     <p class="card-text">
                         {{ object.material.description }}
                     </p>
+                    <div class="collapse multi-collapse">
+                        <a href="{% url 'material_update' object.material.id %}?next={{ request.path }}"
+                           class="modal-link">
+                            Edit <i class="fas fa-fw fa-edit"></i>
+                        </a>
+                    </div>
                 </div>
                 <div class="card-footer">
-                    <a href="{% url 'material_update' object.material.id %}?next={{ request.path }}"
-                       class="modal-link toggle-edit">
-                        Edit <i class="fas fa-fw fa-edit"></i>
-                    </a>
+                    {% if allow_edit %}
+                        <button
+                                class="btn btn-primary"
+                                type="button"
+                                data-toggle="collapse"
+                                data-target=".multi-collapse"
+                                aria-expanded="false"
+                                aria-controls="add-component-group">
+                            Edit
+                        </button>
+                    {% endif %}
                 </div>
             </div>
         </div>
@@ -40,26 +45,61 @@
 
     <!-- start material composition -->
     <div class="row">
-    {% for group_settings, content in composition.items %}
-        <div class="col col-12 col-md-6 col-lg-3 mt-4">
-            <div class="card shadow">
-                <div class="card-header">
-                    <a href="{% url 'material_component_group_detail' group_settings.group.id %}"
-                       class="modal-link">
-                        <b>{{ group_settings.group.name }}</b>
-                    </a>
-                </div>
-                <div class="card-body">
-                    <div class="row">
-                        {% render_table content.averages_table %}
-                    </div>
-                    <div class="row">
-                        <div class="col">
-                            <div id="composition-chart-{{ group_settings.id }}"></div>
+        {% for group_settings, content in composition.items %}
+            <div class="col col-12 col-md-6 col-lg-3 mt-4">
+                <div class="accordion">
+                    <div class="card shadow mt-3 tab-card">
+                        <div class="card-header tab-card-header">
+                            <ul class="nav nav-tabs card-header-tabs" id="composition-tabs-{{ group_settings.id }}"
+                                role="tablist">
+                                <li class="nav-item">
+                                    <a class="nav-link"
+                                       id="composition-table-tab-{{ group_settings.id }}"
+                                       data-toggle="tab"
+                                       href="#composition-table-{{ group_settings.id }}-tab"
+                                       role="tab"
+                                       aria-controls="composition-table-{{ group_settings.id }}-tab"
+                                       aria-selected="true">
+                                        Table
+                                    </a>
+                                </li>
+                                <li class="nav-item">
+                                    <a class="nav-link"
+                                       id="composition-chart-tab-{{ group_settings.id }}"
+                                       data-toggle="tab"
+                                       href="#composition-chart-{{ group_settings.id }}-tab"
+                                       role="tab"
+                                       aria-controls="composition-chart-{{ group_settings.id }}-tab"
+                                       aria-selected="false">
+                                        Chart
+                                    </a>
+                                </li>
+                            </ul>
                         </div>
-                    </div>
-                    <div class="row">
-                        <div class="col">
+                        <div class="card-body tab-content" id="composition-tabs-{{ group_settings.id }}-content">
+                            <h3 class="card-title">{{ group_settings.group.name }}</h3>
+                            <div class="tab-pane fade show active"
+                                 id="composition-table-{{ group_settings.id }}-tab"
+                                 role="tabpanel"
+                                 aria-labelledby="composition-table-tab-{{ group_settings.id }}">
+                                {% render_table content.averages_table %}
+                            </div>
+                            <div class="tab-pane fade p-0"
+                                 id="composition-chart-{{ group_settings.id }}-tab"
+                                 role="tabpanel"
+                                 aria-labelledby="composition-chart-tab-{{ group_settings.id }}">
+                                <div id="composition-chart-{{ group_settings.id }}"></div>
+                            </div>
+                        </div>
+                        <div class="card-header"
+                             role="button"
+                             data-toggle="collapse"
+                             href="#sources-body-{{ group_settings.id }}"
+                             aria-expanded="true"
+                             aria-controls="sources-body-{{ group_settings.id }}">
+                            <b>Sources</b>
+                        </div>
+                        <div class="card-body collapse" id="sources-body-{{ group_settings.id }}">
                             <table class="table">
                                 <tbody>
                                 <tr>
@@ -85,16 +125,22 @@
                                 </tr>
                                 </tbody>
                             </table>
-                            <div>
+                            <div class="collapse multi-collapse">
                                 <a href="{% url 'add_source' group_settings.id %}"
-                                   class="modal-link toggle-edit">
+                                   class="modal-link">
                                     <i class="fas fa-fw fa-plus"></i> Add source
                                 </a>
                             </div>
                         </div>
-                    </div>
-                    <div class="row">
-                        <div class="col">
+                        <div class="card-header"
+                             role="button"
+                             data-toggle="collapse"
+                             href="#seasonality-body-{{ group_settings.id }}"
+                             aria-expanded="true"
+                             aria-controls="seasonality-body-{{ group_settings.id }}">
+                            <b>Seasonality</b>
+                        </div>
+                        <div class="card-body collapse" id="seasonality-body-{{ group_settings.id }}">
                             <table class="table m-0 p-0">
                                 <tbody>
                                 <tr>
@@ -111,11 +157,13 @@
                                             </a>
                                         </td>
                                         <td>
-                                            <a href="{% url 'remove_seasonal_variation' group_settings.id distribution.id %}"
-                                               class="modal-link toggle-edit">
-                                                <i class="fas fa-fw fa-trash"></i> Remove this
-                                                variation
-                                            </a>
+                                            <div class="collapse multi-collapse">
+                                                <a href="{% url 'remove_seasonal_variation' group_settings.id distribution.id %}"
+                                                   class="modal-link">
+                                                    <i class="fas fa-fw fa-trash"></i> Remove this
+                                                    variation
+                                                </a>
+                                            </div>
                                         </td>
                                     </tr>
                                     <tr class="accordion-body collapse" id="{{ table.id }}">
@@ -124,10 +172,10 @@
                                         </td>
                                     </tr>
                                 {% endfor %}
-                                <tr>
+                                <tr class="collapse multi-collapse">
                                     <td colspan="2">
                                         <a href="{% url 'add_seasonal_variation' group_settings.id %}"
-                                           class="modal-link toggle-edit">
+                                           class="modal-link">
                                             <i class="fas fa-fw fa-plus"></i> Add seasonal variation
                                         </a>
                                     </td>
@@ -135,34 +183,37 @@
                                 </tbody>
                             </table>
                         </div>
+                        <div class="card-footer">
+                            <div class="collapse multi-collapse" id="remove-component-group-{{ group_settings.id }}">
+                                <a id="remove-group-{{ group_settings.id }}"
+                                   class="modal-link"
+                                   href="{% url 'material_component_group_remove' group_settings.id %}">
+                                    <i class="fas fa-fw fa-trash"></i> Remove group
+                                </a>
+                            </div>
+                        </div>
                     </div>
                 </div>
-                <div class="card-footer">
-                    <a id="remove-group-{{ group.id }}"
-                       class="modal-link toggle-edit"
-                       href="{% url 'material_component_group_remove' group_settings.id %}">
-                        <i class="fas fa-fw fa-trash"></i> Remove group
-                    </a>
+            </div>
+        {% endfor %}
+    </div>
+    <div class="collapse multi-collapse" id="add-component-group">
+        <div class="row">
+            <div class="col">
+                <div class="card border-left-primary border">
+                    <div class="card-header"></div>
+                    <div class="card-body">
+                        <a href="{% url 'material_add_component_group' object.id %}"
+                           class="modal-link">
+                            <i class="fas fa-fw fa-plus"></i> Add component group
+                        </a>
+                    </div>
+                    <div class="card-footer"></div>
                 </div>
             </div>
-        </div>
-    {% endfor %}
-    </div>
-    <div class="row toggle-edit">
-        <div class="card border-left-primary border">
-            <div class="card-header"></div>
-            <div class="card-body">
-                <a href="{% url 'material_add_component_group' object.id %}"
-                   class="modal-link">
-                    <i class="fas fa-fw fa-plus"></i> Add component group
-                </a>
-            </div>
-            <div class="card-footer"></div>
         </div>
     </div>
     <!-- end material composition -->
-
-    <div id="allow-edit" style="display: none" data-editable="{{ allow_edit }}"></div>
 
 {% endblock content %}
 
@@ -181,21 +232,6 @@
             container.appendChild(canvas)
             new Chart(canvas.getContext('2d'), charts[key]);
         })
-
-    </script>
-
-    <script type="text/javascript">
-
-        $(document).ready(function () {
-
-            if ($("#allow-edit").data()['editable'] === "True") {
-                $(".toggle-edit").show()
-            }
-        });
-
-        function toggle_edit() {
-            $(".toggle-edit").toggle()
-        }
 
     </script>
 
