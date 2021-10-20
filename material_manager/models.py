@@ -467,7 +467,7 @@ class CompositionSet(models.Model):
             data[share.component.name] = share.average
 
         dataset = DataSet(
-            label='Composition of',
+            label='Fraction',
             data=data,
             unit='%'
         )
