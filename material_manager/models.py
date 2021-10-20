@@ -461,7 +461,9 @@ class CompositionSet(models.Model):
 
     def get_chart(self):
         data = {}
+        labels = []
         for share in self.materialcomponentshare_set.all():
+            labels.append(share.component.name)
             data[share.component.name] = share.average
 
         dataset = DataSet(
