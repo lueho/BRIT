@@ -6,8 +6,8 @@ from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.urls import reverse
 from factory.django import mute_signals
-from distributions.plots import DataSet, DoughnutChart
 
+from distributions.plots import DataSet, DoughnutChart
 from flexibi_dst.models import Timestep, TemporalDistribution
 from bibliography.models import Source
 from users.models import ReferenceUsers
@@ -479,7 +479,7 @@ class CompositionSet(models.Model):
         )
         chart.add_dataset(dataset)
 
-        return chart.as_dict()
+        return chart
 
     def get_absolute_url(self):
         return self.group_settings.get_absolute_url()
