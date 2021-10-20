@@ -9,7 +9,7 @@ def averages_table_factory(group_settings):
     for share in composition_set.materialcomponentshare_set.all():
         remove_html = format_html(
             '''
-            <a href="{0}" class="toggle-edit">
+            <a href="{0}" class="collapse multi-collapse">
                 <i class="fas fa-fw fa-trash"></i>
             </a>
             ''',
@@ -33,7 +33,7 @@ def averages_table_factory(group_settings):
     footers = {
         'component': format_html(
             '''
-            <a href="{0}" class="modal-link toggle-edit">
+            <a href="{0}" class="modal-link collapse multi-collapse">
                 <i class="fas fa-fw fa-plus"></i> Add component
             </a>
             ''',
@@ -41,7 +41,7 @@ def averages_table_factory(group_settings):
         ),
         'fraction': format_html(
             '''
-            <a href="{0}" class="modal-link toggle-edit">
+            <a href="{0}" class="modal-link collapse multi-collapse">
                 <i class="fas fa-fw fa-edit"></i> Change composition
             </a>
             ''',
@@ -77,7 +77,7 @@ def distribution_table_factory(group_settings, distribution):
     def footer(cs):
         return format_html(
             '''
-            <a href="{0}" class="modal-link toggle-edit">
+            <a href="{0}" class="modal-link collapse multi-collapse">
                 <i class="fas fa-fw fa-edit"></i>
             </a>
             ''',
