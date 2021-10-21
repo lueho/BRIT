@@ -25,6 +25,7 @@ services:
       - flexibi_dst/settings/.env
     links:
       - db
+    profiles: ["dev"]
   celery:
     build: .
     command: celery --app=flexibi_dst worker --loglevel=info --logfile=logs/celery.log
@@ -35,8 +36,22 @@ services:
     depends_on:
       - web
       - redis
+    profiles: ["dev"]
   redis:
     image: redis:5-alpine
+    profiles: ["dev"]
+  db_admin:
+    build:
+      context: .
+      dockerfile: ./docker/db_admin/Dockerfile
+    entrypoint: ["bin/bash"]
+    env_file:
+      - flexibi_dst/settings/.env
+    depends_on:
+      - db
+    profiles: ["db_admin"]
+    stdin_open: true
+    tty: true
 #  dashboard:
 #    build: .
 #    command: flower -A flexibi_dst --port=5555 --broker=redis://redis:6379/0
