@@ -38,8 +38,8 @@
             let params = {
                 'gattung_deutsch': readMultiChoiceCheckboxes('gattung_deutsch'),
                 'bezirk': readMultiChoiceCheckboxes('bezirk'),
-                'pflanzjahr_min': document.getElementById("id_pflanzjahr_min").value,
-                'pflanzjahr_max': document.getElementById("id_pflanzjahr_max").value,
+                {#'pflanzjahr_min': document.getElementById("id_pflanzjahr_min").value,#}
+                {#'pflanzjahr_max': document.getElementById("id_pflanzjahr_max").value,#}
             };
             let summary = await fetchFeatureGeometries("{% url 'data.hamburg_roadside_trees' %}?", params, mapConfig);
             await renderSummary(summary)
