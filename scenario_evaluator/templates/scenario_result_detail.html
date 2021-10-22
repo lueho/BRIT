@@ -1,106 +1,69 @@
 {% extends 'base.html' %}
+{% load leaflet_tags %}
 {% load static %}
 
+{% block title %}Inventories | {{ object.name }}{% endblock %}
+
 {% block content %}
+    {% leaflet_js %}
+    {% leaflet_css %}
 
-    <!-- first row -->
     <div class="row">
-
-        <!-- Scenario basics card -->
-        <div class="col col-6">
-            <div class="card shadow">
-                <div class="card-header"><b>Scenario basics</b></div>
-                <div class="card-body p-0">
-                    <table class="table">
-                        <tr>
-                            <td class="col-3"><b>Name:</b></td>
-                            <td>{{ object.name }}</td>
-                        <tr>
-                            <td class="col-3"><b>Description:</b></td>
-                            <td>{{ object.description }}</td>
-                        <tr>
-                            <td class="col-3"><b>Case study region:</b></td>
-                            <td>
-                                {#                                <a href="{% url 'catchment_list' %}">#}
-                                {{ object.region }}
-                                {#                                </a>#}
-                            </td>
-                        <tr>
-                            <td class="col-3"><b>Catchment:</b></td>
-                            <td>
-                                {#                                <a href="{% url 'catchment_list' %}">#}
-                                {{ object.catchment }}
-                                {#                                </a>#}
-                            </td>
-                    </table>
-                    <div class="collapse multi-collapse">
-                        <a href="{% url 'scenario_detail' scenario.id %}">
-                            <i class="fas fa-fw fa-edit"></i> Edit scenario basics
-                        </a>
+        <div class="col col-12 col-lg-3 mb-4">
+            <div class="accordion">
+                <div class="card shadow">
+                    <div class="card-header"><b>{{ object.name }}</b></div>
+                    <div class="card-body p-0">
+                        {% leaflet_map "main" %}
+                        <div class="card-text p-2">
+                            <p>{{ object.description }}</p>
+                            <p id="region" data-region-id="{{ object.region.id }}"><b>Region</b>: {{ object.region }}
+                            </p>
+                            <p id="catchment" data-catchment-id="{{ object.catchment.id }}">
+                                <b>Catchment</b>: {{ object.catchment }}</p>
+                        </div>
                     </div>
-                </div>
-                <div class="card-footer">
-                    {% if allow_edit %}
-                        <button
-                                class="btn btn-primary"
-                                type="button"
-                                data-toggle="collapse"
-                                data-target=".multi-collapse"
-                                aria-expanded="false"
-                                aria-controls="add-component-group">
-                            Edit
-                        </button>
-                    {% endif %}
+                    <div class="card-header"
+                         role="button"
+                         data-toggle="collapse"
+                         href="#sources-body-{{ group_settings.id }}"
+                         aria-expanded="true"
+                         aria-controls="sources-body-{{ group_settings.id }}">
+                        <b>Options</b>
+                    </div>
+                    <div class="card-body collapse" id="sources-body-{{ group_settings.id }}">
+                        <table class="table">
+                            <tr>
+                                <td class="col-2">
+                                    <a class="btn btn-primary" href="{% url 'download_result_summary' object.id %}">
+                                        Download</a>
+                                </td>
+                                <td>
+                                    Download .json file with result summary. Use this file to feed results into the
+                                    Process simulation tool.
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                    <div class="card-footer"></div>
                 </div>
             </div>
-
         </div>
-
-        <!-- Options card -->
-        <div class="col col-6">
-            <div class="card shadow">
-                <div class="card-header"><b>Options</b></div>
-                <div class="card-body p-0">
-                    <table class="table">
-                        <tr>
-                            <td class="col-2">
-                                <a class="btn btn-primary" href="{% url 'download_result_summary' object.id %}">
-                                    Download</a>
-                            </td>
-                            <td>
-                                Download .json file with result summary. Use this file to feed results into the
-                                Process simulation tool.
-                            </td>
-                        </tr>
-                    </table>
-                </div>
-                <div class="card-footer"></div>
-            </div>
-        </div>
-    </div>
-    <!-- End of first row -->
-
-    <!-- second row -->
-    <div class="row mt-2">
-        <div class="col">
-            <div class="card shadow">
-                <div class="card-header"><b>Aggregated results</b></div>
-                <div class="card-body">
-                    {% for id, c in charts.items %}
-                        <div class="col col-6">
-                            <div class="card mb-4">
-                                <div class="card-header py-3">
-                                    <h6 class="m-0 font-weight-bold text-primary">{{ c.title }}</h6>
+        <div class="col col-12 col-lg-9">
+            <div class="row">
+                {% for id, c in charts.items %}
+                    <div class="col col-12 col-xl-6">
+                        <div class="card shadow mb-4">
+                            <div class="card-header py-3"><b>{{ c.title }}</b></div>
+                            <div class="card-body p-0">
+                                <div class="chart-bar">
+                                    <canvas id="{{ id }}"></canvas>
                                 </div>
-                                <div class="card-body">
-                                    <div class="chart-bar">
-                                        <canvas id="{{ id }}"></canvas>
-                                    </div>
-                                </div>
+                                <div id="legend-{{ c.id }}"></div>
                             </div>
                         </div>
-                    {% endfor %}
-                </div>
+                    </div>
+                {% endfor %}
             </div>
         </div>
     </div>
@@ -166,8 +129,82 @@
                 chart["unit"],
                 chart["show_legend"],
             );
-            new Chart(ctx, args);
+            let ch = new Chart(ctx, args);
+            document.getElementById('legend-' + ch.canvas.id).innerHTML = ch.generateLegend()
         }
+
+        let map;
+        let catchment_layer;
+        let region_layer;
+
+
+        window.addEventListener("map:init", function (event) {
+            map = event.detail.map;
+        });
+
+        async function fetchRegionGeometry(region_id) {
+
+            // Define query string for REST API
+            let params = L.Util.extend({
+                region_id: region_id
+            });
+
+            let url = "{% url 'ajax_region_geometries' %}" + L.Util.getParamString(params);
+
+            // Remove existing layer
+            if (region_layer !== undefined) {
+                map.removeLayer(region_layer);
+            }
+
+            // Fetch data from REST API
+            let response = await fetch(url);
+            let data = await response.json();
+
+            // Render geodata on map
+            let geodata;
+            geodata = data['geoJson'];
+            region_layer = L.geoJson(geodata, {
+                style: region_layer_style
+            })
+            region_layer.addTo(map);
+            map.fitBounds(region_layer.getBounds())
+        }
+
+        async function fetchCatchmentGeometry(catchment_id) {
+
+            // Define query string for REST API
+            let params = L.Util.extend({
+                catchment_id: catchment_id
+            });
+
+            let dataurl = "{% url 'ajax_catchment_geometries' %}" + L.Util.getParamString(params);
+
+            // Remove existing layer
+            if (undefined !== catchment_layer) {
+                map.removeLayer(catchment_layer);
+            }
+
+            // Fetch data from REST API
+            let response = await fetch(dataurl);
+            let data = await response.json();
+
+            // Render geodata on map
+            let geodata;
+            geodata = data['geoJson'];
+            catchment_layer = L.geoJson(geodata, {
+                style: catchment_layer_style
+            })
+            catchment_layer.addTo(map);
+            map.fitBounds(catchment_layer.getBounds())
+        }
+
+        function onLoad() {
+            fetchRegionGeometry($("#region").data()["regionId"]);
+            fetchCatchmentGeometry($("#catchment").data()["catchmentId"]);
+            map.invalidateSize();
+        }
+
+        window.onload = () => onLoad();
     </script>
 
 {% endblock javascript %}

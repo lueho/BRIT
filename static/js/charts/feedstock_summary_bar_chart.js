@@ -76,7 +76,19 @@ function barChartDefinition(xlabels, data, unit, show_legend) {
                 }
             },
             legend: {
-                display: show_legend
+                display: false
+            },
+            legendCallback: chart => {
+                let html = '<ul style="list-style-type: none;">'
+                chart.data.datasets.forEach((ds, i) => {
+                    const bgColor = ds.backgroundColor[i];
+                    // const border = ds.borderWidth + 'px solid ' + ds.borderColor[i];
+                    html += '<li>' +
+                        '<div style="display: inline-block; margin-right: 10px; width: 25px; height: 0.8rem; background-color: ' + ds.backgroundColor + '"></div>' +
+                        '<span style="display: inline-block; font-size: small;">' + ds.label + '</span>' +
+                        '</li>'
+                })
+                return html += '</ul>'
             },
             maintainAspectRatio: false,
             scales: {

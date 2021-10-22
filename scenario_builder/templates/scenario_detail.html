@@ -1,210 +1,171 @@
 {% extends 'base.html' %}
 {% load leaflet_tags %}
 
+{% block title %}Inventories | {{ object.name }}{% endblock %}
+
 {% block content %}
 
     {% leaflet_js %}
     {% leaflet_css %}
 
-    <!-- Summary row -->
-    <div class="row">
-        <div class="col col-6">
-
-            <!-- Scenario basics card -->
-
-            <div class="row">
-                <div class="col">
-                    <div class="card shadow">
-                        <div class="card-header"><b>Scenario basics</b></div>
-                        <div class="card-body p-0">
-                            <table class="table">
-                                <tr>
-                                    <td class="col-3"><b>Name:</b></td>
-                                    <td>{{ object.name }}</td>
-                                <tr>
-                                    <td class="col-3"><b>Description:</b></td>
-                                    <td>{{ object.description }}</td>
-                                <tr>
-                                    <td class="col-3"><b>Case study region:</b></td>
-                                    <td id="region" data-region-id="{{ object.region.id }}">
-                                        {{ object.region }}
-                                    </td>
-                                <tr>
-                                    <td class="col-3"><b>Catchment:</b></td>
-                                    <td id="catchment" data-catchment-id="{{ object.catchment.id }}">
-                                        {{ object.catchment }}
-                                    </td>
-                            </table>
-                            <div class="collapse multi-collapse">
-                                <a href="javascript:void(0);" class="modal-link"
-                                   data-link="{% url 'scenario_update' scenario.id %}">
-                                    <i class="fas fa-fw fa-edit"></i> Edit scenario definition
-                                </a>
-                            </div>
-                        </div>
-                        <div class="card-footer">
-                            {% if allow_edit %}
-                                <button
-                                        class="btn btn-primary"
-                                        type="button"
-                                        data-toggle="collapse"
-                                        data-target=".multi-collapse"
-                                        aria-expanded="false"
-                                        aria-controls="add-component-group">
-                                    Edit
-                                </button>
-                            {% endif %}
+    <div class="row mb-4">
+        <div class="col col-12 col-lg-3">
+            <div class="accordion">
+                <div class="card shadow">
+                    <div class="card-header"><b>{{ object.name }}</b></div>
+                    <div class="card-body p-0">
+                        {% leaflet_map "main" %}
+                        <div class="card-text p-2">
+                            <p>{{ object.description }}</p>
+                            <p id="region" data-region-id="{{ object.region.id }}"><b>Region</b>: {{ object.region }}
+                            </p>
+                            <p id="catchment" data-catchment-id="{{ object.catchment.id }}">
+                                <b>Catchment</b>: {{ object.catchment }}</p>
                         </div>
                     </div>
-                </div>
-            </div>
+                    <div class="card-header"
+                         role="button"
+                         data-toggle="collapse"
+                         href="#sources-body-{{ group_settings.id }}"
+                         aria-expanded="true"
+                         aria-controls="sources-body-{{ group_settings.id }}">
+                        <b>Options</b>
+                    </div>
+                    <div class="card-body collapse" id="sources-body-{{ group_settings.id }}">
+                        <table class="table">
+                            <tr>
 
-            <!-- end of scenario basics card -->
-
-            <!-- Options card -->
-            <div class="row mt-2">
-                <div class="col">
-                    <div class="card shadow">
-                        <div class="card-header"><b>Options</b></div>
-                        <div class="card-body p-0">
-                            <table class="table">
-                                <tr>
-
-                                    {# status = CHANGED #}
-                                    {% if object.status == 1 %}
-                                        <td class="col-3">
-                                            <form method="post">
-                                                {% csrf_token %}
-                                                <button type="submit" name="run" class="btn btn-primary">
-                                                    Run
-                                                </button>
-                                            </form>
-                                        </td>
-                                        <td>
-                                            Run the evaluation. Depending on the scope of your scenario, this might take
-                                            a
-                                            while
-                                            . While the evaluation is running, you can safely close the browser and
-                                            return
-                                            later.
-                                        </td>
-                                        {# status = RUNNING #}
-                                    {% elif object.status == 2 %}
-                                        <td class="col-3">
-                                            <a class="btn btn-primary" href="{% url 'scenario_result' object.id %}">
-                                                Show progress
-                                            </a>
-                                        </td>
-                                        <td>The scenario evaluation is currently running.</td>
-                                        {# status = FINISHED #}
-                                    {% elif object.status == 3 %}
-                                        <td class="col-3">
-                                            <a class="btn btn-primary" href="{% url 'scenario_result' object.id %}">
-                                                Show results
-                                            </a>
-                                        </td>
-                                        <td>
-                                            This is a summary of the complete configuration of this scenario. The
-                                            scenario
-                                            has
-                                            already been evaluated.
-                                        </td>
-                                    {% endif %}
-                                </tr>
-                                <tr>
-                                    <td class="col-2">
-                                        <a class="btn btn-primary"
-                                           href="{% url 'download_scenario_summary' object.id %}">
-                                            Download
+                                {# status = CHANGED #}
+                                {% if object.status == 1 %}
+                                    <td class="col-3">
+                                        <form method="post">
+                                            {% csrf_token %}
+                                            <button type="submit" name="run" class="btn btn-primary">
+                                                Run
+                                            </button>
+                                        </form>
+                                    </td>
+                                    <td>
+                                        Run the evaluation. Depending on the scope of your scenario, this might take
+                                        a
+                                        while
+                                        . While the evaluation is running, you can safely close the browser and
+                                        return
+                                        later.
+                                    </td>
+                                    {# status = RUNNING #}
+                                {% elif object.status == 2 %}
+                                    <td class="col-3">
+                                        <a class="btn btn-primary" href="{% url 'scenario_result' object.id %}">
+                                            Show progress
                                         </a>
                                     </td>
-                                    <td>Download the scenario definition as .json file</td>
+                                    <td>The scenario evaluation is currently running.</td>
+                                    {# status = FINISHED #}
+                                {% elif object.status == 3 %}
+                                    <td class="col-3">
+                                        <a class="btn btn-primary" href="{% url 'scenario_result' object.id %}">
+                                            Show results
+                                        </a>
+                                    </td>
+                                    <td>
+                                        This is a summary of the complete configuration of this scenario. The
+                                        scenario
+                                        has
+                                        already been evaluated.
+                                    </td>
+                                {% endif %}
+                            </tr>
+                            <tr>
+                                <td class="col-2">
+                                    <a class="btn btn-primary"
+                                       href="{% url 'download_scenario_summary' object.id %}">
+                                        Download
+                                    </a>
+                                </td>
+                                <td>Download the scenario definition as .json file</td>
+                            </tr>
+                            {% if allow_edit %}
+                                <tr>
+                                    <td class="col-2">
+                                        <button
+                                                class="btn btn-primary"
+                                                type="button"
+                                                data-toggle="collapse"
+                                                data-target=".multi-collapse"
+                                                aria-expanded="false"
+                                                aria-controls="add-component-group">
+                                            Edit
+                                        </button>
+                                    </td>
                                 </tr>
-                            </table>
-                        </div>
-                        <div class="card-footer"></div>
+                            {% endif %}
+                        </table>
                     </div>
+                    <div class="card-footer"></div>
                 </div>
             </div>
-            <!-- End of Options card -->
-
         </div>
-
-        <!-- Map card -->
-        <div class="col">
-            <div class="card shadow">
-                <div class="card-header"><b>Scenario Map</b></div>
-                <div class="card-body p-0">
-                    {% leaflet_map "main" %}
-                </div>
-                <div class="card-footer"></div>
-            </div>
+        <div class="col col-12 col-lg-9">
+            {% for feedstock, algos in config.items %}
+                {% for algo, parameters in algos.items %}
+                    <div class="row mb-3">
+                        <div class="col">
+                            <div class="card border-left-primary border">
+                                <div class="card-header">
+                                    <h6 class="m-0 font-weight-bold text-primary">
+                                        Feedstock: {{ feedstock.name }} - Dataset: {{ algo.geodataset }} -
+                                        Algorithm: {{ algo.name }}</h6>
+                                </div>
+                                <div class="card-body">
+                                    <table class="table">
+                                        <tr>
+                                            <th>Parameters:</th>
+                                        </tr>
+                                        {% for parameter, value in parameters.items %}
+                                            <tr>
+                                                <td>
+                                                    {{ parameter.descriptive_name }}: {{ value }}
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </table>
+                                </div>
+                                <div class="card-footer">
+                                    <div class="collapse multi-collapse">
+                                        <a href="{% url 'scenario_update_config' scenario.id algo.id %}"
+                                           class="mx-2">
+                                            <i class="fas fa-fw fa-edit"></i> Edit
+                                        </a>
+                                        <a href="{% url 'remove_algorithm_from_scenario' scenario.id feedstock.id algo.id %}"
+                                           class="mx-2">
+                                            <i class="fas fa-fw fa-trash"></i> Remove from configuration
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                {% endfor %}
+            {% endfor %}
         </div>
-        <!-- end of Map card -->
     </div>
-    <!-- End of summary row -->
 
     <!-- Inventory definition row -->
     <div class="row mt-2">
         <div class="col">
-            <div class="card shadow">
-                <div class="card-header"><b>Inventories</b></div>
-                <div class="card-body">
-                    {% for feedstock, algos in config.items %}
-                        {% for algo, parameters in algos.items %}
-                            <div class="row mb-3">
-                                <div class="col">
-                                    <div class="card border-left-primary border">
-                                        <div class="card-header">
-                                            <h6 class="m-0 font-weight-bold text-primary">
-                                                Feedstock: {{ feedstock.name }} - Dataset: {{ algo.geodataset }} -
-                                                Algorithm: {{ algo.name }}</h6>
-                                        </div>
-                                        <div class="card-body">
-                                            <table class="table">
-                                                <tr>
-                                                    <th>Parameters:</th>
-                                                </tr>
-                                                {% for parameter, value in parameters.items %}
-                                                    <tr>
-                                                        <td>
-                                                            {{ parameter.descriptive_name }}: {{ value }}
-                                                        </td>
-                                                    </tr>
-                                                {% endfor %}
-                                            </table>
-                                        </div>
-                                        <div class="card-footer">
-                                            <div class="collapse multi-collapse">
-                                                <a href="{% url 'scenario_update_config' scenario.id algo.id %}"
-                                                   class="mx-2">
-                                                    <i class="fas fa-fw fa-edit"></i> Edit
-                                                </a>
-                                                <a href="{% url 'remove_algorithm_from_scenario' scenario.id feedstock.id algo.id %}"
-                                                   class="mx-2">
-                                                    <i class="fas fa-fw fa-trash"></i> Remove from configuration
-                                                </a>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        {% endfor %}
-                    {% endfor %}
-                    <div class="collapse multi-collapse">
-                        <div class="card border-left-primary border">
-                            <div class="card-header">
-                            </div>
-                            <div class="card-body">
-                                <a href="{% url 'add_scenario_configuration' scenario.id %}">
-                                    <i class="fas fa-fw fa-plus"></i> Add inventory
-                                </a>
-                            </div>
-                            <div class="card-footer">
-                            </div>
-                        </div>
+
+            <div class="collapse multi-collapse">
+                <div class="card border-left-primary border">
+                    <div class="card-header">
                     </div>
-                    <div class="card-footer"></div>
+                    <div class="card-body">
+                        <a href="{% url 'add_scenario_configuration' scenario.id %}">
+                            <i class="fas fa-fw fa-plus"></i> Add inventory
+                        </a>
+                    </div>
+                    <div class="card-footer">
+                    </div>
                 </div>
             </div>
         </div>
@@ -217,6 +178,7 @@
     {{ block.super }}
 
     <script type="text/javascript">
+
 
         let map;
         let catchment_layer;
