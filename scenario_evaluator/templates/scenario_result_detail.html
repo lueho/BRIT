@@ -52,9 +52,9 @@
         <div class="col col-12 col-lg-9">
             <div class="row">
                 {% for id, c in charts.items %}
-                    <div class="col col-12 col-xl-6">
-                        <div class="card shadow mb-4">
-                            <div class="card-header py-3"><b>{{ c.title }}</b></div>
+                    <div class="col col-12 col-xl-6 mb-4">
+                        <div class="card shadow h-100">
+                            <div class="card-header"><b>{{ c.title }}</b></div>
                             <div class="card-body p-0">
                                 <div class="chart-bar">
                                     <canvas id="{{ id }}"></canvas>
