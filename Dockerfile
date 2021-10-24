@@ -13,4 +13,4 @@ RUN pip install --upgrade pip && pip install -r requirements.txt
 
 COPY . /app
 
-RUN python manage.py collectstatic --noinput
+RUN python manage.py collectstatic --noinput --settings=flexibi_dst.settings.heroku
