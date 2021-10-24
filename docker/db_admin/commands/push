@@ -1,0 +1,7 @@
+export PGPASSWORD=$POSTGRES_PASSWORD
+pg_dump -Fc --no-acl --no-owner -h db -p $POSTGRES_PORT -U $POSTGRES_USER > push.dump
+aws s3 cp push.dump s3://$S3_BUCKET_NAME/push.dump
+#URL=$(aws s3 presign s3://$S3_BUCKET_NAME/push.dump)
+#URL=$(heroku config:get $HEROKU_POSTGRESQL_COLOR_URL -a $HEROKU_APP_NAME)
+heroku pg:backups:restore -a $HEROKU_APP_NAME --confirm $HEROKU_APP_NAME $(aws s3 presign s3://$S3_BUCKET_NAME/push.dump) $HEROKU_POSTGRESQL_COLOR_URL
+rm push.dump
