@@ -12,7 +12,6 @@ services:
   web:
     build:
       context: .
-      dockerfile: docker/web/Dockerfile
     volumes:
       - ./:/app
     depends_on:
@@ -27,7 +26,6 @@ services:
   celery:
     build:
       context: .
-      dockerfile: docker/web/Dockerfile
     command: celery --app=flexibi_dst worker --loglevel=info --logfile=logs/celery.log
     volumes:
       - ./:/app
