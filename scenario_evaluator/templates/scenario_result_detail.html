@@ -35,12 +35,24 @@
                         <table class="table">
                             <tr>
                                 <td class="col-2">
-                                    <a class="btn btn-primary" href="{% url 'download_result_summary' object.id %}">
-                                        Download</a>
+                                    <p>Download the summary as .json for further processing</p>
+                                    <div class="text-center">
+                                        <a class="btn btn-primary w-75"
+                                           href="{% url 'download_result_summary' object.id %}">
+                                            Download
+                                        </a>
+                                    </div>
                                 </td>
-                                <td>
-                                    Download .json file with result summary. Use this file to feed results into the
-                                    Process simulation tool.
+                            </tr>
+                            <tr>
+                                <td class="col-3">
+                                    <p>Show the configuration of the inventories:</p>
+                                    <div class="text-center">
+                                        <a class="btn btn-primary w-75"
+                                           href="{% url 'scenario_detail' object.id %}">
+                                            Show config
+                                        </a>
+                                    </div>
                                 </td>
                             </tr>
                         </table>
