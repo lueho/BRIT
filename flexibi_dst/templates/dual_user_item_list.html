@@ -12,22 +12,22 @@
         </div>
     </div>
 
-    <div class="row">
-        <div class="col">
-            <div class="card shadow mb-3">
-                <div class="card-header"><b>Your custom {{ item_name_plural }}</b></div>
-                {% if user.is_authenticated %}
-                    <div class="card-body">{% render_table custom_item_table %}</div>
-                {% else %}
-                    <div class="card-body">
-                        <a href="{% url 'auth_login' %}?next={{ request.path | urlencode }}">Login</a>
-                        to see your custom {{ item_name_plural }}.
-                    </div>
-                {% endif %}
-                <div class="card-footer"></div>
-            </div>
-        </div>
-    </div>
+{#    <div class="row">#}
+{#        <div class="col">#}
+{#            <div class="card shadow mb-3">#}
+{#                <div class="card-header"><b>Your custom {{ item_name_plural }}</b></div>#}
+{#                {% if user.is_authenticated %}#}
+{#                    <div class="card-body">{% render_table custom_item_table %}</div>#}
+{#                {% else %}#}
+{#                    <div class="card-body">#}
+{#                        <a href="{% url 'auth_login' %}?next={{ request.path | urlencode }}">Login</a>#}
+{#                        to see your custom {{ item_name_plural }}.#}
+{#                    </div>#}
+{#                {% endif %}#}
+{#                <div class="card-footer"></div>#}
+{#            </div>#}
+{#        </div>#}
+{#    </div>#}
 
 {% endblock content %}
 
