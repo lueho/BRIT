@@ -2,8 +2,8 @@ from django.db.models import Sum
 
 from distributions.plots import Distribution
 from flexibi_dst.models import TemporalDistribution
-from scenario_builder.algorithms import InventoryAlgorithmsBase
-from scenario_builder.models import Scenario
+from inventories.algorithms import InventoryAlgorithmsBase
+from inventories.models import Scenario
 from materials.models import MaterialSettings
 from .models import NantesGreenhouses, Greenhouse
 

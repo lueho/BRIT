@@ -2,7 +2,7 @@ from django.contrib.gis.geos import GEOSGeometry
 from django.db import connection
 from django.db.models import QuerySet
 
-from scenario_builder.models import Catchment
+from inventories.models import Catchment
 from .exceptions import EmptyQueryset
 
 

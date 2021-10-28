@@ -34,7 +34,7 @@ INSTALLED_APPS = [
     'distributions.apps.DistributionsConfig',
     'bibliography.apps.BibliographyConfig',
     'materials.apps.MaterialsConfig',
-    'scenario_builder.apps.ScenarioBuilderConfig',
+    'inventories.apps.InventoriesConfig',
     'scenario_evaluator.apps.ScenarioEvaluationConfig',
     'layer_manager.apps.LayerManagerConfig',
     'case_studies.flexibi_nantes.apps.CaseStudyNantesConfig',

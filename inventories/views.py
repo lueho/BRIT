@@ -122,7 +122,7 @@ class CatchmentGeometryAPI(APIView):
 class SeasonalDistributionCreateView(LoginRequiredMixin, CreateView):
     form_class = SeasonalDistributionModelForm
     template_name = 'seasonal_distribution_create.html'
-    success_url = '/scenario_builder/materials/{material_id}'
+    success_url = '/inventories/materials/{material_id}'
 
 
 # ----------- Regions --------------------------------------------------------------------------------------------------

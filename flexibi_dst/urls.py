@@ -19,7 +19,7 @@ urlpatterns = [
     path('contributors/', ContributorsView.as_view(), name='contributors'),
     path('maps/', include('maps.urls')),
     path('materials/', include('materials.urls')),
-    path('scenario_builder/', include('scenario_builder.urls')),
+    path('inventories/', include('inventories.urls')),
     path('scenario_evaluator/', include('scenario_evaluator.urls')),
     path('case_studies/nantes/', include('case_studies.flexibi_nantes.urls')),
     path('bibliography/', include('bibliography.urls')),

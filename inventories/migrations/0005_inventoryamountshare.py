@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
         ('flexibi_dst', '0001_initial'),
         ('materials', '0005_auto_20210510_1142'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ('scenario_builder', '0004_inventoryalgorithmparametervalue_type'),
+        ('inventories', '0004_inventoryalgorithmparametervalue_type'),
     ]
 
     operations = [

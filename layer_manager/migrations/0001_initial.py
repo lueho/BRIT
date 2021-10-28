@@ -9,7 +9,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('scenario_builder', '0001_initial'),
+        ('inventories', '0001_initial'),
         ('materials', '0001_initial'),
         ('flexibi_dst', '0001_initial'),
     ]
@@ -28,7 +28,7 @@ class Migration(migrations.Migration):
                 ('name', models.CharField(max_length=56)),
                 ('geom_type', models.CharField(max_length=20)),
                 ('table_name', models.CharField(max_length=200)),
-                ('algorithm', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='scenario_builder.InventoryAlgorithm')),
+                ('algorithm', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='inventories.InventoryAlgorithm')),
                 ('feedstock', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='materials.MaterialSettings')),
             ],
         ),
@@ -68,7 +68,7 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='layer',
             name='scenario',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='scenario_builder.Scenario'),
+            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='inventories.Scenario'),
         ),
         migrations.CreateModel(
             name='DistributionShare',

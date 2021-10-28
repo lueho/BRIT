@@ -1,6 +1,6 @@
 from django.db import models
 
-from scenario_builder.models import InventoryAlgorithm, Scenario
+from inventories.models import InventoryAlgorithm, Scenario
 
 
 class RunningTask(models.Model):

@@ -5,7 +5,7 @@ from celery import chord
 from flexibi_dst.celery import app
 from layer_manager.models import Layer
 from materials.models import MaterialSettings
-from scenario_builder.models import InventoryAlgorithm, Scenario, ScenarioStatus
+from inventories.models import InventoryAlgorithm, Scenario, ScenarioStatus
 from scenario_evaluator.models import RunningTask
 
 

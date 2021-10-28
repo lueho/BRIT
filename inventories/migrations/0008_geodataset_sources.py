@@ -7,7 +7,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('bibliography', '0003_delete_literaturesource'),
-        ('scenario_builder', '0007_auto_20211007_1350'),
+        ('inventories', '0007_auto_20211007_1350'),
     ]
 
     operations = [

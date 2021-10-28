@@ -8,7 +8,7 @@ from mock import Mock, patch, PropertyMock, MagicMock
 from distributions.plots import DataSet
 from flexibi_dst.exceptions import UnitMismatchError
 from materials.models import Material, BaseObjects
-from scenario_builder.models import Scenario, GeoDataset, Region, Catchment, InventoryAlgorithm, \
+from inventories.models import Scenario, GeoDataset, Region, Catchment, InventoryAlgorithm, \
     InventoryAlgorithmParameter, InventoryAlgorithmParameterValue, ScenarioInventoryConfiguration
 from scenario_evaluator.evaluations import ScenarioResult
 from users.models import ReferenceUsers

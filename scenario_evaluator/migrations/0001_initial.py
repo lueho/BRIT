@@ -9,7 +9,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('scenario_builder', '0001_initial'),
+        ('inventories', '0001_initial'),
     ]
 
     operations = [
@@ -18,8 +18,8 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('uuid', models.UUIDField()),
-                ('algorithm', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='scenario_builder.InventoryAlgorithm')),
-                ('scenario', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='scenario_builder.Scenario')),
+                ('algorithm', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='inventories.InventoryAlgorithm')),
+                ('scenario', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='inventories.Scenario')),
             ],
         ),
     ]

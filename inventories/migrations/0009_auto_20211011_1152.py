@@ -6,7 +6,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('scenario_builder', '0008_geodataset_sources'),
+        ('inventories', '0008_geodataset_sources'),
     ]
 
     operations = [

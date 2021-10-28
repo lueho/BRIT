@@ -4,7 +4,7 @@ from django.db import connection
 from django.test import TestCase
 
 from case_studies.flexibi_hamburg.models import HamburgGreenAreas
-from scenario_builder.models import Scenario, InventoryAlgorithm
+from inventories.models import Scenario, InventoryAlgorithm
 from .models import Layer, LayerField
 
 

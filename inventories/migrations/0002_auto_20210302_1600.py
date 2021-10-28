@@ -6,7 +6,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ('scenario_builder', '0001_initial'),
+        ('inventories', '0001_initial'),
     ]
 
     operations = [
@@ -14,12 +14,12 @@ class Migration(migrations.Migration):
             model_name='scenarioinventoryconfiguration',
             name='inventory_parameter',
             field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE,
-                                    to='scenario_builder.InventoryAlgorithmParameter'),
+                                    to='inventories.InventoryAlgorithmParameter'),
         ),
         migrations.AlterField(
             model_name='scenarioinventoryconfiguration',
             name='inventory_value',
             field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE,
-                                    to='scenario_builder.InventoryAlgorithmParameterValue'),
+                                    to='inventories.InventoryAlgorithmParameterValue'),
         ),
     ]

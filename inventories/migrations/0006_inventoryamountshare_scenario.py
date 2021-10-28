@@ -7,13 +7,13 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('scenario_builder', '0005_inventoryamountshare'),
+        ('inventories', '0005_inventoryamountshare'),
     ]
 
     operations = [
         migrations.AddField(
             model_name='inventoryamountshare',
             name='scenario',
-            field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='scenario_builder.Scenario'),
+            field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='inventories.Scenario'),
         ),
     ]

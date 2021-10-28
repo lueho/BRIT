@@ -1,6 +1,6 @@
 from django.views.generic import ListView
 
-from scenario_builder.models import GeoDataset
+from inventories.models import GeoDataset
 
 
 class MapsListView(ListView):

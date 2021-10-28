@@ -1,6 +1,6 @@
 from django.urls import path
 
-from scenario_builder.views import get_evaluation_status
+from inventories.views import get_evaluation_status
 from .views import (ScenarioEvaluationProgressView,
                     ScenarioListView,
                     ScenarioResultView,

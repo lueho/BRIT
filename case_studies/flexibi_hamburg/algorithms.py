@@ -2,8 +2,8 @@ from case_studies.flexibi_hamburg.models import HamburgGreenAreas, HamburgRoadsi
 from distributions.plots import Distribution
 from flexibi_dst.models import TemporalDistribution
 from materials.models import MaterialComponentGroup, MaterialSettings
-from scenario_builder.algorithms import InventoryAlgorithmsBase
-from scenario_builder.models import Scenario
+from inventories.algorithms import InventoryAlgorithmsBase
+from inventories.models import Scenario
 
 
 class InventoryAlgorithms(InventoryAlgorithmsBase):

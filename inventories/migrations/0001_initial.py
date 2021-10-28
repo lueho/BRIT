@@ -48,7 +48,7 @@ class Migration(migrations.Migration):
                 ('default', models.BooleanField(default=False, verbose_name='Default for this combination of geodataset and feedstock')),
                 ('source', models.CharField(blank=True, max_length=200, null=True)),
                 ('feedstock', models.ManyToManyField(limit_choices_to={'is_feedstock': True}, to='materials.Material')),
-                ('geodataset', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='scenario_builder.GeoDataset')),
+                ('geodataset', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='inventories.GeoDataset')),
             ],
         ),
         migrations.CreateModel(
@@ -60,7 +60,7 @@ class Migration(migrations.Migration):
                 ('description', models.TextField(blank=True, null=True)),
                 ('unit', models.CharField(blank=True, max_length=20, null=True)),
                 ('is_required', models.BooleanField(default=False)),
-                ('inventory_algorithm', models.ManyToManyField(to='scenario_builder.InventoryAlgorithm')),
+                ('inventory_algorithm', models.ManyToManyField(to='inventories.InventoryAlgorithm')),
             ],
         ),
         migrations.CreateModel(
@@ -73,7 +73,7 @@ class Migration(migrations.Migration):
                 ('standard_deviation', models.FloatField(null=True)),
                 ('source', models.CharField(blank=True, max_length=200, null=True)),
                 ('default', models.BooleanField(default=False)),
-                ('parameter', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='scenario_builder.InventoryAlgorithmParameter')),
+                ('parameter', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='inventories.InventoryAlgorithmParameter')),
             ],
         ),
         migrations.CreateModel(
@@ -91,9 +91,9 @@ class Migration(migrations.Migration):
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('name', models.CharField(default='Custom Scenario', max_length=56)),
                 ('description', models.TextField(blank=True, null=True)),
-                ('catchment', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='scenario_builder.Catchment')),
+                ('catchment', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='inventories.Catchment')),
                 ('owner', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
-                ('region', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='scenario_builder.Region')),
+                ('region', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='inventories.Region')),
             ],
         ),
         migrations.CreateModel(
@@ -110,7 +110,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('status', models.IntegerField(choices=[(1, 'Changed'), (2, 'Running'), (3, 'Finished')], default=1)),
-                ('scenario', models.OneToOneField(null=True, on_delete=django.db.models.deletion.CASCADE, to='scenario_builder.Scenario')),
+                ('scenario', models.OneToOneField(null=True, on_delete=django.db.models.deletion.CASCADE, to='inventories.Scenario')),
             ],
         ),
         migrations.CreateModel(
@@ -118,26 +118,26 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('feedstock', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='materials.MaterialSettings')),
-                ('geodataset', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='scenario_builder.GeoDataset')),
-                ('inventory_algorithm', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='scenario_builder.InventoryAlgorithm')),
-                ('inventory_parameter', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='scenario_builder.InventoryAlgorithmParameter')),
-                ('inventory_value', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='scenario_builder.InventoryAlgorithmParameterValue')),
-                ('scenario', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='scenario_builder.Scenario')),
+                ('geodataset', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='inventories.GeoDataset')),
+                ('inventory_algorithm', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='inventories.InventoryAlgorithm')),
+                ('inventory_parameter', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='inventories.InventoryAlgorithmParameter')),
+                ('inventory_value', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='inventories.InventoryAlgorithmParameterValue')),
+                ('scenario', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='inventories.Scenario')),
             ],
         ),
         migrations.AddField(
             model_name='scenario',
             name='site',
-            field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='scenario_builder.SFBSite'),
+            field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='inventories.SFBSite'),
         ),
         migrations.AddField(
             model_name='geodataset',
             name='region',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='scenario_builder.Region'),
+            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='inventories.Region'),
         ),
         migrations.AddField(
             model_name='catchment',
             name='region',
-            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='scenario_builder.Region'),
+            field=models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='inventories.Region'),
         ),
     ]
