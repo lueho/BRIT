@@ -15,7 +15,7 @@ at designing a decision support tool assessing the different pathway for the
 establishment of SFBs by evaluating all pa-rameters accounting to find
 sustainable solutions.
 
-FLEXIBI website: https://www.flexibi-biorefineries.eu
+FLEXIBI website: http://www.flexibi-biorefineries.eu
 
 ## The BIEM research group
 BIEM is a research group that is dedicated to bioresource management.
