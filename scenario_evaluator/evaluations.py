@@ -2,7 +2,7 @@ from distributions.plots import BarChart, DataSet
 from flexibi_dst.exceptions import UnitMismatchError
 from flexibi_dst.models import TemporalDistribution
 from layer_manager.models import LayerAggregatedDistribution
-from material_manager.models import BaseObjects
+from materials.models import BaseObjects
 
 
 class ScenarioResult:

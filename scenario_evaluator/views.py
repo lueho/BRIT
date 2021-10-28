@@ -7,7 +7,7 @@ from django.views.generic import DetailView
 
 from flexibi_dst.views import DualUserListView
 from layer_manager.models import Layer
-from material_manager.models import MaterialSettings
+from materials.models import MaterialSettings
 from scenario_builder.models import InventoryAlgorithm, Scenario
 from scenario_evaluator.evaluations import ScenarioResult
 from scenario_evaluator.models import RunningTask

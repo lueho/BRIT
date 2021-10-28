@@ -9,7 +9,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('flexibi_dst', '0001_initial'),
-        ('material_manager', '0005_auto_20210510_1142'),
+        ('materials', '0005_auto_20210510_1142'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         ('scenario_builder', '0004_inventoryalgorithmparametervalue_type'),
     ]
@@ -21,7 +21,7 @@ class Migration(migrations.Migration):
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('average', models.FloatField(default=0.0)),
                 ('standard_deviation', models.FloatField(default=0.0)),
-                ('feedstock', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='material_manager.MaterialSettings')),
+                ('feedstock', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='materials.MaterialSettings')),
                 ('owner', models.ForeignKey(default=1, on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
                 ('timestep', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='flexibi_dst.Timestep')),
             ],

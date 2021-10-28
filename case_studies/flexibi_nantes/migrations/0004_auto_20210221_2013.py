@@ -8,7 +8,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
     dependencies = [
         ('flexibi_dst', '0001_initial'),
-        ('material_manager', '0002_auto_20210218_1640'),
+        ('materials', '0002_auto_20210218_1640'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         ('flexibi_nantes', '0003_culture'),
     ]
@@ -58,7 +58,7 @@ class Migration(migrations.Migration):
             model_name='culture',
             name='residue',
             field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT,
-                                    to='material_manager.Material'),
+                                    to='materials.Material'),
         ),
         migrations.AlterField(
             model_name='greenhousegrowthcycle',
@@ -71,7 +71,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('group_settings', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE,
-                                                     to='material_manager.MaterialComponentGroupSettings')),
+                                                     to='materials.MaterialComponentGroupSettings')),
                 ('owner', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE,
                                             to=settings.AUTH_USER_MODEL)),
                 ('timestep', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='flexibi_dst.Timestep')),
@@ -84,7 +84,7 @@ class Migration(migrations.Migration):
                 ('average', models.FloatField(default=0.0)),
                 ('standard_deviation', models.FloatField(default=0.0)),
                 ('component', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE,
-                                                to='material_manager.MaterialComponent')),
+                                                to='materials.MaterialComponent')),
                 ('owner', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE,
                                             to=settings.AUTH_USER_MODEL)),
                 ('timestep_set', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE,

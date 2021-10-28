@@ -4,7 +4,7 @@ from distributions.plots import Distribution
 from flexibi_dst.models import TemporalDistribution
 from scenario_builder.algorithms import InventoryAlgorithmsBase
 from scenario_builder.models import Scenario
-from material_manager.models import MaterialSettings
+from materials.models import MaterialSettings
 from .models import NantesGreenhouses, Greenhouse
 
 

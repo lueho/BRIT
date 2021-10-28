@@ -6,7 +6,7 @@ from django.dispatch import receiver
 from django.urls import reverse
 
 from flexibi_dst.models import TemporalDistribution, Timestep
-from material_manager.models import Material, MaterialSettings, MaterialComponent, MaterialComponentGroup, \
+from materials.models import Material, MaterialSettings, MaterialComponent, MaterialComponentGroup, \
     MaterialComponentGroupSettings
 from users.models import ReferenceUsers
 from .tables import growthcycle_table_factory

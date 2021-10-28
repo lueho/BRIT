@@ -16,7 +16,7 @@ from django.utils.safestring import mark_safe
 from extra_views import InlineFormSetFactory
 
 from flexibi_dst.models import Timestep
-from material_manager.models import MaterialComponent
+from materials.models import MaterialComponent
 from .models import Culture, Greenhouse, GreenhouseGrowthCycle, NantesGreenhouses, GrowthTimeStepSet, GrowthShare
 
 CROP_CHOICES = (

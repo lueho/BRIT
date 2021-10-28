@@ -18,7 +18,7 @@ urlpatterns = [
     path('users/', include('users.urls')),
     path('contributors/', ContributorsView.as_view(), name='contributors'),
     path('maps/', include('maps.urls')),
-    path('material_manager/', include('material_manager.urls')),
+    path('materials/', include('materials.urls')),
     path('scenario_builder/', include('scenario_builder.urls')),
     path('scenario_evaluator/', include('scenario_evaluator.urls')),
     path('case_studies/nantes/', include('case_studies.flexibi_nantes.urls')),

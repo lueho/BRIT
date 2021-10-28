@@ -7,7 +7,7 @@ from django.db import migrations, models
 class Migration(migrations.Migration):
     dependencies = [
         ('flexibi_dst', '0001_initial'),
-        ('material_manager', '0002_auto_20210218_1640'),
+        ('materials', '0002_auto_20210218_1640'),
         ('layer_manager', '0001_initial'),
     ]
 
@@ -29,6 +29,6 @@ class Migration(migrations.Migration):
             model_name='distributionshare',
             name='component',
             field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE,
-                                    to='material_manager.MaterialComponent'),
+                                    to='materials.MaterialComponent'),
         ),
     ]

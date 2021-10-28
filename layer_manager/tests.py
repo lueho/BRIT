@@ -1,7 +1,7 @@
 from django.db.models.query import QuerySet
 from django.test import TestCase
 
-from material_manager.models import BaseObjects
+from materials.models import BaseObjects
 from .models import DistributionSet, DistributionShare, LayerAggregatedDistribution
 
 

@@ -10,7 +10,7 @@ from factory.django import mute_signals
 from mock import Mock, patch, PropertyMock, MagicMock
 
 from flexibi_dst.models import TemporalDistribution, Timestep
-from material_manager.models import (
+from materials.models import (
     Material,
     MaterialSettings,
     MaterialComponent,
@@ -438,7 +438,7 @@ class CompositionSetTestCase(NativeTestCase):
 
 class MaterialComponentShareTestCase(NativeTestCase):
 
-    @patch('material_manager.models.MaterialComponentShare.material_settings', new_callable=PropertyMock)
+    @patch('materials.models.MaterialComponentShare.material_settings', new_callable=PropertyMock)
     def test_property_material(self, mock_material_settings):
         material = Mock(spec=Material)
         material.name = 'Test material'
@@ -450,7 +450,7 @@ class MaterialComponentShareTestCase(NativeTestCase):
         share = MaterialComponentShare()
         self.assertEqual(share.material.name, 'Test material')
 
-    @patch('material_manager.models.MaterialComponentShare.group_settings', new_callable=PropertyMock)
+    @patch('materials.models.MaterialComponentShare.group_settings', new_callable=PropertyMock)
     def test_property_material_settings(self, mock_group_settings):
         material_settings = Mock(spec=MaterialSettings)
         material_settings.name = 'Test settings'
@@ -462,7 +462,7 @@ class MaterialComponentShareTestCase(NativeTestCase):
         share = MaterialComponentShare()
         self.assertEqual(share.material_settings.name, 'Test settings')
 
-    @patch('material_manager.models.MaterialComponentShare.group_settings', new_callable=PropertyMock)
+    @patch('materials.models.MaterialComponentShare.group_settings', new_callable=PropertyMock)
     def test_property_group(self, mock_group_settings):
         group = Mock(spec=MaterialComponentGroup)
         group.name = 'Test group'
@@ -474,7 +474,7 @@ class MaterialComponentShareTestCase(NativeTestCase):
         share = MaterialComponentShare()
         self.assertEqual(share.group.name, 'Test group')
 
-    @patch('material_manager.models.MaterialComponentShare.composition_set', new_callable=PropertyMock)
+    @patch('materials.models.MaterialComponentShare.composition_set', new_callable=PropertyMock)
     def test_property_group_settings(self, mock_composition_set):
         group_settings = Mock(spec=MaterialComponentGroupSettings)
         group_settings.id = 5
@@ -486,7 +486,7 @@ class MaterialComponentShareTestCase(NativeTestCase):
         share = MaterialComponentShare()
         self.assertEqual(share.group_settings.id, 5)
 
-    @patch('material_manager.models.MaterialComponentShare.composition_set', new_callable=PropertyMock)
+    @patch('materials.models.MaterialComponentShare.composition_set', new_callable=PropertyMock)
     def test_property_timestep(self, mock_composition_set):
         timestep = Mock(spec=Timestep)
         timestep.name = 'Test timestep'
@@ -498,7 +498,7 @@ class MaterialComponentShareTestCase(NativeTestCase):
         share = MaterialComponentShare()
         self.assertEqual(share.timestep.name, 'Test timestep')
 
-    @patch('material_manager.models.MaterialComponentShare.material_settings', new_callable=PropertyMock)
+    @patch('materials.models.MaterialComponentShare.material_settings', new_callable=PropertyMock)
     def test_get_absolute_url(self, mock_material_settings):
         material_settings = Mock(spec=MaterialSettings)
         material_settings.id = 4
@@ -507,7 +507,7 @@ class MaterialComponentShareTestCase(NativeTestCase):
         share = MaterialComponentShare()
         self.assertEqual(share.get_absolute_url(), reverse('material_settings', kwargs={'pk': 4}))
 
-    @patch('material_manager.models.MaterialComponentShare.material', new_callable=PropertyMock)
+    @patch('materials.models.MaterialComponentShare.material', new_callable=PropertyMock)
     def test_str(self, mock_material):
         component = Mock(spec=MaterialComponent)
         component.name = 'Test component'

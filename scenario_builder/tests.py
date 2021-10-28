@@ -3,7 +3,7 @@ from django.db.models.query import QuerySet
 from django.test import TestCase
 
 from flexibi_dst.models import TemporalDistribution, Timestep
-from material_manager.models import Material, MaterialComponent, MaterialComponentGroup, MaterialSettings
+from materials.models import Material, MaterialComponent, MaterialComponentGroup, MaterialSettings
 from users.models import ReferenceUsers
 from .models import (Catchment,
                      InventoryAlgorithm,

@@ -6,7 +6,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ('material_manager', '0002_auto_20210218_1640'),
+        ('materials', '0002_auto_20210218_1640'),
         ('flexibi_nantes', '0008_auto_20210222_1010'),
     ]
 
@@ -15,6 +15,6 @@ class Migration(migrations.Migration):
             model_name='culture',
             name='feedstock',
             field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT,
-                                    to='material_manager.MaterialSettings'),
+                                    to='materials.MaterialSettings'),
         ),
     ]

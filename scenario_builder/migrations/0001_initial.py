@@ -13,7 +13,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ('material_manager', '0001_initial'),
+        ('materials', '0001_initial'),
     ]
 
     operations = [
@@ -47,7 +47,7 @@ class Migration(migrations.Migration):
                 ('description', models.TextField(blank=True, null=True)),
                 ('default', models.BooleanField(default=False, verbose_name='Default for this combination of geodataset and feedstock')),
                 ('source', models.CharField(blank=True, max_length=200, null=True)),
-                ('feedstock', models.ManyToManyField(limit_choices_to={'is_feedstock': True}, to='material_manager.Material')),
+                ('feedstock', models.ManyToManyField(limit_choices_to={'is_feedstock': True}, to='materials.Material')),
                 ('geodataset', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='scenario_builder.GeoDataset')),
             ],
         ),
@@ -117,7 +117,7 @@ class Migration(migrations.Migration):
             name='ScenarioInventoryConfiguration',
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('feedstock', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='material_manager.MaterialSettings')),
+                ('feedstock', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='materials.MaterialSettings')),
                 ('geodataset', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='scenario_builder.GeoDataset')),
                 ('inventory_algorithm', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='scenario_builder.InventoryAlgorithm')),
                 ('inventory_parameter', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='scenario_builder.InventoryAlgorithmParameter')),

@@ -14,7 +14,7 @@ from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 from rest_framework.views import APIView
 
 from flexibi_dst.views import DualUserListView, UserOwnsObjectMixin, NextOrSuccessUrlMixin
-from material_manager.models import MaterialComponentGroup, BaseObjects
+from materials.models import MaterialComponentGroup, BaseObjects
 from users.models import ReferenceUsers
 from .forms import (CultureModelForm,
                     GreenhouseModalModelForm,

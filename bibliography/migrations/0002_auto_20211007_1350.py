@@ -8,7 +8,7 @@ import django.db.models.deletion
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('material_manager', '0005_auto_20210510_1142'),
+        ('materials', '0005_auto_20210510_1142'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         ('bibliography', '0001_initial'),
     ]

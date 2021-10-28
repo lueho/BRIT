@@ -15,7 +15,7 @@ from rest_framework.views import APIView
 
 from flexibi_dst.views import DualUserListView, UserOwnsObjectMixin, NextOrSuccessUrlMixin
 from layer_manager.models import Layer
-from material_manager.models import MaterialSettings
+from materials.models import MaterialSettings
 from users.models import ReferenceUsers
 from users.views import ModalLoginRequiredMixin
 from .forms import (

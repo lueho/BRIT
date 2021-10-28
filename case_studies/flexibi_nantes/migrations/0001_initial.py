@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('material_manager', '0001_initial'),
+        ('materials', '0001_initial'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
@@ -50,8 +50,8 @@ class Migration(migrations.Migration):
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('cycle_number', models.IntegerField(default=1)),
                 ('culture', models.CharField(blank=True, default='', max_length=255)),
-                ('component', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='material_manager.MaterialComponent')),
-                ('material', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='material_manager.Material')),
+                ('component', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, to='materials.MaterialComponent')),
+                ('material', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='materials.Material')),
             ],
         ),
         migrations.CreateModel(

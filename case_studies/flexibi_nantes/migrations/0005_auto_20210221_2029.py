@@ -6,7 +6,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ('material_manager', '0002_auto_20210218_1640'),
+        ('materials', '0002_auto_20210218_1640'),
         ('flexibi_nantes', '0004_auto_20210221_2013'),
     ]
 
@@ -19,7 +19,7 @@ class Migration(migrations.Migration):
             model_name='greenhousegrowthcycle',
             name='group_settings',
             field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE,
-                                    to='material_manager.MaterialComponentGroupSettings'),
+                                    to='materials.MaterialComponentGroupSettings'),
         ),
         migrations.AddField(
             model_name='growthtimestepset',

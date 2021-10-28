@@ -7,7 +7,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ('material_manager', '0002_auto_20210218_1640'),
+        ('materials', '0002_auto_20210218_1640'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         ('flexibi_nantes', '0002_auto_20210218_1203'),
     ]
@@ -21,7 +21,7 @@ class Migration(migrations.Migration):
                 ('owner', models.ForeignKey(default=1, on_delete=django.db.models.deletion.CASCADE,
                                             to=settings.AUTH_USER_MODEL)),
                 ('residue',
-                 models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='material_manager.Material')),
+                 models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='materials.Material')),
             ],
         ),
     ]

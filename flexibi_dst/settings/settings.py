@@ -33,7 +33,7 @@ INSTALLED_APPS = [
     'flexibi_dst.apps.FlexibiDstConfig',
     'distributions.apps.DistributionsConfig',
     'bibliography.apps.BibliographyConfig',
-    'material_manager.apps.MaterialManagerConfig',
+    'materials.apps.MaterialsConfig',
     'scenario_builder.apps.ScenarioBuilderConfig',
     'scenario_evaluator.apps.ScenarioEvaluationConfig',
     'layer_manager.apps.LayerManagerConfig',

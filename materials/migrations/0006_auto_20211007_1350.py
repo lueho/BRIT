@@ -7,7 +7,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         ('bibliography', '0002_auto_20211007_1350'),
-        ('material_manager', '0005_auto_20210510_1142'),
+        ('materials', '0005_auto_20210510_1142'),
     ]
 
     operations = [

@@ -4,7 +4,7 @@ from django.db import models, connection
 from django.urls import reverse
 
 from flexibi_dst.models import TemporalDistribution, Timestep
-from material_manager.models import MaterialSettings, MaterialComponentShare, CompositionSet, MaterialComponent
+from materials.models import MaterialSettings, MaterialComponentShare, CompositionSet, MaterialComponent
 from scenario_builder.models import Scenario, InventoryAlgorithm
 from .exceptions import InvalidGeometryType, NoFeaturesProvided, TableAlreadyExists
 
