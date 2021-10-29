@@ -2,7 +2,7 @@ import importlib
 
 from django.test import TestCase
 
-from flexibi_dst.models import TemporalDistribution
+from distributions.models import TemporalDistribution
 from inventories.models import Scenario
 from .models import Greenhouse, NantesGreenhouses
 

@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from django.test import TestCase
 
-from flexibi_dst.models import TemporalDistribution, Timestep
+from distributions.models import TemporalDistribution, Timestep
 from materials.models import MaterialComponent, MaterialComponentGroup, MaterialSettings
 from .models import (WrongParameterForInventoryAlgorithm)
 

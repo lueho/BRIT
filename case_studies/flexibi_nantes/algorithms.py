@@ -1,7 +1,7 @@
 from django.db.models import Sum
 
+from distributions.models import TemporalDistribution
 from distributions.plots import Distribution
-from flexibi_dst.models import TemporalDistribution
 from inventories.algorithms import InventoryAlgorithmsBase
 from inventories.models import Scenario
 from materials.models import MaterialSettings

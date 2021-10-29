@@ -10,8 +10,8 @@ from django.dispatch import receiver
 from django.urls import reverse
 
 import case_studies
-from flexibi_dst.models import Timestep
 from bibliography.models import Source
+from distributions.models import Timestep
 from materials.models import Material, MaterialSettings
 from .exceptions import BlockedRunningScenario
 

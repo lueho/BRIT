@@ -8,7 +8,7 @@ from django.forms import (Form,
 from django.forms.widgets import CheckboxSelectMultiple
 from leaflet.forms.widgets import LeafletWidget
 
-from flexibi_dst.models import TemporalDistribution
+from distributions.models import TemporalDistribution
 from .models import (
     Catchment,
     GeoDataset,

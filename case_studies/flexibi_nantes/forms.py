@@ -15,7 +15,7 @@ from django.forms.models import BaseInlineFormSet
 from django.utils.safestring import mark_safe
 from extra_views import InlineFormSetFactory
 
-from flexibi_dst.models import Timestep
+from distributions.models import Timestep
 from materials.models import MaterialComponent
 from .models import Culture, Greenhouse, GreenhouseGrowthCycle, NantesGreenhouses, GrowthTimeStepSet, GrowthShare
 

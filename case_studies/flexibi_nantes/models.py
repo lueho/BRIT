@@ -5,7 +5,7 @@ from django.db.models.signals import post_delete
 from django.dispatch import receiver
 from django.urls import reverse
 
-from flexibi_dst.models import TemporalDistribution, Timestep
+from distributions.models import TemporalDistribution, Timestep
 from materials.models import Material, MaterialSettings, MaterialComponent, MaterialComponentGroup, \
     MaterialComponentGroupSettings
 from users.models import ReferenceUsers

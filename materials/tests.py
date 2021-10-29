@@ -9,7 +9,7 @@ from django.urls import reverse
 from factory.django import mute_signals
 from mock import Mock, patch, PropertyMock, MagicMock
 
-from flexibi_dst.models import TemporalDistribution, Timestep
+from distributions.models import TemporalDistribution, Timestep
 from materials.models import (
     Material,
     MaterialSettings,

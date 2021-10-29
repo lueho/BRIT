@@ -3,9 +3,9 @@ from django.apps import apps
 from django.db import models, connection
 from django.urls import reverse
 
-from flexibi_dst.models import TemporalDistribution, Timestep
-from materials.models import MaterialSettings, MaterialComponentShare, CompositionSet, MaterialComponent
+from distributions.models import TemporalDistribution, Timestep
 from inventories.models import Scenario, InventoryAlgorithm
+from materials.models import MaterialSettings, MaterialComponentShare, CompositionSet, MaterialComponent
 from .exceptions import InvalidGeometryType, NoFeaturesProvided, TableAlreadyExists
 
 

@@ -1,6 +1,6 @@
+from distributions.models import TemporalDistribution
 from distributions.plots import BarChart, DataSet
 from flexibi_dst.exceptions import UnitMismatchError
-from flexibi_dst.models import TemporalDistribution
 from layer_manager.models import LayerAggregatedDistribution
 from materials.models import BaseObjects
 
