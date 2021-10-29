@@ -10,33 +10,4 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.RunSQL("""
-                INSERT INTO inventories_runningtask (
-                    scenario_id,
-                    algorithm_id,
-                    uuid
-                )
-                SELECT
-                    scenario_id,
-                    algorithm_id,
-                    uuid
-                FROM
-                    scenario_evaluator_runningtask;
-                
-                SELECT setval(pg_get_serial_sequence('"inventories_runningtask"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "inventories_runningtask";
-            """, reverse_sql="""
-                INSERT INTO scenario_evaluator_runningtask (
-                    scenario_id,
-                    algorithm_id,
-                    uuid
-                )
-                SELECT
-                    scenario_id,
-                    algorithm_id,
-                    uuid
-                FROM
-                    inventories_runningtask;
-                    
-                SELECT setval(pg_get_serial_sequence('"scenario_evaluator_runningtask"','id'), coalesce(max("id"), 1), max("id") IS NOT null) FROM "scenario_evaluator_runningtask";
-            """)
     ]
