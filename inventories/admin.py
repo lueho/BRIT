@@ -15,7 +15,8 @@ from .models import (Catchment,
                      ScenarioInventoryConfiguration,
                      ScenarioStatus,
                      SFBSite,
-                     GeoDataset, )
+                     GeoDataset,
+                     RunningTask)
 
 
 class CatchmentForm(ModelForm):
@@ -187,3 +188,4 @@ class ScenarioStatusAdmin(ModelAdmin):
 
 admin.site.register(SFBSite)
 admin.site.register(InventoryAmountShare)
+admin.site.register(RunningTask)

@@ -35,7 +35,6 @@ INSTALLED_APPS = [
     'bibliography.apps.BibliographyConfig',
     'materials.apps.MaterialsConfig',
     'inventories.apps.InventoriesConfig',
-    'scenario_evaluator.apps.ScenarioEvaluationConfig',
     'layer_manager.apps.LayerManagerConfig',
     'case_studies.flexibi_nantes.apps.CaseStudyNantesConfig',
     'case_studies.flexibi_hamburg.apps.FlexibiHamburgConfig',

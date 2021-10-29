@@ -20,7 +20,6 @@ urlpatterns = [
     path('maps/', include('maps.urls')),
     path('materials/', include('materials.urls')),
     path('inventories/', include('inventories.urls')),
-    path('scenario_evaluator/', include('scenario_evaluator.urls')),
     path('case_studies/nantes/', include('case_studies.flexibi_nantes.urls')),
     path('bibliography/', include('bibliography.urls')),
     path('cookies/', include('cookie_consent.urls')),
