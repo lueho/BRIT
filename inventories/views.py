@@ -13,7 +13,7 @@ from django.views.generic.base import TemplateResponseMixin
 from django.views.generic.edit import FormMixin, ModelFormMixin
 from rest_framework.views import APIView
 
-from flexibi_dst.views import DualUserListView, UserOwnsObjectMixin, NextOrSuccessUrlMixin
+from brit.views import DualUserListView, UserOwnsObjectMixin, NextOrSuccessUrlMixin
 from layer_manager.models import Layer
 from materials.models import MaterialSettings
 from users.models import ReferenceUsers
@@ -225,7 +225,7 @@ class ScenarioDetailView(UserPassesTestMixin, DetailView):
 class ScenarioUpdateView(ModalLoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
     model = Scenario
     form_class = ScenarioModalModelForm
-    template_name = '../../flexibi_dst/templates/modal_form.html'
+    template_name = '../../brit/templates/modal_form.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

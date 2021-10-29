@@ -30,7 +30,7 @@ INSTALLED_APPS = [
     'cookie_consent',
     'users.apps.UsersConfig',
     'maps.apps.MapsConfig',
-    'flexibi_dst.apps.FlexibiDstConfig',
+    'brit.apps.BRITConfig',
     'distributions.apps.DistributionsConfig',
     'bibliography.apps.BibliographyConfig',
     'materials.apps.MaterialsConfig',
@@ -57,7 +57,7 @@ MIDDLEWARE = [
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
 
-ROOT_URLCONF = 'flexibi_dst.urls'
+ROOT_URLCONF = 'brit.urls'
 
 TEMPLATES = [
     {
@@ -81,7 +81,7 @@ TEMPLATE_CONTEXT_PROCESSORS = [
     'django.template.context_processors.request'
 ]
 
-WSGI_APPLICATION = 'flexibi_dst.wsgi.application'
+WSGI_APPLICATION = 'brit.wsgi.application'
 
 DATABASES = {}
 

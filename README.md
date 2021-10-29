@@ -35,6 +35,6 @@ If you want to run a local instance with your own database,
 you can do so via Docker:
 
 1) Clone this repository ```git clone git@github.com:lueho/BRIT.git ```
-2) cd into directory ```cd flexibi_dst```
+2) cd into directory ```cd brit```
 3) Build and run services ```docker-compose --profile dev up --build```
 

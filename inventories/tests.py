@@ -333,7 +333,7 @@ from django_mock_queries.query import MockSet, MockModel
 from mock import Mock, patch, PropertyMock, MagicMock
 
 from distributions.plots import DataSet
-from flexibi_dst.exceptions import UnitMismatchError
+from brit.exceptions import UnitMismatchError
 from materials.models import Material, BaseObjects
 from inventories.models import Scenario, GeoDataset, Region, Catchment, InventoryAlgorithm, \
     InventoryAlgorithmParameter, InventoryAlgorithmParameterValue, ScenarioInventoryConfiguration

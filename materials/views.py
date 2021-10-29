@@ -7,8 +7,8 @@ from django.urls import reverse_lazy
 from django.views.generic import CreateView, DeleteView, DetailView, View, ListView
 from extra_views import UpdateWithInlinesView
 
+from brit.views import DualUserListView, UserOwnsObjectMixin, NextOrSuccessUrlMixin
 from distributions.models import TemporalDistribution
-from flexibi_dst.views import DualUserListView, UserOwnsObjectMixin, NextOrSuccessUrlMixin
 from users.models import ReferenceUsers
 from .forms import (
     AddComponentForm,

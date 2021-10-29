@@ -1,14 +1,12 @@
 from django.urls import path
 
-from flexibi_dst.views import ModalMessageView
-
+from brit.views import ModalMessageView
 from .views import (AddComponentView,
                     AddComponentGroupView,
                     AddSourceView,
                     AddSeasonalVariationView,
                     RemoveSeasonalVariationView,
                     MaterialListView,
-                    MaterialCreateView,
                     MaterialDetailView,
                     MaterialUpdateView,
                     MaterialDeleteView,

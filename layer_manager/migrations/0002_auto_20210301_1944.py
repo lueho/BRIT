@@ -6,7 +6,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ('flexibi_dst', '0001_initial'),
+        ('distributions', '0001_initial'),
         ('materials', '0002_auto_20210218_1640'),
         ('layer_manager', '0001_initial'),
     ]
@@ -23,7 +23,8 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='distributionset',
             name='timestep',
-            field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='flexibi_dst.Timestep'),
+            field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE,
+                                    to='distributions.Timestep'),
         ),
         migrations.AddField(
             model_name='distributionshare',

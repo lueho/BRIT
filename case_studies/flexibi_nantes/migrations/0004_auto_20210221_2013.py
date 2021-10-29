@@ -7,7 +7,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ('flexibi_dst', '0001_initial'),
+        ('distributions', '0001_initial'),
         ('materials', '0002_auto_20210218_1640'),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
         ('flexibi_nantes', '0003_culture'),
@@ -74,7 +74,8 @@ class Migration(migrations.Migration):
                                                      to='materials.MaterialComponentGroupSettings')),
                 ('owner', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE,
                                             to=settings.AUTH_USER_MODEL)),
-                ('timestep', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='flexibi_dst.Timestep')),
+                ('timestep',
+                 models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='distributions.Timestep')),
             ],
         ),
         migrations.CreateModel(

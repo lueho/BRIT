@@ -8,7 +8,7 @@ services:
     volumes:
       - flexibi_db/:/var/lib/postgresql/data/
     env_file:
-      - flexibi_dst/settings/.env
+      - brit/settings/.env
   web:
     build:
       context: .
@@ -19,18 +19,18 @@ services:
     ports:
       - "8000:8000"
     env_file:
-      - flexibi_dst/settings/.env
+      - brit/settings/.env
     links:
       - db
     profiles: ["dev"]
   celery:
     build:
       context: .
-    command: celery --app=flexibi_dst worker --loglevel=info --logfile=logs/celery.log
+    command: celery --app=brit worker --loglevel=info --logfile=logs/celery.log
     volumes:
       - ./:/app
     env_file:
-      - flexibi_dst/settings/.env
+      - brit/settings/.env
     depends_on:
       - web
       - redis
@@ -42,17 +42,17 @@ services:
     build:
       context: ./docker/db_admin/
     env_file:
-      - flexibi_dst/settings/.env
+      - brit/settings/.env
     depends_on:
       - db
     profiles: ["db_admin"]
 #  dashboard:
 #    build: .
-#    command: flower -A flexibi_dst --port=5555 --broker=redis://redis:6379/0
+#    command: flower -A brit --port=5555 --broker=redis://redis:6379/0
 #    ports:
 #      - 5555:5555
 #    env_file:
-#      - flexibi_dst/settings/.env
+#      - brit/settings/.env
 #    depends_on:
 #      - web
 #      - redis

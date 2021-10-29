@@ -11,7 +11,7 @@ class Migration(migrations.Migration):
     dependencies = [
         ('inventories', '0001_initial'),
         ('materials', '0001_initial'),
-        ('flexibi_dst', '0001_initial'),
+        ('distributions', '0001_initial'),
     ]
 
     operations = [
@@ -56,8 +56,10 @@ class Migration(migrations.Migration):
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('name', models.CharField(max_length=255, null=True)),
                 ('type', models.CharField(choices=[('seasonal', 'seasonal')], max_length=255, null=True)),
-                ('distribution', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='flexibi_dst.TemporalDistribution')),
-                ('layer', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='layer_manager.Layer')),
+                ('distribution', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE,
+                                                   to='distributions.TemporalDistribution')),
+                ('layer',
+                 models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='layer_manager.Layer')),
             ],
         ),
         migrations.AddField(
@@ -76,8 +78,10 @@ class Migration(migrations.Migration):
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('average', models.FloatField()),
                 ('standard_deviation', models.DecimalField(decimal_places=2, max_digits=5)),
-                ('distribution_set', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='layer_manager.DistributionSet')),
-                ('timestep', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='flexibi_dst.Timestep')),
+                ('distribution_set',
+                 models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='layer_manager.DistributionSet')),
+                ('timestep',
+                 models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='distributions.Timestep')),
             ],
         ),
         migrations.AddField(

@@ -3,8 +3,8 @@ build:
     web: Dockerfile
     worker: Dockerfile
 run:
-  web: gunicorn flexibi_dst.wsgi:application --bind 0.0.0.0:$PORT
-  worker: celery worker --app=flexibi_dst
+  web: gunicorn brit.wsgi:application --bind 0.0.0.0:$PORT
+  worker: celery worker --app=brit
 release:
   image: web
   command:

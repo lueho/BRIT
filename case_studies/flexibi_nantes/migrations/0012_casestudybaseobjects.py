@@ -6,7 +6,7 @@ from django.db import migrations, models
 
 class Migration(migrations.Migration):
     dependencies = [
-        ('flexibi_dst', '0001_initial'),
+        ('distributions', '0001_initial'),
         ('flexibi_nantes', '0011_auto_20210222_1606'),
     ]
 
@@ -16,7 +16,7 @@ class Migration(migrations.Migration):
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
                 ('reference_distribution', models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT,
-                                                             to='flexibi_dst.TemporalDistribution')),
+                                                             to='distributions.TemporalDistribution')),
             ],
         ),
     ]

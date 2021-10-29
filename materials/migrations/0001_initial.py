@@ -12,7 +12,7 @@ class Migration(migrations.Migration):
 
     dependencies = [
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
-        ('flexibi_dst', '0001_initial'),
+        ('distributions', '0001_initial'),
         ('bibliography', '0001_initial'),
     ]
 
@@ -90,12 +90,16 @@ class Migration(migrations.Migration):
             name='MaterialComponentGroupSettings',
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('fractions_of', models.ForeignKey(default=1, on_delete=django.db.models.deletion.CASCADE, to='materials.MaterialComponent')),
-                ('group', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='materials.MaterialComponentGroup')),
-                ('material_settings', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='materials.MaterialSettings')),
-                ('owner', models.ForeignKey(default=8, on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
+                ('fractions_of', models.ForeignKey(default=1, on_delete=django.db.models.deletion.CASCADE,
+                                                   to='materials.MaterialComponent')),
+                ('group', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE,
+                                            to='materials.MaterialComponentGroup')),
+                ('material_settings', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE,
+                                                        to='materials.MaterialSettings')),
+                ('owner', models.ForeignKey(default=8, on_delete=django.db.models.deletion.CASCADE,
+                                            to=settings.AUTH_USER_MODEL)),
                 ('sources', models.ManyToManyField(to='bibliography.LiteratureSource')),
-                ('temporal_distributions', models.ManyToManyField(to='flexibi_dst.TemporalDistribution')),
+                ('temporal_distributions', models.ManyToManyField(to='distributions.TemporalDistribution')),
             ],
         ),
         migrations.AddField(
@@ -111,16 +115,21 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='compositionset',
             name='timestep',
-            field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='flexibi_dst.Timestep'),
+            field=models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE,
+                                    to='distributions.Timestep'),
         ),
         migrations.CreateModel(
             name='BaseObjects',
             fields=[
                 ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('base_component', models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT, to='materials.MaterialComponent')),
-                ('base_distribution', models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT, to='flexibi_dst.TemporalDistribution')),
-                ('base_group', models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT, to='materials.MaterialComponentGroup')),
-                ('base_timestep', models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT, to='flexibi_dst.Timestep')),
+                ('base_component', models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT,
+                                                     to='materials.MaterialComponent')),
+                ('base_distribution', models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT,
+                                                        to='distributions.TemporalDistribution')),
+                ('base_group', models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT,
+                                                 to='materials.MaterialComponentGroup')),
+                ('base_timestep', models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT,
+                                                    to='distributions.Timestep')),
             ],
         ),
     ]

@@ -13,7 +13,7 @@ from django_tables2 import table_factory
 from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 from rest_framework.views import APIView
 
-from flexibi_dst.views import DualUserListView, UserOwnsObjectMixin, NextOrSuccessUrlMixin
+from brit.views import DualUserListView, UserOwnsObjectMixin, NextOrSuccessUrlMixin
 from materials.models import MaterialComponentGroup, BaseObjects
 from users.models import ReferenceUsers
 from .forms import (CultureModelForm,
@@ -39,7 +39,7 @@ class CultureListView(DualUserListView):
 
 class CultureCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, BSModalCreateView):
     form_class = CultureModelForm
-    template_name = '../../flexibi_dst/templates/modal_form.html'
+    template_name = '../../brit/templates/modal_form.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -69,7 +69,7 @@ class CultureDetailView(UserOwnsObjectMixin, BSModalReadView):
 class CultureUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
     model = Culture
     form_class = CultureModelForm
-    template_name = '../../flexibi_dst/templates/modal_form.html'
+    template_name = '../../brit/templates/modal_form.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -121,7 +121,7 @@ class GreenhouseListView(DualUserListView):
 
 class GreenhouseCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, BSModalCreateView):
     form_class = GreenhouseModalModelForm
-    template_name = '../../flexibi_dst/templates/modal_form.html'
+    template_name = '../../brit/templates/modal_form.html'
     success_url = reverse_lazy('greenhouse_list')
 
     def get_context_data(self, **kwargs):
@@ -150,7 +150,7 @@ class GreenhouseDetailView(UserOwnsObjectMixin, DetailView):
 class GreenhouseUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
     model = Greenhouse
     form_class = GreenhouseModalModelForm
-    template_name = '../../flexibi_dst/templates/modal_form.html'
+    template_name = '../../brit/templates/modal_form.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -192,7 +192,7 @@ class GreenhouseGrowthCycleCreateView(LoginRequiredMixin, CreateWithInlinesView)
 class GrowthCycleCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, BSModalCreateView):
     model = GreenhouseGrowthCycle
     form_class = GrowthCycleCreateForm
-    template_name = '../../flexibi_dst/templates/modal_form.html'
+    template_name = '../../brit/templates/modal_form.html'
     object = None
 
     def get_context_data(self, **kwargs):

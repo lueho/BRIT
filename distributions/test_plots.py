@@ -1,7 +1,7 @@
 from unittest import TestCase as NativeTestCase
 
+from brit.exceptions import UnitMismatchError
 from distributions.plots import BaseChart, BarChart, BaseDataSet
-from flexibi_dst.exceptions import UnitMismatchError
 
 
 class BaseDataSetTestCase(NativeTestCase):

@@ -5,7 +5,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.views.generic import RedirectView
 
-from .views import HomeView, ContributorsView, DoughnutView
+from .views import HomeView, ContributorsView
 
 admin.autodiscover()
 admin.site.enable_nav_sidebar = False
@@ -23,7 +23,6 @@ urlpatterns = [
     path('case_studies/nantes/', include('case_studies.flexibi_nantes.urls')),
     path('bibliography/', include('bibliography.urls')),
     path('cookies/', include('cookie_consent.urls')),
-    path('doughnut/', DoughnutView.as_view(), name='doughnut_view')
 ]
 
 if settings.DEBUG:
