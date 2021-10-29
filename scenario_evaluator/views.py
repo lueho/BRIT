@@ -8,9 +8,8 @@ from django.views.generic import DetailView
 from flexibi_dst.views import DualUserListView
 from layer_manager.models import Layer
 from materials.models import MaterialSettings
-from inventories.models import InventoryAlgorithm, Scenario
+from inventories.models import InventoryAlgorithm, Scenario, RunningTask
 from scenario_evaluator.evaluations import ScenarioResult
-from scenario_evaluator.models import RunningTask
 from users.models import ReferenceUsers
 
 

@@ -601,3 +601,9 @@ class ScenarioInventoryConfiguration(models.Model):
 
     def get_absolute_url(self):
         return reverse('scenario_detail', kwargs={'pk': self.scenario.pk})
+
+
+class RunningTask(models.Model):
+    scenario = models.ForeignKey(Scenario, on_delete=models.CASCADE)
+    algorithm = models.ForeignKey(InventoryAlgorithm, on_delete=models.CASCADE, null=True)
+    uuid = models.UUIDField(primary_key=False)
