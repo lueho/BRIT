@@ -56,9 +56,9 @@ class RegionAdmin(OSMGeoAdmin):
 
     # @staticmethod
     # def implemented_algorithms(obj):
-    #     algorithms = [(reverse('admin:scenario_builder_inventoryalgorithm_change', args=(alg.id,)),
+    #     algorithms = [(reverse('admin:inventories_inventoryalgorithm_change', args=(alg.id,)),
     #                    alg.geodataset.name,
-    #                    reverse('admin:scenario_builder_material_change', args=(alg.feedstock.id,)),
+    #                    reverse('admin:inventories_material_change', args=(alg.feedstock.id,)),
     #                    alg.feedstock.name)
     #                   for alg in InventoryAlgorithm.objects.filter(geodataset__region=obj)]
     #     algorithm_list = format_html_join(
@@ -79,19 +79,19 @@ class InventoryAlgorithmAdmin(ModelAdmin):
 
     @staticmethod
     def geodataset_link(obj):
-        url = reverse('admin:scenario_builder_geodataset_change', args=(obj.geodataset.id,))
+        url = reverse('admin:inventories_geodataset_change', args=(obj.geodataset.id,))
         return format_html("<a href='{}'>{}</a>", url, obj.geodataset.name)
 
     # @staticmethod
     # def feedstock_link(obj):
-    #     url = reverse('admin:scenario_builder_material_change', args=(obj.feedstock.id,))
+    #     url = reverse('admin:inventories_material_change', args=(obj.feedstock.id,))
     #     return format_html("<a href='{}'>{}</a>", url, obj.feedstock.name)
 
     # @staticmethod
     # def parameter_list(obj):
     #     parameter_list = format_html_join(
     #         '\n', "<li><a href='{}'>{}</a></li>",
-    #         ((reverse('admin:scenario_builder_inventoryalgorithmparameter_change', args=(p.id,)), p) for p in
+    #         ((reverse('admin:inventories_inventoryalgorithmparameter_change', args=(p.id,)), p) for p in
     #          InventoryAlgorithmParameter.objects.filter(inventory_algorithm=obj))
     #     )
     #     return parameter_list
@@ -103,7 +103,7 @@ class InventoryAlgorithmParameterAdmin(ModelAdmin):
 
     # @staticmethod
     # def algorithm(obj):
-    #     url = reverse('admin:scenario_builder_inventoryalgorithm_change', args=(obj.inventory_algorithm.id,))
+    #     url = reverse('admin:inventories_inventoryalgorithm_change', args=(obj.inventory_algorithm.id,))
     #     return format_html("<a href='{}'>{}</a>", url, obj.inventory_algorithm.name)
 
 
@@ -113,7 +113,7 @@ class InventoryAlgorithmParameterValueAdmin(ModelAdmin):
 
     # @staticmethod
     # def parameter_link(obj):
-    #     url = reverse('admin:scenario_builder_inventoryalgorithmparameter_change', args=(obj.parameter.id,))
+    #     url = reverse('admin:inventories_inventoryalgorithmparameter_change', args=(obj.parameter.id,))
     #     return format_html("<a href='{}'>{}</a>", url, obj.parameter.descriptive_name)
 
     # @staticmethod
@@ -133,22 +133,22 @@ class ScenarioInventoryConfigurationAdmin(ModelAdmin):
 
     @staticmethod
     def geodataset_link(obj):
-        url = reverse('admin:scenario_builder_geodataset_change', args=(obj.geodataset.id,))
+        url = reverse('admin:inventories_geodataset_change', args=(obj.geodataset.id,))
         return format_html("<a href='{}'>{}</a>", url, obj.geodataset.name)
 
     @staticmethod
     def inventory_algorithm_link(obj):
-        url = reverse('admin:scenario_builder_inventoryalgorithm_change', args=(obj.inventory_algorithm.id,))
+        url = reverse('admin:inventories_inventoryalgorithm_change', args=(obj.inventory_algorithm.id,))
         return format_html("<a href='{}'>{}</a>", url, obj.inventory_algorithm.name)
 
     @staticmethod
     def parameter(obj):
-        url = reverse('admin:scenario_builder_inventoryalgorithmparameter_change', args=(obj.inventory_parameter.id,))
+        url = reverse('admin:inventories_inventoryalgorithmparameter_change', args=(obj.inventory_parameter.id,))
         return format_html("<a href='{}'>{}</a>", url, obj.inventory_parameter.descriptive_name)
 
     @staticmethod
     def value(obj):
-        url = reverse('admin:scenario_builder_inventoryalgorithmparametervalue_change', args=(obj.inventory_value.id,))
+        url = reverse('admin:inventories_inventoryalgorithmparametervalue_change', args=(obj.inventory_value.id,))
         return format_html("<a href='{}'>{}</a>", url, obj.inventory_value.name)
 
 
@@ -163,12 +163,12 @@ class ScenarioAdmin(ModelAdmin):
 
     @staticmethod
     def region_link(obj):
-        url = reverse('admin:scenario_builder_region_change', args=(obj.region.id,))
+        url = reverse('admin:inventories_region_change', args=(obj.region.id,))
         return format_html("<a href='{}'>{}</a>", url, obj.region.name)
 
     @staticmethod
     def catchment_link(obj):
-        url = reverse('admin:scenario_builder_catchment_change', args=(obj.catchment.id,))
+        url = reverse('admin:inventories_catchment_change', args=(obj.catchment.id,))
         return format_html("<a href='{}'>{}</a>", url, obj.catchment.name)
 
     @staticmethod
