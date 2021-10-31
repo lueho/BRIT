@@ -22,7 +22,6 @@ services:
       - brit/settings/.env
     links:
       - db
-    profiles: ["dev"]
   celery:
     build:
       context: .
@@ -34,10 +33,8 @@ services:
     depends_on:
       - web
       - redis
-    profiles: [ "dev" ]
   redis:
     image: redis:5-alpine
-    profiles: ["dev"]
   db_admin:
     build:
       context: ./docker/db_admin/
@@ -45,7 +42,7 @@ services:
       - brit/settings/.env
     depends_on:
       - db
-    profiles: ["db_admin"]
+    profiles: [ "db_admin" ]
 #  dashboard:
 #    build: .
 #    command: flower -A brit --port=5555 --broker=redis://redis:6379/0
@@ -59,4 +56,4 @@ services:
 #      - celery
 
 volumes:
-  flexibi_db:
+  brit_db:
