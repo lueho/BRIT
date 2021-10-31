@@ -25,7 +25,7 @@ class LiteratureSourceListView(ListView):
 class LiteratureSourceCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, CreateView):
     form_class = LitSourceModelForm
     template_name = 'source_create.html'
-    success_url = reverse_lazy('literature source_list')
+    success_url = reverse_lazy('bib_source_list')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
