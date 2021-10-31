@@ -33,11 +33,40 @@
                             Filter
                         </button>
                     </div>
-                </div>
-                <div class="card shadow">
-                    <div class="card-header"><b>Summary</b></div>
-                    <div class="card-body">
-                        <div id="summary-container"></div>
+                    <div class="card-header"
+                         role="button"
+                         data-toggle="collapse"
+                         href="#summary-container"
+                         aria-expanded="true"
+                         aria-controls="summary-container">
+                        <b>Summary</b>
+                    </div>
+                    <div class="card-body collapse" id="summary-container">
+                        <p class="card-text">No data selected, yet.</p>
+                    </div>
+                    <div class="card-header"
+                         role="button"
+                         data-toggle="collapse"
+                         href="#sources-body"
+                         aria-expanded="true"
+                         aria-controls="sources-body">
+                        <b>Data source</b>
+                    </div>
+                    <div class="card-body collapse" id="sources-body">
+                        <table class="table">
+                            {% for source in geodataset.sources.all %}
+                                <a href="{% url 'bib_source_detail' source.id %}"
+                                   class="modal-link">
+                                    {{ source.abbreviation }}{% if not forloop.last %},{% endif %}
+                                </a>
+                            {% endfor %}
+                        </table>
+                        {#                        <div class="collapse multi-collapse">#}
+                        {#                            <a href="{% url 'add_bib_source' geodataset.id %}"#}
+                        {#                               class="modal-link">#}
+                        {#                                <i class="fas fa-fw fa-plus"></i> Add source#}
+                        {#                            </a>#}
+                        {#                        </div>#}
                     </div>
                 </div>
             </div>
