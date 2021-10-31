@@ -98,7 +98,7 @@ class Migration(migrations.Migration):
                                                         to='materials.MaterialSettings')),
                 ('owner', models.ForeignKey(default=8, on_delete=django.db.models.deletion.CASCADE,
                                             to=settings.AUTH_USER_MODEL)),
-                ('sources', models.ManyToManyField(to='bibliography.LiteratureSource')),
+                ('sources', models.ManyToManyField(to='bibliography.Source')),
                 ('temporal_distributions', models.ManyToManyField(to='distributions.TemporalDistribution')),
             ],
         ),
