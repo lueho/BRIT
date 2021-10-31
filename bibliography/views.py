@@ -47,8 +47,9 @@ class LiteratureSourceDetailView(BSModalReadView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        print(self.object.as_dict())
         context.update({
-            'modal_title': 'Source details',
+            'source_dict': self.object.as_dict()
         })
         return context
 
