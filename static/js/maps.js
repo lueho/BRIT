@@ -106,4 +106,5 @@ async function renderSummary(summary) {
         summary_container.appendChild(label);
         summary_container.appendChild(value);
     });
+    $('#summary-container').collapse('show');
 }
