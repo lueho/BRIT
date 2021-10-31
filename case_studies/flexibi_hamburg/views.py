@@ -2,9 +2,10 @@ from django.http import JsonResponse
 from django.views.generic import TemplateView
 from rest_framework.views import APIView
 
+from inventories.models import GeoDataset
+from .filters import TreeFilter
 from .models import HamburgRoadsideTrees
 from .serializers import HamburgRoadsideTreeGeometrySerializer
-from .filters import TreeFilter
 
 
 class TreeFilterView(TemplateView):
@@ -12,9 +13,11 @@ class TreeFilterView(TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        geodataset = GeoDataset.objects.get(model_name='HamburgRoadsideTrees')
         context.update({
             'map_header': 'Hamburg Roadside Trees',
             'tree_filter': TreeFilter(self.request.GET),
+            'geodataset': geodataset,
         })
         return context
 

@@ -14,6 +14,7 @@ from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 from rest_framework.views import APIView
 
 from brit.views import DualUserListView, UserOwnsObjectMixin, NextOrSuccessUrlMixin
+from inventories.models import GeoDataset
 from materials.models import MaterialComponentGroup, BaseObjects
 from users.models import ReferenceUsers
 from .forms import (CultureModelForm,
@@ -298,7 +299,11 @@ class NantesGreenhousesView(FormView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update({'map_header': 'Nantes Greenhouses'})
+        geodataset = GeoDataset.objects.get(model_name='NantesGreenhouses')
+        context.update({
+            'map_header': 'Nantes Greenhouses',
+            'geodataset': geodataset,
+        })
         return context
 
 
