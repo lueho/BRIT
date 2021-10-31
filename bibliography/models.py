@@ -37,7 +37,26 @@ class Source(models.Model):
     last_accessed = models.DateField(blank=True, null=True)
 
     def get_absolute_url(self):
-        return reverse('literature source_detail', kwargs={'pk': self.id})
+        return reverse('bib_source_detail', kwargs={'pk': self.id})
+
+    def as_dict(self):
+        d = {
+            'Author(s):': {'type': 'text', 'text': self.authors},
+            'Publisher:': {'type': 'text', 'text': self.publisher},
+            'Journal:': {'type': 'text', 'text': self.journal},
+            'Issue:': {'type': 'text', 'text': self.issue},
+            'Year:': {'type': 'text', 'text': self.year},
+            'Title:': {'type': 'text', 'text': self.title},
+            'Abstract:': {'type': 'text', 'text': self.abstract},
+            'URL:': {'type': 'link', 'href': self.url, 'text': self.url},
+            'Last accessed:': {'type': 'text', 'text': self.last_accessed},
+        }
+        if self.doi:
+            d['DOI:'] = {'type': 'link', 'href': f'https://doi.org/{self.doi}', 'text': self.doi}
+        if self.licence:
+            d['License:'] = {'type': 'link', 'href': self.licence.reference_url, 'text': self.licence.name}
+        d['Attributions:'] = {'type': 'text', 'text': self.attributions}
+        return d
 
     def __str__(self):
         return self.abbreviation
