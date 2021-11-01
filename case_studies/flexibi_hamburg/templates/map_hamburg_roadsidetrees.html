@@ -18,20 +18,11 @@
 
 {% block javascript %}
     {{ block.super }}
-{#    <script src="{% static 'js/custom-slider.js' %}"></script>#}
+    {{ map_config|json_script:"mapConfig" }}
+    {#    <script src="{% static 'js/custom-slider.js' %}"></script>#}
     <script type="text/javascript">
 
-        const mapConfig = {
-            'base_url': "{% url 'ajax_region_geometries' %}",
-            'region_id': 3,
-            'load_features': false,
-            'markerStyle': {
-                color: '#63c36c',
-                fillOpacity: 1,
-                radius: 5,
-                stroke: false
-            }
-        }
+        const mapConfig = JSON.parse(document.getElementById("mapConfig").textContent);
 
         async function filterFeatures() {
 

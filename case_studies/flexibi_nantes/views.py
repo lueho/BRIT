@@ -303,6 +303,17 @@ class NantesGreenhousesView(FormView):
         context.update({
             'map_header': 'Nantes Greenhouses',
             'geodataset': geodataset,
+            'map_config': {
+                'base_url': reverse('ajax_region_geometries'),
+                'region_id': 9,
+                'load_features': True,
+                'markerStyle': {
+                    'color': '#4061d2',
+                    'fillOpacity': 1,
+                    'radius': 5,
+                    'stroke': False
+                }
+            }
         })
         return context
 

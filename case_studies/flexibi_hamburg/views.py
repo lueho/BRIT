@@ -1,5 +1,6 @@
 from django.http import JsonResponse
 from django.views.generic import TemplateView
+from django.shortcuts import reverse
 from rest_framework.views import APIView
 
 from inventories.models import GeoDataset
@@ -18,6 +19,17 @@ class TreeFilterView(TemplateView):
             'map_header': 'Hamburg Roadside Trees',
             'tree_filter': TreeFilter(self.request.GET),
             'geodataset': geodataset,
+            'map_config': {
+                'base_url': reverse('ajax_region_geometries'),
+                'region_id': 3,
+                'load_features': False,
+                'markerStyle': {
+                    'color': '#63c36c',
+                    'fillOpacity': 1,
+                    'radius': 5,
+                    'stroke': False
+                }
+            }
         })
         return context
 
