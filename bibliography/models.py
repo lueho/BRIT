@@ -42,11 +42,11 @@ class Source(models.Model):
     def as_dict(self):
         d = {
             'Author(s):': {'type': 'text', 'text': self.authors},
+            'Title:': {'type': 'text', 'text': self.title},
             'Publisher:': {'type': 'text', 'text': self.publisher},
             'Journal:': {'type': 'text', 'text': self.journal},
             'Issue:': {'type': 'text', 'text': self.issue},
             'Year:': {'type': 'text', 'text': self.year},
-            'Title:': {'type': 'text', 'text': self.title},
             'Abstract:': {'type': 'text', 'text': self.abstract},
             'URL:': {'type': 'link', 'href': self.url, 'text': self.url},
             'Last accessed:': {'type': 'text', 'text': self.last_accessed},
