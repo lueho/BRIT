@@ -254,6 +254,5 @@ class BarChart(BaseChart):
 class DoughnutChart(BaseChart):
 
     def __init__(self, **kwargs):
-        print(kwargs)
         kwargs.update({'type': 'doughnut'})
         super().__init__(**kwargs)

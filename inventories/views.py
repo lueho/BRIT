@@ -112,7 +112,6 @@ def load_catchment_options(request):
 class CatchmentGeometryAPI(APIView):
 
     def get(self, request, *args, **kwargs):
-        print(self.request.GET.get('catchment_id'))
         catchments = Catchment.objects.filter(id=self.request.GET.get('catchment_id'))
         serializer = CatchmentSerializer(catchments, many=True)
         data = {
