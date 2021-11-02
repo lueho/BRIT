@@ -10,17 +10,20 @@ from .serializers import HamburgRoadsideTreeGeometrySerializer
 
 
 class TreeFilterView(TemplateView):
-    template_name = 'map_hamburg_roadsidetrees.html'
+    template_name = 'maps_base.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         geodataset = GeoDataset.objects.get(model_name='HamburgRoadsideTrees')
+        form_fields = {key: type(value.field).__name__ for key, value in TreeFilter.base_filters.items()}
         context.update({
             'map_header': 'Hamburg Roadside Trees',
-            'tree_filter': TreeFilter(self.request.GET),
+            'form': TreeFilter(self.request.GET).form,
             'geodataset': geodataset,
             'map_config': {
-                'base_url': reverse('ajax_region_geometries'),
+                'form_fields': form_fields,
+                'region_url': reverse('ajax_region_geometries'),
+                'feature_url': reverse('data.hamburg_roadside_trees'),
                 'region_id': 3,
                 'load_features': False,
                 'markerStyle': {

@@ -1,6 +1,13 @@
 {% extends 'base.html' %}
 {% load static %}
 {% load leaflet_tags %}
+{% load crispy_forms_tags %}
+
+{% block style_sheets %}
+    <link rel="stylesheet" href="{% static 'css/custom-slider.css' %}">
+{% endblock style_sheets %}
+
+{% block title %}Maps | {{ map_header }}{% endblock %}
 
 {% block content %}
 
@@ -12,7 +19,7 @@
         <div class="col">
             <div class="card shadow">
                 <div class="card-header"><b>
-                    {% block map_header %}{% endblock %}
+                    {{ map_header }}
                 </b></div>
                 <div class="card-body p-0">
                     {% leaflet_map "main" %}
@@ -28,7 +35,10 @@
                         <b>Filter</b>
                     </div>
                     <div class="card-body collapse show" id="filter-card-body">
-                        {% block filter_form %}{% endblock %}
+                        <form method="GET">
+                            {% csrf_token %}
+                            {% crispy form %}
+                        </form>
                         <button class="btn btn-primary" id="button_tree_type" onclick="filterFeatures()">
                             Filter
                         </button>
@@ -77,5 +87,13 @@
 
 {% block javascript %}
     {{ block.super }}
+    {{ map_config|json_script:"mapConfig" }}
+    {#    <script src="{% static 'js/custom-slider.js' %}"></script>#}
     <script src="{% static 'js/maps.js' %}"></script>
+    <script type="text/javascript">
+
+        const mapConfig = JSON.parse(document.getElementById("mapConfig").textContent);
+        window.onload = () => loadMap(mapConfig);
+
+    </script>
 {% endblock %}

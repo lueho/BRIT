@@ -293,18 +293,20 @@ class UpdateGreenhouseGrowthCycleValuesView(LoginRequiredMixin, UpdateView):
 
 
 class NantesGreenhousesView(FormView):
-    template_name = 'map_nantes_greenhouses.html'
+    template_name = 'maps_base.html'
     form_class = NantesGreenhousesFilterForm
-    initial = {'heated': 'Yes', 'lighted': 'Yes'}
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         geodataset = GeoDataset.objects.get(model_name='NantesGreenhouses')
+        form_fields = {key: type(value).__name__ for key, value in self.form_class.base_fields.items()}
         context.update({
             'map_header': 'Nantes Greenhouses',
             'geodataset': geodataset,
             'map_config': {
-                'base_url': reverse('ajax_region_geometries'),
+                'form_fields': form_fields,
+                'region_url': reverse('ajax_region_geometries'),
+                'feature_url': reverse('data.nantes_greenhouses'),
                 'region_id': 9,
                 'load_features': True,
                 'markerStyle': {
@@ -344,10 +346,12 @@ class NantesGreenhousesAPIView(APIView):
         elif request.GET.get('cult_man') == '3':
             qs = qs.filter(heated=True)
 
+        crops_query = request.query_params.getlist('crops[]')
+
         crops = []
-        if request.GET.get('cucumber') == 'true':
+        if '1' in crops_query:
             crops.append('Cucumber')
-        if request.GET.get('tomato') == 'true':
+        if '2' in crops_query:
             crops.append('Tomato')
 
         qs = qs.filter(culture_1__in=crops)
