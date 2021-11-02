@@ -14,7 +14,7 @@ from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 from rest_framework.views import APIView
 
 from brit.views import DualUserListView, UserOwnsObjectMixin, NextOrSuccessUrlMixin
-from inventories.models import GeoDataset
+from maps.models import GeoDataset
 from materials.models import MaterialComponentGroup, BaseObjects
 from users.models import ReferenceUsers
 from .forms import (CultureModelForm,

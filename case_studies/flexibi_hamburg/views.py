@@ -3,7 +3,7 @@ from django.views.generic import TemplateView
 from django.shortcuts import reverse
 from rest_framework.views import APIView
 
-from inventories.models import GeoDataset
+from maps.models import GeoDataset
 from .filters import TreeFilter
 from .models import HamburgRoadsideTrees
 from .serializers import HamburgRoadsideTreeGeometrySerializer

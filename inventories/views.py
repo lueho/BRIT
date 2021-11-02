@@ -3,14 +3,14 @@ import json
 
 from bootstrap_modal_forms.generic import BSModalCreateView, BSModalUpdateView, BSModalDeleteView
 from celery.result import AsyncResult
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.auth.models import User
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect
-from django.urls import reverse, reverse_lazy
-from django.views.generic import CreateView, DeleteView, DetailView, ListView, View, UpdateView
+from django.urls import reverse_lazy
+from django.views.generic import CreateView, DetailView, View
 from django.views.generic.base import TemplateResponseMixin
-from django.views.generic.edit import FormMixin, ModelFormMixin
+from django.views.generic.edit import ModelFormMixin
 from rest_framework.views import APIView
 
 from brit.views import DualUserListView, UserOwnsObjectMixin, NextOrSuccessUrlMixin
@@ -20,127 +20,29 @@ from users.models import ReferenceUsers
 from users.views import ModalLoginRequiredMixin
 from .evaluations import ScenarioResult
 from .forms import (
-    CatchmentForm,
-    CatchmentQueryForm,
     ScenarioModalModelForm,
     ScenarioInventoryConfigurationAddForm,
     ScenarioInventoryConfigurationUpdateForm,
     SeasonalDistributionModelForm,
 )
+from maps.models import Catchment, GeoDataset, Region
 from .models import (
-    Catchment,
     Scenario,
     ScenarioInventoryConfiguration,
-    GeoDataset,
     InventoryAlgorithm,
     InventoryAlgorithmParameter,
     InventoryAlgorithmParameterValue,
-    Region,
     ScenarioStatus,
     RunningTask
 )
-from .serializers import CatchmentSerializer, BaseResultMapSerializer, RegionSerializer
+from maps.serializers import BaseResultMapSerializer
 from .tasks import run_inventory
-
-
-# ----------- Catchments -----------------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------------------------
-
-class CatchmentBrowseView(FormMixin, ListView):
-    model = Catchment
-    form_class = CatchmentQueryForm
-    template_name = 'catchment_list.html'
-
-    def get_initial(self):
-        initial = {}
-        region_id = self.request.GET.get('region')
-        catchment_id = self.request.GET.get('catchment')
-        if catchment_id:
-            catchment = Catchment.objects.get(id=catchment_id)
-            initial['region'] = catchment.region.id
-            initial['catchment'] = catchment.id
-        elif region_id:
-            initial['region'] = region_id
-        return initial
-
-
-class CatchmentCreateView(LoginRequiredMixin, CreateView):
-    template_name = 'catchment_create.html'
-    form_class = CatchmentForm
-    success_url = reverse_lazy('catchment_list')
-
-    def form_valid(self, form):
-        form.instance.owner = self.request.user
-        return super().form_valid(form)
-
-
-class CatchmentUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
-    model = Catchment
-    form_class = CatchmentForm
-
-    def get_success_url(self):
-        return reverse('catchment_list')
-
-    def test_func(self):
-        catchment = Catchment.objects.get(id=self.kwargs.get('pk'))
-        return self.request.user == catchment.owner
-
-
-class CatchmentDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
-    model = Catchment
-    success_url = reverse_lazy('catchment_list')
-
-    def test_func(self):
-        catchment = Catchment.objects.get(id=self.kwargs.get('pk'))
-        return catchment.owner == self.request.user
-
-
-def load_catchment_options(request):
-    if request.GET.get('region_id'):
-        region = Region.objects.get(id=request.GET.get('region_id'))
-        catchment_owners = []
-        if int(request.GET.get('category_standard')):
-            catchment_owners.append(User.objects.get(username='flexibi'))
-        if int(request.GET.get('category_custom')) and request.user.is_authenticated:
-            catchment_owners.append(request.user)
-        catchments = Catchment.objects.filter(region=region, owner__in=catchment_owners)
-    else:
-        catchments = Catchment.objects.none()
-    return render(request, 'catchment_dropdown_list_options.html', {'catchments': catchments})
-
-
-class CatchmentGeometryAPI(APIView):
-
-    def get(self, request, *args, **kwargs):
-        catchments = Catchment.objects.filter(id=self.request.GET.get('catchment_id'))
-        serializer = CatchmentSerializer(catchments, many=True)
-        data = {
-            'geoJson': serializer.data,
-        }
-
-        return JsonResponse(data, safe=False)
 
 
 class SeasonalDistributionCreateView(LoginRequiredMixin, CreateView):
     form_class = SeasonalDistributionModelForm
     template_name = 'seasonal_distribution_create.html'
     success_url = '/inventories/materials/{material_id}'
-
-
-# ----------- Regions --------------------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-class RegionGeometryAPI(APIView):
-
-    def get(self, request, *args, **kwargs):
-        regions = Region.objects.filter(id=self.request.GET.get('region_id'))
-        serializer = RegionSerializer(regions, many=True)
-        data = {
-            'geoJson': serializer.data,
-        }
-
-        return JsonResponse(data, safe=False)
 
 
 # ----------- Scenarios ------------------------------------------------------------------------------------------------
@@ -390,6 +292,20 @@ def download_scenario_summary(request, scenario_pk):
         response = HttpResponse(file, content_type='application/json')
         response['Content-Disposition'] = 'attachment; filename=%s' % file_name
         return response
+
+
+def load_catchment_options(request):
+    if request.GET.get('region_id'):
+        region = Region.objects.get(id=request.GET.get('region_id'))
+        catchment_owners = []
+        if int(request.GET.get('category_standard')):
+            catchment_owners.append(User.objects.get(username='flexibi'))
+        if int(request.GET.get('category_custom')) and request.user.is_authenticated:
+            catchment_owners.append(request.user)
+        catchments = Catchment.objects.filter(region=region, owner__in=catchment_owners)
+    else:
+        catchments = Catchment.objects.none()
+    return render(request, 'catchment_dropdown_list_options.html', {'catchments': catchments})
 
 
 def load_geodataset_options(request):
