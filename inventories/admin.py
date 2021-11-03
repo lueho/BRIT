@@ -99,12 +99,12 @@ class ScenarioAdmin(ModelAdmin):
 
     @staticmethod
     def region_link(obj):
-        url = reverse('admin:inventories_region_change', args=(obj.region.id,))
+        url = reverse('admin:maps_region_change', args=(obj.region.id,))
         return format_html("<a href='{}'>{}</a>", url, obj.region.name)
 
     @staticmethod
     def catchment_link(obj):
-        url = reverse('admin:inventories_catchment_change', args=(obj.catchment.id,))
+        url = reverse('admin:maps_catchment_change', args=(obj.catchment.id,))
         return format_html("<a href='{}'>{}</a>", url, obj.catchment.name)
 
     @staticmethod
