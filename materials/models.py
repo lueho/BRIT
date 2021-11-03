@@ -52,7 +52,7 @@ class Material(models.Model):
             material=self,
             owner=self.owner,
             standard=True,
-            name='',
+            full_name='',
             description=''
         )
         settings = MaterialComponentGroupSettings.objects.create(
