@@ -14,6 +14,7 @@ class Licence(models.Model):
 SOURCE_TYPES = (
     ('article', 'article'),
     ('dataset', 'dataset'),
+    ('book', 'book'),
     ('website', 'website'),
     ('custom', 'custom'),
 )
