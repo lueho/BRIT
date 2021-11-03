@@ -1,40 +1,23 @@
 from django.http import JsonResponse
-from django.views.generic import TemplateView
-from django.shortcuts import reverse
+from django.urls import reverse_lazy
 from rest_framework.views import APIView
 
-from maps.models import GeoDataset
+from maps.views import GeoDatasetDetailView
 from .filters import TreeFilter
 from .models import HamburgRoadsideTrees
 from .serializers import HamburgRoadsideTreeGeometrySerializer
 
 
-class TreeFilterView(TemplateView):
-    template_name = 'maps_base.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        geodataset = GeoDataset.objects.get(model_name='HamburgRoadsideTrees')
-        form_fields = {key: type(value.field).__name__ for key, value in TreeFilter.base_filters.items()}
-        context.update({
-            'map_header': 'Hamburg Roadside Trees',
-            'form': TreeFilter(self.request.GET).form,
-            'geodataset': geodataset,
-            'map_config': {
-                'form_fields': form_fields,
-                'region_url': reverse('ajax_region_geometries'),
-                'feature_url': reverse('data.hamburg_roadside_trees'),
-                'region_id': 3,
-                'load_features': False,
-                'markerStyle': {
-                    'color': '#63c36c',
-                    'fillOpacity': 1,
-                    'radius': 5,
-                    'stroke': False
-                }
-            }
-        })
-        return context
+class RoadsideTreesMapView(GeoDatasetDetailView):
+    feature_url = reverse_lazy('data.hamburg_roadside_trees')
+    filter_class = TreeFilter
+    load_features = False
+    marker_style = {
+        'color': '#63c36c',
+        'fillOpacity': 1,
+        'radius': 5,
+        'stroke': False
+    }
 
 
 def is_valid_queryparam(param):

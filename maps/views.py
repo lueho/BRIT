@@ -3,7 +3,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.http import JsonResponse
 from django.shortcuts import render
 from django.urls import reverse, reverse_lazy
-from django.views.generic import CreateView, DeleteView, ListView, UpdateView
+from django.views.generic import CreateView, DeleteView, DetailView, ListView, UpdateView
 from django.views.generic.edit import FormMixin
 from rest_framework.views import APIView
 
@@ -24,7 +24,7 @@ class MapsListView(ListView):
     template_name = 'maps_list.html'
 
 
-# ----------- Catchments -----------------------------------------------------------------------------------------------
+# ----------- Catchment ------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 class CatchmentBrowseView(FormMixin, ListView):
@@ -86,6 +86,51 @@ class CatchmentGeometryAPI(APIView):
         }
 
         return JsonResponse(data, safe=False)
+
+
+# ----------- Geodataset -----------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+class GeoDatasetDetailView(DetailView):
+    feature_url = None
+    region_url = reverse_lazy('ajax_region_geometries')
+    filter_class = None
+    form_class = None
+    load_features = False
+    marker_style = None
+    model = GeoDataset
+    template_name = 'maps_base.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'map_header': self.object.name,
+            'form': self.get_form(),
+            'geodataset': self.object,
+            'map_config': {
+                'form_fields': self.get_form_fields(),
+                'region_url': self.region_url,
+                'feature_url': self.feature_url,
+                'region_id': self.object.region.id,
+                'load_features': self.load_features,
+                'markerStyle': self.marker_style
+            }
+        })
+        return context
+
+    def get_form(self):
+        if self.form_class is not None:
+            return self.form_class
+        if self.filter_class is not None:
+            return self.filter_class(self.request.GET).form
+
+    def get_filter_fields(self):
+        return {key: type(value.field).__name__ for key, value in self.filter_class.base_filters.items()}
+
+    def get_form_fields(self):
+        if self.form_class is None and self.filter_class is not None:
+            return self.get_filter_fields()
+        return {key: type(value).__name__ for key, value in self.form_class.base_fields.items()}
 
 
 # ----------- Regions --------------------------------------------------------------------------------------------------

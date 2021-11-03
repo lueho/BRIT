@@ -7,14 +7,14 @@ from django.db.models import Sum
 from django.http import JsonResponse, HttpResponseRedirect
 from django.urls import reverse
 from django.urls import reverse_lazy
-from django.views.generic import DetailView, FormView, UpdateView
+from django.views.generic import DetailView, UpdateView
 from django.views.generic import TemplateView
 from django_tables2 import table_factory
 from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 from rest_framework.views import APIView
 
 from brit.views import DualUserListView, UserOwnsObjectMixin, NextOrSuccessUrlMixin
-from maps.models import GeoDataset
+from maps.views import GeoDatasetDetailView
 from materials.models import MaterialComponentGroup, BaseObjects
 from users.models import ReferenceUsers
 from .forms import (CultureModelForm,
@@ -292,32 +292,16 @@ class UpdateGreenhouseGrowthCycleValuesView(LoginRequiredMixin, UpdateView):
         }
 
 
-class NantesGreenhousesView(FormView):
-    template_name = 'maps_base.html'
+class GreenhousesMapView(GeoDatasetDetailView):
+    feature_url = reverse_lazy('data.nantes_greenhouses')
     form_class = NantesGreenhousesFilterForm
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        geodataset = GeoDataset.objects.get(model_name='NantesGreenhouses')
-        form_fields = {key: type(value).__name__ for key, value in self.form_class.base_fields.items()}
-        context.update({
-            'map_header': 'Nantes Greenhouses',
-            'geodataset': geodataset,
-            'map_config': {
-                'form_fields': form_fields,
-                'region_url': reverse('ajax_region_geometries'),
-                'feature_url': reverse('data.nantes_greenhouses'),
-                'region_id': 9,
-                'load_features': True,
-                'markerStyle': {
-                    'color': '#4061d2',
-                    'fillOpacity': 1,
-                    'radius': 5,
-                    'stroke': False
-                }
-            }
-        })
-        return context
+    load_features = True
+    marker_style = {
+        'color': '#4061d2',
+        'fillOpacity': 1,
+        'radius': 5,
+        'stroke': False
+    }
 
 
 class NantesGreenhousesAPIView(APIView):
