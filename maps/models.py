@@ -68,7 +68,7 @@ class GeoDataset(models.Model):
     sources = models.ManyToManyField(Source)
 
     def get_absolute_url(self):
-        return reverse(f'{self.model_name}')
+        return reverse(f'{self.model_name}', args=[self.id])
 
     def __str__(self):
         return self.name
