@@ -24,6 +24,11 @@ class MaterialModelForm(BSModalModelForm):
         model = Material
         fields = ('name', 'description')
 
+    def __init__(self, *args, **kwargs):
+        self.helper = FormHelper()
+        self.helper.form_id = 'modal-form'
+        super().__init__(*args, **kwargs)
+
 
 class ComponentModelForm(BSModalModelForm):
     class Meta:
