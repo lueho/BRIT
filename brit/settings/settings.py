@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     'rest_framework_gis',
     'leaflet',
     'cookie_consent',
+    'ai_django_core',
     'users.apps.UsersConfig',
     'maps.apps.MapsConfig',
     'brit.apps.BRITConfig',
@@ -38,6 +39,7 @@ INSTALLED_APPS = [
     'layer_manager.apps.LayerManagerConfig',
     'case_studies.flexibi_nantes.apps.CaseStudyNantesConfig',
     'case_studies.flexibi_hamburg.apps.FlexibiHamburgConfig',
+    'case_studies.soilcom.apps.SoilcomConfig',
     'django.forms',
     'django_filters',
     'crispy_forms',
@@ -53,6 +55,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'ai_django_core.middleware.current_user.CurrentUserMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]

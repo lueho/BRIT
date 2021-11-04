@@ -1,0 +1,18 @@
+{% extends 'base.html' %}
+{% load render_table from django_tables2 %}
+
+{% block content %}
+    <div class="row">
+        <div class="col">
+            <div class="card shadow mb-3">
+                <div class="card-header"><b>Collectors</b></div>
+                <div class="card-body">{% render_table table %}</div>
+                <div class="card-footer">
+                    <a href="{% url 'collector_create' %}" class="modal-link">
+                        <i class="fas fa-fw fa-plus"></i> Add collector
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

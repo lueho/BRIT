@@ -21,6 +21,7 @@ urlpatterns = [
     path('materials/', include('materials.urls')),
     path('inventories/', include('inventories.urls')),
     path('case_studies/nantes/', include('case_studies.flexibi_nantes.urls')),
+    path('waste_collection/', include('case_studies.soilcom.urls')),
     path('bibliography/', include('bibliography.urls')),
     path('cookies/', include('cookie_consent.urls')),
 ]
