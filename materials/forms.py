@@ -19,15 +19,21 @@ from .models import (
 )
 
 
+class ModalFormHelper(FormHelper):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.form_id = 'modal-form'
+
+
 class MaterialModelForm(BSModalModelForm):
     class Meta:
         model = Material
         fields = ('name', 'description')
 
     def __init__(self, *args, **kwargs):
-        self.helper = FormHelper()
-        self.helper.form_id = 'modal-form'
         super().__init__(*args, **kwargs)
+        self.helper = ModalFormHelper()
 
 
 class ComponentModelForm(BSModalModelForm):
@@ -35,12 +41,20 @@ class ComponentModelForm(BSModalModelForm):
         model = MaterialComponent
         fields = ('name', 'description',)
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = ModalFormHelper()
+
 
 class AddComponentForm(BSModalForm):
     component = forms.ModelChoiceField(queryset=MaterialComponent.objects.all())
 
     class Meta:
         fields = ('component',)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = ModalFormHelper()
 
 
 class AddLiteratureSourceForm(BSModalForm):
@@ -56,11 +70,19 @@ class AddSeasonalVariationForm(BSModalForm):
     class Meta:
         fields = ('temporal_distribution',)
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = ModalFormHelper()
+
 
 class ComponentGroupModelForm(BSModalModelForm):
     class Meta:
         model = MaterialComponentGroup
         fields = ('name', 'description',)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = ModalFormHelper()
 
 
 class AddComponentGroupForm(BSModalForm):
@@ -69,6 +91,10 @@ class AddComponentGroupForm(BSModalForm):
 
     class Meta:
         fields = ['group', 'fractions_of', ]
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = ModalFormHelper()
 
 
 class ComponentShareUpdateForm(BSModalModelForm):
@@ -80,6 +106,10 @@ class ComponentShareUpdateForm(BSModalModelForm):
             'standard_deviation': forms.NumberInput(attrs={'min': 0, 'max': 1.0, 'step': 0.01})
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = ModalFormHelper()
+
 
 class CompositionUpdateForm(BSModalModelForm):
     class Meta:
@@ -90,11 +120,19 @@ class CompositionUpdateForm(BSModalModelForm):
             'standard_deviation': forms.NumberInput(attrs={'min': 0, 'max': 1.0, 'step': 0.01})
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = ModalFormHelper()
+
 
 class ItemForm(BSModalModelForm):
     class Meta:
         model = MaterialComponentShare
         fields = ('component', 'average', 'standard_deviation')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
 
 
 class BaseCompositionFormSet(BaseInlineFormSet):
@@ -135,6 +173,10 @@ class AddTemporalDistributionForm(BSModalModelForm):
     class Meta:
         model = MaterialComponentGroupSettings
         fields = '__all__'
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FormHelper()
 
 
 class ComponentShareDistributionFormSetHelper(FormHelper):

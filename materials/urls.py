@@ -28,7 +28,7 @@ from .views import (AddComponentView,
                     )
 
 urlpatterns = [
-    path('materials/', MaterialListView.as_view(), name='material_list'),
+    path('', MaterialListView.as_view(), name='material_list'),
     # path('materials/create/', MaterialCreateView.as_view(), name='material_create'),
     path('materials/create/', ModalMessageView.as_view(
         title='Future feature',

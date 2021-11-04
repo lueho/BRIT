@@ -9,7 +9,11 @@
 </div>
 
 <div class="modal-body">
-    {% crispy form %}
+    {% if helper %}
+        {% crispy form helper %}
+    {% else %}
+        {% crispy form %}
+    {% endif %}
 </div>
 
 <div class="modal-footer">
