@@ -1,20 +1,14 @@
+{% load custom_tags %}
+
 <div class="modal-header">
-    <h5 class="modal-title">{{ modal_title }}</h5>
+    <h5 class="modal-title">{{ object|verbose_name }} Detail</h5>
     <button type="button" class="close" data-dismiss="modal" aria-label="Close">
         <span aria-hidden="true">&times;</span>
     </button>
 </div>
 <div class="modal-body">
-    <table class="table">
-        <tr>
-            <td class="col-3"><strong>Name:</strong></td>
-            <td>{{ object.name }}</td>
-        </tr>
-        <tr>
-            <td class="col-3"><strong>Description:</strong></td>
-            <td>{{ object.description }}</td>
-        </tr>
-    </table>
+    <p class="card-text"><strong>Name:</strong><br>{{ object.name }}</p>
+    <p class="card-text"><strong>Description:</strong><br>{{ object.description }}</p>
 </div>
 
 <div class="modal-footer">
