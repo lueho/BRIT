@@ -150,7 +150,7 @@ LEAFLET_CONFIG = {
 }
 
 LOGIN_REDIRECT_URL = 'home'
-LOGIN_URL = 'users/login'
+LOGIN_URL = '/users/login/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 
