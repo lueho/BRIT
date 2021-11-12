@@ -2,17 +2,13 @@ from django.db import models
 from django.urls import reverse
 
 from brit.models import NamedUserObjectModel
-from materials.models import Material
+from materials.models import Material, MaterialSettings
 
 
 class Collector(NamedUserObjectModel):
 
     def get_absolute_url(self):
         return reverse('collector_detail', args=[self.id])
-
-    @staticmethod
-    def get_create_url():
-        return reverse('collector_create')
 
     class Meta:
         verbose_name = 'Waste Collector'
@@ -27,10 +23,23 @@ class CollectionSystem(NamedUserObjectModel):
         verbose_name = 'Waste Collection System'
 
 
-class WasteStreamCategory(NamedUserObjectModel):
-    pass
+class WasteCategory(NamedUserObjectModel):
+
+    def get_absolute_url(self):
+        return reverse('waste_category_detail', args=[self.id])
+
+    class Meta:
+        verbose_name = 'Waste Category'
+        verbose_name_plural = 'Waste categories'
 
 
-class WasteStreamAllowed(NamedUserObjectModel):
-    category = models.ForeignKey(WasteStreamCategory, on_delete=models.PROTECT)
-    materials = models.ManyToManyField(Material)
+class WasteStream(NamedUserObjectModel):
+    category = models.ForeignKey(WasteCategory, on_delete=models.PROTECT)
+    allowed_materials = models.ManyToManyField(Material)
+    composition = models.ManyToManyField(MaterialSettings)
+
+    def get_absolute_url(self):
+        return reverse('waste_stream_detail', args=[self.id])
+
+    class Meta:
+        verbose_name = 'Waste Stream'

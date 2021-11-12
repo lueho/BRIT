@@ -12,6 +12,16 @@ from distributions.models import Timestep, TemporalDistribution
 from distributions.plots import DataSet, DoughnutChart
 from users.models import ReferenceUsers
 from .tables import averages_table_factory, distribution_table_factory
+from brit.models import NamedUserObjectModel
+
+
+class MaterialGroup(NamedUserObjectModel):
+
+    def get_absolute_url(self):
+        return reverse('material_group_detail', args=[self.id])
+
+    class Meta:
+        verbose_name = 'Material Group'
 
 
 class MaterialManager(models.Manager):
@@ -27,6 +37,7 @@ class Material(models.Model):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
     owner = models.ForeignKey(User, on_delete=models.CASCADE)
+    groups = models.ManyToManyField(MaterialGroup)
     is_feedstock = models.BooleanField(default=True)
     stan_flow_id = models.CharField(max_length=5,
                                     blank=True,
@@ -63,9 +74,8 @@ class Material(models.Model):
         )
         settings.add_component(base_component)
 
-    @staticmethod
-    def get_absolute_url():
-        return reverse('material_list')
+    def get_absolute_url(self):
+        return reverse('material_detail', args=[self.id])
 
     @property
     def detail_url(self):
@@ -83,6 +93,7 @@ class Material(models.Model):
         return self.name
 
     class Meta:
+        verbose_name = 'Material'
         unique_together = [['name', 'owner']]
 
 
@@ -498,7 +509,7 @@ class MaterialComponentShare(models.Model):
 
     @property
     def as_percentage(self):
-        return f'{round(self.average*100, 1)} ± {round(self.standard_deviation*100, 1)}%'
+        return f'{round(self.average * 100, 1)} ± {round(self.standard_deviation * 100, 1)}%'
 
     @property
     def material(self):

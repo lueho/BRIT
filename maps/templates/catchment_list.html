@@ -1,0 +1,138 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_filters %}
+{% load leaflet_tags %}
+
+{% block title %}Maps | Catchments{% endblock %}
+
+{% block content %}
+
+    {% leaflet_js plugins="draw" %}
+    {% leaflet_css plugins="draw" %}
+
+    <div class="row">
+
+        <div class="col">
+            <div class="card shadow">
+                <div class="card-header"><strong>Catchments</strong></div>
+                <div class="card-body p-0">
+                    {% leaflet_map "main" %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-sm-3">
+            <div class="accordion">
+                <div class="card shadow">
+                    <div class="card-header" role="button" data-toggle="collapse" href="#filter-card-body"
+                         aria-expanded="true" aria-controls="filter-card-body">
+                        <b>Filter</b>
+                    </div>
+                    <div class="card-body collapse show" id="filter-card-body">
+                        <form id="catchment-filter-form" method="POST">
+                            {% csrf_token %}
+                            {% crispy form %}
+                        </form>
+                    </div>
+                </div>
+                <div class="card shadow">
+                    <div class="card-header"
+                         role="button"
+                         data-toggle="collapse"
+                         href="#info-container"
+                         aria-expanded="false"
+                         aria-controls="info-container">
+                        <b>Catchment information</b>
+                    </div>
+                    <div class="card-body collapse" id="info-container">
+                        <p class="card-text">No data selected, yet.</p>
+                    </div>
+                </div>
+
+                <!-- Options -->
+                <div class="card shadow">
+                    <div class="card-header" role="button" data-toggle="collapse" href="#options-card-body"
+                         aria-expanded="true" aria-controls="options-card-body">
+                        <b>Options</b>
+                    </div>
+                    <div class="card-body collapse show" id="options-card-body">
+                        <a href="{% url 'catchment_definition' %}">
+                            <i class="fas fa-fw fa-plus"></i> Create a new catchment
+                        </a>
+                        <a id="update-link" href="#" style="display: none;">
+                            <i class="fas fa-fw fa-edit"></i> Edit this catchment
+                        </a>
+                        <a data-toggle="modal" id="delete-link" href="#" style="display: none;"
+                           data-target="#modal-confirm-delete">
+                            <i class="fas fa-fw fa-trash"></i> Delete this catchment
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% include 'modal_confirm_delete.html' %}
+
+{% endblock content %}
+
+{% block javascript %}
+    {{ block.super }}
+    {{ map_config|json_script:"mapConfig" }}
+
+    <script src="{% static 'js/maps.js' %}"></script>
+    <script type="text/javascript">
+
+        const mapConfig = JSON.parse(document.getElementById("mapConfig").textContent);
+
+        async function loadCatchmentOptions() {
+            let params = parseFilterParameters()
+            let url = "{% url 'ajax_catchment_options' %}" + '?' + $.param(params);
+            let response = await fetch(url);
+            return await response.text();
+        }
+
+        function setCatchmentOptions() {
+            loadCatchmentOptions()
+                .then(html => document.getElementById("id_catchment").innerHTML = html)
+                .catch((err) => console.log(err))
+        }
+
+        function updateUrls(catchment_id) {
+            let updateLink = document.getElementById("update-link");
+            updateLink.href = "{% url 'catchment_update' pk=0 %}".replace("0", catchment_id.toString());
+            if (catchment_id === "") {
+                updateLink.style.display = "none";
+            } else {
+                updateLink.style.display = "block";
+            }
+
+            form = document.getElementById("delete-confirmation-form")
+            form.action = "{% url 'catchment_delete' pk=0%}".replace("0", catchment_id.toString());
+
+            let deleteLink = document.getElementById("delete-link");
+            deleteLink.href = "{% url 'catchment_delete' pk=0 %}".replace("0", catchment_id.toString());
+            if (catchment_id === "") {
+                deleteLink.style.display = "none";
+            } else {
+                deleteLink.style.display = "block";
+            }
+        }
+
+        document.getElementById("id_region").onchange = () => {
+            setCatchmentOptions();
+            const region_id = parseFilterParameters()['region'];
+            fetchRegionGeometry(mapConfig['region_url'], region_id);
+        }
+        {#document.getElementById("id_category_1").onchange = () => setCatchmentOptions();#}
+        {#document.getElementById("id_category_2").onchange = () => setCatchmentOptions();#}
+        document.getElementById("id_catchment").onchange = () => {
+            filterFeatures()
+            const catchment_id = parseFilterParameters()['catchment'];
+            updateUrls(catchment_id);
+        }
+        window.onload = () => loadMap(mapConfig);
+
+    </script>
+
+{% endblock %}

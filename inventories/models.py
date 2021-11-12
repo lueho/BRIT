@@ -161,7 +161,7 @@ class Scenario(models.Model):
     description = models.TextField(blank=True, null=True)
     region = models.ForeignKey(Region, on_delete=models.CASCADE, null=True)
     site = models.ForeignKey(SFBSite, on_delete=models.CASCADE, null=True)  # TODO: make many-to-many?
-    catchment = models.ForeignKey(Catchment, on_delete=models.CASCADE, null=True)  # TODO: make many-to-many?
+    catchment = models.ForeignKey(Catchment, on_delete=models.CASCADE, null=True, related_name='catchment')  # TODO: make many-to-many?
 
     @property
     def status(self):

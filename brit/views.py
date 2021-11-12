@@ -75,7 +75,7 @@ class OwnedObjectListView(PermissionRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
         context.update({
             'header': self.model._meta.verbose_name_plural,
-            'create_url': self.create_new_object_url,
+            'create_url': self. create_new_object_url,
             'create_url_text': f'New {self.model._meta.verbose_name}'
         })
         return context

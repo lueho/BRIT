@@ -1,0 +1,33 @@
+{% extends 'base.html' %}
+{% load custom_tags %}
+
+{% block content %}
+
+    <div class="row">
+        <div class="col">
+            <div class="card shadow">
+                <div class="card-header"><strong>{{ object|verbose_name }} Detail</strong></div>
+                <div class="card-body">
+                    <p class="card-text"><strong>Name:</strong><br>{{ object.name }}</p>
+                    <p class="card-text"><strong>Description:</strong><br>{{ object.description }}</p>
+                    <p class="card-text"><strong>Groups:</strong><br>
+                        {% for group in object.groups.all %}
+                            <a href="{% url 'material_group_detail_modal' group.id %}" class="modal-link">
+                                {{ group.name }}
+                            </a>
+                            {% if not forloop.last %},{% endif %}
+                        {% endfor %}
+                    </p>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'material_list' %}" class="mr-3"><i class="fas fa-fw fa-arrow-left"></i> back to
+                        list</a>
+                    <a href="{% url 'material_update' object.id %}" class="mr-3"><i class="fas fa-fw fa-edit"></i> edit</a>
+                    <a href="{% url 'material_delete_modal' object.id %}" class="modal-link"><i
+                            class="fas fa-fw fa-trash"></i> delete</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+{% endblock %}

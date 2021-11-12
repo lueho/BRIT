@@ -7,7 +7,9 @@ from .views import (
     CatchmentUpdateView,
     CatchmentDeleteView,
     MapsListView,
-    RegionGeometryAPI
+    RegionGeometryAPI,
+    NutsMapView,
+    NutsRegionAPIView
 )
 
 urlpatterns = [
@@ -16,6 +18,9 @@ urlpatterns = [
     path('catchment/create/', CatchmentCreateView.as_view(), name='catchment_definition'),
     path('catchments/<int:pk>/update/', CatchmentUpdateView.as_view(), name='catchment_update'),
     path('catchments/<int:pk>/delete/', CatchmentDeleteView.as_view(), name='catchment_delete'),
+    path('catchments/data/', RegionGeometryAPI.as_view(), name='data.catchments'),
+    path('nuts/<int:pk>/', NutsMapView.as_view(), name='NutsRegion'),
+    path('nuts/data/', NutsRegionAPIView.as_view(), name='data.nuts_regions'),
     path('ajax/region_geometries/', RegionGeometryAPI.as_view(), name='ajax_region_geometries'),
     path('ajax/catchment_geometries/', CatchmentGeometryAPI.as_view(), name='ajax_catchment_geometries'),
     # TODO: Can case study urls be detected and added automatically?

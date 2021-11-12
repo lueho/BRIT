@@ -134,12 +134,12 @@ REGISTRATION_AUTO_LOGIN = True
 REGISTRATION_DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL')
 
 LEAFLET_CONFIG = {
-    'DEFAULT_CENTER': (48.917908, 6.921543),
+    'DEFAULT_CENTER': (50.08178260774763, 14.432086500224534),
     'DEFAULT_ZOOM': 5,
     'RESET_VIEW': False,
     'NO_GLOBALS': False,
-    'MIN_ZOOM': 5,
-    'MAX_ZOOM': 18,
+    'MIN_ZOOM': 4,
+    'MAX_ZOOM': 15,
     'PLUGINS': {'draw': {'css': 'draw/leaflet.draw.css',
                          'js': 'draw/leaflet.draw.js',
                          'auto-include': True

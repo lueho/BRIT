@@ -6,17 +6,20 @@ from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView, DeleteView, DetailView, ListView, UpdateView
 from django.views.generic.edit import FormMixin
 from rest_framework.views import APIView
+from django.db.models import Sum
 
 from .forms import (
-    CatchmentForm,
+    CatchmentModelForm,
     CatchmentQueryForm,
+    NutsMapFilterForm
 )
 from .models import (
     Catchment,
     GeoDataset,
     Region,
+    NutsRegion
 )
-from maps.serializers import CatchmentSerializer, RegionSerializer
+from maps.serializers import CatchmentSerializer, RegionSerializer, NutsRegionGeometrySerializer
 
 
 class MapsListView(ListView):
@@ -31,6 +34,17 @@ class CatchmentBrowseView(FormMixin, ListView):
     model = Catchment
     form_class = CatchmentQueryForm
     template_name = 'catchment_list.html'
+    region_url = reverse_lazy('ajax_region_geometries')
+    feature_url = reverse_lazy('ajax_catchment_geometries')
+    filter_class = None
+    load_features = False
+    adjust_bounds_to_features = False
+    load_region = True
+    marker_style = {
+        'color': '#4061d2',
+        'fillOpacity': 1,
+        'stroke': False
+    }
 
     def get_initial(self):
         initial = {}
@@ -38,16 +52,40 @@ class CatchmentBrowseView(FormMixin, ListView):
         catchment_id = self.request.GET.get('catchment')
         if catchment_id:
             catchment = Catchment.objects.get(id=catchment_id)
-            initial['region'] = catchment.region.id
+            initial['parent_region'] = catchment.parent_region.id
             initial['catchment'] = catchment.id
         elif region_id:
             initial['region'] = region_id
         return initial
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'map_header': 'Catchments',
+            'form': self.get_form(),
+            'map_config': {
+                'form_fields': self.get_form_fields(),
+                'region_url': self.region_url,
+                'feature_url': self.feature_url,
+                'load_features': self.load_features,
+                'adjust_bounds_to_features': self.adjust_bounds_to_features,
+                'region_id': self.get_region_id(),
+                'load_region': self.load_region,
+                'markerStyle': self.marker_style
+            }
+        })
+        return context
+
+    def get_form_fields(self):
+        return {key: type(value.widget).__name__ for key, value in self.form_class.base_fields.items()}
+
+    def get_region_id(self):
+        return 3
+
 
 class CatchmentCreateView(LoginRequiredMixin, CreateView):
     template_name = 'catchment_create.html'
-    form_class = CatchmentForm
+    form_class = CatchmentModelForm
     success_url = reverse_lazy('catchment_list')
 
     def form_valid(self, form):
@@ -57,7 +95,7 @@ class CatchmentCreateView(LoginRequiredMixin, CreateView):
 
 class CatchmentUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
     model = Catchment
-    form_class = CatchmentForm
+    form_class = CatchmentModelForm
 
     def get_success_url(self):
         return reverse('catchment_list')
@@ -76,16 +114,7 @@ class CatchmentDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
         return catchment.owner == self.request.user
 
 
-class CatchmentGeometryAPI(APIView):
 
-    def get(self, request, *args, **kwargs):
-        catchments = Catchment.objects.filter(id=self.request.GET.get('catchment_id'))
-        serializer = CatchmentSerializer(catchments, many=True)
-        data = {
-            'geoJson': serializer.data,
-        }
-
-        return JsonResponse(data, safe=False)
 
 
 # ----------- Geodataset -----------------------------------------------------------------------------------------------
@@ -97,6 +126,8 @@ class GeoDatasetDetailView(DetailView):
     filter_class = None
     form_class = None
     load_features = False
+    adjust_bounds_to_features = False
+    load_region = True
     marker_style = None
     model = GeoDataset
     template_name = 'maps_base.html'
@@ -106,13 +137,14 @@ class GeoDatasetDetailView(DetailView):
         context.update({
             'map_header': self.object.name,
             'form': self.get_form(),
-            'geodataset': self.object,
             'map_config': {
                 'form_fields': self.get_form_fields(),
                 'region_url': self.region_url,
                 'feature_url': self.feature_url,
-                'region_id': self.object.region.id,
                 'load_features': self.load_features,
+                'adjust_bounds_to_features': self.adjust_bounds_to_features,
+                'region_id': self.object.region.id,
+                'load_region': self.load_region,
                 'markerStyle': self.marker_style
             }
         })
@@ -125,25 +157,104 @@ class GeoDatasetDetailView(DetailView):
             return self.filter_class(self.request.GET).form
 
     def get_filter_fields(self):
-        return {key: type(value.field).__name__ for key, value in self.filter_class.base_filters.items()}
+        return {key: type(value.field.widget).__name__ for key, value in self.filter_class.base_filters.items()}
 
     def get_form_fields(self):
         if self.form_class is None and self.filter_class is not None:
             return self.get_filter_fields()
-        return {key: type(value).__name__ for key, value in self.form_class.base_fields.items()}
+        return {key: type(value.widget).__name__ for key, value in self.form_class.base_fields.items()}
 
 
 # ----------- Regions --------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
+class CatchmentGeometryAPI(APIView):
+
+    def get(self, request, *args, **kwargs):
+        if 'catchment' in request.query_params:
+            catchment_id = request.query_params.get('catchment')
+            catchment = Catchment.objects.get(id=catchment_id)
+            region_id = catchment.region_id
+            regions = Region.objects.filter(id=region_id)
+            serializer = RegionSerializer(regions, many=True)
+            data = {
+                'geoJson': serializer.data,
+                'info': {
+                    'name': {
+                        'label': 'Name',
+                        'value': catchment.name,
+                    },
+                    'description': {
+                        'label': 'Description',
+                        'value': catchment.description
+                    },
+                    'parent_region': {
+                        'label': 'Parent region',
+                        'value': catchment.parent_region.name
+                    }
+                }
+            }
+            return JsonResponse(data)
+
+        return JsonResponse({})
+
 
 class RegionGeometryAPI(APIView):
 
     def get(self, request, *args, **kwargs):
-        regions = Region.objects.filter(id=self.request.GET.get('region_id'))
-        serializer = RegionSerializer(regions, many=True)
+        if 'region_id' in request.query_params:
+            region_id = request.query_params.get('region_id')
+            regions = Region.objects.filter(id=region_id)
+            serializer = RegionSerializer(regions, many=True)
+            return JsonResponse({'geoJson': serializer.data})
+
+        return JsonResponse({})
+
+
+# ----------- NUTS Map -------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class NutsMapView(GeoDatasetDetailView):
+    feature_url = reverse_lazy('data.nuts_regions')
+    form_class = NutsMapFilterForm
+    load_features = False
+    adjust_bounds_to_features = True
+    load_region = False
+    marker_style = {
+        'color': '#4061d2',
+        'fillOpacity': 1,
+        'stroke': False
+    }
+
+
+def is_valid_queryparam(param):
+    return param != '' and param is not None
+
+
+class NutsRegionAPIView(APIView):
+
+    @staticmethod
+    def get(request):
+        qs = NutsRegion.objects.all()
+
+        levl_code = int(request.query_params['levl_code'])
+        if is_valid_queryparam(levl_code):
+            qs = qs.filter(levl_code=levl_code)
+        cntr_codes = request.query_params.getlist('cntr_code[]')
+        if is_valid_queryparam(cntr_codes):
+            qs = qs.filter(cntr_code__in=cntr_codes)
+
+        serializer = NutsRegionGeometrySerializer(qs, many=True)
+        region_count = len(serializer.data['features'])
         data = {
             'geoJson': serializer.data,
+            'analysis': {
+                'region_count': {
+                    'label': 'Number of selected regions',
+                    'value': str(region_count),
+                },
+            }
         }
 
         return JsonResponse(data, safe=False)

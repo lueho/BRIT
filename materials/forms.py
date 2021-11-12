@@ -15,25 +15,34 @@ from .models import (
     MaterialComponentGroup,
     MaterialComponentGroupSettings,
     MaterialComponentShare,
-
+    MaterialGroup,
 )
 
-
-class ModalFormHelper(FormHelper):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.form_id = 'modal-form'
+from brit.forms import CustomModelForm, CustomModalModelForm, ModalFormHelper
 
 
-class MaterialModelForm(BSModalModelForm):
+class MaterialGroupModelForm(CustomModelForm):
     class Meta:
-        model = Material
+        model = MaterialGroup
         fields = ('name', 'description')
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.helper = ModalFormHelper()
+
+class MaterialGroupModalModelForm(CustomModalModelForm):
+    class Meta:
+        model = MaterialGroup
+        fields = ('name', 'description')
+
+
+class MaterialModelForm(CustomModelForm):
+    class Meta:
+        model = Material
+        fields = ('name', 'description', 'groups')
+
+
+class MaterialModalModelForm(CustomModalModelForm):
+    class Meta:
+        model = Material
+        fields = ('name', 'description', 'groups')
 
 
 class ComponentModelForm(BSModalModelForm):

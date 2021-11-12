@@ -33,8 +33,10 @@ async function fetchFeatureGeometries(params, mapConfig) {
         }
     }).addTo(map);
 
-    // Fill "Results" section with analysis data from the analysis dict
-    return data['analysis'];
+    if (mapConfig['adjust_bounds_to_features'] === true) {
+        map.fitBounds(feature_layer.getBounds())
+    }
+    return data;
 }
 
 async function fetchRegionGeometry(region_url, region_id) {
@@ -63,37 +65,65 @@ async function fetchRegionGeometry(region_url, region_id) {
     })
     region_layer.addTo(map);
     map.fitBounds(region_layer.getBounds())
+
+    return data
 }
 
 async function filterFeatures() {
     const params = parseFilterParameters();
-    let summary = await fetchFeatureGeometries(params, mapConfig);
-    await renderSummary(summary)
+    let data = await fetchFeatureGeometries(params, mapConfig);
+    console.log(data)
+    if ('info' in data) {
+        await renderInfo(data['info'])
+    }
+    if ('analysis' in data) {
+        await renderSummary(data['analysis'])
+    }
 }
 
 function loadMap(config) {
-    fetchRegionGeometry(config['region_url'], config['region_id']);
+    if (config['load_region'] === true) {
+        fetchRegionGeometry(config['region_url'], config['region_id']);
+    }
     if (config['load_features'] === true) {
         filterFeatures();
     }
     map.invalidateSize();
 }
 
-function parseFilterParameters(){
-            const form_fields = mapConfig['form_fields']
-            let params = {}
-            Object.keys(form_fields).forEach(key => {
-                if (form_fields[key] === 'ChoiceField') {
-                    params[key] = readChoiceCheckboxes(key)
-                }
-                if (form_fields[key] === 'MultipleChoiceField') {
-                    params[key] = readMultiChoiceCheckboxes(key)
-                }
-            });
-            return params
+function parseFilterParameters() {
+    const form_fields = mapConfig['form_fields']
+    let params = {}
+    Object.keys(form_fields).forEach(key => {
+        switch (form_fields[key]) {
+            case 'SelectMultiple':
+                params[key] = readSelectMultiple(key);
+                break;
+            case 'RadioSelect':
+                params[key] = readRadioSelect(key);
+                break;
+            case 'CheckboxSelectMultiple':
+                params[key] = readCheckboxSelectMultipe(key);
+                break;
+            default:
+                params[key] = document.getElementsByName(key)[0].value;
         }
+    });
+    return params
+}
 
-function readMultiChoiceCheckboxes(name) {
+function readSelectMultiple(name) {
+    let country_codes = []
+    let inputs = document.getElementsByName(name)[0]
+    for (let i = 0; i < inputs.length; i++) {
+        if (inputs[i].selected === true) {
+            country_codes.push(inputs[i].value)
+        }
+    }
+    return country_codes
+}
+
+function readCheckboxSelectMultipe(name) {
     let ids = []
     let inputs = document.getElementsByName(name)
     for (let i = 0; i < inputs.length; i++) {
@@ -104,7 +134,7 @@ function readMultiChoiceCheckboxes(name) {
     return ids
 }
 
-function readChoiceCheckboxes(name) {
+function readRadioSelect(name) {
     const heatingButtons = document.getElementsByName(name);
     let heating;
     for (let i = 0; i < heatingButtons.length; i++) {
@@ -127,4 +157,19 @@ async function renderSummary(summary) {
         summary_container.appendChild(value);
     });
     $('#summary-container').collapse('show');
+}
+
+async function renderInfo(info) {
+    console.log(info)
+    let info_container = document.getElementById('info-container');
+    info_container.textContent = ''
+    Object.keys(info).forEach(key => {
+        let label = document.createElement('P');
+        let value = document.createElement('P');
+        label.innerText = info[key]['label'].toString() + ':';
+        value.innerText = info[key]['value'].toString();
+        info_container.appendChild(label);
+        info_container.appendChild(value);
+    });
+    $('#info-container').collapse('show');
 }

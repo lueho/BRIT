@@ -43,6 +43,8 @@
                             Filter
                         </button>
                     </div>
+                </div>
+                <div class="card shadow">
                     <div class="card-header"
                          role="button"
                          data-toggle="collapse"
@@ -54,6 +56,8 @@
                     <div class="card-body collapse" id="summary-container">
                         <p class="card-text">No data selected, yet.</p>
                     </div>
+                </div>
+                <div class="card shadow">
                     <div class="card-header"
                          role="button"
                          data-toggle="collapse"
@@ -64,7 +68,7 @@
                     </div>
                     <div class="card-body collapse" id="sources-body">
                         <table class="table">
-                            {% for source in geodataset.sources.all %}
+                            {% for source in self.object.sources.all %}
                                 <a href="{% url 'bib_source_detail' source.id %}"
                                    class="modal-link">
                                     {{ source.abbreviation }}{% if not forloop.last %},{% endif %}

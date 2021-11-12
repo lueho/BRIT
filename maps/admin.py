@@ -8,7 +8,7 @@ from .models import Region, Catchment, SFBSite, GeoDataset
 class CatchmentForm(ModelForm):
     class Meta:
         model = Catchment
-        fields = ('name', 'owner', 'region', 'type', 'description', 'geom',)
+        fields = ('name', 'owner', 'parent_region', 'type', 'description',)
 
     @staticmethod
     def django_contains(region, catchment):
@@ -18,7 +18,7 @@ class CatchmentForm(ModelForm):
 
     def clean(self):
         catchment = super().clean()
-        region = catchment.get('region')
+        region = catchment.get('parent_region')
         if region and catchment:
             if not self.django_contains(region, catchment):
                 raise ValidationError('The catchment must be within the defined region.')
@@ -27,7 +27,7 @@ class CatchmentForm(ModelForm):
 @admin.register(Catchment)
 class CatchmentAdmin(OSMGeoAdmin):
     form = CatchmentForm
-    list_display = ('name', 'region', 'type', 'description')
+    list_display = ('name', 'parent_region', 'type', 'description')
 
     def get_queryset(self, request):
         queryset = super().get_queryset(request)

@@ -5,6 +5,8 @@ from django.contrib.gis.db.models import MultiPolygonField, PointField
 from django.contrib.auth.models import User
 from bibliography.models import Source
 
+from brit.models import NamedUserObjectModel
+
 TYPES = (
     ('administrative', 'administrative'),
     ('custom', 'custom'),
@@ -13,56 +15,64 @@ TYPES = (
 GIS_SOURCE_MODELS = (
     ('HamburgRoadsideTrees', 'HamburgRoadsideTrees'),
     ('HamburgGreenAreas', 'HamburgGreenAreas'),
-    ('NantesGreenhouses', 'NantesGreenhouses')
+    ('NantesGreenhouses', 'NantesGreenhouses'),
+    ('NutsRegion', 'NutsRegion')
 )
 
 
-class Region(models.Model):
-    name = models.CharField(max_length=56, null=False)
+class GeoPolygon(models.Model):
+    fid = models.BigAutoField(primary_key=True)
+    geom = MultiPolygonField(blank=True, null=True)
+
+
+class Region(NamedUserObjectModel):
     country = models.CharField(max_length=56, null=False)
-    geom = MultiPolygonField(null=True)
+    borders = models.ForeignKey(GeoPolygon, on_delete=models.PROTECT, null=True)
+
+    @property
+    def geom(self):
+        return self.borders.geom
 
     @staticmethod
     def get_absolute_url():
         return reverse('catchment_list')
 
-    def __str__(self):
-        return self.name
+
+class NutsRegion(Region):
+    nuts_id = models.CharField(max_length=5, blank=True, null=True)
+    levl_code = models.IntegerField(blank=True, null=True)
+    cntr_code = models.CharField(max_length=2, blank=True, null=True)
+    name_latn = models.CharField(max_length=70, blank=True, null=True)
+    nuts_name = models.CharField(max_length=106, blank=True, null=True)
+    mount_type = models.IntegerField(blank=True, null=True)
+    urbn_type = models.IntegerField(blank=True, null=True)
+    coast_type = models.IntegerField(blank=True, null=True)
 
 
-class Catchment(models.Model):
-    name = models.CharField(max_length=256, default="Custom Catchment")
-    owner = models.ForeignKey(User, on_delete=models.CASCADE)
-    region = models.ForeignKey(Region, on_delete=models.CASCADE)
-    description = models.TextField(blank=True, null=True)
+class Catchment(NamedUserObjectModel):
+    parent_region = models.ForeignKey(Region, on_delete=models.CASCADE, related_name='parent_region', null=True)
+    region = models.ForeignKey(Region, on_delete=models.CASCADE, null=True)
     type = models.CharField(max_length=14, choices=TYPES, default='custom')
-    geom = MultiPolygonField()
+
+    @property
+    def geom(self):
+        return self.region.geom
 
     @staticmethod
     def get_absolute_url():
         return reverse('catchment_list')
 
-    def __str__(self):
-        return self.name
 
-
-class SFBSite(models.Model):
-    name = models.CharField(max_length=20, null=True)
-    owner = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
+class SFBSite(NamedUserObjectModel):
     geom = PointField(null=True)
 
-    def __str__(self):
-        return self.name
 
-
-class GeoDataset(models.Model):
+class GeoDataset(NamedUserObjectModel):
     """
     Holds meta information about datasets from the core module or scenario extensions.
     """
-    name = models.CharField(max_length=56, null=False)
     preview = models.ImageField(upload_to='images', default='img/generic_map.png')
     publish = models.BooleanField(default=False)
-    description = models.TextField(blank=True, null=True)
     region = models.ForeignKey(Region, on_delete=models.CASCADE, null=False)
     model_name = models.CharField(max_length=56, choices=GIS_SOURCE_MODELS, null=True)
     sources = models.ManyToManyField(Source)

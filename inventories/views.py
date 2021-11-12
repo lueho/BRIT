@@ -13,7 +13,7 @@ from django.views.generic.base import TemplateResponseMixin
 from django.views.generic.edit import ModelFormMixin
 from rest_framework.views import APIView
 
-from brit.views import DualUserListView, UserOwnsObjectMixin, NextOrSuccessUrlMixin
+from brit.views import DualUserListView, UserOwnsObjectMixin, NextOrSuccessUrlMixin, OwnedObjectModalUpdateView
 from layer_manager.models import Layer
 from materials.models import MaterialSettings
 from users.models import ReferenceUsers
@@ -126,15 +126,7 @@ class ScenarioDetailView(UserPassesTestMixin, DetailView):
 class ScenarioUpdateView(ModalLoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
     model = Scenario
     form_class = ScenarioModalModelForm
-    template_name = '../../brit/templates/modal_form.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({
-            'form_title': 'Edit scenario basics',
-            'submit_button_text': 'Save'
-        })
-        return context
+    template_name = 'modal_form.html'
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -142,6 +134,13 @@ class ScenarioUpdateView(ModalLoginRequiredMixin, UserOwnsObjectMixin, NextOrSuc
             'region_id': self.object.region.id
         })
         return kwargs
+
+
+class ScenarioModalUpdateView(OwnedObjectModalUpdateView):
+    template_name = 'modal_form.html'
+    model = Scenario
+    form_class = ScenarioModalModelForm
+    permission_required = 'inventories.change_scenario'
 
 
 class ScenarioDeleteView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalDeleteView):
@@ -295,17 +294,12 @@ def download_scenario_summary(request, scenario_pk):
 
 
 def load_catchment_options(request):
-    if request.GET.get('region_id'):
-        region = Region.objects.get(id=request.GET.get('region_id'))
-        catchment_owners = []
-        if int(request.GET.get('category_standard')):
-            catchment_owners.append(User.objects.get(username='flexibi'))
-        if int(request.GET.get('category_custom')) and request.user.is_authenticated:
-            catchment_owners.append(request.user)
-        catchments = Catchment.objects.filter(region=region, owner__in=catchment_owners)
+    region_id = request.GET.get('region_id') or request.GET.get('region')
+    if region_id:
+        return render(request, 'catchment_dropdown_list_options.html', {'catchments':Catchment.objects.filter(parent_region_id=region_id)})
     else:
-        catchments = Catchment.objects.none()
-    return render(request, 'catchment_dropdown_list_options.html', {'catchments': catchments})
+        return render(request, 'catchment_dropdown_list_options.html', {'catchments': Catchment.objects.none()})
+
 
 
 def load_geodataset_options(request):

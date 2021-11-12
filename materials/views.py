@@ -22,82 +22,143 @@ from .forms import (
     ComponentShareDistributionFormSetHelper,
     InlineComponentShare
 )
+from . import forms
 from .models import (
     Material,
     MaterialSettings,
     MaterialComponent,
     MaterialComponentGroup,
+    MaterialGroup,
     CompositionSet
 )
 
+from brit.views import (
+    OwnedObjectListView,
+    OwnedObjectCreateView,
+    OwnedObjectModalCreateView,
+    OwnedObjectDetailView,
+    OwnedObjectModalDetailView,
+    OwnedObjectUpdateView,
+    OwnedObjectModalUpdateView,
+    OwnedObjectDeleteView,
+)
 
-# ----------- Materials CRUD -------------------------------------------------------------------------------------------
 
-# class MaterialListView(DualUserListView):
-#     model = Material
-#     template_name = 'dual_user_item_list.html'
+# ----------- Material Group CRUD --------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
 
-class MaterialListView(ListView):
-    model = MaterialSettings
-    template_name = 'materials_list.html'
+class MaterialGroupListView(OwnedObjectListView):
+    template_name = 'simple_list_card.html'
+    model = MaterialGroup
+    permission_required = 'materials.view_materialgroup'
+    create_new_object_url = reverse_lazy('material_group_create')
 
 
-class MaterialCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, BSModalCreateView):
-    form_class = MaterialModelForm
+class MaterialGroupCreateView(OwnedObjectCreateView):
+    template_name = 'simple_form_card.html'
+    form_class = forms.MaterialGroupModelForm
+    success_url = reverse_lazy('material_group_list')
+    permission_required = 'materials.add_materialgroup'
+
+
+class MaterialGroupModalCreateView(OwnedObjectModalCreateView):
     template_name = 'modal_form.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({
-            'form_title': 'Create new material',
-            'submit_button_text': 'Create'
-        })
-        return context
-
-    def form_valid(self, form):
-        form.instance.owner = self.request.user
-        return super().form_valid(form)
+    form_class = forms.MaterialGroupModalModelForm
+    success_url = reverse_lazy('material_group_list')
+    permission_required = 'materials.add_materialgroup'
 
 
-class MaterialDetailView(UserOwnsObjectMixin, BSModalReadView):
-    model = Material
+class MaterialGroupDetailView(OwnedObjectDetailView):
+    template_name = 'material_group_detail.html'
+    model = MaterialGroup
+    permission_required = 'materials.view_materialgroup'
+
+
+class MaterialGroupModalDetailView(OwnedObjectModalDetailView):
     template_name = 'modal_detail.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({
-            'modal_title': 'Material details',
-        })
-        return context
+    model = MaterialGroup
+    permission_required = 'materials.view_materialgroup'
 
 
-class MaterialUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
+class MaterialGroupUpdateView(OwnedObjectUpdateView):
+    template_name = 'simple_form_card.html'
+    model = MaterialGroup
+    form_class = forms.MaterialGroupModelForm
+    permission_required = 'materials.change_materialgroup'
+
+
+class MaterialGroupModalUpdateView(OwnedObjectModalUpdateView):
+    template_name = 'modal_form.html'
+    model = MaterialGroup
+    form_class = forms.MaterialGroupModalModelForm
+    permission_required = 'materials.change_materialgroup'
+
+
+class MaterialGroupModalDeleteView(OwnedObjectDeleteView):
+    template_name = 'modal_delete.html'
+    model = MaterialGroup
+    success_message = 'Successfully deleted.'
+    success_url = reverse_lazy('material_group_list')
+    permission_required = 'materials.delete_materialgroup'
+
+
+# ----------- Material CRUD --------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class MaterialListView(OwnedObjectListView):
+    template_name = 'simple_list_card.html'
+    model = Material
+    permission_required = 'materials.view_material'
+    create_new_object_url = reverse_lazy('material_create')
+
+
+class MaterialCreateView(OwnedObjectCreateView):
+    template_name = 'simple_form_card.html'
+    form_class = forms.MaterialModelForm
+    success_url = reverse_lazy('material_list')
+    permission_required = 'materials.add_material'
+
+
+class MaterialModalCreateView(OwnedObjectModalCreateView):
+    template_name = 'modal_form.html'
+    form_class = MaterialModelForm
+    success_url = reverse_lazy('material_list')
+    permission_required = 'materials.add_material'
+
+
+class MaterialDetailView(OwnedObjectDetailView):
+    template_name = 'material_detail.html'
+    model = Material
+    permission_required = 'materials.view_material'
+
+
+class MaterialModalDetailView(OwnedObjectModalDetailView):
+    template_name = 'modal_detail.html'
+    model = Material
+    permission_required = 'materials.view_material'
+
+
+class MaterialUpdateView(OwnedObjectUpdateView):
+    template_name = 'simple_form_card.html'
+    model = Material
+    form_class = forms.MaterialModelForm
+    permission_required = 'materials.change_material'
+
+
+class MaterialModalUpdateView(OwnedObjectModalUpdateView):
+    template_name = 'modal_form.html'
     model = Material
     form_class = MaterialModelForm
-    template_name = 'modal_form.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({
-            'form_title': 'Edit material description',
-            'submit_button_text': 'Edit'
-        })
-        return context
+    permission_required = 'materials.change_material'
 
 
-class MaterialDeleteView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalDeleteView):
-    model = Material
+class MaterialModalDeleteView(OwnedObjectDeleteView):
     template_name = 'modal_delete.html'
+    model = Material
     success_message = 'Successfully deleted.'
     success_url = reverse_lazy('material_list')
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({
-            'form_title': 'Delete material',
-            'submit_button_text': 'Delete'
-        })
-        return context
+    permission_required = 'materials.delete_material'
 
 
 # ----------- Material Components CRUD ---------------------------------------------------------------------------------
@@ -534,3 +595,8 @@ class CompositionSetModalUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, Nex
         }
         context.update(kwargs)
         return super().get_context_data(**context)
+
+
+class FeaturedMaterialListView(ListView):
+    template_name = 'featured_materials_list.html'
+    model = MaterialSettings

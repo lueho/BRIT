@@ -1,18 +1,32 @@
 from rest_framework.serializers import ModelSerializer
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
+import rest_framework_gis as rf
 
-from .models import Catchment, Region
+from .models import Catchment, Region, NutsRegion, GeoPolygon
+from django.db import models
+from brit.models import NamedUserObjectModel
+from django.contrib.gis.db.models import MultiPolygonField, PointField
+
+
+class PolygonSerializer(GeoFeatureModelSerializer):
+    class Meta:
+        model = GeoPolygon
+        geo_field = 'geom'
+        fields = '__all__'
 
 
 # ----------- Regions --------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
+class GeoreferencedRegion(GeoPolygon, Region):
+    pass
+
 
 class RegionSerializer(GeoFeatureModelSerializer):
     class Meta:
-        model = Region
+        model = GeoreferencedRegion
         geo_field = 'geom'
-        fields = ['country', 'name']
+        fields = ['name', 'country']
 
 
 class BaseResultMapSerializer(GeoFeatureModelSerializer):
@@ -26,6 +40,10 @@ class BaseResultMapSerializer(GeoFeatureModelSerializer):
         fields = '__all__'
 
 
+class GeoreferencedCatchment(GeoPolygon, Catchment):
+    pass
+
+
 class CatchmentSerializer(GeoFeatureModelSerializer):
     class Meta:
         model = Catchment
@@ -36,4 +54,15 @@ class CatchmentSerializer(GeoFeatureModelSerializer):
 class CatchmentQuerySerializer(ModelSerializer):
     class Meta:
         model = Catchment
-        fields = ['owner', 'region', 'type', 'name']
+        fields = ['owner', 'parent_region', 'type', 'name']
+
+
+class GeoreferencedNutsRegion(GeoPolygon, NutsRegion):
+    pass
+
+
+class NutsRegionGeometrySerializer(GeoFeatureModelSerializer):
+    class Meta:
+        model = GeoreferencedNutsRegion
+        geo_field = 'geom'
+        fields = []
