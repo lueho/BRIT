@@ -25,7 +25,7 @@ from .forms import (
     ScenarioInventoryConfigurationUpdateForm,
     SeasonalDistributionModelForm,
 )
-from maps.models import Catchment, GeoDataset, Region
+from maps.models import Catchment, GeoDataset
 from .models import (
     Scenario,
     ScenarioInventoryConfiguration,
@@ -93,6 +93,16 @@ class ScenarioDetailView(UserPassesTestMixin, DetailView):
     object = None
     config = None
     allow_edit = False
+    region_url = reverse_lazy('ajax_region_geometries')
+    load_region = True
+    feature_url = reverse_lazy('ajax_catchment_geometries')
+    load_features = True
+    adjust_bounds_to_features = False
+    marker_style = {
+        'color': '#4061d2',
+        'fillOpacity': 1,
+        'stroke': False
+    }
 
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()
