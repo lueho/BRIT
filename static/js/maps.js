@@ -72,7 +72,6 @@ async function fetchRegionGeometry(region_url, region_id) {
 async function filterFeatures() {
     const params = parseFilterParameters();
     let data = await fetchFeatureGeometries(params, mapConfig);
-    console.log(data)
     if ('info' in data) {
         await renderInfo(data['info'])
     }
@@ -160,7 +159,6 @@ async function renderSummary(summary) {
 }
 
 async function renderInfo(info) {
-    console.log(info)
     let info_container = document.getElementById('info-container');
     info_container.textContent = ''
     Object.keys(info).forEach(key => {
