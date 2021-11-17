@@ -104,7 +104,7 @@
                             <p class="card-text">{{ group_settings.fractions_of.name }}</p>
                             <p class="card-text"><strong>Sources:</strong></p>
                             {% for source in group_settings.sources.all %}
-                                <a href="{% url 'bib_source_detail' source.id %}"
+                                <a href="{% url 'bib_source_detail_modal' source.id %}"
                                    class="modal-link">
                                     {{ source.abbreviation }}{% if not forloop.last %},{% endif %}
                                 </a>
