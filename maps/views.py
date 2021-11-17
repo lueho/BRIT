@@ -6,7 +6,7 @@ from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView, DeleteView, DetailView, ListView, UpdateView
 from django.views.generic.edit import FormMixin
 from rest_framework.views import APIView
-from django.db.models import Sum
+from django.db.models import Q
 
 from .forms import (
     CatchmentModelForm,
@@ -117,14 +117,12 @@ class CatchmentDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
         return catchment.owner == self.request.user
 
 
-
-
-
 # ----------- Geodataset -----------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 class GeoDatasetDetailView(DetailView):
     feature_url = None
+    feature_popup_url = None
     region_url = reverse_lazy('ajax_region_geometries')
     filter_class = None
     form_class = None
@@ -144,6 +142,7 @@ class GeoDatasetDetailView(DetailView):
                 'form_fields': self.get_form_fields(),
                 'region_url': self.region_url,
                 'feature_url': self.feature_url,
+                'feature_popup_url': self.feature_popup_url,
                 'load_features': self.load_features,
                 'adjust_bounds_to_features': self.adjust_bounds_to_features,
                 'region_id': self.object.region.id,
