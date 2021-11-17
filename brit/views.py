@@ -88,7 +88,13 @@ class CreateOwnedObjectMixin(PermissionRequiredMixin, NextOrSuccessUrlMixin):
 
 
 class OwnedObjectCreateView(CreateOwnedObjectMixin, CreateView):
-    pass
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'form_title': f'Create New {self.form_class._meta.model._meta.verbose_name}',
+        })
+        return context
 
 
 class OwnedObjectModalCreateView(CreateOwnedObjectMixin, BSModalCreateView):
