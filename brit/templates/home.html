@@ -89,6 +89,26 @@
                 </div>
             </div>
         </div>
+        {% if 'soilcom.view_collection' in perms %}
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card h-100">
+               <div class="card-header"><a href="{% url 'waste_collection_home' %}"><b>SOILCOM biowaste collection map</b></a></div>
+                <div class="card-img">
+                    <a class="d-flex align-items-center justify-content-center stretched-link"
+                       href="{% url 'waste_collection_home' %}">
+                        <img class="w-100 m-0 p-1" src="{% static 'img/maps_nuts_regions.png' %}"
+                             alt="Inventories Module Cover Image">
+                    </a>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        The interactive biowaste collection map is being built within the SOILCOM project to learn
+                        more about the way biowaste is collected in European countries.
+                    </p>
+                </div>
+            </div>
+        </div>
+        {% endif %}
         <div class="col col-12 col-md-6 col-lg-3 mt-4">
             <div class="card h-100">
                 <div class="card-header"><b>Stakeholders</b></div>
