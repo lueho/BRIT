@@ -3,7 +3,6 @@ import json
 
 from bootstrap_modal_forms.generic import BSModalCreateView, BSModalUpdateView, BSModalDeleteView
 from celery.result import AsyncResult
-from django.contrib.auth.models import User
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.http import JsonResponse, HttpResponse
 from django.shortcuts import render, redirect
@@ -390,6 +389,16 @@ class ScenarioResultView(DetailView):
     context_object_name = 'scenario'
     object = None
     allow_edit = False
+    region_url = reverse_lazy('ajax_region_geometries')
+    load_region = True
+    feature_url = reverse_lazy('ajax_catchment_geometries')
+    load_features = True
+    adjust_bounds_to_features = False
+    marker_style = {
+        'color': '#4061d2',
+        'fillOpacity': 1,
+        'stroke': False
+    }
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -398,6 +407,15 @@ class ScenarioResultView(DetailView):
         context['layers'] = [layer.as_dict() for layer in result.layers]
         context['charts'] = result.get_charts()
         context['allow_edit'] = self.allow_edit
+        context['map_config'] = {
+            'region_url': self.region_url,
+            'feature_url': self.feature_url,
+            'load_features': self.load_features,
+            'adjust_bounds_to_features': self.adjust_bounds_to_features,
+            'region_id': self.object.region.id,
+            'load_region': self.load_region,
+            'markerStyle': self.marker_style
+        }
         return context
 
     def get(self, request, *args, **kwargs):
