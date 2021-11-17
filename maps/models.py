@@ -16,7 +16,8 @@ GIS_SOURCE_MODELS = (
     ('HamburgRoadsideTrees', 'HamburgRoadsideTrees'),
     ('HamburgGreenAreas', 'HamburgGreenAreas'),
     ('NantesGreenhouses', 'NantesGreenhouses'),
-    ('NutsRegion', 'NutsRegion')
+    ('NutsRegion', 'NutsRegion'),
+    ('WasteCollection', 'WasteCollection')
 )
 
 
