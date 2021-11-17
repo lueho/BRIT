@@ -1,6 +1,7 @@
-from django.contrib.auth.models import User
 from django.db import models
 from django.urls import reverse
+
+from brit.models import OwnedObjectModel
 
 
 class Licence(models.Model):
@@ -17,16 +18,16 @@ SOURCE_TYPES = (
     ('book', 'book'),
     ('website', 'website'),
     ('custom', 'custom'),
+    ('waste_flyer', 'waste_flyer')
 )
 
 
-class Source(models.Model):
-    owner = models.ForeignKey(User, default=8, on_delete=models.CASCADE)
+class Source(OwnedObjectModel):
     type = models.CharField(max_length=255, choices=SOURCE_TYPES, default='custom')
-    authors = models.CharField(max_length=500, null=True)
+    authors = models.CharField(max_length=500, blank=True, null=True)
     publisher = models.CharField(max_length=127, blank=True, null=True)
     title = models.CharField(max_length=500, null=True)
-    journal = models.CharField(max_length=500, null=True)
+    journal = models.CharField(max_length=500, blank=True, null=True)
     issue = models.CharField(max_length=255, blank=True, null=True)
     year = models.IntegerField(null=True)
     abbreviation = models.CharField(max_length=50, null=True)
@@ -36,6 +37,9 @@ class Source(models.Model):
     url = models.URLField(blank=True, null=True)
     doi = models.CharField(max_length=255, blank=True, null=True)
     last_accessed = models.DateField(blank=True, null=True)
+
+    class Meta:
+        verbose_name = 'Source'
 
     def get_absolute_url(self):
         return reverse('bib_source_detail', kwargs={'pk': self.id})

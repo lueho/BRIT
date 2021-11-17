@@ -1,5 +1,4 @@
 from django.contrib.auth.models import User
-from django.core.validators import RegexValidator
 from django.db import models
 from django.db.models import signals
 from django.db.models.signals import post_save
@@ -24,29 +23,11 @@ class MaterialGroup(NamedUserObjectModel):
         verbose_name = 'Material Group'
 
 
-class MaterialManager(models.Manager):
-
-    def feedstocks(self):
-        return self.filter(is_feedstock=True)
-
-
-class Material(models.Model):
+class Material(NamedUserObjectModel):
     """
     Holds all materials used
     """
-    name = models.CharField(max_length=255)
-    description = models.TextField(blank=True, null=True)
-    owner = models.ForeignKey(User, on_delete=models.CASCADE)
-    groups = models.ManyToManyField(MaterialGroup)
-    is_feedstock = models.BooleanField(default=True)
-    stan_flow_id = models.CharField(max_length=5,
-                                    blank=True,
-                                    null=True,
-                                    validators=[RegexValidator(regex=r'^[0-9]{5}?',
-                                                               message='STAN id must have 5 digits.s',
-                                                               code='invalid_stan_id')])
-
-    objects = MaterialManager()
+    groups = models.ManyToManyField(MaterialGroup, blank=True)
 
     def settings(self, owner):
         return self.materialsettings_set.filter(owner=owner)
@@ -89,9 +70,6 @@ class Material(models.Model):
     def delete_url(self):
         return reverse('material_delete', kwargs={'pk': self.id})
 
-    def __str__(self):
-        return self.name
-
     class Meta:
         verbose_name = 'Material'
         unique_together = [['name', 'owner']]
@@ -103,13 +81,11 @@ def initialize_material(sender, instance, created, **kwargs):
         instance.initialize_standard_settings()
 
 
-class MaterialSettings(models.Model):
+class MaterialSettings(NamedUserObjectModel):
     material = models.ForeignKey(Material, on_delete=models.CASCADE)
     preview = models.ImageField(default='img/generic_material.jpg', null=False)
     full_name = models.CharField(max_length=255, blank=True, null=True)
     customization_name = models.CharField(max_length=255, default='Customization')
-    description = models.TextField(blank=True, null=True)
-    owner = models.ForeignKey(User, on_delete=models.CASCADE)
     publish = models.BooleanField(default=False)
     standard = models.BooleanField(default=True)
 
@@ -254,18 +230,12 @@ class MaterialSettings(models.Model):
     def get_absolute_url(self):
         return reverse('material_settings', kwargs={'pk': self.id})
 
-    def __str__(self):
-        return self.name
 
-
-class MaterialComponent(models.Model):
+class MaterialComponent(NamedUserObjectModel):
     """
     Represents any kind of component that a material can consists of (e.g. water, any kind of chemical element
     or more complex components, such as carbohydrates)
     """
-    name = models.CharField(max_length=255)
-    description = models.TextField(blank=True, null=True)
-    owner = models.ForeignKey(User, on_delete=models.CASCADE)
 
     @staticmethod
     def get_absolute_url():
@@ -283,21 +253,15 @@ class MaterialComponent(models.Model):
     def delete_url(self):
         return reverse('component_delete', kwargs={'pk': self.id})
 
-    def __str__(self):
-        return self.name
-
     class Meta:
         verbose_name = 'component'
         unique_together = [['name', 'owner']]
 
 
-class MaterialComponentGroup(models.Model):
+class MaterialComponentGroup(NamedUserObjectModel):
     """
     Container model to group MaterialComponent instances
     """
-    name = models.CharField(max_length=255)
-    description = models.TextField(blank=True, null=True)
-    owner = models.ForeignKey(User, on_delete=models.CASCADE)
 
     @staticmethod
     def get_absolute_url():
@@ -315,8 +279,6 @@ class MaterialComponentGroup(models.Model):
     def delete_url(self):
         return reverse('material_component_group_delete', kwargs={'pk': self.id})
 
-    def __str__(self):
-        return self.name
 
     class Meta:
         verbose_name = 'material_component_group'
