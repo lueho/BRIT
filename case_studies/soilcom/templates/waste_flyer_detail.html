@@ -1,0 +1,30 @@
+{% extends 'base.html' %}
+{% load custom_tags %}
+
+{% block content %}
+
+    <div class="card shadow">
+        <div class="card-header"><strong>{{ object|verbose_name }} Detail</strong></div>
+        <div class="card-body">
+            {% for key, value in source_dict.items %}
+                {% if value.text %}
+                    <p><strong>{{ key }}</strong><br>
+                        {% if value.type == 'link' %}
+                            <a href="{{ value.href }}" target="blank">{{ value.text }}</a>
+                        {% elif value.type == 'text' %}
+                            {{ value.text }}
+                        {% endif %}
+                    </p>
+                {% endif %}
+            {% endfor %}
+        </div>
+        <div class="card-footer">
+            <a href="{% url 'waste_flyer_list' %}" class="mr-3"><i class="fas fa-fw fa-arrow-left"></i> back to
+                list</a>
+            <a href="{% url 'waste_flyer_update' object.id %}" class="mr-3"><i class="fas fa-fw fa-edit"></i> edit</a>
+            <a href="{% url 'waste_flyer_delete_modal' object.id %}" class="modal-link"><i
+                    class="fas fa-fw fa-trash"></i> delete</a>
+        </div>
+    </div>
+
+{% endblock content %}

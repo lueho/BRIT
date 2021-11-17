@@ -1,0 +1,9 @@
+<p><strong>{{ object.catchment.region.name }} ({{ object.catchment.region.nutsregion.nuts_id }})</strong></p>
+<p><strong>Collector:</strong><br>{{ object.collector.name }}</p>
+<p><strong>Collection system:</strong><br>{{ object.collection_system.name }}</p>
+<p><strong>Waste stream category:</strong><br>{{ object.waste_stream.category }}</p>
+<p><strong>Allowed materials:</strong><br>
+    {% for material in object.waste_stream.allowed_materials.all %}
+        {{ material.name }}{% if not forloop.last %}, {% endif %}
+    {% endfor %}
+</p>
