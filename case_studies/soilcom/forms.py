@@ -1,7 +1,13 @@
+from django import forms
+import datetime
+
+from bibliography.models import Source
+
 from brit.forms import CustomModelForm, CustomModalModelForm
-from . import models
 
 from materials.models import Material, MaterialGroup
+
+from . import models
 
 
 class CollectorModelForm(CustomModelForm):
@@ -40,6 +46,18 @@ class WasteCategoryModalModelForm(CustomModalModelForm):
         fields = ('name', 'description')
 
 
+class WasteComponentModelForm(CustomModelForm):
+    class Meta:
+        model = models.WasteComponent
+        fields = ('name', 'description')
+
+
+class WasteComponentModalModelForm(CustomModalModelForm):
+    class Meta:
+        model = models.WasteComponent
+        fields = ('name', 'description')
+
+
 class WasteStreamModelForm(CustomModelForm):
 
     def __init__(self, *args, **kwargs):
@@ -56,3 +74,35 @@ class WasteStreamModalModelForm(CustomModalModelForm):
     class Meta:
         model = models.WasteStream
         fields = ('name', 'category', 'allowed_materials', 'composition', 'description')
+
+
+class WasteFlyerModelForm(CustomModelForm):
+    last_accessed = forms.DateField(initial=datetime.date.today)
+
+    class Meta:
+        model = Source
+        fields = ('publisher', 'title', 'year', 'abbreviation', 'url', 'last_accessed',)
+
+
+class WasteFlyerModalModelForm(CustomModelForm):
+    class Meta:
+        model = Source
+        fields = ('publisher', 'title', 'year', 'abbreviation', 'url', 'last_accessed',)
+
+
+class CollectionModelForm(CustomModelForm):
+    class Meta:
+        model = models.Collection
+        fields = ('name', 'collector', 'catchment', 'collection_system', 'waste_stream', 'flyer', 'description')
+
+
+class CollectionModalModelForm(CustomModalModelForm):
+    class Meta:
+        model = models.Collection
+        fields = ('name', 'collector', 'catchment', 'collection_system', 'waste_stream', 'flyer', 'description')
+
+
+class CollectionFilterForm(forms.ModelForm):
+    class Meta:
+        model = models.Collection
+        fields = ('collector',)
