@@ -2,6 +2,7 @@ from bootstrap_modal_forms.generic import BSModalFormView, BSModalCreateView, BS
     BSModalDeleteView
 from crispy_forms.helper import FormHelper
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, DeleteView, DetailView, View, ListView
@@ -600,3 +601,7 @@ class CompositionSetModalUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, Nex
 class FeaturedMaterialListView(ListView):
     template_name = 'featured_materials_list.html'
     model = MaterialSettings
+
+    def get_queryset(self):
+        user_groups = self.request.user.groups.all()
+        return MaterialSettings.objects.filter(Q(visible_to_groups__in=user_groups) | Q(publish=True))

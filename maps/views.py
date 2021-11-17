@@ -23,8 +23,11 @@ from maps.serializers import CatchmentSerializer, RegionSerializer, NutsRegionGe
 
 
 class MapsListView(ListView):
-    queryset = GeoDataset.objects.all()
     template_name = 'maps_list.html'
+
+    def get_queryset(self):
+        user_groups = self.request.user.groups.all()
+        return GeoDataset.objects.filter(Q(visible_to_groups__in=user_groups) | Q(publish=True))
 
 
 # ----------- Catchment ------------------------------------------------------------------------------------------------
