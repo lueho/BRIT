@@ -7,6 +7,12 @@ window.addEventListener("map:init", function (event) {
     map = event.detail.map;
 });
 
+async function fetchFeatureInfos(feature, mapConfig) {
+    let dataurl = mapConfig['feature_popup_url'] + '?' + 'collection_id=' + feature['properties']['id'];
+    let response = await fetch(dataurl);
+    return await response.json()
+}
+
 async function fetchFeatureGeometries(params, mapConfig) {
 
     let dataurl = mapConfig['feature_url'] + '?' + $.param(params);
@@ -32,7 +38,12 @@ async function fetchFeatureGeometries(params, mapConfig) {
         onEachFeature: function onEachFeature(feature, layer) {
         }
     }).addTo(map);
-
+    
+    feature_layer.on('click', async function(event) {
+        await renderSummaryAlternative(await fetchFeatureInfos(event.layer.feature, mapConfig))
+    });
+    
+    
     if (mapConfig['adjust_bounds_to_features'] === true) {
         map.fitBounds(feature_layer.getBounds())
     }
@@ -152,6 +163,20 @@ async function renderSummary(summary) {
         let value = document.createElement('P');
         label.innerText = summary[key]['label'] + ':';
         value.innerText = summary[key]['value'].toString();
+        summary_container.appendChild(label);
+        summary_container.appendChild(value);
+    });
+    $('#summary-container').collapse('show');
+}
+
+async function renderSummaryAlternative(summary) {
+    let summary_container = document.getElementById('summary-container');
+    summary_container.textContent = ''
+    Object.keys(summary).forEach(key => {
+        let label = document.createElement('P');
+        let value = document.createElement('P');
+        label.innerText = key + ':';
+        value.innerText = summary[key].toString();
         summary_container.appendChild(label);
         summary_container.appendChild(value);
     });
