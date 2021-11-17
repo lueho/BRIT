@@ -111,6 +111,21 @@ class ScenarioDetailView(UserPassesTestMixin, DetailView):
         context['allow_edit'] = self.allow_edit
         return self.render_to_response(context)
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'map_config': {
+                'region_url': self.region_url,
+                'feature_url': self.feature_url,
+                'load_features': self.load_features,
+                'adjust_bounds_to_features': self.adjust_bounds_to_features,
+                'region_id': self.object.region.id,
+                'load_region': self.load_region,
+                'markerStyle': self.marker_style
+            }
+        })
+        return context
+
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         scenario = self.object
