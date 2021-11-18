@@ -12,12 +12,8 @@ from bibliography.views import (SourceListView,
                                 SourceUpdateView,
                                 SourceModalUpdateView,
                                 SourceModalDeleteView)
-
 from brit import views
-
 from maps.views import GeoDatasetDetailView
-from materials.models import MaterialGroup
-
 from . import forms
 from . import models
 from . import serializers
@@ -462,6 +458,24 @@ class WasteCollectionAPIView(APIView):
     @staticmethod
     def get(request):
         qs = models.Collection.objects.all()
+
+        countries = request.query_params.getlist('countries[]')
+        if countries:
+            qs = qs.filter(catchment__region__nutsregion__cntr_code__in=countries)
+
+        collection_system = request.query_params.getlist('collection_system[]')
+        if collection_system:
+            qs = qs.filter(collection_system_id__in=collection_system)
+
+        waste_category = request.query_params.getlist('waste_category[]')
+        if waste_category:
+            qs = qs.filter(waste_stream__category_id__in=waste_category)
+
+        allowed_materials = request.query_params.getlist('allowed_materials[]')
+        if allowed_materials:
+            qs = qs.filter(waste_stream__allowed_materials__in=allowed_materials)
+            print(len(qs))
+
         serializer = serializers.WasteCollectionGeometrySerializer(qs, many=True)
         data = {'geoJson': serializer.data}
         return JsonResponse(data)

@@ -1,12 +1,11 @@
-from django import forms
 import datetime
 
+from django import forms
+
 from bibliography.models import Source
-
 from brit.forms import CustomModelForm, CustomModalModelForm
-
+from maps.models import NutsRegion
 from materials.models import Material, MaterialGroup
-
 from . import models
 
 
@@ -102,7 +101,9 @@ class CollectionModalModelForm(CustomModalModelForm):
         fields = ('name', 'collector', 'catchment', 'collection_system', 'waste_stream', 'flyer', 'description')
 
 
-class CollectionFilterForm(forms.ModelForm):
-    class Meta:
-        model = models.Collection
-        fields = ('collector',)
+class CollectionFilterForm(forms.Form):
+    collection_system = forms.ModelMultipleChoiceField(queryset=models.CollectionSystem.objects.all())
+    waste_category = forms.ModelMultipleChoiceField(queryset=models.WasteCategory.objects.all())
+    countries = forms.MultipleChoiceField(
+        choices=NutsRegion.objects.values_list('cntr_code', 'cntr_code').distinct().order_by('cntr_code'))
+    allowed_materials = forms.ModelMultipleChoiceField(queryset=models.WasteComponent.objects.all())
