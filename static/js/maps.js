@@ -173,12 +173,27 @@ async function renderSummaryAlternative(summary) {
     let summary_container = document.getElementById('summary-container');
     summary_container.textContent = ''
     Object.keys(summary).forEach(key => {
-        let label = document.createElement('P');
-        let value = document.createElement('P');
-        label.innerText = key + ':';
-        value.innerText = summary[key].toString();
-        summary_container.appendChild(label);
-        summary_container.appendChild(value);
+        if (summary[key]) {
+            let label = document.createElement('P');
+            let b = document.createElement('B');
+            b.innerText =  key + ':';
+            label.appendChild(b)
+            summary_container.appendChild(label);
+            let value = document.createElement('P');
+            if (Array.isArray(summary[key])){
+                console.log(summary[key])
+                let ul = document.createElement('ul');
+                value.appendChild(ul);
+                summary[key].forEach(function (item) {
+                    let li = document.createElement('li')
+                    li.innerText = item.toString()
+                    ul.appendChild(li)
+                });
+            } else {
+                value.innerText = summary[key].toString();
+            }
+            summary_container.appendChild(value);
+        }
     });
     $('#summary-container').collapse('show');
 }
