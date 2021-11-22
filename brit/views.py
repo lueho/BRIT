@@ -10,8 +10,9 @@ from .tables import StandardItemTable, UserItemTable
 
 class NextOrSuccessUrlMixin:
     """
-    If a 'next=<url>' paramter is given the query string of the url, the user will be redirected to the given url
-    instead of the url resulting from the get_success_url() method.
+    If a 'next=<url>' parameter is given in the query string of the url,
+    the user will be redirected to the given url instead of the url resulting
+    from the get_success_url() method.
     """
 
     def get_success_url(self):
