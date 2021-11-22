@@ -1,5 +1,7 @@
 import datetime
 
+from crispy_forms.helper import FormHelper
+from crispy_forms.layout import Field, Layout, Submit
 from django import forms
 
 from bibliography.models import Source
@@ -89,10 +91,29 @@ class WasteFlyerModalModelForm(CustomModelForm):
         fields = ('publisher', 'title', 'year', 'abbreviation', 'url', 'last_accessed',)
 
 
-class CollectionModelForm(CustomModelForm):
+class ForeignkeyField(Field):
+    template = 'foreignkey-field.html'
+
+
+class CollectionModelForm(forms.ModelForm):
+    # TODO: Can the RelatedFieldWidgetWrapper be used for this:
+    # collector = forms.ModelChoiceField(queryset=models.Collector.objects.all(), widget=RelatedFieldWidgetWrapper)
+
     class Meta:
         model = models.Collection
         fields = ('name', 'collector', 'catchment', 'collection_system', 'waste_stream', 'flyer', 'description')
+
+    @property
+    def helper(self):
+        helper = FormHelper()
+        helper.layout = Layout()
+        for field_name, field in self.fields.items():
+            if isinstance(field, forms.ModelChoiceField):
+                helper.layout.append(ForeignkeyField(field_name))
+            else:
+                helper.layout.append(Field(field_name))
+        helper.add_input(Submit('submit', 'Save'))
+        return helper
 
 
 class CollectionModalModelForm(CustomModalModelForm):
