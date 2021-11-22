@@ -9,8 +9,19 @@ from django.views.generic import CreateView, DeleteView, DetailView, View, ListV
 from extra_views import UpdateWithInlinesView
 
 from brit.views import DualUserListView, UserOwnsObjectMixin, NextOrSuccessUrlMixin
+from brit.views import (
+    OwnedObjectListView,
+    OwnedObjectCreateView,
+    OwnedObjectModalCreateView,
+    OwnedObjectDetailView,
+    OwnedObjectModalDetailView,
+    OwnedObjectUpdateView,
+    OwnedObjectModalUpdateView,
+    OwnedObjectDeleteView,
+)
 from distributions.models import TemporalDistribution
 from users.models import ReferenceUsers
+from . import forms
 from .forms import (
     AddComponentForm,
     AddComponentGroupForm,
@@ -23,7 +34,6 @@ from .forms import (
     ComponentShareDistributionFormSetHelper,
     InlineComponentShare
 )
-from . import forms
 from .models import (
     Material,
     MaterialSettings,
@@ -31,17 +41,6 @@ from .models import (
     MaterialComponentGroup,
     MaterialGroup,
     CompositionSet
-)
-
-from brit.views import (
-    OwnedObjectListView,
-    OwnedObjectCreateView,
-    OwnedObjectModalCreateView,
-    OwnedObjectDetailView,
-    OwnedObjectModalDetailView,
-    OwnedObjectUpdateView,
-    OwnedObjectModalUpdateView,
-    OwnedObjectDeleteView,
 )
 
 
@@ -111,20 +110,20 @@ class MaterialListView(OwnedObjectListView):
     template_name = 'simple_list_card.html'
     model = Material
     permission_required = 'materials.view_material'
-    create_new_object_url = reverse_lazy('material_create')
+    create_new_object_url = reverse_lazy('material-create')
 
 
 class MaterialCreateView(OwnedObjectCreateView):
     template_name = 'simple_form_card.html'
     form_class = forms.MaterialModelForm
-    success_url = reverse_lazy('material_list')
+    success_url = reverse_lazy('material-list')
     permission_required = 'materials.add_material'
 
 
 class MaterialModalCreateView(OwnedObjectModalCreateView):
     template_name = 'modal_form.html'
     form_class = MaterialModelForm
-    success_url = reverse_lazy('material_list')
+    success_url = reverse_lazy('material-list')
     permission_required = 'materials.add_material'
 
 
@@ -158,7 +157,7 @@ class MaterialModalDeleteView(OwnedObjectDeleteView):
     template_name = 'modal_delete.html'
     model = Material
     success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('material_list')
+    success_url = reverse_lazy('material-list')
     permission_required = 'materials.delete_material'
 
 

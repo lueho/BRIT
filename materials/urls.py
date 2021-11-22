@@ -1,26 +1,27 @@
 from django.urls import path
 
-from brit.views import ModalMessageView
 from . import views
 
 urlpatterns = [
     path('', views.FeaturedMaterialListView.as_view(), name='featured_material_list'),
-    path('list/', views.MaterialListView.as_view(), name='material_list'),
-    path('create/', views.MaterialCreateView.as_view(), name='material_create'),
-    path('create/modal/', views.MaterialModalCreateView.as_view(), name='material_create_modal'),
-    path('<int:pk>/', views.MaterialDetailView.as_view(), name='material_detail'),
-    path('<int:pk>/modal/', views.MaterialModalDetailView.as_view(), name='material_detail_modal'),
-    path('<int:pk>/update/', views.MaterialUpdateView.as_view(), name='material_update'),
-    path('<int:pk>/update/modal/', views.MaterialModalUpdateView.as_view(), name='material_update_modal'),
-    path('<int:pk>/delete/', views.MaterialModalDeleteView.as_view(), name='material_delete_modal'),
+    path('list/', views.MaterialListView.as_view(), name='material-list'),
+    path('create/', views.MaterialCreateView.as_view(), name='material-create'),
+    path('create/modal/', views.MaterialModalCreateView.as_view(), name='material-create-modal'),
+    path('<int:pk>/', views.MaterialDetailView.as_view(), name='material-detail'),
+    path('<int:pk>/modal/', views.MaterialModalDetailView.as_view(), name='material-detail-modal'),
+    path('<int:pk>/update/', views.MaterialUpdateView.as_view(), name='material-update'),
+    path('<int:pk>/update/modal/', views.MaterialModalUpdateView.as_view(), name='material-update-modal'),
+    path('<int:pk>/delete/', views.MaterialModalDeleteView.as_view(), name='material-delete-modal'),
     path('groups/', views.MaterialGroupListView.as_view(), name='material_group_list'),
     path('groups/create/', views.MaterialGroupCreateView.as_view(), name='material_group_create'),
     path('groups/create/modal/', views.MaterialGroupCreateView.as_view(), name='material_group_create_modal'),
     path('groups/<int:pk>/', views.MaterialGroupDetailView.as_view(), name='material_group_detail'),
     path('groups/<int:pk>/modal/', views.MaterialGroupModalDetailView.as_view(), name='material_group_detail_modal'),
     path('groups/<int:pk>/update/', views.MaterialGroupUpdateView.as_view(), name='material_group_update'),
-    path('groups/<int:pk>/update/modal/', views.MaterialGroupModalUpdateView.as_view(), name='material_group_update_modal'),
-    path('groups/<int:pk>/delete/modal/', views.MaterialGroupModalDeleteView.as_view(), name='material_group_delete_modal'),
+    path('groups/<int:pk>/update/modal/', views.MaterialGroupModalUpdateView.as_view(),
+         name='material_group_update_modal'),
+    path('groups/<int:pk>/delete/modal/', views.MaterialGroupModalDeleteView.as_view(),
+         name='material_group_delete_modal'),
     path('materials/settings/<int:pk>/', views.MaterialSettingsDetailView.as_view(), name='material_settings'),
     path('materials/settings/<int:pk>/add_component_group/', views.AddComponentGroupView.as_view(),
          name='material_add_component_group'),

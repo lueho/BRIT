@@ -19,7 +19,7 @@
                         {{ object.material.description }}
                     </p>
                     <div class="collapse multi-collapse">
-                        <a href="{% url 'material_update' object.material.id %}?next={{ request.path }}"
+                        <a href="{% url 'material-update' object.material.id %}?next={{ request.path }}"
                            class="modal-link">
                             Edit <i class="fas fa-fw fa-edit"></i>
                         </a>

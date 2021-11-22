@@ -12,10 +12,10 @@
                     <p class="card-text"><strong>Description:</strong><br>{{ object.description }}</p>
                 </div>
                 <div class="card-footer">
-                    <a href="{% url 'collector_list' %}" class="mr-3"><i class="fas fa-fw fa-arrow-left"></i> back to
+                    <a href="{{ object.list_url }}" class="mr-3"><i class="fas fa-fw fa-arrow-left"></i> back to
                         list</a>
-                    <a href="{% url 'collector_update' object.id %}" class="mr-3"><i class="fas fa-fw fa-edit"></i> edit</a>
-                    <a href="{% url 'collector_delete_modal' object.id %}" class="modal-link"><i
+                    <a href="{{ object.update_url }}" class="mr-3"><i class="fas fa-fw fa-edit"></i> edit</a>
+                    <a href="{{ object.modal_delete_url }}" class="modal-link"><i
                             class="fas fa-fw fa-trash"></i> delete</a>
                 </div>
             </div>

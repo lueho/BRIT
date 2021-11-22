@@ -31,25 +31,24 @@ class CollectorListView(views.OwnedObjectListView):
     template_name = 'simple_list_card.html'
     model = models.Collector
     permission_required = 'soilcom.view_collector'
-    create_new_object_url = reverse_lazy('collector_create')
 
 
 class CollectorCreateView(views.OwnedObjectCreateView):
     template_name = 'simple_form_card.html'
     form_class = forms.CollectorModelForm
-    success_url = reverse_lazy('collector_list')
+    success_url = reverse_lazy('collector-list')
     permission_required = 'soilcom.add_collector'
 
 
 class CollectorModalCreateView(views.OwnedObjectModalCreateView):
     template_name = 'modal_form.html'
     form_class = forms.CollectorModalModelForm
-    success_url = reverse_lazy('collector_list')
+    success_url = reverse_lazy('collector-list')
     permission_required = 'soilcom.add_collector'
 
 
 class CollectorDetailView(views.OwnedObjectDetailView):
-    template_name = 'collector_detail.html'
+    template_name = 'simple_detail_card.html'
     model = models.Collector
     permission_required = 'soilcom.view_collector'
 
@@ -78,7 +77,7 @@ class CollectorModalDeleteView(views.OwnedObjectDeleteView):
     template_name = 'modal_delete.html'
     model = models.Collector
     success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('collector_list')
+    success_url = reverse_lazy('collector-list')
     permission_required = 'soilcom.delete_collector'
 
 
@@ -89,25 +88,24 @@ class CollectionSystemListView(views.OwnedObjectListView):
     template_name = 'simple_list_card.html'
     model = models.CollectionSystem
     permission_required = 'soilcom.view_collectionsystem'
-    create_new_object_url = reverse_lazy('collection_system_create')
 
 
 class CollectionSystemCreateView(views.OwnedObjectCreateView):
     template_name = 'simple_form_card.html'
     form_class = forms.CollectionSystemModelForm
-    success_url = reverse_lazy('collection_system_list')
+    success_url = reverse_lazy('collectionsystem-list')
     permission_required = 'soilcom.add_collectionsystem'
 
 
 class CollectionSystemModalCreateView(views.OwnedObjectModalCreateView):
     template_name = 'modal_form.html'
     form_class = forms.CollectionSystemModalModelForm
-    success_url = reverse_lazy('collection_system_list')
+    success_url = reverse_lazy('collectionsystem-list')
     permission_required = 'soilcom.add_collectionsystem'
 
 
 class CollectionSystemDetailView(views.OwnedObjectDetailView):
-    template_name = 'collection_system_detail.html'
+    template_name = 'simple_detail_card.html'
     model = models.CollectionSystem
     permission_required = 'soilcom.view_collectionsystem'
 
@@ -136,7 +134,7 @@ class CollectionSystemModalDeleteView(views.OwnedObjectDeleteView):
     template_name = 'modal_delete.html'
     model = models.CollectionSystem
     success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('collection_system_list')
+    success_url = reverse_lazy('collectionsystem-list')
     permission_required = 'soilcom.delete_collectionsystem'
 
 
@@ -147,25 +145,24 @@ class WasteCategoryListView(views.OwnedObjectListView):
     template_name = 'simple_list_card.html'
     model = models.WasteCategory
     permission_required = 'soilcom.view_wastecategory'
-    create_new_object_url = reverse_lazy('waste_category_create')
 
 
 class WasteCategoryCreateView(views.OwnedObjectCreateView):
     template_name = 'simple_form_card.html'
     form_class = forms.WasteCategoryModelForm
-    success_url = reverse_lazy('waste_category_list')
+    success_url = reverse_lazy('wastecategory-list')
     permission_required = 'soilcom.add_wastecategory'
 
 
 class WasteCategoryModalCreateView(views.OwnedObjectModalCreateView):
     template_name = 'modal_form.html'
     form_class = forms.WasteCategoryModalModelForm
-    success_url = reverse_lazy('waste_category_list')
+    success_url = reverse_lazy('wastecategory-list')
     permission_required = 'soilcom.add_wastecategory'
 
 
 class WasteCategoryDetailView(views.OwnedObjectDetailView):
-    template_name = 'waste_category_detail.html'
+    template_name = 'simple_detail_card.html'
     model = models.WasteCategory
     permission_required = 'soilcom.view_wastecategory'
 
@@ -194,7 +191,7 @@ class WasteCategoryModalDeleteView(views.OwnedObjectDeleteView):
     template_name = 'modal_delete.html'
     model = models.WasteCategory
     success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('waste_category_list')
+    success_url = reverse_lazy('wastecategory-list')
     permission_required = 'soilcom.delete_wastecategory'
 
 
@@ -205,25 +202,24 @@ class WasteComponentListView(views.OwnedObjectListView):
     template_name = 'simple_list_card.html'
     model = models.WasteComponent
     permission_required = 'soilcom.view_wastecomponent'
-    create_new_object_url = reverse_lazy('waste_component_create')
 
 
 class WasteComponentCreateView(views.OwnedObjectCreateView):
     template_name = 'simple_form_card.html'
     form_class = forms.WasteComponentModelForm
-    success_url = reverse_lazy('waste_component_list')
+    success_url = reverse_lazy('wastecomponent-list')
     permission_required = 'soilcom.add_wastecomponent'
 
 
 class WasteComponentModalCreateView(views.OwnedObjectModalCreateView):
     template_name = 'modal_form.html'
     form_class = forms.WasteComponentModalModelForm
-    success_url = reverse_lazy('waste_component_list')
+    success_url = reverse_lazy('wastecomponent-list')
     permission_required = 'soilcom.add_wastecomponent'
 
 
 class WasteComponentDetailView(views.OwnedObjectDetailView):
-    template_name = 'waste_component_detail.html'
+    template_name = 'simple_detail_card.html'
     model = models.WasteComponent
     permission_required = 'soilcom.view_wastecomponent'
 
@@ -252,7 +248,7 @@ class WasteComponentModalDeleteView(views.OwnedObjectDeleteView):
     template_name = 'modal_delete.html'
     model = models.WasteComponent
     success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('waste_component_list')
+    success_url = reverse_lazy('wastecomponent-list')
     permission_required = 'soilcom.delete_wastecomponent'
 
 
@@ -263,25 +259,24 @@ class WasteStreamListView(views.OwnedObjectListView):
     template_name = 'simple_list_card.html'
     model = models.WasteStream
     permission_required = 'soilcom.view_wastestream'
-    create_new_object_url = reverse_lazy('waste_stream_create')
 
 
 class WasteStreamCreateView(views.OwnedObjectCreateView):
     template_name = 'simple_form_card.html'
     form_class = forms.WasteStreamModelForm
-    success_url = reverse_lazy('waste_stream_list')
+    success_url = reverse_lazy('wastestream-list')
     permission_required = 'soilcom.add_wastestream'
 
 
 class WasteStreamModalCreateView(views.OwnedObjectModalCreateView):
     template_name = 'modal_form.html'
     form_class = forms.WasteStreamModalModelForm
-    success_url = reverse_lazy('waste_category_list')
+    success_url = reverse_lazy('wastecategory-list')
     permission_required = 'soilcom.add_wastestream'
 
 
 class WasteStreamDetailView(views.OwnedObjectDetailView):
-    template_name = 'waste_stream_detail.html'
+    template_name = 'simple_detail_card.html'
     model = models.WasteStream
     permission_required = 'soilcom.view_wastestream'
 
@@ -310,7 +305,7 @@ class WasteStreamModalDeleteView(views.OwnedObjectDeleteView):
     template_name = 'modal_delete.html'
     model = models.WasteStream
     success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('waste_stream_list')
+    success_url = reverse_lazy('wastestream-list')
     permission_required = 'soilcom.delete_wastestream'
 
 
@@ -321,12 +316,12 @@ class WasteFlyerListView(SourceListView):
     template_name = 'waste_flyers_list.html'
     model = models.WasteFlyer
     permission_required = 'soilcom.view_wasteflyer'
-    create_new_object_url = reverse_lazy('waste_flyer_create')
+    create_new_object_url = reverse_lazy('wasteflyer-create')
 
 
 class WasteFlyerCreateView(SourceCreateView):
     form_class = forms.WasteFlyerModelForm
-    success_url = reverse_lazy('waste_flyer_list')
+    success_url = reverse_lazy('wasteflyer-list')
     permission_required = 'soilcom.add_wasteflyer'
 
     def form_valid(self, form):
@@ -336,7 +331,7 @@ class WasteFlyerCreateView(SourceCreateView):
 
 class WasteFlyerModalCreateView(SourceModalCreateView):
     form_class = forms.WasteFlyerModalModelForm
-    success_url = reverse_lazy('waste_flyer_list')
+    success_url = reverse_lazy('wasteflyer-list')
     permission_required = 'soilcom.add_wasteflyer'
 
     def form_valid(self, form):
@@ -380,20 +375,19 @@ class CollectionListView(views.OwnedObjectListView):
     template_name = 'simple_list_card.html'
     model = models.Collection
     permission_required = 'soilcom.view_collection'
-    create_new_object_url = reverse_lazy('waste_collection_create')
 
 
 class CollectionCreateView(views.OwnedObjectCreateView):
     template_name = 'simple_form_card.html'
     form_class = forms.CollectionModelForm
-    success_url = reverse_lazy('waste_collection_list')
+    success_url = reverse_lazy('wastecollection-list')
     permission_required = 'soilcom.add_collection'
 
 
 class CollectionModalCreateView(views.OwnedObjectModalCreateView):
     template_name = 'modal_form.html'
     form_class = forms.CollectionModalModelForm
-    success_url = reverse_lazy('waste_collection_list')
+    success_url = reverse_lazy('wastecollection-list')
     permission_required = 'soilcom.add_collection'
 
 
@@ -427,7 +421,7 @@ class CollectionModalDeleteView(views.OwnedObjectDeleteView):
     template_name = 'modal_delete.html'
     model = models.Collection
     success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('waste_collection_list')
+    success_url = reverse_lazy('wastecollection-list')
     permission_required = 'soilcom.delete_collection'
 
 
@@ -436,8 +430,8 @@ class CollectionModalDeleteView(views.OwnedObjectDeleteView):
 
 
 class WasteCollectionMapView(GeoDatasetDetailView):
-    feature_url = reverse_lazy('data.waste_collections')
-    feature_popup_url = reverse_lazy('data.waste_collection_summary')
+    feature_url = reverse_lazy('data.wastecollections')
+    feature_popup_url = reverse_lazy('data.wastecollection-summary')
     form_class = forms.CollectionFilterForm
     load_features = True
     adjust_bounds_to_features = True
@@ -474,7 +468,6 @@ class WasteCollectionAPIView(APIView):
         allowed_materials = request.query_params.getlist('allowed_materials[]')
         if allowed_materials:
             qs = qs.filter(waste_stream__allowed_materials__in=allowed_materials)
-            print(len(qs))
 
         serializer = serializers.WasteCollectionGeometrySerializer(qs, many=True)
         data = {'geoJson': serializer.data}

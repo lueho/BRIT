@@ -7,11 +7,11 @@ from django.urls import reverse
 from factory.django import mute_signals
 
 from bibliography.models import Source
+from brit.models import NamedUserObjectModel
 from distributions.models import Timestep, TemporalDistribution
 from distributions.plots import DataSet, DoughnutChart
 from users.models import ReferenceUsers
 from .tables import averages_table_factory, distribution_table_factory
-from brit.models import NamedUserObjectModel
 
 
 class MaterialGroup(NamedUserObjectModel):
@@ -54,21 +54,6 @@ class Material(NamedUserObjectModel):
             fractions_of=base_component
         )
         settings.add_component(base_component)
-
-    def get_absolute_url(self):
-        return reverse('material_detail', args=[self.id])
-
-    @property
-    def detail_url(self):
-        return self.materialsettings_set.get(standard=True).get_absolute_url()
-
-    @property
-    def update_url(self):
-        return reverse('material_update', kwargs={'pk': self.id})
-
-    @property
-    def delete_url(self):
-        return reverse('material_delete', kwargs={'pk': self.id})
 
     class Meta:
         verbose_name = 'Material'

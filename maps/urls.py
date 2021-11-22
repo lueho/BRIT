@@ -16,6 +16,7 @@ urlpatterns = [
     path('list', MapsListView.as_view(), name='maps_list'),
     path('catchments/', CatchmentBrowseView.as_view(), name='catchment_list'),
     path('catchment/create/', CatchmentCreateView.as_view(), name='catchment_definition'),
+    path('catchment/create/modal/', CatchmentCreateView.as_view(), name='catchment-create-modal'),
     path('catchments/<int:pk>/update/', CatchmentUpdateView.as_view(), name='catchment_update'),
     path('catchments/<int:pk>/delete/', CatchmentDeleteView.as_view(), name='catchment_delete'),
     path('catchments/data/', RegionGeometryAPI.as_view(), name='data.catchments'),
