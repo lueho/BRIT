@@ -17,7 +17,7 @@
                     </p>
                 </div>
                 <div class="card-footer">
-                    <a href="{% url 'WasteCollection' 5 %}" class="btn btn-primary">View map</a>
+                    <a href="{% url 'WasteCollection' %}" class="btn btn-primary">View map</a>
                 </div>
             </div>
         </div>
@@ -36,14 +36,14 @@
                     </p>
                 </div>
                 <div class="card-footer">
-                    <a href="{% url 'collector-list' %}" class="btn btn-primary">View collectors</a>
+                    <a href="{% url 'catchment-selection' %}" class="btn btn-primary">View collectors</a>
                 </div>
             </div>
         </div>
         <div class="col col-12 col-md-6 col-lg-3 mt-4">
             <div class="card shadow h-100">
                 <div class="card-header">
-                    <a href="{% url 'catchment_list' %}" class="stretched-link"><strong>Catchments</strong></a>
+                    <a href="{% url 'catchment-selection' %}" class="stretched-link"><strong>Catchments</strong></a>
                 </div>
                 <div class="card-body">
                     <p class="card-text">
@@ -52,7 +52,7 @@
                     </p>
                 </div>
                 <div class="card-footer">
-                    <a href="{% url 'catchment_list' %}" class="btn btn-primary">View catchments</a>
+                    <a href="{% url 'catchment-selection' %}" class="btn btn-primary">View catchments</a>
                 </div>
             </div>
         </div>

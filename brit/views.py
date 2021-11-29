@@ -3,6 +3,7 @@ from django.contrib.auth.mixins import UserPassesTestMixin, PermissionRequiredMi
 from django.views.generic import CreateView, UpdateView
 from django.views.generic import TemplateView, ListView, DetailView
 from django_tables2 import table_factory
+from django.http import HttpResponseRedirect
 
 from users.models import ReferenceUsers
 from .tables import StandardItemTable, UserItemTable
@@ -117,7 +118,7 @@ class OwnedObjectModalDetailView(PermissionRequiredMixin, BSModalReadView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update({
-            'modal_title': f'{self.object._meta.verbose_name} Details',
+            'modal_title': f'Details of {self.object._meta.verbose_name}',
         })
         return context
 
@@ -127,7 +128,7 @@ class OwnedObjectUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin, Upda
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update({
-            'form_title': f'{self.object._meta.verbose_name} Update',
+            'form_title': f'Update {self.object._meta.verbose_name}',
             'submit_button_text': 'Save'
         })
         return context
@@ -138,7 +139,7 @@ class OwnedObjectModalUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin,
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update({
-            'modal_title': f'{self.object._meta.verbose_name} Update',
+            'modal_title': f'Update {self.object._meta.verbose_name}',
             'submit_button_text': 'Save'
         })
         return context

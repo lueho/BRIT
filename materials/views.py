@@ -149,7 +149,7 @@ class MaterialUpdateView(OwnedObjectUpdateView):
 class MaterialModalUpdateView(OwnedObjectModalUpdateView):
     template_name = 'modal_form.html'
     model = Material
-    form_class = MaterialModelForm
+    form_class = forms.MaterialModalModelForm
     permission_required = 'materials.change_material'
 
 

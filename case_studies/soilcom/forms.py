@@ -6,7 +6,6 @@ from django import forms
 
 from bibliography.models import Source
 from brit.forms import CustomModelForm, CustomModalModelForm
-from maps.models import NutsRegion
 from materials.models import Material, MaterialGroup
 from . import models
 
@@ -96,22 +95,41 @@ class ForeignkeyField(Field):
 
 
 class CollectionModelForm(forms.ModelForm):
-    # TODO: Can the RelatedFieldWidgetWrapper be used for this:
-    # collector = forms.ModelChoiceField(queryset=models.Collector.objects.all(), widget=RelatedFieldWidgetWrapper)
+    collection_system = forms.ModelChoiceField(queryset=models.CollectionSystem.objects.all(), required=True)
+    catchment = forms.ModelChoiceField(queryset=models.Catchment.objects.all().order_by('region__nutsregion__nuts_id'))
+    waste_category = forms.ModelChoiceField(queryset=models.WasteCategory.objects.all())
+    allowed_materials = forms.ModelMultipleChoiceField(queryset=models.WasteComponent.objects.all(),
+                                                       widget=forms.CheckboxSelectMultiple)
+    flyer_url = forms.URLField(required=False)
 
     class Meta:
         model = models.Collection
-        fields = ('name', 'collector', 'catchment', 'collection_system', 'waste_stream', 'flyer', 'description')
+        fields = (
+            'catchment', 'collector', 'collection_system', 'waste_category', 'allowed_materials', 'flyer_url',
+            'description'
+        )
+        labels = {
+            'description': 'Comments'
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        initial = kwargs.get('initial', {})
+        if 'catchment' in initial:
+            self.fields['catchment'].queryset = models.Catchment.objects.filter(id=initial['catchment'].id)
 
     @property
     def helper(self):
         helper = FormHelper()
-        helper.layout = Layout()
-        for field_name, field in self.fields.items():
-            if isinstance(field, forms.ModelChoiceField):
-                helper.layout.append(ForeignkeyField(field_name))
-            else:
-                helper.layout.append(Field(field_name))
+        helper.layout = Layout(
+            Field('catchment'),
+            ForeignkeyField('collector'),
+            ForeignkeyField('collection_system'),
+            ForeignkeyField('waste_category'),
+            Field('allowed_materials'),
+            Field('flyer_url'),
+            Field('description')
+        )
         helper.add_input(Submit('submit', 'Save'))
         return helper
 
@@ -122,9 +140,31 @@ class CollectionModalModelForm(CustomModalModelForm):
         fields = ('name', 'collector', 'catchment', 'collection_system', 'waste_stream', 'flyer', 'description')
 
 
+COUNTRY_SET = set(sorted(set((c.catchment.region.nutsregion.cntr_code, c.catchment.region.nutsregion.cntr_code) for c in
+                  models.Collection.objects.all())))
+
+
 class CollectionFilterForm(forms.Form):
-    collection_system = forms.ModelMultipleChoiceField(queryset=models.CollectionSystem.objects.all())
-    waste_category = forms.ModelMultipleChoiceField(queryset=models.WasteCategory.objects.all())
+    collection_system = forms.ModelMultipleChoiceField(
+        queryset=models.CollectionSystem.objects.all(),
+        # initial=models.CollectionSystem.objects.all(),
+        widget=forms.CheckboxSelectMultiple
+    )
+    waste_category = forms.ModelMultipleChoiceField(
+        queryset=models.WasteCategory.objects.all(),
+        # initial=models.WasteCategory.objects.all(),
+        widget=forms.CheckboxSelectMultiple
+    )
     countries = forms.MultipleChoiceField(
-        choices=NutsRegion.objects.values_list('cntr_code', 'cntr_code').distinct().order_by('cntr_code'))
-    allowed_materials = forms.ModelMultipleChoiceField(queryset=models.WasteComponent.objects.all())
+        choices=COUNTRY_SET,
+        widget=forms.CheckboxSelectMultiple
+    )
+    allowed_materials = forms.ModelMultipleChoiceField(
+        queryset=models.WasteComponent.objects.all(),
+        # initial=models.WasteComponent.objects.all(),
+        widget=forms.CheckboxSelectMultiple
+    )
+
+    # def __init__(self, *args, **kwargs):
+    #     super().__init__(*args, **kwargs)
+    #     self.fields['countries'].initial = [choice[0] for choice in self.fields['countries'].choices]

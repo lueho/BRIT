@@ -21,10 +21,6 @@ class CustomModelForm(ModelForm):
 
 class ModalFormHelper(FormHelper):
 
-    # def __init__(self, *args, **kwargs):
-    #     super().__init__(*args, **kwargs)
-    #     self.form_id = 'modal-form'
-
     @property
     def form_id(self):
         return 'modal-form'

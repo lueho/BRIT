@@ -14,6 +14,7 @@ from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 from rest_framework.views import APIView
 
 from brit.views import DualUserListView, UserOwnsObjectMixin, NextOrSuccessUrlMixin
+from maps.models import GeoDataset
 from maps.views import GeoDatasetDetailView
 from materials.models import MaterialComponentGroup, BaseObjects
 from users.models import ReferenceUsers
@@ -302,6 +303,10 @@ class GreenhousesMapView(GeoDatasetDetailView):
         'radius': 5,
         'stroke': False
     }
+
+    def get_object(self, **kwargs):
+        self.kwargs.update({'pk': GeoDataset.objects.get(model_name='NantesGreenhouses').pk})
+        return super().get_object(**kwargs)
 
 
 class NantesGreenhousesAPIView(APIView):

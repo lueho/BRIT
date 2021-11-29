@@ -1,7 +1,12 @@
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.http import JsonResponse
-from django.urls import reverse_lazy
+from django.urls import reverse_lazy, reverse
 from django.views.generic import TemplateView
+from django.views.generic.edit import FormMixin, FormView
+from django.db.models import Q
+from functools import reduce
+import operator
+
 from rest_framework.views import APIView
 
 from bibliography.views import (SourceListView,
@@ -13,6 +18,8 @@ from bibliography.views import (SourceListView,
                                 SourceModalUpdateView,
                                 SourceModalDeleteView)
 from brit import views
+from maps.models import Catchment, GeoDataset, NutsRegion
+from maps.forms import CatchmentQueryForm, NutsRegionQueryForm
 from maps.views import GeoDatasetDetailView
 from . import forms
 from . import models
@@ -378,16 +385,51 @@ class CollectionListView(views.OwnedObjectListView):
 
 
 class CollectionCreateView(views.OwnedObjectCreateView):
-    template_name = 'simple_form_card.html'
+    template_name = 'collection_form_card.html'
     form_class = forms.CollectionModelForm
-    success_url = reverse_lazy('wastecollection-list')
+    success_url = reverse_lazy('WasteCollection')
     permission_required = 'soilcom.add_collection'
+
+    def get_initial(self):
+        initial = super().get_initial()
+        if 'region_id' in self.request.GET:
+            region_id = self.request.GET.get('region_id')
+            catchment = NutsRegion.objects.get(id=region_id).region_ptr.catchment_set.first()
+            initial['catchment'] = catchment
+        return initial
+
+    def form_valid(self, form):
+        data = form.cleaned_data
+        name = f'{data["catchment"]} {data["waste_category"]} {data["collection_system"]}'
+
+        waste_stream = models.WasteStream.objects.create(
+            name=name,
+            owner=self.request.user,
+            category=data["waste_category"]
+        )
+        waste_stream.allowed_materials.add(*set(material.id for material in data['allowed_materials']))
+        waste_stream.save()
+
+        if form.cleaned_data['flyer_url']:
+            flyer, created = models.WasteFlyer.objects.get_or_create(
+                type='waste_flyer',
+                owner=self.request.user,
+                title=f'Waste flyer {form.cleaned_data["catchment"]}',
+                abbreviation=f'Waste flyer {form.cleaned_data["catchment"]}',
+                url=form.cleaned_data['flyer_url']
+            )
+            form.instance.flyer = flyer
+
+        form.instance.name = name
+        form.instance.waste_stream = waste_stream
+
+        return super().form_valid(form)
 
 
 class CollectionModalCreateView(views.OwnedObjectModalCreateView):
     template_name = 'modal_form.html'
     form_class = forms.CollectionModalModelForm
-    success_url = reverse_lazy('wastecollection-list')
+    success_url = reverse_lazy('collection-list')
     permission_required = 'soilcom.add_collection'
 
 
@@ -404,10 +446,41 @@ class CollectionModalDetailView(views.OwnedObjectModalDetailView):
 
 
 class CollectionUpdateView(views.OwnedObjectUpdateView):
-    template_name = 'simple_form_card.html'
+    template_name = 'collection_form_card.html'
     model = models.Collection
     form_class = forms.CollectionModelForm
     permission_required = 'soilcom.change_collection'
+    success_url = reverse_lazy('WasteCollection')
+
+    def get_initial(self):
+        initial = super().get_initial()
+        initial['catchment'] = self.object.catchment
+        initial['waste_category'] = self.object.waste_stream.category
+        initial['allowed_materials'] = self.object.waste_stream.allowed_materials.all()
+        initial['flyer_url'] = self.object.flyer.url if self.object.flyer else ''
+        return initial
+
+    def form_valid(self, form):
+        waste_stream = self.object.waste_stream
+        allowed_materials = form.cleaned_data['allowed_materials'].all()
+        for material in waste_stream.allowed_materials.all():
+            if material not in allowed_materials:
+                waste_stream.allowed_materials.remove(material)
+        for material in allowed_materials:
+            if material not in waste_stream.allowed_materials.all():
+                waste_stream.allowed_materials.add(material)
+        waste_stream.save()
+        flyer, created = models.WasteFlyer.objects.get_or_create(
+            type='waste_flyer',
+            url=form.cleaned_data['flyer_url'],
+            defaults={
+                'owner': self.request.user,
+                'title': f'Waste flyer {form.cleaned_data["catchment"]}',
+                'abbreviation': f'Waste flyer {form.cleaned_data["catchment"]}',
+            }
+        )
+        form.instance.flyer = flyer
+        return super().form_valid(form)
 
 
 class CollectionModalUpdateView(views.OwnedObjectModalUpdateView):
@@ -421,19 +494,73 @@ class CollectionModalDeleteView(views.OwnedObjectDeleteView):
     template_name = 'modal_delete.html'
     model = models.Collection
     success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('wastecollection-list')
+    success_url = reverse_lazy('collection-list')
     permission_required = 'soilcom.delete_collection'
 
 
 # ----------- Maps -----------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
+class CatchmentSelectView(FormMixin, TemplateView):
+    model = Catchment
+    form_class = NutsRegionQueryForm
+    template_name = 'waste_collection_catchment_list.html'
+    region_url = reverse_lazy('ajax_region_geometries')
+    feature_url = reverse_lazy('data.catchment-options')
+    filter_class = None
+    load_features = False
+    queryset = NutsRegion.objects.filter(levl_code=0)
+    adjust_bounds_to_features = False
+    load_region = False
+    marker_style = {
+        'color': '#4061d2',
+        'fillOpacity': 1,
+        'stroke': False
+    }
+
+    def get_initial(self):
+        initial = {}
+        region_id = self.request.GET.get('region')
+        catchment_id = self.request.GET.get('catchment')
+        if catchment_id:
+            catchment = Catchment.objects.get(id=catchment_id)
+            initial['parent_region'] = catchment.parent_region.id
+            initial['catchment'] = catchment.id
+        elif region_id:
+            initial['region'] = region_id
+        return initial
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'map_header': 'Catchments',
+            'form': self.get_form(),
+            'map_config': {
+                'form_fields': self.get_form_fields(),
+                'region_url': self.region_url,
+                'feature_url': self.feature_url,
+                'load_features': self.load_features,
+                'adjust_bounds_to_features': self.adjust_bounds_to_features,
+                'region_id': self.get_region_id(),
+                'load_region': self.load_region,
+                'markerStyle': self.marker_style
+            }
+        })
+        return context
+
+    def get_form_fields(self):
+        return {key: type(value.widget).__name__ for key, value in self.form_class.base_fields.items()}
+
+    def get_region_id(self):
+        return 10
+
 
 class WasteCollectionMapView(GeoDatasetDetailView):
-    feature_url = reverse_lazy('data.wastecollections')
-    feature_popup_url = reverse_lazy('data.wastecollection-summary')
+    template_name = 'waste_collection_map.html'
+    feature_url = reverse_lazy('data.collections')
+    feature_popup_url = reverse_lazy('data.collection-summary')
     form_class = forms.CollectionFilterForm
-    load_features = True
+    load_features = False
     adjust_bounds_to_features = True
     load_region = False
     marker_style = {
@@ -441,6 +568,10 @@ class WasteCollectionMapView(GeoDatasetDetailView):
         'fillOpacity': 1,
         'stroke': False
     }
+
+    def get_object(self, **kwargs):
+        self.kwargs.update({'pk': GeoDataset.objects.get(model_name='WasteCollection').pk})
+        return super().get_object(**kwargs)
 
 
 # ----------- API ------------------------------------------------------------------------------------------------------
@@ -451,7 +582,10 @@ class WasteCollectionAPIView(APIView):
 
     @staticmethod
     def get(request):
-        qs = models.Collection.objects.all()
+        if request.query_params:
+            qs = models.Collection.objects.all()
+        else:
+            qs = models.Collection.objects.none()
 
         countries = request.query_params.getlist('countries[]')
         if countries:
@@ -465,9 +599,10 @@ class WasteCollectionAPIView(APIView):
         if waste_category:
             qs = qs.filter(waste_stream__category_id__in=waste_category)
 
-        allowed_materials = request.query_params.getlist('allowed_materials[]')
-        if allowed_materials:
-            qs = qs.filter(waste_stream__allowed_materials__in=allowed_materials)
+        allowed_materials_ids = request.query_params.getlist('allowed_materials[]')
+        if allowed_materials_ids:
+            for material_id in allowed_materials_ids:
+                qs = qs.filter(waste_stream__allowed_materials__id=material_id)
 
         serializer = serializers.WasteCollectionGeometrySerializer(qs, many=True)
         data = {'geoJson': serializer.data}
@@ -480,7 +615,8 @@ class WasteCollectionSummaryAPIView(APIView):
     def get(request):
         obj = models.Collection.objects.get(id=request.query_params.get('collection_id'))
         serializer = serializers.WasteCollectionSerializer(obj, context={'request': request})
-        return JsonResponse(serializer.verbose_data)
+        data = {key.capitalize(): value for key, value in serializer.verbose_data.items()}
+        return JsonResponse(data)
 
 
 class WasteCollectionPopupDetailView(views.OwnedObjectDetailView):

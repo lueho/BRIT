@@ -1,0 +1,33 @@
+{% extends 'simple_form_card.html' %}
+
+{% block javascript %}
+
+    <script type="text/javascript">
+
+        function updateCollectionModalForm() {
+            $(".modal-link").each(function updateCollectionModalForm() {
+                $(this).modalForm({
+                    formURL: $(this).attr("href"),
+                    errorClass: ".is-invalid",
+                    asyncUpdate: true,
+                    asyncSettings: {
+                        closeOnSubmit: true,
+                        successMessage: 'Success',
+                        dataUrl: $(this).attr("href"),
+                        dataElementId: '#id_collection_form',
+                        dataKey: 'table',
+                        addModalFormFunction: updateCollectionModalForm
+                    }
+                })
+                $(this).attr("href", "javascript:void(0)")
+            });
+        }
+
+        $(document).ready(function () {
+            $("#sidebarToggle").click();
+            updateCollectionModalForm();
+        });
+
+    </script>
+
+{% endblock javascript %}

@@ -38,14 +38,18 @@ async function fetchFeatureGeometries(params, mapConfig) {
         onEachFeature: function onEachFeature(feature, layer) {
         }
     }).addTo(map);
-    
-    feature_layer.on('click', async function(event) {
-        await renderSummaryAlternative(await fetchFeatureInfos(event.layer.feature, mapConfig))
+
+    feature_layer.on('click', async function (event) {
+        await clickedFeature(event);
     });
-    
-    
+
+
     if (mapConfig['adjust_bounds_to_features'] === true) {
-        map.fitBounds(feature_layer.getBounds())
+        try {
+            map.fitBounds(feature_layer.getBounds())
+        } catch (ex) {
+
+        }
     }
     return data;
 }
@@ -72,7 +76,8 @@ async function fetchRegionGeometry(region_url, region_id) {
     let geodata;
     geodata = data['geoJson'];
     region_layer = L.geoJson(geodata, {
-        style: region_layer_style
+        style: region_layer_style,
+        interactive: false
     })
     region_layer.addTo(map);
     map.fitBounds(region_layer.getBounds())
@@ -80,15 +85,27 @@ async function fetchRegionGeometry(region_url, region_id) {
     return data
 }
 
+async function clickedFilterButton() {
+    let btn = document.getElementById('filter-button')
+    btn.disabled = true
+    await filterFeatures();
+    btn.disabled = false
+}
+
+async function clickedFeature(event){
+    let feature_infos = await fetchFeatureInfos(event.layer.feature, mapConfig)
+    await renderSummaryAlternative(feature_infos);
+    updateUrls(event.layer.feature['properties']['id']);
+}
+
 async function filterFeatures() {
+
     const params = parseFilterParameters();
     let data = await fetchFeatureGeometries(params, mapConfig);
-    if ('info' in data) {
-        await renderInfo(data['info'])
-    }
     if ('analysis' in data) {
         await renderSummary(data['analysis'])
     }
+
 }
 
 function loadMap(config) {
@@ -166,7 +183,8 @@ async function renderSummary(summary) {
         summary_container.appendChild(label);
         summary_container.appendChild(value);
     });
-    $('#summary-container').collapse('show');
+    $('#info-card-body').collapse('show');
+    $('#filter-card-body').collapse('hide');
 }
 
 async function renderSummaryAlternative(summary) {
@@ -176,12 +194,11 @@ async function renderSummaryAlternative(summary) {
         if (summary[key]) {
             let label = document.createElement('P');
             let b = document.createElement('B');
-            b.innerText =  key + ':';
+            b.innerText = key + ':';
             label.appendChild(b)
             summary_container.appendChild(label);
             let value = document.createElement('P');
-            if (Array.isArray(summary[key])){
-                console.log(summary[key])
+            if (Array.isArray(summary[key])) {
                 let ul = document.createElement('ul');
                 value.appendChild(ul);
                 summary[key].forEach(function (item) {
@@ -195,19 +212,6 @@ async function renderSummaryAlternative(summary) {
             summary_container.appendChild(value);
         }
     });
-    $('#summary-container').collapse('show');
-}
-
-async function renderInfo(info) {
-    let info_container = document.getElementById('info-container');
-    info_container.textContent = ''
-    Object.keys(info).forEach(key => {
-        let label = document.createElement('P');
-        let value = document.createElement('P');
-        label.innerText = info[key]['label'].toString() + ':';
-        value.innerText = info[key]['value'].toString();
-        info_container.appendChild(label);
-        info_container.appendChild(value);
-    });
-    $('#info-container').collapse('show');
+    $('#info-card-body').collapse('show');
+    $('#filter-card-body').collapse('hide');
 }

@@ -2,6 +2,7 @@ from django.http import JsonResponse
 from django.urls import reverse_lazy
 from rest_framework.views import APIView
 
+from maps.models import GeoDataset
 from maps.views import GeoDatasetDetailView
 from .filters import TreeFilter
 from .models import HamburgRoadsideTrees
@@ -18,6 +19,10 @@ class RoadsideTreesMapView(GeoDatasetDetailView):
         'radius': 5,
         'stroke': False
     }
+
+    def get_object(self, **kwargs):
+        self.kwargs.update({'pk': GeoDataset.objects.get(model_name='HamburgRoadsideTrees').pk})
+        return super().get_object(**kwargs)
 
 
 def is_valid_queryparam(param):

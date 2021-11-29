@@ -1,4 +1,4 @@
-from django.urls import path
+from django.urls import path, re_path
 
 from . import views
 
@@ -78,6 +78,7 @@ urlpatterns = [
     path('collections/<int:pk>/delete/modal/', views.CollectionModalDeleteView.as_view(),
          name='collection-delete-modal'),
     path('collections/data/', views.WasteCollectionAPIView.as_view(), name='data.collections'),
-    path('<int:pk>/', views.WasteCollectionMapView.as_view(), name='WasteCollection'),
-    path('collections/summary/', views.WasteCollectionSummaryAPIView.as_view(), name='data.collection-summary')
+    path('collections/map/', views.WasteCollectionMapView.as_view(), name='WasteCollection'),
+    path('collections/summary/', views.WasteCollectionSummaryAPIView.as_view(), name='data.collection-summary'),
+    path('catchment_selection/', views.CatchmentSelectView.as_view(), name='catchment-selection')
 ]

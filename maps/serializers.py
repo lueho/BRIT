@@ -1,4 +1,4 @@
-from rest_framework.serializers import ModelSerializer
+from rest_framework.serializers import ModelSerializer, Serializer, CharField, SerializerMethodField, Field, IntegerField
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 import rest_framework_gis as rf
 
@@ -45,10 +45,13 @@ class GeoreferencedCatchment(GeoPolygon, Catchment):
 
 
 class CatchmentSerializer(GeoFeatureModelSerializer):
+    nutsregion_pk = IntegerField()
+    nuts_lvl = IntegerField()
+
     class Meta:
-        model = Catchment
+        model = GeoreferencedCatchment
         geo_field = 'geom'
-        fields = ['name', 'type', 'description']
+        fields = ['name', 'type', 'description', 'nutsregion_pk', 'nuts_lvl']
 
 
 class CatchmentQuerySerializer(ModelSerializer):
@@ -66,3 +69,15 @@ class NutsRegionGeometrySerializer(GeoFeatureModelSerializer):
         model = GeoreferencedNutsRegion
         geo_field = 'geom'
         fields = []
+
+
+class NutsRegionOptionSerializer(ModelSerializer):
+    name = SerializerMethodField()
+
+    def get_name(self, obj):
+        return obj.__str__()
+
+    class Meta:
+        model = NutsRegion
+        fields = ['id', 'name']
+

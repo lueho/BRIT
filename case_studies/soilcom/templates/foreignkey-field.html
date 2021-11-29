@@ -10,17 +10,17 @@
     {% endif %}
 
     <div class="{{ field_class }} row">
-        <div class="input-group col col-12 col-sm-10">
+        <div class="input-group col col-12 col-sm-11">
             {% crispy_field field %}
         </div>
         <div class="col">
             <div class="mt-2 ml-2 ml-sm-0">
-                <a id="{{ field.id_for_label }}-update"
-                   class="modal-link"
-                   title="Edit selected item">
+{#                <a id="{{ field.id_for_label }}-update"#}
+{#                   class="modal-link"#}
+{#                   title="Edit selected item">#}
                     {#                        data-href-template="{{ field.field.queryset.model.modal_update_url }}?next={{ request.path }}">#}
-                    <i class="fas fa-fw fa-edit"></i>
-                </a>
+{#                    <i class="fas fa-fw fa-edit"></i>#}
+{#                </a>#}
                 <a href="{{ field.field.queryset.model.modal_create_url }}?next={{ request.path }}"
                    class="modal-link"
                    title="Create new item">

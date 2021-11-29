@@ -23,17 +23,67 @@
 
         <div class="col-sm-3">
             <div class="accordion">
-                <div class="card shadow">
-                    <div class="card-header" role="button" data-toggle="collapse" href="#filter-card-body"
+                <div class="card shadow tab-card">
+                    <div class="card-header" role="button" data-toggle="collapse"
+                         href="#filter-card-body"
                          aria-expanded="true" aria-controls="filter-card-body">
-                        <b>Filter</b>
+                        <strong>Filter</strong>
                     </div>
-                    <div class="card-body collapse show" id="filter-card-body">
-                        <form id="catchment-filter-form" method="POST">
-                            {% csrf_token %}
-                            {% crispy form %}
-                        </form>
+                    <div class="card-header tab-card-header">
+                        <ul class="nav nav-tabs card-header-tabs" id="filter-tabs"
+                            role="tablist">
+                            <li class="nav-item">
+                                <a class="nav-link"
+                                   id="nuts-filter-tab"
+                                   data-toggle="tab"
+                                   href="#nuts-filter"
+                                   role="tab"
+                                   aria-controls="nuts-filter"
+                                   aria-selected="true">
+                                    NUTS
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link"
+                                   id="custom-filter-tab"
+                                   data-toggle="tab"
+                                   href="#custom-filter"
+                                   role="tab"
+                                   aria-controls="custom-filter"
+                                   aria-selected="true">
+                                    Custom
+                                </a>
+                            </li>
+                        </ul>
                     </div>
+                    <div class="card-body tab-content" id="filter-card-body">
+                        <div class="tab-pane fade show active"
+                             id="nuts-filter"
+                             role="tabpanel"
+                             aria-labelledby="nuts-filter-tab">
+                            <form id="nuts-filter-form" method="get">
+                                {% crispy nuts_form %}
+                            </form>
+                        </div>
+                        <div class="tab-pane fade"
+                             id="custom-filter"
+                             role="tabpanel"
+                             aria-labelledby="custom-filter-tab">
+                            <form id="catchment-filter-form" method="POST">
+                                {% csrf_token %}
+                                {% crispy form %}
+                            </form>
+                        </div>
+                    </div>
+                    {#                    <div class="card-body tab-content" id="custom-filter">#}
+                    {#                        <div class="card-title"><strong>Custom Filter</strong></div>#}
+                    {#                    </div>#}
+                    {#                    <div class="card-body collapse show" id="filter-card-body">#}
+                    {#                        <form id="catchment-filter-form" method="POST">#}
+                    {#                            {% csrf_token %}#}
+                    {#                            {% crispy form %}#}
+                    {#                        </form>#}
+                    {#                    </div>#}
                 </div>
                 <div class="card shadow">
                     <div class="card-header"
@@ -131,6 +181,78 @@
             const catchment_id = parseFilterParameters()['catchment'];
             updateUrls(catchment_id);
         }
+
+        async function updateSelectOptions(element, params) {
+            let dataurl = element.dataset['optionsapi'] + '?' + $.param(params);
+            let response = await fetch(dataurl);
+            let data = await response.json();
+        }
+
+        async function selectFeature(feature) {
+            let sel = document.getElementById('id_level_' + feature['properties']['nuts_lvl']);
+            sel.value = feature['properties']['nutsregion_pk'];
+            await fetchSelectOptions(sel.dataset['optionsapi'], {id: sel.value});
+            await updateLayers(sel.value)
+        }
+
+        async function fetchSelectOptions(api_url, params) {
+            // fetch options for children of selection
+            params['direction'] = 'children'
+            let dataurl = api_url + '?' + $.param(params);
+            let response = await fetch(dataurl);
+            let children = await response.json();
+            Object.keys(children).forEach(key => {
+                let sel = document.getElementById(key);
+                while (sel.firstChild) {
+                    sel.removeChild(sel.lastChild);
+                }
+                let opt = document.createElement('Option');
+                opt.value = "";
+                opt.innerText = "---------"
+                sel.appendChild(opt)
+                children[key].forEach(function (item) {
+                    opt = document.createElement('Option');
+                    opt.value = item.id;
+                    opt.innerText = item.name;
+                    sel.appendChild(opt);
+                });
+            });
+
+            // mark the parents of the selected item as also selected
+            params['direction'] = 'parents';
+            dataurl = api_url + '?' + $.param(params);
+            response = await fetch(dataurl)
+            let parents = await response.json()
+            Object.keys(parents).forEach(key => {
+                let sel = document.getElementById(key);
+                sel.value = parents[key]['id']
+            })
+        }
+
+        async function updateLayers(feature_id) {
+            // fetch the region geometry
+            await fetchRegionGeometry(mapConfig['region_url'], feature_id);
+
+            // fetch the feature geometries
+            await fetchFeatureGeometries({'parent_id': feature_id}, mapConfig);
+            feature_layer.bringToBack();
+            feature_layer.off('click');
+            feature_layer.on('click', async function (event) {
+                await selectFeature(event.layer.feature)
+            });
+        }
+
+        const changedSelect = async function (e) {
+            // fetch options for children of selection
+            let params = {id: e.target.value};
+            await fetchSelectOptions(e.target.dataset['optionsapi'], params)
+            await updateLayers(e.target.value)
+        }
+
+        document.querySelectorAll("select").forEach(function (selector) {
+            selector.addEventListener("change", changedSelect, false)
+        });
+
         window.onload = () => loadMap(mapConfig);
 
     </script>

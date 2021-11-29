@@ -39,7 +39,7 @@
                             {% csrf_token %}
                             {% crispy form %}
                         </form>
-                        <button class="btn btn-primary" id="button_tree_type" onclick="filterFeatures()">
+                        <button class="btn btn-primary" id="filter-button" onclick="clickedFilterButton()">
                             Filter
                         </button>
                     </div>
@@ -48,41 +48,31 @@
                     <div class="card-header"
                          role="button"
                          data-toggle="collapse"
-                         href="#summary-container"
+                         href="#info-card-body"
                          aria-expanded="true"
-                         aria-controls="summary-container">
+                         aria-controls="info-card-body">
                         <b>Summary</b>
                     </div>
-                    <div class="card-body collapse" id="summary-container">
-                        <p class="card-text">No data selected, yet.</p>
+                    <div class="card-body collapse" id="info-card-body">
+                        <div id="summary-container">
+                            <p class="card-text">No data selected, yet.</p>
+                        </div>
+                        {% if object.sources.first %}
+                            <p class="card-text mt-3">
+                                <strong>Sources:</strong><br>
+                                {% for source in object.sources.all %}
+                                    <a href="{% url 'bib_source_detail' source.id %}"
+                                       class="modal-link">
+                                        {{ source.abbreviation }}{% if not forloop.last %},{% endif %}
+                                    </a>
+                                {% endfor %}
+                            </p>
+                        {% endif %}
+
                     </div>
+
                 </div>
-                <div class="card shadow">
-                    <div class="card-header"
-                         role="button"
-                         data-toggle="collapse"
-                         href="#sources-body"
-                         aria-expanded="true"
-                         aria-controls="sources-body">
-                        <b>Data source</b>
-                    </div>
-                    <div class="card-body collapse" id="sources-body">
-                        <table class="table">
-                            {% for source in self.object.sources.all %}
-                                <a href="{% url 'bib_source_detail' source.id %}"
-                                   class="modal-link">
-                                    {{ source.abbreviation }}{% if not forloop.last %},{% endif %}
-                                </a>
-                            {% endfor %}
-                        </table>
-                        {#                        <div class="collapse multi-collapse">#}
-                        {#                            <a href="{% url 'add_bib_source' geodataset.id %}"#}
-                        {#                               class="modal-link">#}
-                        {#                                <i class="fas fa-fw fa-plus"></i> Add source#}
-                        {#                            </a>#}
-                        {#                        </div>#}
-                    </div>
-                </div>
+                {% block extra_cards %}{% endblock extra_cards %}
             </div>
         </div>
     </div>

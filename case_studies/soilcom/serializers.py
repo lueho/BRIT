@@ -58,7 +58,6 @@ class VerboseFieldLabelsMixin(serializers.Serializer):
         for field in self.Meta.model._meta.get_fields():
             if field.name in self.fields:
                 labels[field.name] = capfirst(field.verbose_name)
-        print(labels)
         return labels
 
     @property
@@ -67,6 +66,12 @@ class VerboseFieldLabelsMixin(serializers.Serializer):
         ret = super().data
         labels = ret.pop('labels')
         return {labels[key] if key in labels else key: value for key, value in ret.items()}
+
+
+class WasteFlyerSerializer(VerboseFieldLabelsMixin, serializers.ModelSerializer):
+    class Meta:
+        model = models.WasteFlyer
+        fields = ('url',)
 
 
 class WasteStreamSerializer(VerboseFieldLabelsMixin, serializers.ModelSerializer):
@@ -80,13 +85,17 @@ class WasteStreamSerializer(VerboseFieldLabelsMixin, serializers.ModelSerializer
 
 class WasteCollectionSerializer(VerboseFieldLabelsMixin, serializers.ModelSerializer):
     collector = serializers.StringRelatedField()
-    collection_system = serializers.StringRelatedField(label='Collection system')
+    collection_system = serializers.StringRelatedField()
+    comments = serializers.CharField(source='description')
 
     class Meta:
         model = models.Collection
-        fields = ['name', 'description', 'collector', 'collection_system', ]
+        fields = ['name', 'collector', 'collection_system', 'comments']
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
+        comments = ret.pop('comments')
         ret.update(WasteStreamSerializer(instance.waste_stream).verbose_data)
+        ret.update({'Comments': comments})
+        ret.update(WasteFlyerSerializer(instance.flyer).data)
         return ret

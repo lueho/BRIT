@@ -1,8 +1,8 @@
 from django.db import models
+from django.db.models import Q
 from django.urls import reverse
 from django.contrib.gis.db.models import MultiPolygonField, PointField
 
-from django.contrib.auth.models import User
 from bibliography.models import Source
 
 from brit.models import NamedUserObjectModel
@@ -38,6 +38,12 @@ class Region(NamedUserObjectModel):
     def get_absolute_url():
         return reverse('catchment_list')
 
+    def __str__(self):
+        try:
+            return self.nutsregion.__str__()
+        except Region.nutsregion.RelatedObjectDoesNotExist:
+            return self.name
+
 
 class NutsRegion(Region):
     nuts_id = models.CharField(max_length=5, blank=True, null=True)
@@ -48,10 +54,30 @@ class NutsRegion(Region):
     mount_type = models.IntegerField(blank=True, null=True)
     urbn_type = models.IntegerField(blank=True, null=True)
     coast_type = models.IntegerField(blank=True, null=True)
+    parent = models.ForeignKey('self', related_name='children', on_delete=models.PROTECT, null=True)
+
+    @property
+    def pedigree(self):
+        pedigree = {}
+
+        # add parents
+        instance = self
+        for lvl in range(self.levl_code, -1, -1):
+            pedigree[f'qs_{lvl}'] = NutsRegion.objects.filter(id=instance.id)
+            instance = instance.parent
+
+        # add children
+        for lvl in range(self.levl_code + 1, 4):
+            pedigree[f'qs_{lvl}'] = NutsRegion.objects.filter(levl_code=lvl, nuts_id__startswith=self.nuts_id)
+
+        return pedigree
+
+    def __str__(self):
+        return f'{self.nuts_name} ({self.nuts_id})'
 
 
 class Catchment(NamedUserObjectModel):
-    parent_region = models.ForeignKey(Region, on_delete=models.CASCADE, related_name='parent_region', null=True)
+    parent_region = models.ForeignKey(Region, on_delete=models.CASCADE, related_name='child_catchments', null=True)
     region = models.ForeignKey(Region, on_delete=models.CASCADE, null=True)
     type = models.CharField(max_length=14, choices=TYPES, default='custom')
 
@@ -59,9 +85,26 @@ class Catchment(NamedUserObjectModel):
     def geom(self):
         return self.region.geom
 
+    @property
+    def nutsregion_pk(self):
+        try:
+            return self.region.nutsregion.pk
+        except Region.nutsregion.RelatedObjectDoesNotExist:
+            return None
+
+    @property
+    def nuts_lvl(self):
+        try:
+            return self.region.nutsregion.levl_code
+        except Region.nutsregion.RelatedObjectDoesNotExist:
+            return None
+
     @staticmethod
     def get_absolute_url():
         return reverse('catchment_list')
+
+    def __str__(self):
+        return self.region.__str__()
 
 
 class SFBSite(NamedUserObjectModel):
@@ -79,7 +122,7 @@ class GeoDataset(NamedUserObjectModel):
     sources = models.ManyToManyField(Source)
 
     def get_absolute_url(self):
-        return reverse(f'{self.model_name}', args=[self.id])
+        return reverse(f'{self.model_name}')
 
     def __str__(self):
         return self.name

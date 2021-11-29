@@ -16,23 +16,3 @@
         </div>
     </div>
 {% endblock %}
-
-{% block javascript %}
-
-    <script type="text/javascript">
-
-        const changedSelect = function (e) {
-            console.log('Changed selector ' + e.target.name + ' to value ' + e.target.value + '.')
-            let sid = e.target.id + '-update'
-            console.log(sid)
-            let btn = document.getElementById(e.target.id + '-update')
-            console.log(btn)
-        }
-
-        document.querySelectorAll("select").forEach(function (selector) {
-            selector.addEventListener("change", changedSelect, false)
-        })
-
-    </script>
-
-{% endblock javascript %}

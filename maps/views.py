@@ -1,9 +1,8 @@
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 
 from django.http import JsonResponse
-from django.shortcuts import render
 from django.urls import reverse, reverse_lazy
-from django.views.generic import CreateView, DeleteView, DetailView, ListView, UpdateView
+from django.views.generic import CreateView, DeleteView, DetailView, ListView, UpdateView, TemplateView
 from django.views.generic.edit import FormMixin
 from rest_framework.views import APIView
 from django.db.models import Q
@@ -11,7 +10,8 @@ from django.db.models import Q
 from .forms import (
     CatchmentModelForm,
     CatchmentQueryForm,
-    NutsMapFilterForm
+    NutsMapFilterForm,
+    NutsRegionQueryForm
 )
 from .models import (
     Catchment,
@@ -19,7 +19,8 @@ from .models import (
     Region,
     NutsRegion
 )
-from maps.serializers import CatchmentSerializer, RegionSerializer, NutsRegionGeometrySerializer
+from maps.serializers import RegionSerializer, CatchmentSerializer, NutsRegionGeometrySerializer, \
+    NutsRegionOptionSerializer
 
 
 class MapsListView(ListView):
@@ -33,12 +34,12 @@ class MapsListView(ListView):
 # ----------- Catchment ------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class CatchmentBrowseView(FormMixin, ListView):
+class CatchmentBrowseView(FormMixin, TemplateView):
     model = Catchment
     form_class = CatchmentQueryForm
     template_name = 'catchment_list.html'
     region_url = reverse_lazy('ajax_region_geometries')
-    feature_url = reverse_lazy('ajax_catchment_geometries')
+    feature_url = reverse_lazy('data.catchment-options')
     filter_class = None
     load_features = False
     adjust_bounds_to_features = False
@@ -66,6 +67,7 @@ class CatchmentBrowseView(FormMixin, ListView):
         context.update({
             'map_header': 'Catchments',
             'form': self.get_form(),
+            'nuts_form': NutsRegionQueryForm,
             'map_config': {
                 'form_fields': self.get_form_fields(),
                 'region_url': self.region_url,
@@ -172,7 +174,8 @@ class GeoDatasetDetailView(DetailView):
 
 class CatchmentGeometryAPI(APIView):
 
-    def get(self, request, *args, **kwargs):
+    @staticmethod
+    def get(request, *args, **kwargs):
         if 'catchment' in request.query_params:
             catchment_id = request.query_params.get('catchment')
             catchment = Catchment.objects.get(id=catchment_id)
@@ -201,9 +204,24 @@ class CatchmentGeometryAPI(APIView):
         return JsonResponse({})
 
 
+class CatchmentOptionGeometryAPI(APIView):
+
+    @staticmethod
+    def get(request):
+        qs = Catchment.objects.all()
+
+        if 'parent_id' in request.query_params:
+            parent_id = request.query_params['parent_id']
+            parent_region = NutsRegion.objects.get(id=parent_id).region_ptr
+            qs = parent_region.child_catchments.all()
+            serializer = CatchmentSerializer(qs, many=True)
+            return JsonResponse({'geoJson': serializer.data})
+
+
 class RegionGeometryAPI(APIView):
 
-    def get(self, request, *args, **kwargs):
+    @staticmethod
+    def get(request, *args, **kwargs):
         if 'region_id' in request.query_params:
             region_id = request.query_params.get('region_id')
             regions = Region.objects.filter(id=region_id)
@@ -229,9 +247,9 @@ class NutsMapView(GeoDatasetDetailView):
         'stroke': False
     }
 
-
-def is_valid_queryparam(param):
-    return param != '' and param is not None
+    def get_object(self, **kwargs):
+        self.kwargs.update({'pk': GeoDataset.objects.get(model_name='NutsRegion').pk})
+        return super().get_object(**kwargs)
 
 
 class NutsRegionAPIView(APIView):
@@ -240,12 +258,12 @@ class NutsRegionAPIView(APIView):
     def get(request):
         qs = NutsRegion.objects.all()
 
-        levl_code = int(request.query_params['levl_code'])
-        if is_valid_queryparam(levl_code):
-            qs = qs.filter(levl_code=levl_code)
-        cntr_codes = request.query_params.getlist('cntr_code[]')
-        if is_valid_queryparam(cntr_codes):
-            qs = qs.filter(cntr_code__in=cntr_codes)
+        if 'levl_code' in request.query_params:
+            qs = qs.filter(levl_code=request.query_params['levl_code'])
+        if 'cntr_code[]' in request.query_params:
+            qs = qs.filter(cntr_code__in=request.query_params.getlist('cntr_code[]'))
+        if 'parent_id' in request.query_params:
+            qs = qs.filter(parent_id=request.query_params['parent_id'])
 
         serializer = NutsRegionGeometrySerializer(qs, many=True)
         region_count = len(serializer.data['features'])
@@ -260,3 +278,32 @@ class NutsRegionAPIView(APIView):
         }
 
         return JsonResponse(data, safe=False)
+
+
+class NutsRegionPedigreeAPI(APIView):
+    """
+    This API is used to reduce options in select widgets of filters. It returns only the ID and name of the
+    region and not the geometry.
+    """
+
+    @staticmethod
+    def get(request):
+
+        data = {}
+
+        if request.query_params['id']:
+            instance = NutsRegion.objects.get(id=request.query_params['id'])
+
+            if request.query_params['direction'] == 'children':
+                for lvl in range(instance.levl_code + 1, 4):
+                    qs = NutsRegion.objects.filter(levl_code=lvl, nuts_id__startswith=instance.nuts_id)
+                    serializer = NutsRegionOptionSerializer(qs, many=True)
+                    data[f'id_level_{lvl}'] = serializer.data
+
+            if request.query_params['direction'] == 'parents':
+                for lvl in range(instance.levl_code - 1, -1, -1):
+                    instance = instance.parent
+                    serializer = NutsRegionOptionSerializer(instance)
+                    data[f'id_level_{lvl}'] = serializer.data
+
+        return JsonResponse(data)
