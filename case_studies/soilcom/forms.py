@@ -78,6 +78,7 @@ class WasteStreamModalModelForm(CustomModalModelForm):
 
 class WasteFlyerModelForm(CustomModelForm):
     last_accessed = forms.DateField(initial=datetime.date.today)
+    url = forms.URLField(max_length=511, widget=forms.URLInput)
 
     class Meta:
         model = Source
