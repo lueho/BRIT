@@ -34,7 +34,7 @@ class Source(OwnedObjectModel):
     abstract = models.TextField(blank=True, null=True)
     licence = models.ForeignKey(Licence, on_delete=models.PROTECT, blank=True, null=True)
     attributions = models.TextField(blank=True, null=True)
-    url = models.URLField(blank=True, null=True)
+    url = models.URLField(max_length=511, blank=True, null=True)
     doi = models.CharField(max_length=255, blank=True, null=True)
     last_accessed = models.DateField(blank=True, null=True)
 
