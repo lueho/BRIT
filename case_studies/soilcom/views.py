@@ -470,16 +470,17 @@ class CollectionUpdateView(views.OwnedObjectUpdateView):
             if material not in waste_stream.allowed_materials.all():
                 waste_stream.allowed_materials.add(material)
         waste_stream.save()
-        flyer, created = models.WasteFlyer.objects.get_or_create(
-            type='waste_flyer',
-            url=form.cleaned_data['flyer_url'],
-            defaults={
-                'owner': self.request.user,
-                'title': f'Waste flyer {form.cleaned_data["catchment"]}',
-                'abbreviation': f'Waste flyer {form.cleaned_data["catchment"]}',
-            }
-        )
-        form.instance.flyer = flyer
+        if form.cleaned_data['flyer_url']:
+            flyer, created = models.WasteFlyer.objects.get_or_create(
+                type='waste_flyer',
+                url=form.cleaned_data['flyer_url'],
+                defaults={
+                    'owner': self.request.user,
+                    'title': f'Waste flyer {form.cleaned_data["catchment"]}',
+                    'abbreviation': f'WasteFlyer{form.cleaned_data["catchment"].region.nutsregion.nuts_id}',
+                }
+            )
+            form.instance.flyer = flyer
         return super().form_valid(form)
 
 
