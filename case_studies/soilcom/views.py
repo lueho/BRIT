@@ -371,7 +371,7 @@ class WasteFlyerModalUpdateView(SourceModalUpdateView):
 
 
 class WasteFlyerModalDeleteView(SourceModalDeleteView):
-    success_url = reverse_lazy('waste_flyer_list')
+    success_url = reverse_lazy('wasteflyer-list')
     permission_required = 'soilcom.delete_wasteflyer'
 
 
