@@ -4,22 +4,29 @@
 
     <script type="text/javascript">
 
+        function data_url(element) {
+            if (element['dataUrl']) {
+                return element['dataUrl'];
+            } else {
+                return element.data('form').replace('__pk__', "{{ object.pk }}");
+            }
+        }
+
         function updateCollectionModalForm() {
-            $(".modal-link").each(function updateCollectionModalForm() {
+            $(".modal-link").each(function () {
                 $(this).modalForm({
-                    formURL: $(this).attr("href"),
+                    formURL: $(this).data('href'),
                     errorClass: ".is-invalid",
                     asyncUpdate: true,
                     asyncSettings: {
                         closeOnSubmit: true,
-                        successMessage: 'Success',
-                        dataUrl: $(this).attr("href"),
-                        dataElementId: '#id_collection_form',
-                        dataKey: 'table',
+                        successMessage: '<div class="success d-none">Success</div>',
+                        dataUrl: data_url($(this)),
+                        dataElementId: '#form-container',
+                        dataKey: 'form',
                         addModalFormFunction: updateCollectionModalForm
                     }
                 })
-                $(this).attr("href", "javascript:void(0)")
             });
         }
 

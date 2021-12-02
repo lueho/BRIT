@@ -8,7 +8,9 @@
             <div class="card shadow">
                 <div class="card-header"><strong>{{ form_title }}</strong></div>
                 <div class="card-body">
-                    {% crispy form %}
+                    <div id="form-container">
+                        {% crispy form %}
+                    </div>
                 </div>
                 <div class="card-footer">
                 </div>

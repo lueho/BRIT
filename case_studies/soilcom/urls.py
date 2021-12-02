@@ -79,6 +79,7 @@ urlpatterns = [
          name='collection-delete-modal'),
     path('collections/data/', views.WasteCollectionAPIView.as_view(), name='data.collections'),
     path('collections/map/', views.WasteCollectionMapView.as_view(), name='WasteCollection'),
+    path('collections/<int:pk>/update_form/', views.CollectionUpdateFormView.as_view(), name='collection-form-update'),
     path('collections/summary/', views.WasteCollectionSummaryAPIView.as_view(), name='data.collection-summary'),
     path('catchment_selection/', views.CatchmentSelectView.as_view(), name='catchment-selection')
 ]

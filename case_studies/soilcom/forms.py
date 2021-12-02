@@ -125,8 +125,8 @@ class CollectionModelForm(forms.ModelForm):
         helper.layout = Layout(
             Field('catchment'),
             ForeignkeyField('collector'),
-            ForeignkeyField('collection_system'),
-            ForeignkeyField('waste_category'),
+            Field('collection_system'),
+            Field('waste_category'),
             Field('allowed_materials'),
             Field('flyer_url'),
             Field('description')
@@ -142,7 +142,7 @@ class CollectionModalModelForm(CustomModalModelForm):
 
 
 COUNTRY_SET = set(sorted(set((c.catchment.region.nutsregion.cntr_code, c.catchment.region.nutsregion.cntr_code) for c in
-                  models.Collection.objects.all())))
+                             models.Collection.objects.all())))
 
 
 class CollectionFilterForm(forms.Form):

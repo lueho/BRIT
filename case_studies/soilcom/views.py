@@ -3,6 +3,7 @@ from django.http import JsonResponse
 from django.urls import reverse_lazy, reverse
 from django.views.generic import TemplateView
 from django.views.generic.edit import FormMixin, FormView
+from django.template.loader import render_to_string
 from django.db.models import Q
 from functools import reduce
 import operator
@@ -482,6 +483,22 @@ class CollectionUpdateView(views.OwnedObjectUpdateView):
             )
             form.instance.flyer = flyer
         return super().form_valid(form)
+
+
+class CollectionUpdateFormView(CollectionUpdateView):
+    template_name = 'just_crispy_form.html'
+    object = None
+
+    def get_initial(self):
+        initial = super().get_initial()
+        initial['collector'] = models.Collector.objects.all().order_by('created_at').reverse().first()
+        return initial
+
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        return JsonResponse({
+            'form': render_to_string('just_crispy_form.html', context=self.get_context_data(), request=self.request)
+        })
 
 
 class CollectionModalUpdateView(views.OwnedObjectModalUpdateView):
