@@ -9,6 +9,8 @@ from materials.models import Material, MaterialGroup, MaterialSettings
 
 
 class Collector(NamedUserObjectModel):
+    website = models.URLField(max_length=511, blank=True, null=True)
+
     class Meta:
         verbose_name = 'Waste Collector'
 

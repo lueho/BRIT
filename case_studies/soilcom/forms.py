@@ -13,13 +13,13 @@ from . import models
 class CollectorModelForm(CustomModelForm):
     class Meta:
         model = models.Collector
-        fields = ('name', 'description')
+        fields = ('name', 'website', 'description')
 
 
 class CollectorModalModelForm(CustomModalModelForm):
     class Meta:
         model = models.Collector
-        fields = ('name', 'description')
+        fields = ('name', 'website', 'description')
 
 
 class CollectionSystemModelForm(CustomModelForm):
