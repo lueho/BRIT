@@ -4,6 +4,7 @@ from django.views.generic import CreateView, UpdateView
 from django.views.generic import TemplateView, ListView, DetailView
 from django_tables2 import table_factory
 from django.http import HttpResponseRedirect
+from django.core.exceptions import FieldError
 
 from users.models import ReferenceUsers
 from .tables import StandardItemTable, UserItemTable
@@ -81,6 +82,12 @@ class OwnedObjectListView(PermissionRequiredMixin, ListView):
             'create_url_text': f'New {self.model._meta.verbose_name}'
         })
         return context
+
+    def get_queryset(self):
+        try:
+            return super().get_queryset().order_by('name')
+        except FieldError:
+            return super().get_queryset()
 
 
 class CreateOwnedObjectMixin(PermissionRequiredMixin, NextOrSuccessUrlMixin):
