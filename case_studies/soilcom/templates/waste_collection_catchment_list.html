@@ -137,10 +137,17 @@
 
         const changedSelect = async function (e) {
             // fetch options for children of selection
-            let params = {id: e.target.value};
-            await updateUrls(e.target.value)
-            await fetchSelectOptions(e.target.dataset['optionsapi'], params)
-            await updateLayers(e.target.value)
+            let target = e.target;
+            if (target.value == "") {
+                const selectors = $('.select');
+                target = selectors.eq(selectors.index(target) - 1)[0];
+            }
+            if (target.value !== "") {
+                let params = {id: target.value};
+                await updateUrls(target.value);
+                await fetchSelectOptions(target.dataset['optionsapi'], params);
+                await updateLayers(target.value);
+            }
         }
 
         document.querySelectorAll("select").forEach(function (selector) {
@@ -149,7 +156,6 @@
 
         window.onload = () => {
             loadMap(mapConfig);
-            {#fetchFeatureGeometries({'levl_code': 0}, mapConfig);#}
         }
 
     </script>
