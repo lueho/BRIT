@@ -2,10 +2,10 @@ build:
   docker:
     web: Dockerfile
     worker: Dockerfile
-run:
-  web: gunicorn brit.wsgi:application --bind 0.0.0.0:$PORT
-  worker: celery --app=brit worker
 release:
   image: web
   command:
     - bash release-commands.sh
+run:
+  web: gunicorn brit.wsgi:application --bind 0.0.0.0:$PORT
+  worker: celery --app=brit worker
