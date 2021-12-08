@@ -8,12 +8,12 @@
             if (element['dataUrl']) {
                 return element['dataUrl'];
             } else {
-                return element.data('form').replace('__pk__', "{{ object.pk }}");
+                return element.data('options')
             }
         }
 
         function updateCollectionModalForm() {
-            $(".modal-link").each(function () {
+            $("#btn-add-collector").each(function () {
                 $(this).modalForm({
                     formURL: $(this).data('href'),
                     errorClass: ".is-invalid",
@@ -22,8 +22,8 @@
                         closeOnSubmit: true,
                         successMessage: '<div class="success d-none">Success</div>',
                         dataUrl: data_url($(this)),
-                        dataElementId: '#form-container',
-                        dataKey: 'form',
+                        dataElementId: '#id_collector',
+                        dataKey: 'options',
                         addModalFormFunction: updateCollectionModalForm
                     }
                 })
