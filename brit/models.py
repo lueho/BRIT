@@ -49,6 +49,11 @@ class CRUDUrlsMixin(models.Model):
 
     @classmethod
     @property
+    def options_list_url(cls):
+        return reverse(f'{cls.__name__.lower()}-options')
+
+    @classmethod
+    @property
     def create_url(cls):
         return reverse(f'{cls.__name__.lower()}-create')
 
