@@ -1,4 +1,4 @@
-FROM python:3.9-slim
+FROM python:3.9
 
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
@@ -11,7 +11,7 @@ COPY requirements.txt /tmp/requirements.txt
 RUN pip install --upgrade pip && pip install -r /tmp/requirements.txt \
     && rm -rf /tmp/requirements.txt \
     && useradd -U standard_user \
-    && install -d -m 0755 -o standard_user -g standard_user /app/static_root
+    && install -d -m 0755 -o standard_user -g standard_user /app/staticfiles
 
 WORKDIR /app
 
@@ -21,4 +21,4 @@ COPY --chown=standard_user:standard_user . .
 
 RUN chmod +x *.sh
 
-RUN python manage.py collectstatic --no-input
+RUN python manage.py collectstatic --no-input  --settings=brit.settings.heroku
