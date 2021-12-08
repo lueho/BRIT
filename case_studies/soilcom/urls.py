@@ -12,6 +12,7 @@ urlpatterns = [
     path('collectors/<int:pk>/update/', views.CollectorUpdateView.as_view(), name='collector-update'),
     path('collectors/<int:pk>/update/modal/', views.CollectorModalUpdateView.as_view(), name='collector-update-modal'),
     path('collectors/<int:pk>/delete/modal/', views.CollectorModalDeleteView.as_view(), name='collector-delete-modal'),
+    path('collectors/options/', views.CollectorOptions.as_view(), name='collector-options'),
     path('collectionsystems/', views.CollectionSystemListView.as_view(), name='collectionsystem-list'),
     path('collectionsystems/create/', views.CollectionSystemCreateView.as_view(), name='collectionsystem-create'),
     path('collectionsystems/create/modal/', views.CollectionSystemModalCreateView.as_view(),
@@ -79,7 +80,6 @@ urlpatterns = [
          name='collection-delete-modal'),
     path('collections/data/', views.WasteCollectionAPIView.as_view(), name='data.collections'),
     path('collections/map/', views.WasteCollectionMapView.as_view(), name='WasteCollection'),
-    path('collections/<int:pk>/update_form/', views.CollectionUpdateFormView.as_view(), name='collection-form-update'),
     path('collections/summary/', views.WasteCollectionSummaryAPIView.as_view(), name='data.collection-summary'),
     path('catchment_selection/', views.CatchmentSelectView.as_view(), name='catchment-selection')
 ]

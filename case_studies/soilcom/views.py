@@ -1,13 +1,10 @@
 from django.contrib.auth.mixins import PermissionRequiredMixin
+from django.db.models import Max
 from django.http import JsonResponse
-from django.urls import reverse_lazy, reverse
-from django.views.generic import TemplateView
-from django.views.generic.edit import FormMixin, FormView
 from django.template.loader import render_to_string
-from django.db.models import Q
-from functools import reduce
-import operator
-
+from django.urls import reverse_lazy
+from django.views.generic import TemplateView
+from django.views.generic.edit import FormMixin
 from rest_framework.views import APIView
 
 from bibliography.views import (SourceListView,
@@ -19,8 +16,8 @@ from bibliography.views import (SourceListView,
                                 SourceModalUpdateView,
                                 SourceModalDeleteView)
 from brit import views
+from maps.forms import NutsRegionQueryForm
 from maps.models import Catchment, GeoDataset, NutsRegion
-from maps.forms import CatchmentQueryForm, NutsRegionQueryForm
 from maps.views import GeoDatasetDetailView
 from . import forms
 from . import models
@@ -487,19 +484,25 @@ class CollectionUpdateView(views.OwnedObjectUpdateView):
         return super().form_valid(form)
 
 
-class CollectionUpdateFormView(CollectionUpdateView):
-    template_name = 'just_crispy_form.html'
-    object = None
+class CollectorOptions(CollectorListView):
+    template_name = 'selection_options.html'
+    object_list = None
 
-    def get_initial(self):
-        initial = super().get_initial()
-        initial['collector'] = models.Collector.objects.all().order_by('created_at').reverse().first()
-        return initial
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        created_at = models.Collector.objects.aggregate(max_created_at=Max('created_at'))['max_created_at']
+        collector = models.Collector.objects.get(created_at=created_at)
+        context.update({'selected': collector.pk})
+        return context
 
     def get(self, request, *args, **kwargs):
-        self.object = self.get_object()
+        self.object_list = self.get_queryset()
         return JsonResponse({
-            'form': render_to_string('just_crispy_form.html', context=self.get_context_data(), request=self.request)
+            'options': render_to_string(
+                self.template_name,
+                context=self.get_context_data(),
+                request=self.request
+            )
         })
 
 
