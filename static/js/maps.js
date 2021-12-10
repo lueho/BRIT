@@ -7,9 +7,15 @@ window.addEventListener("map:init", function (event) {
     map = event.detail.map;
 });
 
-async function fetchFeatureGeometries(base_url, params, mapConfig) {
+async function fetchFeatureInfos(feature, mapConfig) {
+    let dataurl = mapConfig['feature_popup_url'] + '?' + 'collection_id=' + feature['properties']['id'];
+    let response = await fetch(dataurl);
+    return await response.json()
+}
 
-    let dataurl = base_url + $.param(params);
+async function fetchFeatureGeometries(params, mapConfig) {
+
+    let dataurl = mapConfig['feature_url'] + '?' + $.param(params);
 
     // Remove existing layer
     if (feature_layer !== undefined) {
@@ -33,18 +39,29 @@ async function fetchFeatureGeometries(base_url, params, mapConfig) {
         }
     }).addTo(map);
 
-    // Fill "Results" section with analysis data from the analysis dict
-    return data['analysis'];
+    feature_layer.on('click', async function (event) {
+        await clickedFeature(event);
+    });
+
+
+    if (mapConfig['adjust_bounds_to_features'] === true) {
+        try {
+            map.fitBounds(feature_layer.getBounds())
+        } catch (ex) {
+
+        }
+    }
+    return data;
 }
 
-async function fetchRegionGeometry(region_base_url, region_id) {
+async function fetchRegionGeometry(region_url, region_id) {
 
     // Define query string for REST API
     let params = L.Util.extend({
         region_id: region_id
     });
 
-    let url = region_base_url + L.Util.getParamString(params);
+    let url = region_url + L.Util.getParamString(params);
 
     // Remove existing layer
     if (region_layer !== undefined) {
@@ -59,21 +76,81 @@ async function fetchRegionGeometry(region_base_url, region_id) {
     let geodata;
     geodata = data['geoJson'];
     region_layer = L.geoJson(geodata, {
-        style: region_layer_style
+        style: region_layer_style,
+        interactive: false
     })
     region_layer.addTo(map);
     map.fitBounds(region_layer.getBounds())
+
+    return data
+}
+
+async function clickedFilterButton() {
+    let btn = document.getElementById('filter-button')
+    btn.disabled = true
+    await filterFeatures();
+    btn.disabled = false
+}
+
+async function clickedFeature(event){
+    let feature_infos = await fetchFeatureInfos(event.layer.feature, mapConfig)
+    await renderSummaryAlternative(feature_infos);
+    updateUrls(event.layer.feature['properties']['id']);
+}
+
+async function filterFeatures() {
+
+    const params = parseFilterParameters();
+    let data = await fetchFeatureGeometries(params, mapConfig);
+    if ('analysis' in data) {
+        await renderSummary(data['analysis'])
+    }
+
 }
 
 function loadMap(config) {
-    fetchRegionGeometry(config['base_url'], config['region_id']);
+    if (config['load_region'] === true) {
+        fetchRegionGeometry(config['region_url'], config['region_id']);
+    }
     if (config['load_features'] === true) {
         filterFeatures();
     }
     map.invalidateSize();
 }
 
-function readMultiChoiceCheckboxes(name) {
+function parseFilterParameters() {
+    const form_fields = mapConfig['form_fields']
+    let params = {}
+    Object.keys(form_fields).forEach(key => {
+        switch (form_fields[key]) {
+            case 'SelectMultiple':
+                params[key] = readSelectMultiple(key);
+                break;
+            case 'RadioSelect':
+                params[key] = readRadioSelect(key);
+                break;
+            case 'CheckboxSelectMultiple':
+                params[key] = readCheckboxSelectMultipe(key);
+                break;
+            default:
+                params[key] = document.getElementsByName(key)[0].value;
+        }
+    });
+    return params
+}
+
+function readSelectMultiple(name) {
+    let country_codes = []
+    let inputs = document.getElementsByName(name)[0]
+    for (let i = 0; i < inputs.length; i++) {
+        if (inputs[i].selected === true) {
+            country_codes.push(inputs[i].value)
+        }
+    }
+    return country_codes
+}
+
+function readCheckboxSelectMultipe(name) {
     let ids = []
     let inputs = document.getElementsByName(name)
     for (let i = 0; i < inputs.length; i++) {
@@ -84,7 +161,7 @@ function readMultiChoiceCheckboxes(name) {
     return ids
 }
 
-function readSingleChoiceCheckbox(name) {
+function readRadioSelect(name) {
     const heatingButtons = document.getElementsByName(name);
     let heating;
     for (let i = 0; i < heatingButtons.length; i++) {
@@ -106,4 +183,35 @@ async function renderSummary(summary) {
         summary_container.appendChild(label);
         summary_container.appendChild(value);
     });
+    $('#info-card-body').collapse('show');
+    $('#filter-card-body').collapse('hide');
+}
+
+async function renderSummaryAlternative(summary) {
+    let summary_container = document.getElementById('summary-container');
+    summary_container.textContent = ''
+    Object.keys(summary).forEach(key => {
+        if (summary[key]) {
+            let label = document.createElement('P');
+            let b = document.createElement('B');
+            b.innerText = key + ':';
+            label.appendChild(b)
+            summary_container.appendChild(label);
+            let value = document.createElement('P');
+            if (Array.isArray(summary[key])) {
+                let ul = document.createElement('ul');
+                value.appendChild(ul);
+                summary[key].forEach(function (item) {
+                    let li = document.createElement('li')
+                    li.innerText = item.toString()
+                    ul.appendChild(li)
+                });
+            } else {
+                value.innerText = summary[key].toString();
+            }
+            summary_container.appendChild(value);
+        }
+    });
+    $('#info-card-body').collapse('show');
+    $('#filter-card-body').collapse('hide');
 }

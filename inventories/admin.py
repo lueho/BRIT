@@ -1,77 +1,17 @@
 from django.contrib import admin
 from django.contrib.admin import ModelAdmin
-from django.contrib.gis.admin import OSMGeoAdmin
-from django.forms import ModelForm, ValidationError
 from django.urls import reverse
 from django.utils.html import format_html
 
-from .models import (Catchment,
+from .models import (
                      InventoryAlgorithm,
                      InventoryAlgorithmParameter,
                      InventoryAlgorithmParameterValue,
                      InventoryAmountShare,
-                     Region,
                      Scenario,
                      ScenarioInventoryConfiguration,
                      ScenarioStatus,
-                     SFBSite,
-                     GeoDataset,
                      RunningTask)
-
-
-class CatchmentForm(ModelForm):
-    class Meta:
-        model = Catchment
-        fields = ('name', 'owner', 'region', 'type', 'description', 'geom',)
-
-    @staticmethod
-    def django_contains(region, catchment):
-        region_geom = region.geom
-        catchment_geom = catchment.get('geom')
-        return region_geom.contains(catchment_geom)
-
-    def clean(self):
-        catchment = super().clean()
-        region = catchment.get('region')
-        if region and catchment:
-            if not self.django_contains(region, catchment):
-                raise ValidationError('The catchment must be within the defined region.')
-
-
-@admin.register(Catchment)
-class CatchmentAdmin(OSMGeoAdmin):
-    form = CatchmentForm
-    list_display = ('name', 'region', 'type', 'description')
-
-    def get_queryset(self, request):
-        queryset = super().get_queryset(request)
-        queryset = queryset.order_by('type', 'region', 'name', )
-        return queryset
-
-
-@admin.register(Region)
-class RegionAdmin(OSMGeoAdmin):
-    list_display = ('name', 'country',)
-
-    # readonly_fields = ('implemented_algorithms',)
-
-    # @staticmethod
-    # def implemented_algorithms(obj):
-    #     algorithms = [(reverse('admin:inventories_inventoryalgorithm_change', args=(alg.id,)),
-    #                    alg.geodataset.name,
-    #                    reverse('admin:inventories_material_change', args=(alg.feedstock.id,)),
-    #                    alg.feedstock.name)
-    #                   for alg in InventoryAlgorithm.objects.filter(geodataset__region=obj)]
-    #     algorithm_list = format_html_join(
-    #         '\n', "<li><a href='{}'>{}</a>: <a href='{}'>{}</a></li>",
-    #         (alg for alg in algorithms)
-    #     )
-    #     return algorithm_list
-
-    def get_queryset(self, request):
-        queryset = super(RegionAdmin, self).get_queryset(request)
-        queryset = queryset.order_by('name')
-        return queryset
 
 
 @admin.register(InventoryAlgorithm)
@@ -153,23 +93,18 @@ class ScenarioInventoryConfigurationAdmin(ModelAdmin):
         return format_html("<a href='{}'>{}</a>", url, obj.inventory_value.name)
 
 
-@admin.register(GeoDataset)
-class GeoDatasetAdmin(ModelAdmin):
-    list_display = ('name', 'region', 'description')
-
-
 @admin.register(Scenario)
 class ScenarioAdmin(ModelAdmin):
     list_display = ('name', 'region_link', 'catchment_link', 'description', 'status')
 
     @staticmethod
     def region_link(obj):
-        url = reverse('admin:inventories_region_change', args=(obj.region.id,))
+        url = reverse('admin:maps_region_change', args=(obj.region.id,))
         return format_html("<a href='{}'>{}</a>", url, obj.region.name)
 
     @staticmethod
     def catchment_link(obj):
-        url = reverse('admin:inventories_catchment_change', args=(obj.catchment.id,))
+        url = reverse('admin:maps_catchment_change', args=(obj.catchment.id,))
         return format_html("<a href='{}'>{}</a>", url, obj.catchment.name)
 
     @staticmethod
@@ -186,6 +121,6 @@ class ScenarioStatusAdmin(ModelAdmin):
 # class LiteratureSourceAdmin(ModelAdmin):
 #     list_display = ('id', 'timesteps', 'cycles', 'start_stop', 'values', 'material', 'component')
 
-admin.site.register(SFBSite)
+
 admin.site.register(InventoryAmountShare)
 admin.site.register(RunningTask)

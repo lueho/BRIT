@@ -1,22 +1,28 @@
 from django.http import JsonResponse
-from django.views.generic import TemplateView
+from django.urls import reverse_lazy
 from rest_framework.views import APIView
 
+from maps.models import GeoDataset
+from maps.views import GeoDatasetDetailView
+from .filters import TreeFilter
 from .models import HamburgRoadsideTrees
 from .serializers import HamburgRoadsideTreeGeometrySerializer
-from .filters import TreeFilter
 
 
-class TreeFilterView(TemplateView):
-    template_name = 'map_hamburg_roadsidetrees.html'
+class RoadsideTreesMapView(GeoDatasetDetailView):
+    feature_url = reverse_lazy('data.hamburg_roadside_trees')
+    filter_class = TreeFilter
+    load_features = False
+    marker_style = {
+        'color': '#63c36c',
+        'fillOpacity': 1,
+        'radius': 5,
+        'stroke': False
+    }
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({
-            'map_header': 'Hamburg Roadside Trees',
-            'tree_filter': TreeFilter(self.request.GET),
-        })
-        return context
+    def get_object(self, **kwargs):
+        self.kwargs.update({'pk': GeoDataset.objects.get(model_name='HamburgRoadsideTrees').pk})
+        return super().get_object(**kwargs)
 
 
 def is_valid_queryparam(param):

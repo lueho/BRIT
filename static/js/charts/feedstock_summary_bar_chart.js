@@ -30,7 +30,6 @@ function number_format(number, decimals, dec_point, thousands_sep) {
 
 function chartDefinition(type, labels, values, unit, show_legend) {
 
-    console.log(values)
 
     switch (type) {
         case 'barchart':
@@ -40,7 +39,6 @@ function chartDefinition(type, labels, values, unit, show_legend) {
     }
 
 }
-
 
 function barChartDefinition(xlabels, data, unit, show_legend) {
 

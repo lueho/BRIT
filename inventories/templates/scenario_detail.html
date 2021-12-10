@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load leaflet_tags %}
+{% load static %}
 
 {% block title %}Inventories | {{ object.name }}{% endblock %}
 
@@ -23,7 +24,8 @@
                                 <b>Catchment</b>: {{ object.catchment }}
                             </p>
                             <div class="collapse multi-collapse">
-                                <a href="{% url 'scenario_update' object.id %}?next={{ request.path }}"
+                                <a href="{% url 'scenario_update_modal' object.id %}" class="modal-link mr-3"><i class="fas fa-fw fa-edit"></i> edit</a>
+                                <a href="{% url 'scenario_update_modal' object.id %}?next={{ request.path }}"
                                    class="modal-link">
                                     Edit <i class="fas fa-fw fa-edit"></i>
                                 </a>
@@ -186,78 +188,19 @@
 
 {% block javascript %}
     {{ block.super }}
+    {{ map_config|json_script:"mapConfig" }}
 
+    <script src="{% static 'js/maps.js' %}"></script>
     <script type="text/javascript">
 
-
-        let map;
-        let catchment_layer;
-        let region_layer;
-
-
-        window.addEventListener("map:init", function (event) {
-            map = event.detail.map;
-        });
-
-        async function fetchRegionGeometry(region_id) {
-
-            // Define query string for REST API
-            let params = L.Util.extend({
-                region_id: region_id
-            });
-
-            let url = "{% url 'ajax_region_geometries' %}" + L.Util.getParamString(params);
-
-            // Remove existing layer
-            if (region_layer !== undefined) {
-                map.removeLayer(region_layer);
-            }
-
-            // Fetch data from REST API
-            let response = await fetch(url);
-            let data = await response.json();
-
-            // Render geodata on map
-            let geodata;
-            geodata = data['geoJson'];
-            region_layer = L.geoJson(geodata, {
-                style: region_layer_style
-            })
-            region_layer.addTo(map);
-            map.fitBounds(region_layer.getBounds())
-        }
-
-        async function fetchCatchmentGeometry(catchment_id) {
-
-            // Define query string for REST API
-            let params = L.Util.extend({
-                catchment_id: catchment_id
-            });
-
-            let dataurl = "{% url 'ajax_catchment_geometries' %}" + L.Util.getParamString(params);
-
-            // Remove existing layer
-            if (undefined !== catchment_layer) {
-                map.removeLayer(catchment_layer);
-            }
-
-            // Fetch data from REST API
-            let response = await fetch(dataurl);
-            let data = await response.json();
-
-            // Render geodata on map
-            let geodata;
-            geodata = data['geoJson'];
-            catchment_layer = L.geoJson(geodata, {
-                style: catchment_layer_style
-            })
-            catchment_layer.addTo(map);
-            map.fitBounds(catchment_layer.getBounds())
-        }
+        const mapConfig = JSON.parse(document.getElementById("mapConfig").textContent);
 
         function onLoad() {
-            fetchRegionGeometry($("#region").data()["regionId"]);
-            fetchCatchmentGeometry($("#catchment").data()["catchmentId"]);
+            const region_url = "{% url 'ajax_region_geometries' %}"
+            const region_id = $("#region").data()["regionId"]
+            fetchRegionGeometry(region_url, region_id);
+            const params = {catchment: $("#catchment").data()["catchmentId"]}
+            fetchFeatureGeometries(params, mapConfig);
             map.invalidateSize();
         }
 

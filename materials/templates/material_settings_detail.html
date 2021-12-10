@@ -12,14 +12,14 @@
                     <b>{{ object.material.name }}</b>
                 </div>
                 <div class="card-img-top">
-                    <img class="w-100 m-0" src="{{ object.preview.url }}" alt="Maps Module Cover Image">
+                    <img class="w-100 m-0" src="{{ object.preview.url }}" alt="Materials Module Cover Image">
                 </div>
                 <div class="card-body">
                     <p class="card-text">
                         {{ object.material.description }}
                     </p>
                     <div class="collapse multi-collapse">
-                        <a href="{% url 'material_update' object.material.id %}?next={{ request.path }}"
+                        <a href="{% url 'material-update-modal' object.material.id %}?next={{ request.path }}"
                            class="modal-link">
                             Edit <i class="fas fa-fw fa-edit"></i>
                         </a>
@@ -97,34 +97,18 @@
                              href="#sources-body-{{ group_settings.id }}"
                              aria-expanded="true"
                              aria-controls="sources-body-{{ group_settings.id }}">
-                            <b>Sources</b>
+                            <b>More information</b>
                         </div>
                         <div class="card-body collapse" id="sources-body-{{ group_settings.id }}">
-                            <table class="table">
-                                <tbody>
-                                <tr>
-                                    <td>
-                                        <b>Fractions based on:</b>
-                                    </td>
-                                    <td>{{ group_settings.fractions_of.name }}</td>
-                                </tr>
-                                <tr>
-                                    <td>
-                                        <b>Sources:</b>
-                                    </td>
-                                    <td>
-                                        {% for source in group_settings.sources.all %}
-                                            <p>
-                                                <a href="{% url 'literature source_detail' source.id %}"
-                                                   class="modal-link">
-                                                    {{ source.abbreviation }}
-                                                </a>
-                                            </p>
-                                        {% endfor %}
-                                    </td>
-                                </tr>
-                                </tbody>
-                            </table>
+                            <p class="card-text"><strong>Fractions based on:</strong></p>
+                            <p class="card-text">{{ group_settings.fractions_of.name }}</p>
+                            <p class="card-text"><strong>Sources:</strong></p>
+                            {% for source in group_settings.sources.all %}
+                                <a href="{% url 'bib_source_detail_modal' source.id %}"
+                                   class="modal-link">
+                                    {{ source.abbreviation }}{% if not forloop.last %},{% endif %}
+                                </a>
+                            {% endfor %}
                             <div class="collapse multi-collapse">
                                 <a href="{% url 'add_source' group_settings.id %}"
                                    class="modal-link">
@@ -184,7 +168,8 @@
                             </table>
                         </div>
                         <div class="card-footer">
-                            <div class="collapse multi-collapse" id="remove-component-group-{{ group_settings.id }}">
+                            <div class="collapse multi-collapse"
+                                 id="remove-component-group-{{ group_settings.id }}">
                                 <a id="remove-group-{{ group_settings.id }}"
                                    class="modal-link"
                                    href="{% url 'material_component_group_remove' group_settings.id %}">

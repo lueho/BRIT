@@ -7,13 +7,15 @@ from django.db.models import Sum
 from django.http import JsonResponse, HttpResponseRedirect
 from django.urls import reverse
 from django.urls import reverse_lazy
-from django.views.generic import DetailView, FormView, UpdateView
+from django.views.generic import DetailView, UpdateView
 from django.views.generic import TemplateView
 from django_tables2 import table_factory
 from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 from rest_framework.views import APIView
 
 from brit.views import DualUserListView, UserOwnsObjectMixin, NextOrSuccessUrlMixin
+from maps.models import GeoDataset
+from maps.views import GeoDatasetDetailView
 from materials.models import MaterialComponentGroup, BaseObjects
 from users.models import ReferenceUsers
 from .forms import (CultureModelForm,
@@ -291,15 +293,20 @@ class UpdateGreenhouseGrowthCycleValuesView(LoginRequiredMixin, UpdateView):
         }
 
 
-class NantesGreenhousesView(FormView):
-    template_name = 'map_nantes_greenhouses.html'
+class GreenhousesMapView(GeoDatasetDetailView):
+    feature_url = reverse_lazy('data.nantes_greenhouses')
     form_class = NantesGreenhousesFilterForm
-    initial = {'heated': 'Yes', 'lighted': 'Yes'}
+    load_features = True
+    marker_style = {
+        'color': '#4061d2',
+        'fillOpacity': 1,
+        'radius': 5,
+        'stroke': False
+    }
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({'map_header': 'Nantes Greenhouses'})
-        return context
+    def get_object(self, **kwargs):
+        self.kwargs.update({'pk': GeoDataset.objects.get(model_name='NantesGreenhouses').pk})
+        return super().get_object(**kwargs)
 
 
 class NantesGreenhousesAPIView(APIView):
@@ -328,10 +335,12 @@ class NantesGreenhousesAPIView(APIView):
         elif request.GET.get('cult_man') == '3':
             qs = qs.filter(heated=True)
 
+        crops_query = request.query_params.getlist('crops[]')
+
         crops = []
-        if request.GET.get('cucumber') == 'true':
+        if '1' in crops_query:
             crops.append('Cucumber')
-        if request.GET.get('tomato') == 'true':
+        if '2' in crops_query:
             crops.append('Tomato')
 
         qs = qs.filter(culture_1__in=crops)

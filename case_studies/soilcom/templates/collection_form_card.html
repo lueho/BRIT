@@ -1,0 +1,40 @@
+{% extends 'simple_form_card.html' %}
+
+{% block javascript %}
+
+    <script type="text/javascript">
+
+        function data_url(element) {
+            if (element['dataUrl']) {
+                return element['dataUrl'];
+            } else {
+                return element.data('options')
+            }
+        }
+
+        function updateCollectionModalForm() {
+            $("#btn-add-collector").each(function () {
+                $(this).modalForm({
+                    formURL: $(this).data('href'),
+                    errorClass: ".is-invalid",
+                    asyncUpdate: true,
+                    asyncSettings: {
+                        closeOnSubmit: true,
+                        successMessage: '<div class="success d-none">Success</div>',
+                        dataUrl: data_url($(this)),
+                        dataElementId: '#id_collector',
+                        dataKey: 'options',
+                        addModalFormFunction: updateCollectionModalForm
+                    }
+                })
+            });
+        }
+
+        $(document).ready(function () {
+            $("#sidebarToggle").click();
+            updateCollectionModalForm();
+        });
+
+    </script>
+
+{% endblock javascript %}

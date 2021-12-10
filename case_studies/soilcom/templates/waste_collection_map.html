@@ -1,0 +1,78 @@
+{% extends 'maps_base.html' %}
+
+{% block extra_cards %}
+
+    <div class="card shadow">
+
+        <div class="card-header"
+             role="button"
+             data-toggle="collapse"
+             href="#options-body"
+             aria-expanded="true"
+             aria-controls="options-body">
+            <b>Options</b>
+        </div>
+
+        <div class="card-body collapse" id="options-body">
+
+            {% if 'soilcom.add_collection' in perms %}
+                <div class="row">
+                    <div class="col">
+                        <div class="text-center">
+                            <a class="btn btn-primary w-75"
+                               href="{% url 'catchment-selection' %}">
+                                Add new collection
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
+            {% if 'soilcom.change_collection' in perms %}
+                <div class="row mt-3">
+                    <div class="col">
+                        <div class="text-center">
+                            <a id="btn-collection-update"
+                               class="btn btn-primary w-75"
+                               href="javascript:void(0)"
+                               data-hreftemplate="/waste_collection/collections/__pk__/update/">
+                                Edit selected collection
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
+            {% if 'soilcom.change_collection' in perms %}
+                <div class="row mt-3">
+                    <div class="col">
+                        <div class="text-center">
+                            <a class="btn btn-primary w-75"
+                               href="{% url 'waste-collection-home' %}">
+                                Waste collection dashboard
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
+        </div>
+    </div>
+
+{% endblock extra_cards %}
+
+{% block javascript %}
+    {{ block.super }}
+{#    <script src="{% static 'js/maps.js' %}"></script>#}
+
+    <script type="text/javascript">
+
+    function updateUrls(feature_id){
+        let update_button = document.getElementById('btn-collection-update')
+        let url = update_button.dataset['hreftemplate'].replace('__pk__', feature_id.toString())
+        update_button.setAttribute('href', url)
+    }
+
+    </script>
+
+{% endblock javascript %}

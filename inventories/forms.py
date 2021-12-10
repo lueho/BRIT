@@ -1,67 +1,18 @@
 from bootstrap_modal_forms.forms import BSModalModelForm
 from crispy_forms.helper import FormHelper
-from django.forms import (Form,
-                          ModelChoiceField,
-                          ModelForm,
-                          MultipleChoiceField,
-                          HiddenInput)
-from django.forms.widgets import CheckboxSelectMultiple
-from leaflet.forms.widgets import LeafletWidget
+from django.forms import (
+    ModelForm,
+    HiddenInput)
+
+from brit.forms import CustomModelForm, CustomModalModelForm
 
 from distributions.models import TemporalDistribution
+from maps.models import Region, Catchment, GeoDataset
 from .models import (
-    Catchment,
-    GeoDataset,
     InventoryAlgorithm,
-    Region,
     Scenario,
     ScenarioInventoryConfiguration,
 )
-
-
-# ----------- Catchments -----------------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-class CatchmentCreateForm(ModelForm):
-    class Meta:
-        model = Catchment
-        fields = ['region', 'name', 'description', 'geom', ]
-        widgets = {'geom': LeafletWidget()}
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['geom'].label = ''
-
-
-class CatchmentForm(ModelForm):
-    class Meta:
-        model = Catchment
-        fields = ('region', 'name', 'description', 'geom',)
-        widgets = {'geom': LeafletWidget()}
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['geom'].label = ''
-
-    def clean(self):
-        catchment = super().clean()
-        region = catchment.get('region')
-        if region and catchment:
-            if not region.geom.contains(catchment.get('geom')):
-                self.add_error('geom', 'The catchment must be inside the region.')
-
-
-class CatchmentQueryForm(Form):
-    region = ModelChoiceField(queryset=Region.objects.all())
-    category = MultipleChoiceField(
-        choices=(('standard', 'Standard'), ('custom', 'Custom'),),
-        widget=CheckboxSelectMultiple
-    )
-    catchment = ModelChoiceField(queryset=Catchment.objects.all())
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
 
 
 class SeasonalDistributionModelForm(ModelForm):
@@ -80,14 +31,14 @@ class ScenarioModelForm(ModelForm):
         fields = ['name', 'description', 'region', 'catchment']
 
 
-class ScenarioModalModelForm(BSModalModelForm):
+class ScenarioModalModelForm(CustomModalModelForm):
 
     def __init__(self, *args, **kwargs):
         region_id = kwargs.pop('region_id', None)
         super().__init__(*args, **kwargs)
         if region_id is not None:
             self.fields['region'].queryset = Region.objects.filter(id=region_id)
-            self.fields['catchment'].queryset = Catchment.objects.filter(region_id=region_id)
+            self.fields['catchment'].queryset = Catchment.objects.filter(parent_region_id=region_id)
 
     class Meta:
         model = Scenario

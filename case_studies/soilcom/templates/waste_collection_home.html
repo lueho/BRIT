@@ -1,0 +1,154 @@
+{% extends 'base.html' %}
+
+{% block title %}BRIT | Waste Collection{% endblock %}
+
+{% block content %}
+
+    <div class="row">
+        <div class="col col-12 col-md-6">
+            <div class="card shadow h-100">
+                <div class="card-header"><strong>Soilcom Waste Collections</strong></div>
+                <div class="card-body">
+                    <p class="card-text">
+                        This project aims at building an interactive map of the biowaste collection in Europe.
+                        The waste streams are characterised based on the collection system and the materials that
+                        are allowed to be given into the collection. The main source are information given by the
+                        responsible waste collectors to the local citizens in their respective catchment.
+                    </p>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'WasteCollection' %}" class="btn btn-primary">View map</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header">
+                    <a href="{% url 'collector-list' %}" class="stretched-link"><strong>Collectors</strong></a>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        The collector is the organisation that is responsible for providing the means of biowaste
+                        collection, collecting the waste and managing its utilisation.
+                    </p>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'catchment-selection' %}" class="btn btn-primary">View collectors</a>
+                </div>
+            </div>
+        </div>
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header">
+                    <a href="{% url 'catchment-selection' %}" class="stretched-link"><strong>Catchments</strong></a>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        A catchment is the area that a collection is dedicated to. Usually they are administrative
+                        regions, such as counties.
+                    </p>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'catchment-selection' %}" class="btn btn-primary">View catchments</a>
+                </div>
+            </div>
+        </div>
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header">
+                    <strong>
+                        <a href="{% url 'collectionsystem-list' %}" class="stretched-link">Collection systems</a>
+                    </strong>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        The collection systems describe the means by which the collectors organise the collection. It
+                        is determined by how and when and where the collector is active and provides space and
+                        containers for the biowaste.
+                    </p>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'collectionsystem-list' %}" class="btn btn-primary">View collection systems</a>
+                </div>
+            </div>
+        </div>
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header">
+                    <strong>
+                        <a href="{% url 'wastestream-list' %}" class="stretched-link">Waste streams</a>
+                    </strong>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Waste streams are determined by the materials that are included in the collection. While
+                        rough categories, such as "green waste" might be shared among the collectors, the details
+                        differ regionally and play a significant role in how the respective waste stream is composed
+                        and can be utilised in the end.
+                    </p>
+
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'wastestream-list' %}" class="btn btn-primary">View waste streams</a>
+                </div>
+            </div>
+        </div>
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header">
+                    <strong>
+                        <a href="{% url 'wastecategory-list' %}" class="stretched-link">Waste categories</a>
+                    </strong>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Categories allow to order waste streams into similar groups.
+                    </p>
+
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'wastecategory-list' %}" class="btn btn-primary">View waste categories</a>
+                </div>
+            </div>
+        </div>
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header">
+                    <strong>
+                        <a href="{% url 'wastecomponent-list' %}" class="stretched-link">Waste components</a>
+                    </strong>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Waste components are materials that are present in the waste.
+                    </p>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'wastecomponent-list' %}" class="btn btn-primary">View waste components</a>
+                </div>
+            </div>
+        </div>
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header">
+                    <strong>
+                        <a href="{% url 'collection-list' %}" class="stretched-link">Collections</a>
+                    </strong>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Each waste collection is conducted by a specific collector in a specific catchment and for only
+                        one waste stream. More than one collection per collector or catchment is possible.
+                    </p>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'collection-list' %}" class="btn btn-primary">View waste collections</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+{% endblock content %}

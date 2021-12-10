@@ -28,6 +28,7 @@ INSTALLED_APPS = [
     'rest_framework_gis',
     'leaflet',
     'cookie_consent',
+    'ai_django_core',
     'users.apps.UsersConfig',
     'maps.apps.MapsConfig',
     'brit.apps.BRITConfig',
@@ -38,6 +39,7 @@ INSTALLED_APPS = [
     'layer_manager.apps.LayerManagerConfig',
     'case_studies.flexibi_nantes.apps.CaseStudyNantesConfig',
     'case_studies.flexibi_hamburg.apps.FlexibiHamburgConfig',
+    'case_studies.soilcom.apps.SoilcomConfig',
     'django.forms',
     'django_filters',
     'crispy_forms',
@@ -53,6 +55,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
+    'ai_django_core.middleware.current_user.CurrentUserMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]
@@ -131,12 +134,12 @@ REGISTRATION_AUTO_LOGIN = True
 REGISTRATION_DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL')
 
 LEAFLET_CONFIG = {
-    'DEFAULT_CENTER': (48.917908, 6.921543),
+    'DEFAULT_CENTER': (50.08178260774763, 14.432086500224534),
     'DEFAULT_ZOOM': 5,
     'RESET_VIEW': False,
     'NO_GLOBALS': False,
-    'MIN_ZOOM': 5,
-    'MAX_ZOOM': 18,
+    'MIN_ZOOM': 4,
+    'MAX_ZOOM': 15,
     'PLUGINS': {'draw': {'css': 'draw/leaflet.draw.css',
                          'js': 'draw/leaflet.draw.js',
                          'auto-include': True
@@ -147,7 +150,7 @@ LEAFLET_CONFIG = {
 }
 
 LOGIN_REDIRECT_URL = 'home'
-LOGIN_URL = 'users/login'
+LOGIN_URL = '/users/login/'
 
 DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 

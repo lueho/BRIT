@@ -1,74 +1,79 @@
-from bootstrap_modal_forms.generic import BSModalReadView, BSModalUpdateView, BSModalDeleteView
-from django.contrib.auth.mixins import LoginRequiredMixin
 from django.urls import reverse_lazy
-from django.views.generic import ListView, CreateView
+from bootstrap_modal_forms.generic import BSModalCreateView, BSModalUpdateView, BSModalDeleteView, BSModalReadView
 
-from brit.views import UserOwnsObjectMixin, NextOrSuccessUrlMixin
-from .forms import LitSourceModelForm
+
+from brit import views
+from . import forms
 from .models import Source
-from .tables import SourceTable
 
 
-# ----------- LiteratureSource CRUD ------------------------------------------------------------------------------------
+# ----------- Source CRUD ------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
 
-class LiteratureSourceListView(ListView):
+class SourceListView(views.OwnedObjectListView):
+    template_name = 'source_list_card.html'
     model = Source
-    template_name = 'source_list.html'
-    queryset = Source.objects.all()
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({'table': SourceTable(self.get_queryset())})
-        return context
+    permission_required = 'bibliography.view_source'
+    create_new_object_url = reverse_lazy('bib_source_create')
 
 
-class LiteratureSourceCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, CreateView):
-    form_class = LitSourceModelForm
-    template_name = 'source_create.html'
-    success_url = reverse_lazy('literature source_list')
+class SourceCreateView(views.OwnedObjectCreateView):
+    template_name = 'simple_form_card.html'
+    form_class = forms.SourceModelForm
+    success_url = reverse_lazy('bib_source_list')
+    permission_required = 'bibliography.add_source'
+
+
+class SourceModalCreateView(views.OwnedObjectModalCreateView):
+    template_name = 'modal_form.html'
+    form_class = forms.SourceModalModelForm
+    success_url = reverse_lazy('bib_source_list')
+    permission_required = 'bibliography.add_source'
+
+
+class SourceDetailView(views.OwnedObjectDetailView):
+    template_name = 'source_detail.html'
+    model = Source
+    permission_required = 'bibliography.view_source'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update({
-            'form_title': 'Add new source',
-            'submit_button_text': 'Add'
+            'source_dict': self.object.as_dict()
         })
         return context
 
-    def form_valid(self, form):
-        form.instance.owner = self.request.user
-        return super().form_valid(form)
 
-
-class LiteratureSourceDetailView(BSModalReadView):
-    model = Source
+class SourceModalDetailView(BSModalReadView):
     template_name = 'modal_source_detail.html'
-    object = None
+    model = Source
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update({
-            'modal_title': 'Source details',
+            'modal_title': f'{self.object._meta.verbose_name} Details',
+            'source_dict': self.object.as_dict()
         })
         return context
 
 
-class LiteratureSourceUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
+class SourceUpdateView(views.OwnedObjectUpdateView):
+    template_name = 'simple_form_card.html'
     model = Source
-    form_class = LitSourceModelForm
-    template_name = '../brit/templates/modal_form.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({
-            'form_title': 'Edit source',
-            'submit_button_text': 'Edit'
-        })
-        return context
+    form_class = forms.SourceModelForm
+    permission_required = 'bibliography.change_source'
 
 
-class LiteratureSourceDeleteView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalDeleteView):
+class SourceModalUpdateView(views.OwnedObjectModalUpdateView):
+    template_name = 'modal_form.html'
     model = Source
+    form_class = forms.SourceModalModelForm
+    permission_required = 'bibliography.change_source'
+
+
+class SourceModalDeleteView(views.OwnedObjectDeleteView):
     template_name = 'modal_delete.html'
+    model = Source
     success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('litsource_list')
+    success_url = reverse_lazy('bib_source_list')
+    permission_required = 'bibliography.delete_source'

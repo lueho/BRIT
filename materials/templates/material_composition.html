@@ -35,7 +35,7 @@
                     </table>
                 </div>
                 <div class="card-footer">
-                    <a href="{% url 'material_update' object.material.id %}?next={{ request.path }}"
+                    <a href="{% url 'material-update' object.material.id %}?next={{ request.path }}"
                        class="modal-link toggle-edit">
                         Edit <i class="fas fa-fw fa-edit"></i>
                     </a>
@@ -92,7 +92,7 @@
                                                         <td>
                                                             {% for source in group_settings.sources.all %}
                                                                 <p>
-                                                                    <a href="{% url 'literature source_detail' source.id %}"
+                                                                    <a href="{% url 'bib_source_detail' source.id %}"
                                                                        class="modal-link">
                                                                         {{ source.abbreviation }}
                                                                     </a>

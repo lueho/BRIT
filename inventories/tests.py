@@ -277,7 +277,8 @@ class ScenarioTestCase(TestCase):
         self.assertEqual(algo, self.alg)
 
     def test_remaining_inventory_algorithm_options(self):
-        algos = self.scenario.remaining_inventory_algorithm_options(feedstock=self.material.standard_settings, geodataset=self.gds)
+        algos = self.scenario.remaining_inventory_algorithm_options(feedstock=self.material.standard_settings,
+                                                                    geodataset=self.gds)
         self.assertIsInstance(algos, QuerySet)
         self.assertEqual(algos.count(), 0)
 
@@ -335,8 +336,10 @@ from mock import Mock, patch, PropertyMock, MagicMock
 from distributions.plots import DataSet
 from brit.exceptions import UnitMismatchError
 from materials.models import Material, BaseObjects
-from inventories.models import Scenario, GeoDataset, Region, Catchment, InventoryAlgorithm, \
-    InventoryAlgorithmParameter, InventoryAlgorithmParameterValue, ScenarioInventoryConfiguration
+from inventories.models import Scenario, InventoryAlgorithm, InventoryAlgorithmParameter, \
+    InventoryAlgorithmParameterValue, ScenarioInventoryConfiguration
+from maps.models import GeoDataset, Region, Catchment
+
 from inventories.evaluations import ScenarioResult
 from users.models import ReferenceUsers
 
@@ -523,9 +526,9 @@ class ScenarioResultTestCase(NativeTestCase):
 
     # TODO: delete when ready
     # def test_total_production_per_material_component(self):
-    #     feedstock1 = MockModel(component_groups=MockSet(MockModel(name='Group 1')))
+    #     feedstock1 = GeoreferencedRegion(component_groups=MockSet(GeoreferencedRegion(name='Group 1')))
     #     composition = {
-    #         MockModel(name='Group 1'): 1
+    #         GeoreferencedRegion(name='Group 1'): 1
     #     }
     #     feedstock1.composition = MagicMock(return_value=composition)
     #     self.scenario.feedstocks = MockSet(feedstock1)

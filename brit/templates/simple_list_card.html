@@ -1,0 +1,27 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <div class="row">
+        <div class="col">
+            <div class="card shadow mb-3">
+                <div class="card-header"><b>{{ header }}</b></div>
+                <div class="card-body overflow-auto">
+                    <table class="table">
+                        {% for object in object_list %}
+                            <tr>
+                                <td>
+                                    <a href="{{ object.get_absolute_url }}">{{ object.name }}</a>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </table>
+                </div>
+                <div class="card-footer">
+                    <a href="{{ object_list.first.create_url }}">
+                        <i class="fas fa-fw fa-plus"></i> {{ create_url_text }}
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}
