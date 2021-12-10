@@ -641,6 +641,10 @@ class WasteCollectionAPIView(APIView):
             for material_id in allowed_materials_ids:
                 qs = qs.filter(waste_stream__allowed_materials__id=material_id)
 
+        last_editor = request.query_params.getlist('last_editor[]')
+        if last_editor:
+            qs = qs.filter(lastmodified_by__in=last_editor)
+
         serializer = serializers.WasteCollectionGeometrySerializer(qs, many=True)
         data = {'geoJson': serializer.data}
         return JsonResponse(data)

@@ -2,6 +2,7 @@ import datetime
 
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Field, Layout, Submit
+from django.contrib.auth.models import User
 from django import forms
 
 from bibliography.models import Source
@@ -148,24 +149,29 @@ COUNTRY_SET = set(sorted(set((c.catchment.region.nutsregion.cntr_code, c.catchme
 class CollectionFilterForm(forms.Form):
     collection_system = forms.ModelMultipleChoiceField(
         queryset=models.CollectionSystem.objects.all(),
-        # initial=models.CollectionSystem.objects.all(),
-        widget=forms.CheckboxSelectMultiple
+        widget=forms.CheckboxSelectMultiple,
+        required=False
     )
     waste_category = forms.ModelMultipleChoiceField(
         queryset=models.WasteCategory.objects.all(),
-        # initial=models.WasteCategory.objects.all(),
-        widget=forms.CheckboxSelectMultiple
+        widget=forms.CheckboxSelectMultiple,
+        required=False
     )
     countries = forms.MultipleChoiceField(
         choices=COUNTRY_SET,
-        widget=forms.CheckboxSelectMultiple
+        widget=forms.CheckboxSelectMultiple,
+        required=False
     )
     allowed_materials = forms.ModelMultipleChoiceField(
         queryset=models.WasteComponent.objects.all(),
-        # initial=models.WasteComponent.objects.all(),
-        widget=forms.CheckboxSelectMultiple
+        widget=forms.CheckboxSelectMultiple,
+        required=False
     )
 
-    # def __init__(self, *args, **kwargs):
-    #     super().__init__(*args, **kwargs)
-    #     self.fields['countries'].initial = [choice[0] for choice in self.fields['countries'].choices]
+    last_editor = forms.ModelMultipleChoiceField(
+        queryset=User.objects.filter(
+            id__in=[i[0] for i in models.Collection.objects.values_list('lastmodified_by').distinct()]),
+        widget=forms.CheckboxSelectMultiple,
+        required=False
+    )
+    
