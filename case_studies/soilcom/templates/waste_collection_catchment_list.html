@@ -37,7 +37,7 @@
                             <a href="{% url 'collection-create' %}"
                                id="btn-collection-create"
                                class="btn btn-primary mt-2"
-                               data-hreftemplate="{% url 'collection-create' %}">
+                               data-href-template="{% url 'collection-create' %}">
                                 Create collection
                             </a>
                         </form>
@@ -130,8 +130,14 @@
         }
 
         async function updateUrls(region_id) {
+            let next = new URLSearchParams(window.location.search).get('next')
+            console.log(next)
+            let params = {
+                'next': next,
+                'region_id': region_id
+            }
             let create_button = document.getElementById('btn-collection-create');
-            let url = create_button.dataset['hreftemplate'] + '?region_id=' + region_id;
+            let url = create_button.dataset['hrefTemplate'] + '?' + $.param(params);
             create_button.setAttribute('href', url);
         }
 
@@ -156,6 +162,7 @@
 
         window.onload = () => {
             loadMap(mapConfig);
+            updateUrls()
         }
 
     </script>

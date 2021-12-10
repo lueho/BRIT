@@ -19,7 +19,9 @@
                 <div class="row">
                     <div class="col">
                         <div class="text-center">
-                            <a class="btn btn-primary w-75"
+                            <a id="btn-collection-create"
+                               class="btn btn-primary w-75"
+                               data-href-template="{% url 'catchment-selection' %}"
                                href="{% url 'catchment-selection' %}">
                                 Add new collection
                             </a>
@@ -63,15 +65,37 @@
 
 {% block javascript %}
     {{ block.super }}
-{#    <script src="{% static 'js/maps.js' %}"></script>#}
 
     <script type="text/javascript">
 
-    function updateUrls(feature_id){
-        let update_button = document.getElementById('btn-collection-update')
-        let url = update_button.dataset['hreftemplate'].replace('__pk__', feature_id.toString())
-        update_button.setAttribute('href', url)
-    }
+        document.getElementById('btn-collection-create').addEventListener("click", function(e){
+            e.preventDefault();
+            let filter_params = parseFilterParameters();
+            filter_params.load_features = true;
+            let params = {'next': '/waste_collection/collections/map/?' + $.param(filter_params)};
+            location.href = e.target.dataset['hrefTemplate'] + '?' + $.param(params);
+
+        })
+
+        function updateCreateUrl(btn) {
+            console.log(btn)
+            let filter_params = parseFilterParameters();
+            filter_params.load_features = true;
+            let params = {'next': '/waste_collection/collections/map/?' + $.param(filter_params)};
+            let create_url = btn.href + '?' + $.param(params);
+            console.log(create_url)
+            btn.setAttribute('href', create_url)
+            console.log(btn)
+        }
+
+        function updateUrls(feature_id) {
+            let filter_params = parseFilterParameters();
+            filter_params.load_features = true;
+            let params = {'next': '/waste_collection/collections/map/?' + $.param(filter_params)};
+            let update_button = document.getElementById('btn-collection-update')
+            let url = update_button.dataset['hreftemplate'].replace('__pk__', feature_id.toString()) + '?' + $.param(params);
+            update_button.setAttribute('href', url)
+        }
 
     </script>
 

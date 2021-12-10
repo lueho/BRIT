@@ -122,7 +122,7 @@ class CatchmentDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
 # ----------- Geodataset -----------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class GeoDatasetDetailView(DetailView):
+class GeoDatasetDetailView(FormMixin, DetailView):
     feature_url = None
     feature_popup_url = None
     region_url = reverse_lazy('ajax_region_geometries')
@@ -145,7 +145,7 @@ class GeoDatasetDetailView(DetailView):
                 'region_url': self.region_url,
                 'feature_url': self.feature_url,
                 'feature_popup_url': self.feature_popup_url,
-                'load_features': self.load_features,
+                'load_features': self.get_load_features(),
                 'adjust_bounds_to_features': self.adjust_bounds_to_features,
                 'region_id': self.object.region.id,
                 'load_region': self.load_region,
@@ -154,9 +154,9 @@ class GeoDatasetDetailView(DetailView):
         })
         return context
 
-    def get_form(self):
+    def get_form(self, form_class=None):
         if self.form_class is not None:
-            return self.form_class
+            return self.form_class(**self.get_form_kwargs())
         if self.filter_class is not None:
             return self.filter_class(self.request.GET).form
 
@@ -167,6 +167,12 @@ class GeoDatasetDetailView(DetailView):
         if self.form_class is None and self.filter_class is not None:
             return self.get_filter_fields()
         return {key: type(value.widget).__name__ for key, value in self.form_class.base_fields.items()}
+
+    def get_load_features(self):
+        if self.request.GET.get('load_features'):
+            return self.request.GET.get('load_features') == 'true'
+        else:
+            return self.load_features
 
 
 # ----------- Regions --------------------------------------------------------------------------------------------------
