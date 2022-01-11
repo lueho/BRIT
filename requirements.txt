@@ -1,14 +1,14 @@
 ai-django-core==5.7.3
-amqp==5.0.6
+amqp==5.0.9
 asgiref==3.4.1
 billiard==3.6.4.0
 bleach==4.1.0
 boto3==1.18.60
 botocore==1.21.60
-celery==5.1.2
+celery==5.2.3
 certifi==2021.10.8
 charset-normalizer==2.0.7
-click==7.1.2
+click==8.0.3
 click-didyoumean==0.3.0
 click-plugins==1.1.1
 click-repl==0.2.0
@@ -46,7 +46,7 @@ humanize==3.12.0
 idna==3.3
 importlib-metadata==4.8.1
 jmespath==0.10.0
-kombu==5.1.0
+kombu==5.2.3
 mock==4.0.3
 model-bakery==1.3.3
 packaging==21.2
