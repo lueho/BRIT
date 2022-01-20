@@ -84,13 +84,14 @@ class WasteStreamSerializer(VerboseFieldLabelsMixin, serializers.ModelSerializer
 
 
 class WasteCollectionSerializer(VerboseFieldLabelsMixin, serializers.ModelSerializer):
+    catchment = serializers.StringRelatedField()
     collector = serializers.StringRelatedField()
     collection_system = serializers.StringRelatedField()
     comments = serializers.CharField(source='description')
 
     class Meta:
         model = models.Collection
-        fields = ['name', 'collector', 'collection_system', 'comments']
+        fields = ['catchment', 'collector', 'collection_system', 'comments']
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
