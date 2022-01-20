@@ -1,10 +1,8 @@
-from django.db import models
-from django.db.models import Q
-from django.urls import reverse
 from django.contrib.gis.db.models import MultiPolygonField, PointField
+from django.db import models
+from django.urls import reverse
 
 from bibliography.models import Source
-
 from brit.models import NamedUserObjectModel
 
 TYPES = (
@@ -74,6 +72,31 @@ class NutsRegion(Region):
 
     def __str__(self):
         return f'{self.nuts_name} ({self.nuts_id})'
+
+
+# class LauRegion(Region):
+#     cntr_code = models.CharField(max_length=2, blank=True, null=True)
+#     lau_id = models.CharField(max_length=13, blank=True, null=True)
+#     lau_name = models.CharField(max_length=113, blank=True, null=True)
+#     year = models.IntegerField(blank=True, null=True)
+#     nuts_parent = models.ForeignKey(NutsRegion, related_name='lau_children', on_delete=models.PROTECT, null=True)
+#
+#     def __str__(self):
+#         return f'{self.lau_name} ({self.lau_id})'
+
+
+# class LauRegionTemp(models.Model):
+#     geom = MultiPolygonField(blank=True, null=True)
+#     gisco_id = models.CharField(max_length=16, blank=True, null=True)
+#     cntr_code = models.CharField(max_length=2, blank=True, null=True)
+#     lau_id = models.CharField(max_length=13, blank=True, null=True)
+#     lau_name = models.CharField(max_length=113, blank=True, null=True)
+#     pop_2020 = models.IntegerField(blank=True, null=True)
+#     pop_dens_2 = models.FloatField(blank=True, null=True)
+#     area_km2 = models.FloatField(blank=True, null=True)
+#     year = models.IntegerField(blank=True, null=True)
+#     fid = models.CharField(max_length=16, blank=True, null=True)
+#     nuts_parent_id = models.CharField(max_length=10, blank=True, null=True)
 
 
 class Catchment(NamedUserObjectModel):
