@@ -74,15 +74,15 @@ class NutsRegion(Region):
         return f'{self.nuts_name} ({self.nuts_id})'
 
 
-# class LauRegion(Region):
-#     cntr_code = models.CharField(max_length=2, blank=True, null=True)
-#     lau_id = models.CharField(max_length=13, blank=True, null=True)
-#     lau_name = models.CharField(max_length=113, blank=True, null=True)
-#     year = models.IntegerField(blank=True, null=True)
-#     nuts_parent = models.ForeignKey(NutsRegion, related_name='lau_children', on_delete=models.PROTECT, null=True)
-#
-#     def __str__(self):
-#         return f'{self.lau_name} ({self.lau_id})'
+class LauRegion(Region):
+    cntr_code = models.CharField(max_length=2, blank=True, null=True)
+    lau_id = models.CharField(max_length=13, blank=True, null=True)
+    lau_name = models.CharField(max_length=113, blank=True, null=True)
+    year = models.IntegerField(blank=True, null=True)
+    nuts_parent = models.ForeignKey(NutsRegion, related_name='lau_children', on_delete=models.PROTECT, null=True)
+
+    def __str__(self):
+        return f'{self.lau_name} ({self.lau_id})'
 
 
 # class LauRegionTemp(models.Model):
