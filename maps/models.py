@@ -85,20 +85,6 @@ class LauRegion(Region):
         return f'{self.lau_name} ({self.lau_id})'
 
 
-class LauRegionTemp(models.Model):
-    geom = MultiPolygonField(blank=True, null=True)
-    gisco_id = models.CharField(max_length=16, blank=True, null=True)
-    cntr_code = models.CharField(max_length=2, blank=True, null=True)
-    lau_id = models.CharField(max_length=13, blank=True, null=True)
-    lau_name = models.CharField(max_length=113, blank=True, null=True)
-    pop_2020 = models.IntegerField(blank=True, null=True)
-    pop_dens_2 = models.FloatField(blank=True, null=True)
-    area_km2 = models.FloatField(blank=True, null=True)
-    year = models.IntegerField(blank=True, null=True)
-    fid = models.CharField(max_length=16, blank=True, null=True)
-    nuts_parent_id = models.CharField(max_length=10, blank=True, null=True)
-
-
 class Catchment(NamedUserObjectModel):
     parent_region = models.ForeignKey(Region, on_delete=models.CASCADE, related_name='child_catchments', null=True)
     region = models.ForeignKey(Region, on_delete=models.CASCADE, null=True)
