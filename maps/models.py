@@ -32,6 +32,17 @@ class Region(NamedUserObjectModel):
     def geom(self):
         return self.borders.geom
 
+    @property
+    def country_code(self):
+        try:
+            return self.nutsregion.cntr_code
+        except Region.nutsregion.RelatedObjectDoesNotExist:
+            pass
+        try:
+            return self.lauregion.cntr_code
+        except Region.lauregion.RelatedObjectDoesNotExist:
+            return None
+
     @staticmethod
     def get_absolute_url():
         return reverse('catchment_list')
@@ -40,6 +51,10 @@ class Region(NamedUserObjectModel):
         try:
             return self.nutsregion.__str__()
         except Region.nutsregion.RelatedObjectDoesNotExist:
+            pass
+        try:
+            return self.lauregion.__str__()
+        except Region.lauregion.RelatedObjectDoesNotExist:
             return self.name
 
 

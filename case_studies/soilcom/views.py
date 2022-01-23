@@ -1,5 +1,5 @@
 from django.contrib.auth.mixins import PermissionRequiredMixin
-from django.db.models import Max
+from django.db.models import Max, Q
 from django.http import JsonResponse
 from django.template.loader import render_to_string
 from django.urls import reverse_lazy
@@ -17,7 +17,7 @@ from bibliography.views import (SourceListView,
                                 SourceModalDeleteView)
 from brit import views
 from maps.forms import NutsRegionQueryForm
-from maps.models import Catchment, GeoDataset, NutsRegion
+from maps.models import Catchment, GeoDataset, Region, NutsRegion
 from maps.views import GeoDatasetDetailView
 from . import forms
 from . import models
@@ -471,13 +471,23 @@ class CollectionUpdateView(views.OwnedObjectUpdateView):
                 waste_stream.allowed_materials.add(material)
         waste_stream.save()
         if form.cleaned_data['flyer_url']:
+            region_id = None
+            try:
+                region_id = form.cleaned_data["catchment"].region.nutsregion.nuts_id
+            except Region.nutsregion.RelatedObjectDoesNotExist:
+                pass
+            try:
+                region_id = form.cleaned_data["catchment"].region.lauregion.lau_id
+            except Region.lauregion.RelatedObjectDoesNotExist:
+                pass
+
             flyer, created = models.WasteFlyer.objects.get_or_create(
                 type='waste_flyer',
                 url=form.cleaned_data['flyer_url'],
                 defaults={
                     'owner': self.request.user,
                     'title': f'Waste flyer {form.cleaned_data["catchment"]}',
-                    'abbreviation': f'WasteFlyer{form.cleaned_data["catchment"].region.nutsregion.nuts_id}',
+                    'abbreviation': f'WasteFlyer{region_id}',
                 }
             )
             form.instance.flyer = flyer
@@ -626,7 +636,9 @@ class WasteCollectionAPIView(APIView):
 
         countries = request.query_params.getlist('countries[]')
         if countries:
-            qs = qs.filter(catchment__region__nutsregion__cntr_code__in=countries)
+            qs = qs.filter(
+                Q(catchment__region__nutsregion__cntr_code__in=countries) |
+                Q(catchment__region__lauregion__cntr_code__in=countries))
 
         collection_system = request.query_params.getlist('collection_system[]')
         if collection_system:

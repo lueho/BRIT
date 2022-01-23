@@ -2,8 +2,8 @@ import datetime
 
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Field, Layout, Submit
-from django.contrib.auth.models import User
 from django import forms
+from django.contrib.auth.models import User
 
 from bibliography.models import Source
 from brit.forms import CustomModelForm, CustomModalModelForm
@@ -142,7 +142,7 @@ class CollectionModalModelForm(CustomModalModelForm):
         fields = ('name', 'collector', 'catchment', 'collection_system', 'waste_stream', 'flyer', 'description')
 
 
-COUNTRY_SET = set(sorted(set((c.catchment.region.nutsregion.cntr_code, c.catchment.region.nutsregion.cntr_code) for c in
+COUNTRY_SET = set(sorted(set((c.catchment.region.country_code, c.catchment.region.country_code) for c in
                              models.Collection.objects.all())))
 
 
