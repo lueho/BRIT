@@ -1,3 +1,5 @@
+import os
+
 import psycopg2
 from django.core.management.base import BaseCommand, CommandError
 
@@ -10,8 +12,9 @@ class Command(BaseCommand):
 
     def handle(self, *args, **options):
 
-        connection = psycopg2.connect(user="brit_admin", password="V88a&ToxyMyI", host="db", port="5432",
-                                      database="brit_db")
+        # connection = psycopg2.connect(user="brit_admin", password="V88a&ToxyMyI", host="db", port="5432",
+        #                               database="brit_db")
+        connection = psycopg2.connect(os.environ.get('HEROKU_POSTGRESQL_COPPER_URL'))
         cursor = connection.cursor()
         fields = (
             'lau_id', 'lau_name', 'collector', 'collector_url', 'sys', 'npab', 'pab', 'nppb', 'ppb', 'sgw', 'hgw',
