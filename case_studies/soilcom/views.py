@@ -409,13 +409,22 @@ class CollectionCreateView(views.OwnedObjectCreateView):
         waste_stream.save()
 
         if form.cleaned_data['flyer_url']:
+            region_id = None
+            try:
+                region_id = form.cleaned_data["catchment"].region.nutsregion.nuts_id
+            except Region.nutsregion.RelatedObjectDoesNotExist:
+                pass
+            try:
+                region_id = form.cleaned_data["catchment"].region.lauregion.lau_id
+            except Region.lauregion.RelatedObjectDoesNotExist:
+                pass
             flyer, created = models.WasteFlyer.objects.get_or_create(
                 type='waste_flyer',
                 url=form.cleaned_data['flyer_url'],
                 defaults={
                     'owner': self.request.user,
                     'title': f'Waste flyer {form.cleaned_data["catchment"]}',
-                    'abbreviation': f'WasteFlyer{form.cleaned_data["catchment"].region.nutsregion.nuts_id}',
+                    'abbreviation': f'WasteFlyer{region_id}',
                 }
             )
             form.instance.flyer = flyer
