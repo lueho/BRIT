@@ -7,6 +7,12 @@ window.addEventListener("map:init", function (event) {
     map = event.detail.map;
 });
 
+document.querySelector("#summary-container").addEventListener('click', function (e) {
+    if (e.target.matches('.collapse-selector')) {
+        expandedSummaryItem(e.target)
+    }
+});
+
 async function fetchFeatureInfos(feature, mapConfig) {
     let dataurl = mapConfig['feature_popup_url'] + '?' + 'collection_id=' + feature['properties']['id'];
     let response = await fetch(dataurl);
@@ -187,16 +193,21 @@ async function renderSummary(summary) {
     $('#filter-card-body').collapse('hide');
 }
 
-async function renderSummaryAlternative(summary) {
-    let summary_container = document.getElementById('summary-container');
-    summary_container.textContent = ''
+
+function renderSummaryContainer(summary, summary_container) {
+
     Object.keys(summary).forEach(key => {
+
         if (summary[key]) {
+
+            let summary_item = document.createElement('div')
+
             let label = document.createElement('P');
             let b = document.createElement('B');
             b.innerText = key + ':';
-            label.appendChild(b)
-            summary_container.appendChild(label);
+            label.appendChild(b);
+            summary_item.appendChild(label);
+
             let value = document.createElement('P');
             if (Array.isArray(summary[key])) {
                 let ul = document.createElement('ul');
@@ -209,9 +220,79 @@ async function renderSummaryAlternative(summary) {
             } else {
                 value.innerText = summary[key].toString();
             }
-            summary_container.appendChild(value);
+            summary_item.appendChild(value)
+            if (key === 'id') {
+                summary_item.className = 'd-none'
+                summary_container.className += ' pk-holder'
+                summary_container.setAttribute('data-pk', summary['id'])
+            }
+
+            summary_container.appendChild(summary_item);
         }
     });
+}
+
+async function renderSummaryAlternative(json) {
+
+    // Empty summary container from previous content
+    let outer_summary_container = document.getElementById('summary-container');
+    outer_summary_container.textContent = ''
+
+    if (json['summaries'].length > 1) {
+
+        // render multiple summaries
+
+        let message = document.createElement('P');
+        message.innerText = 'Found ' + json['summaries'].length + ' items:';
+        outer_summary_container.appendChild(message);
+
+        let accordion = document.createElement('div');
+        accordion.id = 'summaries_accordion'
+        accordion.className = 'accordion';
+        outer_summary_container.appendChild(accordion);
+
+
+        json['summaries'].forEach((summary, i) => {
+
+            let card = document.createElement('div');
+            card.className = 'card';
+            accordion.appendChild(card);
+
+            let header = document.createElement('div');
+            header.className = 'card-header collapse-selector';
+            header.setAttribute('role', 'button');
+            header.setAttribute('data-toggle', 'collapse');
+            header.setAttribute('href', '#collapse' + i.toString());
+            header.setAttribute('aria-expanded', 'true');
+            header.setAttribute('aria-controls', 'collapse' + i.toString());
+            if (summary['id']) {
+                header.setAttribute('data-pk', summary['id']);
+            }
+            let numbering = i + 1;
+            header.innerHTML = '<b>#' + numbering.toString() + '</b>';
+            card.appendChild(header);
+
+            let collapse_container = document.createElement('div');
+            collapse_container.id = 'collapse' + i.toString();
+            collapse_container.className = 'summary collapse';
+            collapse_container.setAttribute('aria-labelledby', 'collapse' + i.toString());
+            collapse_container.setAttribute('data-parent', '#summaries_accordion');
+            card.appendChild(collapse_container);
+
+            let body = document.createElement('div');
+            body.className = 'card-body';
+
+            collapse_container.appendChild(body);
+            renderSummaryContainer(summary, body);
+        });
+
+
+    } else {
+        // render one single summary
+        const summary = json['summaries'][0];
+        renderSummaryContainer(summary, outer_summary_container);
+    }
+
     $('#info-card-body').collapse('show');
     $('#filter-card-body').collapse('hide');
 }
