@@ -1,7 +1,9 @@
-from rest_framework_gis.serializers import GeoFeatureModelSerializer
+from collections import OrderedDict
+
 from rest_framework import serializers
-from rest_framework.fields import SerializerMethodField
-from django.utils.text import capfirst
+from rest_framework.fields import SkipField
+from rest_framework.relations import PKOnlyObject
+from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from maps.models import GeoPolygon
 from materials.models import Material
@@ -40,42 +42,45 @@ class WasteComponentSerializer(OwnedObjectModelSerializer):
         fields = ('name',)
 
 
-class VerboseFieldLabelsMixin(serializers.Serializer):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+class VerboseLabelMixin(serializers.Serializer):
 
-        if 'labels' in self.fields:
-            raise RuntimeError(
-                'You cant have labels field defined '
-                'while using MyModelSerializer'
-            )
+    def to_representation(self, instance):
 
-        self.fields['labels'] = SerializerMethodField()
+        ret = OrderedDict()
+        fields = self._readable_fields
 
-    def get_labels(self, *args):
-        labels = {}
+        for field in fields:
+            try:
+                attribute = field.get_attribute(instance)
+            except SkipField:
+                continue
 
-        for field in self.Meta.model._meta.get_fields():
-            if field.name in self.fields:
-                labels[field.name] = capfirst(field.verbose_name)
-        return labels
+            # We skip `to_representation` for `None` values so that fields do
+            # not have to explicitly deal with that case.
+            #
+            # For related fields with `use_pk_only_optimization` we need to
+            # resolve the pk value.
+            check_for_none = attribute.pk if isinstance(attribute, PKOnlyObject) else attribute
+            if check_for_none is None:
+                ret[field.label] = None
+            else:
+                ret[field.label] = field.to_representation(attribute)
 
-    @property
-    def verbose_data(self):
-
-        ret = super().data
-        labels = ret.pop('labels')
-        return {labels[key] if key in labels else key: value for key, value in ret.items()}
+        return ret
 
 
-class WasteFlyerSerializer(VerboseFieldLabelsMixin, serializers.ModelSerializer):
+class VerboseLabelModelSerializer(VerboseLabelMixin, serializers.ModelSerializer):
+    """Renders output with defined labels instead of field names"""
+
+
+class WasteFlyerSerializer(VerboseLabelModelSerializer):
     class Meta:
         model = models.WasteFlyer
         fields = ('url',)
 
 
-class WasteStreamSerializer(VerboseFieldLabelsMixin, serializers.ModelSerializer):
-    allowed_materials = serializers.StringRelatedField(many=True)
+class WasteStreamSerializer(VerboseLabelModelSerializer):
+    allowed_materials = serializers.StringRelatedField(many=True, label='Allowed materials')
     category = serializers.StringRelatedField(label='Waste category')
 
     class Meta:
@@ -83,7 +88,8 @@ class WasteStreamSerializer(VerboseFieldLabelsMixin, serializers.ModelSerializer
         fields = ['category', 'allowed_materials']
 
 
-class WasteCollectionSerializer(VerboseFieldLabelsMixin, serializers.ModelSerializer):
+class WasteCollectionSerializer(VerboseLabelModelSerializer):
+    id = serializers.IntegerField(label='id')
     catchment = serializers.StringRelatedField()
     collector = serializers.StringRelatedField()
     collection_system = serializers.StringRelatedField()
@@ -91,12 +97,12 @@ class WasteCollectionSerializer(VerboseFieldLabelsMixin, serializers.ModelSerial
 
     class Meta:
         model = models.Collection
-        fields = ['catchment', 'collector', 'collection_system', 'comments']
+        fields = ['id', 'catchment', 'collector', 'collection_system', 'comments']
 
     def to_representation(self, instance):
         ret = super().to_representation(instance)
-        comments = ret.pop('comments')
-        ret.update(WasteStreamSerializer(instance.waste_stream).verbose_data)
+        comments = ret.pop('Comments')
+        ret.update(WasteStreamSerializer(instance.waste_stream).data)
         ret.update({'Comments': comments})
         ret.update(WasteFlyerSerializer(instance.flyer).data)
         return ret
