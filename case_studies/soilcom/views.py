@@ -676,9 +676,9 @@ class WasteCollectionSummaryAPIView(APIView):
     @staticmethod
     def get(request):
         obj = models.Collection.objects.get(id=request.query_params.get('collection_id'))
-        serializer = serializers.WasteCollectionSerializer(obj, context={'request': request})
-        data = {key.capitalize(): value for key, value in serializer.verbose_data.items()}
-        return JsonResponse(data)
+        objs = models.Collection.objects.filter(catchment=obj.catchment)
+        serializer = serializers.WasteCollectionSerializer(objs, many=True, context={'request': request})
+        return JsonResponse({'summaries': serializer.data})
 
 
 class WasteCollectionPopupDetailView(views.OwnedObjectDetailView):
