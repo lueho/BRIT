@@ -9,7 +9,7 @@ window.addEventListener("map:init", function (event) {
 
 document.querySelector("#summary-container").addEventListener('click', function (e) {
     if (e.target.matches('.collapse-selector')) {
-        expandedSummaryItem(e.target)
+        updateUrls(e.target.dataset['pk']);
     }
 });
 
