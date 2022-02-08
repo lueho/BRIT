@@ -94,21 +94,17 @@ class WasteStreamSerializer(FieldLabelModelSerializer):
         fields = ['category', 'allowed_materials']
 
 
-class WasteCollectionSerializer(VerboseLabelModelSerializer):
+class CollectionModelSerializer(FieldLabelMixin, serializers.ModelSerializer):
     id = serializers.IntegerField(label='id')
     catchment = serializers.StringRelatedField()
     collector = serializers.StringRelatedField()
     collection_system = serializers.StringRelatedField()
+    waste_category = serializers.CharField(source='waste_stream.category')
+    allowed_materials = serializers.StringRelatedField(many=True, source='waste_stream.allowed_materials')
+    flyer = serializers.CharField(source='flyer.url')
     comments = serializers.CharField(source='description')
 
     class Meta:
         model = models.Collection
-        fields = ['id', 'catchment', 'collector', 'collection_system', 'comments']
-
-    def to_representation(self, instance):
-        ret = super().to_representation(instance)
-        comments = ret.pop('Comments')
-        ret.update(WasteStreamSerializer(instance.waste_stream).data)
-        ret.update({'Comments': comments})
-        ret.update(WasteFlyerSerializer(instance.flyer).data)
-        return ret
+        fields = ('id', 'catchment', 'collector', 'collection_system', 'waste_category', 'allowed_materials', 'flyer',
+                  'comments')

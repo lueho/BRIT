@@ -5,7 +5,7 @@ from django.template.loader import render_to_string
 from django.urls import reverse_lazy
 from django.views.generic import TemplateView
 from django.views.generic.edit import FormMixin
-from rest_framework.views import APIView
+from rest_framework.views import APIView, Response
 
 from bibliography.views import (SourceListView,
                                 SourceCreateView,
@@ -677,8 +677,12 @@ class WasteCollectionSummaryAPIView(APIView):
     def get(request):
         obj = models.Collection.objects.get(id=request.query_params.get('collection_id'))
         objs = models.Collection.objects.filter(catchment=obj.catchment)
-        serializer = serializers.WasteCollectionSerializer(objs, many=True, context={'request': request})
-        return JsonResponse({'summaries': serializer.data})
+        serializer = serializers.CollectionModelSerializer(
+            objs,
+            many=True,
+            field_labels_as_keys=True,
+            context={'request': request})
+        return Response({'summaries': serializer.data})
 
 
 class WasteCollectionPopupDetailView(views.OwnedObjectDetailView):
