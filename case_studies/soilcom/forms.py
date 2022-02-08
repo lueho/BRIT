@@ -7,6 +7,7 @@ from django.contrib.auth.models import User
 
 from bibliography.models import Source
 from brit.forms import CustomModelForm, CustomModalModelForm
+from maps.models import Region
 from materials.models import Material, MaterialGroup
 from . import models
 
@@ -134,6 +135,55 @@ class CollectionModelForm(forms.ModelForm):
         )
         helper.add_input(Submit('submit', 'Save'))
         return helper
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+
+        data = self.cleaned_data
+
+        # Create a name
+        name = f'{data["catchment"]} {data["waste_category"]} {data["collection_system"]}'
+        instance.name = name
+
+        # Associate with a new or existing waste stream
+        waste_stream, created = models.WasteStream.objects.get_or_create(
+            defaults={'owner': instance.owner},
+            category=data["waste_category"],
+            allowed_materials=models.WasteComponent.objects.filter(id__in=data['allowed_materials'])
+        )
+        waste_stream.allowed_materials.add(*data['allowed_materials'])
+        waste_stream.save()
+        instance.waste_stream = waste_stream
+
+        # Associate with a new or existing waste collection source flyer
+        if data['flyer_url']:
+            region_id = None
+            try:
+                region_id = data["catchment"].region.nutsregion.nuts_id
+            except AttributeError:
+                pass
+            except Region.nutsregion.RelatedObjectDoesNotExist:
+                pass
+            try:
+                region_id = data["catchment"].region.lauregion.lau_id
+            except AttributeError:
+                pass
+            except Region.lauregion.RelatedObjectDoesNotExist:
+                pass
+            flyer, created = models.WasteFlyer.objects.get_or_create(
+                type='waste_flyer',
+                url=data['flyer_url'],
+                defaults={
+                    'owner': instance.owner,
+                    'title': f'Waste flyer {data["catchment"]}',
+                    'abbreviation': f'WasteFlyer{region_id}',
+                }
+            )
+            instance.flyer = flyer
+
+        if commit:
+            instance.save()
+        return instance
 
 
 class CollectionModalModelForm(CustomModalModelForm):
