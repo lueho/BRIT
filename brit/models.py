@@ -1,7 +1,7 @@
 from ai_django_core.models import CommonInfo
 from django.contrib.auth.models import User, Group
 from django.db import models
-from django.urls import reverse
+from django.urls import reverse, exceptions
 
 
 class ReadableQueryset(models.QuerySet):
@@ -40,54 +40,90 @@ class CRUDUrlsMixin(models.Model):
     @classmethod
     @property
     def list_url(cls):
-        return reverse(f'{cls.__name__.lower()}-list')
+        try:
+            return reverse(f'{cls.__name__.lower()}-list')
+        except exceptions.NoReverseMatch:
+            return None
 
     @classmethod
     @property
     def modal_list_url(cls):
-        return reverse(f'{cls.__name__.lower()}-list-modal')
+        try:
+            return reverse(f'{cls.__name__.lower()}-list-modal')
+        except exceptions.NoReverseMatch:
+            return None
 
     @classmethod
     @property
     def options_list_url(cls):
-        return reverse(f'{cls.__name__.lower()}-options')
+        try:
+            return reverse(f'{cls.__name__.lower()}-options')
+        except exceptions.NoReverseMatch:
+            return None
 
     @classmethod
     @property
     def create_url(cls):
-        return reverse(f'{cls.__name__.lower()}-create')
+        try:
+            return reverse(f'{cls.__name__.lower()}-create')
+        except exceptions.NoReverseMatch:
+            return None
 
     @classmethod
     @property
     def modal_create_url(cls):
-        return reverse(f'{cls.__name__.lower()}-create-modal')
+        try:
+            return reverse(f'{cls.__name__.lower()}-create-modal')
+        except exceptions.NoReverseMatch:
+            return None
 
     @property
     def detail_url(self):
-        return reverse(f'{self.__class__.__name__.lower()}-detail', kwargs={'pk': self.pk})
+        try:
+            return reverse(f'{self.__class__.__name__.lower()}-detail', kwargs={'pk': self.pk})
+        except exceptions.NoReverseMatch:
+            return None
 
     @property
     def modal_detail_url(self):
-        return reverse(f'{self.__class__.__name__.lower()}-detail-modal', kwargs={'pk': self.pk})
+        try:
+            return reverse(f'{self.__class__.__name__.lower()}-detail-modal', kwargs={'pk': self.pk})
+        except exceptions.NoReverseMatch:
+            return None
 
     def get_absolute_url(self):
-        return reverse(f'{self.__class__.__name__.lower()}-detail', kwargs={'pk': self.pk})
+        try:
+            return reverse(f'{self.__class__.__name__.lower()}-detail', kwargs={'pk': self.pk})
+        except exceptions.NoReverseMatch:
+            return None
 
     @property
     def update_url(self):
-        return reverse(f'{self.__class__.__name__.lower()}-update', kwargs={'pk': self.pk})
+        try:
+            return reverse(f'{self.__class__.__name__.lower()}-update', kwargs={'pk': self.pk})
+        except exceptions.NoReverseMatch:
+            return None
 
     @property
     def modal_update_url(self):
-        return reverse(f'{self.__class__.__name__.lower()}-update-modal', kwargs={'pk': self.pk})
+        try:
+            return reverse(f'{self.__class__.__name__.lower()}-update-modal', kwargs={'pk': self.pk})
+        except exceptions.NoReverseMatch:
+            return None
 
     @property
     def delete_url(self):
-        return reverse(f'{self.__class__.__name__.lower()}-delete', kwargs={'pk': self.pk})
+        try:
+            return reverse(f'{self.__class__.__name__.lower()}-delete', kwargs={'pk': self.pk})
+        except exceptions.NoReverseMatch:
+            return None
 
     @property
     def modal_delete_url(self):
-        return reverse(f'{self.__class__.__name__.lower()}-delete-modal', kwargs={'pk': self.pk})
+        try:
+            return reverse(f'{self.__class__.__name__.lower()}-delete-modal', kwargs={'pk': self.pk})
+        except exceptions.NoReverseMatch:
+            return None
 
 
 class NamedUserObjectModel(CRUDUrlsMixin, OwnedObjectModel):
