@@ -5,7 +5,7 @@ from django.test import TestCase
 
 from case_studies.flexibi_hamburg.models import HamburgGreenAreas
 from inventories.models import Scenario, InventoryAlgorithm
-from .models import Layer, LayerField
+from layer_manager.models import Layer, LayerField
 
 
 class LayerTestCase(TestCase):

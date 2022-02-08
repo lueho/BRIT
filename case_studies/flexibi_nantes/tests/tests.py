@@ -2,9 +2,9 @@ import importlib
 
 from django.test import TestCase
 
+from case_studies.flexibi_nantes.models import Greenhouse, NantesGreenhouses
 from distributions.models import TemporalDistribution
 from inventories.models import Scenario
-from .models import Greenhouse, NantesGreenhouses
 
 
 class InventoryAlgorithmsTestCase(TestCase):

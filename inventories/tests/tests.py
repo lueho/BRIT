@@ -2,8 +2,8 @@ from django.contrib.auth.models import User
 from django.test import TestCase
 
 from distributions.models import TemporalDistribution, Timestep
+from inventories.models import (WrongParameterForInventoryAlgorithm)
 from materials.models import MaterialComponent, MaterialComponentGroup, MaterialSettings
-from .models import (WrongParameterForInventoryAlgorithm)
 
 
 class RegionTestCase(TestCase):

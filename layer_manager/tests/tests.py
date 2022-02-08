@@ -1,8 +1,8 @@
 from django.db.models.query import QuerySet
 from django.test import TestCase
 
+from layer_manager.models import DistributionSet, DistributionShare, LayerAggregatedDistribution
 from materials.models import BaseObjects
-from .models import DistributionSet, DistributionShare, LayerAggregatedDistribution
 
 
 class LayerAggregatedDistributionTestCase(TestCase):
