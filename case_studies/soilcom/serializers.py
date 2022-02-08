@@ -42,7 +42,12 @@ class WasteComponentSerializer(OwnedObjectModelSerializer):
         fields = ('name',)
 
 
-class VerboseLabelMixin(serializers.Serializer):
+class FieldLabelMixin(serializers.Serializer):
+    field_labels_as_keys = False
+
+    def __init__(self, *args, **kwargs):
+        self.field_labels_as_keys = kwargs.pop('field_labels_as_keys', self.field_labels_as_keys)
+        super().__init__(*args, **kwargs)
 
     def to_representation(self, instance):
 
@@ -61,25 +66,26 @@ class VerboseLabelMixin(serializers.Serializer):
             # For related fields with `use_pk_only_optimization` we need to
             # resolve the pk value.
             check_for_none = attribute.pk if isinstance(attribute, PKOnlyObject) else attribute
+            key = field.label if self.field_labels_as_keys else field.field_name
             if check_for_none is None:
-                ret[field.label] = None
+                ret[key] = None
             else:
-                ret[field.label] = field.to_representation(attribute)
+                ret[key] = field.to_representation(attribute)
 
         return ret
 
 
-class VerboseLabelModelSerializer(VerboseLabelMixin, serializers.ModelSerializer):
+class FieldLabelModelSerializer(FieldLabelMixin, serializers.ModelSerializer):
     """Renders output with defined labels instead of field names"""
 
 
-class WasteFlyerSerializer(VerboseLabelModelSerializer):
+class WasteFlyerSerializer(FieldLabelModelSerializer):
     class Meta:
         model = models.WasteFlyer
         fields = ('url',)
 
 
-class WasteStreamSerializer(VerboseLabelModelSerializer):
+class WasteStreamSerializer(FieldLabelModelSerializer):
     allowed_materials = serializers.StringRelatedField(many=True, label='Allowed materials')
     category = serializers.StringRelatedField(label='Waste category')
 
