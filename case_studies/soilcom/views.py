@@ -17,7 +17,7 @@ from bibliography.views import (SourceListView,
                                 SourceModalDeleteView)
 from brit import views
 from maps.forms import NutsRegionQueryForm
-from maps.models import Catchment, GeoDataset, Region, NutsRegion
+from maps.models import Catchment, GeoDataset, NutsRegion
 from maps.views import GeoDatasetDetailView
 from . import forms
 from . import models
