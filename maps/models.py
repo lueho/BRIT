@@ -128,7 +128,7 @@ class Catchment(NamedUserObjectModel):
         return reverse('catchment_list')
 
     def __str__(self):
-        return self.region.__str__()
+        return self.name if self.name else self.region.__str__()
 
 
 class SFBSite(NamedUserObjectModel):
