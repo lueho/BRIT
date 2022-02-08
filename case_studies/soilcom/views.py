@@ -396,9 +396,6 @@ class CollectionCreateView(views.OwnedObjectCreateView):
             initial['catchment'] = catchment
         return initial
 
-    def form_valid(self, form):
-        data = form.cleaned_data
-        name = f'{data["catchment"]} {data["waste_category"]} {data["collection_system"]}'
 
 class CollectionCopyView(CollectionCreateView):
     model = models.Collection
@@ -445,44 +442,12 @@ class CollectionUpdateView(views.OwnedObjectUpdateView):
 
     def get_initial(self):
         initial = super().get_initial()
-        initial['catchment'] = self.object.catchment
-        initial['waste_category'] = self.object.waste_stream.category
-        initial['allowed_materials'] = self.object.waste_stream.allowed_materials.all()
-        initial['flyer_url'] = self.object.flyer.url if self.object.flyer else ''
+        initial.update({
+            'waste_category': self.object.waste_stream.category,
+            'allowed_materials': self.object.waste_stream.allowed_materials.all(),
+            'flyer_url': self.object.flyer.url if self.object.flyer else ''
+        })
         return initial
-
-    def form_valid(self, form):
-        waste_stream = self.object.waste_stream
-        allowed_materials = form.cleaned_data['allowed_materials'].all()
-        for material in waste_stream.allowed_materials.all():
-            if material not in allowed_materials:
-                waste_stream.allowed_materials.remove(material)
-        for material in allowed_materials:
-            if material not in waste_stream.allowed_materials.all():
-                waste_stream.allowed_materials.add(material)
-        waste_stream.save()
-        if form.cleaned_data['flyer_url']:
-            region_id = None
-            try:
-                region_id = form.cleaned_data["catchment"].region.nutsregion.nuts_id
-            except Region.nutsregion.RelatedObjectDoesNotExist:
-                pass
-            try:
-                region_id = form.cleaned_data["catchment"].region.lauregion.lau_id
-            except Region.lauregion.RelatedObjectDoesNotExist:
-                pass
-
-            flyer, created = models.WasteFlyer.objects.get_or_create(
-                type='waste_flyer',
-                url=form.cleaned_data['flyer_url'],
-                defaults={
-                    'owner': self.request.user,
-                    'title': f'Waste flyer {form.cleaned_data["catchment"]}',
-                    'abbreviation': f'WasteFlyer{region_id}',
-                }
-            )
-            form.instance.flyer = flyer
-        return super().form_valid(form)
 
 
 class CollectorOptions(CollectorListView):
