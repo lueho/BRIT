@@ -30,6 +30,21 @@
                 </div>
             {% endif %}
 
+            {% if 'soilcom.add_collection' in perms %}
+                <div class="row">
+                    <div class="col">
+                        <div class="text-center">
+                            <a id="btn-collection-copy"
+                               class="btn btn-primary w-75"
+                               data-hreftemplate="/waste_collection/collections/__pk__/copy/"
+                               href="javascript:void(0)">
+                                Copy selected collection
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
             {% if 'soilcom.change_collection' in perms %}
                 <div class="row mt-3">
                     <div class="col">
@@ -93,8 +108,12 @@
             filter_params.load_features = true;
             let params = {'next': '/waste_collection/collections/map/?' + $.param(filter_params)};
             let update_button = document.getElementById('btn-collection-update')
-            let url = update_button.dataset['hreftemplate'].replace('__pk__', feature_id.toString()) + '?' + $.param(params);
-            update_button.setAttribute('href', url)
+            let update_url = update_button.dataset['hreftemplate'].replace('__pk__', feature_id.toString()) + '?' + $.param(params);
+            update_button.setAttribute('href', update_url)
+
+            let copy_button = document.getElementById('btn-collection-copy')
+            let copy_url = copy_button.dataset['hreftemplate'].replace('__pk__', feature_id.toString()) + '?' + $.param(params);
+            copy_button.setAttribute('href', copy_url)
         }
 
     </script>
