@@ -76,6 +76,7 @@ urlpatterns = [
     path('collections/<int:pk>/update/', views.CollectionUpdateView.as_view(), name='collection-update'),
     path('collections/<int:pk>/update/modal/', views.CollectionModalUpdateView.as_view(),
          name='collection-update-modal'),
+    path('collections/<int:pk>/copy/', views.CollectionCopyView.as_view(), name='collection-copy'),
     path('collections/<int:pk>/delete/modal/', views.CollectionModalDeleteView.as_view(),
          name='collection-delete-modal'),
     path('collections/data/', views.WasteCollectionAPIView.as_view(), name='data.collections'),

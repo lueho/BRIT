@@ -400,39 +400,21 @@ class CollectionCreateView(views.OwnedObjectCreateView):
         data = form.cleaned_data
         name = f'{data["catchment"]} {data["waste_category"]} {data["collection_system"]}'
 
-        waste_stream = models.WasteStream.objects.create(
-            name=name,
-            owner=self.request.user,
-            category=data["waste_category"]
-        )
-        waste_stream.allowed_materials.add(*set(material.id for material in data['allowed_materials']))
-        waste_stream.save()
+class CollectionCopyView(CollectionCreateView):
+    model = models.Collection
 
-        if form.cleaned_data['flyer_url']:
-            region_id = None
-            try:
-                region_id = form.cleaned_data["catchment"].region.nutsregion.nuts_id
-            except Region.nutsregion.RelatedObjectDoesNotExist:
-                pass
-            try:
-                region_id = form.cleaned_data["catchment"].region.lauregion.lau_id
-            except Region.lauregion.RelatedObjectDoesNotExist:
-                pass
-            flyer, created = models.WasteFlyer.objects.get_or_create(
-                type='waste_flyer',
-                url=form.cleaned_data['flyer_url'],
-                defaults={
-                    'owner': self.request.user,
-                    'title': f'Waste flyer {form.cleaned_data["catchment"]}',
-                    'abbreviation': f'WasteFlyer{region_id}',
-                }
-            )
-            form.instance.flyer = flyer
-
-        form.instance.name = name
-        form.instance.waste_stream = waste_stream
-
-        return super().form_valid(form)
+    def get_initial(self):
+        collection = self.get_object()
+        initial = {
+            'catchment': collection.catchment,
+            'collector': collection.collector,
+            'collection_system': collection.collection_system,
+            'waste_category': collection.waste_stream.category,
+            'allowed_materials': collection.waste_stream.allowed_materials.all(),
+            'flyer_url': collection.flyer.url,
+            'description': collection.description
+        }
+        return initial
 
 
 class CollectionModalCreateView(views.OwnedObjectModalCreateView):
