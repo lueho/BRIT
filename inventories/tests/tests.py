@@ -64,7 +64,6 @@ class InventoryAlgorithmTestCase(TestCase):
         self.feedstock = Material.objects.create(
             name='Feedstock',
             owner=self.user,
-            is_feedstock=True
         )
         self.gds = GeoDataset.objects.create(
             name='Hamburg Roadside Trees',
@@ -110,7 +109,6 @@ class ScenarioInventoryConfigurationTestCase(TestCase):
         self.material = Material.objects.create(
             name='First test material',
             owner=self.user,
-            is_feedstock=True
         )
         self.scenario = Scenario.objects.create(
             name='Test scenario',
@@ -166,7 +164,6 @@ class ScenarioTestCase(TestCase):
         self.material = Material.objects.create(
             name='First test material',
             owner=self.user,
-            is_feedstock=True
         )
         self.gds = GeoDataset.objects.create(
             name='Hamburg Roadside Trees',
@@ -547,7 +544,6 @@ class ScenarioResultTestCaseDB(DjangoTestCase):
         self.material = Material.objects.create(
             name='First test material',
             owner=self.user,
-            is_feedstock=True
         )
         self.gds = GeoDataset.objects.create(
             name='Hamburg Roadside Trees',

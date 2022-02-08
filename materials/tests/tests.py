@@ -88,7 +88,6 @@ class MaterialSetupTestCase(DjangoTestCase):
         self.material = Material.objects.create(
             name='Test material',
             owner=ReferenceUsers.objects.get.standard_owner,
-            is_feedstock=True
         )
 
     def test_true(self):
@@ -144,7 +143,6 @@ class MaterialTestCase(DjangoTestCase):
             self.material1 = Material.objects.create(
                 name='First test material',
                 owner=self.superuser,
-                is_feedstock=True
             )
             self.msettings1 = MaterialSettings.objects.create(
                 owner=self.superuser,
@@ -175,7 +173,6 @@ class MaterialTestCase(DjangoTestCase):
         material = Material.objects.create(
             name='Second test material',
             owner=self.user,
-            is_feedstock=True
         )
         self.assertEqual(MaterialSettings.objects.all().count(), 2)
         self.assertEqual(MaterialComponentGroupSettings.objects.all().count(), 1)
@@ -219,7 +216,6 @@ class MaterialTestCase(DjangoTestCase):
         material = Material.objects.create(
             name='Second test material',
             owner=self.user,
-            is_feedstock=True
         )
         settings = material.standard_settings
         main_group_settings = settings.add_component_group(self.main_group)
@@ -383,7 +379,6 @@ class MaterialTestCase(DjangoTestCase):
         material = Material.objects.create(
             name='Second test material',
             owner=self.user,
-            is_feedstock=True
         )
         standard_settings = material.standard_settings
         self.assertEqual(standard_settings.materialcomponentgroupsettings_set.all().count(), 1)
