@@ -8,6 +8,8 @@ from brit.models import NamedUserObjectModel
 TYPES = (
     ('administrative', 'administrative'),
     ('custom', 'custom'),
+    ('nuts', 'nuts'),
+    ('lau', 'lau'),
 )
 
 GIS_SOURCE_MODELS = (
@@ -44,7 +46,7 @@ class Region(NamedUserObjectModel):
             return None
 
     @staticmethod
-    def get_absolute_url():
+    def get_absolute_url(**kwargs):
         return reverse('catchment_list')
 
     def __str__(self):
@@ -110,21 +112,14 @@ class Catchment(NamedUserObjectModel):
         return self.region.geom
 
     @property
-    def nutsregion_pk(self):
-        try:
-            return self.region.nutsregion.pk
-        except Region.nutsregion.RelatedObjectDoesNotExist:
-            return None
-
-    @property
-    def nuts_lvl(self):
-        try:
+    def level(self):
+        if hasattr(self.region, 'nutsregion'):
             return self.region.nutsregion.levl_code
-        except Region.nutsregion.RelatedObjectDoesNotExist:
-            return None
+        if hasattr(self.region, 'lauregion'):
+            return 4
 
     @staticmethod
-    def get_absolute_url():
+    def get_absolute_url(**kwargs):
         return reverse('catchment_list')
 
     def __str__(self):

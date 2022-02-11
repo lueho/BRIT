@@ -1,12 +1,14 @@
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-
+from django.db.models import Q
 from django.http import JsonResponse
 from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView, DeleteView, DetailView, ListView, UpdateView, TemplateView
 from django.views.generic.edit import FormMixin
-from rest_framework.views import APIView
-from django.db.models import Q
+from rest_framework.exceptions import ParseError, NotFound
+from rest_framework.views import APIView, Response
 
+from maps.serializers import RegionSerializer, CatchmentSerializer, NutsRegionGeometrySerializer, \
+    NutsRegionOptionSerializer, LauRegionOptionSerializer
 from .forms import (
     CatchmentModelForm,
     CatchmentQueryForm,
@@ -17,10 +19,9 @@ from .models import (
     Catchment,
     GeoDataset,
     Region,
-    NutsRegion
+    NutsRegion,
+    LauRegion
 )
-from maps.serializers import RegionSerializer, CatchmentSerializer, NutsRegionGeometrySerializer, \
-    NutsRegionOptionSerializer
 
 
 class MapsListView(ListView):
@@ -218,19 +219,41 @@ class CatchmentOptionGeometryAPI(APIView):
 
         if 'parent_id' in request.query_params:
             parent_id = request.query_params['parent_id']
-            parent_region = NutsRegion.objects.get(id=parent_id).region_ptr
+            parent_catchment = Catchment.objects.get(id=parent_id)
+            parent_region = parent_catchment.region
             qs = parent_region.child_catchments.all()
             serializer = CatchmentSerializer(qs, many=True)
             return JsonResponse({'geoJson': serializer.data})
 
 
 class RegionGeometryAPI(APIView):
+    """
+    Takes the id of a region and returns its geometry as GeoJSON.
+    """
 
     @staticmethod
     def get(request, *args, **kwargs):
         if 'region_id' in request.query_params:
             region_id = request.query_params.get('region_id')
             regions = Region.objects.filter(id=region_id)
+            serializer = RegionSerializer(regions, many=True)
+            return JsonResponse({'geoJson': serializer.data})
+
+        return JsonResponse({})
+
+
+class CatchmentRegionGeometryAPI(APIView):
+    """
+    Similar to RegionGeometryAPI. Instead of taking the id of the requested region, this takes a catchment id as input
+    and returns the geometry of the associated Region.
+    """
+
+    @staticmethod
+    def get(request, *args, **kwargs):
+        if 'region_id' in request.query_params:
+            region_id = request.query_params.get('region_id')
+            catchment = Catchment.objects.get(id=region_id)
+            regions = Region.objects.filter(catchment=catchment)
             serializer = RegionSerializer(regions, many=True)
             return JsonResponse({'geoJson': serializer.data})
 
@@ -295,21 +318,37 @@ class NutsRegionPedigreeAPI(APIView):
     @staticmethod
     def get(request):
 
+        if 'id' not in request.query_params:
+            raise ParseError('Query parameter "id" missing. Must provide valid id of NUTS region.')
+
+        if 'direction' not in request.query_params or request.query_params['direction'] not in ('children', 'parents'):
+            raise ParseError('Missing or wrong query parameter "direction". Options: "parents", "children"')
+
+        try:
+            catchment = Catchment.objects.get(id=request.query_params['id'])
+            instance = catchment.region.nutsregion
+        except AttributeError:
+            raise NotFound('A NUTS region with the provided id does not exist.')
+        except NutsRegion.DoesNotExist:
+            raise NotFound('A NUTS region with the provided id does not exist.')
+
         data = {}
 
-        if request.query_params['id']:
-            instance = NutsRegion.objects.get(id=request.query_params['id'])
+        if request.query_params['direction'] == 'children':
+            for lvl in range(instance.levl_code + 1, 4):
+                qs = NutsRegion.objects.filter(levl_code=lvl, nuts_id__startswith=instance.nuts_id)
+                serializer = NutsRegionOptionSerializer(qs, many=True)
+                data[f'id_level_{lvl}'] = serializer.data
+            data['id_level_4'] = []
+            if instance.levl_code == 3:
+                qs = LauRegion.objects.filter(nuts_parent=instance)
+                serializer = LauRegionOptionSerializer(qs, many=True)
+                data[f'id_level_4'] = serializer.data
 
-            if request.query_params['direction'] == 'children':
-                for lvl in range(instance.levl_code + 1, 4):
-                    qs = NutsRegion.objects.filter(levl_code=lvl, nuts_id__startswith=instance.nuts_id)
-                    serializer = NutsRegionOptionSerializer(qs, many=True)
-                    data[f'id_level_{lvl}'] = serializer.data
+        if request.query_params['direction'] == 'parents':
+            for lvl in range(instance.levl_code - 1, -1, -1):
+                instance = instance.parent
+                serializer = NutsRegionOptionSerializer(instance)
+                data[f'id_level_{lvl}'] = serializer.data
 
-            if request.query_params['direction'] == 'parents':
-                for lvl in range(instance.levl_code - 1, -1, -1):
-                    instance = instance.parent
-                    serializer = NutsRegionOptionSerializer(instance)
-                    data[f'id_level_{lvl}'] = serializer.data
-
-        return JsonResponse(data)
+        return Response(data)

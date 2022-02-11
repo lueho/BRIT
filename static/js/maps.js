@@ -7,11 +7,15 @@ window.addEventListener("map:init", function (event) {
     map = event.detail.map;
 });
 
-document.querySelector("#summary-container").addEventListener('click', function (e) {
-    if (e.target.matches('.collapse-selector')) {
-        updateUrls(e.target.dataset['pk']);
-    }
-});
+try {
+    document.querySelector("#summary-container").addEventListener('click', function (e) {
+        if (e.target.matches('.collapse-selector')) {
+            updateUrls(e.target.dataset['pk']);
+        }
+    });
+} catch (e) {
+}
+
 
 async function fetchFeatureInfos(feature, mapConfig) {
     let dataurl = mapConfig['feature_popup_url'] + '?' + 'collection_id=' + feature['properties']['id'];
@@ -98,7 +102,7 @@ async function clickedFilterButton() {
     btn.disabled = false
 }
 
-async function clickedFeature(event){
+async function clickedFeature(event) {
     let feature_infos = await fetchFeatureInfos(event.layer.feature, mapConfig)
     await renderSummaryAlternative(feature_infos);
     updateUrls(event.layer.feature['properties']['id']);

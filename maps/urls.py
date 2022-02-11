@@ -7,11 +7,14 @@ from .views import (
     CatchmentOptionGeometryAPI,
     CatchmentUpdateView,
     CatchmentDeleteView,
+    CatchmentRegionGeometryAPI,
     MapsListView,
     RegionGeometryAPI,
     NutsMapView,
     NutsRegionAPIView,
-    NutsRegionPedigreeAPI
+    NutsRegionPedigreeAPI,
+    LauRegionOptionsAPI,
+    NutsAndLauCatchmentPedigreeAPI
 )
 
 urlpatterns = [
@@ -26,8 +29,12 @@ urlpatterns = [
     path('nuts/map/', NutsMapView.as_view(), name='NutsRegion'),
     path('nuts/data/', NutsRegionAPIView.as_view(), name='data.nuts_regions'),
     path('nuts_options/data/', NutsRegionPedigreeAPI.as_view(), name='data.nuts_region_options'),
-    path('ajax/region_geometries/', RegionGeometryAPI.as_view(), name='ajax_region_geometries'),
-    path('ajax/catchment_geometries/', CatchmentGeometryAPI.as_view(), name='ajax_catchment_geometries'),
+    path('lau_options/data/', LauRegionOptionsAPI.as_view(), name='data.lau_region_options'),
+    path('nuts_lau_catchment_options/data/', NutsAndLauCatchmentPedigreeAPI.as_view(),
+         name='data.nuts_lau_catchment_options'),
+    path('region_geometries/', RegionGeometryAPI.as_view(), name='ajax_region_geometries'),
+    path('catchment_region_geometries/', CatchmentRegionGeometryAPI.as_view(), name='data.catchment_region_geometries'),
+    path('catchment_geometries/', CatchmentGeometryAPI.as_view(), name='ajax_catchment_geometries'),
     # TODO: Can case study urls be detected and added automatically?
     path('nantes/', include('case_studies.flexibi_nantes.urls')),
     path('hamburg/', include('case_studies.flexibi_hamburg.urls')),

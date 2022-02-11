@@ -1,8 +1,8 @@
 from collections import OrderedDict
+
 from django.contrib.auth.models import Permission, User
 from django.test import RequestFactory, TestCase, modify_settings
 from django.urls import reverse
-from rest_framework.parsers import JSONParser
 
 from maps.models import Catchment
 from materials.models import MaterialGroup
@@ -89,7 +89,7 @@ class CollectionCreateViewTestCase(TestCase):
         self.assertFormError(response, 'form', 'collection_system', 'This field is required.')
         self.assertFormError(response, 'form', 'waste_category', 'This field is required.')
         self.assertFormError(response, 'form', 'allowed_materials', 'This field is required.')
-        self.assertFormError(response, 'form', 'flyer_url', 'This field is required.')
+        # self.assertFormError(response, 'form', 'flyer_url', 'This field is required.')
 
     def test_post_with_valid_form_data(self):
         self.client.force_login(self.member)
@@ -274,7 +274,7 @@ class CollectionUpdateViewTestCase(TestCase):
         self.assertFormError(response, 'form', 'collection_system', 'This field is required.')
         self.assertFormError(response, 'form', 'waste_category', 'This field is required.')
         self.assertFormError(response, 'form', 'allowed_materials', 'This field is required.')
-        self.assertFormError(response, 'form', 'flyer_url', 'This field is required.')
+        # self.assertFormError(response, 'form', 'flyer_url', 'This field is required.')
 
     def test_post_with_valid_form_data(self):
         self.client.force_login(self.member)

@@ -71,6 +71,26 @@ class NutsRegionQueryForm(Form):
         return helper
 
 
+class NutsAndLauCatchmentQueryForm(Form):
+    level_0 = ModelChoiceField(queryset=Catchment.objects.filter(region__nutsregion__levl_code=0))
+    level_1 = ModelChoiceField(queryset=Catchment.objects.filter(region__nutsregion__levl_code=1), required=False)
+    level_2 = ModelChoiceField(queryset=Catchment.objects.filter(region__nutsregion__levl_code=2), required=False)
+    level_3 = ModelChoiceField(queryset=Catchment.objects.filter(region__nutsregion__levl_code=3), required=False)
+    level_4 = ModelChoiceField(queryset=Catchment.objects.none(), required=False)
+
+    @property
+    def helper(self):
+        helper = FormHelper()
+        helper.layout = Layout(
+            Field('level_0', data_optionsapi=f'{reverse("data.nuts_lau_catchment_options")}', data_lvl=0),
+            Field('level_1', data_optionsapi=f'{reverse("data.nuts_lau_catchment_options")}', data_lvl=1),
+            Field('level_2', data_optionsapi=f'{reverse("data.nuts_lau_catchment_options")}', data_lvl=2),
+            Field('level_3', data_optionsapi=f'{reverse("data.nuts_lau_catchment_options")}', data_lvl=3),
+            Field('level_4', data_lvl=4)
+        )
+        return helper
+
+
 class NutsMapFilterForm(Form):
     levl_code = IntegerField(label='Level', min_value=0, max_value=3)
     cntr_code = MultipleChoiceField(label='Country', choices=(('DE', 'DE'), ('FR', 'FR'),))

@@ -45,13 +45,12 @@ class GeoreferencedCatchment(GeoPolygon, Catchment):
 
 
 class CatchmentSerializer(GeoFeatureModelSerializer):
-    nutsregion_pk = IntegerField()
-    nuts_lvl = IntegerField()
+    level = IntegerField()
 
     class Meta:
         model = GeoreferencedCatchment
         geo_field = 'geom'
-        fields = ['name', 'type', 'description', 'nutsregion_pk', 'nuts_lvl']
+        fields = ['id', 'name', 'type', 'description', 'level']
 
 
 class CatchmentQuerySerializer(ModelSerializer):
@@ -72,7 +71,11 @@ class NutsRegionGeometrySerializer(GeoFeatureModelSerializer):
 
 
 class NutsRegionOptionSerializer(ModelSerializer):
+    id = SerializerMethodField()
     name = SerializerMethodField()
+
+    def get_id(self, obj):
+        return obj.region_ptr.catchment_set.first().id
 
     def get_name(self, obj):
         return obj.__str__()

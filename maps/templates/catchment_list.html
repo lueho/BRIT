@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load crispy_forms_tags %}
 {% load crispy_forms_filters %}
 {% load leaflet_tags %}
 
@@ -182,15 +183,9 @@
             updateUrls(catchment_id);
         }
 
-        async function updateSelectOptions(element, params) {
-            let dataurl = element.dataset['optionsapi'] + '?' + $.param(params);
-            let response = await fetch(dataurl);
-            let data = await response.json();
-        }
-
         async function selectFeature(feature) {
             let sel = document.getElementById('id_level_' + feature['properties']['nuts_lvl']);
-            sel.value = feature['properties']['nutsregion_pk'];
+            sel.value = feature['properties']['id'];
             await fetchSelectOptions(sel.dataset['optionsapi'], {id: sel.value});
             await updateLayers(sel.value)
         }

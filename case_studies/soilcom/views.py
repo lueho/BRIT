@@ -16,7 +16,7 @@ from bibliography.views import (SourceListView,
                                 SourceModalUpdateView,
                                 SourceModalDeleteView)
 from brit import views
-from maps.forms import NutsRegionQueryForm
+from maps.forms import NutsAndLauCatchmentQueryForm
 from maps.models import Catchment, GeoDataset, NutsRegion
 from maps.views import GeoDatasetDetailView
 from . import forms
@@ -392,7 +392,7 @@ class CollectionCreateView(views.OwnedObjectCreateView):
         initial = super().get_initial()
         if 'region_id' in self.request.GET:
             region_id = self.request.GET.get('region_id')
-            catchment = NutsRegion.objects.get(id=region_id).region_ptr.catchment_set.first()
+            catchment = Catchment.objects.get(id=region_id)
             initial['catchment'] = catchment
         return initial
 
@@ -492,9 +492,9 @@ class CollectionModalDeleteView(views.OwnedObjectDeleteView):
 
 class CatchmentSelectView(FormMixin, TemplateView):
     model = Catchment
-    form_class = NutsRegionQueryForm
+    form_class = NutsAndLauCatchmentQueryForm
     template_name = 'waste_collection_catchment_list.html'
-    region_url = reverse_lazy('ajax_region_geometries')
+    region_url = reverse_lazy('data.catchment_region_geometries')
     feature_url = reverse_lazy('data.catchment-options')
     filter_class = None
     load_features = False
