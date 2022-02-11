@@ -84,6 +84,8 @@ class NutsRegion(Region):
         # add children
         for lvl in range(self.levl_code + 1, 4):
             pedigree[f'qs_{lvl}'] = NutsRegion.objects.filter(levl_code=lvl, nuts_id__startswith=self.nuts_id)
+        if self.levl_code == 3:
+            pedigree[f'qs_4'] = self.lau_children.all()
 
         return pedigree
 

@@ -1,3 +1,5 @@
+from crispy_forms.helper import FormHelper
+from crispy_forms.layout import Field, Layout
 from django.forms import (Form,
                           ModelChoiceField,
                           ModelForm,
@@ -5,13 +7,10 @@ from django.forms import (Form,
                           ChoiceField,
                           IntegerField,
                           )
-from django.urls import reverse
 from django.forms.widgets import CheckboxSelectMultiple, RadioSelect
-from leaflet.forms.widgets import LeafletWidget
-from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Field, Layout, Submit
+from django.urls import reverse
 
-from .models import Region, Catchment, NutsRegion
+from .models import Region, Catchment, NutsRegion, LauRegion
 
 
 # ----------- Catchments -----------------------------------------------------------------------------------------------
@@ -58,6 +57,7 @@ class NutsRegionQueryForm(Form):
     level_1 = ModelChoiceField(queryset=NutsRegion.objects.filter(levl_code=1).order_by('nuts_id'), required=False)
     level_2 = ModelChoiceField(queryset=NutsRegion.objects.filter(levl_code=2).order_by('nuts_id'), required=False)
     level_3 = ModelChoiceField(queryset=NutsRegion.objects.filter(levl_code=3).order_by('nuts_id'), required=False)
+    level_4 = ModelChoiceField(queryset=LauRegion.objects.none(), required=False)
 
     @property
     def helper(self):
@@ -66,7 +66,8 @@ class NutsRegionQueryForm(Form):
             Field('level_0', data_optionsapi=f'{reverse("data.nuts_region_options")}', data_lvl=0),
             Field('level_1', data_optionsapi=f'{reverse("data.nuts_region_options")}', data_lvl=1),
             Field('level_2', data_optionsapi=f'{reverse("data.nuts_region_options")}', data_lvl=2),
-            Field('level_3', data_optionsapi=f'{reverse("data.nuts_region_options")}', data_lvl=3)
+            Field('level_3', data_optionsapi=f'{reverse("data.nuts_region_options")}', data_lvl=3),
+            Field('level_4', data_lvl=4)
         )
         return helper
 

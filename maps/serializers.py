@@ -1,11 +1,7 @@
-from rest_framework.serializers import ModelSerializer, Serializer, CharField, SerializerMethodField, Field, IntegerField
+from rest_framework.serializers import ModelSerializer, SerializerMethodField, IntegerField
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
-import rest_framework_gis as rf
 
-from .models import Catchment, Region, NutsRegion, GeoPolygon
-from django.db import models
-from brit.models import NamedUserObjectModel
-from django.contrib.gis.db.models import MultiPolygonField, PointField
+from .models import Catchment, Region, LauRegion, NutsRegion, GeoPolygon
 
 
 class PolygonSerializer(GeoFeatureModelSerializer):
@@ -84,3 +80,17 @@ class NutsRegionOptionSerializer(ModelSerializer):
         model = NutsRegion
         fields = ['id', 'name']
 
+
+class LauRegionOptionSerializer(ModelSerializer):
+    id = SerializerMethodField()
+    name = SerializerMethodField()
+
+    def get_id(self, obj):
+        return obj.region_ptr.catchment_set.first().id
+
+    def get_name(self, obj):
+        return obj.__str__()
+
+    class Meta:
+        model = LauRegion
+        fields = ['id', 'name']

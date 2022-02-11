@@ -352,3 +352,64 @@ class NutsRegionPedigreeAPI(APIView):
                 data[f'id_level_{lvl}'] = serializer.data
 
         return Response(data)
+
+
+class LauRegionOptionsAPI(APIView):
+    """
+    This API is used to reduce options in select widgets of filters. It returns only the ID and name of the
+    region and not the geometry.
+    """
+
+    @staticmethod
+    def get(request):
+        data = {}
+        qs = LauRegion.objects.all()
+        serializer = LauRegionOptionSerializer(qs, many=True)
+        data['id_lau'] = serializer.data
+
+        return JsonResponse(data)
+
+
+class NutsAndLauCatchmentPedigreeAPI(APIView):
+    """
+    This API is used to reduce options in select widgets of filters. It returns only the ID and name of the
+    region and not the geometry.
+    """
+
+    @staticmethod
+    def get(request):
+
+        if 'id' not in request.query_params:
+            raise ParseError('Query parameter "id" missing. Must provide valid catchment id.')
+
+        if 'direction' not in request.query_params or request.query_params['direction'] not in ('children', 'parents'):
+            raise ParseError('Missing or wrong query parameter "direction". Options: "parents", "children"')
+
+        try:
+            catchment = Catchment.objects.get(id=request.query_params['id'])
+            instance = catchment.region.nutsregion
+        except AttributeError:
+            raise NotFound('A NUTS region with the provided id does not exist.')
+        except Catchment.DoesNotExist:
+            raise NotFound('A NUTS region with the provided id does not exist.')
+
+        data = {}
+
+        if request.query_params['direction'] == 'children':
+            for lvl in range(instance.levl_code + 1, 4):
+                qs = NutsRegion.objects.filter(levl_code=lvl, nuts_id__startswith=instance.nuts_id)
+                serializer = NutsRegionOptionSerializer(qs, many=True)
+                data[f'id_level_{lvl}'] = serializer.data
+            data['id_level_4'] = []
+            if instance.levl_code == 3:
+                qs = LauRegion.objects.filter(nuts_parent=instance)
+                serializer = LauRegionOptionSerializer(qs, many=True)
+                data[f'id_level_4'] = serializer.data
+
+        if request.query_params['direction'] == 'parents':
+            for lvl in range(instance.levl_code - 1, -1, -1):
+                instance = instance.parent
+                serializer = NutsRegionOptionSerializer(instance)
+                data[f'id_level_{lvl}'] = serializer.data
+
+        return Response(data)
