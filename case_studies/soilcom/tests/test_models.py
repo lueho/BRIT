@@ -2,7 +2,7 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 
-from case_studies.soilcom.models import WasteStream, WasteCategory
+from case_studies.soilcom.models import WasteStream, WasteCategory, WasteFlyer
 from materials.models import Material
 
 
@@ -187,3 +187,27 @@ class WasteStreamQuerysetTestCase(TestCase):
                 defaults={'allowed_materials': allowed_materials},
                 id=self.waste_stream.id
             )
+
+
+class WasteFlyerTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = User.objects.create(username='owner', password='very-secure!')
+
+        WasteFlyer.objects.create(
+            owner=owner,
+            abbreviation='WasteFlyer007',
+            url='https://www.super-test-flyer.org'
+        )
+
+    def setUp(self):
+        pass
+
+    def test_new_instance_is_saved_with_type_waste_flyer(self):
+        flyer = WasteFlyer.objects.create(owner=User.objects.first(), abbreviation='WasteFlyer002')
+        self.assertEqual(flyer.type, 'waste_flyer')
+
+    def test_str_returns_url(self):
+        flyer = WasteFlyer.objects.get(abbreviation='WasteFlyer007')
+        self.assertEqual(flyer.__str__(), 'https://www.super-test-flyer.org')
