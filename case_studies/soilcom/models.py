@@ -1,6 +1,6 @@
 from django.core.exceptions import ValidationError
 from django.db import models
-from django.db.models.signals import post_save
+from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
 
 from bibliography.models import Source
@@ -162,6 +162,14 @@ class WasteFlyer(Source):
     class Meta:
         proxy = True
         verbose_name = 'Waste Flyer'
+
+    def __str__(self):
+        return self.url
+
+
+@receiver(pre_save, sender=WasteFlyer)
+def set_source_type(sender, instance, **kwargs):
+    instance.type = 'waste_flyer'
 
 
 class Collection(NamedUserObjectModel):
