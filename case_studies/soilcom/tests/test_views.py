@@ -40,15 +40,16 @@ class CollectionCreateViewTestCase(TestCase):
             abbreviation='WasteFlyer123',
             url='https://www.test-flyer.org'
         )
-        Collection.objects.create(
+        collection1 = Collection.objects.create(
             owner=owner,
+            name='collection1',
             catchment=Catchment.objects.create(owner=owner, name='Test catchment'),
             collector=Collector.objects.create(owner=owner, name='Test collector'),
             collection_system=CollectionSystem.objects.create(owner=owner, name='Test system'),
             waste_stream=waste_stream,
-            flyer=waste_flyer,
             description='This is a test case.'
         )
+        collection1.flyers.add(waste_flyer)
 
     def setUp(self):
         self.collection = Collection.objects.first()
@@ -172,7 +173,6 @@ class CollectionCopyViewTestCase(TestCase):
             collector=Collector.objects.create(owner=owner, name='Test collector'),
             collection_system=CollectionSystem.objects.create(owner=owner, name='Test system'),
             waste_stream=waste_stream,
-            flyer=waste_flyer,
             description='This is a test case.'
         )
         collection.flyers.add(waste_flyer)
@@ -309,15 +309,16 @@ class CollectionUpdateViewTestCase(TestCase):
             abbreviation='WasteFlyer123',
             url='https://www.test-flyer.org'
         )
-        Collection.objects.create(
+        collection1 = Collection.objects.create(
             owner=owner,
+            name='collection1',
             catchment=Catchment.objects.create(owner=owner, name='Test catchment'),
             collector=Collector.objects.create(owner=owner, name='Test collector'),
             collection_system=CollectionSystem.objects.create(owner=owner, name='Test system'),
             waste_stream=waste_stream,
-            flyer=waste_flyer,
             description='This is a test case.'
         )
+        collection1.flyers.add(waste_flyer)
 
     def setUp(self):
         self.outsider = User.objects.get(username='outsider')
@@ -413,15 +414,16 @@ class CollectionSummaryAPIViewTestCase(TestCase):
             abbreviation='WasteFlyer123',
             url='https://www.test-flyer.org'
         )
-        Collection.objects.create(
+        collection1 = Collection.objects.create(
             owner=owner,
+            name='collection1',
             catchment=Catchment.objects.create(owner=owner, name='Test catchment'),
             collector=Collector.objects.create(owner=owner, name='Test collector'),
             collection_system=CollectionSystem.objects.create(owner=owner, name='Test system'),
             waste_stream=waste_stream,
-            flyer=waste_flyer,
             description='This is a test case.'
         )
+        collection1.flyers.add(waste_flyer)
 
     def setUp(self):
         self.outsider = User.objects.get(username='outsider')

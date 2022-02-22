@@ -212,12 +212,6 @@ class CollectionModelForm(forms.ModelForm):
             return super().save(commit=False)
 
 
-class CollectionModalModelForm(CustomModalModelForm):
-    class Meta:
-        model = models.Collection
-        fields = ('name', 'collector', 'catchment', 'collection_system', 'waste_stream', 'flyer', 'description')
-
-
 COUNTRY_SET = set(sorted(set((c.catchment.region.country_code, c.catchment.region.country_code) for c in
                              models.Collection.objects.all())))
 

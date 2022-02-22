@@ -479,13 +479,6 @@ class CollectionCopyView(CollectionCreateView):
         return initial
 
 
-class CollectionModalCreateView(views.OwnedObjectModalCreateView):
-    template_name = 'modal_form.html'
-    form_class = forms.CollectionModalModelForm
-    success_url = reverse_lazy('collection-list')
-    permission_required = 'soilcom.add_collection'
-
-
 class CollectionDetailView(views.OwnedObjectDetailView):
     template_name = 'collection_detail.html'
     model = models.Collection
@@ -557,13 +550,6 @@ class CollectorOptions(CollectorListView):
                 request=self.request
             )
         })
-
-
-class CollectionModalUpdateView(views.OwnedObjectModalUpdateView):
-    template_name = 'modal_form.html'
-    model = models.Collection
-    form_class = forms.CollectionModalModelForm
-    permission_required = 'soilcom.change_collection'
 
 
 class CollectionModalDeleteView(views.OwnedObjectDeleteView):

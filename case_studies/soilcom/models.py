@@ -180,7 +180,6 @@ class Collection(NamedUserObjectModel):
     catchment = models.ForeignKey(Catchment, on_delete=models.PROTECT, blank=True, null=True)
     collection_system = models.ForeignKey(CollectionSystem, on_delete=models.CASCADE, blank=True, null=True)
     waste_stream = models.ForeignKey(WasteStream, on_delete=models.SET_NULL, blank=True, null=True)
-    flyer = models.ForeignKey(WasteFlyer, on_delete=models.CASCADE, blank=True, null=True)
     flyers = models.ManyToManyField(WasteFlyer, related_name='collections')
 
     @property
