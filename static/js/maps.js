@@ -198,40 +198,45 @@ async function renderSummary(summary) {
 }
 
 
+function isEmptyArray(el) {
+    return Array.isArray(el) && el.length === 0
+}
+
 function renderSummaryContainer(summary, summary_container) {
 
     Object.keys(summary).forEach(key => {
 
         if (summary[key]) {
+            if (!isEmptyArray(summary[key])) {
+                let summary_item = document.createElement('div')
 
-            let summary_item = document.createElement('div')
+                let label = document.createElement('P');
+                let b = document.createElement('B');
+                b.innerText = key + ':';
+                label.appendChild(b);
+                summary_item.appendChild(label);
 
-            let label = document.createElement('P');
-            let b = document.createElement('B');
-            b.innerText = key + ':';
-            label.appendChild(b);
-            summary_item.appendChild(label);
+                let value = document.createElement('P');
+                if (Array.isArray(summary[key])) {
+                    let ul = document.createElement('ul');
+                    value.appendChild(ul);
+                    summary[key].forEach(function (item) {
+                        let li = document.createElement('li')
+                        li.innerText = item.toString()
+                        ul.appendChild(li)
+                    });
+                } else {
+                    value.innerText = summary[key].toString();
+                }
+                summary_item.appendChild(value)
+                if (key === 'id') {
+                    summary_item.className = 'd-none'
+                    summary_container.className += ' pk-holder'
+                    summary_container.setAttribute('data-pk', summary['id'])
+                }
 
-            let value = document.createElement('P');
-            if (Array.isArray(summary[key])) {
-                let ul = document.createElement('ul');
-                value.appendChild(ul);
-                summary[key].forEach(function (item) {
-                    let li = document.createElement('li')
-                    li.innerText = item.toString()
-                    ul.appendChild(li)
-                });
-            } else {
-                value.innerText = summary[key].toString();
+                summary_container.appendChild(summary_item);
             }
-            summary_item.appendChild(value)
-            if (key === 'id') {
-                summary_item.className = 'd-none'
-                summary_container.className += ' pk-holder'
-                summary_container.setAttribute('data-pk', summary['id'])
-            }
-
-            summary_container.appendChild(summary_item);
         }
     });
 }

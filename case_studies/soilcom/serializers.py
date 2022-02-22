@@ -101,10 +101,10 @@ class CollectionModelSerializer(FieldLabelMixin, serializers.ModelSerializer):
     collection_system = serializers.StringRelatedField()
     waste_category = serializers.CharField(source='waste_stream.category')
     allowed_materials = serializers.StringRelatedField(many=True, source='waste_stream.allowed_materials')
-    flyer = serializers.CharField(source='flyer.url')
+    sources = serializers.StringRelatedField(source='flyers', many=True)
     comments = serializers.CharField(source='description')
 
     class Meta:
         model = models.Collection
-        fields = ('id', 'catchment', 'collector', 'collection_system', 'waste_category', 'allowed_materials', 'flyer',
-                  'comments')
+        fields = ('id', 'catchment', 'collector', 'collection_system',
+                  'waste_category', 'allowed_materials', 'sources', 'comments')

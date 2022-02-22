@@ -1,13 +1,12 @@
-import datetime
-
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Field, Layout, Submit
 from django import forms
 from django.contrib.auth.models import User
+from django.forms import BaseModelFormSet
+from extra_views import InlineFormSetFactory
 
 from bibliography.models import Source
 from brit.forms import CustomModelForm, CustomModalModelForm
-from maps.models import Region
 from materials.models import Material, MaterialGroup
 from . import models
 
@@ -79,18 +78,67 @@ class WasteStreamModalModelForm(CustomModalModelForm):
 
 
 class WasteFlyerModelForm(CustomModelForm):
-    last_accessed = forms.DateField(initial=datetime.date.today)
-    url = forms.URLField(max_length=511, widget=forms.URLInput)
-
     class Meta:
-        model = Source
-        fields = ('publisher', 'title', 'year', 'abbreviation', 'url', 'last_accessed',)
+        model = models.WasteFlyer
+        fields = ('url',)
+        labels = {'url': 'Sources (Urls)'}
+
+    def save(self, commit=True):
+        if commit:
+            defaults = {
+                'owner': self.instance.owner,
+                'title': 'Waste flyer',
+                'abbreviation': 'WasteFlyer'
+            }
+            instance, _ = models.WasteFlyer.objects.get_or_create(url=self.cleaned_data['url'], defaults=defaults)
+            return instance
+        else:
+            return super().save(commit=False)
+
+
+class WasteFlyerModelFormSet(BaseModelFormSet):
+    parent_object = None
+
+    def __init__(self, **kwargs):
+        self.parent_object = kwargs.pop('parent_object', None)
+        super().__init__(**kwargs)
+
+    def clean(self):
+        if any(self.errors):
+            return
+        for form in self.forms:
+            if not form.cleaned_data.get('url') and form.cleaned_data.get('id'):
+                flyer = form.cleaned_data.get('id')
+                if self.parent_object:
+                    self.parent_object.flyers.remove(flyer)
+                if not flyer.collections.exists():
+                    form.cleaned_data.get('id').delete()
+                self.forms.remove(form)
 
 
 class WasteFlyerModalModelForm(CustomModelForm):
     class Meta:
         model = Source
         fields = ('publisher', 'title', 'year', 'abbreviation', 'url', 'last_accessed',)
+        labels = {'url': 'Sources'}
+
+
+class FormSetHelper(FormHelper):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.template = 'bootstrap4/table_inline_formset.html'
+        self.form_method = 'post'
+        self.add_input(Submit("submit", "Save"))
+
+
+class InlineWasteFlyerFormset(InlineFormSetFactory):
+    model = models.WasteFlyer
+    fields = ('url',)
+
+    factory_kwargs = {
+        'extra': 1,
+        'can_delete': True,
+    }
 
 
 class ForeignkeyField(Field):
@@ -98,22 +146,25 @@ class ForeignkeyField(Field):
 
 
 class CollectionModelForm(forms.ModelForm):
-    collection_system = forms.ModelChoiceField(queryset=models.CollectionSystem.objects.all(), required=True)
-    catchment = forms.ModelChoiceField(queryset=models.Catchment.objects.all().order_by('region__nutsregion__nuts_id'))
-    waste_category = forms.ModelChoiceField(queryset=models.WasteCategory.objects.all())
-    allowed_materials = forms.ModelMultipleChoiceField(queryset=models.WasteComponent.objects.all(),
-                                                       widget=forms.CheckboxSelectMultiple)
-    flyer_url = forms.URLField(required=False)
+    collection_system = forms.ModelChoiceField(
+        queryset=models.CollectionSystem.objects.all(),
+        required=True)
+    catchment = forms.ModelChoiceField(
+        queryset=models.Catchment.objects.all().order_by('region__nutsregion__nuts_id'),
+        required=True
+    )
+    waste_category = forms.ModelChoiceField(
+        queryset=models.WasteCategory.objects.all()
+    )
+    allowed_materials = forms.ModelMultipleChoiceField(
+        queryset=models.WasteComponent.objects.all(),
+        widget=forms.CheckboxSelectMultiple
+    )
 
     class Meta:
         model = models.Collection
-        fields = (
-            'catchment', 'collector', 'collection_system', 'waste_category', 'allowed_materials', 'flyer_url',
-            'description'
-        )
-        labels = {
-            'description': 'Comments'
-        }
+        fields = ('catchment', 'collector', 'collection_system', 'waste_category', 'allowed_materials', 'description')
+        labels = {'description': 'Comments'}
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -124,16 +175,15 @@ class CollectionModelForm(forms.ModelForm):
     @property
     def helper(self):
         helper = FormHelper()
+        helper.form_tag = False
         helper.layout = Layout(
             Field('catchment'),
             ForeignkeyField('collector'),
             Field('collection_system'),
             Field('waste_category'),
             Field('allowed_materials'),
-            Field('flyer_url'),
             Field('description')
         )
-        helper.add_input(Submit('submit', 'Save'))
         return helper
 
     def save(self, commit=True):
@@ -151,39 +201,15 @@ class CollectionModelForm(forms.ModelForm):
             category=data["waste_category"],
             allowed_materials=models.WasteComponent.objects.filter(id__in=data['allowed_materials'])
         )
-        waste_stream.allowed_materials.add(*data['allowed_materials'])
+        if created:
+            waste_stream.allowed_materials.add(*data['allowed_materials'])
         waste_stream.save()
         instance.waste_stream = waste_stream
 
-        # Associate with a new or existing waste collection source flyer
-        if data['flyer_url']:
-            region_id = None
-            try:
-                region_id = data["catchment"].region.nutsregion.nuts_id
-            except AttributeError:
-                pass
-            except Region.nutsregion.RelatedObjectDoesNotExist:
-                pass
-            try:
-                region_id = data["catchment"].region.lauregion.lau_id
-            except AttributeError:
-                pass
-            except Region.lauregion.RelatedObjectDoesNotExist:
-                pass
-            flyer, created = models.WasteFlyer.objects.get_or_create(
-                type='waste_flyer',
-                url=data['flyer_url'],
-                defaults={
-                    'owner': instance.owner,
-                    'title': f'Waste flyer {data["catchment"]}',
-                    'abbreviation': f'WasteFlyer{region_id}',
-                }
-            )
-            instance.flyer = flyer
-
         if commit:
-            instance.save()
-        return instance
+            return super().save()
+        else:
+            return super().save(commit=False)
 
 
 class CollectionModalModelForm(CustomModalModelForm):
@@ -224,4 +250,3 @@ class CollectionFilterForm(forms.Form):
         widget=forms.CheckboxSelectMultiple,
         required=False
     )
-    

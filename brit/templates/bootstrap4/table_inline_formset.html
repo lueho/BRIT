@@ -1,6 +1,7 @@
 {% load crispy_forms_tags %}
 {% load crispy_forms_utils %}
 {% load crispy_forms_field %}
+{% load crispy_forms_filters %}
 
 {% specialspaceless %}
     {% if formset_tag %}
@@ -15,7 +16,7 @@
     {{ formset.management_form|crispy }}
 </div>
 
-<table{% if form_id %} id="{{ form_id }}_table"{% endif %} class="table table-sm">
+<table{% if form_id %} id="{{ form_id }}_table"{% endif %} class="table table-sm table-borderless">
     <thead>
     {% if formset.readonly and not formset.queryset.exists %}
     {% else %}
@@ -33,20 +34,40 @@
     {% endif %}
     </thead>
 
-    <tbody>
+    <tbody id="formset-container">
+
+    <tr id="empty-form-row" class="d-none">
+        {% for field in formset.empty_form %}
+            {% include 'bootstrap4/field.html' with tag="td" form_show_labels=False %}
+        {% endfor %}
+    </tr>
+
 
     {% for form in formset %}
+
+
         {% if form_show_errors and not form.is_extra %}
             {% include "bootstrap4/errors.html" %}
         {% endif %}
 
-        <tr>
+        <tr class="formset-form-row">
             {% for field in form %}
                 {% include 'bootstrap4/field.html' with tag="td" form_show_labels=False %}
             {% endfor %}
         </tr>
     {% endfor %}
     </tbody>
+    <tfoot>
+    <tr>
+        <td>
+            <a href="javascript:void(0)"
+               id="add-more"
+               title="Add another form">
+                <i class="fas fa-fw fa-plus"></i>
+            </a>
+        </td>
+    </tr>
+    </tfoot>
 </table>
 
 {% include "bootstrap4/errors_formset.html" %}

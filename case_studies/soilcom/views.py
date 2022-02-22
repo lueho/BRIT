@@ -1,6 +1,7 @@
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db.models import Max, Q
-from django.http import JsonResponse
+from django.forms import modelformset_factory
+from django.http import HttpResponseRedirect, JsonResponse
 from django.template.loader import render_to_string
 from django.urls import reverse_lazy
 from django.views.generic import TemplateView
@@ -382,11 +383,47 @@ class CollectionListView(views.OwnedObjectListView):
     permission_required = 'soilcom.view_collection'
 
 
-class CollectionCreateView(views.OwnedObjectCreateView):
+class ModelFormAndModelFormSetMixin:
+    object = None
+    formset_model = None
+    formset_class = None
+    formset_form_class = None
+
+    def get_formset(self, **kwargs):
+        FormSet = modelformset_factory(
+            self.formset_model,
+            form=self.formset_form_class,
+            formset=self.formset_class
+        )
+        return FormSet(**self.get_formset_kwargs())
+
+    def get_formset_kwargs(self, **kwargs):
+        if self.request.method in ("POST", "PUT"):
+            kwargs.update({'data': self.request.POST.copy()})
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        if 'formset' not in kwargs:
+            kwargs['formset'] = self.get_formset()
+        kwargs['formset_helper'] = forms.FormSetHelper()
+        return super().get_context_data(**kwargs)
+
+
+class CollectionCreateView(ModelFormAndModelFormSetMixin, views.OwnedObjectCreateView):
     template_name = 'collection_form_card.html'
     form_class = forms.CollectionModelForm
+    formset_model = models.WasteFlyer
+    formset_class = forms.WasteFlyerModelFormSet
+    formset_form_class = forms.WasteFlyerModelForm
     success_url = reverse_lazy('WasteCollection')
     permission_required = 'soilcom.add_collection'
+
+    def get_formset_kwargs(self, **kwargs):
+        if 'queryset' not in kwargs:
+            kwargs.update({
+                'queryset': self.formset_model.objects.none()
+            })
+        return super().get_formset_kwargs(**kwargs)
 
     def get_initial(self):
         initial = super().get_initial()
@@ -396,21 +433,49 @@ class CollectionCreateView(views.OwnedObjectCreateView):
             initial['catchment'] = catchment
         return initial
 
+    def post(self, request, *args, **kwargs):
+        form = self.get_form()
+        formset = self.get_formset()
+
+        if form.is_valid() and formset.is_valid():
+            form.instance.owner = self.request.user
+            self.object = form.save()
+            for form in formset:
+                form.instance.owner = request.user
+            flyers = formset.save()
+            self.object.flyers.set(list(flyers))
+            return HttpResponseRedirect(self.get_success_url())
+        else:
+            context = self.get_context_data(form=form, formset=formset)
+            return self.render_to_response(context)
+
 
 class CollectionCopyView(CollectionCreateView):
     model = models.Collection
 
+    def get_formset_kwargs(self, **kwargs):
+        kwargs.update({
+            'parent_object': self.object,
+            'queryset': self.formset_model.objects.filter(collections=self.kwargs['pk'])
+        })
+        return super().get_formset_kwargs(**kwargs)
+
     def get_initial(self):
         collection = self.get_object()
-        initial = {
-            'catchment': collection.catchment,
-            'collector': collection.collector,
-            'collection_system': collection.collection_system,
-            'waste_category': collection.waste_stream.category,
-            'allowed_materials': collection.waste_stream.allowed_materials.all(),
-            'flyer_url': collection.flyer.url,
-            'description': collection.description
-        }
+        initial = {}
+        if collection.catchment:
+            initial['catchment'] = collection.catchment
+        if collection.collector:
+            initial['collector'] = collection.collector
+        if collection.collection_system:
+            initial['collection_system'] = collection.collection_system
+        if collection.waste_stream:
+            if collection.waste_stream.category:
+                initial['waste_category'] = collection.waste_stream.category
+            if collection.waste_stream.allowed_materials.exists():
+                initial['allowed_materials'] = collection.waste_stream.allowed_materials.all()
+        if collection.description:
+            initial['description'] = collection.description
         return initial
 
 
@@ -433,21 +498,43 @@ class CollectionModalDetailView(views.OwnedObjectModalDetailView):
     permission_required = 'soilcom.view_collection'
 
 
-class CollectionUpdateView(views.OwnedObjectUpdateView):
-    template_name = 'collection_form_card.html'
+class CollectionUpdateView(ModelFormAndModelFormSetMixin, views.OwnedObjectUpdateView):
     model = models.Collection
     form_class = forms.CollectionModelForm
+    formset_model = models.WasteFlyer
+    formset_class = forms.WasteFlyerModelFormSet
+    formset_form_class = forms.WasteFlyerModelForm
     permission_required = 'soilcom.change_collection'
-    success_url = reverse_lazy('WasteCollection')
+    template_name = 'collection_form_card.html'
+
+    def get_formset_kwargs(self, **kwargs):
+        kwargs.update({
+            'parent_object': self.object,
+            'queryset': self.formset_model.objects.filter(collections=self.kwargs['pk'])
+        })
+        return super().get_formset_kwargs(**kwargs)
 
     def get_initial(self):
-        initial = super().get_initial()
-        initial.update({
+        return {
             'waste_category': self.object.waste_stream.category,
             'allowed_materials': self.object.waste_stream.allowed_materials.all(),
-            'flyer_url': self.object.flyer.url if self.object.flyer else ''
-        })
-        return initial
+        }
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        form = self.get_form()
+        formset = self.get_formset()
+
+        if form.is_valid() and formset.is_valid():
+            collection = form.save()
+            for form in formset:
+                form.instance.owner = request.user
+            flyers = formset.save()
+            collection.flyers.set(flyers)
+            return HttpResponseRedirect(self.get_success_url())
+        else:
+            context = self.get_context_data(form=form, formset=formset)
+            return self.render_to_response(context)
 
 
 class CollectorOptions(CollectorListView):

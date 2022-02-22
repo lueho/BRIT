@@ -164,7 +164,10 @@ class WasteFlyer(Source):
         verbose_name = 'Waste Flyer'
 
     def __str__(self):
-        return self.url
+        if self.url:
+            return self.url
+        else:
+            return ''
 
 
 @receiver(pre_save, sender=WasteFlyer)
@@ -178,6 +181,7 @@ class Collection(NamedUserObjectModel):
     collection_system = models.ForeignKey(CollectionSystem, on_delete=models.CASCADE, blank=True, null=True)
     waste_stream = models.ForeignKey(WasteStream, on_delete=models.SET_NULL, blank=True, null=True)
     flyer = models.ForeignKey(WasteFlyer, on_delete=models.CASCADE, blank=True, null=True)
+    flyers = models.ManyToManyField(WasteFlyer, related_name='collections')
 
     @property
     def geom(self):

@@ -3,8 +3,10 @@ from django.db import models
 from django.test import TestCase
 from rest_framework.serializers import ModelSerializer, Serializer, CharField, IntegerField
 
-from ..models import Collector
-from ..serializers import FieldLabelMixin
+from maps.models import Catchment
+from materials.models import MaterialGroup
+from ..models import Collector, WasteComponent, WasteStream, WasteCategory, WasteFlyer, CollectionSystem, Collection
+from ..serializers import FieldLabelMixin, CollectionModelSerializer
 
 
 class FieldLabelMixinTestCase(TestCase):
@@ -73,3 +75,53 @@ class FieldLabelMixinTestCase(TestCase):
         # self.assertTrue(serializer.is_valid())
         # self.assertDictEqual(serializer.validated_data, self.data)
         self.assertDictEqual(serializer.data[0], self.tdata)
+
+
+class CollectionSerializerTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = User.objects.create(username='owner', password='very-secure!')
+
+        MaterialGroup.objects.create(owner=owner, name='Biowaste component')
+        material1 = WasteComponent.objects.create(owner=owner, name='Test material 1')
+        material2 = WasteComponent.objects.create(owner=owner, name='Test material 2')
+        waste_stream = WasteStream.objects.create(
+            owner=owner,
+            name='Test waste stream',
+            category=WasteCategory.objects.create(owner=owner, name='Test category'),
+        )
+        waste_stream.allowed_materials.add(material1)
+        waste_stream.allowed_materials.add(material2)
+
+        waste_flyer_1 = WasteFlyer.objects.create(
+            owner=owner,
+            abbreviation='WasteFlyer123',
+            url='https://www.test-flyer.org'
+        )
+        waste_flyer_2 = WasteFlyer.objects.create(
+            owner=owner,
+            abbreviation='WasteFlyer456',
+            url='https://www.best-flyer.org'
+        )
+        collection = Collection.objects.create(
+            owner=owner,
+            catchment=Catchment.objects.create(owner=owner, name='Test catchment'),
+            collector=Collector.objects.create(owner=owner, name='Test collector'),
+            collection_system=CollectionSystem.objects.create(owner=owner, name='Test system'),
+            waste_stream=waste_stream,
+            description='This is a test case.'
+        )
+        collection.flyers.add(waste_flyer_1)
+        collection.flyers.add(waste_flyer_2)
+
+    def setUp(self):
+        self.collection = Collection.objects.first()
+
+    def test_multiple_sources_in_representation(self):
+        serializer = CollectionModelSerializer(Collection.objects.first())
+        flyer_urls = serializer.data['sources']
+        self.assertIsInstance(flyer_urls, list)
+        self.assertEqual(len(flyer_urls), 2)
+        for url in flyer_urls:
+            self.assertIsInstance(url, str)

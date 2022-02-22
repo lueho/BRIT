@@ -14,6 +14,11 @@
                     <p class="card-text"><strong>Collection System:</strong><br>{{ object.collection_system.name }}</p>
                     <p class="card-text"><strong>Waste Stream:</strong><br>{{ object.waste_stream.name }}</p>
                     <p class="card-text"><strong>Flyer:</strong><br>{{ object.flyer.abbreviation }}</p>
+                    <p class="card-text"><strong>Flyer urls:</strong><br>
+                        {% for flyer in object.flyers.all %}
+                            {{ flyer.abbreviation }}
+                        {% endfor %}
+                    </p>
                 </div>
                 <div class="card-footer">
                     <a href="{% url 'collection-list' %}" class="mr-3"><i class="fas fa-fw fa-arrow-left"></i> back to
