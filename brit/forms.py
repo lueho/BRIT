@@ -19,6 +19,12 @@ class CustomModelForm(ModelForm):
         return helper
 
 
+class OwnedObjectModelForm(CustomModelForm):
+    class Meta:
+        exclude = ('created_at', 'created_by', 'lastmodified_at',
+                   'lastmodified_by', 'owner', 'visible_to_groups')
+
+
 class ModalFormHelper(FormHelper):
 
     @property
