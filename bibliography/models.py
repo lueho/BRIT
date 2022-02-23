@@ -1,5 +1,4 @@
 from django.db import models
-from django.urls import reverse
 
 from brit.models import OwnedObjectModel
 
@@ -40,9 +39,6 @@ class Source(OwnedObjectModel):
 
     class Meta:
         verbose_name = 'Source'
-
-    def get_absolute_url(self):
-        return reverse('bib_source_detail', kwargs={'pk': self.id})
 
     def as_dict(self):
         d = {

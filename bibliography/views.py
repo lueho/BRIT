@@ -1,6 +1,4 @@
 from django.urls import reverse_lazy
-from bootstrap_modal_forms.generic import BSModalCreateView, BSModalUpdateView, BSModalDeleteView, BSModalReadView
-
 
 from brit import views
 from . import forms
@@ -14,27 +12,29 @@ class SourceListView(views.OwnedObjectListView):
     template_name = 'source_list_card.html'
     model = Source
     permission_required = 'bibliography.view_source'
-    create_new_object_url = reverse_lazy('bib_source_create')
+    create_new_object_url = reverse_lazy('source-create')
 
 
 class SourceCreateView(views.OwnedObjectCreateView):
     template_name = 'simple_form_card.html'
     form_class = forms.SourceModelForm
-    success_url = reverse_lazy('bib_source_list')
+    success_url = reverse_lazy('source-list')
     permission_required = 'bibliography.add_source'
 
 
 class SourceModalCreateView(views.OwnedObjectModalCreateView):
     template_name = 'modal_form.html'
     form_class = forms.SourceModalModelForm
-    success_url = reverse_lazy('bib_source_list')
+    success_url = reverse_lazy('source-list')
     permission_required = 'bibliography.add_source'
 
 
 class SourceDetailView(views.OwnedObjectDetailView):
     template_name = 'source_detail.html'
     model = Source
-    permission_required = 'bibliography.view_source'
+    permission_required = set()
+
+    # permission_required = 'bibliography.view_source'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -44,9 +44,10 @@ class SourceDetailView(views.OwnedObjectDetailView):
         return context
 
 
-class SourceModalDetailView(BSModalReadView):
+class SourceModalDetailView(views.OwnedObjectModalDetailView):
     template_name = 'modal_source_detail.html'
     model = Source
+    permission_required = set()
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -75,5 +76,5 @@ class SourceModalDeleteView(views.OwnedObjectDeleteView):
     template_name = 'modal_delete.html'
     model = Source
     success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('bib_source_list')
+    success_url = reverse_lazy('source-list')
     permission_required = 'bibliography.delete_source'
