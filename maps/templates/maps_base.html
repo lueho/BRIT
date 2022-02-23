@@ -61,7 +61,7 @@
                             <p class="card-text mt-3">
                                 <strong>Sources:</strong><br>
                                 {% for source in object.sources.all %}
-                                    <a href="{% url 'bib_source_detail' source.id %}"
+                                    <a href="{% url 'source-detail' source.id %}"
                                        class="modal-link">
                                         {{ source.abbreviation }}{% if not forloop.last %},{% endif %}
                                     </a>
