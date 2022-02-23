@@ -8,6 +8,7 @@ from django.utils.safestring import mark_safe
 from extra_views import InlineFormSetFactory
 
 from bibliography.models import Source
+from brit.forms import CustomModelForm, CustomModalModelForm, ModalFormHelper
 from distributions.models import TemporalDistribution
 from .models import (
     Material,
@@ -17,8 +18,6 @@ from .models import (
     MaterialComponentShare,
     MaterialGroup,
 )
-
-from brit.forms import CustomModelForm, CustomModalModelForm, ModalFormHelper
 
 
 class MaterialGroupModelForm(CustomModelForm):
@@ -157,7 +156,10 @@ class PlainTextComponentWidget(forms.Widget):
     def render(self, name, value, attrs=None, renderer=None):
         if hasattr(self, 'initial'):
             value = self.initial
-        object_name = MaterialComponent.objects.get(id=value).name
+        try:
+            object_name = MaterialComponent.objects.get(id=value).name
+        except MaterialComponent.DoesNotExist:
+            object_name = '-'
 
         return mark_safe("<div style=\"min-width: 7em; padding-right: 12px;\">" + (str(
             object_name) if value is not None else '-') + "</div>" + f"<input type='hidden' name='{name}' value='{value}'>")
@@ -172,8 +174,8 @@ class InlineComponentShare(InlineFormSetFactory):
         'can_delete': False,
         'widgets': {
             'component': PlainTextComponentWidget(),
-            'average': forms.NumberInput(attrs={'min': 0, 'max': 1.0, 'step': 0.01}),
-            'standard_deviation': forms.NumberInput(attrs={'min': 0, 'max': 1.0, 'step': 0.01})
+            'average': forms.NumberInput(attrs={'min': 0, 'max': 1.0, 'step': 0.0001}),
+            'standard_deviation': forms.NumberInput(attrs={'min': 0, 'max': 1.0, 'step': 0.0001})
         }
     }
 
