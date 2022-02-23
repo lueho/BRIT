@@ -92,7 +92,7 @@
                                                         <td>
                                                             {% for source in group_settings.sources.all %}
                                                                 <p>
-                                                                    <a href="{% url 'bib_source_detail' source.id %}"
+                                                                    <a href="{% url 'source-detail' source.id %}"
                                                                        class="modal-link">
                                                                         {{ source.abbreviation }}
                                                                     </a>
