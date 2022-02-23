@@ -3,15 +3,26 @@ from django.db import migrations
 
 def create_initial_data(apps, schema_editor):
     Group = apps.get_model('auth', 'Group')
-    registered = Group.objects.get(name='registered')
-    Permission = apps.get_model('auth', 'Permission')
     Source = apps.get_model('bibliography', 'Source')
+
     ContentType = apps.get_model("contenttypes", "ContentType")
     content_type = ContentType.objects.get_for_model(Source)
-    permission, _ = Permission.objects.get_or_create(codename='add_source', content_type=content_type)
-    registered.permissions.add(permission)
-    permission, _ = Permission.objects.get_or_create(codename='view_source', content_type=content_type)
-    registered.permissions.add(permission)
+
+    Permission = apps.get_model('auth', 'Permission')
+    add_source_permission, _ = Permission.objects.get_or_create(codename='add_source', content_type=content_type)
+    view_source_permission, _ = Permission.objects.get_or_create(codename='view_source', content_type=content_type)
+    change_source_permission, _ = Permission.objects.get_or_create(codename='change_source', content_type=content_type)
+    delete_source_permission, _ = Permission.objects.get_or_create(codename='delete_source', content_type=content_type)
+
+    registered = Group.objects.get(name='registered')
+    registered.permissions.add(add_source_permission)
+    registered.permissions.add(view_source_permission)
+
+    librarians, _ = Group.objects.get_or_create(name='librarians')
+    librarians.permissions.add(add_source_permission)
+    librarians.permissions.add(view_source_permission)
+    librarians.permissions.add(change_source_permission)
+    librarians.permissions.add(delete_source_permission)
 
 
 class Migration(migrations.Migration):
