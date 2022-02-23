@@ -65,7 +65,6 @@ class CollectionCreateViewTestCase(TestCase):
         response = self.client.get(reverse('collection-create'))
         self.assertEqual(response.status_code, 403)
 
-    #
     def test_get_http_200_ok_for_group_members(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('collection-create'))
