@@ -216,11 +216,18 @@ class MaterialSettings(NamedUserObjectModel):
         return reverse('material_settings', kwargs={'pk': self.id})
 
 
+class MaterialComponentManager(models.Manager):
+    def default(self):
+        return self.get_queryset().get(name='Fresh Matter (FM)')
+
+
 class MaterialComponent(NamedUserObjectModel):
     """
     Represents any kind of component that a material can consists of (e.g. water, any kind of chemical element
     or more complex components, such as carbohydrates)
     """
+
+    objects = MaterialComponentManager()
 
     @staticmethod
     def get_absolute_url():
@@ -241,6 +248,11 @@ class MaterialComponent(NamedUserObjectModel):
     class Meta:
         verbose_name = 'component'
         unique_together = [['name', 'owner']]
+
+
+class MaterialComponentGroupManager(models.Manager):
+    def default(self):
+        return self.get_queryset().get(name='Total Material')
 
 
 class MaterialComponentGroup(NamedUserObjectModel):
@@ -264,6 +276,7 @@ class MaterialComponentGroup(NamedUserObjectModel):
     def delete_url(self):
         return reverse('material_component_group_delete', kwargs={'pk': self.id})
 
+    objects = MaterialComponentGroupManager()
 
     class Meta:
         verbose_name = 'material_component_group'
