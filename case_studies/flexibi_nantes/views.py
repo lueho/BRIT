@@ -16,8 +16,8 @@ from rest_framework.views import APIView
 from brit.views import DualUserListView, UserOwnsObjectMixin, NextOrSuccessUrlMixin
 from maps.models import GeoDataset
 from maps.views import GeoDatasetDetailView
-from materials.models import MaterialComponentGroup, BaseObjects
-from users.models import ReferenceUsers
+from materials.models import MaterialComponentGroup
+from users.models import get_default_owner
 from .forms import (CultureModelForm,
                     GreenhouseModalModelForm,
                     GreenhouseGrowthCycle,
@@ -107,7 +107,7 @@ class DualUserListView(TemplateView):
         kwargs['standard_item_table'] = table_factory(
             self.model,
             table=StandardGreenhouseTable
-        )(self.model.objects.filter(owner=ReferenceUsers.objects.get.standard_owner))
+        )(self.model.objects.filter(owner=get_default_owner()))
         if not self.request.user.is_anonymous:
             kwargs['custom_item_table'] = table_factory(
                 self.model,
@@ -211,7 +211,8 @@ class GrowthCycleCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, BSModalCr
             form.instance.greenhouse = Greenhouse.objects.get(id=self.kwargs.get('pk'))
             material_settings = form.instance.culture.residue
             macro_components = MaterialComponentGroup.objects.get(name='Macro Components')
-            base_group = BaseObjects.objects.get.base_group
+            # base_group = BaseObjects.objects.get.base_group
+            base_group = MaterialComponentGroup.objects.default()
             try:
                 group_settings = material_settings.materialcomponentgroupsettings_set.get(group=macro_components)
             except ObjectDoesNotExist:

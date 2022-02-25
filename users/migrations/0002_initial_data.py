@@ -1,7 +1,8 @@
 import os
+
+from django.contrib.auth import get_user_model
 from django.db import migrations
 from django.utils import timezone
-from django.contrib.auth import get_user_model
 
 
 def create_initial_data(apps, schema_editor):
@@ -10,7 +11,7 @@ def create_initial_data(apps, schema_editor):
 
     User = get_user_model()
     try:
-        superuser = User.objects.get(username=os.environ['ADMIN_USERNAME'])
+        superuser = User.objects.get(username=os.environ.get('ADMIN_USERNAME'))
     except User.DoesNotExist:
         superuser = User(
             is_active=True,

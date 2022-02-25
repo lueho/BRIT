@@ -20,7 +20,7 @@ from brit.views import (
     OwnedObjectDeleteView,
 )
 from distributions.models import TemporalDistribution
-from users.models import ReferenceUsers
+from users.models import get_default_owner
 from . import forms
 from .forms import (
     AddComponentForm,
@@ -332,7 +332,7 @@ class MaterialSettingsDetailView(UserPassesTestMixin, DetailView):
 
     def test_func(self):
         self.object = self.get_object()
-        standard_owner = ReferenceUsers.objects.get.standard_owner
+        standard_owner = get_default_owner()
         if self.object.owner == standard_owner:
             if self.request.user == standard_owner:
                 self.allow_edit = True

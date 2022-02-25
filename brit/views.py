@@ -1,12 +1,11 @@
 from bootstrap_modal_forms.generic import BSModalCreateView, BSModalUpdateView, BSModalDeleteView, BSModalReadView
 from django.contrib.auth.mixins import UserPassesTestMixin, PermissionRequiredMixin
+from django.core.exceptions import FieldError
 from django.views.generic import CreateView, UpdateView
 from django.views.generic import TemplateView, ListView, DetailView
 from django_tables2 import table_factory
-from django.http import HttpResponseRedirect
-from django.core.exceptions import FieldError
 
-from users.models import ReferenceUsers
+from users.models import get_default_owner
 from .tables import StandardItemTable, UserItemTable
 
 
@@ -142,7 +141,7 @@ class DualUserListView(TemplateView):
         kwargs['standard_item_table'] = table_factory(
             self.model,
             table=StandardItemTable
-        )(self.model.objects.filter(owner=ReferenceUsers.objects.get.standard_owner))
+        )(self.model.objects.filter(owner=get_default_owner()))
         if not self.request.user.is_anonymous:
             kwargs['custom_item_table'] = table_factory(
                 self.model,

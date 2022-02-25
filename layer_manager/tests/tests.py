@@ -1,23 +1,24 @@
 from django.db.models.query import QuerySet
 from django.test import TestCase
 
+from distributions.models import Timestep, TemporalDistribution
 from layer_manager.models import DistributionSet, DistributionShare, LayerAggregatedDistribution
-from materials.models import BaseObjects
+from materials.models import MaterialComponent
 
 
 class LayerAggregatedDistributionTestCase(TestCase):
 
     def setUp(self):
-        self.component = BaseObjects.objects.get.base_component
-        self.timestep = BaseObjects.objects.get.base_timestep
-        self.distribution = BaseObjects.objects.get.base_distribution
+        self.component = MaterialComponent.objects.default()
+        self.timestep = Timestep.objects.default()
+        self.distribution = TemporalDistribution.objects.default()
         self.aggregated_distribution = LayerAggregatedDistribution.objects.create(
             name='Test distribution',
             distribution=self.distribution
         )
         self.distribution_set = DistributionSet.objects.create(
             aggregated_distribution=self.aggregated_distribution,
-            component=self.component
+            aggregated_distribution__component=self.component
         )
         self.share = DistributionShare.objects.create(
             timestep=self.timestep,

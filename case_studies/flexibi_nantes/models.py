@@ -8,7 +8,7 @@ from django.urls import reverse
 from distributions.models import TemporalDistribution, Timestep
 from materials.models import Material, MaterialSettings, MaterialComponent, MaterialComponentGroup, \
     MaterialComponentGroupSettings
-from users.models import ReferenceUsers
+from users.models import get_default_owner
 from .tables import growthcycle_table_factory
 
 
@@ -82,7 +82,7 @@ class Greenhouse(models.Model):
         growth_cycles = list(self.greenhousegrowthcycle_set.all())
         growth_cycles.sort(key=lambda x: x.min_timestep.id)
         for n, c in enumerate(growth_cycles):
-            GreenhouseGrowthCycle.objects.filter(pk=c.pk).update(cycle_number=n+1)
+            GreenhouseGrowthCycle.objects.filter(pk=c.pk).update(cycle_number=n + 1)
 
     @property
     def number_of_growth_cycles(self):
@@ -91,7 +91,8 @@ class Greenhouse(models.Model):
     def configuration(self):
         return {gc: {'culture': gc.culture,
                      'timesteps': [t for t in gc.timesteps],
-                     'table': growthcycle_table_factory(gc)} for gc in self.greenhousegrowthcycle_set.all().order_by('cycle_number')}
+                     'table': growthcycle_table_factory(gc)} for gc in
+                self.greenhousegrowthcycle_set.all().order_by('cycle_number')}
 
     def cultures(self):
         cultures = {
@@ -261,7 +262,7 @@ class BaseObjectManager(models.Manager):
     DISTRIBUTION = 'Months of the year'
 
     def initialize(self):
-        owner = ReferenceUsers.objects.get.standard_owner
+        owner = get_default_owner()
         distribution, created = TemporalDistribution.objects.get_or_create(name=self.DISTRIBUTION, owner=owner)
         if created:
             months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']

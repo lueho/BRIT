@@ -1,9 +1,7 @@
 from unittest import TestCase as NativeTestCase
 
 from django.contrib.auth.models import User
-from django.db import transaction
 from django.db.models import signals
-from django.db.utils import IntegrityError
 from django.test import TestCase as DjangoTestCase, tag
 from django.urls import reverse
 from factory.django import mute_signals
@@ -17,68 +15,9 @@ from materials.models import (
     MaterialComponentGroup,
     MaterialComponentGroupSettings,
     MaterialComponentShare,
-    CompositionSet,
-    BaseObjects
+    CompositionSet
 )
-from users.models import ReferenceUsers
-
-
-@tag('db')
-class BaseObjectsTestCase(DjangoTestCase):
-
-    def test_base_objects(self):
-        standard_owner = ReferenceUsers.objects.get.standard_owner
-
-        base_group = BaseObjects.objects.get.base_group
-        self.assertIsInstance(base_group, MaterialComponentGroup)
-        self.assertEqual(MaterialComponentGroup.objects.all().count(), 1)
-        self.assertEqual(base_group.name, 'Total Material')
-        self.assertEqual(base_group.owner, standard_owner)
-        base_group = BaseObjects.objects.get.base_group
-        self.assertIsInstance(base_group, MaterialComponentGroup)
-        self.assertEqual(MaterialComponentGroup.objects.all().count(), 1)
-        self.assertEqual(base_group.name, 'Total Material')
-
-        base_component = BaseObjects.objects.get.base_component
-        self.assertIsInstance(base_component, MaterialComponent)
-        self.assertEqual(MaterialComponent.objects.all().count(), 1)
-        self.assertEqual(base_component.name, 'Fresh Matter (FM)')
-        self.assertEqual(base_component.owner, standard_owner)
-        base_component = BaseObjects.objects.get.base_component
-        self.assertIsInstance(base_component, MaterialComponent)
-        self.assertEqual(MaterialComponent.objects.all().count(), 1)
-        self.assertEqual(base_component.name, 'Fresh Matter (FM)')
-
-        base_distribution = BaseObjects.objects.get.base_distribution
-        self.assertIsInstance(base_distribution, TemporalDistribution)
-        self.assertEqual(TemporalDistribution.objects.all().count(), 1)
-        self.assertEqual(base_distribution.name, 'Average')
-        self.assertEqual(base_distribution.owner, standard_owner)
-        base_distribution = BaseObjects.objects.get.base_distribution
-        self.assertIsInstance(base_distribution, TemporalDistribution)
-        self.assertEqual(TemporalDistribution.objects.all().count(), 1)
-        self.assertEqual(base_distribution.name, 'Average')
-
-        base_timestep = BaseObjects.objects.get.base_timestep
-        self.assertIsInstance(base_timestep, Timestep)
-        self.assertEqual(Timestep.objects.all().count(), 1)
-        self.assertEqual(base_timestep.name, 'Average')
-        self.assertEqual(base_timestep.owner, standard_owner)
-        base_timestep = BaseObjects.objects.get.base_timestep
-        self.assertIsInstance(base_timestep, Timestep)
-        self.assertEqual(Timestep.objects.all().count(), 1)
-        self.assertEqual(base_timestep.name, 'Average')
-
-        with self.assertRaises(IntegrityError):
-            with transaction.atomic():
-                TemporalDistribution.objects.create(
-                    name='Average',
-                    owner=standard_owner
-                )
-        first_base_distribution = BaseObjects.objects.get.base_distribution
-        second_base_distribution = TemporalDistribution.objects.get(name='Average')
-        self.assertEqual(first_base_distribution, second_base_distribution)
-        self.assertEqual(base_timestep.distribution, base_distribution)
+from users.models import get_default_owner
 
 
 @tag('db')
@@ -87,7 +26,7 @@ class MaterialSetupTestCase(DjangoTestCase):
     def setUp(self):
         self.material = Material.objects.create(
             name='Test material',
-            owner=ReferenceUsers.objects.get.standard_owner,
+            owner=get_default_owner(),
         )
 
     def test_true(self):
@@ -98,21 +37,14 @@ class MaterialSetupTestCase(DjangoTestCase):
 class MaterialTestCase(DjangoTestCase):
 
     def setUp(self):
-        self.superuser = User.objects.create_superuser(username='flexibi')
+        self.superuser = get_default_owner()
         self.user = User.objects.create(username='standard_user')
-        self.base_distribution = TemporalDistribution.objects.create(
-            name='Average',
-            owner=self.superuser
-        )
+        self.base_distribution = TemporalDistribution.objects.default()
         self.main_distribution = TemporalDistribution.objects.create(
             name='Main',
             owner=self.superuser
         )
-        self.base_timestep = Timestep.objects.create(
-            name='Average',
-            owner=self.superuser,
-            distribution=self.base_distribution
-        )
+        self.base_timestep = Timestep.objects.default()
         self.main_step1 = Timestep.objects.create(
             name='Summer',
             owner=self.superuser,
@@ -123,18 +55,12 @@ class MaterialTestCase(DjangoTestCase):
             owner=self.superuser,
             distribution=self.main_distribution
         )
-        self.base_group = MaterialComponentGroup.objects.create(
-            name='Total Material',
-            owner=self.superuser
-        )
+        self.base_group = MaterialComponentGroup.objects.default()
         self.main_group = MaterialComponentGroup.objects.create(
             name='Basics',
             owner=self.superuser
         )
-        self.base_component = MaterialComponent.objects.create(
-            name='Fresh Matter (FM)',
-            owner=self.superuser
-        )
+        self.base_component = MaterialComponent.objects.default()
         self.main_component = MaterialComponent.objects.create(
             name='Total Solids (TS)',
             owner=self.superuser

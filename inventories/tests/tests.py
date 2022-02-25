@@ -1,9 +1,23 @@
-from django.contrib.auth.models import User
-from django.test import TestCase
+from unittest import TestCase as NativeTestCase
 
+from django.contrib.auth.models import User
+from django.db.models.query import QuerySet
+from django.test import TestCase
+from django.test import TestCase as DjangoTestCase, tag
+from django_mock_queries.query import MockSet, MockModel
+from mock import Mock, patch, PropertyMock, MagicMock
+
+from brit.exceptions import UnitMismatchError
 from distributions.models import TemporalDistribution, Timestep
+from distributions.plots import DataSet
+from inventories.evaluations import ScenarioResult
+from inventories.models import Scenario, InventoryAlgorithm, InventoryAlgorithmParameter, \
+    InventoryAlgorithmParameterValue, ScenarioInventoryConfiguration
 from inventories.models import (WrongParameterForInventoryAlgorithm)
+from maps.models import GeoDataset, Region, Catchment
+from materials.models import Material
 from materials.models import MaterialComponent, MaterialComponentGroup, MaterialSettings
+from users.models import get_default_owner
 
 
 class RegionTestCase(TestCase):
@@ -18,7 +32,7 @@ class RegionTestCase(TestCase):
 
 
 class CatchmentTestCase(TestCase):
-    fixtures = ['user.json', 'regions.json', 'catchments.json']
+    fixtures = ['regions.json', 'catchments.json']
 
     def test_create(self):
         catchment = Catchment.objects.get(name='Wandsbek')
@@ -26,7 +40,7 @@ class CatchmentTestCase(TestCase):
 
 
 class GeoDatasetTestCase(TestCase):
-    fixtures = ['user.json', 'regions.json', 'catchments.json']
+    fixtures = ['regions.json', 'catchments.json']
 
     def test_create(self):
         ds = GeoDataset.objects.create(
@@ -39,7 +53,7 @@ class GeoDatasetTestCase(TestCase):
 
 
 class InventoryAlgorithmTestCase(TestCase):
-    fixtures = ['user.json', 'regions.json', 'catchments.json']
+    fixtures = ['regions.json', 'catchments.json']
 
     def setUp(self):
         self.superuser = User.objects.create_superuser(username='superuser')
@@ -102,10 +116,10 @@ class InventoryAlgorithmTestCase(TestCase):
 #         self.assertEqual(param_value.standard_deviation, 0.5)
 
 class ScenarioInventoryConfigurationTestCase(TestCase):
-    fixtures = ['user.json', 'regions.json', 'catchments.json']
+    fixtures = ['regions.json', 'catchments.json']
 
     def setUp(self):
-        self.user = ReferenceUsers.objects.get.standard_owner
+        self.user = get_default_owner()
         self.material = Material.objects.create(
             name='First test material',
             owner=self.user,
@@ -157,10 +171,10 @@ class ScenarioInventoryConfigurationTestCase(TestCase):
 
 
 class ScenarioTestCase(TestCase):
-    fixtures = ['user.json', 'regions.json', 'catchments.json']
+    fixtures = ['regions.json', 'catchments.json']
 
     def setUp(self):
-        self.user = ReferenceUsers.objects.get.standard_owner
+        self.user = get_default_owner()
         self.material = Material.objects.create(
             name='First test material',
             owner=self.user,
@@ -321,24 +335,6 @@ class ScenarioTestCase(TestCase):
     #     for entry in config:
     #         self.assertTrue(entry.inventory_value.default)
     #         self.assertIn(entry.inventory_parameter.short_name, ['point_yield', 'area_yield', ])
-
-
-from unittest import TestCase as NativeTestCase
-
-from django.db.models.query import QuerySet
-from django.test import TestCase as DjangoTestCase, tag
-from django_mock_queries.query import MockSet, MockModel
-from mock import Mock, patch, PropertyMock, MagicMock
-
-from distributions.plots import DataSet
-from brit.exceptions import UnitMismatchError
-from materials.models import Material, BaseObjects
-from inventories.models import Scenario, InventoryAlgorithm, InventoryAlgorithmParameter, \
-    InventoryAlgorithmParameterValue, ScenarioInventoryConfiguration
-from maps.models import GeoDataset, Region, Catchment
-
-from inventories.evaluations import ScenarioResult
-from users.models import ReferenceUsers
 
 
 class ScenarioResultTestCase(NativeTestCase):
@@ -537,10 +533,10 @@ class ScenarioResultTestCase(NativeTestCase):
 
 @tag('db')
 class ScenarioResultTestCaseDB(DjangoTestCase):
-    fixtures = ['user.json', 'regions.json', 'catchments.json']
+    fixtures = ['regions.json', 'catchments.json']
 
     def setUp(self):
-        self.user = ReferenceUsers.objects.get.standard_owner
+        self.user = get_default_owner()
         self.material = Material.objects.create(
             name='First test material',
             owner=self.user,
@@ -606,7 +602,7 @@ class ScenarioResultTestCaseDB(DjangoTestCase):
         self.assertIsInstance(distributions, QuerySet)
         self.assertEqual(distributions.count(), 1)
         distribution = distributions.first()
-        self.assertEqual(distribution.name, BaseObjects.objects.get.base_distribution)
+        self.assertEqual(distribution.name, TemporalDistribution.objects.default())
 
     # def test_total_production_per_feedstock(self):
     #     run_inventory(self.scenario.id)

@@ -108,3 +108,5 @@ class CollectionModelSerializer(FieldLabelMixin, serializers.ModelSerializer):
         model = models.Collection
         fields = ('id', 'catchment', 'collector', 'collection_system',
                   'waste_category', 'allowed_materials', 'sources', 'comments')
+
+# class CollectionModelSerializer

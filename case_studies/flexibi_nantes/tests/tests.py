@@ -8,7 +8,7 @@ from inventories.models import Scenario
 
 
 class InventoryAlgorithmsTestCase(TestCase):
-    fixtures = ['user.json', 'regions.json', 'catchments.json', 'greenhouses.json', 'greenhouse_types.json']
+    fixtures = ['regions.json', 'catchments.json', 'greenhouses.json', 'greenhouse_types.json']
 
     def setUp(self):
         pass

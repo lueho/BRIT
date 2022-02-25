@@ -14,8 +14,10 @@ from rest_framework.views import APIView
 
 from brit.views import DualUserListView, UserOwnsObjectMixin, NextOrSuccessUrlMixin, OwnedObjectModalUpdateView
 from layer_manager.models import Layer
+from maps.models import Catchment, GeoDataset
+from maps.serializers import BaseResultMapSerializer
 from materials.models import MaterialSettings
-from users.models import ReferenceUsers
+from users.models import get_default_owner
 from users.views import ModalLoginRequiredMixin
 from .evaluations import ScenarioResult
 from .forms import (
@@ -24,7 +26,6 @@ from .forms import (
     ScenarioInventoryConfigurationUpdateForm,
     SeasonalDistributionModelForm,
 )
-from maps.models import Catchment, GeoDataset
 from .models import (
     Scenario,
     ScenarioInventoryConfiguration,
@@ -34,7 +35,6 @@ from .models import (
     ScenarioStatus,
     RunningTask
 )
-from maps.serializers import BaseResultMapSerializer
 from .tasks import run_inventory
 
 
@@ -135,7 +135,7 @@ class ScenarioDetailView(UserPassesTestMixin, DetailView):
 
     def test_func(self):
         self.object = self.get_object()
-        standard_owner = ReferenceUsers.objects.get.standard_owner
+        standard_owner = get_default_owner()
         if self.object.owner == standard_owner:
             if self.request.user == standard_owner:
                 self.allow_edit = True
@@ -454,7 +454,7 @@ class ScenarioResultView(DetailView):
 
     def test_func(self):
         self.object = self.get_object()
-        standard_owner = ReferenceUsers.objects.get.standard_owner
+        standard_owner = get_default_owner()
         if self.object.owner == standard_owner:
             if self.request.user == standard_owner:
                 self.allow_edit = True

@@ -2,7 +2,7 @@ from brit.exceptions import UnitMismatchError
 from distributions.models import TemporalDistribution
 from distributions.plots import BarChart, DataSet
 from layer_manager.models import LayerAggregatedDistribution
-from materials.models import BaseObjects
+from materials.models import MaterialComponentGroup
 
 
 class ScenarioResult:
@@ -27,7 +27,7 @@ class ScenarioResult:
         material_settings = self.scenario.feedstocks()
         for material_setting in material_settings:
             for group_setting in material_setting.materialcomponentgroupsettings_set.all():
-                if not group_setting.group == BaseObjects.objects.get.base_group:
+                if not group_setting.group == MaterialComponentGroup.objects.default():
                     group_settings.append(group_setting)
         return list(set(group_settings))
 
