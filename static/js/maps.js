@@ -202,6 +202,18 @@ function isEmptyArray(el) {
     return Array.isArray(el) && el.length === 0
 }
 
+function isValidHttpUrl(string) {
+    let url;
+
+    try {
+        url = new URL(string);
+    } catch (_) {
+        return false;
+    }
+
+    return url.protocol === "http:" || url.protocol === "https:";
+}
+
 function renderSummaryContainer(summary, summary_container) {
 
     Object.keys(summary).forEach(key => {
@@ -222,7 +234,15 @@ function renderSummaryContainer(summary, summary_container) {
                     value.appendChild(ul);
                     summary[key].forEach(function (item) {
                         let li = document.createElement('li')
-                        li.innerText = item.toString()
+                        if (isValidHttpUrl(item.toString())) {
+                            let a = document.createElement('a');
+                            a.href = item.toString();
+                            a.innerText = item.toString();
+                            a.setAttribute('target', '_blank')
+                            li.appendChild(a);
+                        } else {
+                            li.innerText = item.toString()
+                        }
                         ul.appendChild(li)
                     });
                 } else {
