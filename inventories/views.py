@@ -131,7 +131,7 @@ class ScenarioDetailView(UserPassesTestMixin, DetailView):
         scenario = self.object
         scenario.set_status(ScenarioStatus.Status.RUNNING)
         run_inventory(scenario.id)
-        return redirect('scenario_result', scenario.id)
+        return redirect('scenario-result', scenario.id)
 
     def test_func(self):
         self.object = self.get_object()

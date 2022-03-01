@@ -2,6 +2,7 @@ from bootstrap_modal_forms.generic import BSModalFormView, BSModalCreateView, BS
     BSModalDeleteView
 from crispy_forms.helper import FormHelper
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.urls import reverse_lazy
@@ -27,7 +28,6 @@ from .forms import (
     AddComponentGroupForm,
     AddLiteratureSourceForm,
     AddSeasonalVariationForm,
-    MaterialModelForm,
     ComponentModelForm,
     ComponentGroupModelForm,
     MaterialComponentGroupSettings,
@@ -109,7 +109,7 @@ class MaterialGroupModalDeleteView(OwnedObjectDeleteView):
 class MaterialListView(OwnedObjectListView):
     template_name = 'simple_list_card.html'
     model = Material
-    permission_required = 'materials.view_material'
+    permission_required = set()
     create_new_object_url = reverse_lazy('material-create')
 
 
@@ -122,7 +122,7 @@ class MaterialCreateView(OwnedObjectCreateView):
 
 class MaterialModalCreateView(OwnedObjectModalCreateView):
     template_name = 'modal_form.html'
-    form_class = MaterialModelForm
+    form_class = forms.MaterialModalModelForm
     success_url = reverse_lazy('material-list')
     permission_required = 'materials.add_material'
 
@@ -130,13 +130,13 @@ class MaterialModalCreateView(OwnedObjectModalCreateView):
 class MaterialDetailView(OwnedObjectDetailView):
     template_name = 'material_detail.html'
     model = Material
-    permission_required = 'materials.view_material'
+    permission_required = set()
 
 
 class MaterialModalDetailView(OwnedObjectModalDetailView):
     template_name = 'modal_detail.html'
     model = Material
-    permission_required = 'materials.view_material'
+    permission_required = set()
 
 
 class MaterialUpdateView(OwnedObjectUpdateView):

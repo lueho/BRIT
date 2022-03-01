@@ -403,7 +403,7 @@ def initialize_group_settings(sender, instance, created, **kwargs):
         base_distribution = TemporalDistribution.objects.default()
         instance.add_temporal_distribution(base_distribution)
 
-
+# TODO: Unique_together: timestep, group_settings
 class CompositionSet(models.Model):
     """
     A composition set is the container for all weight fraction of a subgroup of components. The sum of all weight

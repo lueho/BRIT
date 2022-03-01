@@ -18,9 +18,12 @@ class ScenarioResult:
         self.timesteps = self.homogenize_timesteps()
 
     def homogenize_timesteps(self):
-        layer = self.layers.first()  # TODO: Fix this!!!
-        dist = layer.layeraggregateddistribution_set.first().distribution
-        return [timestep for timestep in dist.timestep_set.all()]
+        try:
+            layer = self.layers.first()  # TODO: Fix this!!!
+            dist = layer.layeraggregateddistribution_set.first().distribution
+            return [timestep for timestep in dist.timestep_set.all()]
+        except AttributeError:
+            return []
 
     def material_component_groups(self):
         group_settings = []
@@ -57,7 +60,7 @@ class ScenarioResult:
             agg_value = layer.layeraggregatedvalue_set.get(name='Total production')
             unit = agg_value.unit
             data[layer.feedstock.name] = agg_value.value
-        production = DataSet(label='Total production per feedstocks', data=data, unit=unit)
+        production = DataSet(label='Total production per feedstock', data=data, unit=unit)
         return production
 
     def get_charts(self):

@@ -41,21 +41,22 @@ class LayerManager(models.Manager):
 
         results = kwargs.pop('results')
 
-        if 'features' not in results:
+        if 'features' not in results or len(results['features']) == 0:
             raise NoFeaturesProvided(results)
         else:
             features = results['features']
             fields = {}
             # The data types of the fields are detected from their content. Any column that has only null values
             # will be omitted completely
-            fields_with_unknown_datatype = list(features[0].keys())
-            for feature in features:
-                if not fields_with_unknown_datatype:
-                    break
-                for key, value in feature.items():
-                    if feature[key] and key in fields_with_unknown_datatype:
-                        fields[key] = type(value).__name__
-                        fields_with_unknown_datatype.remove(key)
+            if features:
+                fields_with_unknown_datatype = list(features[0].keys())
+                for feature in features:
+                    if not fields_with_unknown_datatype:
+                        break
+                    for key, value in feature.items():
+                        if feature[key] and key in fields_with_unknown_datatype:
+                            fields[key] = type(value).__name__
+                            fields_with_unknown_datatype.remove(key)
 
             # At this point there might be fields left out because there were only null values from which the
             # data type could be detected. They should be omitted but this information should be logged
@@ -92,8 +93,10 @@ class LayerManager(models.Manager):
             for feature in features:
                 feature_collection.objects.create(**feature)
 
-        layer.add_aggregated_values(results['aggregated_values'])
-        layer.add_aggregated_distributions(results['aggregated_distributions'])
+        if 'aggregated_values' in results:
+            layer.add_aggregated_values(results['aggregated_values'])
+        if 'aggregated_distributions' in results:
+            layer.add_aggregated_distributions(results['aggregated_distributions'])
 
         return layer, feature_collection
 

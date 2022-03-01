@@ -1,7 +1,7 @@
 from unittest import TestCase as NativeTestCase
 
 from brit.exceptions import UnitMismatchError
-from distributions.plots import BaseChart, BarChart, BaseDataSet
+from ..plots import BaseChart, BarChart, BaseDataSet
 
 
 class BaseDataSetTestCase(NativeTestCase):
@@ -84,7 +84,7 @@ class BasePlotTestCase(NativeTestCase):
             'data': [
                 {'label': 'Dataset 1', 'data': [1.0, 2.0, 3.0], 'unit': self.unit},
                 {'label': 'Dataset 2', 'data': [1.5, 2.5, 3.5], 'unit': self.unit}
-            ]
+            ],
         }
 
     def test_create_plot(self):
@@ -121,7 +121,18 @@ class BasePlotTestCase(NativeTestCase):
     def test_create_with_kwargs(self):
         chart = BaseChart(**self.chart_dict)
         self.maxDiff = None
-        self.assertDictEqual(chart.as_dict(), self.chart_dict)
+        generated_dict = self.chart.as_dict()
+        self.assertIn('type', generated_dict.keys())
+        self.assertIn('data', generated_dict.keys())
+        self.assertIn('options', generated_dict.keys())
+        self.assertIn('labels', generated_dict['data'])
+        self.assertIn('datasets', generated_dict['data'])
+        self.assertIn('unit', generated_dict['data'])
+        for dataset in generated_dict['data']['datasets']:
+            self.assertIn('label', dataset.keys())
+            self.assertIn('data', dataset.keys())
+            self.assertIn('backgroundColor', dataset.keys())
+            self.assertIn('borderColor', dataset.keys())
 
     def test_has_no_data_at_instantiation(self):
         self.assertFalse(self.chart.has_data)
@@ -169,7 +180,18 @@ class BasePlotTestCase(NativeTestCase):
         self.chart.show_legend = False
         self.chart.id = 'testChart'
         self.maxDiff = None
-        self.assertDictEqual(self.chart.as_dict(), self.chart_dict)
+        generated_dict = self.chart.as_dict()
+        self.assertIn('type', generated_dict.keys())
+        self.assertIn('data', generated_dict.keys())
+        self.assertIn('options', generated_dict.keys())
+        self.assertIn('labels', generated_dict['data'])
+        self.assertIn('datasets', generated_dict['data'])
+        self.assertIn('unit', generated_dict['data'])
+        for dataset in generated_dict['data']['datasets']:
+            self.assertIn('label', dataset.keys())
+            self.assertIn('data', dataset.keys())
+            self.assertIn('backgroundColor', dataset.keys())
+            self.assertIn('borderColor', dataset.keys())
 
 
 class BarchartTestCase(NativeTestCase):

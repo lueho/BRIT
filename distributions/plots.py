@@ -222,6 +222,7 @@ class BaseChart:
             'type': self.type,
             'data': {
                 'labels': self.labels,
+                'unit': self.unit,
                 'datasets': [],
             },
             'options': {

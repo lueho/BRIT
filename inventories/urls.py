@@ -1,4 +1,4 @@
-from django.urls import include, path
+from django.urls import path
 
 from .views import (
     get_evaluation_status,
@@ -32,7 +32,7 @@ urlpatterns = [
     path('scenarios/', ScenarioListView.as_view(), name='scenario_list'),
     path('scenarios/create/', ScenarioCreateView.as_view(), name='scenario_create'),
     path('scenarios/<int:pk>/', ScenarioDetailView.as_view(), name='scenario_detail'),
-    path('scenarios/<int:pk>/result/', ScenarioResultView.as_view(), name='scenario_result'),
+    path('scenarios/<int:pk>/result/', ScenarioResultView.as_view(), name='scenario-result'),
     path('scenarios/<int:pk>/update/', ScenarioUpdateView.as_view(), name='scenario_update'),
     path('scenarios/<int:pk>/update/modal/', ScenarioModalUpdateView.as_view(), name='scenario_update_modal'),
     path('scenarios/<int:pk>/delete/', ScenarioDeleteView.as_view(), name='scenario_delete'),
