@@ -1,10 +1,12 @@
 from django.contrib.auth.models import User
 from django.db import models
 
+from users.models import get_default_owner
+
 
 class TemporalDistributionManager(models.Manager):
     def default(self):
-        return self.get_queryset().get(name='Average')
+        return self.get_queryset().get(name='Average', owner=get_default_owner())
 
 
 class TemporalDistribution(models.Model):
@@ -27,7 +29,7 @@ class TemporalDistribution(models.Model):
 
 class TimestepManager(models.Manager):
     def default(self):
-        return self.get_queryset().get(name='Average')
+        return self.get_queryset().get(name='Average', owner=get_default_owner())
 
 
 class Timestep(models.Model):

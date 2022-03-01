@@ -10,6 +10,7 @@ from bibliography.models import Source
 from brit.models import NamedUserObjectModel
 from distributions.models import Timestep, TemporalDistribution
 from distributions.plots import DataSet, DoughnutChart
+from users.models import get_default_owner
 from .tables import averages_table_factory, distribution_table_factory
 
 
@@ -217,7 +218,7 @@ class MaterialSettings(NamedUserObjectModel):
 
 class MaterialComponentManager(models.Manager):
     def default(self):
-        return self.get_queryset().get(name='Fresh Matter (FM)')
+        return self.get_queryset().get(name='Fresh Matter (FM)', owner=get_default_owner())
 
 
 class MaterialComponent(NamedUserObjectModel):
@@ -251,7 +252,7 @@ class MaterialComponent(NamedUserObjectModel):
 
 class MaterialComponentGroupManager(models.Manager):
     def default(self):
-        return self.get_queryset().get(name='Total Material')
+        return self.get_queryset().get(name='Total Material', owner=get_default_owner())
 
 
 class MaterialComponentGroup(NamedUserObjectModel):

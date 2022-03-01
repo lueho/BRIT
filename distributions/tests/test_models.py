@@ -1,4 +1,6 @@
+from django.db.utils import IntegrityError
 from django.test import TestCase
+from users.models import get_default_owner
 
 from ..models import TemporalDistribution, Timestep
 
@@ -26,6 +28,11 @@ class TemporalDistributionTestCase(TestCase):
         self.assertIsInstance(default, TemporalDistribution)
         self.assertEqual(default.name, 'Average')
 
+    def test_name_and_owner_unique_together(self):
+        default_timestep = Timestep.objects.default()
+        with self.assertRaises(IntegrityError):
+            TemporalDistribution.objects.create(owner=default_timestep.owner, name=default_timestep.name)
+
 
 class TimeStepTestCase(TestCase):
 
@@ -33,3 +40,13 @@ class TimeStepTestCase(TestCase):
         default = Timestep.objects.default()
         self.assertIsInstance(default, Timestep)
         self.assertEqual(default.name, 'Average')
+
+    def test_name_and_owner_unique_together(self):
+        default_timestep = Timestep.objects.default()
+        default_distribution = TemporalDistribution.objects.default()
+        with self.assertRaises(IntegrityError):
+            Timestep.objects.create(
+                owner=default_timestep.owner,
+                name=default_timestep.name,
+                distribution=default_distribution
+            )
