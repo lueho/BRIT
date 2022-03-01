@@ -45,7 +45,7 @@ def averages_table_factory(group_settings):
                 <i class="fas fa-fw fa-edit"></i> Change composition
             </a>
             ''',
-            reverse('composition_set_update', kwargs={'pk': group_settings.average_composition.id})
+            reverse('compositionset-update-modal', kwargs={'pk': group_settings.average_composition.id})
         )
     }
     columns = {
@@ -81,7 +81,7 @@ def distribution_table_factory(group_settings, distribution):
                 <i class="fas fa-fw fa-edit"></i>
             </a>
             ''',
-            reverse('composition_set_update', kwargs={'pk': cs.id}))
+            reverse('compositionset-update-modal', kwargs={'pk': cs.id}))
 
     if len(table_data) > 0:
         columns = {}

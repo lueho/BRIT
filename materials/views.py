@@ -575,12 +575,17 @@ class CompositionSetUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSu
         return super().get_context_data(**context)
 
 
-class CompositionSetModalUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin,
+class CompositionSetModalUpdateView(PermissionRequiredMixin,
+                                    NextOrSuccessUrlMixin,
                                     UpdateWithInlinesView):
     model = CompositionSet
     inlines = [InlineComponentShare, ]
     fields = []
     template_name = 'modal_item_formset.html'
+    permission_required = (
+        'materials.change_compositionset',
+        'materials.change_materialcomponentshare',
+    )
 
     def get_context_data(self, **kwargs):
         inline_helper = ComponentShareDistributionFormSetHelper()

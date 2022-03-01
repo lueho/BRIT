@@ -143,13 +143,32 @@ class ItemForm(BSModalModelForm):
         self.helper = FormHelper()
 
 
-class BaseCompositionFormSet(BaseInlineFormSet):
+class MaterialComponentShareModelForm(forms.ModelForm):
+    class Meta:
+        model = MaterialComponentShare
+        fields = ('component', 'average', 'standard_deviation',)
+
+    def __init__(self, *args, **kwargs):
+        if 'instance' in kwargs:
+            instance = kwargs.get('instance')
+            instance.average *= 100
+            instance.standard_deviation *= 100
+        super().__init__(*args, **kwargs)
+
+    def clean_average(self):
+        return self.cleaned_data.get('average') / 100
+
+    def clean_standard_deviation(self):
+        return self.cleaned_data.get('standard_deviation') / 100
+
+
+class MaterialComponentShareInlineFormset(BaseInlineFormSet):
     def clean(self):
-        """Checks that the sum of all weight fractions is 1."""
         if any(self.errors):
             return
         if sum([form.cleaned_data.get('average') for form in self.forms]) != 1.0:
-            raise ValidationError("The weight fractions must sum up to 1.")
+            raise ValidationError('Weight shares of components must sum up to 100%')
+        super().clean()
 
 
 class PlainTextComponentWidget(forms.Widget):
@@ -169,13 +188,14 @@ class InlineComponentShare(InlineFormSetFactory):
     model = MaterialComponentShare
     fields = ('component', 'average', 'standard_deviation')
     factory_kwargs = {
-        'formset': BaseCompositionFormSet,
+        'form': MaterialComponentShareModelForm,
+        'formset': MaterialComponentShareInlineFormset,
         'extra': 0,
         'can_delete': False,
         'widgets': {
             'component': PlainTextComponentWidget(),
-            'average': forms.NumberInput(attrs={'min': 0, 'max': 1.0, 'step': 0.0001}),
-            'standard_deviation': forms.NumberInput(attrs={'min': 0, 'max': 1.0, 'step': 0.0001})
+            'average': forms.NumberInput(attrs={'min': 0, 'max': 100, 'step': 0.01}),
+            'standard_deviation': forms.NumberInput(attrs={'min': 0, 'max': 100, 'step': 0.01})
         }
     }
 
