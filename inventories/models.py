@@ -7,11 +7,12 @@ from django.db.models.query import QuerySet
 from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
 from django.urls import reverse
-from maps.models import Region, Catchment, GeoDataset, SFBSite
 
 import case_studies
+from bibliography.models import Source
 from distributions.models import Timestep
-from materials.models import Material, MaterialSettings
+from maps.models import Region, Catchment, GeoDataset, SFBSite
+from materials.models import Material, SampleSeries
 from .exceptions import BlockedRunningScenario
 
 
@@ -26,9 +27,9 @@ class InventoryAlgorithm(models.Model):
     function_name = models.CharField(max_length=56, null=True)
     description = models.TextField(blank=True, null=True)
     geodataset = models.ForeignKey(GeoDataset, on_delete=models.CASCADE)  # TODO: Make many2many?
-    feedstock = models.ManyToManyField(Material, limit_choices_to={'is_feedstock': True})  # TODO: rename to plural
+    feedstocks = models.ManyToManyField(Material)
     default = models.BooleanField('Default for this combination of geodataset and feedstock', default=False)
-    source = models.CharField(max_length=200, blank=True, null=True)  # TODO: connect to bibliography
+    source = models.ForeignKey(Source, on_delete=models.PROTECT, null=True)
 
     # TODO: How are default values controlled?
 
@@ -181,14 +182,14 @@ class Scenario(models.Model):
         """
         Returns all materials that can be included in this scenario.
         """
-        materials = Material.objects.filter(id__in=self.available_inventory_algorithms().values('feedstock'))
-        return MaterialSettings.objects.filter(material__in=materials)
+        materials = Material.objects.filter(id__in=self.available_inventory_algorithms().values('feedstocks'))
+        return SampleSeries.objects.filter(material__in=materials)
 
     def feedstocks(self):
         """
-        Returns all materials (MaterialSettings) that have been included in this scenario.
+        Returns all materials (SampleSeries) that have been included in this scenario.
         """
-        return MaterialSettings.objects.filter(id__in=self.scenarioinventoryconfiguration_set.all().values('feedstock'))
+        return SampleSeries.objects.filter(id__in=self.scenarioinventoryconfiguration_set.all().values('feedstock'))
 
     def available_geodatasets(self, feedstock: Material = None, feedstocks: QuerySet = None):
         """
@@ -197,17 +198,17 @@ class Scenario(models.Model):
         geodatasets which have algorithms for these given feedstocks.
         """
         if feedstocks is None and feedstock is None:
-            feedstocks = Material.objects.feedstocks()
+            feedstocks = Material.objects.filter(type='material')
         elif feedstocks is None and feedstock is not None:
             feedstocks = Material.objects.filter(id=feedstock.id)
 
         return GeoDataset.objects.filter(
             id__in=InventoryAlgorithm.objects.filter(
-                feedstock__in=feedstocks, geodataset__region=self.region).values('geodataset'))
+                feedstocks__in=feedstocks, geodataset__region=self.region).values('geodataset'))
 
     def evaluated_geodatasets(self, feedstock: Material = None, feedstocks: QuerySet = None):
         if feedstocks is None and feedstock is None:
-            feedstocks = Material.objects.feedstocks()
+            feedstocks = Material.objects.filter(type='material')
         elif feedstocks is None and feedstock is not None:
             feedstocks = Material.objects.filter(id=feedstock.id)
         return GeoDataset.objects.filter(
@@ -216,7 +217,7 @@ class Scenario(models.Model):
 
     def remaining_geodataset_options(self, feedstock: Material = None, feedstocks: QuerySet = None):
         if feedstocks is None and feedstock is None:
-            feedstocks = Material.objects.feedstocks()
+            feedstocks = Material.objects.filter(type='material')
         elif feedstocks is None and feedstock is not None:
             feedstocks = Material.objects.filter(id=feedstock.id)
         return self.available_geodatasets(
@@ -229,7 +230,7 @@ class Scenario(models.Model):
                                        geodatasets: QuerySet = None):
 
         if feedstocks is None and feedstock is None:
-            feedstocks = Material.objects.feedstocks()
+            feedstocks = Material.objects.filter(type='material')
         elif feedstocks is None and feedstock is not None:
             feedstocks = Material.objects.filter(id=feedstock.id)
 
@@ -240,7 +241,7 @@ class Scenario(models.Model):
 
         geodatasets = geodatasets.filter(region=self.region)
 
-        return InventoryAlgorithm.objects.filter(feedstock__in=feedstocks, geodataset__in=geodatasets)
+        return InventoryAlgorithm.objects.filter(feedstocks__in=feedstocks, geodataset__in=geodatasets)
 
     def evaluated_inventory_algorithms(self):
         return InventoryAlgorithm.objects.filter(
@@ -278,7 +279,7 @@ class Scenario(models.Model):
         # self.remove_inventory_algorithm(algorithm, feedstock)
 
         if feedstock not in self.available_feedstocks():
-            raise FeedstockNotImplemented(algorithm.feedstock)
+            raise FeedstockNotImplemented(feedstock)
 
         if custom_parameter_values:
             # for value in custom_parameter_values:
@@ -310,7 +311,7 @@ class Scenario(models.Model):
                 }
                 ScenarioInventoryConfiguration.objects.create(**config)
 
-    def remove_inventory_algorithm(self, algorithm: InventoryAlgorithm, feedstock: MaterialSettings):
+    def remove_inventory_algorithm(self, algorithm: InventoryAlgorithm, feedstock: SampleSeries):
         """
         Remove all entries from the configuration that are associated with the given algorithm.
         """
@@ -473,7 +474,7 @@ class Scenario(models.Model):
 class InventoryAmountShare(models.Model):
     owner = models.ForeignKey(User, default=1, on_delete=models.CASCADE)
     scenario = models.ForeignKey(Scenario, null=True, on_delete=models.CASCADE)
-    feedstock = models.ForeignKey(MaterialSettings, null=True, on_delete=models.CASCADE)
+    feedstock = models.ForeignKey(SampleSeries, null=True, on_delete=models.CASCADE)
     timestep = models.ForeignKey(Timestep, null=True, on_delete=models.CASCADE)
     average = models.FloatField(default=0.0)
     standard_deviation = models.FloatField(default=0.0)
@@ -502,7 +503,7 @@ def manage_scenario_status(sender, instance, created, **kwargs):
 
 class ScenarioInventoryConfiguration(models.Model):
     scenario = models.ForeignKey(Scenario, on_delete=models.CASCADE)
-    feedstock = models.ForeignKey(MaterialSettings, on_delete=models.CASCADE, null=True)
+    feedstock = models.ForeignKey(SampleSeries, on_delete=models.CASCADE, null=True)
     geodataset = models.ForeignKey(GeoDataset, on_delete=models.CASCADE)
     inventory_algorithm = models.ForeignKey(InventoryAlgorithm, on_delete=models.CASCADE)
     inventory_parameter = models.ForeignKey(InventoryAlgorithmParameter, on_delete=models.CASCADE, null=True)

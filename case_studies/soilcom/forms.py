@@ -1,3 +1,4 @@
+import django.db.utils
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Field, Layout, Submit
 from django import forms
@@ -7,7 +8,7 @@ from extra_views import InlineFormSetFactory
 
 from bibliography.models import Source
 from brit.forms import CustomModelForm, CustomModalModelForm
-from materials.models import Material, MaterialGroup
+from materials.models import Material, MaterialCategory
 from . import models
 
 
@@ -63,8 +64,8 @@ class WasteStreamModelForm(CustomModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        groups = MaterialGroup.objects.filter(name='Biowaste component')
-        self.fields['allowed_materials'].queryset = Material.objects.filter(groups__in=groups)
+        categories = MaterialCategory.objects.filter(name='Biowaste component')
+        self.fields['allowed_materials'].queryset = Material.objects.filter(categories__in=categories)
 
     class Meta:
         model = models.WasteStream
@@ -212,10 +213,6 @@ class CollectionModelForm(forms.ModelForm):
             return super().save(commit=False)
 
 
-COUNTRY_SET = set(sorted(set((c.catchment.region.country_code, c.catchment.region.country_code) for c in
-                             models.Collection.objects.all())))
-
-
 class CollectionFilterForm(forms.Form):
     collection_system = forms.ModelMultipleChoiceField(
         queryset=models.CollectionSystem.objects.all(),
@@ -228,7 +225,7 @@ class CollectionFilterForm(forms.Form):
         required=False
     )
     countries = forms.MultipleChoiceField(
-        choices=COUNTRY_SET,
+        choices=set(),
         widget=forms.CheckboxSelectMultiple,
         required=False
     )
@@ -238,9 +235,12 @@ class CollectionFilterForm(forms.Form):
         required=False
     )
 
-    last_editor = forms.ModelMultipleChoiceField(
-        queryset=User.objects.filter(
+    last_editor = forms.ModelMultipleChoiceField(queryset=None, widget=forms.CheckboxSelectMultiple, required=False)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['countries'].choices = set(
+            sorted(set((c.catchment.region.country_code, c.catchment.region.country_code) for c in
+                       models.Collection.objects.all())))
+        self.fields['last_editor'].queryset = User.objects.filter(
             id__in=[i[0] for i in models.Collection.objects.values_list('lastmodified_by').distinct()]),
-        widget=forms.CheckboxSelectMultiple,
-        required=False
-    )

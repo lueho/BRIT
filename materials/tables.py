@@ -3,20 +3,16 @@ from django.utils.html import format_html
 from django_tables2 import Column, Table
 
 
-def averages_table_factory(group_settings):
+def averages_table_factory(composition):
     table_data = []
-    composition_set = group_settings.average_composition
-    for share in composition_set.materialcomponentshare_set.all():
+    for share in composition.shares.all():
         remove_html = format_html(
             '''
-            <a href="{0}" class="collapse multi-collapse">
+            <a href="{0}" class="collapse multi-collapse modal-link">
                 <i class="fas fa-fw fa-trash"></i>
             </a>
             ''',
-            reverse('material_component_group_remove_component', kwargs={
-                'pk': group_settings.id,
-                'component_pk': share.component.id
-            })
+            reverse('weightshare-delete-modal', kwargs={'pk': share.id})
         )
         table_row = {
             'component': share.component.name,
@@ -37,7 +33,7 @@ def averages_table_factory(group_settings):
                 <i class="fas fa-fw fa-plus"></i> Add component
             </a>
             ''',
-            reverse('add_component', kwargs={'pk': group_settings.id})
+            reverse('composition-add-component', kwargs={'pk': composition.id})
         ),
         'fraction': format_html(
             '''
@@ -45,7 +41,7 @@ def averages_table_factory(group_settings):
                 <i class="fas fa-fw fa-edit"></i> Change composition
             </a>
             ''',
-            reverse('compositionset-update-modal', kwargs={'pk': group_settings.average_composition.id})
+            reverse('composition-update-modal', kwargs={'pk': composition.id})
         )
     }
     columns = {
@@ -53,7 +49,7 @@ def averages_table_factory(group_settings):
         'fraction': Column(footer=footers['fraction']),
         'remove': Column(attrs={"td": {"class": "collapse multi-collapse"}, "th": {"class": "collapse multi-collapse"}})
     }
-    table_class = type(f'AveragesTable{group_settings.id}', (Table,), columns)
+    table_class = type(f'AveragesTable{composition.id}', (Table,), columns)
     return table_class(table_data)
 
 
@@ -81,7 +77,7 @@ def distribution_table_factory(group_settings, distribution):
                 <i class="fas fa-fw fa-edit"></i>
             </a>
             ''',
-            reverse('compositionset-update-modal', kwargs={'pk': cs.id}))
+            reverse('composition-update-modal', kwargs={'pk': cs.id}))
 
     if len(table_data) > 0:
         columns = {}

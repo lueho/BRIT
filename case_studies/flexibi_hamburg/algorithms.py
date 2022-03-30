@@ -3,7 +3,7 @@ from distributions.models import TemporalDistribution
 from distributions.plots import Distribution
 from inventories.algorithms import InventoryAlgorithmsBase
 from inventories.models import Scenario
-from materials.models import MaterialComponentGroup, MaterialSettings
+from materials.models import MaterialComponentGroup, SampleSeries
 
 
 class InventoryAlgorithms(InventoryAlgorithmsBase):
@@ -22,7 +22,7 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
         result = super().avg_point_yield(**kwargs)
 
         scenario = Scenario.objects.get(id=kwargs.get('scenario_id'))
-        feedstock = MaterialSettings.objects.get(id=kwargs.get('feedstock_id'))
+        feedstock = SampleSeries.objects.get(id=kwargs.get('feedstock_id'))
 
         result['aggregated_distributions'] = []
 

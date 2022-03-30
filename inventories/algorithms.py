@@ -139,7 +139,7 @@ class InventoryAlgorithmsBase(object):
                 'point_yield_standard_deviation': point_yield['standard_deviation']
             })
 
-        component_list = kwargs.get('component_list')
+        component_list = kwargs.get('materialcomponent-list')
         distribution = kwargs.get('seasonal_distribution')
 
         for component in component_list:

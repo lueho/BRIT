@@ -4,7 +4,7 @@ from django.test import TestCase
 from rest_framework.serializers import ModelSerializer, Serializer, CharField, IntegerField
 
 from maps.models import Catchment
-from materials.models import MaterialGroup
+from materials.models import MaterialCategory
 from ..models import Collector, WasteComponent, WasteStream, WasteCategory, WasteFlyer, CollectionSystem, Collection
 from ..serializers import FieldLabelMixin, CollectionModelSerializer
 
@@ -83,7 +83,7 @@ class CollectionSerializerTestCase(TestCase):
     def setUpTestData(cls):
         owner = User.objects.create(username='owner', password='very-secure!')
 
-        MaterialGroup.objects.create(owner=owner, name='Biowaste component')
+        MaterialCategory.objects.create(owner=owner, name='Biowaste component')
         material1 = WasteComponent.objects.create(owner=owner, name='Test material 1')
         material2 = WasteComponent.objects.create(owner=owner, name='Test material 2')
         waste_stream = WasteStream.objects.create(

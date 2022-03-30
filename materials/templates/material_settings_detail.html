@@ -40,6 +40,38 @@
                 </div>
             </div>
         </div>
+
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow">
+                <div class="card-header">
+                    <b>Properties</b>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        {{ object.material.description }}
+                    </p>
+                    <div class="collapse multi-collapse">
+                        <a href="{% url 'material-update-modal' object.material.id %}?next={{ request.path }}"
+                           class="modal-link">
+                            Edit <i class="fas fa-fw fa-edit"></i>
+                        </a>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    {% if allow_edit %}
+                        <button
+                                class="btn btn-primary"
+                                type="button"
+                                data-toggle="collapse"
+                                data-target=".multi-collapse"
+                                aria-expanded="false"
+                                aria-controls="add-component-group">
+                            Edit
+                        </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
     </div>
     <!-- end basic material definition -->
 
@@ -50,6 +82,7 @@
                 <div class="accordion">
                     <div class="card shadow mt-3 tab-card">
                         <div class="card-header tab-card-header">
+                            <h3 class="card-title">{{ group_settings.group.name }}</h3>
                             <ul class="nav nav-tabs card-header-tabs" id="composition-tabs-{{ group_settings.id }}"
                                 role="tablist">
                                 <li class="nav-item">
@@ -172,7 +205,7 @@
                                  id="remove-component-group-{{ group_settings.id }}">
                                 <a id="remove-group-{{ group_settings.id }}"
                                    class="modal-link"
-                                   href="{% url 'material_component_group_remove' group_settings.id %}">
+                                   href="{% url 'composition-delete-modal' group_settings.id %}">
                                     <i class="fas fa-fw fa-trash"></i> Remove group
                                 </a>
                             </div>
@@ -188,7 +221,7 @@
                 <div class="card border-left-primary border">
                     <div class="card-header"></div>
                     <div class="card-body">
-                        <a href="{% url 'material_add_component_group' object.id %}"
+                        <a href="{% url 'sampleseries-add-componentgroup' object.id %}"
                            class="modal-link">
                             <i class="fas fa-fw fa-plus"></i> Add component group
                         </a>

@@ -1,6 +1,6 @@
 from bootstrap_modal_forms.forms import BSModalModelForm, BSModalForm
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Row, Field
+from crispy_forms.layout import Layout, Row, Field, Fieldset
 from django import forms
 from django.core.exceptions import ValidationError
 from django.forms.models import BaseInlineFormSet
@@ -14,54 +14,150 @@ from .models import (
     Material,
     MaterialComponent,
     MaterialComponentGroup,
-    MaterialComponentGroupSettings,
-    MaterialComponentShare,
-    MaterialGroup,
+    Composition,
+    WeightShare,
+    MaterialCategory,
+    SampleSeries, MaterialProperty,
+    Sample, MaterialPropertyValue
 )
 
 
-class MaterialGroupModelForm(CustomModelForm):
+class MaterialCategoryModelForm(CustomModelForm):
     class Meta:
-        model = MaterialGroup
+        model = MaterialCategory
         fields = ('name', 'description')
 
 
-class MaterialGroupModalModelForm(CustomModalModelForm):
+class MaterialCategoryModalModelForm(CustomModalModelForm):
     class Meta:
-        model = MaterialGroup
+        model = MaterialCategory
         fields = ('name', 'description')
 
 
 class MaterialModelForm(CustomModelForm):
     class Meta:
         model = Material
-        fields = ('name', 'description', 'groups')
+        fields = ('name', 'description', 'categories')
 
 
 class MaterialModalModelForm(CustomModalModelForm):
     class Meta:
         model = Material
-        fields = ('name', 'description', 'groups')
+        fields = ('name', 'description', 'categories')
 
 
-class ComponentModelForm(BSModalModelForm):
+class ComponentModelForm(CustomModelForm):
+    class Meta:
+        model = MaterialComponent
+        fields = ('name', 'description')
+
+
+class ComponentModalModelForm(CustomModalModelForm):
     class Meta:
         model = MaterialComponent
         fields = ('name', 'description',)
 
+
+class ComponentGroupModelForm(CustomModelForm):
+    class Meta:
+        model = MaterialComponentGroup
+        fields = ('name', 'description')
+
+
+class ComponentGroupModalModelForm(CustomModalModelForm):
+    class Meta:
+        model = MaterialComponentGroup
+        fields = ('name', 'description',)
+
+
+class MaterialPropertyModelForm(CustomModelForm):
+    class Meta:
+        model = MaterialProperty
+        fields = ('name', 'unit', 'description')
+
+
+class MaterialPropertyModalModelForm(CustomModalModelForm):
+    class Meta:
+        model = MaterialProperty
+        fields = ('name', 'unit', 'description',)
+
+
+class MaterialPropertyValueModelForm(CustomModelForm):
+    class Meta:
+        model = MaterialPropertyValue
+        fields = ('property', 'average', 'standard_deviation')
+
+
+class MaterialPropertyValueModalModelForm(CustomModalModelForm):
+    class Meta:
+        model = MaterialPropertyValue
+        fields = ('property', 'average', 'standard_deviation',)
+
+
+class SampleSeriesModelForm(CustomModelForm):
+    class Meta:
+        model = SampleSeries
+        fields = ('name', 'material')
+
+
+class SampleSeriesModalModelForm(CustomModalModelForm):
+    class Meta:
+        model = SampleSeries
+        fields = ('name', 'material')
+
+
+class SampleModelForm(CustomModelForm):
+    class Meta:
+        model = Sample
+        fields = ('name', 'series', 'timestep', 'taken_at', 'preview')
+
+
+class SampleModalModelForm(CustomModalModelForm):
+    class Meta:
+        model = Sample
+        fields = ('name', 'series', 'timestep', 'taken_at', 'preview')
+
+
+class CompositionModelForm(CustomModelForm):
+    class Meta:
+        model = Composition
+        fields = ('group', 'sample', 'fractions_of')
+
+
+class CompositionModalModelForm(CustomModalModelForm):
+    class Meta:
+        model = Composition
+        fields = ('group', 'sample', 'fractions_of')
+
+
+class AddComponentGroupModalForm(BSModalModelForm):
+    group = forms.ModelChoiceField(queryset=MaterialComponentGroup.objects.all())
+    fractions_of = forms.ModelChoiceField(queryset=MaterialComponent.objects.all())
+
+    class Meta:
+        model = SampleSeries
+        fields = ['group', 'fractions_of', ]
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['group'].queryset = MaterialComponentGroup.objects.exclude(id__in=self.instance.blocked_ids)
+        self.fields['fractions_of'].queryset = self.instance.components
+        self.fields['fractions_of'].empty_label = None
         self.helper = ModalFormHelper()
 
 
-class AddComponentForm(BSModalForm):
+class AddComponentModalForm(BSModalModelForm):
     component = forms.ModelChoiceField(queryset=MaterialComponent.objects.all())
 
     class Meta:
+        model = Composition
         fields = ('component',)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['component'].queryset = MaterialComponent.objects.exclude(
+            id__in=self.instance.blocked_component_ids
+        )
         self.helper = ModalFormHelper()
 
 
@@ -83,31 +179,9 @@ class AddSeasonalVariationForm(BSModalForm):
         self.helper = ModalFormHelper()
 
 
-class ComponentGroupModelForm(BSModalModelForm):
-    class Meta:
-        model = MaterialComponentGroup
-        fields = ('name', 'description',)
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.helper = ModalFormHelper()
-
-
-class AddComponentGroupForm(BSModalForm):
-    group = forms.ModelChoiceField(queryset=MaterialComponentGroup.objects.all())
-    fractions_of = forms.ModelChoiceField(queryset=MaterialComponent.objects.all())
-
-    class Meta:
-        fields = ['group', 'fractions_of', ]
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.helper = ModalFormHelper()
-
-
 class ComponentShareUpdateForm(BSModalModelForm):
     class Meta:
-        model = MaterialComponentShare
+        model = WeightShare
         fields = ('average', 'standard_deviation')
         widgets = {
             'average': forms.NumberInput(attrs={'min': 0, 'max': 1.0, 'step': 0.01}),
@@ -121,7 +195,7 @@ class ComponentShareUpdateForm(BSModalModelForm):
 
 class CompositionUpdateForm(BSModalModelForm):
     class Meta:
-        model = MaterialComponentShare
+        model = WeightShare
         fields = ('component', 'average', 'standard_deviation')
         widgets = {
             'average': forms.NumberInput(attrs={'min': 0, 'max': 1.0, 'step': 0.01}),
@@ -135,7 +209,7 @@ class CompositionUpdateForm(BSModalModelForm):
 
 class ItemForm(BSModalModelForm):
     class Meta:
-        model = MaterialComponentShare
+        model = WeightShare
         fields = ('component', 'average', 'standard_deviation')
 
     def __init__(self, *args, **kwargs):
@@ -145,7 +219,7 @@ class ItemForm(BSModalModelForm):
 
 class MaterialComponentShareModelForm(forms.ModelForm):
     class Meta:
-        model = MaterialComponentShare
+        model = WeightShare
         fields = ('component', 'average', 'standard_deviation',)
 
     def __init__(self, *args, **kwargs):
@@ -154,6 +228,8 @@ class MaterialComponentShareModelForm(forms.ModelForm):
             instance.average *= 100
             instance.standard_deviation *= 100
         super().__init__(*args, **kwargs)
+        self.fields.get('component').label = ' '
+        self.fields.get('component').required = False
 
     def clean_average(self):
         return self.cleaned_data.get('average') / 100
@@ -180,18 +256,21 @@ class PlainTextComponentWidget(forms.Widget):
         except MaterialComponent.DoesNotExist:
             object_name = '-'
 
-        return mark_safe("<div style=\"min-width: 7em; padding-right: 12px;\">" + (str(
-            object_name) if value is not None else '-') + "</div>" + f"<input type='hidden' name='{name}' value='{value}'>")
+        return mark_safe("<div style=\"min-width: 7em; padding-right: 12px;\"><b>" + (str(
+            object_name) if value is not None else '-') + "</b></div>" + f"<input type='hidden' name='{name}' value='{value}'>")
+
+        # return mark_safe("<b>" + (str(object_name) if value is not None else '-') + "</b>" +
+        #                  f"<input type='hidden' name='{name}' value='{value}'>")
 
 
 class InlineComponentShare(InlineFormSetFactory):
-    model = MaterialComponentShare
+    model = WeightShare
     fields = ('component', 'average', 'standard_deviation')
     factory_kwargs = {
         'form': MaterialComponentShareModelForm,
         'formset': MaterialComponentShareInlineFormset,
         'extra': 0,
-        'can_delete': False,
+        'can_delete': True,
         'widgets': {
             'component': PlainTextComponentWidget(),
             'average': forms.NumberInput(attrs={'min': 0, 'max': 100, 'step': 0.01}),
@@ -202,12 +281,27 @@ class InlineComponentShare(InlineFormSetFactory):
 
 class AddTemporalDistributionForm(BSModalModelForm):
     class Meta:
-        model = MaterialComponentGroupSettings
+        model = Composition
         fields = '__all__'
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
+
+
+class WeightShareUpdateFormSetHelper(FormHelper):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.form_method = 'post'
+        self.layout = Layout(
+            Row(
+                Field('component'),
+                Field('average'),
+                Field('standard_deviation'),
+                Field('DELETE')
+            ),
+        )
+        self.render_required_fields = True
 
 
 class ComponentShareDistributionFormSetHelper(FormHelper):

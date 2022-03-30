@@ -7,4 +7,4 @@ class BlockedRunningScenario(Exception):
 
 
 class IllegalComponentShare(Exception):
-    """Creating ComponentGroupShares is only valid with the MaterialComponentGroupSettings API"""
+    """Creating ComponentGroupShares is only valid with the Composition API"""

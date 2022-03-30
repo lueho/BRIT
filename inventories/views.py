@@ -16,7 +16,7 @@ from brit.views import DualUserListView, UserOwnsObjectMixin, NextOrSuccessUrlMi
 from layer_manager.models import Layer
 from maps.models import Catchment, GeoDataset
 from maps.serializers import BaseResultMapSerializer
-from materials.models import MaterialSettings
+from materials.models import SampleSeries
 from users.models import get_default_owner
 from users.views import ModalLoginRequiredMixin
 from .evaluations import ScenarioResult
@@ -208,7 +208,7 @@ class ScenarioAddInventoryAlgorithmView(LoginRequiredMixin, UserPassesTestMixin,
     def post(request, *args, **kwargs):
         scenario_id = request.POST.get('scenario')
         scenario = Scenario.objects.get(id=scenario_id)
-        feedstock = MaterialSettings.objects.get(id=request.POST.get('feedstock'))
+        feedstock = SampleSeries.objects.get(id=request.POST.get('feedstock'))
         algorithm_id = request.POST.get('inventory_algorithm')
         algorithm = InventoryAlgorithm.objects.get(id=algorithm_id)
         parameters = algorithm.inventoryalgorithmparameter_set.all()
@@ -257,7 +257,7 @@ class ScenarioAlgorithmConfigurationUpdateView(LoginRequiredMixin, UserPassesTes
     def post(request, *args, **kwargs):
         scenario = Scenario.objects.get(id=request.POST.get('scenario'))
         current_algorithm = InventoryAlgorithm.objects.get(id=request.POST.get('current_algorithm'))
-        feedstock = MaterialSettings.objects.get(id=request.POST.get('feedstock'))
+        feedstock = SampleSeries.objects.get(id=request.POST.get('feedstock'))
         scenario.remove_inventory_algorithm(current_algorithm, feedstock)
         new_algorithm = InventoryAlgorithm.objects.get(id=request.POST.get('inventory_algorithm'))
         parameters = new_algorithm.inventoryalgorithmparameter_set.all()
@@ -303,7 +303,7 @@ class ScenarioRemoveInventoryAlgorithmView(LoginRequiredMixin, UserPassesTestMix
     def get(self, request, *args, **kwargs):
         self.scenario = Scenario.objects.get(id=self.kwargs.get('scenario_pk'))
         self.algorithm = InventoryAlgorithm.objects.get(id=self.kwargs.get('algorithm_pk'))
-        self.feedstock = MaterialSettings.objects.get(id=self.kwargs.get('feedstock_pk'))
+        self.feedstock = SampleSeries.objects.get(id=self.kwargs.get('feedstock_pk'))
         self.scenario.remove_inventory_algorithm(algorithm=self.algorithm, feedstock=self.feedstock)
         return redirect('scenario_detail', pk=self.scenario.id)
 
@@ -329,7 +329,7 @@ def load_catchment_options(request):
 def load_geodataset_options(request):
     scenario = Scenario.objects.get(id=request.GET.get('scenario'))
     if request.GET.get('feedstock'):
-        feedstock = MaterialSettings.objects.get(id=request.GET.get('feedstock'))
+        feedstock = SampleSeries.objects.get(id=request.GET.get('feedstock'))
         if request.GET.get('options') == 'create':
             geodatasets = scenario.remaining_geodataset_options(feedstock=feedstock.material)
         elif request.GET.get('options') == 'update':
@@ -345,7 +345,7 @@ def load_geodataset_options(request):
 def load_algorithm_options(request):
     scenario = Scenario.objects.get(id=request.GET.get('scenario'))
     if request.GET.get('feedstock') and request.GET.get('geodataset'):
-        feedstock = MaterialSettings.objects.get(id=request.GET.get('feedstock'))
+        feedstock = SampleSeries.objects.get(id=request.GET.get('feedstock'))
         geodataset = GeoDataset.objects.get(id=request.GET.get('geodataset'))
         if request.GET.get('options') == 'create':
             algorithms = scenario.remaining_inventory_algorithm_options(feedstock, geodataset)
@@ -485,7 +485,7 @@ class ScenarioResultDetailMapView(DetailView):
     def get_object(self, **kwargs):
         scenario = Scenario.objects.get(id=self.kwargs.get('pk'))
         algorithm = InventoryAlgorithm.objects.get(id=self.kwargs.get('algorithm_pk'))
-        feedstock = MaterialSettings.objects.get(id=self.kwargs.get('feedstock_pk'))
+        feedstock = SampleSeries.objects.get(id=self.kwargs.get('feedstock_pk'))
         return Layer.objects.get(scenario=scenario, algorithm=algorithm, feedstock=feedstock)
 
 

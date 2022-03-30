@@ -1,7 +1,7 @@
 {% extends 'base.html' %}
 {% load static %}
 
-{% block title %}BRIT | Materials{% endblock title %}
+{% block title %}BRIT | Material Samples{% endblock title %}
 
 {% block content %}
 
@@ -22,22 +22,11 @@
     </div>
     <div class="row">
 
-        {% for material in object_list %}
+        {% for object in object_list %}
             <div class="col col-12 col-md-6 col-lg-3 mt-4">
                 {% include 'material_card.html' %}
             </div>
         {% endfor %}
 
     </div>
-    <div class="row">
-        <div class="col">
-            <div class="card shadow mt-4">
-                <div class="card-header"></div>
-                <div class="card-body">
-                    <a class="btn btn-primary" href="{% url 'sampleseries-list' %}">See all sample series</a>
-                </div>
-            </div>
-        </div>
-    </div>
-
 {% endblock content %}

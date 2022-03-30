@@ -2,12 +2,119 @@ from django.contrib.auth.models import User, Group, Permission
 from django.forms import inlineformset_factory
 from django.test import TestCase
 
-from ..forms import MaterialComponentShareModelForm, MaterialComponentShareInlineFormset
-from ..models import Material, MaterialComponentGroup, MaterialComponentGroupSettings, MaterialComponent, \
-    CompositionSet, MaterialComponentShare
+from distributions.models import Timestep
+from ..forms import MaterialComponentShareModelForm, MaterialComponentShareInlineFormset, AddComponentGroupModalForm, \
+    AddComponentModalForm
+from ..models import Material, MaterialComponentGroup, Composition, MaterialComponent, \
+    WeightShare, Sample, get_default_owner, SampleSeries
 
 
-class CompositionSetUpdateFormTestCase(TestCase):
+class AddComponentGroupModalModelFormTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = get_default_owner()
+        material = Material.objects.create(
+            owner=owner,
+            name='Test Material'
+        )
+        MaterialComponentGroup.objects.create(
+            owner=owner,
+            name='Test Group 1'
+        )
+        MaterialComponentGroup.objects.create(
+            owner=owner,
+            name='Test Group 2'
+        )
+
+    def setUp(self):
+        self.owner = get_default_owner()
+        self.material = Material.objects.get(name='Test Material')
+        self.group1 = MaterialComponentGroup.objects.get(name='Test Group 1')
+        self.group2 = MaterialComponentGroup.objects.get(name='Test Group 2')
+
+    def test_initial_group_queryset_has_only_unused_groups(self):
+        sample_series = SampleSeries.objects.create(
+            owner=self.owner,
+            material=self.material
+        )
+        sample_series.add_component_group(self.group1)
+        form = AddComponentGroupModalForm(instance=sample_series)
+        self.assertQuerysetEqual(
+            form.fields['group'].queryset.order_by('id'),
+            MaterialComponentGroup.objects.filter(name='Test Group 2').order_by('id')
+        )
+
+    def test_initial_fractions_of_queryset_has_only_used_components(self):
+        sample_series = SampleSeries.objects.create(
+            owner=self.owner,
+            material=self.material
+        )
+        form = AddComponentGroupModalForm(instance=sample_series)
+        self.assertQuerysetEqual(
+            form.fields['fractions_of'].queryset.order_by('id'),
+            MaterialComponent.objects.filter(id=MaterialComponent.objects.default().id).order_by('id')
+        )
+
+
+class AddComponentModalModelFormTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = get_default_owner()
+        material = Material.objects.create(
+            owner=owner,
+            name='Test Material'
+        )
+        sample_series = SampleSeries.objects.create(
+            owner=owner,
+            material=material,
+            name='Test Series',
+        )
+        sample = Sample.objects.get(
+            owner=owner,
+            series=sample_series,
+            timestep=Timestep.objects.default()
+        )
+        component_group = MaterialComponentGroup.objects.create(
+            owner=owner,
+            name='Test Group'
+        )
+        Composition.objects.create(
+            owner=owner,
+            sample=sample,
+            group=component_group,
+            fractions_of=MaterialComponent.objects.default()
+        )
+
+        MaterialComponent.objects.create(
+            owner=owner,
+            name='Test Component 1'
+        )
+
+        MaterialComponent.objects.create(
+            owner=owner,
+            name='Test Component 2'
+        )
+
+    def setUp(self):
+        self.owner = get_default_owner()
+        self.component_group = MaterialComponentGroup.objects.get(name='Test Group')
+        self.sample = Sample.objects.get(series__name='Test Series', timestep=Timestep.objects.default())
+        self.composition = Composition.objects.get(sample=self.sample, group=self.component_group)
+        self.component1 = MaterialComponent.objects.get(name='Test Component 1')
+        self.component2 = MaterialComponent.objects.get(name='Test Component 2')
+
+    def test_initial_component_queryset_contains_only_unused_components(self):
+        self.composition.add_component(self.component1, average=0.5, standard_deviation=0.02)
+        form = AddComponentModalForm(instance=self.composition)
+        self.assertQuerysetEqual(
+            form.fields['component'].queryset.order_by('id'),
+            MaterialComponent.objects.filter(name='Test Component 2').order_by('id')
+        )
+
+
+class CompositionUpdateFormTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
@@ -15,8 +122,8 @@ class CompositionSetUpdateFormTestCase(TestCase):
         User.objects.create(username='outsider', password='very-secure!')
         member = User.objects.create(username='member', password='very-secure!')
         members = Group.objects.create(name='members')
-        members.permissions.add(Permission.objects.get(codename='change_compositionset'))
-        members.permissions.add(Permission.objects.get(codename='change_materialcomponentshare'))
+        members.permissions.add(Permission.objects.get(codename='change_composition'))
+        members.permissions.add(Permission.objects.get(codename='change_weightshare'))
         member.groups.add(members)
 
         material = Material.objects.create(
@@ -28,16 +135,18 @@ class CompositionSetUpdateFormTestCase(TestCase):
             owner=owner,
             name='Test Group'
         )
-        group_settings = MaterialComponentGroupSettings.objects.create(
+
+        SampleSeries.objects.create(
             owner=owner,
-            group=group,
-            material_settings=material.standard_settings,
-            fractions_of=MaterialComponent.objects.default()
+            material=material,
+            name='Test Series'
         )
 
-        composition_set = CompositionSet.objects.get(
+        composition = Composition.objects.create(
             owner=owner,
-            group_settings=group_settings
+            group=group,
+            sample=Sample.objects.get(series__name='Test Series'),
+            fractions_of=MaterialComponent.objects.default()
         )
 
         for i in range(5):
@@ -45,10 +154,10 @@ class CompositionSetUpdateFormTestCase(TestCase):
                 owner=owner,
                 name=f'Test Component {i}'
             )
-            MaterialComponentShare.objects.create(
+            WeightShare.objects.create(
                 owner=owner,
                 component=component,
-                composition_set=composition_set,
+                composition=composition,
                 average=0.2,
                 standard_deviation=0.01
             )
@@ -57,8 +166,8 @@ class CompositionSetUpdateFormTestCase(TestCase):
         self.owner = User.objects.get(username='owner')
         self.outsider = User.objects.get(username='outsider')
         self.member = User.objects.get(username='member')
-        self.composition_set = CompositionSet.objects.get(
-            group_settings__group__name='Test Group'
+        self.composition = Composition.objects.get(
+            group__name='Test Group'
         )
         self.material = Material.objects.get(
             owner=self.owner,
@@ -67,17 +176,17 @@ class CompositionSetUpdateFormTestCase(TestCase):
 
     def test_initial_values_are_displayed_as_percentages(self):
         FormSet = inlineformset_factory(
-            CompositionSet,
-            MaterialComponentShare,
+            Composition,
+            WeightShare,
             form=MaterialComponentShareModelForm,
             formset=MaterialComponentShareInlineFormset,
             extra=0
         )
-        formset = FormSet(instance=self.composition_set)
+        formset = FormSet(instance=self.composition)
         averages_sum = 0
         for form in formset:
             component = MaterialComponent.objects.get(id=form['component'].value())
-            share = MaterialComponentShare.objects.get(component=component)
+            share = WeightShare.objects.get(component=component)
             self.assertEqual(form['average'].value(), share.average * 100)
             self.assertEqual(form['standard_deviation'].value(), share.standard_deviation * 100)
             averages_sum += form['average'].value()
@@ -85,26 +194,26 @@ class CompositionSetUpdateFormTestCase(TestCase):
 
     def test_input_percentages_are_stored_as_fractions_of_one(self):
         FormSet = inlineformset_factory(
-            CompositionSet,
-            MaterialComponentShare,
+            Composition,
+            WeightShare,
             form=MaterialComponentShareModelForm,
             formset=MaterialComponentShareInlineFormset,
             extra=0
         )
         components = [c.id for c in MaterialComponent.objects.exclude(name='Fresh Matter (FM)')]
         data = {
-            'materialcomponentshare_set-INITIAL_FORMS': '0',
-            'materialcomponentshare_set-TOTAL_FORMS': '2',
-            'materialcomponentshare_set-0-id': '',
-            'materialcomponentshare_set-0-component': f'{components[0]}',
-            'materialcomponentshare_set-0-average': '45.5',
-            'materialcomponentshare_set-0-standard_deviation': '1.5',
-            'materialcomponentshare_set-1-id': '',
-            'materialcomponentshare_set-1-component': f'{components[1]}',
-            'materialcomponentshare_set-1-average': '54.5',
-            'materialcomponentshare_set-1-standard_deviation': '1.5',
+            'shares-INITIAL_FORMS': '0',
+            'shares-TOTAL_FORMS': '2',
+            'shares-0-id': '',
+            'shares-0-component': f'{components[0]}',
+            'shares-0-average': '45.5',
+            'shares-0-standard_deviation': '1.5',
+            'shares-1-id': '',
+            'shares-1-component': f'{components[1]}',
+            'shares-1-average': '54.5',
+            'shares-1-standard_deviation': '1.5',
         }
-        formset = FormSet(data=data, instance=self.composition_set)
+        formset = FormSet(data=data, instance=self.composition)
         formset.is_valid()
         self.assertTrue(formset.is_valid())
         for form in formset:
@@ -116,39 +225,39 @@ class CompositionSetUpdateFormTestCase(TestCase):
 
     def test_form_valid_if_averages_sum_up_to_100_percent(self):
         FormSet = inlineformset_factory(
-            CompositionSet,
-            MaterialComponentShare,
+            Composition,
+            WeightShare,
             form=MaterialComponentShareModelForm,
             formset=MaterialComponentShareInlineFormset,
             extra=0
         )
         components = [c.id for c in MaterialComponent.objects.exclude(name='Fresh Matter (FM)')]
         data = {
-            'materialcomponentshare_set-INITIAL_FORMS': '0',
-            'materialcomponentshare_set-TOTAL_FORMS': '2',
-            'materialcomponentshare_set-0-id': '',
-            'materialcomponentshare_set-0-component': f'{components[0]}',
-            'materialcomponentshare_set-0-average': '45.5',
-            'materialcomponentshare_set-0-standard_deviation': '1.5',
-            'materialcomponentshare_set-1-id': '',
-            'materialcomponentshare_set-1-component': f'{components[1]}',
-            'materialcomponentshare_set-1-average': '54.5',
-            'materialcomponentshare_set-1-standard_deviation': '1.5',
+            'shares-INITIAL_FORMS': '0',
+            'shares-TOTAL_FORMS': '2',
+            'shares-0-id': '',
+            'shares-0-component': f'{components[0]}',
+            'shares-0-average': '45.5',
+            'shares-0-standard_deviation': '1.5',
+            'shares-1-id': '',
+            'shares-1-component': f'{components[1]}',
+            'shares-1-average': '54.5',
+            'shares-1-standard_deviation': '1.5',
         }
-        formset = FormSet(data=data, instance=self.composition_set)
+        formset = FormSet(data=data, instance=self.composition)
         formset.is_valid()
         self.assertTrue(formset.is_valid())
         for form in formset:
             form.instance.owner = self.owner
         formset.save()
-        for share in MaterialComponentShare.objects.all():
+        for share in WeightShare.objects.all():
             self.assertLessEqual(share.average, 1)
             self.assertGreaterEqual(share.average, 0)
 
     def test_form_invalid_if_averages_dont_sum_up_to_100_percent(self):
         FormSet = inlineformset_factory(
-            CompositionSet,
-            MaterialComponentShare,
+            Composition,
+            WeightShare,
             form=MaterialComponentShareModelForm,
             formset=MaterialComponentShareInlineFormset,
             extra=0
@@ -169,6 +278,6 @@ class CompositionSetUpdateFormTestCase(TestCase):
         formset = FormSet(data=data)
         self.assertFalse(formset.is_valid())
         self.assertIn('Weight shares of components must sum up to 100%', formset.non_form_errors())
-        for share in MaterialComponentShare.objects.all():
+        for share in WeightShare.objects.all():
             self.assertLessEqual(share.average, 1)
             self.assertGreaterEqual(share.average, 0)

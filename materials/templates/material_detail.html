@@ -12,7 +12,7 @@
                     <p class="card-text"><strong>Description:</strong><br>{{ object.description }}</p>
                     <p class="card-text"><strong>Groups:</strong><br>
                         {% for group in object.groups.all %}
-                            <a href="{% url 'material_group_detail_modal' group.id %}" class="modal-link">
+                            <a href="{% url 'materialcategory-detail-modal' group.id %}" class="modal-link">
                                 {{ group.name }}
                             </a>
                             {% if not forloop.last %},{% endif %}

@@ -1,0 +1,144 @@
+{% extends 'base.html' %}
+
+{% block title %}BRIT | Waste Collection{% endblock %}
+
+{% block content %}
+
+    <div class="row">
+        <div class="col col-12 col-md-6">
+            <div class="card shadow h-100">
+                <div class="card-header"><strong>Materials</strong></div>
+                <div class="card-body">
+                    <p class="card-text">
+                        This is a database for heterogeneous bioresources, also referred to as materials in this
+                        context. There are materials, that are defined by their name. Several samples from each
+                        material can exist, describing the material in its context. The database structure follows
+                        the design as used in material flow analysis. The composition of a material is expressed as
+                        components, which make up a certain weight fraction of the total material. To account for
+                        the different ways of describing a composition of a given material, components can be grouped.
+                        Components of each group must add up to 100%.
+                    </p>
+                </div>
+                <div class="card-footer">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header">
+                    <a href="{% url 'material-list' %}" class="stretched-link"><strong>Materials</strong></a>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        This is the basic list of all materials. The general definition and description of a material
+                        with words is done here.
+                    </p>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'material-list' %}" class="btn btn-primary">View Materials</a>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header">
+                    <a href="{% url 'materialcategory-list' %}" class="stretched-link"><strong>Material Categories</strong></a>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Material categories are useful for clustering and filtering materials. They can have their own
+                        definition and description.
+                    </p>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'materialcategory-list' %}" class="btn btn-primary">View categories</a>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header">
+                    <a href="{% url 'sampleseries-list' %}" class="stretched-link"><strong>Samples</strong></a>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        A sample is linked to a material. Several samples for each material can be created. The samples
+                        contain concrete data about the composition of a material, which where measured. A sample can
+                        comprise of several analyses of the same material at different times to create a temporal
+                        distribution, id desired.
+                    </p>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'sampleseries-list' %}" class="btn btn-primary">View Samples</a>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header">
+                    <a href="{% url 'sample-list' %}" class="stretched-link"><strong>Samples</strong></a>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        A sample is linked to a material. Several samples for each material can be created. The samples
+                        contain concrete data about the composition of a material, which where measured. A sample can
+                        comprise of several analyses of the same material at different times to create a temporal
+                        distribution, id desired.
+                    </p>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'sample-list' %}" class="btn btn-primary">View Samples</a>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header">
+                    <a href="{% url 'materialcomponentgroup-list' %}" class="stretched-link"><strong>Component Group</strong></a>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Component groups are closely related to analysis method of the composition of a material sample
+                        Likely, if one analysis method was applied (e.g. chrometography) the different data points from
+                        that method comprise the components of a joint group.
+                    </p>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'materialcomponentgroup-list' %}" class="btn btn-primary">View Component Groups</a>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header">
+                    <a href="{% url 'materialproperty-list' %}" class="stretched-link"><strong>Material Properties</strong></a>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Material properties can be used to describe materials apart from components that are relevant
+                        for composition. Anything that has a unit, which is not related to mass can be found here.
+                    </p>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'materialproperty-list' %}" class="btn btn-primary">View Material Properties</a>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+{% endblock content %}

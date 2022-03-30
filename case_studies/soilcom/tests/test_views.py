@@ -6,7 +6,7 @@ from django.test import RequestFactory, TestCase, modify_settings
 from django.urls import reverse
 
 from maps.models import Catchment
-from materials.models import MaterialGroup
+from materials.models import MaterialCategory
 from .. import views
 from ..forms import CollectionModelForm
 from ..models import Collection, Collector, CollectionSystem, WasteCategory, WasteComponent, WasteFlyer, WasteStream
@@ -24,7 +24,7 @@ class CollectionCreateViewTestCase(TestCase):
         member = User.objects.create(username='member', password='very-secure!')
         member.user_permissions.add(Permission.objects.get(codename='add_collection'))
 
-        MaterialGroup.objects.create(owner=owner, name='Biowaste component')
+        MaterialCategory.objects.create(owner=owner, name='Biowaste component')
         material1 = WasteComponent.objects.create(owner=owner, name='Test material 1')
         material2 = WasteComponent.objects.create(owner=owner, name='Test material 2')
         waste_stream = WasteStream.objects.create(
@@ -149,7 +149,7 @@ class CollectionCopyViewTestCase(TestCase):
         member = User.objects.create(username='member', password='very-secure!')
         member.user_permissions.add(Permission.objects.get(codename='add_collection'))
 
-        MaterialGroup.objects.create(owner=owner, name='Biowaste component')
+        MaterialCategory.objects.create(owner=owner, name='Biowaste component')
         material1 = WasteComponent.objects.create(owner=owner, name='Test material 1')
         material2 = WasteComponent.objects.create(owner=owner, name='Test material 2')
         waste_stream = WasteStream.objects.create(
@@ -292,7 +292,7 @@ class CollectionUpdateViewTestCase(TestCase):
         member = User.objects.create(username='member', password='very-secure!')
         member.user_permissions.add(Permission.objects.get(codename='change_collection'))
 
-        MaterialGroup.objects.create(owner=owner, name='Biowaste component')
+        MaterialCategory.objects.create(owner=owner, name='Biowaste component')
         material1 = WasteComponent.objects.create(owner=owner, name='Test material 1')
         material2 = WasteComponent.objects.create(owner=owner, name='Test material 2')
         waste_stream = WasteStream.objects.create(
@@ -397,7 +397,7 @@ class CollectionSummaryAPIViewTestCase(TestCase):
         member = User.objects.create(username='member', password='very-secure!')
         member.user_permissions.add(Permission.objects.get(codename='change_collection'))
 
-        MaterialGroup.objects.create(owner=owner, name='Biowaste component')
+        MaterialCategory.objects.create(owner=owner, name='Biowaste component')
         material1 = WasteComponent.objects.create(owner=owner, name='Test material 1')
         material2 = WasteComponent.objects.create(owner=owner, name='Test material 2')
         waste_stream = WasteStream.objects.create(

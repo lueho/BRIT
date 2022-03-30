@@ -5,7 +5,7 @@ from django.urls import reverse
 
 from distributions.models import TemporalDistribution, Timestep
 from inventories.models import Scenario, InventoryAlgorithm
-from materials.models import MaterialSettings, MaterialComponentShare, CompositionSet, MaterialComponent
+from materials.models import SampleSeries, MaterialComponent
 from .exceptions import InvalidGeometryType, NoFeaturesProvided, TableAlreadyExists
 
 
@@ -114,7 +114,7 @@ class Layer(models.Model):
     geom_type = models.CharField(max_length=20)
     table_name = models.CharField(max_length=200)
     scenario = models.ForeignKey(Scenario, on_delete=models.CASCADE)
-    feedstock = models.ForeignKey(MaterialSettings, on_delete=models.CASCADE)
+    feedstock = models.ForeignKey(SampleSeries, on_delete=models.CASCADE)
     algorithm = models.ForeignKey(InventoryAlgorithm, on_delete=models.CASCADE)
     layer_fields = models.ManyToManyField(LayerField)
 

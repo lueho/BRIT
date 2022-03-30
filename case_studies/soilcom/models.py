@@ -6,7 +6,7 @@ from django.dispatch import receiver
 from bibliography.models import Source
 from brit.models import NamedUserObjectModel
 from maps.models import Catchment
-from materials.models import Material, MaterialGroup, MaterialSettings
+from materials.models import Material, MaterialCategory, SampleSeries
 
 
 class Collector(NamedUserObjectModel):
@@ -30,8 +30,8 @@ class WasteCategory(NamedUserObjectModel):
 class WasteComponentManager(models.Manager):
 
     def get_queryset(self):
-        groups = MaterialGroup.objects.filter(name__in=('Biowaste component',))
-        return super().get_queryset().filter(groups__in=groups)
+        categories = MaterialCategory.objects.filter(name__in=('Biowaste component',))
+        return super().get_queryset().filter(categories__in=categories)
 
 
 class WasteComponent(Material):
@@ -42,10 +42,10 @@ class WasteComponent(Material):
 
 
 @receiver(post_save, sender=WasteComponent)
-def add_material_group(sender, instance, created, **kwargs):
+def add_material_category(sender, instance, created, **kwargs):
     if created:
-        group = MaterialGroup.objects.get(name='Biowaste component')
-        instance.groups.add(group)
+        category = MaterialCategory.objects.get(name='Biowaste component')
+        instance.categories.add(category)
         instance.save()
 
 
@@ -142,7 +142,7 @@ class WasteStreamQueryset(models.query.QuerySet):
 class WasteStream(NamedUserObjectModel):
     category = models.ForeignKey(WasteCategory, on_delete=models.PROTECT)
     allowed_materials = models.ManyToManyField(Material)
-    composition = models.ManyToManyField(MaterialSettings)
+    composition = models.ManyToManyField(SampleSeries)
 
     objects = WasteStreamQueryset.as_manager()
 

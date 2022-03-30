@@ -1,22 +1,20 @@
-from unittest import TestCase as NativeTestCase
-
 from django.contrib.auth.models import User
 from django.db.models import signals
 from django.test import TestCase
-from django.test import TestCase as DjangoTestCase, tag
 from django.urls import reverse
 from factory.django import mute_signals
-from mock import Mock, patch, PropertyMock
 
 from distributions.models import TemporalDistribution, Timestep
 from materials.models import (
     Material,
-    MaterialSettings,
-    MaterialComponent,
     MaterialComponentGroup,
-    MaterialComponentGroupSettings,
-    MaterialComponentShare,
-    CompositionSet
+    MaterialComponent,
+    SampleSeries,
+    MaterialProperty,
+    MaterialPropertyValue,
+    Sample,
+    Composition,
+    WeightShare,
 )
 from users.models import get_default_owner
 
@@ -52,358 +50,509 @@ class MaterialTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        User.objects.create(username='owner', password='very-secure!')
+        owner = get_default_owner()
+        User.objects.create(username='standard_user')
+        custom_distribution = TemporalDistribution.objects.create(
+            name='Custom Distribution',
+            owner=owner
+        )
+        main_step1 = Timestep.objects.create(
+            name='Timestep 1',
+            owner=owner,
+            distribution=custom_distribution
+        )
+        main_step2 = Timestep.objects.create(
+            name='Timestep 2',
+            owner=owner,
+            distribution=custom_distribution
+        )
+        MaterialComponentGroup.objects.create(
+            name='Custom Group',
+            owner=owner
+        )
+        MaterialComponent.objects.default()
+        MaterialComponent.objects.create(
+            name='Custom Component',
+            owner=owner
+        )
 
-    def setUp(self):
-        self.owner = User.objects.get(username='owner')
-
-    def test_group_settings_created_with_post_save_signal(self):
-        material = Material.objects.create(
-            owner=self.owner,
-            name='Test Material'
-        )
-        MaterialSettings.objects.get(material=material)
-        self.assertEqual(MaterialSettings.objects.count(), 1)
-
-
-@tag('db')
-class MaterialTestCase(DjangoTestCase):
-
-    def setUp(self):
-        self.superuser = get_default_owner()
-        self.user = User.objects.create(username='standard_user')
-        self.base_distribution = TemporalDistribution.objects.default()
-        self.main_distribution = TemporalDistribution.objects.create(
-            name='Main',
-            owner=self.superuser
-        )
-        self.base_timestep = Timestep.objects.default()
-        self.main_step1 = Timestep.objects.create(
-            name='Summer',
-            owner=self.superuser,
-            distribution=self.main_distribution
-        )
-        self.main_step2 = Timestep.objects.create(
-            name='Winter',
-            owner=self.superuser,
-            distribution=self.main_distribution
-        )
-        self.base_group = MaterialComponentGroup.objects.default()
-        self.main_group = MaterialComponentGroup.objects.create(
-            name='Basics',
-            owner=self.superuser
-        )
-        self.base_component = MaterialComponent.objects.default()
-        self.main_component = MaterialComponent.objects.create(
-            name='Total Solids (TS)',
-            owner=self.superuser
-        )
         with mute_signals(signals.post_save):
-            self.material1 = Material.objects.create(
-                name='First test material',
-                owner=self.superuser,
+            material1 = Material.objects.create(
+                name='Test Material 1',
+                owner=owner,
             )
-            self.msettings1 = MaterialSettings.objects.create(
-                owner=self.superuser,
-                material=self.material1,
+            sample_series = SampleSeries.objects.create(
+                owner=owner,
+                material=material1,
                 standard=True
             )
-
-    def test_material_initialize_standard_settings(self):
-        # TODO: Implement check for materials with the same name
-        material = Material.objects.create(
-            name='Second test material',
-            owner=self.user,
-        )
-        self.assertEqual(MaterialSettings.objects.all().count(), 2)
-        self.assertEqual(MaterialComponentGroupSettings.objects.all().count(), 1)
-        self.assertEqual(CompositionSet.objects.all().count(), 1)
-        self.assertEqual(MaterialComponentShare.objects.all().count(), 1)
-        self.assertEqual(material.materialsettings_set.all().count(), 1)
-        self.assertEqual(material.materialsettings_set.filter(standard=True).count(), 1)
-
-        msettings = MaterialSettings.objects.get(material=material)
-        self.assertEqual(msettings.material, material)
-        self.assertEqual(msettings.owner, self.user)
-        self.assertTrue(msettings.standard)
-
-        standard_settings = material.standard_settings
-        self.assertEqual(standard_settings.material, material)
-        self.assertEqual(standard_settings.owner, self.user)
-        self.assertTrue(standard_settings.standard)
-
-        gsettings = MaterialComponentGroupSettings.objects.get(material_settings=msettings)
-        self.assertEqual(gsettings.owner, self.user)
-        self.assertEqual(gsettings.group, self.base_group)
-        self.assertEqual(gsettings.fractions_of, self.base_component)
-        self.assertEqual(gsettings.sources.count(), 0)
-        self.assertEqual(gsettings.components().count(), 1)
-
-        self.assertEqual(gsettings.temporal_distributions.count(), 1)
-        dist = gsettings.temporal_distributions.first()
-        self.assertEqual(dist, self.base_distribution)
-
-        composition_set = CompositionSet.objects.get(group_settings=gsettings)
-        self.assertEqual(composition_set.owner, self.user)
-        self.assertEqual(composition_set.timestep, self.base_timestep)
-
-        share = MaterialComponentShare.objects.get(composition_set=composition_set)
-        self.assertEqual(share.owner, self.user)
-        self.assertEqual(share.component, self.base_component)
-        self.assertEqual(share.average, 0.0)
-        self.assertEqual(share.standard_deviation, 0.0)
-
-    def test_material_settings_add_component_group(self):
-        material = Material.objects.create(
-            name='Second test material',
-            owner=self.user,
-        )
-        settings = material.standard_settings
-        main_group_settings = settings.add_component_group(self.main_group)
-        self.assertEqual(main_group_settings,
-                         MaterialComponentGroupSettings.objects.get(material_settings=settings, group=self.main_group))
-
-        self.assertEqual(settings.materialcomponentgroupsettings_set.all().count(), 2)
-        self.assertEqual(MaterialComponentGroupSettings.objects.all().count(), 2)
-        self.assertEqual(
-            list(MaterialComponentGroupSettings.objects.all()),
-            list(settings.materialcomponentgroupsettings_set.all())
-        )
-        self.assertEqual(main_group_settings.components().count(), 0)
-        self.assertEqual(main_group_settings.compositionset_set.all().count(), 1)
-        self.assertEqual(main_group_settings.compositionset_set.first().timestep.name, 'Average')
-
-    def test_group_settings_add_temporal_distribution(self):
-        with mute_signals(signals.post_save):
-            settings = MaterialComponentGroupSettings.objects.create(
-                owner=self.user,
-                group=self.base_group,
-                material_settings=self.msettings1,
-                fractions_of=self.base_component
+            Sample.objects.create(
+                owner=owner,
+                series=sample_series,
+                timestep=Timestep.objects.default()
             )
-            settings.add_temporal_distribution(self.base_distribution)
-        self.assertEqual(settings.temporal_distributions.all().count(), 1)
-        self.assertEqual(settings.temporal_distributions.first(), self.base_distribution)
-        self.assertEqual(settings.compositionset_set.all().count(), 1)
-        composition = settings.compositionset_set.first()
-        self.assertEqual(composition.timestep, self.base_timestep)
-        self.assertEqual(composition.group_settings, settings)
-        self.assertEqual(composition.owner, self.user)
-
-        settings.add_temporal_distribution(self.main_distribution)
-        self.assertEqual(settings.temporal_distributions.all().count(), 2)
-        self.assertEqual(settings.compositionset_set.all().count(), 3)
-        summer_composition = settings.compositionset_set.get(timestep__name='Summer')
-        self.assertEqual(summer_composition.timestep, self.main_step1)
-        self.assertEqual(summer_composition.materialcomponentshare_set.all().count(), 0)
-        winter_composition = settings.compositionset_set.get(timestep__name='Winter')
-        self.assertEqual(winter_composition.timestep, self.main_step2)
-        self.assertEqual(winter_composition.materialcomponentshare_set.all().count(), 0)
-
-    def test_group_settings_add_component(self):
-        with mute_signals(signals.post_save):
-            settings = MaterialComponentGroupSettings.objects.create(
-                owner=self.user,
-                group=self.base_group,
-                material_settings=self.msettings1,
-                fractions_of=self.base_component
+            Sample.objects.create(
+                owner=owner,
+                series=sample_series,
+                timestep=main_step1
             )
-        settings.add_temporal_distribution(self.base_distribution)
-        settings.add_component(self.base_component)
+            Sample.objects.create(
+                owner=owner,
+                series=sample_series,
+                timestep=main_step2
+            )
 
-        self.assertEqual(settings.components().count(), 1)
-        self.assertEqual(settings.components().first(), self.base_component)
+    def setUp(self):
+        self.user = User.objects.get(username='standard_user')
+        self.default_group = MaterialComponentGroup.objects.default()
+        self.default_component = MaterialComponent.objects.default()
 
-        settings.add_component(self.main_component)
-        self.assertEqual(settings.components().count(), 2)
-        self.assertEqual(CompositionSet.objects.all().count(), 1)
+    def test_true_is_not_false(self):
+        self.assertTrue(True)
 
-        composition_set = settings.compositionset_set.first()
-        self.assertEqual(composition_set.materialcomponentshare_set.all().count(), 2)
-        self.assertEqual(MaterialComponentShare.objects.all().count(), 2)
 
-    def test_group_settings_create_with_signal(self):
-        settings = MaterialComponentGroupSettings.objects.create(
-            owner=self.user,
-            group=self.base_group,
-            material_settings=self.msettings1,
-            fractions_of=self.base_component
+class SampleSeriesTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = get_default_owner()
+        User.objects.create(username='standard_user')
+        custom_distribution = TemporalDistribution.objects.create(
+            name='Custom Distribution',
+            owner=owner
         )
-        self.assertEqual(settings.temporal_distributions.all().count(), 1)
-        self.assertEqual(settings.temporal_distributions.first(), self.base_distribution)
-        self.assertEqual(settings.compositionset_set.all().count(), 1)
-        composition = settings.compositionset_set.first()
-        self.assertEqual(composition.timestep, self.base_timestep)
-        self.assertEqual(composition.group_settings, settings)
-        self.assertEqual(composition.owner, self.user)
-
-        settings.add_component(self.base_component)
-        self.assertEqual(settings.components().count(), 1)
-        self.assertEqual(settings.components().first(), self.base_component)
-
-    def test_group_settings_add_component_on_distribution(self):
-        settings = MaterialComponentGroupSettings.objects.create(
-            owner=self.user,
-            group=self.base_group,
-            material_settings=self.msettings1,
-            fractions_of=self.base_component
+        timestep1 = Timestep.objects.create(
+            name='Timestep 1',
+            owner=owner,
+            distribution=custom_distribution
         )
-        settings.add_component(self.base_component)
-        settings.add_temporal_distribution(self.main_distribution)
-        settings.add_component(self.main_component)
-
-        self.assertEqual(settings.temporal_distributions.all().count(), 2)
-        self.assertEqual(settings.components().count(), 2)
-        self.assertEqual(settings.compositionset_set.all().count(), 3)
-        self.assertEqual(MaterialComponentShare.objects.all().count(), 6)
-
-    def test_group_settings_add_distribution_on_component(self):
-        settings = MaterialComponentGroupSettings.objects.create(
-            owner=self.user,
-            group=self.base_group,
-            material_settings=self.msettings1,
-            fractions_of=self.base_component
+        timestep2 = Timestep.objects.create(
+            name='Timestep 2',
+            owner=owner,
+            distribution=custom_distribution
         )
-        settings.add_component(self.base_component)
-        settings.add_component(self.main_component)
-        settings.add_temporal_distribution(self.main_distribution)
-
-        self.assertEqual(settings.temporal_distributions.all().count(), 2)
-        self.assertEqual(settings.components().count(), 2)
-        self.assertEqual(settings.compositionset_set.all().count(), 3)
-        self.assertEqual(MaterialComponentShare.objects.all().count(), 6)
-
-    def test_group_settings_remove_temporal_distribution(self):
-        settings = MaterialComponentGroupSettings.objects.create(
-            owner=self.user,
-            group=self.base_group,
-            material_settings=self.msettings1,
-            fractions_of=self.base_component
+        MaterialComponentGroup.objects.create(
+            name='Custom Group',
+            owner=owner
         )
-        settings.add_component(self.base_component)
-        settings.add_component(self.main_component)
-        settings.add_temporal_distribution(self.main_distribution)
-        settings.remove_temporal_distribution(self.main_distribution)
-
-        self.assertEqual(settings.temporal_distributions.all().count(), 1)
-        self.assertEqual(settings.components().count(), 2)
-        self.assertEqual(settings.compositionset_set.all().count(), 1)
-        self.assertEqual(MaterialComponentShare.objects.all().count(), 2)
-
-    def test_group_settings_remove_component(self):
-        settings = MaterialComponentGroupSettings.objects.create(
-            owner=self.user,
-            group=self.base_group,
-            material_settings=self.msettings1,
-            fractions_of=self.base_component
+        MaterialComponent.objects.default()
+        MaterialComponent.objects.create(
+            name='Custom Component',
+            owner=owner
         )
-        settings.add_component(self.base_component)
-        settings.add_component(self.main_component)
-        settings.add_temporal_distribution(self.main_distribution)
-        settings.remove_component(self.main_component)
 
-        self.assertEqual(settings.temporal_distributions.all().count(), 2)
-        self.assertEqual(settings.components().count(), 1)
-        self.assertEqual(settings.compositionset_set.all().count(), 3)
-        self.assertEqual(MaterialComponentShare.objects.all().count(), 3)
+        with mute_signals(signals.post_save):
+            material1 = Material.objects.create(
+                name='Test Material 1',
+                owner=owner,
+            )
+            sample_series = SampleSeries.objects.create(
+                owner=owner,
+                material=material1,
+                standard=True
+            )
+            Sample.objects.create(
+                owner=owner,
+                series=sample_series,
+                timestep=Timestep.objects.default()
+            )
+            Sample.objects.create(
+                owner=owner,
+                series=sample_series,
+                timestep=timestep1
+            )
+            Sample.objects.create(
+                owner=owner,
+                series=sample_series,
+                timestep=timestep2
+            )
 
-    def test_material_settings_create(self):
-        settings = MaterialSettings.objects.create(
-            owner=self.user,
+    def setUp(self):
+        self.user = User.objects.get(username='standard_user')
+        self.owner = get_default_owner()
+        self.material1 = Material.objects.get(name='Test Material 1')
+        self.sample0 = Sample.objects.get(timestep=Timestep.objects.default())
+        self.default_distribution = TemporalDistribution.objects.default()
+        self.custom_distribution = TemporalDistribution.objects.get(name='Custom Distribution')
+        self.default_group = MaterialComponentGroup.objects.default()
+        self.custom_group = MaterialComponentGroup.objects.get(name='Custom Group')
+        self.default_component = MaterialComponent.objects.default()
+        self.custom_component = MaterialComponent.objects.get(name='Custom Component')
+        self.sample_series = SampleSeries.objects.create(
+            owner=get_default_owner(),
             material=self.material1,
-            standard=True
         )
-        self.assertIsInstance(settings, MaterialSettings)
-        self.assertEqual(MaterialSettings.objects.all().count(), 2)
 
-    # TODO: test_material_create_copy
-    def test_material_create_copy(self):
+    def test_add_temporal_distribution(self):
+        self.sample_series.add_temporal_distribution(self.custom_distribution)
+        # the sample series should now have two associated distributions: default and custom
+        self.assertEqual(self.sample_series.temporal_distributions.count(), 2)
+        # for each timestep in both distributions a sample object should exist
+        self.assertEqual(self.sample_series.samples.count(), 3)
+        for timestep in self.custom_distribution.timestep_set.all():
+            Sample.objects.get(series=self.sample_series, timestep=timestep)
+
+    def test_remove_temporal_distribution(self):
+        self.sample_series.add_temporal_distribution(self.custom_distribution)
+        self.sample_series.remove_temporal_distribution(self.custom_distribution)
+        # now only the default distribution and only the according samples should remain
+        self.assertEqual(self.sample_series.temporal_distributions.count(), 1)
+        for timestep in self.custom_distribution.timestep_set.all():
+            with self.assertRaises(Sample.DoesNotExist):
+                Sample.objects.get(series=self.sample_series, timestep=timestep)
+
+    def test_add_component_group(self):
+        self.sample_series.add_component_group(self.custom_group)
+        for sample in self.sample_series.samples.all():
+            Composition.objects.get(sample=sample, group=self.custom_group)
+
+    def test_remove_component_group(self):
+        self.sample_series.add_component_group(self.custom_group)
+        self.sample_series.remove_component_group(self.custom_group)
+        for sample in self.sample_series.samples.all():
+            with self.assertRaises(Composition.DoesNotExist):
+                Composition.objects.get(sample=sample, group=self.custom_group)
+
+    def test_add_component(self):
+        self.sample_series.add_component_group(self.custom_group)
+        self.sample_series.add_temporal_distribution(self.custom_distribution)
+        self.sample_series.add_component(self.custom_component, self.custom_group)
+
+        for sample in self.sample_series.samples.all():
+            for composition in sample.compositions.filter(group=self.custom_group):
+                WeightShare.objects.get(
+                    composition=composition,
+                    component=self.custom_component
+                )
+
+    def test_remove_component(self):
+        self.sample_series.add_component_group(self.custom_group)
+        self.sample_series.add_component(self.custom_component, self.custom_group)
+        self.sample_series.add_temporal_distribution(self.custom_distribution)
+        self.sample_series.remove_component(self.custom_component, self.custom_group)
+
+        for sample in self.sample_series.samples.all():
+            for composition in sample.compositions.filter(group=self.custom_group):
+                with self.assertRaises(WeightShare.DoesNotExist):
+                    WeightShare.objects.get(
+                        composition=composition,
+                        component=self.custom_component
+                    )
+
+    def test_duplicate_creates_new_instance_with_identical_field_values(self):
+        creator = User.objects.create(username='creator')
+        duplicate = self.sample_series.duplicate(creator)
+        self.assertIsInstance(duplicate, SampleSeries)
+        self.assertNotEqual(self.sample_series, duplicate)
+        self.assertEqual(duplicate.owner, creator)
+        for field in self.sample_series._meta.get_fields():
+            if field.concrete and field.name not in ['id', 'owner', 'created_at', 'lastmodified_at',
+                                                     'visible_to_groups', 'temporal_distributions']:
+                self.assertEqual(getattr(duplicate, field.name), getattr(self.sample_series, field.name))
+            elif field.name == 'samples':
+                self.assertTrue(self.sample_series.samples.exists())
+                self.assertTrue(duplicate.samples.exists())
+                for sample in self.sample_series.samples.all():
+                    duplicate.samples.get(
+                        owner=creator,
+                        timestep=sample.timestep,
+                        taken_at=sample.taken_at,
+                    )
+            elif field.name == 'temporal_distributions':
+                self.assertTrue(self.sample_series.temporal_distributions.exists())
+                self.assertTrue(duplicate.temporal_distributions.exists())
+                self.assertQuerysetEqual(
+                    duplicate.temporal_distributions.all().order_by('id'),
+                    self.sample_series.temporal_distributions.all().order_by('id')
+                )
+
+
+class MaterialPropertyTestCase(TestCase):
+    pass
+
+
+class MaterialPropertyValueTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
         pass
 
+    def setUp(self):
+        self.owner = get_default_owner()
 
-class MaterialComponentShareTestCase(NativeTestCase):
-
-    @patch('materials.models.MaterialComponentShare.material_settings', new_callable=PropertyMock)
-    def test_property_material(self, mock_material_settings):
-        material = Mock(spec=Material)
-        material.name = 'Test material'
-        material._state = Mock()
-        material_settings = Mock(spec=MaterialSettings)
-        material_settings._state = Mock()
-        material_settings.material = material
-        mock_material_settings.return_value = material_settings
-        share = MaterialComponentShare()
-        self.assertEqual(share.material.name, 'Test material')
-
-    @patch('materials.models.MaterialComponentShare.group_settings', new_callable=PropertyMock)
-    def test_property_material_settings(self, mock_group_settings):
-        material_settings = Mock(spec=MaterialSettings)
-        material_settings.name = 'Test settings'
-        material_settings._state = Mock()
-        group_settings = Mock(spec=MaterialComponentGroupSettings)
-        group_settings.material_settings = material_settings
-        group_settings._state = Mock()
-        mock_group_settings.return_value = group_settings
-        share = MaterialComponentShare()
-        self.assertEqual(share.material_settings.name, 'Test settings')
-
-    @patch('materials.models.MaterialComponentShare.group_settings', new_callable=PropertyMock)
-    def test_property_group(self, mock_group_settings):
-        group = Mock(spec=MaterialComponentGroup)
-        group.name = 'Test group'
-        group._status = Mock()
-        group_settings = Mock(spec=MaterialComponentGroupSettings)
-        group_settings.group = group
-        group_settings._status = Mock()
-        mock_group_settings.return_value = group_settings
-        share = MaterialComponentShare()
-        self.assertEqual(share.group.name, 'Test group')
-
-    @patch('materials.models.MaterialComponentShare.composition_set', new_callable=PropertyMock)
-    def test_property_group_settings(self, mock_composition_set):
-        group_settings = Mock(spec=MaterialComponentGroupSettings)
-        group_settings.id = 5
-        group_settings._status = Mock()
-        composition_set = Mock(spec=CompositionSet)
-        composition_set.group_settings = group_settings
-        composition_set._status = Mock()
-        mock_composition_set.return_value = composition_set
-        share = MaterialComponentShare()
-        self.assertEqual(share.group_settings.id, 5)
-
-    @patch('materials.models.MaterialComponentShare.composition_set', new_callable=PropertyMock)
-    def test_property_timestep(self, mock_composition_set):
-        timestep = Mock(spec=Timestep)
-        timestep.name = 'Test timestep'
-        timestep._status = Mock()
-        composition_set = Mock(spec=CompositionSet)
-        composition_set.timestep = timestep
-        composition_set._status = Mock()
-        mock_composition_set.return_value = composition_set
-        share = MaterialComponentShare()
-        self.assertEqual(share.timestep.name, 'Test timestep')
-
-    @patch('materials.models.MaterialComponentShare.material_settings', new_callable=PropertyMock)
-    def test_get_absolute_url(self, mock_material_settings):
-        material_settings = Mock(spec=MaterialSettings)
-        material_settings.id = 4
-        material_settings._status = Mock()
-        mock_material_settings.return_value = material_settings
-        share = MaterialComponentShare()
-        self.assertEqual(share.get_absolute_url(), reverse('material_settings', kwargs={'pk': 4}))
-
-    @patch('materials.models.MaterialComponentShare.material', new_callable=PropertyMock)
-    def test_str(self, mock_material):
-        component = Mock(spec=MaterialComponent)
-        component.name = 'Test component'
-        component._state = Mock()
-        material = Mock(spec=Material)
-        material.name = 'Test material'
-        material._state = Mock()
-        mock_material.return_value = material
-        share = MaterialComponentShare()
-        share.component = component
-        self.assertEqual(
-            share.__str__(),
-            'Component share of material: Test material, component: Test component'
+    def test_duplicate_creates_new_instance_with_identical_field_values(self):
+        prop = MaterialProperty.objects.create(owner=self.owner, name='Test Property')
+        value = MaterialPropertyValue.objects.create(
+            owner=self.owner,
+            property=prop,
+            average=27.3,
+            standard_deviation=0.1337
         )
+        creator = User.objects.create(username='creator')
+        duplicate = value.duplicate(creator)
+        self.assertIsInstance(duplicate, MaterialPropertyValue)
+        self.assertNotEqual(duplicate, value)
+        self.assertEqual(duplicate.owner, creator)
+        self.assertEqual(duplicate.property, value.property)
+        self.assertEqual(duplicate.average, value.average)
+        self.assertEqual(duplicate.standard_deviation, value.standard_deviation)
+
+
+class SampleTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = get_default_owner()
+        MaterialComponentGroup.objects.create(
+            name='Custom Group',
+            owner=owner
+        )
+        MaterialComponent.objects.create(
+            name='Custom Component',
+            owner=owner
+        )
+        material = Material.objects.create(owner=owner, name='Test Material')
+
+        with mute_signals(signals.post_save):
+            series = SampleSeries.objects.create(owner=owner, name='Test Series', material=material)
+            Sample.objects.create(
+                owner=owner,
+                series=series,
+                timestep=Timestep.objects.default()
+            )
+
+        prop = MaterialProperty.objects.create(owner=owner, name='Test Property', unit='Test Unit')
+        MaterialPropertyValue.objects.create(owner=owner, property=prop, average=12.3, standard_deviation=0.321)
+
+    def setUp(self):
+        self.owner = get_default_owner()
+        self.sample = Sample.objects.get(timestep=Timestep.objects.default())
+        self.default_group = MaterialComponentGroup.objects.default()
+        self.default_component = MaterialComponent.objects.default()
+        self.custom_component = MaterialComponent.objects.get(name='Custom Component')
+        self.composition = Composition.objects.create(
+            owner=self.owner,
+            group=self.default_group,
+            sample=self.sample,
+            fractions_of=self.default_component
+        )
+
+    def test_duplicate_creates_new_instance_with_identical_field_values(self):
+        creator = User.objects.create(username='creator')
+        property_value = MaterialPropertyValue.objects.get(average=12.3)
+        self.sample.properties.add(property_value)
+        duplicate = self.sample.duplicate(creator)
+        self.assertIsInstance(duplicate, Sample)
+        self.assertNotEqual(duplicate, self.sample)
+        self.assertEqual(duplicate.owner, creator)
+        for field in self.sample._meta.get_fields():
+            if field.concrete and field.name not in ['id', 'owner', 'preview', 'created_at', 'lastmodified_at',
+                                                     'visible_to_groups', 'properties', 'sources']:
+                self.assertEqual(getattr(duplicate, field.name), getattr(self.sample, field.name))
+            elif field.name == 'compositions':
+                self.assertTrue(self.sample.compositions.exists())
+                self.assertTrue(duplicate.compositions.exists())
+                for composition in self.sample.compositions.all():
+                    duplicate.compositions.get(
+                        owner=creator,
+                        group=composition.group,
+                        fractions_of=composition.fractions_of
+                    )
+            elif field.name == 'properties':
+                self.assertTrue(self.sample.properties.exists())
+                self.assertTrue(duplicate.properties.exists())
+                for prop in self.sample.properties.all():
+                    duplicate.properties.get(
+                        owner=creator,
+                        property=prop.property,
+                        average=prop.average,
+                        standard_deviation=prop.standard_deviation
+                    )
+
+
+class CompositionTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = get_default_owner()
+        User.objects.create(username='standard_user')
+        custom_distribution = TemporalDistribution.objects.create(
+            name='Custom Distribution',
+            owner=owner
+        )
+        main_step1 = Timestep.objects.create(
+            name='Timestep 1',
+            owner=owner,
+            distribution=custom_distribution
+        )
+        main_step2 = Timestep.objects.create(
+            name='Timestep 2',
+            owner=owner,
+            distribution=custom_distribution
+        )
+        MaterialComponentGroup.objects.create(
+            name='Custom Group',
+            owner=owner
+        )
+
+        MaterialComponent.objects.create(
+            name='Custom Component',
+            owner=owner
+        )
+
+        with mute_signals(signals.post_save):
+            material1 = Material.objects.create(
+                name='Test Material 1',
+                owner=owner,
+            )
+            sample_series = SampleSeries.objects.create(
+                owner=owner,
+                material=material1,
+                standard=True
+            )
+            Sample.objects.create(
+                owner=owner,
+                series=sample_series,
+                timestep=Timestep.objects.default()
+            )
+            Sample.objects.create(
+                owner=owner,
+                series=sample_series,
+                timestep=main_step1
+            )
+            Sample.objects.create(
+                owner=owner,
+                series=sample_series,
+                timestep=main_step2
+            )
+
+    def setUp(self):
+        self.owner = get_default_owner()
+        self.user = User.objects.get(username='standard_user')
+        self.material1 = Material.objects.get(name='Test Material 1')
+        self.sample0 = Sample.objects.get(timestep=Timestep.objects.default())
+        self.default_distribution = TemporalDistribution.objects.default()
+        self.custom_distribution = TemporalDistribution.objects.get(name='Custom Distribution')
+        self.default_group = MaterialComponentGroup.objects.default()
+        self.custom_group = MaterialComponentGroup.objects.get(name='Custom Group')
+        self.default_component = MaterialComponent.objects.default()
+        self.custom_component = MaterialComponent.objects.get(name='Custom Component')
+        self.composition = Composition.objects.create(
+            owner=self.user,
+            group=self.default_group,
+            sample=self.sample0,
+            fractions_of=self.default_component
+        )
+
+    def test_add_component(self):
+        self.composition.add_temporal_distribution(self.default_distribution)
+        self.composition.add_component(self.custom_component)
+
+        WeightShare.objects.get(composition=self.composition, component=self.custom_component)
+        self.assertEqual(self.composition.shares.count(), 1)
+
+    def test_composition_create_with_signal(self):
+        self.assertEqual(self.composition.timestep, Timestep.objects.default())
+        self.assertEqual(self.composition.owner, self.user)
+
+        self.composition.add_component(self.default_component)
+        self.assertEqual(self.composition.components().count(), 1)
+        self.assertEqual(self.composition.components().first(), self.default_component)
+
+    def test_group_settings_add_component_on_distribution(self):
+        self.composition.add_component(self.default_component)
+        self.composition.add_temporal_distribution(self.custom_distribution)
+        self.composition.add_component(self.custom_component)
+
+        self.assertEqual(self.composition.sample.series.temporal_distributions.all().count(), 1)
+        self.assertEqual(self.composition.components().count(), 2)
+        self.assertEqual(WeightShare.objects.all().count(), 4)
+
+    def test_group_settings_add_distribution_on_component(self):
+        self.composition.add_component(self.default_component)
+        self.composition.add_component(self.custom_component)
+        self.composition.add_temporal_distribution(self.custom_distribution)
+
+        self.assertEqual(self.composition.sample.series.temporal_distributions.all().count(), 1)
+        self.assertEqual(self.composition.components().count(), 2)
+        self.assertEqual(WeightShare.objects.all().count(), 4)
+
+    def test_duplicate_creates_new_instance_with_identical_field_values(self):
+        creator = User.objects.create(username='creator')
+        WeightShare.objects.create(
+            owner=self.owner,
+            component=self.custom_component,
+            composition=self.composition,
+            average=0.9,
+            standard_deviation=0.1337
+        )
+        duplicate = self.composition.duplicate(creator)
+        self.assertIsInstance(duplicate, Composition)
+        self.assertNotEqual(self.composition, duplicate)
+        self.assertEqual(duplicate.owner, creator)
+        for field in self.composition._meta.get_fields():
+            if field.concrete and field.name not in ['id', 'owner', 'created_at', 'lastmodified_at',
+                                                     'visible_to_groups']:
+                self.assertEqual(getattr(duplicate, field.name), getattr(self.composition, field.name))
+            elif field.name == 'shares':
+                self.assertTrue(self.composition.shares.exists())
+                self.assertTrue(duplicate.shares.exists())
+                for share in self.composition.shares.all():
+                    duplicate.shares.get(
+                        owner=creator,
+                        component=share.component,
+                        average=share.average,
+                        standard_deviation=share.standard_deviation
+                    )
+
+
+class WeightShareTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = User.objects.create(username='owner', password='very-secure!')
+        material = Material.objects.create(owner=owner, name='Test Material')
+        sample_series = SampleSeries.objects.create(owner=owner, material=material, name='Test Series')
+        sample = Sample.objects.create(owner=owner, series=sample_series)
+        component_group = MaterialComponentGroup.objects.create(owner=owner, name='Test Group')
+        composition = Composition.objects.create(owner=owner, sample=sample, group=component_group)
+        component = MaterialComponent.objects.create(owner=owner, name='Test Component')
+        WeightShare.objects.create(
+            owner=owner,
+            composition=composition,
+            component=component,
+            average=1.0,
+            standard_deviation=0.123
+        )
+
+    def setUp(self):
+        self.share = WeightShare.objects.get(standard_deviation=0.123)
+        self.sample_series = SampleSeries.objects.get(name='Test Series')
+
+    def test_property_material(self):
+        self.assertEqual(self.share.material.name, 'Test Material')
+
+    def test_property_group(self):
+        self.assertEqual(self.share.group.name, 'Test Group')
+
+    def test_get_absolute_url(self):
+        self.assertEqual(
+            self.share.get_absolute_url(),
+            reverse('sampleseries-detail', kwargs={'pk': self.sample_series.pk})
+        )
+
+    def test_str(self):
+        self.assertEqual(
+            self.share.__str__(),
+            'Component share of material: Test Material, component: Test Component'
+        )
+
+    def test_duplicate_creates_new_instance_with_identical_field_values(self):
+        creator = User.objects.create(username='creator')
+        duplicate = self.share.duplicate(creator)
+        self.assertIsInstance(duplicate, WeightShare)
+        self.assertNotEqual(self.share, duplicate)
+        self.assertEqual(duplicate.owner, creator)
+        for field in self.share._meta.get_fields():
+            if field.name not in ['id', 'owner', 'created_at', 'lastmodified_at', 'visible_to_groups']:
+                self.assertEqual(getattr(duplicate, field.name), getattr(self.share, field.name))

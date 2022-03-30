@@ -4,7 +4,7 @@ from distributions.models import TemporalDistribution
 from distributions.plots import Distribution
 from inventories.algorithms import InventoryAlgorithmsBase
 from inventories.models import Scenario
-from materials.models import MaterialSettings
+from materials.models import SampleSeries
 from .models import NantesGreenhouses, Greenhouse
 
 
@@ -16,7 +16,7 @@ class InventoryAlgorithms(InventoryAlgorithmsBase):
         Here all the algorithms that are specific to the case study of the greenhouses in Nantes region are implemented.
         """
         scenario = Scenario.objects.get(id=kwargs.get('scenario_id'))
-        feedstock = MaterialSettings.objects.get(id=kwargs.get('feedstock_id'))
+        feedstock = SampleSeries.objects.get(id=kwargs.get('feedstock_id'))
         catchment = scenario.catchment
 
         result = {

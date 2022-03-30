@@ -5,7 +5,7 @@ from celery import chord
 from brit.celery import app
 from inventories.models import InventoryAlgorithm, Scenario, ScenarioStatus, RunningTask
 from layer_manager.models import Layer
-from materials.models import MaterialSettings
+from materials.models import SampleSeries
 
 
 @app.task
@@ -45,7 +45,7 @@ def run_inventory_algorithm(self, module_function, **kwargs):
     kwargs = {
         'name': algorithm.function_name,
         'scenario': Scenario.objects.get(id=kwargs.get('scenario_id')),
-        'feedstock': MaterialSettings.objects.get(id=kwargs.get('feedstock_id')),
+        'feedstock': SampleSeries.objects.get(id=kwargs.get('feedstock_id')),
         'algorithm': algorithm,
         'results': results
     }

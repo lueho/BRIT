@@ -3,7 +3,7 @@ from django.forms import modelformset_factory
 from django.test import TestCase
 
 from maps.models import Catchment
-from materials.models import MaterialGroup
+from materials.models import MaterialCategory
 from ..forms import CollectionModelForm, WasteFlyerModelForm, WasteFlyerModelFormSet
 from ..models import Collection, Collector, CollectionSystem, WasteCategory, WasteComponent, WasteFlyer, WasteStream
 
@@ -16,11 +16,11 @@ class TestCollectionModelForm(TestCase):
         self.collector = Collector.objects.create(owner=self.owner, name='Collector')
         self.collection_system = CollectionSystem.objects.create(owner=self.owner, name='System')
         self.waste_category = WasteCategory.objects.create(owner=self.owner, name='Category')
-        self.material_group = MaterialGroup.objects.create(owner=self.owner, name='Biowaste component')
+        self.material_group = MaterialCategory.objects.create(owner=self.owner, name='Biowaste component')
         self.material1 = WasteComponent.objects.create(owner=self.owner, name='Material 1')
-        self.material1.groups.add(self.material_group)
+        self.material1.categories.add(self.material_group)
         self.material2 = WasteComponent.objects.create(owner=self.owner, name='Material 2')
-        self.material2.groups.add(self.material_group)
+        self.material2.categories.add(self.material_group)
 
     def test_missing_data_errors(self):
         waste_stream = WasteStream.objects.create(
@@ -142,11 +142,11 @@ class WasteFlyerModelFormSetTestCase(TestCase):
         collector = Collector.objects.create(owner=owner, name='Collector')
         collection_system = CollectionSystem.objects.create(owner=owner, name='System')
         waste_category = WasteCategory.objects.create(owner=owner, name='Category')
-        material_group = MaterialGroup.objects.create(owner=owner, name='Biowaste component')
+        material_group = MaterialCategory.objects.create(owner=owner, name='Biowaste component')
         material1 = WasteComponent.objects.create(owner=owner, name='Material 1')
-        material1.groups.add(material_group)
+        material1.categories.add(material_group)
         material2 = WasteComponent.objects.create(owner=owner, name='Material 2')
-        material2.groups.add(material_group)
+        material2.categories.add(material_group)
         waste_stream = WasteStream.objects.create(
             owner=owner,
             category=waste_category,

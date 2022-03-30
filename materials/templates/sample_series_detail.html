@@ -1,0 +1,129 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% load crispy_forms_filters %}
+{% load render_table from django_tables2 %}
+
+{% block content %}
+    <div class="row">
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow">
+                <div class="card-header">
+                    <b>{{ object.material.name }}</b>
+                </div>
+
+                {% if object.preview %}
+                    <div class="card-img-top">
+                        <img class="w-100 m-0" src="{{ object.preview.url }}" alt="Materials Module Cover Image">
+                    </div>
+                {% endif %}
+
+                <div class="card-body">
+
+                    {% if object.material.description %}
+                        <p class="card-text">
+                            {{ object.material.description }}
+                        </p>
+                    {% endif %}
+
+                    {% if perms.materials %}
+                        <span data-toggle="collapse" data-target=".multi-collapse" aria-expanded="false"
+                              aria-controls="add-component-group">
+                            <input type="checkbox" data-toggle="toggle" data-on="Edit" data-off="View"
+                                   data-onstyle="primary" data-offstyle="secondary">
+                        </span>
+                    {% endif %}
+
+                </div>
+                <div class="card-footer">
+                    <div class="collapse multi-collapse">
+                        <a href="{% url 'material-update-modal' object.material.id %}?next={{ request.path }}"
+                           class="modal-link">
+                            Edit <i class="fas fa-fw fa-edit"></i>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+    <!-- end basic material definition -->
+
+    <div class="row">
+        {% for distribution in data.distributions %}
+            <div class="col col-12 col-md-6 col-lg-3 mt-4">
+                <div class="card shadow mt-3">
+                    <div class="card-header">
+                        <h2 class="card-title">{{ distribution.name }}</h2>
+                    </div>
+                    <div class="card-body">
+                        {% if distribution.description %}
+                            <p class="card-text">{{ distribution.description }}</p>
+                        {% endif %}
+                        <p class="card-text"><strong>Timesteps:</strong></p>
+                        {% for sample in distribution.samples %}
+                            <a href="{% url 'sample-detail' sample.id %}">{{ sample.timestep }}</a>
+                        {% endfor %}
+                    </div>
+                    <div class="card-footer"></div>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+
+    <div class="collapse multi-collapse" id="add-component-group">
+        <div class="row">
+            <div class="col mt-4">
+                <div class="card border-left-primary border">
+                    <div class="card-header"></div>
+                    <div class="card-body">
+                        <a href="{% url 'sampleseries-duplicate-modal' object.id %}"  class="modal-link">
+                            <i class="fas fa-fw fa-plus"></i> Duplicate this sample series
+                        </a>
+                    </div>
+                    <div class="card-footer"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- start material composition -->
+    {#    <div class="collapse multi-collapse" id="add-component-group">#}
+    {#        <div class="row">#}
+    {#            <div class="col">#}
+    {#                <div class="card border-left-primary border">#}
+    {#                    <div class="card-header"></div>#}
+    {#                    <div class="card-body">#}
+    {#                        <a href="{% url 'sampleseries-add-temporaldistribution' object.id %}"#}
+    {#                           class="modal-link">#}
+    {#                            <i class="fas fa-fw fa-plus"></i> Add temporal distribution#}
+    {#                        </a>#}
+    {#                    </div>#}
+    {#                    <div class="card-footer"></div>#}
+    {#                </div>#}
+    {#            </div>#}
+    {#        </div>#}
+    {#    </div>#}
+    <!-- end material composition -->
+
+{% endblock content %}
+
+{% block javascript %}
+    {{ block.super }}
+    {{ charts|json_script:"charts" }}
+
+    <script>
+
+        const charts = JSON.parse(document.getElementById("charts").textContent);
+
+        Object.keys(charts).forEach(key => {
+            let container = document.getElementById(key)
+            let canvas = document.createElement('canvas')
+            canvas.setAttribute('id', key)
+            container.appendChild(canvas)
+            new Chart(canvas.getContext('2d'), charts[key]);
+        })
+
+    </script>
+
+{% endblock javascript %}

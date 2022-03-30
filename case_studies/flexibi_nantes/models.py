@@ -6,8 +6,8 @@ from django.dispatch import receiver
 from django.urls import reverse
 
 from distributions.models import TemporalDistribution, Timestep
-from materials.models import Material, MaterialSettings, MaterialComponent, MaterialComponentGroup, \
-    MaterialComponentGroupSettings
+from materials.models import Material, SampleSeries, MaterialComponent, MaterialComponentGroup, \
+    Composition
 from users.models import get_default_owner
 from .tables import growthcycle_table_factory
 
@@ -161,7 +161,7 @@ class Greenhouse(models.Model):
 class Culture(models.Model):
     owner = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
     name = models.CharField(max_length=255, blank=True, null=True)
-    residue = models.ForeignKey(MaterialSettings, on_delete=models.PROTECT, null=True)
+    residue = models.ForeignKey(SampleSeries, on_delete=models.PROTECT, null=True)
 
     @staticmethod
     def get_absolute_url():
@@ -188,11 +188,11 @@ class GreenhouseGrowthCycle(models.Model):
     cycle_number = models.IntegerField(default=1)
     culture = models.ForeignKey(Culture, on_delete=models.CASCADE, null=True)
     greenhouse = models.ForeignKey(Greenhouse, on_delete=models.CASCADE, null=True)
-    group_settings = models.ForeignKey(MaterialComponentGroupSettings, on_delete=models.CASCADE, null=True)
+    group_settings = models.ForeignKey(Composition, on_delete=models.CASCADE, null=True)
 
     def add_timestep(self, timestep):
         ts_set = GrowthTimeStepSet.objects.create(owner=self.owner, timestep=timestep, growth_cycle=self)
-        for component in self.group_settings.components():
+        for component in self.group_settings.components:
             ts_set.add_component(component)
 
     @property
