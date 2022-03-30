@@ -4,14 +4,15 @@ from django.urls import reverse
 from bibliography.models import Source
 from distributions.models import Timestep
 from users.models import get_default_owner
-
-from ..models import MaterialComponent, MaterialComponentGroup, MaterialProperty, MaterialPropertyValue, Composition, Material, SampleSeries, Sample, WeightShare
+from ..models import MaterialComponent, MaterialComponentGroup, MaterialProperty, MaterialPropertyValue, Composition, \
+    Material, SampleSeries, Sample, WeightShare
 from ..serializers import (
+    CompositionDoughnutChartSerializer,
     CompositionModelSerializer,
     MaterialPropertyValueModelSerializer,
     SampleSeriesModelSerializer,
     SampleModelSerializer,
-    WeightShareModelSerializer
+    WeightShareModelSerializer,
 )
 
 
@@ -71,7 +72,8 @@ class SampleSerializerTestCase(TestCase):
         owner = get_default_owner()
         material = Material.objects.create(owner=owner, name='Test Material')
         series = SampleSeries.objects.create(owner=owner, name='Test Series', material=material)
-        sample = Sample.objects.create(owner=owner, name='Test Sample', series=series, timestep=Timestep.objects.default())
+        sample = Sample.objects.create(owner=owner, name='Test Sample', series=series,
+                                       timestep=Timestep.objects.default())
         source = Source.objects.create(owner=owner, title='Test Source')
         sample.sources.add(source)
 
@@ -174,3 +176,41 @@ class WeightShareModelSerializerTestCase(TestCase):
         self.assertIn('component_name', data)
         self.assertIn('average', data)
         self.assertIn('standard_deviation', data)
+
+
+class CompositionDoughnutChartSerializerTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = get_default_owner()
+        material = Material.objects.create(owner=owner, name='Test Material')
+        series = SampleSeries.objects.create(owner=owner, name='Test Series', material=material)
+        sample = Sample.objects.create(owner=owner, name='Test Sample', series=series)
+        group = MaterialComponentGroup.objects.create(owner=owner, name='Test Group')
+        composition = Composition.objects.create(
+            owner=owner,
+            sample=sample,
+            group=group,
+            fractions_of=MaterialComponent.objects.default()
+        )
+        component1 = MaterialComponent.objects.create(owner=owner, name='Test Component 1')
+        component2 = MaterialComponent.objects.create(owner=owner, name='Test Component 2')
+        composition.add_component(MaterialComponent.objects.other(), average=0.7, standard_deviation=0.1337)
+        composition.add_component(component1, average=0.1, standard_deviation=0.1337)
+        composition.add_component(component2, average=0.2, standard_deviation=0.1337)
+
+    def setUp(self):
+        self.composition = Composition.objects.get(group__name='Test Group')
+
+    def test_serializer_returns_correct_data(self):
+        data = CompositionDoughnutChartSerializer(self.composition).data
+        self.assertIn('id', data)
+        self.assertIn('title', data)
+        self.assertIn('unit', data)
+        self.assertIn('labels', data)
+        self.assertIsInstance(data['labels'], list)
+        self.assertListEqual(data['labels'], ['Test Component 2', 'Test Component 1', 'Other'])
+        self.assertIn('data', data)
+        self.assertIsInstance(data['data'], list)
+        self.assertIsInstance(data['data'][0]['data'], list)
+        self.assertListEqual(data['data'][0]['data'], [0.2, 0.1, 0.7])

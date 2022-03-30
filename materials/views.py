@@ -5,7 +5,7 @@ from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.urls import reverse, reverse_lazy
-from django.views.generic import ListView, TemplateView, FormView
+from django.views.generic import ListView, TemplateView
 from extra_views import UpdateWithInlinesView
 
 from brit.views import (
@@ -20,6 +20,7 @@ from brit.views import (
 )
 from brit.views import UserOwnsObjectMixin, NextOrSuccessUrlMixin
 from distributions.models import TemporalDistribution
+from distributions.plots import DoughnutChart
 from . import forms
 from .forms import (
     AddComponentModalForm,
@@ -40,7 +41,7 @@ from .models import (
     MaterialComponent,
     MaterialComponentGroup,
     MaterialCategory, WeightShare, MaterialProperty, MaterialPropertyValue, )
-from .serializers import SampleModelSerializer, SampleSeriesModelSerializer
+from .serializers import CompositionDoughnutChartSerializer, SampleModelSerializer, SampleSeriesModelSerializer
 
 
 class MaterialsDashboardView(PermissionRequiredMixin, TemplateView):
@@ -497,7 +498,9 @@ class SampleDetailView(OwnedObjectDetailView):
         data = SampleModelSerializer(self.object, context={'request': self.request}).data
         charts = {}
         for composition in self.object.compositions.all():
-            charts[f'composition-chart-{composition.id}'] = composition.get_chart().as_dict()
+            chart_data = CompositionDoughnutChartSerializer(composition).data
+            chart = DoughnutChart(**chart_data)
+            charts[f'composition-chart-{composition.id}'] = chart.as_dict()
         context.update({
             'data': data,
             'charts': charts

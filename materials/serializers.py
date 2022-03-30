@@ -20,7 +20,7 @@ class CompositionModelSerializer(ModelSerializer):
     fractions_of_name = StringRelatedField(source='fractions_of')
     shares = SerializerMethodField()
 
-    def get_shares(self, obj):
+    def get_shares(salf, obj):
         """
         Gets the weight shares of the given composition in default order but takes cares that the "Other" element
         is last in the list, regardless of the previous order.
@@ -35,6 +35,49 @@ class CompositionModelSerializer(ModelSerializer):
     class Meta:
         model = Composition
         fields = ('id', 'group', 'group_name', 'sample', 'fractions_of', 'fractions_of_name', 'shares',)
+
+
+class CompositionDoughnutChartSerializer(ModelSerializer):
+    id = SerializerMethodField()
+    title = ReadOnlyField(default='Composition')
+    unit = ReadOnlyField(default='%')
+    labels = SerializerMethodField()
+    data = SerializerMethodField()
+
+    class Meta:
+        model = Composition
+        fields = ('id', 'title', 'unit', 'labels', 'data')
+
+    def get_id(self, obj):
+        return f'materialCompositionChart-{obj.id}'
+
+    def get_shares(self, obj):
+        other = MaterialComponent.objects.other()
+        shares = WeightShareModelSerializer(obj.shares.exclude(component=other), many=True).data
+        other_qs = obj.shares.filter(component=other)
+        if other_qs.exists():
+            shares.append(WeightShareModelSerializer(obj.shares.filter(component=other), many=True).data[0])
+        return shares
+
+    def get_labels(self, obj):
+        other = MaterialComponent.objects.other()
+        labels = [share.component.name for share in obj.shares.exclude(component=other)]
+        other_qs = obj.shares.filter(component=other)
+        if other_qs.exists():
+            labels.append('Other')
+        return labels
+
+    def get_data(self, obj):
+        other = MaterialComponent.objects.other()
+        data = [{
+            'label': 'Fraction',
+            'unit': '%',
+            'data': [share.average for share in obj.shares.exclude(component=other)]
+        }]
+        other_qs = obj.shares.filter(component=other)
+        if other_qs.exists():
+            data[0]['data'].append(other_qs.first().average)
+        return data
 
 
 class MaterialPropertyValueModelSerializer(ModelSerializer):

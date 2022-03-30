@@ -8,9 +8,7 @@ from factory.django import mute_signals
 from bibliography.models import Source
 from brit.models import NamedUserObjectModel
 from distributions.models import Timestep, TemporalDistribution
-from distributions.plots import DataSet, DoughnutChart
 from users.models import get_default_owner
-from .tables import averages_table_factory, distribution_table_factory
 
 
 class MaterialCategory(NamedUserObjectModel):
@@ -249,20 +247,20 @@ class SampleSeries(NamedUserObjectModel):
             group=MaterialComponentGroup.objects.default()
         )
 
-    def composition(self):
-        grouped_shares = {}
-        compositions = self.group_settings
-        for composition in compositions:
-            grouped_shares[composition] = {
-                'averages': [],
-                'averages_composition': composition,
-                'averages_table': composition.averages_table(),
-                'averages_chart': composition.get_chart(),
-                # 'distribution_tables': setting.distribution_tables(),
-            }
-            for share in composition.shares.all():
-                grouped_shares[composition]['averages'].append(share)
-        return grouped_shares
+    # def composition(self):
+    #     grouped_shares = {}
+    #     compositions = self.group_settings
+    #     for composition in compositions:
+    #         grouped_shares[composition] = {
+    #             'averages': [],
+    #             'averages_composition': composition,
+    #             'averages_table': composition.averages_table(),
+    #             'averages_chart': composition.get_chart(),
+    #             # 'distribution_tables': setting.distribution_tables(),
+    #         }
+    #         for share in composition.shares.all():
+    #             grouped_shares[composition]['averages'].append(share)
+    #     return grouped_shares
 
 
 @receiver(post_save, sender=SampleSeries)
@@ -414,34 +412,34 @@ class Composition(NamedUserObjectModel):
         """
         self.sample.series.remove_temporal_distribution(distribution)
 
-    def get_chart(self):
-        data = {}
-        labels = []
-        for share in self.shares.all():
-            labels.append(share.component.name)
-            data[share.component.name] = share.average
+    # def get_chart(self):
+    #     data = {}
+    #     labels = []
+    #     for share in self.shares.all():
+    #         labels.append(share.component.name)
+    #         data[share.component.name] = share.average
+    #
+    #     dataset = DataSet(
+    #         label='Fraction',
+    #         data=data,
+    #         unit='%'
+    #     )
+    #
+    #     chart = DoughnutChart(
+    #         id=f'materialCompositionChart-{self.id}',
+    #         title='Composition',
+    #         unit='%'
+    #     )
+    #     chart.add_dataset(dataset)
+    #
+    #     return chart
 
-        dataset = DataSet(
-            label='Fraction',
-            data=data,
-            unit='%'
-        )
+    # def averages_table(self):
+    #     return averages_table_factory(self)
 
-        chart = DoughnutChart(
-            id=f'materialCompositionChart-{self.id}',
-            title='Composition',
-            unit='%'
-        )
-        chart.add_dataset(dataset)
-
-        return chart
-
-    def averages_table(self):
-        return averages_table_factory(self)
-
-    def distribution_tables(self):
-        return {distribution: distribution_table_factory(self.sample.series, distribution) for distribution in
-                self.sample.series.temporal_distributions.exclude(id=TemporalDistribution.objects.default().id)}
+    # def distribution_tables(self):
+    #     return {distribution: distribution_table_factory(self.sample.series, distribution) for distribution in
+    #             self.sample.series.temporal_distributions.exclude(id=TemporalDistribution.objects.default().id)}
 
     def duplicate(self, creator):
         with mute_signals(post_save):
