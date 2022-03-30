@@ -15,6 +15,8 @@ from materials.models import (
     Sample,
     Composition,
     WeightShare,
+    get_default_component,
+    get_default_component_pk
 )
 from users.models import get_default_owner
 
@@ -27,7 +29,11 @@ class InitialDataTestCase(TestCase):
 
     def test_base_component_is_created_from_migrations(self):
         MaterialComponent.objects.get(name='Fresh Matter (FM)')
-        self.assertEqual(MaterialComponent.objects.all().count(), 1)
+        self.assertEqual(MaterialComponent.objects.all().count(), 2)
+
+    def test_other_component_is_created_from_migrations(self):
+        MaterialComponent.objects.get(name='Other')
+        self.assertEqual(MaterialComponent.objects.all().count(), 2)
 
 
 class MaterialComponentGroupTestCase(TestCase):
@@ -40,10 +46,25 @@ class MaterialComponentGroupTestCase(TestCase):
 
 class MaterialComponentTestCase(TestCase):
 
-    def test_get_default_material_component(self):
+    def test_get_default_material_component_manager_function(self):
         default = MaterialComponent.objects.default()
         self.assertIsInstance(default, MaterialComponent)
         self.assertEqual(default.name, 'Fresh Matter (FM)')
+
+    def test_get_default_material_component_function(self):
+        default_component = get_default_component()
+        self.assertIsInstance(default_component, MaterialComponent)
+        self.assertEqual(default_component.name, 'Fresh Matter (FM)')
+
+    def test_get_default_material_component_pk(self):
+        default_component_pk = get_default_component_pk()
+        self.assertIsInstance(default_component_pk, int)
+        self.assertEqual(default_component_pk, get_default_component().pk)
+
+    def test_get_other_material_component_manager_function(self):
+        default = MaterialComponent.objects.other()
+        self.assertIsInstance(default, MaterialComponent)
+        self.assertEqual(default.name, 'Other')
 
 
 class MaterialTestCase(TestCase):

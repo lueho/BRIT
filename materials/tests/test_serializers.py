@@ -111,25 +111,29 @@ class CompositionSerializerTestCase(TestCase):
             timestep=Timestep.objects.default()
         )
         group = MaterialComponentGroup.objects.create(owner=owner, name='Test Group')
-        Composition.objects.create(
+        composition = Composition.objects.create(
             owner=owner,
             group=group,
             sample=sample,
             fractions_of=MaterialComponent.objects.default()
         )
+        composition.add_component(MaterialComponent.objects.other(), average=0.5, standard_deviation=0.1337)
 
     def setUp(self):
         self.composition = Composition.objects.get(group__name='Test Group', sample__name='Test Sample')
 
     def test_serializer_construction(self):
-        request = RequestFactory().get(reverse('composition-update-modal', kwargs={'pk': self.composition.id}))
-        data = CompositionModelSerializer(self.composition, context={'request': request}).data
+        data = CompositionModelSerializer(self.composition).data
+        self.assertIn('group', data)
         self.assertIn('group_name', data)
-        self.assertIn('group_url', data)
         self.assertIn('sample', data)
+        self.assertIn('fractions_of', data)
         self.assertIn('fractions_of_name', data)
-        self.assertIn('fractions_of_url', data)
         self.assertIn('shares', data)
+
+    def test_other_component_is_last_in_the_shares_list(self):
+        data = CompositionModelSerializer(self.composition).data
+        self.assertEqual(data['shares'][-1]['component'], MaterialComponent.objects.other().pk)
 
 
 class WeightShareModelSerializerTestCase(TestCase):
@@ -165,9 +169,8 @@ class WeightShareModelSerializerTestCase(TestCase):
         self.share = WeightShare.objects.get(standard_deviation=0.1337)
 
     def test_serializer_construction(self):
-        request = RequestFactory().get(reverse('sample-detail', kwargs={'pk': self.share.id}))
-        data = WeightShareModelSerializer(self.share, context={'request': request}).data
+        data = WeightShareModelSerializer(self.share).data
+        self.assertIn('component', data)
         self.assertIn('component_name', data)
-        self.assertIn('component_url', data)
         self.assertIn('average', data)
         self.assertIn('standard_deviation', data)

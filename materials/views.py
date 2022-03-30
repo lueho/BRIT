@@ -376,10 +376,14 @@ class SampleSeriesModalCreateView(OwnedObjectModalCreateView):
     permission_required = 'materials.add_sampleseries'
 
 
-# class SampleSeriesDetailView(OwnedObjectDetailView):
-#     template_name = 'sampleseries_detail.html'
-#     model = SampleSeries
-#     permission_required = set()
+class SampleSeriesDetailView(OwnedObjectDetailView):
+    model = SampleSeries
+    template_name = 'sample_series_detail.html'
+    permission_required = set()
+
+    def get_context_data(self, **kwargs):
+        kwargs['data'] = SampleSeriesModelSerializer(self.object).data
+        return super().get_context_data(**kwargs)
 
 
 class SampleSeriesModalDetailView(OwnedObjectModalDetailView):
@@ -408,16 +412,6 @@ class SampleSeriesModalDeleteView(OwnedObjectDeleteView):
     success_message = 'Successfully deleted.'
     success_url = reverse_lazy('sampleseries-list')
     permission_required = 'materials.delete_sampleseries'
-
-
-class SampleSeriesDetailView(OwnedObjectDetailView):
-    model = SampleSeries
-    template_name = 'sample_series_detail.html'
-    permission_required = set()
-
-    def get_context_data(self, **kwargs):
-        kwargs['data'] = SampleSeriesModelSerializer(self.object).data
-        return super().get_context_data(**kwargs)
 
 
 # ----------- Sample Series Utilities ----------------------------------------------------------------------------------

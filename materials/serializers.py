@@ -3,36 +3,38 @@ from rest_framework.serializers import PrimaryKeyRelatedField, ReadOnlyField, St
 
 from bibliography.serializers import SourceAbbreviationSerializer
 from distributions.models import TemporalDistribution
-from .models import Composition, MaterialPropertyValue, Sample, WeightShare, SampleSeries
+from .models import Composition, MaterialPropertyValue, Sample, WeightShare, SampleSeries, MaterialComponent
 
 
 class WeightShareModelSerializer(ModelSerializer):
     component_name = StringRelatedField(source='component')
-    component_url = HyperlinkedRelatedField(source='component', read_only=True,
-                                            view_name='materialcomponent-detail-modal')
     as_percentage = ReadOnlyField()
 
     class Meta:
         model = WeightShare
-        fields = ('component', 'component_name', 'component_url', 'average', 'standard_deviation', 'as_percentage')
+        fields = ('component', 'component_name', 'average', 'standard_deviation', 'as_percentage')
 
 
 class CompositionModelSerializer(ModelSerializer):
     group_name = StringRelatedField(source='group')
-    group_url = HyperlinkedRelatedField(source='group', read_only=True, view_name='materialcomponentgroup-detail-modal')
     fractions_of_name = StringRelatedField(source='fractions_of')
-    fractions_of_url = HyperlinkedRelatedField(
-        source='fractions_of',
-        read_only=True,
-        view_name='materialcomponent-detail'
-    )
-    shares = WeightShareModelSerializer(many=True)
+    shares = SerializerMethodField()
+
+    def get_shares(self, obj):
+        """
+        Gets the weight shares of the given composition in default order but takes cares that the "Other" element
+        is last in the list, regardless of the previous order.
+        """
+        other = MaterialComponent.objects.other()
+        shares = WeightShareModelSerializer(obj.shares.exclude(component=other), many=True).data
+        other_qs = obj.shares.filter(component=other)
+        if other_qs.exists():
+            shares.append(WeightShareModelSerializer(obj.shares.filter(component=other), many=True).data[0])
+        return shares
 
     class Meta:
         model = Composition
-        fields = (
-        'id', 'group', 'group_url', 'group_name', 'sample', 'fractions_of', 'fractions_of_name', 'fractions_of_url',
-        'shares')
+        fields = ('id', 'group', 'group_name', 'sample', 'fractions_of', 'fractions_of_name', 'shares',)
 
 
 class MaterialPropertyValueModelSerializer(ModelSerializer):

@@ -138,7 +138,7 @@
             <div class="col col-12 col-md-6 col-lg-3 mt-4">
                     <div class="card shadow mt-3 h-100 tab-card">
                         <div class="card-header tab-card-header">
-                            <h2 class="card-title"><a href="{{ composition.group_url }}"
+                            <h2 class="card-title"><a href="{% url 'materialcomponentgroup-detail-modal' composition.group %}"
                                                       class="modal-link">{{ composition.group_name }}</a></h2>
                             <ul class="nav nav-tabs card-header-tabs" id="composition-tabs-{{ composition.id }}"
                                 role="tablist">
@@ -181,7 +181,7 @@
                                     <tbody>
                                     {% for share in composition.shares %}
                                         <tr>
-                                            <td><a href="{{ share.component_url }}"
+                                            <td><a href="{% url 'materialcomponent-detail-modal' share.component %}"
                                                    class="modal-link">{{ share.component_name }}</a></td>
                                             {# <td>{{ share.average }} ± {{ share.standard_deviation }} %</td>#}
                                             <td>{{ share.as_percentage }}</td>

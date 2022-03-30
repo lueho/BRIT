@@ -51,6 +51,9 @@ class MaterialComponentManager(models.Manager):
     def default(self):
         return self.get_queryset().get(name='Fresh Matter (FM)', owner=get_default_owner())
 
+    def other(self):
+        return self.get_queryset().get(name='Other', owner=get_default_owner())
+
 
 class MaterialComponent(BaseMaterial):
     """
@@ -471,6 +474,9 @@ class WeightShare(NamedUserObjectModel):
     composition = models.ForeignKey(Composition, related_name='shares', on_delete=models.CASCADE)
     average = models.FloatField(default=0.0)
     standard_deviation = models.FloatField(default=0.0)
+
+    class Meta:
+        ordering = ['-average']
 
     @property
     def as_percentage(self):

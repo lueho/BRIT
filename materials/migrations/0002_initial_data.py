@@ -13,6 +13,7 @@ def create_initial_data(apps, schema_editor):
     group, _ = MaterialComponentGroup.objects.get_or_create(name='Total Material', owner=owner)
     MaterialComponent = apps.get_model('materials', 'MaterialComponent')
     component, _ = MaterialComponent.objects.get_or_create(name='Fresh Matter (FM)', owner=owner)
+    other, _ = MaterialComponent.objects.get_or_create(name='Other', owner=owner)
 
     Group = apps.get_model('auth', 'Group')
 

@@ -107,6 +107,7 @@ class AddComponentModalModelFormTestCase(TestCase):
 
     def test_initial_component_queryset_contains_only_unused_components(self):
         self.composition.add_component(self.component1, average=0.5, standard_deviation=0.02)
+        self.composition.add_component(MaterialComponent.objects.other(), average=0.5, standard_deviation=0.1337)
         form = AddComponentModalForm(instance=self.composition)
         self.assertQuerysetEqual(
             form.fields['component'].queryset.order_by('id'),
