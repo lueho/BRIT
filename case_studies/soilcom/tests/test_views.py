@@ -388,6 +388,28 @@ class CollectionUpdateViewTestCase(TestCase):
         )
         self.assertEqual(response.status_code, 302)
 
+    def test_regression_post_with_valid_data_doesnt_delete_unchanged_flyers(self):
+        self.client.force_login(self.member)
+        data = {
+            'catchment': self.collection.catchment.id,
+            'collector': self.collection.collector.id,
+            'collection_system': self.collection.collection_system.id,
+            'waste_category': self.collection.waste_stream.category.id,
+            'allowed_materials': [m.id for m in self.collection.waste_stream.allowed_materials.all()],
+            'description': self.collection.description,
+            'form-INITIAL_FORMS': '1',
+            'form-TOTAL_FORMS': '2',
+            'form-0-url': self.collection.flyers.first().url,
+            'form-0-id': self.collection.flyers.first().id,
+            'form-1-url': 'https://www.fest-flyer.org',
+            'form-1-id': '',
+        }
+        response = self.client.post(reverse('collection-update', kwargs={'pk': self.collection.id}), data=data)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(WasteFlyer.objects.get(url='https://www.fest-flyer.org'), self.collection.flyers.all())
+        self.assertIn(WasteFlyer.objects.get(url='https://www.test-flyer.org'), self.collection.flyers.all())
+        self.assertEqual(WasteFlyer.objects.count(), 2)
+
 
 class CollectionSummaryAPIViewTestCase(TestCase):
 

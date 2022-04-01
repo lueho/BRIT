@@ -523,7 +523,9 @@ class CollectionUpdateView(ModelFormAndModelFormSetMixin, views.OwnedObjectUpdat
             for form in formset:
                 form.instance.owner = request.user
             flyers = formset.save()
-            collection.flyers.set(flyers)
+            for flyer in flyers:
+                if flyer not in collection.flyers.all():
+                    collection.flyers.add(flyer)
             return HttpResponseRedirect(self.get_success_url())
         else:
             context = self.get_context_data(form=form, formset=formset)
