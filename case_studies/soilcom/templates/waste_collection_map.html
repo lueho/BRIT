@@ -1,89 +1,96 @@
 {% extends 'maps_base.html' %}
 
+
 {% block extra_cards %}
 
-    <div class="card shadow">
+    {% if 'add_collection' in perms or 'change_collection' in perms %}
 
-        <div class="card-header"
-             role="button"
-             data-toggle="collapse"
-             href="#options-body"
-             aria-expanded="true"
-             aria-controls="options-body">
-            <b>Options</b>
+        <div class="card shadow">
+
+            <div class="card-header"
+                 role="button"
+                 data-toggle="collapse"
+                 href="#options-body"
+                 aria-expanded="true"
+                 aria-controls="options-body">
+                <b>Options</b>
+            </div>
+
+            <div class="card-body collapse" id="options-body">
+
+                {% if 'soilcom.add_collection' in perms %}
+                    <div class="row">
+                        <div class="col">
+                            <div class="text-center">
+                                <a id="btn-collection-create"
+                                   class="btn btn-primary w-75"
+                                   data-href-template="{% url 'catchment-selection' %}"
+                                   href="{% url 'catchment-selection' %}">
+                                    Add new collection
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+
+                {% if 'soilcom.add_collection' in perms %}
+                    <div class="row mt-3">
+                        <div class="col">
+                            <div class="text-center">
+                                <a id="btn-collection-copy"
+                                   class="btn btn-primary w-75"
+                                   data-hreftemplate="/waste_collection/collections/__pk__/copy/"
+                                   href="javascript:void(0)">
+                                    Copy selected collection
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+
+                {% if 'soilcom.change_collection' in perms %}
+                    <div class="row mt-3">
+                        <div class="col">
+                            <div class="text-center">
+                                <a id="btn-collection-update"
+                                   class="btn btn-primary w-75"
+                                   href="javascript:void(0)"
+                                   data-hreftemplate="/waste_collection/collections/__pk__/update/">
+                                    Edit selected collection
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+
+                {% if 'soilcom.change_collection' in perms %}
+                    <div class="row mt-3">
+                        <div class="col">
+                            <div class="text-center">
+                                <a class="btn btn-primary w-75"
+                                   href="{% url 'waste-collection-home' %}">
+                                    Waste collection dashboard
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                {% endif %}
+
+            </div>
         </div>
 
-        <div class="card-body collapse" id="options-body">
-
-            {% if 'soilcom.add_collection' in perms %}
-                <div class="row">
-                    <div class="col">
-                        <div class="text-center">
-                            <a id="btn-collection-create"
-                               class="btn btn-primary w-75"
-                               data-href-template="{% url 'catchment-selection' %}"
-                               href="{% url 'catchment-selection' %}">
-                                Add new collection
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            {% endif %}
-
-            {% if 'soilcom.add_collection' in perms %}
-                <div class="row mt-3">
-                    <div class="col">
-                        <div class="text-center">
-                            <a id="btn-collection-copy"
-                               class="btn btn-primary w-75"
-                               data-hreftemplate="/waste_collection/collections/__pk__/copy/"
-                               href="javascript:void(0)">
-                                Copy selected collection
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            {% endif %}
-
-            {% if 'soilcom.change_collection' in perms %}
-                <div class="row mt-3">
-                    <div class="col">
-                        <div class="text-center">
-                            <a id="btn-collection-update"
-                               class="btn btn-primary w-75"
-                               href="javascript:void(0)"
-                               data-hreftemplate="/waste_collection/collections/__pk__/update/">
-                                Edit selected collection
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            {% endif %}
-
-            {% if 'soilcom.change_collection' in perms %}
-                <div class="row mt-3">
-                    <div class="col">
-                        <div class="text-center">
-                            <a class="btn btn-primary w-75"
-                               href="{% url 'waste-collection-home' %}">
-                                Waste collection dashboard
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            {% endif %}
-
-        </div>
-    </div>
+    {% endif %}
 
 {% endblock extra_cards %}
+
+
 
 {% block javascript %}
     {{ block.super }}
 
     <script type="text/javascript">
 
-        document.getElementById('btn-collection-create').addEventListener("click", function(e){
+        document.getElementById('btn-collection-create').addEventListener("click", function (e) {
             e.preventDefault();
             let filter_params = parseFilterParameters();
             filter_params.load_features = true;
