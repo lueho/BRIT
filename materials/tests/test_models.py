@@ -526,6 +526,16 @@ class CompositionTestCase(TestCase):
                         standard_deviation=share.standard_deviation
                     )
 
+    def test_add_next_order_value(self):
+        self.assertEqual(self.composition.order, 100)
+        second_composition = Composition.objects.create(
+            owner=self.user,
+            group=self.default_group,
+            sample=self.sample0,
+            fractions_of=self.default_component
+        )
+        self.assertEqual(second_composition.order, 110)
+
 
 class WeightShareTestCase(TestCase):
 

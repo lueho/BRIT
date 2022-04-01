@@ -151,9 +151,11 @@ class Migration(migrations.Migration):
                 ('owner', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
                 ('sample', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='compositions', to='materials.sample')),
                 ('visible_to_groups', models.ManyToManyField(to='auth.Group')),
+                ('order', models.IntegerField(default=90)),
             ],
             options={
                 'abstract': False,
+                'ordering': ['order']
             },
         ),
         migrations.CreateModel(
@@ -219,6 +221,7 @@ class Migration(migrations.Migration):
             ],
             options={
                 'abstract': False,
+                'ordering': ['-average']
             },
         ),
         migrations.AddField(

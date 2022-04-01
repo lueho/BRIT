@@ -1,5 +1,6 @@
 from django.conf import settings
 from django.db import models
+from django.db.models import Max
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 from django.urls import reverse
@@ -247,21 +248,6 @@ class SampleSeries(NamedUserObjectModel):
             group=MaterialComponentGroup.objects.default()
         )
 
-    # def composition(self):
-    #     grouped_shares = {}
-    #     compositions = self.group_settings
-    #     for composition in compositions:
-    #         grouped_shares[composition] = {
-    #             'averages': [],
-    #             'averages_composition': composition,
-    #             'averages_table': composition.averages_table(),
-    #             'averages_chart': composition.get_chart(),
-    #             # 'distribution_tables': setting.distribution_tables(),
-    #         }
-    #         for share in composition.shares.all():
-    #             grouped_shares[composition]['averages'].append(share)
-    #     return grouped_shares
-
 
 @receiver(post_save, sender=SampleSeries)
 def add_default_temporal_distribution(sender, instance, created, **kwargs):
@@ -344,6 +330,10 @@ class Composition(NamedUserObjectModel):
     group = models.ForeignKey(MaterialComponentGroup, related_name='compositions', on_delete=models.PROTECT)
     sample = models.ForeignKey(Sample, related_name='compositions', on_delete=models.CASCADE)
     fractions_of = models.ForeignKey(MaterialComponent, on_delete=models.PROTECT, default=get_default_component_pk)
+    order = models.IntegerField(default=90)
+
+    class Meta:
+        ordering = ['order']
 
     @property
     def material(self):
@@ -448,6 +438,7 @@ class Composition(NamedUserObjectModel):
                 group=self.group,
                 sample=self.sample,
                 fractions_of=self.fractions_of,
+                order=self.order
             )
         for share in self.shares.all():
             duplicate_share = share.duplicate(creator)
@@ -461,6 +452,14 @@ class Composition(NamedUserObjectModel):
 
     def __str__(self):
         return f'Composition of {self.group.name} of sample {self.sample.name}'
+
+
+@receiver(post_save, sender=Composition)
+def add_next_order_value(sender, instance, created, **kwargs):
+    if created:
+        compositions = Composition.objects.filter(sample=instance.sample)
+        instance.order = compositions.aggregate(Max('order'))['order__max'] + 10
+        instance.save()
 
 
 class WeightShare(NamedUserObjectModel):
