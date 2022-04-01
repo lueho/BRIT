@@ -5,8 +5,9 @@ from django.forms.formsets import BaseFormSet
 from django.test import RequestFactory, TestCase, modify_settings
 from django.urls import reverse
 
-from maps.models import Catchment
+from maps.models import Catchment, Region
 from materials.models import MaterialCategory
+from users.models import get_default_owner, Group
 from .. import views
 from ..forms import CollectionModelForm
 from ..models import Collection, Collector, CollectionSystem, WasteCategory, WasteComponent, WasteFlyer, WasteStream
@@ -500,3 +501,21 @@ class WasteFlyerListViewTestCase(TestCase):
         response = self.client.get(reverse('wasteflyer-list'))
         self.assertIn('object_list', response.context)
         self.assertEqual(len(response.context['object_list']), 3)
+
+
+@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
+class WasteCollectionMapViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = get_default_owner()
+        region = Region.objects.create(owner=owner, name='Test Region')
+        catchment = Catchment.objects.create(owner=owner, name='Test Catchment', region=region)
+        Collection.objects.create(owner=owner, name='Test Collection', catchment=catchment)
+
+    def setUp(self):
+        self.collection = Collection.objects.get(name='Test Collection')
+
+    def test_http_200_ok_for_anonymous(self):
+        response = self.client.get(reverse('WasteCollection'))
+        self.assertEqual(response.status_code, 200)
