@@ -402,35 +402,6 @@ class Composition(NamedUserObjectModel):
         """
         self.sample.series.remove_temporal_distribution(distribution)
 
-    # def get_chart(self):
-    #     data = {}
-    #     labels = []
-    #     for share in self.shares.all():
-    #         labels.append(share.component.name)
-    #         data[share.component.name] = share.average
-    #
-    #     dataset = DataSet(
-    #         label='Fraction',
-    #         data=data,
-    #         unit='%'
-    #     )
-    #
-    #     chart = DoughnutChart(
-    #         id=f'materialCompositionChart-{self.id}',
-    #         title='Composition',
-    #         unit='%'
-    #     )
-    #     chart.add_dataset(dataset)
-    #
-    #     return chart
-
-    # def averages_table(self):
-    #     return averages_table_factory(self)
-
-    # def distribution_tables(self):
-    #     return {distribution: distribution_table_factory(self.sample.series, distribution) for distribution in
-    #             self.sample.series.temporal_distributions.exclude(id=TemporalDistribution.objects.default().id)}
-
     def duplicate(self, creator):
         with mute_signals(post_save):
             duplicate = Composition.objects.create(
