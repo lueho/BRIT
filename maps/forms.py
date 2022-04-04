@@ -10,7 +10,33 @@ from django.forms import (Form,
 from django.forms.widgets import CheckboxSelectMultiple, RadioSelect
 from django.urls import reverse
 
-from .models import Region, Catchment, NutsRegion, LauRegion
+from brit.forms import CustomModelForm, CustomModalModelForm, ModalFormHelper
+
+from .models import Attribute, Region, Catchment, NutsRegion, LauRegion, RegionAttributeValue
+
+
+class AttributeModelForm(CustomModelForm):
+    class Meta:
+        model = Attribute
+        fields = ('name', 'unit', 'description')
+
+
+class AttributeModalModelForm(CustomModalModelForm):
+    class Meta:
+        model = Attribute
+        fields = ('name', 'unit', 'description',)
+
+
+class RegionAttributeValueModelForm(CustomModelForm):
+    class Meta:
+        model = RegionAttributeValue
+        fields = ('region', 'attribute', 'value', 'standard_deviation')
+
+
+class RegionAttributeValueModalModelForm(CustomModalModelForm):
+    class Meta:
+        model = RegionAttributeValue
+        fields = ('region', 'attribute', 'value', 'standard_deviation')
 
 
 # ----------- Catchments -----------------------------------------------------------------------------------------------

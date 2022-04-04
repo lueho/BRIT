@@ -1,8 +1,11 @@
-from django.contrib.auth.models import User, Permission
+from django.contrib.auth.models import Group, User, Permission
+from django.test import TestCase, modify_settings
 from django.urls import reverse
 from rest_framework.test import APITestCase
 
-from ..models import Catchment, LauRegion, NutsRegion
+from users.models import get_default_owner
+
+from ..models import Attribute, RegionAttributeValue, Catchment, LauRegion, NutsRegion, Region
 
 
 class NutsRegionPedigreeAPITestCase(APITestCase):
@@ -156,3 +159,740 @@ class NutsRegionPedigreeAPITestCase(APITestCase):
         response = self.client.get(reverse('data.nuts_lau_catchment_options'),
                                    {'id': self.ukh14.id, 'direction': 'children'})
         self.assertIn('id_level_4', response.data)
+
+
+# ----------- Attribute CRUD -------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
+class AttributeListViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        User.objects.create(username='outsider')
+
+    def setUp(self):
+        self.outsider = User.objects.get(username='outsider')
+
+    def test_get_http_200_ok_for_anonymous(self):
+        response = self.client.get(reverse('attribute-list'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_get_http_200_ok_for_logged_in_users(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('attribute-list'))
+        self.assertEqual(response.status_code, 200)
+
+
+@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
+class AttributeCreateViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        User.objects.create(username='outsider')
+        member = User.objects.create(username='member')
+        members = Group.objects.create(name='members')
+        members.permissions.add(Permission.objects.get(codename='add_attribute'))
+        member.groups.add(members)
+
+    def setUp(self):
+        self.member = User.objects.get(username='member')
+        self.outsider = User.objects.get(username='outsider')
+
+    def test_get_http_302_redirect_for_anonymous(self):
+        response = self.client.get(reverse('attribute-create'))
+        self.assertEqual(response.status_code, 302)
+
+    def test_get_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('attribute-create'))
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('attribute-create'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_http_302_redirect_for_anonymous(self):
+        response = self.client.post(reverse('attribute-create'), data={})
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(reverse('attribute-create'), data={})
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_http_302_redirect_for_members_with_minimal_data(self):
+        self.client.force_login(self.member)
+        data = {'name': 'Test Attribute', 'unit': 'Test Unit'}
+        response = self.client.post(reverse('attribute-create'), data=data)
+        self.assertEqual(response.status_code, 302)
+
+
+@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
+class AttributeModalCreateViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        User.objects.create(username='outsider')
+        member = User.objects.create(username='member')
+        members = Group.objects.create(name='members')
+        members.permissions.add(Permission.objects.get(codename='add_attribute'))
+        member.groups.add(members)
+
+    def setUp(self):
+        self.member = User.objects.get(username='member')
+        self.outsider = User.objects.get(username='outsider')
+
+    def test_get_http_302_redirect_for_anonymous(self):
+        response = self.client.get(reverse('attribute-create-modal'))
+        self.assertEqual(response.status_code, 302)
+
+    def test_get_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('attribute-create-modal'))
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('attribute-create-modal'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_http_302_redirect_for_anonymous(self):
+        response = self.client.post(reverse('attribute-create-modal'), data={})
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(reverse('attribute-create-modal'), data={})
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_http_302_redirect_for_members_with_minimal_data(self):
+        self.client.force_login(self.member)
+        data = {'name': 'Test Attribute', 'unit': 'Test Unit'}
+        response = self.client.post(reverse('attribute-create-modal'), data=data)
+        self.assertEqual(response.status_code, 302)
+
+
+@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
+class AttributeDetailViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        User.objects.create(username='owner')
+        User.objects.create(username='outsider')
+
+    def setUp(self):
+        self.owner = User.objects.get(username='owner')
+        self.outsider = User.objects.get(username='outsider')
+        self.attribute = Attribute.objects.create(
+            owner=self.owner,
+            name='Test Attribute',
+            unit='Test Unit',
+            description='This ist a test element'
+        )
+
+    def test_get_http_200_ok_for_anonymous(self):
+        response = self.client.get(reverse('attribute-detail', kwargs={'pk': self.attribute.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_get_http_200_ok_for_logged_in_users(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('attribute-detail', kwargs={'pk': self.attribute.pk}))
+        self.assertEqual(response.status_code, 200)
+
+
+@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
+class AttributeModalDetailViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        User.objects.create(username='owner')
+        User.objects.create(username='outsider')
+
+    def setUp(self):
+        self.owner = User.objects.get(username='owner')
+        self.outsider = User.objects.get(username='outsider')
+        self.attribute = Attribute.objects.create(
+            owner=self.owner,
+            name='Test Attribute',
+            unit='Test Unit',
+            description='This ist a test element'
+        )
+
+    def test_get_http_200_ok_for_anonymous(self):
+        response = self.client.get(reverse('attribute-detail-modal', kwargs={'pk': self.attribute.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_get_http_200_ok_for_logged_in_users(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('attribute-detail-modal', kwargs={'pk': self.attribute.pk}))
+        self.assertEqual(response.status_code, 200)
+
+
+@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
+class AttributeUpdateViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        User.objects.create(username='owner')
+        User.objects.create(username='outsider')
+        member = User.objects.create(username='member')
+        members = Group.objects.create(name='members')
+        members.permissions.add(Permission.objects.get(codename='change_attribute'))
+        member.groups.add(members)
+
+    def setUp(self):
+        self.owner = User.objects.get(username='owner')
+        self.outsider = User.objects.get(username='outsider')
+        self.member = User.objects.get(username='member')
+        self.attribute = Attribute.objects.create(
+            owner=self.owner,
+            name='Test Attribute',
+            unit='Test Unit',
+            description='This ist a test element'
+        )
+
+    def test_get_http_302_redirect_for_anonymous(self):
+        response = self.client.get(reverse('attribute-update', kwargs={'pk': self.attribute.pk}))
+        self.assertEqual(response.status_code, 302)
+
+    def test_get_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('attribute-update', kwargs={'pk': self.attribute.pk}))
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('attribute-update', kwargs={'pk': self.attribute.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_http_302_redirect_for_anonymous(self):
+        response = self.client.post(reverse('attribute-update', kwargs={'pk': self.attribute.pk}), data={})
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        data = {'name': 'Updated Attribute', 'unit': self.attribute.unit}
+        response = self.client.post(reverse('attribute-update', kwargs={'pk': self.attribute.pk}), data=data)
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_http_302_redirect_for_members(self):
+        self.client.force_login(self.member)
+        data = {'name': 'Updated Attribute', 'unit': self.attribute.unit}
+        response = self.client.post(reverse('attribute-update', kwargs={'pk': self.attribute.pk}), data=data)
+        self.assertEqual(response.status_code, 302)
+
+
+@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
+class AttributeModalUpdateViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        User.objects.create(username='owner')
+        User.objects.create(username='outsider')
+        member = User.objects.create(username='member')
+        members = Group.objects.create(name='members')
+        members.permissions.add(Permission.objects.get(codename='change_attribute'))
+        member.groups.add(members)
+
+    def setUp(self):
+        self.owner = User.objects.get(username='owner')
+        self.outsider = User.objects.get(username='outsider')
+        self.member = User.objects.get(username='member')
+        self.attribute = Attribute.objects.create(
+            owner=self.owner,
+            name='Test Attribute',
+            unit='Test Unit',
+            description='This ist a test element'
+        )
+
+    def test_get_http_302_redirect_for_anonymous(self):
+        response = self.client.get(reverse('attribute-update-modal', kwargs={'pk': self.attribute.pk}))
+        self.assertEqual(response.status_code, 302)
+
+    def test_get_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('attribute-update-modal', kwargs={'pk': self.attribute.pk}))
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('attribute-update-modal', kwargs={'pk': self.attribute.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_http_302_redirect_for_anonymous(self):
+        response = self.client.post(reverse('attribute-update-modal', kwargs={'pk': self.attribute.pk}), data={})
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        data = {'name': 'Updated Attribute', 'unit': self.attribute.unit}
+        response = self.client.post(reverse('attribute-update-modal', kwargs={'pk': self.attribute.pk}), data=data)
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_http_302_redirect_for_members(self):
+        self.client.force_login(self.member)
+        data = {'name': 'Updated Attribute', 'unit': self.attribute.unit}
+        response = self.client.post(reverse('attribute-update-modal', kwargs={'pk': self.attribute.pk}), data=data)
+        self.assertEqual(response.status_code, 302)
+
+
+@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
+class AttributeModalDeleteViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        User.objects.create(username='owner')
+        User.objects.create(username='outsider')
+        member = User.objects.create(username='member')
+        members = Group.objects.create(name='members')
+        members.permissions.add(Permission.objects.get(codename='delete_attribute'))
+        member.groups.add(members)
+
+    def setUp(self):
+        self.owner = User.objects.get(username='owner')
+        self.outsider = User.objects.get(username='outsider')
+        self.member = User.objects.get(username='member')
+        self.attribute = Attribute.objects.create(
+            owner=self.owner,
+            name='Test Attribute',
+            unit='Test Unit',
+            description='This ist a test element'
+        )
+
+    def test_get_http_302_redirect_for_anonymous(self):
+        response = self.client.get(reverse('attribute-delete-modal', kwargs={'pk': self.attribute.pk}))
+        self.assertEqual(response.status_code, 302)
+
+    def test_get_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('attribute-delete-modal', kwargs={'pk': self.attribute.pk}))
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('attribute-delete-modal', kwargs={'pk': self.attribute.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_http_302_redirect_for_anonymous(self):
+        response = self.client.post(reverse('attribute-delete-modal', kwargs={'pk': self.attribute.pk}))
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(reverse('attribute-delete-modal', kwargs={'pk': self.attribute.pk}))
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_successful_delete_and_http_302_and_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.post(reverse('attribute-delete-modal', kwargs={'pk': self.attribute.pk}))
+        with self.assertRaises(Attribute.DoesNotExist):
+            Attribute.objects.get(pk=self.attribute.pk)
+        self.assertEqual(response.status_code, 302)
+
+
+# ----------- Region Attribute Value CRUD ------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
+class RegionAttributeValueListViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        User.objects.create(username='outsider')
+
+    def setUp(self):
+        self.outsider = User.objects.get(username='outsider')
+
+    def test_get_http_200_ok_for_anonymous(self):
+        response = self.client.get(reverse('regionattributevalue-list'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_get_http_200_ok_for_logged_in_users(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('regionattributevalue-list'))
+        self.assertEqual(response.status_code, 200)
+
+
+@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
+class RegionAttributeValueCreateViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = get_default_owner()
+        User.objects.create(username='outsider')
+        member = User.objects.create(username='member')
+        members = Group.objects.create(name='members')
+        members.permissions.add(Permission.objects.get(codename='add_regionattributevalue'))
+        member.groups.add(members)
+        Region.objects.create(owner=owner, name='Test Region')
+        Attribute.objects.create(owner=owner, name='Test Attribute', unit='Test Unit')
+
+    def setUp(self):
+        self.member = User.objects.get(username='member')
+        self.outsider = User.objects.get(username='outsider')
+        self.region = Region.objects.get(name='Test Region')
+        self.attribute = Attribute.objects.get(name='Test Attribute')
+
+    def test_get_http_302_redirect_for_anonymous(self):
+        response = self.client.get(reverse('regionattributevalue-create'))
+        self.assertEqual(response.status_code, 302)
+
+    def test_get_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('regionattributevalue-create'))
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('regionattributevalue-create'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_http_302_redirect_for_anonymous(self):
+        response = self.client.post(reverse('regionattributevalue-create'), data={})
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(reverse('regionattributevalue-create'), data={})
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_http_302_redirect_for_members_with_minimal_data(self):
+        self.client.force_login(self.member)
+        data = {
+            'name': 'Test Attribute Value',
+            'region': self.region.id,
+            'attribute': self.attribute.id,
+            'value': 123.321
+        }
+        response = self.client.post(reverse('regionattributevalue-create'), data=data)
+        self.assertEqual(response.status_code, 302)
+
+
+@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
+class RegionAttributeValueModalCreateViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = get_default_owner()
+        User.objects.create(username='outsider')
+        member = User.objects.create(username='member')
+        members = Group.objects.create(name='members')
+        members.permissions.add(Permission.objects.get(codename='add_regionattributevalue'))
+        member.groups.add(members)
+        Region.objects.create(owner=owner, name='Test Region')
+        Attribute.objects.create(owner=owner, name='Test Attribute', unit='Test Unit')
+
+    def setUp(self):
+        self.owner = get_default_owner()
+        self.member = User.objects.get(username='member')
+        self.outsider = User.objects.get(username='outsider')
+        self.region = Region.objects.get(name='Test Region')
+        self.attribute = Attribute.objects.get(name='Test Attribute')
+
+    def test_get_http_302_redirect_for_anonymous(self):
+        response = self.client.get(reverse('regionattributevalue-create-modal'))
+        self.assertEqual(response.status_code, 302)
+
+    def test_get_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('regionattributevalue-create-modal'))
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('regionattributevalue-create-modal'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_http_302_redirect_for_anonymous(self):
+        response = self.client.post(reverse('regionattributevalue-create-modal'), data={})
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(reverse('regionattributevalue-create-modal'), data={})
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_http_302_redirect_for_members_with_minimal_data(self):
+        self.client.force_login(self.member)
+        data = {
+            'name': 'Test Attribute Value',
+            'region': self.region.id,
+            'attribute': self.attribute.id,
+            'value': 123.321
+        }
+        response = self.client.post(reverse('regionattributevalue-create-modal'), data=data)
+        self.assertEqual(response.status_code, 302)
+
+
+@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
+class RegionAttributeValueDetailViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = get_default_owner()
+        User.objects.create(username='outsider')
+        Region.objects.create(owner=owner, name='Test Region')
+        Attribute.objects.create(owner=owner, name='Test Attribute', unit='Test Unit')
+
+    def setUp(self):
+        self.owner = get_default_owner()
+        self.outsider = User.objects.get(username='outsider')
+        self.region = Region.objects.get(name='Test Region')
+        self.attribute = Attribute.objects.get(name='Test Attribute')
+        self.value = RegionAttributeValue.objects.create(
+            owner=self.owner,
+            name='Test Value',
+            region=self.region,
+            attribute=self.attribute,
+            value=123.312
+        )
+
+    def test_get_http_200_ok_for_anonymous(self):
+        response = self.client.get(reverse('regionattributevalue-detail', kwargs={'pk': self.value.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_get_http_200_ok_for_logged_in_users(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('regionattributevalue-detail', kwargs={'pk': self.value.pk}))
+        self.assertEqual(response.status_code, 200)
+
+
+@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
+class RegionAttributeValueModalDetailViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = get_default_owner()
+        User.objects.create(username='owner')
+        User.objects.create(username='outsider')
+        Region.objects.create(owner=owner, name='Test Region')
+        Attribute.objects.create(owner=owner, name='Test Attribute', unit='Test Unit')
+
+    def setUp(self):
+        self.owner = get_default_owner()
+        self.outsider = User.objects.get(username='outsider')
+        self.region = Region.objects.get(name='Test Region')
+        self.attribute = Attribute.objects.get(name='Test Attribute')
+        self.value = RegionAttributeValue.objects.create(
+            owner=self.owner,
+            name='Test Value',
+            region=self.region,
+            attribute=self.attribute,
+            value=123.312
+        )
+
+    def test_get_http_200_ok_for_anonymous(self):
+        response = self.client.get(reverse('regionattributevalue-detail-modal', kwargs={'pk': self.value.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_get_http_200_ok_for_logged_in_users(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('regionattributevalue-detail-modal', kwargs={'pk': self.value.pk}))
+        self.assertEqual(response.status_code, 200)
+
+
+@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
+class RegionAttributeValueUpdateViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = get_default_owner()
+        User.objects.create(username='owner')
+        User.objects.create(username='outsider')
+        member = User.objects.create(username='member')
+        members = Group.objects.create(name='members')
+        members.permissions.add(Permission.objects.get(codename='change_regionattributevalue'))
+        member.groups.add(members)
+        Region.objects.create(owner=owner, name='Test Region')
+        Attribute.objects.create(owner=owner, name='Test Attribute', unit='Test Unit')
+
+    def setUp(self):
+        self.owner = get_default_owner()
+        self.outsider = User.objects.get(username='outsider')
+        self.member = User.objects.get(username='member')
+        self.region = Region.objects.get(name='Test Region')
+        self.attribute = Attribute.objects.get(name='Test Attribute')
+        self.value = RegionAttributeValue.objects.create(
+            owner=self.owner,
+            name='Test Value',
+            region=self.region,
+            attribute=self.attribute,
+            value=123.312
+        )
+
+    def test_get_http_302_redirect_for_anonymous(self):
+        response = self.client.get(reverse('regionattributevalue-update', kwargs={'pk': self.value.pk}))
+        self.assertEqual(response.status_code, 302)
+
+    def test_get_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('regionattributevalue-update', kwargs={'pk': self.value.pk}))
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('regionattributevalue-update', kwargs={'pk': self.value.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_http_302_redirect_for_anonymous(self):
+        response = self.client.post(reverse('regionattributevalue-update', kwargs={'pk': self.value.pk}), data={})
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        data = {
+            'name': 'Updated Value',
+            'region': self.region.id,
+            'attribute': self.attribute.id,
+            'value': 456.654
+        }
+        response = self.client.post(reverse('regionattributevalue-update', kwargs={'pk': self.value.pk}), data=data)
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_http_302_redirect_for_members(self):
+        self.client.force_login(self.member)
+        data = {
+            'name': 'Updated Value',
+            'region': self.region.id,
+            'attribute': self.attribute.id,
+            'value': 456.654
+        }
+        response = self.client.post(reverse('regionattributevalue-update', kwargs={'pk': self.value.pk}), data=data)
+        self.assertEqual(response.status_code, 302)
+
+
+@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
+class RegionAttributeValueModalUpdateViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = get_default_owner()
+        User.objects.create(username='outsider')
+        member = User.objects.create(username='member')
+        members = Group.objects.create(name='members')
+        members.permissions.add(Permission.objects.get(codename='change_regionattributevalue'))
+        member.groups.add(members)
+        Region.objects.create(owner=owner, name='Test Region')
+        Attribute.objects.create(owner=owner, name='Test Attribute', unit='Test Unit')
+
+    def setUp(self):
+        self.owner = get_default_owner()
+        self.outsider = User.objects.get(username='outsider')
+        self.member = User.objects.get(username='member')
+        self.region = Region.objects.get(name='Test Region')
+        self.attribute = Attribute.objects.get(name='Test Attribute')
+        self.value = RegionAttributeValue.objects.create(
+            owner=self.owner,
+            name='Test Value',
+            region=self.region,
+            attribute=self.attribute,
+            value=123.312
+        )
+
+    def test_get_http_302_redirect_for_anonymous(self):
+        response = self.client.get(reverse('regionattributevalue-update-modal', kwargs={'pk': self.value.pk}))
+        self.assertEqual(response.status_code, 302)
+
+    def test_get_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('regionattributevalue-update-modal', kwargs={'pk': self.value.pk}))
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('regionattributevalue-update-modal', kwargs={'pk': self.value.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_http_302_redirect_for_anonymous(self):
+        response = self.client.post(reverse('regionattributevalue-update-modal', kwargs={'pk': self.value.pk}), data={})
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        data = {
+            'name': 'Updated Value',
+            'region': self.region.id,
+            'attribute': self.attribute.id,
+            'value': 456.654
+        }
+        response = self.client.post(
+            reverse('regionattributevalue-update-modal', kwargs={'pk': self.value.pk}),
+            data=data
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_http_302_redirect_for_members(self):
+        self.client.force_login(self.member)
+        data = {
+            'name': 'Updated Value',
+            'region': self.region.id,
+            'attribute': self.attribute.id,
+            'value': 456.654
+        }
+        response = self.client.post(
+            reverse('regionattributevalue-update-modal', kwargs={'pk': self.value.pk}),
+            data=data
+        )
+        self.assertEqual(response.status_code, 302)
+
+
+@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
+class RegionAttributeValueModalDeleteViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = get_default_owner()
+        User.objects.create(username='owner')
+        User.objects.create(username='outsider')
+        member = User.objects.create(username='member')
+        members = Group.objects.create(name='members')
+        members.permissions.add(Permission.objects.get(codename='delete_regionattributevalue'))
+        member.groups.add(members)
+        Region.objects.create(owner=owner, name='Test Region')
+        Attribute.objects.create(owner=owner, name='Test Attribute', unit='Test Unit')
+
+    def setUp(self):
+        self.owner = get_default_owner()
+        self.outsider = User.objects.get(username='outsider')
+        self.member = User.objects.get(username='member')
+        self.region = Region.objects.get(name='Test Region')
+        self.attribute = Attribute.objects.get(name='Test Attribute')
+        self.value = RegionAttributeValue.objects.create(
+            owner=self.owner,
+            name='Test Value',
+            region=self.region,
+            attribute=self.attribute,
+            value=123.312
+        )
+
+    def test_get_http_302_redirect_for_anonymous(self):
+        response = self.client.get(reverse('regionattributevalue-delete-modal', kwargs={'pk': self.value.pk}))
+        self.assertEqual(response.status_code, 302)
+
+    def test_get_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('regionattributevalue-delete-modal', kwargs={'pk': self.value.pk}))
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('regionattributevalue-delete-modal', kwargs={'pk': self.value.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_http_302_redirect_for_anonymous(self):
+        response = self.client.post(reverse('regionattributevalue-delete-modal', kwargs={'pk': self.value.pk}))
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(reverse('regionattributevalue-delete-modal', kwargs={'pk': self.value.pk}))
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_successful_delete_and_http_302_and_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.post(reverse('regionattributevalue-delete-modal', kwargs={'pk': self.value.pk}))
+        with self.assertRaises(RegionAttributeValue.DoesNotExist):
+            RegionAttributeValue.objects.get(pk=self.value.pk)
+        self.assertEqual(response.status_code, 302)

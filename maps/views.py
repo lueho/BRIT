@@ -7,15 +7,32 @@ from django.views.generic.edit import FormMixin
 from rest_framework.exceptions import ParseError, NotFound
 from rest_framework.views import APIView, Response
 
+from brit.views import (
+    OwnedObjectListView,
+    OwnedObjectCreateView,
+    OwnedObjectModalCreateView,
+    OwnedObjectDetailView,
+    OwnedObjectModalDetailView,
+    OwnedObjectUpdateView,
+    OwnedObjectModalUpdateView,
+    OwnedObjectDeleteView,
+)
+
 from maps.serializers import RegionSerializer, CatchmentSerializer, NutsRegionGeometrySerializer, \
     NutsRegionOptionSerializer, LauRegionOptionSerializer
 from .forms import (
+    AttributeModelForm,
+    AttributeModalModelForm,
     CatchmentModelForm,
     CatchmentQueryForm,
     NutsMapFilterForm,
-    NutsRegionQueryForm
+    NutsRegionQueryForm,
+    RegionAttributeValueModelForm,
+    RegionAttributeValueModalModelForm
 )
 from .models import (
+    Attribute,
+    RegionAttributeValue,
     Catchment,
     GeoDataset,
     Region,
@@ -413,3 +430,117 @@ class NutsAndLauCatchmentPedigreeAPI(APIView):
                 data[f'id_level_{lvl}'] = serializer.data
 
         return Response(data)
+
+
+# ----------- Attribute CRUD -------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+class AttributeListView(OwnedObjectListView):
+    template_name = 'simple_list_card.html'
+    model = Attribute
+    permission_required = set()
+
+
+class AttributeCreateView(OwnedObjectCreateView):
+    template_name = 'simple_form_card.html'
+    form_class = AttributeModelForm
+    success_url = reverse_lazy('attribute-list')
+    permission_required = 'maps.add_attribute'
+
+
+class AttributeModalCreateView(OwnedObjectModalCreateView):
+    template_name = 'modal_form.html'
+    form_class = AttributeModalModelForm
+    success_url = reverse_lazy('attribute-list')
+    permission_required = 'maps.add_attribute'
+
+
+class AttributeDetailView(OwnedObjectDetailView):
+    template_name = 'attribute_detail.html'
+    model = Attribute
+    permission_required = set()
+
+
+class AttributeModalDetailView(OwnedObjectModalDetailView):
+    template_name = 'modal_detail.html'
+    model = Attribute
+    permission_required = set()
+
+
+class AttributeUpdateView(OwnedObjectUpdateView):
+    template_name = 'simple_form_card.html'
+    model = Attribute
+    form_class = AttributeModelForm
+    permission_required = 'maps.change_attribute'
+
+
+class AttributeModalUpdateView(OwnedObjectModalUpdateView):
+    template_name = 'modal_form.html'
+    model = Attribute
+    form_class = AttributeModalModelForm
+    permission_required = 'maps.change_attribute'
+
+
+class AttributeModalDeleteView(OwnedObjectDeleteView):
+    template_name = 'modal_delete.html'
+    model = Attribute
+    success_message = 'Successfully deleted.'
+    success_url = reverse_lazy('attribute-list')
+    permission_required = 'maps.delete_attribute'
+
+
+# ----------- Region Attribute Value CRUD ------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+class RegionAttributeValueListView(OwnedObjectListView):
+    template_name = 'simple_list_card.html'
+    model = RegionAttributeValue
+    permission_required = set()
+
+
+class RegionAttributeValueCreateView(OwnedObjectCreateView):
+    template_name = 'simple_form_card.html'
+    form_class = RegionAttributeValueModelForm
+    success_url = reverse_lazy('regionattributevalue-list')
+    permission_required = 'maps.add_regionattributevalue'
+
+
+class RegionAttributeValueModalCreateView(OwnedObjectModalCreateView):
+    template_name = 'modal_form.html'
+    form_class = RegionAttributeValueModalModelForm
+    success_url = reverse_lazy('regionattributevalue-list')
+    permission_required = 'maps.add_regionattributevalue'
+
+
+class RegionAttributeValueDetailView(OwnedObjectDetailView):
+    template_name = 'regionattributevalue_detail.html'
+    model = RegionAttributeValue
+    permission_required = set()
+
+
+class RegionAttributeValueModalDetailView(OwnedObjectModalDetailView):
+    template_name = 'modal_detail.html'
+    model = RegionAttributeValue
+    permission_required = set()
+
+
+class RegionAttributeValueUpdateView(OwnedObjectUpdateView):
+    template_name = 'simple_form_card.html'
+    model = RegionAttributeValue
+    form_class = RegionAttributeValueModelForm
+    permission_required = 'maps.change_regionattributevalue'
+
+
+class RegionAttributeValueModalUpdateView(OwnedObjectModalUpdateView):
+    template_name = 'modal_form.html'
+    model = RegionAttributeValue
+    form_class = RegionAttributeValueModalModelForm
+    permission_required = 'maps.change_regionattributevalue'
+
+
+class RegionAttributeValueModalDeleteView(OwnedObjectDeleteView):
+    template_name = 'modal_delete.html'
+    model = RegionAttributeValue
+    success_message = 'Successfully deleted.'
+    success_url = reverse_lazy('regionattributevalue-list')
+    permission_required = 'maps.delete_regionattributevalue'

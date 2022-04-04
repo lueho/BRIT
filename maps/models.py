@@ -147,3 +147,25 @@ class GeoDataset(NamedUserObjectModel):
 
     def __str__(self):
         return self.name
+
+
+class Attribute(NamedUserObjectModel):
+    """
+    Defines an attribute class that can be attached to features of a map.
+    """
+    unit = models.CharField(max_length=127)
+
+    def __str__(self):
+        return f'{self.name} [{self.unit}]'
+
+
+class RegionAttributeValue(NamedUserObjectModel):
+    """
+    Attaches a value of an attribute class to a region
+    """
+    region = models.ForeignKey(Region, on_delete=models.PROTECT)
+    attribute = models.ForeignKey(Attribute, on_delete=models.PROTECT)
+    date = models.DateField()
+    value = models.FloatField(default=0.0)
+    standard_deviation = models.FloatField(default=0.0, blank=True, null=True)
+
