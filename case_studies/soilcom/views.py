@@ -322,7 +322,6 @@ class WasteFlyerListView(SourceListView):
     template_name = 'waste_flyers_list.html'
     model = models.WasteFlyer
     permission_required = 'soilcom.view_wasteflyer'
-    create_new_object_url = reverse_lazy('wasteflyer-create')
 
 
 class WasteFlyerCreateView(SourceCreateView):

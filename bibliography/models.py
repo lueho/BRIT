@@ -1,6 +1,6 @@
 from django.db import models
 
-from brit.models import OwnedObjectModel
+from brit.models import OwnedObjectModel, CRUDUrlsMixin
 
 
 class Licence(models.Model):
@@ -21,7 +21,7 @@ SOURCE_TYPES = (
 )
 
 
-class Source(OwnedObjectModel):
+class Source(CRUDUrlsMixin, OwnedObjectModel):
     type = models.CharField(max_length=255, choices=SOURCE_TYPES, default='custom')
     authors = models.CharField(max_length=500, blank=True, null=True)
     publisher = models.CharField(max_length=127, blank=True, null=True)

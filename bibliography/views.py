@@ -12,7 +12,6 @@ class SourceListView(views.OwnedObjectListView):
     template_name = 'source_list_card.html'
     model = Source
     permission_required = 'bibliography.view_source'
-    create_new_object_url = reverse_lazy('source-create')
 
 
 class SourceCreateView(views.OwnedObjectCreateView):

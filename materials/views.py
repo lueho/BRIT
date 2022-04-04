@@ -56,7 +56,6 @@ class MaterialCategoryListView(OwnedObjectListView):
     template_name = 'simple_list_card.html'
     model = MaterialCategory
     permission_required = set()
-    create_new_object_url = reverse_lazy('materialcategory-create')
 
 
 class MaterialCategoryCreateView(OwnedObjectCreateView):
@@ -115,7 +114,6 @@ class MaterialListView(OwnedObjectListView):
     template_name = 'simple_list_card.html'
     model = Material
     permission_required = set()
-    create_new_object_url = reverse_lazy('material-create')
 
 
 class MaterialCreateView(OwnedObjectCreateView):
@@ -173,7 +171,6 @@ class ComponentListView(OwnedObjectListView):
     template_name = 'simple_list_card.html'
     model = MaterialComponent
     permission_required = set()
-    create_new_object_url = reverse_lazy('materialcomponent-create')
 
 
 class ComponentCreateView(OwnedObjectCreateView):
@@ -232,7 +229,6 @@ class ComponentGroupListView(OwnedObjectListView):
     template_name = 'simple_list_card.html'
     model = MaterialComponentGroup
     permission_required = set()
-    create_new_object_url = reverse_lazy('materialcomponentgroup-create')
 
 
 class ComponentGroupCreateView(OwnedObjectCreateView):
@@ -290,7 +286,6 @@ class MaterialPropertyListView(OwnedObjectListView):
     template_name = 'simple_list_card.html'
     model = MaterialProperty
     permission_required = set()
-    create_new_object_url = reverse_lazy('materialproperty-create')
 
 
 class MaterialPropertyCreateView(OwnedObjectCreateView):
@@ -360,7 +355,6 @@ class SampleSeriesListView(OwnedObjectListView):
     template_name = 'simple_list_card.html'
     model = SampleSeries
     permission_required = set()
-    create_new_object_url = reverse_lazy('sampleseries-create')
 
 
 class SampleSeriesCreateView(OwnedObjectCreateView):
@@ -463,7 +457,6 @@ class SampleListView(OwnedObjectListView):
     template_name = 'simple_list_card.html'
     model = Sample
     permission_required = set()
-    create_new_object_url = reverse_lazy('sample-create')
 
 
 class FeaturedSampleListView(OwnedObjectListView):
@@ -471,7 +464,6 @@ class FeaturedSampleListView(OwnedObjectListView):
     model = Sample
     queryset = Sample.objects.filter(series__publish=True)
     permission_required = set()
-    create_new_object_url = reverse_lazy('sample-create')
 
 
 class SampleCreateView(OwnedObjectCreateView):
@@ -580,7 +572,6 @@ class CompositionListView(OwnedObjectListView):
     template_name = 'simple_list_card.html'
     model = Composition
     permission_required = set()
-    create_new_object_url = reverse_lazy('composition-create')
 
 
 class CompositionCreateView(OwnedObjectCreateView):
