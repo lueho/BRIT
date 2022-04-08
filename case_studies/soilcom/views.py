@@ -373,6 +373,63 @@ class WasteFlyerModalDeleteView(SourceModalDeleteView):
     permission_required = 'soilcom.delete_wasteflyer'
 
 
+# ----------- Frequency CRUD -------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+class FrequencyListView(views.OwnedObjectListView):
+    template_name = 'simple_list_card.html'
+    model = models.CollectionFrequency
+    permission_required = set()
+
+
+class FrequencyCreateView(views.OwnedObjectCreateView):
+    template_name = 'simple_form_card.html'
+    form_class = forms.CollectionFrequencyModelForm
+    success_url = reverse_lazy('collectionfrequency-list')
+    permission_required = 'soilcom.add_collectionfrequency'
+
+
+class FrequencyModalCreateView(views.OwnedObjectModalCreateView):
+    template_name = 'modal_form.html'
+    form_class = forms.CollectionFrequencyModalModelForm
+    success_url = reverse_lazy('collectionfrequency-list')
+    permission_required = 'soilcom.add_collectionfrequency'
+
+
+class FrequencyDetailView(views.OwnedObjectDetailView):
+    template_name = 'simple_detail_card.html'
+    model = models.CollectionFrequency
+    permission_required = set()
+
+
+class FrequencyModalDetailView(views.OwnedObjectModalDetailView):
+    template_name = 'modal_detail.html'
+    model = models.CollectionFrequency
+    permission_required = set()
+
+
+class FrequencyUpdateView(views.OwnedObjectUpdateView):
+    template_name = 'simple_form_card.html'
+    model = models.CollectionFrequency
+    form_class = forms.CollectionFrequencyModelForm
+    permission_required = 'soilcom.change_collectionfrequency'
+
+
+class FrequencyModalUpdateView(views.OwnedObjectModalUpdateView):
+    template_name = 'modal_form.html'
+    model = models.CollectionFrequency
+    form_class = forms.CollectionFrequencyModalModelForm
+    permission_required = 'soilcom.change_collectionfrequency'
+
+
+class FrequencyModalDeleteView(views.OwnedObjectDeleteView):
+    template_name = 'modal_delete.html'
+    model = models.CollectionFrequency
+    success_message = 'Successfully deleted.'
+    success_url = reverse_lazy('collectionfrequency-list')
+    permission_required = 'soilcom.delete_collectionfrequency'
+
+
 # ----------- Collection CRUD ------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -473,6 +530,8 @@ class CollectionCopyView(CollectionCreateView):
                 initial['waste_category'] = collection.waste_stream.category
             if collection.waste_stream.allowed_materials.exists():
                 initial['allowed_materials'] = collection.waste_stream.allowed_materials.all()
+        if collection.frequency:
+            initial['frequency'] = collection.frequency
         if collection.description:
             initial['description'] = collection.description
         return initial
@@ -507,10 +566,12 @@ class CollectionUpdateView(ModelFormAndModelFormSetMixin, views.OwnedObjectUpdat
         return super().get_formset_kwargs(**kwargs)
 
     def get_initial(self):
-        return {
+        initial = super().get_initial()
+        initial.update({
             'waste_category': self.object.waste_stream.category,
             'allowed_materials': self.object.waste_stream.allowed_materials.all(),
-        }
+        })
+        return initial
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()

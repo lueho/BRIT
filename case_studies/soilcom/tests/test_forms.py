@@ -4,8 +4,9 @@ from django.test import TestCase
 
 from maps.models import Catchment
 from materials.models import MaterialCategory
+
 from ..forms import CollectionModelForm, WasteFlyerModelForm, WasteFlyerModelFormSet
-from ..models import Collection, Collector, CollectionSystem, WasteCategory, WasteComponent, WasteFlyer, WasteStream
+from ..models import Collection, Collector, CollectionFrequency, CollectionSystem, WasteCategory, WasteComponent, WasteFlyer, WasteStream
 
 
 class TestCollectionModelForm(TestCase):
@@ -21,6 +22,7 @@ class TestCollectionModelForm(TestCase):
         self.material1.categories.add(self.material_group)
         self.material2 = WasteComponent.objects.create(owner=self.owner, name='Material 2')
         self.material2.categories.add(self.material_group)
+        self.frequency = CollectionFrequency.objects.create(owner=self.owner, name='fix')
 
     def test_missing_data_errors(self):
         waste_stream = WasteStream.objects.create(
@@ -33,7 +35,8 @@ class TestCollectionModelForm(TestCase):
             catchment=self.catchment,
             collector=self.collector,
             collection_system=self.collection_system,
-            waste_stream=waste_stream
+            waste_stream=waste_stream,
+            frequency=self.frequency
         )
         form = CollectionModelForm(instance=collection, data={})
         self.assertFalse(form.is_valid())
@@ -49,6 +52,7 @@ class TestCollectionModelForm(TestCase):
             'collection_system': self.collection_system.id,
             'waste_category': self.waste_category.id,
             'allowed_materials': [self.material1.id, self.material2.id],
+            'frequency': self.frequency.id,
             'description': 'This is a test case'
         })
         self.assertTrue(form.is_valid())
@@ -65,6 +69,7 @@ class TestCollectionModelForm(TestCase):
             'collection_system': self.collection_system.id,
             'waste_category': self.waste_category.id,
             'allowed_materials': [self.material1.id, self.material2.id],
+            'frequency': self.frequency.id,
             'flyer_url': 'https://www.great-test-flyers.com',
             'description': 'This is a test case'
         })

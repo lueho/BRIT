@@ -118,6 +118,25 @@
             <div class="card shadow h-100">
                 <div class="card-header">
                     <strong>
+                        <a href="{% url 'collectionfrequency-list' %}" class="stretched-link">Collection frequencies</a>
+                    </strong>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        The frequencies of the collections can be grouped into categories. These can be created or
+                        edited here.
+                    </p>
+
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'collectionfrequency-list' %}" class="btn btn-primary">View collection frequencies</a>
+                </div>
+            </div>
+        </div>
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header">
+                    <strong>
                         <a href="{% url 'wastecomponent-list' %}" class="stretched-link">Waste components</a>
                     </strong>
                 </div>

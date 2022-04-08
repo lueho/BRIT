@@ -78,6 +78,18 @@ class WasteStreamModalModelForm(CustomModalModelForm):
         fields = ('name', 'category', 'allowed_materials', 'composition', 'description')
 
 
+class CollectionFrequencyModelForm(CustomModelForm):
+    class Meta:
+        model = models.CollectionFrequency
+        fields = ('name', 'description')
+
+
+class CollectionFrequencyModalModelForm(CustomModalModelForm):
+    class Meta:
+        model = models.CollectionFrequency
+        fields = ('name', 'description')
+
+
 class WasteFlyerModelForm(CustomModelForm):
     class Meta:
         model = models.WasteFlyer
@@ -164,7 +176,8 @@ class CollectionModelForm(forms.ModelForm):
 
     class Meta:
         model = models.Collection
-        fields = ('catchment', 'collector', 'collection_system', 'waste_category', 'allowed_materials', 'description')
+        fields = ('catchment', 'collector', 'collection_system', 'waste_category', 'allowed_materials',
+                  'frequency', 'description')
         labels = {'description': 'Comments'}
 
     def __init__(self, *args, **kwargs):
@@ -183,6 +196,7 @@ class CollectionModelForm(forms.ModelForm):
             Field('collection_system'),
             Field('waste_category'),
             Field('allowed_materials'),
+            Field('frequency'),
             Field('description')
         )
         return helper

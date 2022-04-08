@@ -61,10 +61,11 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
     collection_system = serializers.StringRelatedField()
     waste_category = serializers.CharField(source='waste_stream.category')
     allowed_materials = serializers.StringRelatedField(many=True, source='waste_stream.allowed_materials')
+    frequency = serializers.StringRelatedField()
     sources = serializers.StringRelatedField(source='flyers', many=True)
     comments = serializers.CharField(source='description')
 
     class Meta:
         model = models.Collection
         fields = ('id', 'catchment', 'collector', 'collection_system',
-                  'waste_category', 'allowed_materials', 'sources', 'comments')
+                  'waste_category', 'allowed_materials', 'frequency', 'sources', 'comments')

@@ -175,11 +175,16 @@ def set_source_type(sender, instance, **kwargs):
     instance.type = 'waste_flyer'
 
 
+class CollectionFrequency(NamedUserObjectModel):
+    pass
+
+
 class Collection(NamedUserObjectModel):
     collector = models.ForeignKey(Collector, on_delete=models.CASCADE, blank=True, null=True)
     catchment = models.ForeignKey(Catchment, on_delete=models.PROTECT, blank=True, null=True)
     collection_system = models.ForeignKey(CollectionSystem, on_delete=models.CASCADE, blank=True, null=True)
     waste_stream = models.ForeignKey(WasteStream, on_delete=models.SET_NULL, blank=True, null=True)
+    frequency = models.ForeignKey(CollectionFrequency, on_delete=models.SET_NULL, blank=True, null=True)
     flyers = models.ManyToManyField(WasteFlyer, related_name='collections')
 
     @property

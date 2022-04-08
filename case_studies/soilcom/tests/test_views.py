@@ -10,7 +10,327 @@ from materials.models import MaterialCategory
 from users.models import get_default_owner, Group
 from .. import views
 from ..forms import CollectionModelForm
-from ..models import Collection, Collector, CollectionSystem, WasteCategory, WasteComponent, WasteFlyer, WasteStream
+from ..models import (Collection, Collector, CollectionSystem, WasteCategory, WasteComponent, WasteFlyer, WasteStream,
+                      CollectionFrequency)
+
+
+# ----------- Collection Frequency CRUD --------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
+class CollectionFrequencyListViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        User.objects.create(username='outsider')
+
+    def setUp(self):
+        self.outsider = User.objects.get(username='outsider')
+
+    def test_get_http_200_ok_for_anonymous(self):
+        response = self.client.get(reverse('collectionfrequency-list'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_get_http_200_ok_for_logged_in_users(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('collectionfrequency-list'))
+        self.assertEqual(response.status_code, 200)
+
+
+@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
+class CollectionFrequencyCreateViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        User.objects.create(username='outsider')
+        member = User.objects.create(username='member')
+        members = Group.objects.create(name='members')
+        members.permissions.add(Permission.objects.get(codename='add_collectionfrequency'))
+        member.groups.add(members)
+
+    def setUp(self):
+        self.member = User.objects.get(username='member')
+        self.outsider = User.objects.get(username='outsider')
+
+    def test_get_http_302_redirect_for_anonymous(self):
+        response = self.client.get(reverse('collectionfrequency-create'))
+        self.assertEqual(response.status_code, 302)
+
+    def test_get_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('collectionfrequency-create'))
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('collectionfrequency-create'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_http_302_redirect_for_anonymous(self):
+        response = self.client.post(reverse('collectionfrequency-create'), data={})
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(reverse('collectionfrequency-create'), data={})
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_http_302_redirect_for_members_with_minimal_data(self):
+        self.client.force_login(self.member)
+        data = {'name': 'Test Frequency'}
+        response = self.client.post(reverse('collectionfrequency-create'), data=data)
+        self.assertEqual(response.status_code, 302)
+
+
+@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
+class CollectionFrequencyModalCreateViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        User.objects.create(username='outsider')
+        member = User.objects.create(username='member')
+        members = Group.objects.create(name='members')
+        members.permissions.add(Permission.objects.get(codename='add_collectionfrequency'))
+        member.groups.add(members)
+
+    def setUp(self):
+        self.member = User.objects.get(username='member')
+        self.outsider = User.objects.get(username='outsider')
+
+    def test_get_http_302_redirect_for_anonymous(self):
+        response = self.client.get(reverse('collectionfrequency-create-modal'))
+        self.assertEqual(response.status_code, 302)
+
+    def test_get_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('collectionfrequency-create-modal'))
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('collectionfrequency-create-modal'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_http_302_redirect_for_anonymous(self):
+        response = self.client.post(reverse('collectionfrequency-create-modal'), data={})
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(reverse('collectionfrequency-create-modal'), data={})
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_http_302_redirect_for_members_with_minimal_data(self):
+        self.client.force_login(self.member)
+        data = {'name': 'Test Frequency'}
+        response = self.client.post(reverse('collectionfrequency-create-modal'), data=data)
+        self.assertEqual(response.status_code, 302)
+
+
+@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
+class CollectionFrequencyDetailViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = get_default_owner()
+        User.objects.create(username='owner')
+        User.objects.create(username='outsider')
+        CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
+
+    def setUp(self):
+        self.owner = get_default_owner()
+        self.outsider = User.objects.get(username='outsider')
+        self.frequency = CollectionFrequency.objects.get(name='Test Frequency')
+
+    def test_get_http_200_ok_for_anonymous(self):
+        response = self.client.get(reverse('collectionfrequency-detail', kwargs={'pk': self.frequency.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_get_http_200_ok_for_logged_in_users(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('collectionfrequency-detail', kwargs={'pk': self.frequency.pk}))
+        self.assertEqual(response.status_code, 200)
+
+
+@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
+class CollectionFrequencyModalDetailViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = get_default_owner()
+        User.objects.create(username='owner')
+        User.objects.create(username='outsider')
+        CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
+
+    def setUp(self):
+        self.outsider = User.objects.get(username='outsider')
+        self.frequency = CollectionFrequency.objects.get(name='Test Frequency')
+
+    def test_get_http_200_ok_for_anonymous(self):
+        response = self.client.get(reverse('collectionfrequency-detail-modal', kwargs={'pk': self.frequency.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_get_http_200_ok_for_logged_in_users(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('collectionfrequency-detail-modal', kwargs={'pk': self.frequency.pk}))
+        self.assertEqual(response.status_code, 200)
+
+
+@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
+class CollectionFrequencyUpdateViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = get_default_owner()
+        User.objects.create(username='outsider')
+        member = User.objects.create(username='member')
+        members = Group.objects.create(name='members')
+        members.permissions.add(Permission.objects.get(codename='change_collectionfrequency'))
+        member.groups.add(members)
+        CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
+
+    def setUp(self):
+        self.outsider = User.objects.get(username='outsider')
+        self.member = User.objects.get(username='member')
+        self.frequency = CollectionFrequency.objects.get(name='Test Frequency')
+
+    def test_get_http_302_redirect_for_anonymous(self):
+        response = self.client.get(reverse('collectionfrequency-update', kwargs={'pk': self.frequency.pk}))
+        self.assertEqual(response.status_code, 302)
+
+    def test_get_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('collectionfrequency-update', kwargs={'pk': self.frequency.pk}))
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('collectionfrequency-update', kwargs={'pk': self.frequency.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_http_302_redirect_for_anonymous(self):
+        response = self.client.post(reverse('collectionfrequency-update', kwargs={'pk': self.frequency.pk}), data={})
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        data = {'name': 'Updated Test Frequency'}
+        response = self.client.post(reverse('collectionfrequency-update', kwargs={'pk': self.frequency.pk}), data=data)
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_http_302_redirect_for_members(self):
+        self.client.force_login(self.member)
+        data = {'name': 'Updated Test Frequency'}
+        response = self.client.post(reverse('collectionfrequency-update', kwargs={'pk': self.frequency.pk}), data=data)
+        self.assertEqual(response.status_code, 302)
+
+
+@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
+class CollectionFrequencyModalUpdateViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = get_default_owner()
+        User.objects.create(username='outsider')
+        member = User.objects.create(username='member')
+        members = Group.objects.create(name='members')
+        members.permissions.add(Permission.objects.get(codename='change_collectionfrequency'))
+        member.groups.add(members)
+        CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
+
+    def setUp(self):
+        self.outsider = User.objects.get(username='outsider')
+        self.member = User.objects.get(username='member')
+        self.frequency = CollectionFrequency.objects.get(name='Test Frequency')
+
+    def test_get_http_302_redirect_for_anonymous(self):
+        response = self.client.get(reverse('collectionfrequency-update-modal', kwargs={'pk': self.frequency.pk}))
+        self.assertEqual(response.status_code, 302)
+
+    def test_get_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('collectionfrequency-update-modal', kwargs={'pk': self.frequency.pk}))
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('collectionfrequency-update-modal', kwargs={'pk': self.frequency.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_http_302_redirect_for_anonymous(self):
+        response = self.client.post(reverse('collectionfrequency-update-modal', kwargs={'pk': self.frequency.pk}), data={})
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        data = {'name': 'Updated Test Frequency'}
+        response = self.client.post(
+            reverse('collectionfrequency-update-modal', kwargs={'pk': self.frequency.pk}),
+            data=data
+        )
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_http_302_redirect_for_members(self):
+        self.client.force_login(self.member)
+        data = {'name': 'Update Test Frequency'}
+        response = self.client.post(
+            reverse('collectionfrequency-update-modal', kwargs={'pk': self.frequency.pk}),
+            data=data
+        )
+        self.assertEqual(response.status_code, 302)
+
+
+@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
+class CollectionFrequencyModalDeleteViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = get_default_owner()
+        User.objects.create(username='outsider')
+        member = User.objects.create(username='member')
+        members = Group.objects.create(name='members')
+        members.permissions.add(Permission.objects.get(codename='delete_collectionfrequency'))
+        member.groups.add(members)
+        CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
+
+    def setUp(self):
+        self.outsider = User.objects.get(username='outsider')
+        self.member = User.objects.get(username='member')
+        self.frequency = CollectionFrequency.objects.get(name='Test Frequency')
+
+    def test_get_http_302_redirect_for_anonymous(self):
+        response = self.client.get(reverse('collectionfrequency-delete-modal', kwargs={'pk': self.frequency.pk}))
+        self.assertEqual(response.status_code, 302)
+
+    def test_get_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('collectionfrequency-delete-modal', kwargs={'pk': self.frequency.pk}))
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('collectionfrequency-delete-modal', kwargs={'pk': self.frequency.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_http_302_redirect_for_anonymous(self):
+        response = self.client.post(reverse('collectionfrequency-delete-modal', kwargs={'pk': self.frequency.pk}))
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(reverse('collectionfrequency-delete-modal', kwargs={'pk': self.frequency.pk}))
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_successful_delete_and_http_302_and_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.post(reverse('collectionfrequency-delete-modal', kwargs={'pk': self.frequency.pk}))
+        with self.assertRaises(CollectionFrequency.DoesNotExist):
+            CollectionFrequency.objects.get(pk=self.frequency.pk)
+        self.assertEqual(response.status_code, 302)
+
+
+# ----------- Collection CRUD ------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 # CurrentUserMiddleware is used to track object creation and change. It causes errors in the TestCases with
@@ -41,6 +361,7 @@ class CollectionCreateViewTestCase(TestCase):
             abbreviation='WasteFlyer123',
             url='https://www.test-flyer.org'
         )
+        frequency = CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
         collection1 = Collection.objects.create(
             owner=owner,
             name='collection1',
@@ -48,6 +369,7 @@ class CollectionCreateViewTestCase(TestCase):
             collector=Collector.objects.create(owner=owner, name='Test collector'),
             collection_system=CollectionSystem.objects.create(owner=owner, name='Test system'),
             waste_stream=waste_stream,
+            frequency=frequency,
             description='This is a test case.'
         )
         collection1.flyers.add(waste_flyer)
@@ -127,6 +449,7 @@ class CollectionCreateViewTestCase(TestCase):
                 'collection_system': CollectionSystem.objects.first().id,
                 'waste_category': WasteCategory.objects.first().id,
                 'allowed_materials': [c.id for c in WasteComponent.objects.all()],
+                'frequency': CollectionFrequency.objects.first().id,
                 'description': 'This is a test case that should pass!',
                 'form-INITIAL_FORMS': '0',
                 'form-TOTAL_FORMS': '2',
@@ -166,6 +489,7 @@ class CollectionCopyViewTestCase(TestCase):
             abbreviation='WasteFlyer123',
             url='https://www.test-flyer.org'
         )
+        frequency = CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
         collection = Collection.objects.create(
             owner=owner,
             name='collection1',
@@ -173,6 +497,7 @@ class CollectionCopyViewTestCase(TestCase):
             collector=Collector.objects.create(owner=owner, name='Test collector'),
             collection_system=CollectionSystem.objects.create(owner=owner, name='Test system'),
             waste_stream=waste_stream,
+            frequency=frequency,
             description='This is a test case.'
         )
         collection.flyers.add(waste_flyer)
@@ -207,6 +532,7 @@ class CollectionCopyViewTestCase(TestCase):
             'collector': self.collection.collector,
             'collection_system': self.collection.collection_system,
             'waste_category': self.collection.waste_stream.category,
+            'frequency': self.collection.frequency,
             'allowed_materials': self.collection.waste_stream.allowed_materials.all(),
             'description': self.collection.description
         }
@@ -232,6 +558,7 @@ class CollectionCopyViewTestCase(TestCase):
         self.collection.catchment = None
         self.collection.collection_system = None
         self.collection.waste_stream = None
+        self.collection.frequency = None
         self.collection.description = None
         self.collection.save()
         request = RequestFactory().get(reverse('collection-copy', kwargs={'pk': self.collection.id}))
@@ -309,6 +636,7 @@ class CollectionUpdateViewTestCase(TestCase):
             abbreviation='WasteFlyer123',
             url='https://www.test-flyer.org'
         )
+        frequency = CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
         collection1 = Collection.objects.create(
             owner=owner,
             name='collection1',
@@ -316,6 +644,7 @@ class CollectionUpdateViewTestCase(TestCase):
             collector=Collector.objects.create(owner=owner, name='Test collector'),
             collection_system=CollectionSystem.objects.create(owner=owner, name='Test system'),
             waste_stream=waste_stream,
+            frequency=frequency,
             description='This is a test case.'
         )
         collection1.flyers.add(waste_flyer)
@@ -379,6 +708,7 @@ class CollectionUpdateViewTestCase(TestCase):
                 'collection_system': CollectionSystem.objects.first().id,
                 'waste_category': WasteCategory.objects.first().id,
                 'allowed_materials': [c.id for c in WasteComponent.objects.all()],
+                'frequency': CollectionFrequency.objects.first().id,
                 'description': 'This is a test case that should pass!',
                 'form-INITIAL_FORMS': '0',
                 'form-TOTAL_FORMS': '2',
@@ -396,6 +726,7 @@ class CollectionUpdateViewTestCase(TestCase):
             'collection_system': self.collection.collection_system.id,
             'waste_category': self.collection.waste_stream.category.id,
             'allowed_materials': [m.id for m in self.collection.waste_stream.allowed_materials.all()],
+            'frequency': self.collection.frequency.id,
             'description': self.collection.description,
             'form-INITIAL_FORMS': '1',
             'form-TOTAL_FORMS': '2',
@@ -436,6 +767,7 @@ class CollectionSummaryAPIViewTestCase(TestCase):
             abbreviation='WasteFlyer123',
             url='https://www.test-flyer.org'
         )
+        frequency = CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
         collection1 = Collection.objects.create(
             owner=owner,
             name='collection1',
@@ -443,6 +775,7 @@ class CollectionSummaryAPIViewTestCase(TestCase):
             collector=Collector.objects.create(owner=owner, name='Test collector'),
             collection_system=CollectionSystem.objects.create(owner=owner, name='Test system'),
             waste_stream=waste_stream,
+            frequency=frequency,
             description='This is a test case.'
         )
         collection1.flyers.add(waste_flyer)
@@ -468,6 +801,7 @@ class CollectionSummaryAPIViewTestCase(TestCase):
                 ('Collection system', self.collection.collection_system.name),
                 ('Waste category', self.collection.waste_stream.category.name),
                 ('Allowed materials', [m.name for m in self.collection.waste_stream.allowed_materials.all()]),
+                ('Frequency', self.collection.frequency.name),
                 ('Sources', [flyer.url for flyer in self.collection.flyers.all()]),
                 ('Comments', self.collection.description)
             ]),

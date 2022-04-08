@@ -6,7 +6,7 @@ from rest_framework.serializers import ModelSerializer, Serializer, CharField, I
 from maps.models import Catchment
 from maps.serializers import FieldLabelMixin
 from materials.models import MaterialCategory
-from ..models import Collector, WasteComponent, WasteStream, WasteCategory, WasteFlyer, CollectionSystem, Collection
+from ..models import Collector, WasteComponent, WasteStream, WasteCategory, WasteFlyer, CollectionSystem, Collection, CollectionFrequency
 from ..serializers import CollectionModelSerializer
 
 
@@ -105,12 +105,14 @@ class CollectionSerializerTestCase(TestCase):
             abbreviation='WasteFlyer456',
             url='https://www.best-flyer.org'
         )
+        frequency = CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
         collection = Collection.objects.create(
             owner=owner,
             catchment=Catchment.objects.create(owner=owner, name='Test catchment'),
             collector=Collector.objects.create(owner=owner, name='Test collector'),
             collection_system=CollectionSystem.objects.create(owner=owner, name='Test system'),
             waste_stream=waste_stream,
+            frequency=frequency,
             description='This is a test case.'
         )
         collection.flyers.add(waste_flyer_1)
