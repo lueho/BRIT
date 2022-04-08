@@ -165,7 +165,17 @@ class RegionAttributeValue(NamedUserObjectModel):
     """
     region = models.ForeignKey(Region, on_delete=models.PROTECT)
     attribute = models.ForeignKey(Attribute, on_delete=models.PROTECT)
-    date = models.DateField()
+    date = models.DateField(blank=True, null=True)
     value = models.FloatField(default=0.0)
     standard_deviation = models.FloatField(default=0.0, blank=True, null=True)
+
+
+class RegionAttributeTextValue(NamedUserObjectModel):
+    """
+    Attaches a category value of an attribute class to a region
+    """
+    region = models.ForeignKey(Region, on_delete=models.PROTECT)
+    attribute = models.ForeignKey(Attribute, on_delete=models.PROTECT)
+    date = models.DateField(blank=True, null=True)
+    value = models.CharField(max_length=511)
 

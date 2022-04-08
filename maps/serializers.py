@@ -5,7 +5,7 @@ from rest_framework.relations import PKOnlyObject, StringRelatedField
 from rest_framework.serializers import CharField, FloatField, ModelSerializer, SerializerMethodField, IntegerField, Serializer
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
-from .models import Catchment, Region, LauRegion, NutsRegion, GeoPolygon, RegionAttributeValue
+from .models import Catchment, Region, LauRegion, NutsRegion, GeoPolygon, RegionAttributeValue, RegionAttributeTextValue
 
 
 class FieldLabelMixin(Serializer):
@@ -134,10 +134,11 @@ class NutsRegionCatchmentOptionSerializer(ModelSerializer):
 class NutsRegionSummarySerializer(FieldLabelModelSerializer):
     name = CharField(source='name_latn')
     population_density = SerializerMethodField()
+    rural_urban_remoteness = SerializerMethodField()
 
     class Meta:
         model = NutsRegion
-        fields = ('nuts_id', 'name', 'population_density')
+        fields = ('nuts_id', 'name', 'population_density', 'rural_urban_remoteness')
 
     def get_population_density(self, obj):
         qs = obj.regionattributevalue_set.filter(attribute__name='Population density').order_by('-date')
@@ -145,6 +146,12 @@ class NutsRegionSummarySerializer(FieldLabelModelSerializer):
             pd = qs[0]
             return f'{pd.value} per km² ({pd.date.year})'
         else:
+            return None
+
+    def get_rural_urban_remoteness(self, obj):
+        try:
+            return obj.regionattributetextvalue_set.get(attribute__name='Rural urban remoteness').value
+        except RegionAttributeTextValue.DoesNotExist:
             return None
 
 
