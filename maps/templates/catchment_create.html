@@ -80,7 +80,6 @@
             // Fetch data from REST API
             let response = await fetch(dataurl);
             let data = await response.json();
-            console.log(data);
 
             // Render geodata on map
             let geodata = data['geoJson']

@@ -100,14 +100,11 @@
         })
 
         function updateCreateUrl(btn) {
-            console.log(btn)
             let filter_params = parseFilterParameters();
             filter_params.load_features = true;
             let params = {'next': '/waste_collection/collections/map/?' + $.param(filter_params)};
             let create_url = btn.href + '?' + $.param(params);
-            console.log(create_url)
             btn.setAttribute('href', create_url)
-            console.log(btn)
         }
 
         function updateUrls(feature_id) {
