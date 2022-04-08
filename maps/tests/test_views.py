@@ -4,8 +4,28 @@ from django.urls import reverse
 from rest_framework.test import APITestCase
 
 from users.models import get_default_owner
+from ..models import Attribute, RegionAttributeValue, Catchment, LauRegion, NutsRegion, Region, GeoDataset
 
-from ..models import Attribute, RegionAttributeValue, Catchment, LauRegion, NutsRegion, Region
+
+class NutsRegionMapViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = get_default_owner()
+        region = Region.objects.create(owner=owner, name='Test Region')
+        dataset = GeoDataset.objects.create(
+            owner=owner,
+            name='Test Dataset',
+            region=region,
+            model_name='NutsRegion'
+        )
+
+    def setUp(self):
+        pass
+
+    def test_get_http_200_ok_for_anonymous(self):
+        response = self.client.get(reverse('NutsRegion'))
+        self.assertEqual(response.status_code, 200)
 
 
 class NutsRegionPedigreeAPITestCase(APITestCase):
@@ -159,6 +179,31 @@ class NutsRegionPedigreeAPITestCase(APITestCase):
         response = self.client.get(reverse('data.nuts_lau_catchment_options'),
                                    {'id': self.ukh14.id, 'direction': 'children'})
         self.assertIn('id_level_4', response.data)
+
+
+@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
+class NutsRegionSummaryAPIViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = get_default_owner()
+        NutsRegion.objects.create(
+            owner=owner,
+            nuts_id='TE57',
+            name_latn='Test NUTS'
+        )
+
+    def setUp(self):
+        self.region = NutsRegion.objects.get(nuts_id='TE57')
+
+    def test_get_http_200_ok_for_anonymous(self):
+        response = self.client.get(reverse('data.nutsregion-summary'), {'pk': self.region.pk})
+        self.assertEqual(response.status_code, 200)
+
+    def test_returns_correct_data(self):
+        response = self.client.get(reverse('data.nutsregion-summary'), {'pk': self.region.pk})
+        self.assertIn('summaries', response.data)
+        self.assertEqual(response.data['summaries'][0]['Name'], self.region.name_latn)
 
 
 # ----------- Attribute CRUD -------------------------------------------------------------------------------------------

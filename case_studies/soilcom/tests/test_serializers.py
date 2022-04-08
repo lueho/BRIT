@@ -4,9 +4,10 @@ from django.test import TestCase
 from rest_framework.serializers import ModelSerializer, Serializer, CharField, IntegerField
 
 from maps.models import Catchment
+from maps.serializers import FieldLabelMixin
 from materials.models import MaterialCategory
 from ..models import Collector, WasteComponent, WasteStream, WasteCategory, WasteFlyer, CollectionSystem, Collection
-from ..serializers import FieldLabelMixin, CollectionModelSerializer
+from ..serializers import CollectionModelSerializer
 
 
 class FieldLabelMixinTestCase(TestCase):

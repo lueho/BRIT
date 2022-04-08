@@ -17,15 +17,15 @@ from brit.views import (
     OwnedObjectModalUpdateView,
     OwnedObjectDeleteView,
 )
-
-from maps.serializers import RegionSerializer, CatchmentSerializer, NutsRegionGeometrySerializer, \
-    NutsRegionOptionSerializer, LauRegionOptionSerializer
+from maps.serializers import (
+    RegionSerializer, CatchmentSerializer, NutsRegionGeometrySerializer,
+    NutsRegionCatchmentOptionSerializer, NutsRegionSummarySerializer, LauRegionOptionSerializer,
+    NutsRegionOptionSerializer)
 from .forms import (
     AttributeModelForm,
     AttributeModalModelForm,
     CatchmentModelForm,
     CatchmentQueryForm,
-    NutsMapFilterForm,
     NutsRegionQueryForm,
     RegionAttributeValueModelForm,
     RegionAttributeValueModalModelForm
@@ -142,7 +142,7 @@ class CatchmentDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
 
 class GeoDatasetDetailView(FormMixin, DetailView):
     feature_url = None
-    feature_popup_url = None
+    feature_summary_url = None
     region_url = reverse_lazy('ajax_region_geometries')
     filter_class = None
     form_class = None
@@ -162,7 +162,7 @@ class GeoDatasetDetailView(FormMixin, DetailView):
                 'form_fields': self.get_form_fields(),
                 'region_url': self.region_url,
                 'feature_url': self.feature_url,
-                'feature_popup_url': self.feature_popup_url,
+                'feature_summary_url': self.feature_summary_url,
                 'load_features': self.get_load_features(),
                 'adjust_bounds_to_features': self.adjust_bounds_to_features,
                 'region_id': self.object.region.id,
@@ -191,6 +191,19 @@ class GeoDatasetDetailView(FormMixin, DetailView):
             return self.request.GET.get('load_features') == 'true'
         else:
             return self.load_features
+
+
+class NutsRegionSummaryAPIView(APIView):
+
+    @staticmethod
+    def get(request):
+        obj = NutsRegion.objects.filter(id=request.query_params.get('pk'))
+        serializer = NutsRegionSummarySerializer(
+            obj,
+            many=True,
+            field_labels_as_keys=True,
+            context={'request': request})
+        return Response({'summaries': serializer.data})
 
 
 # ----------- Regions --------------------------------------------------------------------------------------------------
@@ -250,13 +263,17 @@ class RegionGeometryAPI(APIView):
 
     @staticmethod
     def get(request, *args, **kwargs):
-        if 'region_id' in request.query_params:
-            region_id = request.query_params.get('region_id')
+        if 'pk' in request.query_params:
+            region_id = request.query_params.get('pk')
             regions = Region.objects.filter(id=region_id)
             serializer = RegionSerializer(regions, many=True)
             return JsonResponse({'geoJson': serializer.data})
 
         return JsonResponse({})
+
+
+# ----------- NutsRegions ----------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 class CatchmentRegionGeometryAPI(APIView):
@@ -281,9 +298,12 @@ class CatchmentRegionGeometryAPI(APIView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class NutsMapView(GeoDatasetDetailView):
-    feature_url = reverse_lazy('data.nuts_regions')
-    form_class = NutsMapFilterForm
+class NutsRegionMapView(GeoDatasetDetailView):
+    template_name = 'nuts_region_map.html'
+    feature_url = reverse_lazy('data.nutsregion')
+    feature_summary_url = reverse_lazy('data.nutsregion-summary')
+    region_url = reverse_lazy('data.nutsregion')
+    form_class = NutsRegionQueryForm
     load_features = False
     adjust_bounds_to_features = True
     load_region = False
@@ -304,6 +324,8 @@ class NutsRegionAPIView(APIView):
     def get(request):
         qs = NutsRegion.objects.all()
 
+        if 'pk' in request.query_params:
+            qs = qs.filter(pk=request.query_params['pk'])
         if 'levl_code' in request.query_params:
             qs = qs.filter(levl_code=request.query_params['levl_code'])
         if 'cntr_code[]' in request.query_params:
@@ -342,8 +364,7 @@ class NutsRegionPedigreeAPI(APIView):
             raise ParseError('Missing or wrong query parameter "direction". Options: "parents", "children"')
 
         try:
-            catchment = Catchment.objects.get(id=request.query_params['id'])
-            instance = catchment.region.nutsregion
+            instance = NutsRegion.objects.get(id=request.query_params['id'])
         except AttributeError:
             raise NotFound('A NUTS region with the provided id does not exist.')
         except NutsRegion.DoesNotExist:
@@ -356,11 +377,6 @@ class NutsRegionPedigreeAPI(APIView):
                 qs = NutsRegion.objects.filter(levl_code=lvl, nuts_id__startswith=instance.nuts_id)
                 serializer = NutsRegionOptionSerializer(qs, many=True)
                 data[f'id_level_{lvl}'] = serializer.data
-            data['id_level_4'] = []
-            if instance.levl_code == 3:
-                qs = LauRegion.objects.filter(nuts_parent=instance)
-                serializer = LauRegionOptionSerializer(qs, many=True)
-                data[f'id_level_4'] = serializer.data
 
         if request.query_params['direction'] == 'parents':
             for lvl in range(instance.levl_code - 1, -1, -1):
@@ -415,7 +431,7 @@ class NutsAndLauCatchmentPedigreeAPI(APIView):
         if request.query_params['direction'] == 'children':
             for lvl in range(instance.levl_code + 1, 4):
                 qs = NutsRegion.objects.filter(levl_code=lvl, nuts_id__startswith=instance.nuts_id)
-                serializer = NutsRegionOptionSerializer(qs, many=True)
+                serializer = NutsRegionCatchmentOptionSerializer(qs, many=True)
                 data[f'id_level_{lvl}'] = serializer.data
             data['id_level_4'] = []
             if instance.levl_code == 3:
@@ -426,7 +442,7 @@ class NutsAndLauCatchmentPedigreeAPI(APIView):
         if request.query_params['direction'] == 'parents':
             for lvl in range(instance.levl_code - 1, -1, -1):
                 instance = instance.parent
-                serializer = NutsRegionOptionSerializer(instance)
+                serializer = NutsRegionCatchmentOptionSerializer(instance)
                 data[f'id_level_{lvl}'] = serializer.data
 
         return Response(data)

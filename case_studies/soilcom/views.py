@@ -621,7 +621,7 @@ class CatchmentSelectView(FormMixin, TemplateView):
 class WasteCollectionMapView(GeoDatasetDetailView):
     template_name = 'waste_collection_map.html'
     feature_url = reverse_lazy('data.collections')
-    feature_popup_url = reverse_lazy('data.collection-summary')
+    feature_summary_url = reverse_lazy('data.collection-summary')
     form_class = forms.CollectionFilterForm
     load_features = False
     adjust_bounds_to_features = True
@@ -692,7 +692,7 @@ class WasteCollectionSummaryAPIView(APIView):
 
     @staticmethod
     def get(request):
-        obj = models.Collection.objects.get(id=request.query_params.get('collection_id'))
+        obj = models.Collection.objects.get(id=request.query_params.get('pk'))
         objs = models.Collection.objects.filter(catchment=obj.catchment)
         serializer = serializers.CollectionModelSerializer(
             objs,
@@ -708,4 +708,4 @@ class WasteCollectionPopupDetailView(views.OwnedObjectDetailView):
     permission_required = 'soilcom.view_collection'
 
     def get_object(self, **kwargs):
-        return self.model.objects.get(id=self.request.GET.get('collection_id'))
+        return self.model.objects.get(id=self.request.GET.get('pk'))

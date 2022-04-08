@@ -17,15 +17,22 @@ try {
 }
 
 
-async function fetchFeatureInfos(feature, mapConfig) {
-    let dataurl = mapConfig['feature_popup_url'] + '?' + 'collection_id=' + feature['properties']['id'];
+async function fetchFeatureSummary(feature, mapConfig) {
+    let feature_id;
+    if (typeof(feature) == 'object') {
+        feature_id = feature['properties']['id'].toString();
+    } else {
+        feature_id = feature.toString();
+    }
+
+    const dataurl = mapConfig['feature_summary_url'] + '?' + 'pk=' + feature_id;
     let response = await fetch(dataurl);
-    return await response.json()
+    return await response.json();
 }
 
 async function fetchFeatureGeometries(params, mapConfig) {
 
-    let dataurl = mapConfig['feature_url'] + '?' + $.param(params);
+    const dataurl = mapConfig['feature_url'] + '?' + $.param(params);
 
     // Remove existing layer
     if (feature_layer !== undefined) {
@@ -68,7 +75,7 @@ async function fetchRegionGeometry(region_url, region_id) {
 
     // Define query string for REST API
     let params = L.Util.extend({
-        region_id: region_id
+        pk: region_id
     });
 
     let url = region_url + L.Util.getParamString(params);
@@ -103,7 +110,7 @@ async function clickedFilterButton() {
 }
 
 async function clickedFeature(event) {
-    let feature_infos = await fetchFeatureInfos(event.layer.feature, mapConfig)
+    let feature_infos = await fetchFeatureSummary(event.layer.feature, mapConfig)
     await renderSummaryAlternative(feature_infos);
     updateUrls(event.layer.feature['properties']['id']);
 }
@@ -323,5 +330,4 @@ async function renderSummaryAlternative(json) {
     }
 
     $('#info-card-body').collapse('show');
-    $('#filter-card-body').collapse('hide');
 }

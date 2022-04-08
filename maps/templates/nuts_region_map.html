@@ -1,0 +1,102 @@
+{% extends 'maps_base.html' %}
+
+
+{% block extra_cards %}
+
+{% endblock extra_cards %}
+
+
+
+{% block javascript %}
+    {{ block.super }}
+
+    <script type="text/javascript">
+
+    async function selectFeature(feature) {
+            let sel = document.getElementById('id_level_' + feature['properties']['level']);
+            sel.value = feature['properties']['id'];
+            if (sel.hasAttribute('data-optionsapi')) {
+                await fetchSelectOptions(sel.dataset['optionsapi'], {id: sel.value});
+            }
+            await updateLayers(sel.value)
+        }
+
+    async function fetchSelectOptions(api_url, params) {
+            // fetch options for children of selection
+            params['direction'] = 'children'
+            let dataurl = api_url + '?' + $.param(params);
+            let response = await fetch(dataurl);
+            let children = await response.json();
+            Object.keys(children).forEach(key => {
+                let sel = document.getElementById(key);
+                while (sel.firstChild) {
+                    sel.removeChild(sel.lastChild);
+                }
+                let opt = document.createElement('Option');
+                opt.value = "";
+                opt.innerText = "---------"
+                sel.appendChild(opt)
+                children[key].forEach(function (item) {
+                    opt = document.createElement('Option');
+                    opt.value = item.id;
+                    opt.innerText = item.name;
+                    sel.appendChild(opt);
+                });
+            });
+
+            // mark the parents of the selected item as also selected
+            params['direction'] = 'parents';
+            dataurl = api_url + '?' + $.param(params);
+            response = await fetch(dataurl)
+            let parents = await response.json()
+            Object.keys(parents).forEach(key => {
+                let sel = document.getElementById(key);
+                sel.value = parents[key]['id']
+            })
+
+        }
+
+    async function updateLayers(feature_id) {
+            // fetch the region geometry
+            await fetchRegionGeometry(mapConfig['region_url'], feature_id);
+
+            // fetch the feature geometries
+            await fetchFeatureGeometries({'parent_id': feature_id}, mapConfig);
+            feature_layer.bringToBack();
+            feature_layer.off('click');
+            feature_layer.on('click', async function (event) {
+                await selectFeature(event.layer.feature);
+                let feature_infos = await fetchFeatureSummary(event.layer.feature, mapConfig);
+                await renderSummaryAlternative(feature_infos);
+            });
+        }
+
+    const changedSelect = async function (e) {
+            // fetch options for children of selection
+            document.querySelectorAll("select").forEach(selector => selector.disabled=true)
+
+            let target = e.target;
+            if (target.value == "") {
+                const selectors = $('.select');
+                target = selectors.eq(selectors.index(target) - 1)[0];
+            }
+            if (target.value !== "") {
+                let params = {id: target.value};
+                if (target.hasAttribute('data-optionsapi')) {
+                    await fetchSelectOptions(target.dataset['optionsapi'], params);
+                }
+                await updateLayers(target.value);
+                let feature_infos = await fetchFeatureSummary(target.value, mapConfig);
+                await renderSummaryAlternative(feature_infos);
+            }
+
+            document.querySelectorAll("select").forEach(selector => selector.disabled=false)
+        }
+
+        document.querySelectorAll("select").forEach(function (selector) {
+            selector.addEventListener("change", changedSelect, false)
+        });
+
+    </script>
+
+{% endblock javascript %}
