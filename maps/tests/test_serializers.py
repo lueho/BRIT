@@ -33,12 +33,12 @@ class NutsRegionSummarySerializerTestCase(TestCase):
             value=123.321,
             date=datetime.date(2019, 1, 1)
         )
-        Attribute.objects.get_or_create(owner=owner, name='Rural urban remoteness', unit='')
+        Attribute.objects.get_or_create(owner=owner, name='Urban rural remoteness', unit='')
 
     def setUp(self):
         self.owner = get_default_owner()
         self.region = NutsRegion.objects.get(nuts_id='TE57')
-        self.rural_urban_remoteness = Attribute.objects.get(name='Rural urban remoteness')
+        self.urban_rural_remoteness = Attribute.objects.get(name='Urban rural remoteness')
 
     def test_serializer_contains_main_data(self):
         data = NutsRegionSummarySerializer(self.region).data
@@ -50,20 +50,20 @@ class NutsRegionSummarySerializerTestCase(TestCase):
         self.assertIn('population_density', data)
         self.assertEqual(data['population_density'], '123.321 per km² (2019)')
 
-    def test_rural_urban_remoteness_method_field_returns_non_if_for_non_existing(self):
+    def test_urban_rural_remoteness_method_field_returns_non_if_for_non_existing(self):
         data = NutsRegionSummarySerializer(self.region).data
-        self.assertIn('rural_urban_remoteness', data)
-        self.assertFalse(data['rural_urban_remoteness'])
+        self.assertIn('urban_rural_remoteness', data)
+        self.assertFalse(data['urban_rural_remoteness'])
 
-    def test_rural_urban_remoteness_method_field_returns_existing_values(self):
+    def test_urban_rural_remoteness_method_field_returns_existing_values(self):
         RegionAttributeTextValue.objects.create(
             owner=self.owner,
-            attribute=self.rural_urban_remoteness,
+            attribute=self.urban_rural_remoteness,
             region=self.region,
             value='intermediate, close to a city',
             date=datetime.date.today()
         )
         data = NutsRegionSummarySerializer(self.region).data
-        self.assertIn('rural_urban_remoteness', data)
-        self.assertEqual(data['rural_urban_remoteness'], 'intermediate, close to a city')
+        self.assertIn('urban_rural_remoteness', data)
+        self.assertEqual(data['urban_rural_remoteness'], 'intermediate, close to a city')
 

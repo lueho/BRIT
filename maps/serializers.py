@@ -1,11 +1,11 @@
 from collections import OrderedDict
 
 from rest_framework.fields import SkipField
-from rest_framework.relations import PKOnlyObject, StringRelatedField
-from rest_framework.serializers import CharField, FloatField, ModelSerializer, SerializerMethodField, IntegerField, Serializer
+from rest_framework.relations import PKOnlyObject
+from rest_framework.serializers import CharField, ModelSerializer, SerializerMethodField, IntegerField, Serializer
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
-from .models import Catchment, Region, LauRegion, NutsRegion, GeoPolygon, RegionAttributeValue, RegionAttributeTextValue
+from .models import Catchment, Region, LauRegion, NutsRegion, GeoPolygon, RegionAttributeTextValue
 
 
 class FieldLabelMixin(Serializer):
@@ -110,7 +110,6 @@ class NutsRegionGeometrySerializer(GeoFeatureModelSerializer):
 
 
 class NutsRegionOptionSerializer(ModelSerializer):
-
     class Meta:
         model = NutsRegion
         fields = ['id', 'name']
@@ -134,11 +133,11 @@ class NutsRegionCatchmentOptionSerializer(ModelSerializer):
 class NutsRegionSummarySerializer(FieldLabelModelSerializer):
     name = CharField(source='name_latn')
     population_density = SerializerMethodField()
-    rural_urban_remoteness = SerializerMethodField()
+    urban_rural_remoteness = SerializerMethodField()
 
     class Meta:
         model = NutsRegion
-        fields = ('nuts_id', 'name', 'population_density', 'rural_urban_remoteness')
+        fields = ('nuts_id', 'name', 'population_density', 'urban_rural_remoteness')
 
     def get_population_density(self, obj):
         qs = obj.regionattributevalue_set.filter(attribute__name='Population density').order_by('-date')
@@ -148,9 +147,9 @@ class NutsRegionSummarySerializer(FieldLabelModelSerializer):
         else:
             return None
 
-    def get_rural_urban_remoteness(self, obj):
+    def get_urban_rural_remoteness(self, obj):
         try:
-            return obj.regionattributetextvalue_set.get(attribute__name='Rural urban remoteness').value
+            return obj.regionattributetextvalue_set.get(attribute__name='Urban rural remoteness').value
         except RegionAttributeTextValue.DoesNotExist:
             return None
 
