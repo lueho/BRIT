@@ -28,3 +28,20 @@
     </div>
 
 {% endblock content %}
+
+{% block javascript %}
+    <script src="{% static 'js/dynamic-formset.js' %}"></script>
+    <script type="text/javascript">
+        // Existing form should not change the component. Therefore, all other options are removed.
+        const formsetContainer = document.getElementById('formset-container');
+        const formRows = formsetContainer.getElementsByClassName('formset-form-row');
+        for (let row of formRows) {
+            const selectField = row.getElementsByTagName('select')[0];
+            Array.from(selectField.options).forEach(opt => {
+                if (!opt.selected) {
+                    opt.remove()
+                }
+            });
+        }
+    </script>
+{% endblock javascript %}

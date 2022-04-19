@@ -265,16 +265,16 @@ class CompositionUpdateFormTestCase(TestCase):
         )
         components = [c.id for c in MaterialComponent.objects.exclude(name='Fresh Matter (FM)')]
         data = {
-            'form-INITIAL_FORMS': '0',
-            'form-TOTAL_FORMS': '2',
-            'form-0-id': '',
-            'form-0-component': f'{components[0]}',
-            'form-0-average': '999',
-            'form-0-standard_deviation': '0.01',
-            'form-1-id': '',
-            'form-1-component': f'{components[1]}',
-            'form-1-average': '999',
-            'form-1-standard_deviation': '0.01',
+            'shares-INITIAL_FORMS': '0',
+            'shares-TOTAL_FORMS': '2',
+            'shares-0-id': '',
+            'shares-0-component': f'{components[0]}',
+            'shares-0-average': '999',
+            'shares-0-standard_deviation': '0.01',
+            'shares-1-id': '',
+            'shares-1-component': f'{components[1]}',
+            'shares-1-average': '999',
+            'shares-1-standard_deviation': '0.01',
         }
         formset = FormSet(data=data)
         self.assertFalse(formset.is_valid())
@@ -282,3 +282,30 @@ class CompositionUpdateFormTestCase(TestCase):
         for share in WeightShare.objects.all():
             self.assertLessEqual(share.average, 1)
             self.assertGreaterEqual(share.average, 0)
+
+    def test_add_other(self):
+        FormSet = inlineformset_factory(
+            Composition,
+            WeightShare,
+            form=WeightShareModelForm,
+            formset=WeightShareInlineFormset,
+            extra=0
+        )
+        components = [c.id for c in MaterialComponent.objects.exclude(name='Fresh Matter (FM)')]
+        data = {
+            'shares-INITIAL_FORMS': '0',
+            'shares-TOTAL_FORMS': '2',
+            'shares-0-id': '',
+            'shares-0-composition': f'{self.composition.id}',
+            'shares-0-component': f'{components[0]}',
+            'shares-0-average': '30',
+            'shares-0-standard_deviation': '0.01',
+            'shares-1-id': '',
+            'shares-1-composition': f'{self.composition.id}',
+            'shares-1-component': f'{components[1]}',
+            'shares-1-average': '20',
+            'shares-1-standard_deviation': '0.01',
+        }
+        formset = FormSet(data=data, instance=self.composition)
+        formset.add_other()
+        self.assertTrue(formset.is_valid())

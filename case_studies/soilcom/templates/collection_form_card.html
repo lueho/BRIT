@@ -39,28 +39,6 @@
             });
         }
 
-        const addFormButton = document.getElementById('add-more');
-        const totalNewForms = document.getElementById('id_form-TOTAL_FORMS');
-
-
-        addFormButton.addEventListener('click', (e) => {
-
-            if (e) {
-                e.preventDefault();
-            }
-            const currentForms = document.getElementsByClassName('formset-form-row');
-            let currentFormCount = currentForms.length;
-            const emptyForm = document.getElementById('empty-form-row').cloneNode(true);
-            emptyForm.setAttribute('class', 'formset-form-row');
-            emptyForm.setAttribute('id', '');
-            const regex = new RegExp('__prefix__', 'g');
-            emptyForm.innerHTML = emptyForm.innerHTML.replace(regex, currentFormCount);
-            totalNewForms.setAttribute('value', `${currentFormCount + 1}`);
-
-            const formContainer = document.getElementById('formset-container');
-            formContainer.append(emptyForm);
-        });
-
         $(document).ready(function () {
             $("#sidebarToggle").click();
             updateCollectionModalForm();

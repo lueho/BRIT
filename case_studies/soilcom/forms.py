@@ -139,7 +139,7 @@ class WasteFlyerModalModelForm(CustomModelForm):
 class FormSetHelper(FormHelper):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.template = 'bootstrap4/table_inline_formset.html'
+        self.template = 'bootstrap4/dynamic_table_inline_formset.html'
         self.form_method = 'post'
         self.add_input(Submit("submit", "Save"))
 
