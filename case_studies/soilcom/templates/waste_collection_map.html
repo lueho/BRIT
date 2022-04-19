@@ -3,7 +3,7 @@
 
 {% block extra_cards %}
 
-    {% if 'add_collection' in perms or 'change_collection' in perms %}
+    {% if 'soilcom.add_collection' in perms or 'soilcom.change_collection' in perms %}
 
         <div class="card shadow">
 
@@ -87,7 +87,6 @@
 
 {% block javascript %}
     {{ block.super }}
-
     <script type="text/javascript">
 
         document.getElementById('btn-collection-create').addEventListener("click", function (e) {
