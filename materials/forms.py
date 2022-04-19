@@ -1,6 +1,6 @@
 from bootstrap_modal_forms.forms import BSModalModelForm, BSModalForm
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Row, Field, Fieldset
+from crispy_forms.layout import Layout, Row, Field
 from django import forms
 from django.core.exceptions import ValidationError
 from django.forms.models import BaseInlineFormSet
