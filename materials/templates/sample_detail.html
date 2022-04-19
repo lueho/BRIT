@@ -63,10 +63,11 @@
                     {% endif %}
 
                     {% if perms.materials %}
+                        <p class="card-text"><strong><label for="id_toggle_edit">Edit:</label></strong></p>
                         <span data-toggle="collapse" data-target=".multi-collapse" aria-expanded="false"
                               aria-controls="add-component-group">
-                            <input type="checkbox" data-toggle="toggle" data-on="Edit" data-off="View"
-                                   data-onstyle="primary" data-offstyle="secondary">
+                                <input id="id_toggle_edit" type="checkbox" data-toggle="toggle" data-on="On"
+                                       data-off="Off" data-onstyle="primary" data-offstyle="secondary">
                         </span>
                     {% endif %}
 
