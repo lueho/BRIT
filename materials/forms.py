@@ -190,8 +190,6 @@ class WeightShareModelForm(CustomModelForm):
             instance.average *= 100
             instance.standard_deviation *= 100
         super().__init__(*args, **kwargs)
-        self.fields.get('component').label = ' '
-        self.fields.get('component').required = False
 
     def clean_average(self):
         return self.cleaned_data.get('average') / 100
