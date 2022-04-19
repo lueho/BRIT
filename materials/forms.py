@@ -203,8 +203,14 @@ class WeightShareInlineFormset(BaseInlineFormSet):
     def clean(self):
         if any(self.errors):
             return
-        if sum([form.cleaned_data.get('average') for form in self.forms]) != 1.0:
-            raise ValidationError('Weight shares of components must sum up to 100%')
+        print('clean')
+        if self.forms and not all([form.cleaned_data['DELETE'] for form in self.forms]):
+            print('first if')
+            summe = sum([form.cleaned_data.get('average') for form in self.forms if not form.cleaned_data['DELETE']])
+            print(f'sum: {summe}')
+            if summe != 1.0:
+                print('second if')
+                raise ValidationError('Weight shares of components must sum up to 100%')
         super().clean()
 
 
