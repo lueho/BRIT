@@ -104,7 +104,7 @@
                                 <td class="collapse multi-collapse">
                                     <div class="collapse multi-collapse">
                                         <a href="{% url 'materialpropertyvalue-delete-modal' property.id %}?next={{ request.path }}"
-                                            class="modal-link">
+                                           class="modal-link">
                                             <i class="fas fa-fw fa-trash"></i>
                                         </a>
                                     </div>
@@ -136,86 +136,87 @@
     <div class="row">
         {% for composition in data.compositions %}
             <div class="col col-12 col-md-6 col-lg-3 mt-4">
-                    <div class="card shadow mt-3 h-100 tab-card">
-                        <div class="card-header tab-card-header">
-                            <h2 class="card-title"><a href="{% url 'materialcomponentgroup-detail-modal' composition.group %}"
-                                                      class="modal-link">{{ composition.group_name }}</a></h2>
-                            <ul class="nav nav-tabs card-header-tabs" id="composition-tabs-{{ composition.id }}"
-                                role="tablist">
-                                <li class="nav-item">
-                                    <a class="nav-link active"
-                                       id="composition-table-tab-{{ composition.id }}"
-                                       data-toggle="tab"
-                                       href="#composition-table-{{ composition.id }}-tab"
-                                       role="tab"
-                                       aria-controls="composition-table-{{ composition.id }}-tab"
-                                       aria-selected="true">
-                                        Table
-                                    </a>
-                                </li>
-                                <li class="nav-item">
-                                    <a class="nav-link"
-                                       id="composition-chart-tab-{{ composition.id }}"
-                                       data-toggle="tab"
-                                       href="#composition-chart-{{ composition.id }}-tab"
-                                       role="tab"
-                                       aria-controls="composition-chart-{{ composition.id }}-tab"
-                                       aria-selected="false">
-                                        Chart
-                                    </a>
-                                </li>
-                            </ul>
-                        </div>
-                        <div class="card-body tab-content" id="composition-tabs-{{ group_settings.id }}-content">
-                            <div class="tab-pane fade show active"
-                                 id="composition-table-{{ composition.id }}-tab"
-                                 role="tabpanel"
-                                 aria-labelledby="composition-table-tab-{{ composition.id }}">
-                                <table class="table">
-                                    <thead>
+                <div class="card shadow mt-3 h-100 tab-card">
+                    <div class="card-header tab-card-header">
+                        <h2 class="card-title"><a
+                                href="{% url 'materialcomponentgroup-detail-modal' composition.group %}"
+                                class="modal-link">{{ composition.group_name }}</a></h2>
+                        <ul class="nav nav-tabs card-header-tabs" id="composition-tabs-{{ composition.id }}"
+                            role="tablist">
+                            <li class="nav-item">
+                                <a class="nav-link active"
+                                   id="composition-table-tab-{{ composition.id }}"
+                                   data-toggle="tab"
+                                   href="#composition-table-{{ composition.id }}-tab"
+                                   role="tab"
+                                   aria-controls="composition-table-{{ composition.id }}-tab"
+                                   aria-selected="true">
+                                    Table
+                                </a>
+                            </li>
+                            <li class="nav-item">
+                                <a class="nav-link"
+                                   id="composition-chart-tab-{{ composition.id }}"
+                                   data-toggle="tab"
+                                   href="#composition-chart-{{ composition.id }}-tab"
+                                   role="tab"
+                                   aria-controls="composition-chart-{{ composition.id }}-tab"
+                                   aria-selected="false">
+                                    Chart
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                    <div class="card-body tab-content" id="composition-tabs-{{ group_settings.id }}-content">
+                        <div class="tab-pane fade show active"
+                             id="composition-table-{{ composition.id }}-tab"
+                             role="tabpanel"
+                             aria-labelledby="composition-table-tab-{{ composition.id }}">
+                            <table class="table">
+                                <thead>
+                                <tr>
+                                    <th>Component</th>
+                                    <th>Share</th>
+                                </tr>
+                                </thead>
+                                <tbody>
+                                {% for share in composition.shares %}
                                     <tr>
-                                        <th>Component</th>
-                                        <th>Share</th>
+                                        <td><a href="{% url 'materialcomponent-detail-modal' share.component %}"
+                                               class="modal-link">{{ share.component_name }}</a></td>
+                                        {# <td>{{ share.average }} ± {{ share.standard_deviation }} %</td>#}
+                                        <td>{{ share.as_percentage }}</td>
                                     </tr>
-                                    </thead>
-                                    <tbody>
-                                    {% for share in composition.shares %}
-                                        <tr>
-                                            <td><a href="{% url 'materialcomponent-detail-modal' share.component %}"
-                                                   class="modal-link">{{ share.component_name }}</a></td>
-                                            {# <td>{{ share.average }} ± {{ share.standard_deviation }} %</td>#}
-                                            <td>{{ share.as_percentage }}</td>
-                                        </tr>
-                                    {% endfor %}
-                                    </tbody>
-                                    <tfoot></tfoot>
-                                </table>
+                                {% endfor %}
+                                </tbody>
+                                <tfoot></tfoot>
+                            </table>
 
-                            </div>
-                            <div class="tab-pane fade p-0"
-                                 id="composition-chart-{{ composition.id }}-tab"
-                                 role="tabpanel"
-                                 aria-labelledby="composition-chart-tab-{{ composition.id }}">
-                                <div id="composition-chart-{{ composition.id }}"></div>
-                            </div>
-                            <b>Shares of:</b> {{ composition.fractions_of_name }}
                         </div>
-                        <div class="card-footer">
-                            <div class="collapse multi-collapse"
-                                 id="remove-composition-{{ composition.id }}">
-                                <a id="edit-group-{{ composition.id }}" class="modal-link"
-                                   href="{% url 'composition-update-modal' composition.id %}?next={{ request.path }}">
-                                    <i class="fas fa-fw fa-edit"></i> Edit
-                                </a>
-                                <a id="remove-group-{{ composition.id }}"
-                                   class="modal-link"
-                                   href="{% url 'composition-delete-modal' composition.id %}?next={{ request.path }}">
-                                    <i class="fas fa-fw fa-trash"></i> Delete
-                                </a>
+                        <div class="tab-pane fade p-0"
+                             id="composition-chart-{{ composition.id }}-tab"
+                             role="tabpanel"
+                             aria-labelledby="composition-chart-tab-{{ composition.id }}">
+                            <div id="composition-chart-{{ composition.id }}"></div>
+                        </div>
+                        <b>Shares of:</b> {{ composition.fractions_of_name }}
+                    </div>
+                    <div class="card-footer">
+                        <div class="collapse multi-collapse"
+                             id="remove-composition-{{ composition.id }}">
+                            <a id="edit-group-{{ composition.id }}"
+                               href="{% url 'composition-update' composition.id %}?next={{ request.path }}">
+                                <i class="fas fa-fw fa-edit"></i> Edit
+                            </a>
+                            <a id="remove-group-{{ composition.id }}"
+                               class="modal-link"
+                               href="{% url 'composition-delete-modal' composition.id %}?next={{ request.path }}">
+                                <i class="fas fa-fw fa-trash"></i> Delete
+                            </a>
 
-                            </div>
                         </div>
                     </div>
+                </div>
             </div>
         {% endfor %}
     </div>
