@@ -202,21 +202,6 @@ class WeightShareModelForm(CustomModelForm):
 
 class WeightShareInlineFormset(BaseInlineFormSet):
 
-    def add_other(self):
-        composition = self.data['shares-0-composition']
-        other = MaterialComponent.objects.other()
-        form_count = int(self.data['shares-TOTAL_FORMS'])
-        other_value = 100 - sum([float(self.data[f'shares-{i}-average']) for i in range(form_count)])
-        additions = {
-            f'shares-TOTAL_FORMS': f'{form_count + 1}',
-            f'shares-{form_count}-id': '',
-            f'shares-{form_count}-component': f'{other.id}',
-            f'shares-{form_count}-average': f'{other_value}',
-            f'shares-{form_count}-composition': f'{self.data["shares-0-composition"]}',
-            f'shares-{form_count}-standard_deviation': '0.00'
-        }
-        self.data.update(additions)
-
     def clean(self):
         if any(self.errors):
             return

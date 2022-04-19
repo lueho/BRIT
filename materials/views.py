@@ -603,7 +603,7 @@ class CompositionModalDetailView(OwnedObjectModalDetailView):
 class CompositionUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin, UpdateWithInlinesView):
     model = Composition
     inlines = [InlineWeightShare, ]
-    form_class = forms.CompositionModelForm
+    fields = set()
     template_name = 'composition_update.html'
     permission_required = (
         'materials.change_composition',
