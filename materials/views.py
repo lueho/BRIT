@@ -24,7 +24,7 @@ from distributions.plots import DoughnutChart
 from . import forms
 from .forms import (
     AddComponentModalForm,
-    AddComponentGroupModalForm,
+    AddCompositionModalForm,
     AddLiteratureSourceForm,
     AddSeasonalVariationForm,
     ComponentModelForm,
@@ -32,7 +32,7 @@ from .forms import (
     Composition,
     ComponentShareDistributionFormSetHelper,
     WeightShareUpdateFormSetHelper,
-    InlineComponentShare, ComponentModalModelForm, ComponentGroupModalModelForm
+    InlineWeightShare, ComponentModalModelForm, ComponentGroupModalModelForm, ModalInlineComponentShare
 )
 from .models import (
     Material,
@@ -602,8 +602,8 @@ class CompositionModalDetailView(OwnedObjectModalDetailView):
 
 class CompositionUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin, UpdateWithInlinesView):
     model = Composition
-    inlines = [InlineComponentShare, ]
-    fields = []
+    inlines = [InlineWeightShare, ]
+    form_class = forms.CompositionModelForm
     template_name = 'composition_update.html'
     permission_required = (
         'materials.change_composition',
@@ -625,7 +625,7 @@ class CompositionUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin, Upda
 
 class CompositionModalUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin, UpdateWithInlinesView):
     model = Composition
-    inlines = [InlineComponentShare, ]
+    inlines = [ModalInlineComponentShare, ]
     fields = []
     template_name = 'modal_item_formset.html'
     permission_required = (
@@ -700,9 +700,9 @@ class WeightShareModalDeleteView(OwnedObjectDeleteView):
 # ----------- Materials/Components/Groups Relation -----------------------------------------------------------------
 
 
-class AddComponentGroupView(PermissionRequiredMixin, BSModalUpdateView):
+class AddCompositionView(PermissionRequiredMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
     model = SampleSeries
-    form_class = AddComponentGroupModalForm
+    form_class = AddCompositionModalForm
     template_name = 'modal_form.html'
     permission_required = ('materials.add_composition', 'materials.add_weightshare')
 

@@ -3595,21 +3595,21 @@ class AddComponentGroupViewTestCase(TestCase):
         self.default_component = MaterialComponent.objects.default()
 
     def test_get_http_302_redirect_for_anonymous(self):
-        response = self.client.get(reverse('sampleseries-add-componentgroup', kwargs={'pk': self.series.pk}))
+        response = self.client.get(reverse('sampleseries-add-composition', kwargs={'pk': self.series.pk}))
         self.assertEqual(response.status_code, 302)
 
     def test_get_http_403_forbidden_for_outsiders(self):
         self.client.force_login(self.outsider)
-        response = self.client.get(reverse('sampleseries-add-componentgroup', kwargs={'pk': self.series.pk}))
+        response = self.client.get(reverse('sampleseries-add-composition', kwargs={'pk': self.series.pk}))
         self.assertEqual(response.status_code, 403)
 
     def test_get_http_200_ok_for_members(self):
         self.client.force_login(self.member)
-        response = self.client.get(reverse('sampleseries-add-componentgroup', kwargs={'pk': self.series.pk}))
+        response = self.client.get(reverse('sampleseries-add-composition', kwargs={'pk': self.series.pk}))
         self.assertEqual(response.status_code, 200)
 
     def test_post_http_302_redirect_for_anonymous(self):
-        response = self.client.post(reverse('sampleseries-add-componentgroup', kwargs={'pk': self.series.pk}), data={})
+        response = self.client.post(reverse('sampleseries-add-composition', kwargs={'pk': self.series.pk}), data={})
         self.assertEqual(response.status_code, 302)
 
     def test_post_http_403_forbidden_for_outsiders(self):
@@ -3619,7 +3619,7 @@ class AddComponentGroupViewTestCase(TestCase):
             'fractions_of': self.default_component.id
         }
         response = self.client.post(
-            reverse('sampleseries-add-componentgroup', kwargs={'pk': self.series.pk}),
+            reverse('sampleseries-add-composition', kwargs={'pk': self.series.pk}),
             data=data
         )
         self.assertEqual(response.status_code, 403)
@@ -3631,7 +3631,7 @@ class AddComponentGroupViewTestCase(TestCase):
             'fractions_of': self.default_component.id
         }
         response = self.client.post(
-            reverse('sampleseries-add-componentgroup', kwargs={'pk': self.series.pk}),
+            reverse('sampleseries-add-composition', kwargs={'pk': self.series.pk}),
             data=data)
         self.assertEqual(response.status_code, 302)
 
@@ -3642,7 +3642,7 @@ class AddComponentGroupViewTestCase(TestCase):
             'fractions_of': self.default_component.id
         }
         response = self.client.post(
-            reverse('sampleseries-add-componentgroup', kwargs={'pk': self.series.pk}),
+            reverse('sampleseries-add-composition', kwargs={'pk': self.series.pk}),
             data=data)
         self.assertEqual(response.status_code, 302)
         for sample in self.series.samples.all():

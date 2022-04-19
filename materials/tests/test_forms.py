@@ -3,7 +3,7 @@ from django.forms import inlineformset_factory
 from django.test import TestCase
 
 from distributions.models import Timestep
-from ..forms import MaterialComponentShareModelForm, MaterialComponentShareInlineFormset, AddComponentGroupModalForm, \
+from ..forms import WeightShareModelForm, WeightShareInlineFormset, AddCompositionModalForm, \
     AddComponentModalForm
 from ..models import Material, MaterialComponentGroup, Composition, MaterialComponent, \
     WeightShare, Sample, get_default_owner, SampleSeries
@@ -39,7 +39,7 @@ class AddComponentGroupModalModelFormTestCase(TestCase):
             material=self.material
         )
         sample_series.add_component_group(self.group1)
-        form = AddComponentGroupModalForm(instance=sample_series)
+        form = AddCompositionModalForm(instance=sample_series)
         self.assertQuerysetEqual(
             form.fields['group'].queryset.order_by('id'),
             MaterialComponentGroup.objects.filter(name='Test Group 2').order_by('id')
@@ -50,7 +50,7 @@ class AddComponentGroupModalModelFormTestCase(TestCase):
             owner=self.owner,
             material=self.material
         )
-        form = AddComponentGroupModalForm(instance=sample_series)
+        form = AddCompositionModalForm(instance=sample_series)
         self.assertQuerysetEqual(
             form.fields['fractions_of'].queryset.order_by('id'),
             MaterialComponent.objects.filter(id=MaterialComponent.objects.default().id).order_by('id')
@@ -179,8 +179,8 @@ class CompositionUpdateFormTestCase(TestCase):
         FormSet = inlineformset_factory(
             Composition,
             WeightShare,
-            form=MaterialComponentShareModelForm,
-            formset=MaterialComponentShareInlineFormset,
+            form=WeightShareModelForm,
+            formset=WeightShareInlineFormset,
             extra=0
         )
         formset = FormSet(instance=self.composition)
@@ -197,8 +197,8 @@ class CompositionUpdateFormTestCase(TestCase):
         FormSet = inlineformset_factory(
             Composition,
             WeightShare,
-            form=MaterialComponentShareModelForm,
-            formset=MaterialComponentShareInlineFormset,
+            form=WeightShareModelForm,
+            formset=WeightShareInlineFormset,
             extra=0
         )
         components = [c.id for c in MaterialComponent.objects.exclude(name='Fresh Matter (FM)')]
@@ -228,8 +228,8 @@ class CompositionUpdateFormTestCase(TestCase):
         FormSet = inlineformset_factory(
             Composition,
             WeightShare,
-            form=MaterialComponentShareModelForm,
-            formset=MaterialComponentShareInlineFormset,
+            form=WeightShareModelForm,
+            formset=WeightShareInlineFormset,
             extra=0
         )
         components = [c.id for c in MaterialComponent.objects.exclude(name='Fresh Matter (FM)')]
@@ -259,8 +259,8 @@ class CompositionUpdateFormTestCase(TestCase):
         FormSet = inlineformset_factory(
             Composition,
             WeightShare,
-            form=MaterialComponentShareModelForm,
-            formset=MaterialComponentShareInlineFormset,
+            form=WeightShareModelForm,
+            formset=WeightShareInlineFormset,
             extra=0
         )
         components = [c.id for c in MaterialComponent.objects.exclude(name='Fresh Matter (FM)')]

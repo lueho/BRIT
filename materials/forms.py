@@ -130,7 +130,7 @@ class CompositionModalModelForm(CustomModalModelForm):
         fields = ('group', 'sample', 'fractions_of')
 
 
-class AddComponentGroupModalForm(BSModalModelForm):
+class AddCompositionModalForm(BSModalModelForm):
     group = forms.ModelChoiceField(queryset=MaterialComponentGroup.objects.all())
     fractions_of = forms.ModelChoiceField(queryset=MaterialComponent.objects.all())
 
@@ -179,45 +179,7 @@ class AddSeasonalVariationForm(BSModalForm):
         self.helper = ModalFormHelper()
 
 
-class ComponentShareUpdateForm(BSModalModelForm):
-    class Meta:
-        model = WeightShare
-        fields = ('average', 'standard_deviation')
-        widgets = {
-            'average': forms.NumberInput(attrs={'min': 0, 'max': 1.0, 'step': 0.01}),
-            'standard_deviation': forms.NumberInput(attrs={'min': 0, 'max': 1.0, 'step': 0.01})
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.helper = ModalFormHelper()
-
-
-class CompositionUpdateForm(BSModalModelForm):
-    class Meta:
-        model = WeightShare
-        fields = ('component', 'average', 'standard_deviation')
-        widgets = {
-            'average': forms.NumberInput(attrs={'min': 0, 'max': 1.0, 'step': 0.01}),
-            'standard_deviation': forms.NumberInput(attrs={'min': 0, 'max': 1.0, 'step': 0.01})
-        }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.helper = ModalFormHelper()
-
-
-class ItemForm(BSModalModelForm):
-    class Meta:
-        model = WeightShare
-        fields = ('component', 'average', 'standard_deviation')
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.helper = FormHelper()
-
-
-class MaterialComponentShareModelForm(forms.ModelForm):
+class WeightShareModelForm(CustomModelForm):
     class Meta:
         model = WeightShare
         fields = ('component', 'average', 'standard_deviation',)
@@ -238,13 +200,72 @@ class MaterialComponentShareModelForm(forms.ModelForm):
         return self.cleaned_data.get('standard_deviation') / 100
 
 
-class MaterialComponentShareInlineFormset(BaseInlineFormSet):
+class WeightShareInlineFormset(BaseInlineFormSet):
+
+    def add_other(self):
+        composition = self.data['shares-0-composition']
+        other = MaterialComponent.objects.other()
+        form_count = int(self.data['shares-TOTAL_FORMS'])
+        other_value = 100 - sum([float(self.data[f'shares-{i}-average']) for i in range(form_count)])
+        additions = {
+            f'shares-TOTAL_FORMS': f'{form_count + 1}',
+            f'shares-{form_count}-id': '',
+            f'shares-{form_count}-component': f'{other.id}',
+            f'shares-{form_count}-average': f'{other_value}',
+            f'shares-{form_count}-composition': f'{self.data["shares-0-composition"]}',
+            f'shares-{form_count}-standard_deviation': '0.00'
+        }
+        self.data.update(additions)
+
     def clean(self):
         if any(self.errors):
             return
         if sum([form.cleaned_data.get('average') for form in self.forms]) != 1.0:
             raise ValidationError('Weight shares of components must sum up to 100%')
         super().clean()
+
+
+class InlineWeightShare(InlineFormSetFactory):
+    model = WeightShare
+    fields = ('owner', 'component', 'average', 'standard_deviation')
+    factory_kwargs = {
+        'form': WeightShareModelForm,
+        'formset': WeightShareInlineFormset,
+        'extra': 0,
+        'can_delete': True,
+        'widgets': {
+            'owner': forms.HiddenInput(),
+            'average': forms.NumberInput(attrs={'min': 0, 'max': 100, 'step': 0.01}),
+            'standard_deviation': forms.NumberInput(attrs={'min': 0, 'max': 100, 'step': 0.01})
+        }
+    }
+
+    def get_formset_kwargs(self):
+        kwargs = super().get_formset_kwargs()
+        kwargs['form_kwargs'] = {'initial': {'owner': self.request.user}}
+        return kwargs
+
+
+class WeightShareUpdateFormSetHelper(FormHelper):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.template = 'bootstrap4/dynamic_table_inline_formset.html'
+        self.form_method = 'post'
+        self.layout = Layout(
+            Row(
+                Field('component'),
+                Field('average'),
+                Field('standard_deviation'),
+            ),
+        )
+        self.render_required_fields = True
+
+
+class WeightShareModalModelForm(WeightShareModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields.get('component').label = ' '
+        self.fields.get('component').required = False
 
 
 class PlainTextComponentWidget(forms.Widget):
@@ -263,12 +284,12 @@ class PlainTextComponentWidget(forms.Widget):
         #                  f"<input type='hidden' name='{name}' value='{value}'>")
 
 
-class InlineComponentShare(InlineFormSetFactory):
+class ModalInlineComponentShare(InlineFormSetFactory):
     model = WeightShare
     fields = ('component', 'average', 'standard_deviation')
     factory_kwargs = {
-        'form': MaterialComponentShareModelForm,
-        'formset': MaterialComponentShareInlineFormset,
+        'form': WeightShareModalModelForm,
+        'formset': WeightShareInlineFormset,
         'extra': 0,
         'can_delete': True,
         'widgets': {
@@ -287,21 +308,6 @@ class AddTemporalDistributionForm(BSModalModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper = FormHelper()
-
-
-class WeightShareUpdateFormSetHelper(FormHelper):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.form_method = 'post'
-        self.layout = Layout(
-            Row(
-                Field('component'),
-                Field('average'),
-                Field('standard_deviation'),
-                Field('DELETE')
-            ),
-        )
-        self.render_required_fields = True
 
 
 class ComponentShareDistributionFormSetHelper(FormHelper):
