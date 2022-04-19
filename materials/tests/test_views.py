@@ -3096,17 +3096,17 @@ class CompositionUpdateViewTestCase(TestCase):
     def test_post_http_302_redirect_for_members(self):
         self.client.force_login(self.member)
         components = [c.id for c in MaterialComponent.objects.exclude(name='Fresh Matter (FM)')]
-        shares = [s.id for s in WeightShare.objects.exclude(
-            component__name='Fresh Matter (FM)'
-        )]
+        shares = [s.id for s in WeightShare.objects.exclude(component__name='Fresh Matter (FM)')]
         data = {
             'shares-INITIAL_FORMS': '2',
             'shares-TOTAL_FORMS': '2',
             'shares-0-id': f'{shares[0]}',
+            'shares-0-owner': f'{self.member.id}',
             'shares-0-component': f'{components[0]}',
             'shares-0-average': '45.5',
             'shares-0-standard_deviation': '1.5',
             'shares-1-id': f'{shares[1]}',
+            'shares-1-owner': f'{self.member.id}',
             'shares-1-component': f'{components[1]}',
             'shares-1-average': '54.5',
             'shares-1-standard_deviation': '1.5',
@@ -3120,17 +3120,17 @@ class CompositionUpdateViewTestCase(TestCase):
     def test_post_http_302_redirect_for_members_with_correct_data(self):
         self.client.force_login(self.member)
         components = [c.id for c in MaterialComponent.objects.exclude(name='Fresh Matter (FM)')]
-        shares = [s.id for s in WeightShare.objects.exclude(
-            component__name='Fresh Matter (FM)'
-        )]
+        shares = [s.id for s in WeightShare.objects.exclude(component__name='Fresh Matter (FM)')]
         data = {
             'shares-INITIAL_FORMS': '2',
             'shares-TOTAL_FORMS': '2',
             'shares-0-id': f'{shares[0]}',
+            'shares-0-owner': f'{self.member.id}',
             'shares-0-component': f'{components[0]}',
             'shares-0-average': '45.5',
             'shares-0-standard_deviation': '1.5',
             'shares-1-id': f'{shares[1]}',
+            'shares-1-owner': f'{self.member.id}',
             'shares-1-component': f'{components[1]}',
             'shares-1-average': '54.5',
             'shares-1-standard_deviation': '1.5',
@@ -3139,9 +3139,72 @@ class CompositionUpdateViewTestCase(TestCase):
             reverse('composition-update', kwargs={'pk': self.composition.pk}),
             data=data
         )
-
         self.assertEqual(response.status_code, 302)
         self.assertEqual(len(WeightShare.objects.all()), 3)
+
+    def test_deleted_forms_are_not_included_in_total_sum_validation(self):
+        self.client.force_login(self.member)
+        components = [c.id for c in MaterialComponent.objects.exclude(name='Fresh Matter (FM)')]
+        shares = [s.id for s in WeightShare.objects.exclude(component__name='Fresh Matter (FM)')]
+        new_component = MaterialComponent.objects.create(owner=self.owner, name='New Component')
+        data = {
+            'shares-INITIAL_FORMS': '2',
+            'shares-TOTAL_FORMS': '3',
+            'shares-0-id': f'{shares[0]}',
+            'shares-0-owner': f'{self.member.id}',
+            'shares-0-component': f'{components[0]}',
+            'shares-0-average': '45.5',
+            'shares-0-standard_deviation': '1.5',
+            'shares-1-id': f'{shares[1]}',
+            'shares-1-owner': f'{self.member.id}',
+            'shares-1-component': f'{components[1]}',
+            'shares-1-average': '54.5',
+            'shares-1-standard_deviation': '1.5',
+            'shares-1-DELETE': True,
+            'shares-2-id': '',
+            'shares-2-owner': f'{self.member.id}',
+            'shares-2-component': f'{new_component.id}',
+            'shares-2-average': '54.5',
+            'shares-2-standard_deviation': '1.5',
+        }
+        response = self.client.post(reverse('composition-update', kwargs={'pk': self.composition.pk}), data=data)
+        self.assertEqual(response.status_code, 302)
+
+    def test_sum_validation_raises_no_error_when_last_element_is_deleted(self):
+        self.client.force_login(self.member)
+        component = MaterialComponent.objects.get(name='Test Component 1')
+        share = WeightShare.objects.create(owner=self.owner, component=component, composition=self.composition)
+        data = {
+            'shares-INITIAL_FORMS': '1',
+            'shares-TOTAL_FORMS': '1',
+            'shares-0-id': f'{share.id}',
+            'shares-0-owner': f'{self.member.id}',
+            'shares-0-component': f'{component.id}',
+            'shares-0-average': '45.5',
+            'shares-0-standard_deviation': '1.5',
+            'shares-0-DELETE': True,
+        }
+        response = self.client.post(reverse('composition-update', kwargs={'pk': self.composition.pk}), data=data)
+        self.assertEqual(response.status_code, 302)
+
+    def test_deleted_forms_delete_correct_weight_share_record(self):
+        self.client.force_login(self.member)
+        component = MaterialComponent.objects.get(name='Test Component 1')
+        share = WeightShare.objects.create(owner=self.owner, component=component, composition=self.composition)
+        data = {
+            'shares-INITIAL_FORMS': '1',
+            'shares-TOTAL_FORMS': '1',
+            'shares-0-id': f'{share.id}',
+            'shares-0-owner': f'{self.member.id}',
+            'shares-0-component': f'{component.id}',
+            'shares-0-average': '45.5',
+            'shares-0-standard_deviation': '1.5',
+            'shares-0-DELETE': True,
+        }
+        response = self.client.post(reverse('composition-update', kwargs={'pk': self.composition.pk}), data=data)
+        self.assertEqual(response.status_code, 302)
+        with self.assertRaises(WeightShare.DoesNotExist):
+            WeightShare.objects.get(id=share.id)
 
 
 @modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
