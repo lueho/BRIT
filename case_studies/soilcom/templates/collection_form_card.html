@@ -1,4 +1,5 @@
 {% extends 'simple_form_card.html' %}
+{% load static %}
 {% load crispy_forms_tags %}
 
 {% block extra_form_content %}
@@ -9,6 +10,7 @@
 
 {% block javascript %}
 
+    <script src="{% static 'js/dynamic-formset.js' %}"></script>
     <script type="text/javascript">
 
         function data_url(element) {

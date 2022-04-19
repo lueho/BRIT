@@ -128,7 +128,7 @@
     {{ charts|json_script:"charts" }}
     {{ map_config|json_script:"mapConfig" }}
 
-    <script src="{% static 'js/charts/feedstock_summary_bar_chart.js' %}"></script>
+    <script src="{% static 'js/feedstock_summary_bar_chart.js' %}"></script>
     <script src="{% static 'js/maps.js' %}"></script>
     <script>
         let charts = JSON.parse(document.getElementById("charts").textContent);

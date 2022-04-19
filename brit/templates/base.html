@@ -30,22 +30,15 @@
     <link rel="icon" href="{% static 'img/favicon.ico' %}" type="image/x-icon">
 
     <!-- Custom fonts for this template-->
-    <link href="{% static 'vendor/fontawesome-free/css/all.min.css' %}" rel="stylesheet">
+    <link href="{% static 'lib/fontawesome-free/css/all.min.css' %}" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css?family=Nunito" rel="stylesheet">
 
     <!-- Custom styles for this template-->
     <link href="{% static 'css/sb-admin-2.min.css' %}" rel="stylesheet">
-    <link href="{% static 'vendor/jquery-ui/css/jquery-ui.min.css' %}" rel="stylesheet">
-    <link href="{% static 'vendor/jquery-ui/css/jquery-ui.structure.min.css' %}" rel="stylesheet">
-    <link href="{% static 'vendor/jquery-ui/css/jquery-ui.theme.min.css' %}" rel="stylesheet">
+    <link href="{% static 'lib/jquery-ui/css/jquery-ui.min.css' %}" rel="stylesheet">
+    <link href="{% static 'lib/jquery-ui/css/jquery-ui.structure.min.css' %}" rel="stylesheet">
+    <link href="{% static 'lib/jquery-ui/css/jquery-ui.theme.min.css' %}" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/gh/gitbrent/bootstrap4-toggle@3.6.1/css/bootstrap4-toggle.min.css" rel="stylesheet">
-
-
-    <!-- Custom styles for leaflet maps-->
-    <link href="{% static 'css/map-style.css' %}" rel="stylesheet">
-
-    <!-- Other custom styles-->
-    <link href="{% static 'css/brit.css' %}" rel="stylesheet">
 
     {% block style_sheets %}{% endblock style_sheets %}
 
@@ -125,28 +118,25 @@
     </div>
 </div>
 
-<script src="{% static 'vendor/jquery/jquery.min.js' %}"></script>
-<script src="{% static 'vendor/jquery-ui/js/jquery-ui.min.js' %}"></script>
+<script src="{% static 'lib/jquery/jquery.min.js' %}"></script>
+<script src="{% static 'lib/jquery-ui/js/jquery-ui.min.js' %}"></script>
 
 <!-- Bootstrap core JavaScript-->
 
-<script src="{% static 'vendor/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+<script src="{% static 'lib/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
 
 <!-- Core plugin JavaScript-->
-<script src="{% static 'vendor/jquery-easing/jquery.easing.min.js' %}"></script>
+<script src="{% static 'lib/jquery-easing/jquery.easing.min.js' %}"></script>
 
 <!-- Custom scripts for all pages-->
 <script src="{% static 'js/sb-admin-2.min.js' %}"></script>
 <script src="{% static 'js/jquery.bootstrap.modal.forms.js' %}"></script>
 <script src="https://cdn.jsdelivr.net/gh/gitbrent/bootstrap4-toggle@3.6.1/js/bootstrap4-toggle.min.js"></script>
+{#<script src="{% static 'js/dynamic-formset.js' %}"></script>#}
 
 
 <!-- Page level plugins -->
-<script src="{% static 'vendor/chart.js/Chart.min.js' %}"></script>
-{#<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.4.0/Chart.min.js"></script>#}
-
-<!-- Page level custom scripts -->
-<script src="{% static 'js/brit-map-styles.js' %}"></script>
+<script src="{% static 'lib/chart.js/Chart.min.js' %}"></script>
 
 {% block javascript %}
     <script type="text/javascript">

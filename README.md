@@ -6,7 +6,7 @@ to support decision making of bioresource management.
 
 ## The FLEXIBI project
 
-![FLEXIBI Logo](./static/img/LOGO_Flexibi_White_BG.png)
+![FLEXIBI Logo](brit/static/img/LOGO_Flexibi_White_BG.png)
 
 FLEXIBI studied the potential of residues from agri– and horticulture, gardening
 and landscaping, as well as from post-consumer wood from peri-urban and urban 

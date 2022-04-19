@@ -140,8 +140,8 @@ LEAFLET_CONFIG = {
     'NO_GLOBALS': False,
     'MIN_ZOOM': 4,
     'MAX_ZOOM': 15,
-    'PLUGINS': {'draw': {'css': 'draw/leaflet.draw.css',
-                         'js': 'draw/leaflet.draw.js',
+    'PLUGINS': {'draw': {'css': 'lib/leaflet-draw/leaflet.draw.css',
+                         'js': 'lib/leaflet-draw/leaflet.draw.js',
                          'auto-include': True
                          },
                 'forms': {'auto-include': True},

@@ -3,6 +3,15 @@ let myRenderer = L.canvas({padding: 0.5});
 let feature_layer;
 let region_layer;
 
+const catchment_layer_style = {
+    "color": "#04555E"
+}
+
+const region_layer_style = {
+    "color": "#A1221C",
+    "fillOpacity": 0.0
+}
+
 window.addEventListener("map:init", function (event) {
     map = event.detail.map;
 });
