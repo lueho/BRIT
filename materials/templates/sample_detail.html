@@ -254,6 +254,14 @@
             new Chart(canvas.getContext('2d'), charts[key]);
         })
 
+        window.onload = function () {
+            {% if 'materials.change_material' in perms %}
+                const btn = document.getElementById('id_toggle_edit')
+                btn.click()
+                $('#id_toggle_edit').bootstrapzToggle('on')
+            {% endif %}
+        }
+
     </script>
 
 {% endblock javascript %}
