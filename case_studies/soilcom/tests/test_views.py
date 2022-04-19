@@ -865,13 +865,73 @@ class WasteCollectionMapViewTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         owner = get_default_owner()
+        User.objects.create(username='outsider')
+        member = User.objects.create(username='member')
+        members = Group.objects.create(name='members')
+        members.permissions.add(Permission.objects.get(codename='add_collection'))
+        members.permissions.add(Permission.objects.get(codename='view_collection'))
+        members.permissions.add(Permission.objects.get(codename='change_collection'))
+        members.permissions.add(Permission.objects.get(codename='delete_collection'))
+        member.groups.add(members)
         region = Region.objects.create(owner=owner, name='Test Region')
         catchment = Catchment.objects.create(owner=owner, name='Test Catchment', region=region)
         Collection.objects.create(owner=owner, name='Test Collection', catchment=catchment)
 
     def setUp(self):
+        self.member = User.objects.get(username='member')
+        self.outsider = User.objects.get(username='outsider')
         self.collection = Collection.objects.get(name='Test Collection')
 
     def test_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse('WasteCollection'))
         self.assertEqual(response.status_code, 200)
+
+    def test_http_200_ok_for_member(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('WasteCollection'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_uses_correct_template(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('WasteCollection'))
+        self.assertTemplateUsed(response, 'waste_collection_map.html')
+
+    def test_create_collection_option_visible_for_member(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('WasteCollection'))
+        self.assertContains(response, 'Add new collection')
+
+    def test_create_collection_option_not_available_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('WasteCollection'))
+        self.assertNotContains(response, 'Add new collection')
+
+    def test_copy_collection_option_visible_for_member(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('WasteCollection'))
+        self.assertContains(response, 'Copy selected collection')
+
+    def test_copy_collection_option_not_available_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('WasteCollection'))
+        self.assertNotContains(response, 'Copy selected collection')
+
+    def test_update_collection_option_visible_for_member(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('WasteCollection'))
+        self.assertContains(response, 'Edit selected collection')
+
+    def test_update_collection_option_not_available_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('WasteCollection'))
+        self.assertNotContains(response, 'Edit selected collection')
+
+    def test_collection_dashboard_option_visible_for_member(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('WasteCollection'))
+        self.assertContains(response, 'Waste collection dashboard')
+
+    def test_collection_dashboard_option_not_available_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('WasteCollection'))
+        self.assertNotContains(response, 'Waste collection dashboard')
