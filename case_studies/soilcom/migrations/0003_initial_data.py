@@ -21,7 +21,7 @@ def create_initial_data(apps, schema_editor):
 class Migration(migrations.Migration):
 
     dependencies = [
-        ('soilcom', '0001_initial'),
+        ('soilcom', '0002_add_collection_frequency'),
         ('maps', '0001_initial'),
         ('users', '0001_initial_data')
     ]
