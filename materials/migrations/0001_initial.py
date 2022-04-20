@@ -65,7 +65,7 @@ class Migration(migrations.Migration):
                 ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
                 ('name', models.CharField(max_length=255)),
                 ('description', models.TextField(blank=True, null=True)),
-                ('preview', models.ImageField(default='img/generic_material.jpg', upload_to='')),
+                ('preview', models.ImageField(default='materials/img/generic_material.jpg', upload_to='')),
                 ('publish', models.BooleanField(default=False)),
                 ('standard', models.BooleanField(default=True)),
                 ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='materials_sampleseries_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
