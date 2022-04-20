@@ -73,7 +73,7 @@ class MaterialCategoryModalCreateView(OwnedObjectModalCreateView):
 
 
 class MaterialCategoryDetailView(OwnedObjectDetailView):
-    template_name = 'material_group_detail.html'
+    template_name = 'simple_detail_card.html'
     model = MaterialCategory
     permission_required = set()
 
@@ -131,7 +131,7 @@ class MaterialModalCreateView(OwnedObjectModalCreateView):
 
 
 class MaterialDetailView(OwnedObjectDetailView):
-    template_name = 'material_detail.html'
+    template_name = 'simple_detail_card.html'
     model = Material
     permission_required = set()
 
@@ -188,7 +188,7 @@ class ComponentModalCreateView(OwnedObjectModalCreateView):
 
 
 class ComponentDetailView(OwnedObjectDetailView):
-    template_name = 'component_detail.html'
+    template_name = 'simple_detail_card.html'
     model = MaterialComponent
     permission_required = set()
 
@@ -239,7 +239,7 @@ class ComponentGroupCreateView(OwnedObjectCreateView):
 
 
 class ComponentGroupDetailView(OwnedObjectDetailView):
-    template_name = 'componentgroup_detail.html'
+    template_name = 'simple_detail_card.html'
     model = MaterialComponentGroup
     permission_required = set()
 
@@ -303,7 +303,7 @@ class MaterialPropertyModalCreateView(OwnedObjectModalCreateView):
 
 
 class MaterialPropertyDetailView(OwnedObjectDetailView):
-    template_name = 'material_property_detail.html'
+    template_name = 'simple_detail_card.html'
     model = MaterialProperty
     permission_required = set()
 

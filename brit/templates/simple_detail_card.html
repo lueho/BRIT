@@ -1,25 +1,31 @@
 {% extends 'base.html' %}
-{% load custom_tags %}
+
+{% block title %}BRIT | {{ object.name }} details{% endblock %}
 
 {% block content %}
-
     <div class="row">
         <div class="col">
             <div class="card shadow">
-                <div class="card-header"><strong>{{ object|verbose_name }} Detail</strong></div>
+                <div class="card-header"><strong>{{ model_name }} details</strong></div>
                 <div class="card-body">
                     <p class="card-text"><strong>Name:</strong><br>{{ object.name }}</p>
                     <p class="card-text"><strong>Description:</strong><br>{{ object.description }}</p>
                 </div>
                 <div class="card-footer">
-                    <a href="{{ object.list_url }}" class="mr-3"><i class="fas fa-fw fa-arrow-left"></i> back to
-                        list</a>
-                    <a href="{{ object.update_url }}" class="mr-3"><i class="fas fa-fw fa-edit"></i> edit</a>
-                    <a href="{{ object.modal_delete_url }}" class="modal-link"><i
-                            class="fas fa-fw fa-trash"></i> delete</a>
+                    <a href="{{ object.list_url }}" class="mr-3">
+                        <i class="fas fa-fw fa-arrow-left">
+                        </i> back to list
+                    </a>
+                    <a href="{{ object.update_url}}" class="mr-3">
+                        <i class="fas fa-fw fa-edit">
+                        </i> edit
+                    </a>
+                    <a href="{{ object.modal_delete_url}}" class="modal-link">
+                        <i class="fas fa-fw fa-trash">
+                        </i> delete
+                    </a>
                 </div>
             </div>
         </div>
     </div>
-
 {% endblock %}
