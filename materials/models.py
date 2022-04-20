@@ -13,9 +13,7 @@ from users.models import get_default_owner
 
 
 class MaterialCategory(NamedUserObjectModel):
-    class Meta:
-        verbose_name = 'Material Group'
-
+    pass
 
 class BaseMaterial(NamedUserObjectModel):
     """
@@ -43,7 +41,6 @@ class Material(BaseMaterial):
 
     class Meta:
         proxy = True
-        verbose_name = 'Material'
 
 
 class MaterialComponentManager(models.Manager):
@@ -103,8 +100,6 @@ class MaterialComponentGroup(NamedUserObjectModel):
     objects = MaterialComponentGroupManager()
 
     class Meta:
-        verbose_name = 'material_component_group'
-        verbose_name_plural = 'groups'
         unique_together = [['name', 'owner']]
 
 
