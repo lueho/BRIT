@@ -77,9 +77,12 @@
                            class="modal-link">
                             <i class="fas fa-fw fa-edit"></i> Edit
                         </a>
-                        <a href="{% url 'sample-duplicate-modal' object.id %}?next={{ request.path }}"
+                        <a href="{% url 'sample-duplicate-modal' object.id %}"
                            class="modal-link">
                             <i class="fas fa-fw fa-copy"></i> Duplicate
+                        </a>
+                        <a href="{% url 'material-dashboard' %}">
+                            <i class="fas fa-fw fa-cog"></i> Dashboard
                         </a>
                     </div>
                 </div>
