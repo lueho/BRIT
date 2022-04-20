@@ -290,13 +290,13 @@ class Sample(NamedUserObjectModel):
     properties = models.ManyToManyField(MaterialPropertyValue)
     sources = models.ManyToManyField(Source)
 
-    def duplicate(self, creator):
+    def duplicate(self, creator, **kwargs):
         with mute_signals(post_save):
             duplicate = Sample.objects.create(
                 owner=creator,
-                series=self.series,
-                timestep=self.timestep,
-                taken_at=self.taken_at,
+                series=kwargs.get('series', self.series),
+                timestep=kwargs.get('timestep', self.timestep),
+                taken_at=kwargs.get('taken_at', self.taken_at),
             )
         for composition in self.compositions.all():
             duplicate_composition = composition.duplicate(creator)

@@ -2802,6 +2802,132 @@ class SampleModalAddPropertyViewTestCase(TestCase):
         self.assertIn(value, self.sample.properties.all())
 
 
+# ----------- Sample Series Utilities ----------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
+class SampleCreateDuplicateViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = get_default_owner()
+        User.objects.create(username='outsider')
+        member = User.objects.create(username='member')
+        members = Group.objects.create(name='members')
+        members.permissions.add(Permission.objects.get(codename='add_sample'))
+        member.groups.add(members)
+
+        material = Material.objects.create(owner=owner, name='Test Material')
+        series = SampleSeries.objects.create(owner=owner, name='Test Series', material=material)
+        distribution = TemporalDistribution.objects.create(owner=owner, name='Test Distribution')
+        timestep = Timestep.objects.create(owner=owner, name='Test Timestep 1', distribution=distribution)
+        Timestep.objects.create(owner=owner, name='Test Timestep 2', distribution=distribution)
+        Sample.objects.create(owner=owner, name='Test Sample', series=series, timestep=timestep)
+
+    def setUp(self):
+        self.owner = get_default_owner()
+        self.outsider = User.objects.get(username='outsider')
+        self.member = User.objects.get(username='member')
+        self.material = Material.objects.get(name='Test Material')
+        self.series = SampleSeries.objects.get(name='Test Series')
+        self.sample = Sample.objects.get(name='Test Sample')
+
+    def test_get_http_302_redirect_for_anonymous(self):
+        response = self.client.get(reverse('sample-duplicate', kwargs={'pk': self.sample.pk}))
+        self.assertEqual(response.status_code, 302)
+
+    def test_get_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('sample-duplicate', kwargs={'pk': self.sample.pk}))
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('sample-duplicate', kwargs={'pk': self.sample.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_http_302_redirect_for_anonymous(self):
+        response = self.client.post(reverse('sample-duplicate', kwargs={'pk': self.sample.pk}), data={})
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(reverse('sample-duplicate', kwargs={'pk': self.sample.pk}), data={})
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_http_302_redirect_for_members_with_minimal_data(self):
+        self.client.force_login(self.member)
+        data = {
+            'name': 'Test Sample Duplicate',
+            'series': self.series.id,
+            'timestep': Timestep.objects.get(name='Test Timestep 2').id
+        }
+        response = self.client.post(reverse('sample-duplicate', kwargs={'pk': self.sample.pk}), data=data)
+        self.assertEqual(response.status_code, 302)
+
+
+@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
+class SampleModalCreateDuplicateViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = get_default_owner()
+        User.objects.create(username='outsider')
+        member = User.objects.create(username='member')
+        members = Group.objects.create(name='members')
+        members.permissions.add(Permission.objects.get(codename='add_sample'))
+        member.groups.add(members)
+
+        material = Material.objects.create(owner=owner, name='Test Material')
+        series = SampleSeries.objects.create(owner=owner, name='Test Series', material=material)
+        distribution = TemporalDistribution.objects.create(owner=owner, name='Test Distribution')
+        timestep = Timestep.objects.create(owner=owner, name='Test Timestep 1', distribution=distribution)
+        Timestep.objects.create(owner=owner, name='Test Timestep 2', distribution=distribution)
+        Sample.objects.create(owner=owner, name='Test Sample', series=series, timestep=timestep)
+
+    def setUp(self):
+        self.owner = get_default_owner()
+        self.outsider = User.objects.get(username='outsider')
+        self.member = User.objects.get(username='member')
+        self.material = Material.objects.get(name='Test Material')
+        self.series = SampleSeries.objects.get(name='Test Series')
+        self.sample = Sample.objects.get(name='Test Sample')
+
+    def test_get_http_302_redirect_for_anonymous(self):
+        response = self.client.get(reverse('sample-duplicate-modal', kwargs={'pk': self.sample.pk}))
+        self.assertEqual(response.status_code, 302)
+
+    def test_get_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('sample-duplicate-modal', kwargs={'pk': self.sample.pk}))
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('sample-duplicate-modal', kwargs={'pk': self.sample.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_http_302_redirect_for_anonymous(self):
+        response = self.client.post(reverse('sample-duplicate-modal', kwargs={'pk': self.sample.pk}), data={})
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(reverse('sample-duplicate-modal', kwargs={'pk': self.sample.pk}), data={})
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_http_302_redirect_for_members_with_minimal_data(self):
+        self.client.force_login(self.member)
+        data = {
+            'name': 'Test Sample Duplicate',
+            'series': self.series.id,
+            'timestep': Timestep.objects.get(name='Test Timestep 2').id
+        }
+        response = self.client.post(reverse('sample-duplicate-modal', kwargs={'pk': self.sample.pk}), data=data)
+        self.assertEqual(response.status_code, 302)
+
+
 # ----------- Composition CRUD -----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 

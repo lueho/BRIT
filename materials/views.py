@@ -565,6 +565,43 @@ class SampleModalAddPropertyView(OwnedObjectModalCreateView):
         return reverse('sample-detail', kwargs={'pk': self.kwargs.get('pk')})
 
 
+class SampleCreateDuplicateView(OwnedObjectUpdateView):
+    template_name = 'simple_form_card.html'
+    model = Sample
+    form_class = forms.SampleModelForm
+    permission_required = 'materials.add_sample'
+    object = None
+
+    def form_valid(self, form):
+        self.object = self.object.duplicate(
+            creator=self.request.user,
+            **form.cleaned_data
+        )
+        return HttpResponseRedirect(self.get_success_url())
+
+    def get_success_url(self):
+        return reverse('sample-detail', kwargs={'pk': self.object.pk})
+
+
+class SampleModalCreateDuplicateView(OwnedObjectModalUpdateView):
+    template_name = 'modal_form.html'
+    model = Sample
+    form_class = forms.SampleModalModelForm
+    permission_required = 'materials.add_sample'
+    object = None
+
+    def form_valid(self, form):
+        if not self.request.is_ajax():
+            self.object = self.object.duplicate(
+                creator=self.request.user,
+                **form.cleaned_data
+            )
+        return HttpResponseRedirect(self.get_success_url())
+
+    def get_success_url(self):
+        return reverse('sample-detail', kwargs={'pk': self.object.pk})
+
+
 # ----------- Composition CRUD -----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
