@@ -84,7 +84,7 @@ class OwnedObjectListView(PermissionRequiredMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update({
-            'header': self.model._meta.verbose_name_plural,
+            'header': self.model._meta.verbose_name_plural.capitalize(),
             'create_url': self.model.create_url,
             'create_url_text': f'New {self.model._meta.verbose_name}'
         })
@@ -125,7 +125,13 @@ class OwnedObjectModalCreateView(CreateOwnedObjectMixin, BSModalCreateView):
 
 
 class OwnedObjectDetailView(PermissionRequiredMixin, DetailView):
-    pass
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'model_name': self.object._meta.verbose_name.capitalize(),
+        })
+        return context
 
 
 class OwnedObjectModalDetailView(PermissionRequiredMixin, BSModalReadView):
