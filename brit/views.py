@@ -79,6 +79,7 @@ class ModalMessageView(TemplateView):
 
 
 class OwnedObjectListView(PermissionRequiredMixin, ListView):
+    paginate_by = 15
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
