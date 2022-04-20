@@ -592,15 +592,34 @@ class CollectionUpdateView(ModelFormAndModelFormSetMixin, views.OwnedObjectUpdat
             return self.render_to_response(context)
 
 
-class CollectorOptions(CollectorListView):
+class OptionsView(views.OwnedObjectListView):
+    """
+    Returns a pre-rendered list of options for a select DOM element as json response. This is useful for updating
+    options when new objects have been created via ajax.
+    """
+
+    model = None
     template_name = 'selection_options.html'
     object_list = None
 
+    def get_selected(self):
+        """
+        Returns the element, which will be selected in the new options list. By default this will be the
+        newest created element. Override this if you require a different behaviour.
+        """
+        created_at = self.model.objects.aggregate(max_created_at=Max('created_at'))['max_created_at']
+        return self.model.objects.get(created_at=created_at)
+
+    def get_queryset(self):
+        """
+        Returns a queryset of all the options that will be rendered in the template. By default returns all objects.
+        Override this if you want to limit the choices.
+        """
+        return super().get_queryset()
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        created_at = models.Collector.objects.aggregate(max_created_at=Max('created_at'))['max_created_at']
-        collector = models.Collector.objects.get(created_at=created_at)
-        context.update({'selected': collector.pk})
+        context.update({'selected': self.get_selected().pk})
         return context
 
     def get(self, request, *args, **kwargs):
@@ -612,6 +631,26 @@ class CollectorOptions(CollectorListView):
                 request=self.request
             )
         })
+
+
+class CollectorOptions(OptionsView):
+    model = models.Collector
+    permission_required = 'soilcom.view_collector'
+
+
+class CollectionSystemOptions(OptionsView):
+    model = models.CollectionSystem
+    permission_required = 'soilcom.view_collectionsystem'
+
+
+class CollectionFrequencyOptions(OptionsView):
+    model = models.CollectionFrequency
+    permission_required = 'soilcom.view_collectionfrequency'
+
+
+class WasteCategoryOptions(OptionsView):
+    model = models.WasteCategory
+    permission_required = 'soilcom.view_wastecategory'
 
 
 class CollectionModalDeleteView(views.OwnedObjectDeleteView):

@@ -191,10 +191,10 @@ class CollectionModelForm(forms.ModelForm):
         helper.layout = Layout(
             Field('catchment'),
             ForeignkeyField('collector'),
-            Field('collection_system'),
-            Field('waste_category'),
+            ForeignkeyField('collection_system'),
+            ForeignkeyField('waste_category'),
             Field('allowed_materials'),
-            Field('frequency'),
+            ForeignkeyField('frequency'),
             Field('description')
         )
         return helper
