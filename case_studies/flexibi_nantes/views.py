@@ -254,7 +254,7 @@ class GrowthTimeStepSetModalUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, 
     model = GrowthTimeStepSet
     inlines = [InlineGrowthShare, ]
     fields = []
-    template_name = 'modal_item_formset.html'
+    template_name = 'modal_form_with_formset.html'
 
     def get_context_data(self, **kwargs):
         inline_helper = GrowthShareFormSetHelper()

@@ -664,7 +664,7 @@ class CompositionModalUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin,
     model = Composition
     inlines = [ModalInlineComponentShare, ]
     fields = []
-    template_name = 'modal_item_formset.html'
+    template_name = 'modal_form_with_formset.html'
     permission_required = (
         'materials.change_composition',
         'materials.change_weightshare',
