@@ -97,25 +97,25 @@ class MaterialPropertyValueModalModelForm(CustomModalModelForm):
 class SampleSeriesModelForm(CustomModelForm):
     class Meta:
         model = SampleSeries
-        fields = ('name', 'material')
+        fields = ('name', 'material', 'description')
 
 
 class SampleSeriesModalModelForm(CustomModalModelForm):
     class Meta:
         model = SampleSeries
-        fields = ('name', 'material')
+        fields = ('name', 'material', 'description')
 
 
 class SampleModelForm(CustomModelForm):
     class Meta:
         model = Sample
-        fields = ('name', 'series', 'timestep', 'taken_at', 'preview')
+        fields = ('name', 'series', 'timestep', 'taken_at', 'description', 'preview')
 
 
 class SampleModalModelForm(CustomModalModelForm):
     class Meta:
         model = Sample
-        fields = ('name', 'series', 'timestep', 'taken_at', 'preview')
+        fields = ('name', 'series', 'timestep', 'taken_at', 'description', 'preview')
 
 
 class CompositionModelForm(CustomModelForm):
