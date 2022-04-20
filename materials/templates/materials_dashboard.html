@@ -124,6 +124,26 @@
         <div class="col col-12 col-md-6 col-lg-3 mt-4">
             <div class="card shadow h-100">
                 <div class="card-header">
+                    <a href="{% url 'materialcomponent-list' %}" class="stretched-link"><strong>Material Component</strong></a>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Every material consists of components. The term component is used in an abstract form here. It
+                        can either be another fully defined material (e.g. kitchen waste contains eggshells) or a sum
+                        parameter such as organic dry matter, ash etc. Anything that is not a material itself but needs
+                        to be included in a composition of materials can be defined here.
+                    </p>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'materialcomponent-list' %}" class="btn btn-primary">View Components</a>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header">
                     <a href="{% url 'materialproperty-list' %}" class="stretched-link"><strong>Material Properties</strong></a>
                 </div>
                 <div class="card-body">
