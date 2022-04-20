@@ -66,18 +66,17 @@
         <div class="col col-12 col-md-6 col-lg-3 mt-4">
             <div class="card shadow h-100">
                 <div class="card-header">
-                    <a href="{% url 'sampleseries-list' %}" class="stretched-link"><strong>Samples</strong></a>
+                    <a href="{% url 'sampleseries-list' %}" class="stretched-link"><strong>Sample Series</strong></a>
                 </div>
                 <div class="card-body">
                     <p class="card-text">
-                        A sample is linked to a material. Several samples for each material can be created. The samples
-                        contain concrete data about the composition of a material, which where measured. A sample can
-                        comprise of several analyses of the same material at different times to create a temporal
-                        distribution, id desired.
+                        A sample series summarizes individual samples that are linked through a common context.
+                        This could mean e.g. samples taken from the same location at different times or samples from the
+                        same region.
                     </p>
                 </div>
                 <div class="card-footer">
-                    <a href="{% url 'sampleseries-list' %}" class="btn btn-primary">View Samples</a>
+                    <a href="{% url 'sampleseries-list' %}" class="btn btn-primary">View Series</a>
                 </div>
             </div>
         </div>
