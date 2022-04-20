@@ -431,7 +431,7 @@ class SampleSeriesCreateDuplicateView(OwnedObjectUpdateView):
         return reverse('sampleseries-detail', kwargs={'pk': self.object.pk})
 
 
-class SampleSeriesModalCreateDuplicateView(OwnedObjectUpdateView):
+class SampleSeriesModalCreateDuplicateView(OwnedObjectModalUpdateView):
     template_name = 'modal_form.html'
     model = SampleSeries
     form_class = forms.SampleSeriesModalModelForm
