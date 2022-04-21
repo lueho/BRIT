@@ -3662,6 +3662,130 @@ class AddComponentViewTestCase(TestCase):
         self.composition.shares.get(component=self.component)
 
 
+@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
+class ComponentOrderUpViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = get_default_owner()
+        User.objects.create(username='outsider')
+        member = User.objects.create(username='member')
+        members = Group.objects.create(name='members')
+        members.permissions.add(Permission.objects.get(codename='change_composition'))
+        member.groups.add(members)
+
+        material = Material.objects.create(
+            owner=owner,
+            name='Test Material'
+        )
+        MaterialComponentGroup.objects.create(
+            owner=owner,
+            name='Test Group'
+        )
+        SampleSeries.objects.create(
+            owner=owner,
+            material=material,
+            name='Test Series'
+        )
+
+    def setUp(self):
+        self.owner = get_default_owner()
+        self.outsider = User.objects.get(username='outsider')
+        self.member = User.objects.get(username='member')
+        self.series = SampleSeries.objects.get(name='Test Series')
+        self.component_group = MaterialComponentGroup.objects.get(name='Test Group')
+        self.default_component = MaterialComponent.objects.default()
+        self.sample = Sample.objects.get(series=self.series, timestep=Timestep.objects.default())
+        self.composition = Composition.objects.create(
+            owner=self.owner,
+            sample=self.sample,
+            group=self.component_group,
+            fractions_of=self.default_component
+        )
+        self.component = MaterialComponent.objects.create(
+            owner=self.owner,
+            name='Test Component'
+        )
+
+    def test_get_http_302_redirect_for_anonymous(self):
+        response = self.client.get(reverse('composition-order-up', kwargs={'pk': self.composition.pk}))
+        self.assertEqual(response.status_code, 302)
+
+    def test_get_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('composition-order-up', kwargs={'pk': self.composition.pk}))
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_302_redirect_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('composition-order-up', kwargs={'pk': self.composition.pk}))
+        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(response, reverse('sample-detail', kwargs={'pk': self.sample.pk}))
+        self.assertTemplateUsed('sample-detail.html')
+
+
+@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
+class ComponentOrderDownViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = get_default_owner()
+        User.objects.create(username='outsider')
+        member = User.objects.create(username='member')
+        members = Group.objects.create(name='members')
+        members.permissions.add(Permission.objects.get(codename='change_composition'))
+        member.groups.add(members)
+
+        material = Material.objects.create(
+            owner=owner,
+            name='Test Material'
+        )
+        MaterialComponentGroup.objects.create(
+            owner=owner,
+            name='Test Group'
+        )
+        SampleSeries.objects.create(
+            owner=owner,
+            material=material,
+            name='Test Series'
+        )
+
+    def setUp(self):
+        self.owner = get_default_owner()
+        self.outsider = User.objects.get(username='outsider')
+        self.member = User.objects.get(username='member')
+        self.series = SampleSeries.objects.get(name='Test Series')
+        self.component_group = MaterialComponentGroup.objects.get(name='Test Group')
+        self.default_component = MaterialComponent.objects.default()
+        self.sample = Sample.objects.get(series=self.series, timestep=Timestep.objects.default())
+        self.composition = Composition.objects.create(
+            owner=self.owner,
+            sample=self.sample,
+            group=self.component_group,
+            fractions_of=self.default_component
+        )
+        self.component = MaterialComponent.objects.create(
+            owner=self.owner,
+            name='Test Component'
+        )
+
+    def test_get_http_302_redirect_for_anonymous(self):
+        response = self.client.get(reverse('composition-order-down', kwargs={'pk': self.composition.pk}))
+        self.assertEqual(response.status_code, 302)
+
+    def test_get_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('composition-order-down', kwargs={'pk': self.composition.pk}))
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_302_redirect_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('composition-order-down', kwargs={'pk': self.composition.pk}))
+        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(response, reverse('sample-detail', kwargs={'pk': self.sample.pk}))
+        self.assertTemplateUsed('sample-detail.html')
+
+
 # ----------- Weight Share CRUD ----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 

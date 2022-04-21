@@ -5,7 +5,8 @@ from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.urls import reverse, reverse_lazy
-from django.views.generic import ListView, TemplateView
+from django.views.generic import ListView, TemplateView, RedirectView
+from django.views.generic.detail import SingleObjectMixin
 from extra_views import UpdateWithInlinesView
 
 from brit.views import (
@@ -718,6 +719,35 @@ class AddComponentView(PermissionRequiredMixin, NextOrSuccessUrlMixin, BSModalUp
         if not self.request.is_ajax():
             self.get_object().add_component(form.cleaned_data['component'])
         return HttpResponseRedirect(self.get_success_url())
+
+
+class CompositionOrderUpView(PermissionRequiredMixin, SingleObjectMixin, RedirectView):
+    model = Composition
+    permission_required = 'materials.change_composition'
+
+    def get_redirect_url(self, *args, **kwargs):
+        return reverse('sample-detail', kwargs={'pk': self.object.sample.pk})
+
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        self.object.order_up()
+        return super().get(request, *args, **kwargs)
+
+
+class CompositionOrderDownView(PermissionRequiredMixin, SingleObjectMixin, RedirectView):
+    model = Composition
+    permission_required = 'materials.change_composition'
+
+    def get_redirect_url(self, *args, **kwargs):
+        return reverse('sample-detail', kwargs={'pk': self.object.sample.pk})
+
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        self.object.order_down()
+        return super().get(request, *args, **kwargs)
+
+
+
 
 
 # ----------- Weight Share CRUD ----------------------------------------------------------------------------------------

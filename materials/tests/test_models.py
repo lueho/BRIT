@@ -536,6 +536,46 @@ class CompositionTestCase(TestCase):
         )
         self.assertEqual(second_composition.order, 110)
 
+    def test_order_up(self):
+        self.assertEqual(self.composition.order, 100)
+        second_composition = Composition.objects.create(
+            owner=self.user,
+            group=self.default_group,
+            sample=self.sample0,
+            fractions_of=self.default_component
+        )
+        self.assertGreater(second_composition.order, self.composition.order)
+        self.composition.order_up()
+        second_composition.refresh_from_db()
+        self.composition.refresh_from_db()
+        self.assertLess(second_composition.order, self.composition.order)
+
+    def test_order_up_does_nothing_if_table_is_already_last(self):
+        self.assertEqual(self.composition.order, 100)
+        self.composition.order_up()
+        self.composition.refresh_from_db()
+        self.assertEqual(self.composition.order, 100)
+
+    def test_order_down(self):
+        self.assertEqual(self.composition.order, 100)
+        second_composition = Composition.objects.create(
+            owner=self.user,
+            group=self.default_group,
+            sample=self.sample0,
+            fractions_of=self.default_component
+        )
+        self.assertGreater(second_composition.order, self.composition.order)
+        second_composition.order_down()
+        second_composition.refresh_from_db()
+        self.composition.refresh_from_db()
+        self.assertLess(second_composition.order, self.composition.order)
+
+    def test_order_down_does_nothing_if_table_is_already_first(self):
+        self.assertEqual(self.composition.order, 100)
+        self.composition.order_down()
+        self.composition.refresh_from_db()
+        self.assertEqual(self.composition.order, 100)
+
 
 class WeightShareTestCase(TestCase):
 

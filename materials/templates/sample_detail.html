@@ -212,7 +212,11 @@
                     </div>
                     <div class="card-footer">
                         <div class="collapse multi-collapse"
-                             id="remove-composition-{{ composition.id }}">
+                             id="options-composition-{{ composition.id }}">
+                            <a id="edit-group-{{ composition.id }}"
+                               href="{% url 'composition-order-down' composition.id %}?next={{ request.path }}">
+                                <i class="fas fa-fw fa-arrow-left"></i>
+                            </a>
                             <a id="edit-group-{{ composition.id }}"
                                href="{% url 'composition-update' composition.id %}?next={{ request.path }}">
                                 <i class="fas fa-fw fa-edit"></i> Edit
@@ -221,6 +225,10 @@
                                class="modal-link"
                                href="{% url 'composition-delete-modal' composition.id %}?next={{ request.path }}">
                                 <i class="fas fa-fw fa-trash"></i> Delete
+                            </a>
+                            <a id="edit-group-{{ composition.id }}"
+                               href="{% url 'composition-order-up' composition.id %}?next={{ request.path }}">
+                                <i class="fas fa-fw fa-arrow-right"></i>
                             </a>
 
                         </div>

@@ -397,6 +397,24 @@ class Composition(NamedUserObjectModel):
         """
         self.sample.series.remove_temporal_distribution(distribution)
 
+    def order_up(self):
+        current_order = self.order
+        next_composition = self.sample.compositions.filter(order__gt=self.order).order_by('order').first()
+        if next_composition:
+            self.order = next_composition.order
+            next_composition.order = current_order
+            next_composition.save()
+            self.save()
+
+    def order_down(self):
+        current_order = self.order
+        previous_composition = self.sample.compositions.filter(order__lt=self.order).order_by('-order').first()
+        if previous_composition:
+            self.order = previous_composition.order
+            previous_composition.order = current_order
+            previous_composition.save()
+            self.save()
+
     def duplicate(self, creator):
         with mute_signals(post_save):
             duplicate = Composition.objects.create(
