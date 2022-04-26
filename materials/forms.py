@@ -97,13 +97,15 @@ class MaterialPropertyValueModalModelForm(CustomModalModelForm):
 class SampleSeriesModelForm(CustomModelForm):
     class Meta:
         model = SampleSeries
-        fields = ('name', 'material', 'description')
+        fields = ('name', 'material', 'publish', 'description', 'preview')
+        labels = {'publish': 'featured'}
 
 
 class SampleSeriesModalModelForm(CustomModalModelForm):
     class Meta:
         model = SampleSeries
-        fields = ('name', 'material', 'description')
+        fields = ('name', 'material', 'publish', 'description', 'preview')
+        labels = {'publish': 'featured'}
 
 
 class SampleModelForm(CustomModelForm):
