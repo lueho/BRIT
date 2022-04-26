@@ -17,6 +17,14 @@
                         inventories module.
                     </p>
                 </div>
+                <div class="card-footer">
+                    {% if perms.materials %}
+                        <a href="{% url 'material-dashboard' %}"
+                           class="modal-link">
+                            <nobr><i class="fas fa-fw fa-edit"></i> Edit</nobr>
+                        </a>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </div>
