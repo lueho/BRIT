@@ -119,10 +119,12 @@ class NutsRegionCatchmentOptionSerializer(ModelSerializer):
     id = SerializerMethodField()
     name = SerializerMethodField()
 
-    def get_id(self, obj):
+    @staticmethod
+    def get_id(obj):
         return obj.region_ptr.catchment_set.first().id
 
-    def get_name(self, obj):
+    @staticmethod
+    def get_name(obj):
         return obj.__str__()
 
     class Meta:
@@ -139,7 +141,8 @@ class NutsRegionSummarySerializer(FieldLabelModelSerializer):
         model = NutsRegion
         fields = ('nuts_id', 'name', 'population_density', 'urban_rural_remoteness')
 
-    def get_population_density(self, obj):
+    @staticmethod
+    def get_population_density(obj):
         qs = obj.regionattributevalue_set.filter(attribute__name='Population density').order_by('-date')
         if qs.exists():
             pd = qs[0]
@@ -147,7 +150,8 @@ class NutsRegionSummarySerializer(FieldLabelModelSerializer):
         else:
             return None
 
-    def get_urban_rural_remoteness(self, obj):
+    @staticmethod
+    def get_urban_rural_remoteness(obj):
         try:
             return obj.regionattributetextvalue_set.get(attribute__name='Urban rural remoteness').value
         except RegionAttributeTextValue.DoesNotExist:
@@ -166,10 +170,12 @@ class LauRegionOptionSerializer(ModelSerializer):
     id = SerializerMethodField()
     name = SerializerMethodField()
 
-    def get_id(self, obj):
+    @staticmethod
+    def get_id(obj):
         return obj.region_ptr.catchment_set.first().id
 
-    def get_name(self, obj):
+    @staticmethod
+    def get_name(obj):
         return obj.__str__()
 
     class Meta:
