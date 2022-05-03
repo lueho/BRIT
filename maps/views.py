@@ -20,6 +20,7 @@ from brit.views import (
 from maps.serializers import (
     RegionSerializer, CatchmentSerializer, NutsRegionGeometrySerializer,
     NutsRegionCatchmentOptionSerializer, NutsRegionSummarySerializer, LauRegionOptionSerializer,
+    LauRegionSummarySerializer,
     NutsRegionOptionSerializer)
 from .forms import (
     AttributeModelForm,
