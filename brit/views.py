@@ -1,6 +1,8 @@
 from bootstrap_modal_forms.generic import BSModalCreateView, BSModalUpdateView, BSModalDeleteView, BSModalReadView
 from django.contrib.auth.mixins import UserPassesTestMixin, PermissionRequiredMixin
 from django.core.exceptions import FieldError
+from django.http import JsonResponse
+from django.template.loader import render_to_string
 from django.views.generic import CreateView, UpdateView
 from django.views.generic import TemplateView, ListView, DetailView
 from django_tables2 import table_factory
@@ -181,3 +183,57 @@ class RestrictedAccessListView(PermissionRequiredMixin, ListView):
     def get_queryset(self):
         user = self.request.user
         return self.model.objects.readable(user)
+
+
+class ModelSelectOptionsView(ListView):
+    """
+    Returns a pre-rendered list of options for a select DOM element as json response. This is useful for updating
+    options when new objects have been created via ajax.
+    """
+
+    model = None
+    template_name = 'html_select_element_options.html'
+    object_list = None
+    selected_object = None
+
+    def get_selected_object(self):
+        """
+        Returns the element, which will be selected in the new options list. By default this will be the
+        newest created element. Override this if you require a different behaviour.
+        """
+        return self.selected_object
+
+    def get_selected_object_pk(self):
+        """
+        Returns the primary key of the selected object, if there is any.
+        """
+        selected_object = self.get_selected_object()
+        if selected_object:
+            return selected_object.pk
+        return None
+
+    def get_queryset(self):
+        """
+        Returns a queryset of all the options that will be rendered in the template. By default returns all objects.
+        Override this if you want to limit the choices.
+        """
+        return super().get_queryset()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({'selected': self.get_selected_object_pk()})
+        return context
+
+    def get(self, request, *args, **kwargs):
+        self.object_list = self.get_queryset()
+        return JsonResponse({
+            'options': render_to_string(
+                self.template_name,
+                context=self.get_context_data(),
+                request=self.request
+            )
+        })
+
+
+class OwnedObjectModelSelectOptionsView(PermissionRequiredMixin, ModelSelectOptionsView):
+    pass
