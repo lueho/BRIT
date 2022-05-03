@@ -1,168 +1,34 @@
-{% extends 'base.html' %}
+{% extends 'nuts_region_map.html' %}
 {% load static %}
 {% load crispy_forms_tags %}
-{% load crispy_forms_filters %}
-{% load leaflet_tags %}
 
 {% block title %}Maps | Catchments{% endblock %}
 
-{% block content %}
-
-    {% leaflet_js plugins="draw" %}
-    {% leaflet_css plugins="draw" %}
-
-    <div class="row">
-
-        <div class="col">
-            <div class="card shadow">
-                <div class="card-header"><strong>Catchments</strong></div>
-                <div class="card-body p-0">
-                    {% leaflet_map "main" %}
-                </div>
-            </div>
-        </div>
-
-        <div class="col-sm-3">
-            <div class="accordion">
-                <div class="card shadow tab-card">
-                    <div class="card-header" role="button" data-toggle="collapse"
-                         href="#filter-card-body"
-                         aria-expanded="true" aria-controls="filter-card-body">
-                        <strong>Filter</strong>
-                    </div>
-                    <div class="card-body">
-                        <h3 class="card-title">NUTS Levels</h3>
-                        <form id="catchment-filter-form" method="POST">
-                            {% csrf_token %}
-                            {% crispy form %}
-                            <a href="{% url 'collection-create' %}"
-                               id="btn-collection-create"
-                               class="btn btn-primary mt-2"
-                               data-href-template="{% url 'collection-create' %}">
-                                Create collection
-                            </a>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    {% include 'modal_confirm_delete.html' %}
-
-{% endblock content %}
+{% block filter_form_buttons %}
+    <a href="{% url 'collection-create' %}"
+       id="btn-collection-create"
+       class="btn btn-primary mt-2"
+       data-href-template="{% url 'collection-create' %}">
+        Create collection
+    </a>
+{% endblock filter_form_buttons %}
 
 {% block javascript %}
     {{ block.super }}
-    {{ map_config|json_script:"mapConfig" }}
 
-    <script src="{% static 'js/maps.js' %}"></script>
     <script type="text/javascript">
 
-        const mapConfig = JSON.parse(document.getElementById("mapConfig").textContent);
-
-        async function loadCatchmentOptions() {
-            let params = parseFilterParameters()
-            let url = "{% url 'ajax_catchment_options' %}" + '?' + $.param(params);
-            let response = await fetch(url);
-            return await response.text();
-        }
-
-
-        async function selectFeature(feature) {
-            let sel = document.getElementById('id_level_' + feature['properties']['level']);
-            sel.value = feature['properties']['id'];
-            if (sel.hasAttribute('data-optionsapi')) {
-                await fetchSelectOptions(sel.dataset['optionsapi'], {id: sel.value});
-            }
-            await updateLayers(sel.value)
-            await updateUrls(sel.value)
-        }
-
-        async function fetchSelectOptions(api_url, params) {
-            // fetch options for children of selection
-            params['direction'] = 'children'
-            let dataurl = api_url + '?' + $.param(params);
-            let response = await fetch(dataurl);
-            let children = await response.json();
-            Object.keys(children).forEach(key => {
-                let sel = document.getElementById(key);
-                while (sel.firstChild) {
-                    sel.removeChild(sel.lastChild);
-                }
-                let opt = document.createElement('Option');
-                opt.value = "";
-                opt.innerText = "---------"
-                sel.appendChild(opt)
-                children[key].forEach(function (item) {
-                    opt = document.createElement('Option');
-                    opt.value = item.id;
-                    opt.innerText = item.name;
-                    sel.appendChild(opt);
-                });
-            });
-
-            // mark the parents of the selected item as also selected
-            params['direction'] = 'parents';
-            dataurl = api_url + '?' + $.param(params);
-            response = await fetch(dataurl)
-            let parents = await response.json()
-            Object.keys(parents).forEach(key => {
-                let sel = document.getElementById(key);
-                sel.value = parents[key]['id']
-            })
-        }
-
-        async function updateLayers(feature_id) {
-            // fetch the region geometry
-            await fetchRegionGeometry(mapConfig['region_url'], feature_id);
-
-            // fetch the feature geometries
-            await fetchFeatureGeometries({'parent_id': feature_id}, mapConfig);
-            feature_layer.bringToBack();
-            feature_layer.off('click');
-            feature_layer.on('click', async function (event) {
-                await selectFeature(event.layer.feature)
-            });
-        }
-
         async function updateUrls(region_id) {
-            let next = new URLSearchParams(window.location.search).get('next')
-            let params = {
+            const next = new URLSearchParams(window.location.search).get('next')
+            const params = {
                 'next': next,
                 'region_id': region_id
             }
-            let create_button = document.getElementById('btn-collection-create');
-            let url = create_button.dataset['hrefTemplate'] + '?' + $.param(params);
+            const create_button = document.getElementById('btn-collection-create');
+            const url = create_button.dataset['hrefTemplate'] + '?' + $.param(params);
             create_button.setAttribute('href', url);
-        }
-
-        const changedSelect = async function (e) {
-            // fetch options for children of selection
-            let target = e.target;
-            if (target.value == "") {
-                const selectors = $('.select');
-                target = selectors.eq(selectors.index(target) - 1)[0];
-            }
-            if (target.value !== "") {
-                let params = {id: target.value};
-                if (target.hasAttribute('data-optionsapi')) {
-                    await fetchSelectOptions(target.dataset['optionsapi'], params);
-                }
-                await updateLayers(target.value);
-                await updateUrls(target.value);
-            }
-        }
-
-        document.querySelectorAll("select").forEach(function (selector) {
-            selector.addEventListener("change", changedSelect, false)
-        });
-
-        window.onload = () => {
-            loadMap(mapConfig);
-            updateUrls()
         }
 
     </script>
 
-{% endblock %}
+{% endblock javascript %}
