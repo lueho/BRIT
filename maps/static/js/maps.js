@@ -158,7 +158,7 @@ function renderCatchment(geoJson) {
         interactive: false
     });
     catchment_layer.addTo(map);
-    map.fitBounds(region_layer.getBounds());
+    map.fitBounds(catchment_layer.getBounds());
 }
 
 function renderFeatures(geoJson) {
