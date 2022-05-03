@@ -19,7 +19,7 @@ from bibliography.views import (SourceListView,
 from brit import views
 from maps.forms import NutsAndLauCatchmentQueryForm
 from maps.models import Catchment, GeoDataset, NutsRegion
-from maps.views import GeoDatasetDetailView
+from maps.views import GeoDatasetDetailView, GeoDataSetMixin, GeoDataSetFormMixin
 from . import forms
 from . import models
 from . import serializers
@@ -630,17 +630,17 @@ class CollectionModalDeleteView(views.OwnedObjectDeleteView):
 # ----------- Maps -----------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class CatchmentSelectView(FormMixin, TemplateView):
-    model = Catchment
-    form_class = NutsAndLauCatchmentQueryForm
+
+class CatchmentSelectView(GeoDataSetFormMixin, GeoDataSetMixin, TemplateView):
     template_name = 'waste_collection_catchment_list.html'
+    form_class = NutsAndLauCatchmentQueryForm
     region_url = reverse_lazy('data.catchment_region_geometries')
     feature_url = reverse_lazy('data.catchment-options')
-    filter_class = None
+    feature_summary_url = reverse_lazy('data.catchment_region_summaries')
     load_features = False
-    queryset = NutsRegion.objects.filter(levl_code=0)
     adjust_bounds_to_features = False
     load_region = False
+    map_title = 'Catchments'
     marker_style = {
         'color': '#4061d2',
         'fillOpacity': 1,
@@ -649,7 +649,7 @@ class CatchmentSelectView(FormMixin, TemplateView):
 
     def get_initial(self):
         initial = {}
-        region_id = self.request.GET.get('region')
+        region_id = self.get_region_id()
         catchment_id = self.request.GET.get('catchment')
         if catchment_id:
             catchment = Catchment.objects.get(id=catchment_id)
@@ -659,29 +659,8 @@ class CatchmentSelectView(FormMixin, TemplateView):
             initial['region'] = region_id
         return initial
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({
-            'map_header': 'Catchments',
-            'form': self.get_form(),
-            'map_config': {
-                'form_fields': self.get_form_fields(),
-                'region_url': self.region_url,
-                'feature_url': self.feature_url,
-                'load_features': self.load_features,
-                'adjust_bounds_to_features': self.adjust_bounds_to_features,
-                'region_id': self.get_region_id(),
-                'load_region': self.load_region,
-                'markerStyle': self.marker_style
-            }
-        })
-        return context
-
-    def get_form_fields(self):
-        return {key: type(value.widget).__name__ for key, value in self.form_class.base_fields.items()}
-
     def get_region_id(self):
-        return 10
+        return self.request.GET.get('region')
 
 
 class WasteCollectionMapView(GeoDatasetDetailView):
