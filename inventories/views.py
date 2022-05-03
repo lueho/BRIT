@@ -412,8 +412,9 @@ class ScenarioResultView(DetailView):
     allow_edit = False
     region_url = reverse_lazy('ajax_region_geometries')
     load_region = True
-    feature_url = reverse_lazy('ajax_catchment_geometries')
-    load_features = True
+    catchment_url = reverse_lazy('ajax_catchment_geometries')
+    load_catchment = True
+    load_features = False
     adjust_bounds_to_features = False
     marker_style = {
         'color': '#4061d2',
@@ -430,7 +431,9 @@ class ScenarioResultView(DetailView):
         context['allow_edit'] = self.allow_edit
         context['map_config'] = {
             'region_url': self.region_url,
-            'feature_url': self.feature_url,
+            'catchment_url': self.catchment_url,
+            'catchment_id': self.get_catchment_id(),
+            'load_catchment': self.load_catchment,
             'load_features': self.load_features,
             'adjust_bounds_to_features': self.adjust_bounds_to_features,
             'region_id': self.object.region.id,
@@ -457,6 +460,9 @@ class ScenarioResultView(DetailView):
         else:
             context = self.get_context_data()
             return self.render_to_response(context)
+
+    def get_catchment_id(self):
+        return self.object.catchment.id
 
     def test_func(self):
         self.object = self.get_object()
