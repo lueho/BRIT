@@ -66,15 +66,26 @@ function loadMap(mapConfig) {
     Promise.all(promises).then(map.invalidateSize());
 
 }
+
 async function updateLayers({region_params, catchment_params, feature_params} = {}) {
     const promises = [];
-    if (region_params) {promises.push(fetchRegionGeometry(region_params));}
-    if (catchment_params) {promises.push(fetchCatchmentGeometry(catchment_params));}
-    if (feature_params) {promises.push(fetchFeatureGeometries(feature_params));}
+    if (region_params) {
+        promises.push(fetchRegionGeometry(region_params));
+    }
+    if (catchment_params) {
+        promises.push(fetchCatchmentGeometry(catchment_params));
+    }
+    if (feature_params) {
+        promises.push(fetchFeatureGeometries(feature_params));
+    }
     Promise.all(promises).then(() => {
         map.invalidateSize();
-        if (catchment_layer) {catchment_layer.bringToBack();}
-        if (feature_layer) {feature_layer.bringToBack();}
+        if (catchment_layer) {
+            catchment_layer.bringToBack();
+        }
+        if (feature_layer) {
+            feature_layer.bringToBack();
+        }
     });
 
 }
@@ -98,7 +109,9 @@ async function fetchFeatureGeometries(params) {
     const response = await fetch(url);
     const json = await response.json();
     renderFeatures(json.geoJson);
-    if ('summaries' in json) {renderSummaries(json);}
+    if ('summaries' in json) {
+        renderSummaries(json);
+    }
 }
 
 async function fetchFeatureSummaries(feature) {
@@ -201,23 +214,25 @@ async function clickedFeature(event) {
 }
 
 function parseFilterParameters() {
-    const form_fields = mapConfig.form_fields;
     const params = {};
-    Object.keys(form_fields).forEach(key => {
-        switch (form_fields[key]) {
-        case 'SelectMultiple':
-            params[key] = readSelectMultiple(key);
-            break;
-        case 'RadioSelect':
-            params[key] = readRadioSelect(key);
-            break;
-        case 'CheckboxSelectMultiple':
-            params[key] = readCheckboxSelectMultiple(key);
-            break;
-        default:
-            params[key] = document.getElementsByName(key)[0].value;
-        }
-    });
+    if ('form_fields' in mapConfig) {
+        const form_fields = mapConfig.form_fields;
+        Object.keys(form_fields).forEach(key => {
+            switch (form_fields[key]) {
+            case 'SelectMultiple':
+                params[key] = readSelectMultiple(key);
+                break;
+            case 'RadioSelect':
+                params[key] = readRadioSelect(key);
+                break;
+            case 'CheckboxSelectMultiple':
+                params[key] = readCheckboxSelectMultiple(key);
+                break;
+            default:
+                params[key] = document.getElementsByName(key)[0].value;
+            }
+        });
+    }
     return params;
 }
 
@@ -281,8 +296,12 @@ function renderSummaryContainer(summary, summary_container) {
             boldLabelElement.innerText = key;
             let value = summary[key];
             if (typeof summary[key] === 'object') {
-                if ('label' in summary[key]) {boldLabelElement.innerText = summary[key].label;}
-                if ('value' in summary[key]) {value = summary[key].value;}
+                if ('label' in summary[key]) {
+                    boldLabelElement.innerText = summary[key].label;
+                }
+                if ('value' in summary[key]) {
+                    value = summary[key].value;
+                }
             }
             boldLabelElement.innerText += ':';
             labelElement.appendChild(boldLabelElement);
