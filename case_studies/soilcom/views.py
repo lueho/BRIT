@@ -2,10 +2,8 @@ from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db.models import Max, Q
 from django.forms import modelformset_factory
 from django.http import HttpResponseRedirect, JsonResponse
-from django.template.loader import render_to_string
 from django.urls import reverse_lazy
 from django.views.generic import TemplateView
-from django.views.generic.edit import FormMixin
 from rest_framework.views import APIView, Response
 
 from bibliography.views import (SourceListView,
@@ -18,7 +16,7 @@ from bibliography.views import (SourceListView,
                                 SourceModalDeleteView)
 from brit import views
 from maps.forms import NutsAndLauCatchmentQueryForm
-from maps.models import Catchment, GeoDataset, NutsRegion
+from maps.models import Catchment, GeoDataset
 from maps.views import GeoDatasetDetailView, GeoDataSetMixin, GeoDataSetFormMixin
 from . import forms
 from . import models
