@@ -65,12 +65,12 @@ class HamburgRoadsideTreeAPIView(APIView):
         serializer = HamburgRoadsideTreeGeometrySerializer(qs, many=True)
         data = {
             'geoJson': serializer.data,
-            'analysis': {
+            'summaries': [{
                 'tree_count': {
                     'label': 'Number of trees',
                     'value': len(serializer.data['features'])
                 },
-            }
+            }]
         }
 
-        return JsonResponse(data, safe=False)
+        return JsonResponse(data)

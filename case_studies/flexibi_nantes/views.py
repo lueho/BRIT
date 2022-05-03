@@ -354,7 +354,7 @@ class NantesGreenhousesAPIView(APIView):
             greenhouse_area = round(greenhouse_area_qs, 1)
         data = {
             'geoJson': serializer.data,
-            'analysis': {
+            'summaries': [{
                 'gh_count': {
                     'label': 'Number of greenhouses',
                     'value': str(greenhouse_count),
@@ -363,7 +363,7 @@ class NantesGreenhousesAPIView(APIView):
                     'label': 'Total growth surface',
                     'value': str(greenhouse_area) + ' ha'
                 }
-            }
+            }]
         }
 
-        return JsonResponse(data, safe=False)
+        return JsonResponse(data)

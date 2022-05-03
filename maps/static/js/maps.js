@@ -1,190 +1,246 @@
-let map;
-let myRenderer = L.canvas({padding: 0.5});
-let feature_layer;
-let region_layer;
+"use strict";
 
-const catchment_layer_style = {
-    "color": "#04555E"
-}
+/**
+ * For rendering information about map features, the namespace featureInfos is reserved. The below structure follows
+ * the for the json object that any related API should return.
+ * @namespace featureInfos
+ * @property featureInfos.summaries
+ */
+
+/**
+ * Reserved namespace for the configuration data of a map. The below structure follows
+ * the for the json object that any related API should return.
+ * @namespace mapConfig
+ * @property mapConfig.feature_summary_url
+ * @property mapConfig.feature_url
+ * @property mapConfig.region_url
+ * @property mapConfig.region_id
+ * @property mapConfig.catchment_url
+ * @property mapConfig.load_catchment
+ * @property mapConfig.catchment_id
+ * @property mapConfig.markerStyle
+ * @property mapConfig.adjust_bounds_to_features
+ * @property mapConfig.load_region
+ * @property mapConfig.load_features
+ * @property mapConfig.form_fields
+ */
+
+let map;
+window.addEventListener("map:init", function(event) {
+    map = event.detail.map;
+});
+
+const myRenderer = L.canvas({padding: 0.5});
+let region_layer;
+let catchment_layer;
+let feature_layer;
 
 const region_layer_style = {
     "color": "#A1221C",
     "fillOpacity": 0.0
+};
+
+const catchment_layer_style = {
+    "color": "#04555E"
+};
+
+const feature_layer_style = {
+    "color": "#04555E"
+};
+
+function loadMap(mapConfig) {
+    const promises = [];
+    if (mapConfig.load_region === true) {
+        const params = {pk: mapConfig.region_id};
+        promises.push(fetchRegionGeometry(params));
+    }
+    if (mapConfig.load_catchment === true) {
+        const params = {catchment: mapConfig.catchment_id};
+        promises.push(fetchFeatureGeometries(params));
+    }
+    if (mapConfig.load_features === true) {
+        const params = parseFilterParameters();
+        promises.push(fetchFeatureGeometries(params));
+        // filterFeatures();
+    }
+    Promise.all(promises).then(map.invalidateSize());
+
 }
-
-window.addEventListener("map:init", function (event) {
-    map = event.detail.map;
-});
-
-try {
-    document.querySelector("#summary-container").addEventListener('click', function (e) {
-        if (e.target.matches('.collapse-selector')) {
-            updateUrls(e.target.dataset['pk']);
-        }
+async function updateLayers({region_params, catchment_params, feature_params} = {}) {
+    const promises = [];
+    if (region_params) {promises.push(fetchRegionGeometry(region_params));}
+    if (catchment_params) {promises.push(fetchCatchmentGeometry(catchment_params));}
+    if (feature_params) {promises.push(fetchFeatureGeometries(feature_params));}
+    Promise.all(promises).then(() => {
+        map.invalidateSize();
+        if (catchment_layer) {catchment_layer.bringToBack();}
+        if (feature_layer) {feature_layer.bringToBack();}
     });
-} catch (e) {
+
 }
 
+async function fetchRegionGeometry(params) {
+    const url = mapConfig.region_url + '?' + $.param(params).toString();
+    const response = await fetch(url);
+    const json = await response.json();
+    renderRegion(json.geoJson);
+}
 
-async function fetchFeatureSummary(feature, mapConfig) {
+async function fetchCatchmentGeometry(params) {
+    const url = mapConfig.catchment_url + '?' + $.param(params).toString();
+    const response = await fetch(url);
+    const json = await response.json();
+    renderCatchment(json.geoJson);
+}
+
+async function fetchFeatureGeometries(params) {
+    const url = mapConfig.feature_url + '?' + $.param(params).toString();
+    const response = await fetch(url);
+    const json = await response.json();
+    renderFeatures(json.geoJson);
+    if ('summaries' in json) {renderSummaries(json);}
+}
+
+async function fetchFeatureSummaries(feature) {
+
     let feature_id;
-    if (typeof(feature) == 'object') {
-        feature_id = feature['properties']['id'].toString();
+    if (typeof (feature) === 'object') {
+        feature_id = feature.properties.id.toString();
     } else {
         feature_id = feature.toString();
     }
 
-    const dataurl = mapConfig['feature_summary_url'] + '?' + 'pk=' + feature_id;
-    let response = await fetch(dataurl);
+    const dataurl = mapConfig.feature_summary_url + '?' + 'pk=' + feature_id;
+    const response = await fetch(dataurl);
     return await response.json();
 }
 
-async function fetchFeatureGeometries(params, mapConfig) {
-
-    const dataurl = mapConfig['feature_url'] + '?' + $.param(params);
-
-    // Remove existing layer
-    if (feature_layer !== undefined) {
-        map.removeLayer(feature_layer);
-    }
-
-    // Fetch data from REST API
-    let response = await fetch(dataurl);
-    let data = await response.json();
-
-    let markerStyle = mapConfig['markerStyle']
-    markerStyle['renderer'] = myRenderer
-
-    // Render geodata on map
-    let geodata = data['geoJson'];
-    feature_layer = L.geoJson(geodata, {
-        pointToLayer: function (feature, latlng) {
-            return L.circleMarker(latlng, markerStyle)
-        },
-        onEachFeature: function onEachFeature(feature, layer) {
-        }
-    }).addTo(map);
-
-    feature_layer.on('click', async function (event) {
-        await clickedFeature(event);
-    });
-
-
-    if (mapConfig['adjust_bounds_to_features'] === true) {
-        try {
-            map.fitBounds(feature_layer.getBounds())
-        } catch (ex) {
-
-        }
-    }
-    return data;
-}
-
-async function fetchRegionGeometry(region_url, region_id) {
-
-    // Define query string for REST API
-    let params = L.Util.extend({
-        pk: region_id
-    });
-
-    let url = region_url + L.Util.getParamString(params);
+function renderRegion(geoJson) {
 
     // Remove existing layer
     if (region_layer !== undefined) {
         map.removeLayer(region_layer);
     }
 
-    // Fetch data from REST API
-    let response = await fetch(url);
-    let data = await response.json();
-
     // Render geodata on map
-    let geodata;
-    geodata = data['geoJson'];
-    region_layer = L.geoJson(geodata, {
+    region_layer = L.geoJson(geoJson, {
         style: region_layer_style,
         interactive: false
-    })
+    });
     region_layer.addTo(map);
-    map.fitBounds(region_layer.getBounds())
-
-    return data
+    map.fitBounds(region_layer.getBounds());
 }
 
-async function clickedFilterButton() {
-    let btn = document.getElementById('filter-button')
-    btn.disabled = true
-    await filterFeatures();
-    btn.disabled = false
+function renderCatchment(geoJson) {
+
+    // Remove existing layer
+    if (catchment_layer !== undefined) {
+        map.removeLayer(catchment_layer);
+    }
+
+    // Render geodata on map
+    catchment_layer = L.geoJson(geoJson, {
+        style: catchment_layer_style,
+        interactive: false
+    });
+    catchment_layer.addTo(map);
+    map.fitBounds(region_layer.getBounds());
+}
+
+function renderFeatures(geoJson) {
+
+    // Remove existing layer
+    if (feature_layer !== undefined) {
+        map.removeLayer(feature_layer);
+    }
+
+    const markerStyle = mapConfig.markerStyle;
+    markerStyle.renderer = myRenderer;
+
+    feature_layer = L.geoJson(geoJson, {
+        pointToLayer: function(feature, latlng) {
+            return L.circleMarker(latlng, markerStyle);
+        },
+        onEachFeature: function onEachFeature(feature, layer) {
+        }
+    }).addTo(map);
+
+    feature_layer.on('click', async function(event) {
+        await clickedFeature(event);
+    });
+
+    if (mapConfig.adjust_bounds_to_features === true) {
+        try {
+            map.fitBounds(feature_layer.getBounds());
+        } catch (ex) {
+
+        }
+    }
+}
+
+try {
+    document.querySelector("#summary-container").addEventListener('click', function(e) {
+        if (e.target.matches('.collapse-selector')) {
+            updateUrls(e.target.dataset.pk);
+        }
+    });
+} catch (e) {
+}
+
+function clickedFilterButton() {
+    const btn = document.getElementById('filter-button');
+    btn.disabled = true;
+    const params = parseFilterParameters();
+    fetchFeatureGeometries(params).then(btn.disabled = false);
 }
 
 async function clickedFeature(event) {
-    let feature_infos = await fetchFeatureSummary(event.layer.feature, mapConfig)
-    await renderSummaryAlternative(feature_infos);
-    updateUrls(event.layer.feature['properties']['id']);
-}
-
-async function filterFeatures() {
-
-    const params = parseFilterParameters();
-    let data = await fetchFeatureGeometries(params, mapConfig);
-    if ('analysis' in data) {
-        await renderSummary(data['analysis'])
-    }
-
-}
-
-function loadMap(config) {
-    if (config['load_region'] === true) {
-        fetchRegionGeometry(config['region_url'], config['region_id']);
-    }
-    if (config['load_features'] === true) {
-        filterFeatures();
-    }
-    map.invalidateSize();
+    const summaries = await fetchFeatureSummaries(event.layer.feature);
+    renderSummaries(summaries);
+    updateUrls(event.layer.feature.properties.id);
 }
 
 function parseFilterParameters() {
-    const form_fields = mapConfig['form_fields']
-    let params = {}
+    const form_fields = mapConfig.form_fields;
+    const params = {};
     Object.keys(form_fields).forEach(key => {
         switch (form_fields[key]) {
-            case 'SelectMultiple':
-                params[key] = readSelectMultiple(key);
-                break;
-            case 'RadioSelect':
-                params[key] = readRadioSelect(key);
-                break;
-            case 'CheckboxSelectMultiple':
-                params[key] = readCheckboxSelectMultipe(key);
-                break;
-            default:
-                params[key] = document.getElementsByName(key)[0].value;
+        case 'SelectMultiple':
+            params[key] = readSelectMultiple(key);
+            break;
+        case 'RadioSelect':
+            params[key] = readRadioSelect(key);
+            break;
+        case 'CheckboxSelectMultiple':
+            params[key] = readCheckboxSelectMultiple(key);
+            break;
+        default:
+            params[key] = document.getElementsByName(key)[0].value;
         }
     });
-    return params
+    return params;
 }
 
 function readSelectMultiple(name) {
-    let country_codes = []
-    let inputs = document.getElementsByName(name)[0]
+    const country_codes = [];
+    const inputs = document.getElementsByName(name)[0];
     for (let i = 0; i < inputs.length; i++) {
         if (inputs[i].selected === true) {
-            country_codes.push(inputs[i].value)
+            country_codes.push(inputs[i].value);
         }
     }
-    return country_codes
+    return country_codes;
 }
 
-function readCheckboxSelectMultipe(name) {
-    let ids = []
-    let inputs = document.getElementsByName(name)
+function readCheckboxSelectMultiple(name) {
+    const ids = [];
+    const inputs = document.getElementsByName(name);
     for (let i = 0; i < inputs.length; i++) {
         if (inputs[i].checked === true) {
-            ids.push(inputs[i].value)
+            ids.push(inputs[i].value);
         }
     }
-    return ids
+    return ids;
 }
 
 function readRadioSelect(name) {
@@ -195,27 +251,11 @@ function readRadioSelect(name) {
             heating = heatingButtons[i].value;
         }
     }
-    return heating
+    return heating;
 }
-
-async function renderSummary(summary) {
-    let summary_container = document.getElementById('summary-container');
-    summary_container.textContent = ''
-    Object.keys(summary).forEach(key => {
-        let label = document.createElement('P');
-        let value = document.createElement('P');
-        label.innerText = summary[key]['label'] + ':';
-        value.innerText = summary[key]['value'].toString();
-        summary_container.appendChild(label);
-        summary_container.appendChild(value);
-    });
-    $('#info-card-body').collapse('show');
-    $('#filter-card-body').collapse('hide');
-}
-
 
 function isEmptyArray(el) {
-    return Array.isArray(el) && el.length === 0
+    return Array.isArray(el) && el.length === 0;
 }
 
 function isValidHttpUrl(string) {
@@ -234,97 +274,98 @@ function renderSummaryContainer(summary, summary_container) {
 
     Object.keys(summary).forEach(key => {
 
-        if (summary[key]) {
-            if (!isEmptyArray(summary[key])) {
-                let summary_item = document.createElement('div')
-
-                let label = document.createElement('P');
-                let b = document.createElement('B');
-                b.innerText = key + ':';
-                label.appendChild(b);
-                summary_item.appendChild(label);
-
-                let value = document.createElement('P');
-                if (Array.isArray(summary[key])) {
-                    let ul = document.createElement('ul');
-                    value.appendChild(ul);
-                    summary[key].forEach(function (item) {
-                        let li = document.createElement('li')
-                        if (isValidHttpUrl(item.toString())) {
-                            let a = document.createElement('a');
-                            a.href = item.toString();
-                            a.innerText = item.toString();
-                            a.setAttribute('target', '_blank')
-                            li.appendChild(a);
-                        } else {
-                            li.innerText = item.toString()
-                        }
-                        ul.appendChild(li)
-                    });
-                } else {
-                    value.innerText = summary[key].toString();
-                }
-                summary_item.appendChild(value)
-                if (key === 'id') {
-                    summary_item.className = 'd-none'
-                    summary_container.className += ' pk-holder'
-                    summary_container.setAttribute('data-pk', summary['id'])
-                }
-
-                summary_container.appendChild(summary_item);
+        if (!isEmptyArray(summary[key]) && summary[key] !== null) {
+            const summaryElement = document.createElement('div');
+            const labelElement = document.createElement('P');
+            const boldLabelElement = document.createElement('B');
+            boldLabelElement.innerText = key;
+            let value = summary[key];
+            if (typeof summary[key] === 'object') {
+                if ('label' in summary[key]) {boldLabelElement.innerText = summary[key].label;}
+                if ('value' in summary[key]) {value = summary[key].value;}
             }
+            boldLabelElement.innerText += ':';
+            labelElement.appendChild(boldLabelElement);
+            summaryElement.appendChild(labelElement);
+
+            const summaryValueElement = document.createElement('P');
+            if (Array.isArray(value)) {
+                const ul = document.createElement('ul');
+                summaryValueElement.appendChild(ul);
+                value.forEach(function(item) {
+                    const li = document.createElement('li');
+                    if (isValidHttpUrl(item.toString())) {
+                        const a = document.createElement('a');
+                        a.href = item.toString();
+                        a.innerText = item.toString();
+                        a.setAttribute('target', '_blank');
+                        li.appendChild(a);
+                    } else {
+                        li.innerText = item.toString();
+                    }
+                    ul.appendChild(li);
+                });
+            } else {
+                summaryValueElement.innerText = value.toString();
+            }
+            summaryElement.appendChild(summaryValueElement);
+            if (key === 'id') {
+                summaryElement.className = 'd-none';
+                summary_container.className += ' pk-holder';
+                summary_container.setAttribute('data-pk', summary.id);
+            }
+
+            summary_container.appendChild(summaryElement);
         }
     });
 }
 
-async function renderSummaryAlternative(json) {
+function renderSummaries(featureInfos) {
 
     // Empty summary container from previous content
-    let outer_summary_container = document.getElementById('summary-container');
-    outer_summary_container.textContent = ''
+    const outer_summary_container = document.getElementById('summary-container');
+    outer_summary_container.textContent = '';
 
-    if (json['summaries'].length > 1) {
+    if (featureInfos.summaries.length > 1) {
 
         // render multiple summaries
-
-        let message = document.createElement('P');
-        message.innerText = 'Found ' + json['summaries'].length + ' items:';
+        const message = document.createElement('P');
+        message.innerText = 'Found ' + featureInfos.summaries.length + ' items:';
         outer_summary_container.appendChild(message);
 
-        let accordion = document.createElement('div');
-        accordion.id = 'summaries_accordion'
+        const accordion = document.createElement('div');
+        accordion.id = 'summaries_accordion';
         accordion.className = 'accordion';
         outer_summary_container.appendChild(accordion);
 
+        featureInfos.summaries.forEach((summary, i) => {
 
-        json['summaries'].forEach((summary, i) => {
-
-            let card = document.createElement('div');
+            const card = document.createElement('div');
             card.className = 'card';
             accordion.appendChild(card);
 
-            let header = document.createElement('div');
+            const header = document.createElement('div');
             header.className = 'card-header collapse-selector';
             header.setAttribute('role', 'button');
             header.setAttribute('data-toggle', 'collapse');
             header.setAttribute('href', '#collapse' + i.toString());
             header.setAttribute('aria-expanded', 'true');
             header.setAttribute('aria-controls', 'collapse' + i.toString());
-            if (summary['id']) {
-                header.setAttribute('data-pk', summary['id']);
+            if (summary.id) {
+                header.setAttribute('data-pk', summary.id);
             }
-            let numbering = i + 1;
+            const numbering = i + 1;
             header.innerHTML = '<b>#' + numbering.toString() + '</b>';
             card.appendChild(header);
 
-            let collapse_container = document.createElement('div');
+            const collapse_container = document.createElement('div');
             collapse_container.id = 'collapse' + i.toString();
             collapse_container.className = 'summary collapse';
             collapse_container.setAttribute('aria-labelledby', 'collapse' + i.toString());
             collapse_container.setAttribute('data-parent', '#summaries_accordion');
             card.appendChild(collapse_container);
 
-            let body = document.createElement('div');
+            const body = document.createElement('div');
             body.className = 'card-body';
 
             collapse_container.appendChild(body);
@@ -332,9 +373,9 @@ async function renderSummaryAlternative(json) {
         });
 
 
-    } else {
+    } else if (featureInfos.summaries.length === 1) {
         // render one single summary
-        const summary = json['summaries'][0];
+        const summary = featureInfos.summaries[0];
         renderSummaryContainer(summary, outer_summary_container);
     }
 

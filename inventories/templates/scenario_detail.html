@@ -188,24 +188,10 @@
 
 {% block javascript %}
     {{ block.super }}
-    {{ map_config|json_script:"mapConfig" }}
-
     <script src="{% static 'js/maps.js' %}"></script>
+    {{ map_config|json_script:"mapConfig" }}
     <script type="text/javascript">
-
         const mapConfig = JSON.parse(document.getElementById("mapConfig").textContent);
-
-        function onLoad() {
-            const region_url = "{% url 'ajax_region_geometries' %}"
-            const region_id = $("#region").data()["regionId"]
-            fetchRegionGeometry(region_url, region_id);
-            const params = {catchment: $("#catchment").data()["catchmentId"]}
-            fetchFeatureGeometries(params, mapConfig);
-            map.invalidateSize();
-        }
-
-        window.onload = () => onLoad();
-
+        window.onload = () => loadMap(mapConfig);
     </script>
-
-{% endblock javascript %}
+{% endblock %}

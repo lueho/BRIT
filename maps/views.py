@@ -332,9 +332,8 @@ class CatchmentRegionGeometryAPI(APIView):
 
     @staticmethod
     def get(request, *args, **kwargs):
-        if 'region_id' in request.query_params:
-            region_id = request.query_params.get('region_id')
-            catchment = Catchment.objects.get(id=region_id)
+        if 'pk' in request.query_params:
+            catchment = Catchment.objects.get(pk=request.query_params.get('pk'))
             regions = Region.objects.filter(catchment=catchment)
             serializer = RegionSerializer(regions, many=True)
             return JsonResponse({'geoJson': serializer.data})
@@ -411,18 +410,7 @@ class NutsRegionAPIView(APIView):
             qs = qs.filter(parent_id=request.query_params['parent_id'])
 
         serializer = NutsRegionGeometrySerializer(qs, many=True)
-        region_count = len(serializer.data['features'])
-        data = {
-            'geoJson': serializer.data,
-            'analysis': {
-                'region_count': {
-                    'label': 'Number of selected regions',
-                    'value': str(region_count),
-                },
-            }
-        }
-
-        return JsonResponse(data, safe=False)
+        return JsonResponse({'geoJson': serializer.data})
 
 
 class NutsRegionPedigreeAPI(APIView):

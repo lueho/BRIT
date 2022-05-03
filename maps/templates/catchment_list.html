@@ -172,15 +172,14 @@
 
         document.getElementById("id_region").onchange = () => {
             setCatchmentOptions();
-            const region_id = parseFilterParameters()['region'];
-            fetchRegionGeometry(mapConfig['region_url'], region_id);
+            fetchRegionGeometry({pk: parseFilterParameters()['region']});
         }
         {#document.getElementById("id_category_1").onchange = () => setCatchmentOptions();#}
         {#document.getElementById("id_category_2").onchange = () => setCatchmentOptions();#}
         document.getElementById("id_catchment").onchange = () => {
-            filterFeatures()
-            const catchment_id = parseFilterParameters()['catchment'];
-            updateUrls(catchment_id);
+            const params = parseFilterParameters();
+            fetchFeatureGeometries(params);
+            updateUrls(params['catchment']);
         }
 
         async function selectFeature(feature) {
@@ -226,10 +225,10 @@
 
         async function updateLayers(feature_id) {
             // fetch the region geometry
-            await fetchRegionGeometry(mapConfig['region_url'], feature_id);
+            fetchRegionGeometry({pk: feature_id});
 
             // fetch the feature geometries
-            await fetchFeatureGeometries({'parent_id': feature_id}, mapConfig);
+            await fetchFeatureGeometries({'parent_id': feature_id});
             feature_layer.bringToBack();
             feature_layer.off('click');
             feature_layer.on('click', async function (event) {
