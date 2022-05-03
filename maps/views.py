@@ -140,35 +140,77 @@ class CatchmentDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
 # ----------- Geodataset -----------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class GeoDatasetDetailView(FormMixin, DetailView):
+class GeoDataSetMixin:
     feature_url = None
     feature_summary_url = None
     region_url = reverse_lazy('ajax_region_geometries')
-    filter_class = None
-    form_class = None
+    load_region = True
+    region_id = None
+    load_catchment = False
+    catchment_id = None
     load_features = False
     adjust_bounds_to_features = False
-    load_region = True
     marker_style = None
-    model = GeoDataset
-    template_name = 'maps_base.html'
+    map_title = None
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update({
-            'map_header': self.object.name,
-            'form': self.get_form(),
+            'map_title': self.get_map_title(),
             'map_config': {
-                'form_fields': self.get_form_fields(),
-                'region_url': self.region_url,
-                'feature_url': self.feature_url,
-                'feature_summary_url': self.feature_summary_url,
+                'region_url': self.get_region_url(),
+                'feature_url': self.get_feature_url(),
+                'feature_summary_url': self.get_feature_summary_url(),
                 'load_features': self.get_load_features(),
                 'adjust_bounds_to_features': self.adjust_bounds_to_features,
-                'region_id': self.object.region.id,
+                'region_id': self.get_region_id(),
                 'load_region': self.load_region,
-                'markerStyle': self.marker_style
+                'catchment_id': self.get_catchment_id(),
+                'load_catchment': self.load_catchment,
+                'markerStyle': self.get_marker_style()
             }
+        })
+        return context
+
+    def get_map_title(self):
+        return self.map_title
+
+    def get_feature_url(self):
+        return self.feature_url
+
+    def get_feature_summary_url(self):
+        return self.feature_summary_url
+
+    def get_region_url(self):
+        return self.region_url
+
+    def get_region_id(self):
+        return self.region_id
+
+    def get_catchment_id(self):
+        return self.catchment_id
+
+    def get_load_features(self):
+        if self.request.GET.get('load_features'):
+            return self.request.GET.get('load_features') == 'true'
+        else:
+            return self.load_features
+
+    def get_marker_style(self):
+        return self.marker_style
+
+
+class GeoDataSetFormMixin(FormMixin):
+    filter_class = None
+    form_class = None
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['map_config'].update({
+            'form_fields': self.get_form_fields(),
+        })
+        context.update({
+            'form': self.get_form(),
         })
         return context
 
@@ -186,24 +228,16 @@ class GeoDatasetDetailView(FormMixin, DetailView):
             return self.get_filter_fields()
         return {key: type(value.widget).__name__ for key, value in self.form_class.base_fields.items()}
 
-    def get_load_features(self):
-        if self.request.GET.get('load_features'):
-            return self.request.GET.get('load_features') == 'true'
-        else:
-            return self.load_features
 
+class GeoDatasetDetailView(GeoDataSetFormMixin, GeoDataSetMixin, DetailView):
+    model = GeoDataset
+    template_name = 'maps_base.html'
 
-class NutsRegionSummaryAPIView(APIView):
+    def get_map_title(self):
+        return self.object.name
 
-    @staticmethod
-    def get(request):
-        obj = NutsRegion.objects.filter(id=request.query_params.get('pk'))
-        serializer = NutsRegionSummarySerializer(
-            obj,
-            many=True,
-            field_labels_as_keys=True,
-            context={'request': request})
-        return Response({'summaries': serializer.data})
+    def get_region_id(self):
+        return self.object.region.id
 
 
 # ----------- Regions --------------------------------------------------------------------------------------------------
