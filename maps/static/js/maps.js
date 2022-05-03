@@ -56,7 +56,7 @@ function loadMap(mapConfig) {
     }
     if (mapConfig.load_catchment === true) {
         const params = {catchment: mapConfig.catchment_id};
-        promises.push(fetchFeatureGeometries(params));
+        promises.push(fetchCatchmentGeometry(params));
     }
     if (mapConfig.load_features === true) {
         const params = parseFilterParameters();
