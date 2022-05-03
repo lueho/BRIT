@@ -275,6 +275,18 @@ class RegionGeometryAPI(APIView):
 # ----------- NutsRegions ----------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
+class NutsRegionSummaryAPIView(APIView):
+
+    @staticmethod
+    def get(request):
+        obj = NutsRegion.objects.filter(id=request.query_params.get('pk'))
+        serializer = NutsRegionSummarySerializer(
+            obj,
+            many=True,
+            field_labels_as_keys=True,
+            context={'request': request})
+        return Response({'summaries': serializer.data})
+
 
 class CatchmentRegionGeometryAPI(APIView):
     """
@@ -292,6 +304,35 @@ class CatchmentRegionGeometryAPI(APIView):
             return JsonResponse({'geoJson': serializer.data})
 
         return JsonResponse({})
+
+
+class CatchmentRegionSummaryAPIView(APIView):
+
+    @staticmethod
+    def get(request, *args, **kwargs):
+        if 'pk' in request.query_params:
+            catchment = Catchment.objects.get(pk=request.query_params.get('pk'))
+            try:
+                region = catchment.region.nutsregion
+                serializer = NutsRegionSummarySerializer(
+                    region,
+                    field_labels_as_keys=True,
+                    context={'request': request})
+                return Response({'summaries': [serializer.data]})
+            except Region.nutsregion.RelatedObjectDoesNotExist:
+                pass
+
+            try:
+                region = catchment.region.lauregion
+                serializer = LauRegionSummarySerializer(
+                    region,
+                    field_labels_as_keys=True,
+                    context={'request': request})
+                return Response({'summaries': [serializer.data]})
+            except Region.nutsregion.RelatedObjectDoesNotExist:
+                pass
+
+        return Response({})
 
 
 # ----------- NUTS Map -------------------------------------------------------------------------------------------------

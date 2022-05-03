@@ -24,6 +24,7 @@ from .views import (
     CatchmentUpdateView,
     CatchmentDeleteView,
     CatchmentRegionGeometryAPI,
+    CatchmentRegionSummaryAPIView,
     MapsListView,
     RegionGeometryAPI,
     NutsRegionMapView,
@@ -68,6 +69,7 @@ urlpatterns = [
          name='data.nuts_lau_catchment_options'),
     path('region_geometries/', RegionGeometryAPI.as_view(), name='ajax_region_geometries'),
     path('catchment_region_geometries/', CatchmentRegionGeometryAPI.as_view(), name='data.catchment_region_geometries'),
+    path('catchment_regions_summaries/', CatchmentRegionSummaryAPIView.as_view(), name='data.catchment_region_summaries'),
     path('catchment_geometries/', CatchmentGeometryAPI.as_view(), name='ajax_catchment_geometries'),
     # TODO: Can case study urls be detected and added automatically?
     path('nantes/', include('case_studies.flexibi_nantes.urls')),

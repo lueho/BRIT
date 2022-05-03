@@ -154,6 +154,14 @@ class NutsRegionSummarySerializer(FieldLabelModelSerializer):
             return None
 
 
+class LauRegionSummarySerializer(FieldLabelModelSerializer):
+    name = CharField(source='lau_name')
+
+    class Meta:
+        model = LauRegion
+        fields = ('lau_id', 'name')
+
+
 class LauRegionOptionSerializer(ModelSerializer):
     id = SerializerMethodField()
     name = SerializerMethodField()
