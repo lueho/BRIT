@@ -19,9 +19,8 @@
                 </div>
                 <div class="card-footer">
                     {% if perms.materials %}
-                        <a href="{% url 'material-dashboard' %}"
-                           class="modal-link">
-                            <nobr><i class="fas fa-fw fa-edit"></i> Edit</nobr>
+                        <a href="{% url 'material-dashboard' %}">
+                            <nobr><i class="fas fa-fw fa-cog"></i> Dashboard</nobr>
                         </a>
                     {% endif %}
                 </div>
