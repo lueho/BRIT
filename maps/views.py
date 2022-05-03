@@ -16,6 +16,7 @@ from brit.views import (
     OwnedObjectUpdateView,
     OwnedObjectModalUpdateView,
     OwnedObjectDeleteView,
+    OwnedObjectModelSelectOptionsView
 )
 from maps.serializers import (
     RegionSerializer, CatchmentSerializer, NutsRegionGeometrySerializer,
@@ -636,3 +637,7 @@ class RegionAttributeValueModalDeleteView(OwnedObjectDeleteView):
     success_message = 'Successfully deleted.'
     success_url = reverse_lazy('regionattributevalue-list')
     permission_required = 'maps.delete_regionattributevalue'
+
+
+class RegionChildCatchmentOptions(OwnedObjectModelSelectOptionsView):
+    model = Catchment
