@@ -63,7 +63,7 @@ function loadMap(mapConfig) {
         promises.push(fetchFeatureGeometries(params));
         // filterFeatures();
     }
-    Promise.all(promises).then(map.invalidateSize());
+    Promise.all(promises).then(() => {orderLayers();});
 
 }
 
@@ -78,16 +78,17 @@ async function updateLayers({region_params, catchment_params, feature_params} = 
     if (feature_params) {
         promises.push(fetchFeatureGeometries(feature_params));
     }
-    Promise.all(promises).then(() => {
-        map.invalidateSize();
-        if (catchment_layer) {
-            catchment_layer.bringToBack();
-        }
-        if (feature_layer) {
-            feature_layer.bringToBack();
-        }
-    });
+    Promise.all(promises).then(() => {orderLayers();});
+}
 
+function orderLayers() {
+    map.invalidateSize();
+    if (catchment_layer) {
+        catchment_layer.bringToBack();
+    }
+    if (feature_layer) {
+        feature_layer.bringToBack();
+    }
 }
 
 async function fetchRegionGeometry(params) {
