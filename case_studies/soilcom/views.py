@@ -1,3 +1,4 @@
+from dal import autocomplete
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db.models import Max, Q
 from django.forms import modelformset_factory
@@ -83,6 +84,17 @@ class CollectorModalDeleteView(views.OwnedObjectDeleteView):
     success_message = 'Successfully deleted.'
     success_url = reverse_lazy('collector-list')
     permission_required = 'soilcom.delete_collector'
+
+
+# ----------- Collector utilities --------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+class CollectorAutoCompleteView(autocomplete.Select2QuerySetView):
+    def get_queryset(self):
+        qs = models.Collector.objects.all()
+        if self.q:
+            qs = qs.filter(name__icontains=self.q)
+        return qs
 
 
 # ----------- Collection System CRUD -----------------------------------------------------------------------------------

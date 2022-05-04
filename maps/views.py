@@ -4,6 +4,8 @@ from django.http import JsonResponse
 from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView, DeleteView, DetailView, ListView, UpdateView, TemplateView
 from django.views.generic.edit import FormMixin
+
+from dal import autocomplete
 from rest_framework.exceptions import ParseError, NotFound
 from rest_framework.views import APIView, Response
 
@@ -51,7 +53,7 @@ class MapsListView(ListView):
         return GeoDataset.objects.filter(Q(visible_to_groups__in=user_groups) | Q(publish=True))
 
 
-# ----------- Catchment ------------------------------------------------------------------------------------------------
+# ----------- Catchment CRUD--------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 class CatchmentBrowseView(FormMixin, TemplateView):
@@ -137,6 +139,18 @@ class CatchmentDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
     def test_func(self):
         catchment = Catchment.objects.get(id=self.kwargs.get('pk'))
         return catchment.owner == self.request.user
+
+
+# ----------- Catchment utilities---------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class CatchmentAutocompleteView(autocomplete.Select2QuerySetView):
+    def get_queryset(self):
+        qs = Catchment.objects.all().order_by('name')
+        if self.q:
+            qs = qs.filter(name__icontains=self.q)
+        return qs
 
 
 # ----------- Geodataset -----------------------------------------------------------------------------------------------

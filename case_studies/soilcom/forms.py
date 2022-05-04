@@ -1,5 +1,6 @@
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Field, Layout, Submit
+from dal import autocomplete
 from django import forms
 from django.forms import BaseModelFormSet
 from extra_views import InlineFormSetFactory
@@ -162,6 +163,7 @@ class CollectionModelForm(forms.ModelForm):
         required=True)
     catchment = forms.ModelChoiceField(
         queryset=models.Catchment.objects.all().order_by('region__nutsregion__nuts_id'),
+        widget=autocomplete.ModelSelect2(url='catchment-autocomplete'),
         required=True
     )
     waste_category = forms.ModelChoiceField(
@@ -177,9 +179,14 @@ class CollectionModelForm(forms.ModelForm):
         fields = ('catchment', 'collector', 'collection_system', 'waste_category', 'allowed_materials',
                   'frequency', 'description')
         labels = {'description': 'Comments'}
+        widgets = {
+            'collector': autocomplete.ModelSelect2(url='collector-autocomplete')
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.fields['collector'].widget.attrs = {'data-theme': 'bootstrap4'}
+        self.fields['catchment'].widget.attrs = {'data-theme': 'bootstrap4'}
         initial = kwargs.get('initial', {})
         if 'catchment' in initial:
             self.fields['catchment'].queryset = models.Catchment.objects.filter(id=initial['catchment'].id)
@@ -188,6 +195,10 @@ class CollectionModelForm(forms.ModelForm):
     def helper(self):
         helper = FormHelper()
         helper.form_tag = False
+        # django-crispy-forms and django-autocomplete-light conflict in the order JQuery needs to be loaded.
+        # Suppressing media inclusion here and explicitly adding {{ form.media }} in the template solves this.
+        # See https://github.com/yourlabs/django-autocomplete-light/issues/788
+        helper.include_media = False
         helper.layout = Layout(
             Field('catchment'),
             ForeignkeyField('collector'),

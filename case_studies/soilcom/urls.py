@@ -13,6 +13,7 @@ urlpatterns = [
     path('collectors/<int:pk>/update/modal/', views.CollectorModalUpdateView.as_view(), name='collector-update-modal'),
     path('collectors/<int:pk>/delete/modal/', views.CollectorModalDeleteView.as_view(), name='collector-delete-modal'),
     path('collectors/options/', views.CollectorOptions.as_view(), name='collector-options'),
+    path('collectors/autocomplete/', views.CollectorAutoCompleteView.as_view(), name='collector-autocomplete'),
     path('collectionsystems/', views.CollectionSystemListView.as_view(), name='collectionsystem-list'),
     path('collectionsystems/create/', views.CollectionSystemCreateView.as_view(), name='collectionsystem-create'),
     path('collectionsystems/create/modal/', views.CollectionSystemModalCreateView.as_view(),

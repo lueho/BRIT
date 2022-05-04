@@ -9,5 +9,6 @@
 {% endblock %}
 
 {% block javascript %}
+    {{ block.super }}
     <script src="{% static 'js/dynamic-formset.js' %}"></script>
 {% endblock javascript %}
