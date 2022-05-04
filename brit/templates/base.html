@@ -38,7 +38,7 @@
     <link href="{% static 'lib/jquery-ui/css/jquery-ui.min.css' %}" rel="stylesheet">
     <link href="{% static 'lib/jquery-ui/css/jquery-ui.structure.min.css' %}" rel="stylesheet">
     <link href="{% static 'lib/jquery-ui/css/jquery-ui.theme.min.css' %}" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/gh/gitbrent/bootstrap4-toggle@3.6.1/css/bootstrap4-toggle.min.css" rel="stylesheet">
+    <link href="{% static 'lib/bootstrap4-toggle/css/bootstrap4-toggle.min.css' %}" rel="stylesheet">
 
     {% block style_sheets %}{% endblock style_sheets %}
 
@@ -131,9 +131,7 @@
 <!-- Custom scripts for all pages-->
 <script src="{% static 'js/sb-admin-2.min.js' %}"></script>
 <script src="{% static 'js/jquery.bootstrap.modal.forms.js' %}"></script>
-<script src="https://cdn.jsdelivr.net/gh/gitbrent/bootstrap4-toggle@3.6.1/js/bootstrap4-toggle.min.js"></script>
-{#<script src="{% static 'js/dynamic-formset.js' %}"></script>#}
-
+<script src="{% static 'lib/bootstrap4-toggle/js/bootstrap4-toggle.min.js' %}"></script>
 
 <!-- Page level plugins -->
 <script src="{% static 'lib/chart.js/Chart.min.js' %}"></script>
