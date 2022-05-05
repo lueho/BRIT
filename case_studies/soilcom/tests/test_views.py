@@ -369,6 +369,8 @@ class CollectionCreateViewTestCase(TestCase):
             collector=Collector.objects.create(owner=owner, name='Test collector'),
             collection_system=CollectionSystem.objects.create(owner=owner, name='Test system'),
             waste_stream=waste_stream,
+            connection_rate=0.7,
+            connection_rate_year=2020,
             frequency=frequency,
             description='This is a test case.'
         )
@@ -428,7 +430,7 @@ class CollectionCreateViewTestCase(TestCase):
         self.client.force_login(self.member)
         response = self.client.post(
             reverse('collection-create'),
-            data={}
+            data={'connection_rate_year': 123}
         )
         self.assertEqual(response.status_code, 200)
 
@@ -438,6 +440,7 @@ class CollectionCreateViewTestCase(TestCase):
         self.assertTrue(error_msg in response.context['form'].errors['collection_system'])
         self.assertTrue(error_msg in response.context['form'].errors['waste_category'])
         self.assertTrue(error_msg in response.context['form'].errors['allowed_materials'])
+        self.assertTrue('Year needs to be in YYYY format.' in response.context['form'].errors['connection_rate_year'])
 
     def test_post_with_valid_form_data(self):
         self.client.force_login(self.member)
@@ -449,6 +452,8 @@ class CollectionCreateViewTestCase(TestCase):
                 'collection_system': CollectionSystem.objects.first().id,
                 'waste_category': WasteCategory.objects.first().id,
                 'allowed_materials': [c.id for c in WasteComponent.objects.all()],
+                'connection_rate': 0.7,
+                'connection_rate_year': 2020,
                 'frequency': CollectionFrequency.objects.first().id,
                 'description': 'This is a test case that should pass!',
                 'form-INITIAL_FORMS': '0',
@@ -497,6 +502,8 @@ class CollectionCopyViewTestCase(TestCase):
             collector=Collector.objects.create(owner=owner, name='Test collector'),
             collection_system=CollectionSystem.objects.create(owner=owner, name='Test system'),
             waste_stream=waste_stream,
+            connection_rate=0.7,
+            connection_rate_year=2020,
             frequency=frequency,
             description='This is a test case.'
         )
@@ -532,6 +539,8 @@ class CollectionCopyViewTestCase(TestCase):
             'collector': self.collection.collector,
             'collection_system': self.collection.collection_system,
             'waste_category': self.collection.waste_stream.category,
+            'connection_rate': self.collection.connection_rate,
+            'connection_rate_year': self.collection.connection_rate_year,
             'frequency': self.collection.frequency,
             'allowed_materials': self.collection.waste_stream.allowed_materials.all(),
             'description': self.collection.description
@@ -558,6 +567,8 @@ class CollectionCopyViewTestCase(TestCase):
         self.collection.catchment = None
         self.collection.collection_system = None
         self.collection.waste_stream = None
+        self.collection.connection_rate = None
+        self.collection.connection_rate_year = None
         self.collection.frequency = None
         self.collection.description = None
         self.collection.save()
@@ -644,6 +655,8 @@ class CollectionUpdateViewTestCase(TestCase):
             collector=Collector.objects.create(owner=owner, name='Test collector'),
             collection_system=CollectionSystem.objects.create(owner=owner, name='Test system'),
             waste_stream=waste_stream,
+            connection_rate=0.7,
+            connection_rate_year=2020,
             frequency=frequency,
             description='This is a test case.'
         )
@@ -687,7 +700,7 @@ class CollectionUpdateViewTestCase(TestCase):
         self.client.force_login(self.member)
         response = self.client.post(
             reverse('collection-update', kwargs={'pk': self.collection.id}),
-            data={}
+            data={'connection_rate_year': 123}
         )
         self.assertEqual(response.status_code, 200)
 
@@ -697,6 +710,7 @@ class CollectionUpdateViewTestCase(TestCase):
         self.assertTrue(error_msg in response.context['form'].errors['collection_system'])
         self.assertTrue(error_msg in response.context['form'].errors['waste_category'])
         self.assertTrue(error_msg in response.context['form'].errors['allowed_materials'])
+        self.assertTrue('Year needs to be in YYYY format.' in response.context['form'].errors['connection_rate_year'])
 
     def test_post_with_valid_form_data(self):
         self.client.force_login(self.member)
@@ -708,6 +722,8 @@ class CollectionUpdateViewTestCase(TestCase):
                 'collection_system': CollectionSystem.objects.first().id,
                 'waste_category': WasteCategory.objects.first().id,
                 'allowed_materials': [c.id for c in WasteComponent.objects.all()],
+                'connection_rate': 0.7,
+                'connection_rate_year': 2020,
                 'frequency': CollectionFrequency.objects.first().id,
                 'description': 'This is a test case that should pass!',
                 'form-INITIAL_FORMS': '0',
@@ -726,6 +742,8 @@ class CollectionUpdateViewTestCase(TestCase):
             'collection_system': self.collection.collection_system.id,
             'waste_category': self.collection.waste_stream.category.id,
             'allowed_materials': [m.id for m in self.collection.waste_stream.allowed_materials.all()],
+            'connection_rate': 0.7,
+            'connection_rate_year': 2020,
             'frequency': self.collection.frequency.id,
             'description': self.collection.description,
             'form-INITIAL_FORMS': '1',
@@ -775,6 +793,8 @@ class CollectionSummaryAPIViewTestCase(TestCase):
             collector=Collector.objects.create(owner=owner, name='Test collector'),
             collection_system=CollectionSystem.objects.create(owner=owner, name='Test system'),
             waste_stream=waste_stream,
+            connection_rate=0.7,
+            connection_rate_year=2020,
             frequency=frequency,
             description='This is a test case.'
         )
@@ -791,6 +811,7 @@ class CollectionSummaryAPIViewTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_get_returns_correct_summary_on_existing_collection_pk(self):
+        self.maxDiff = None
         self.client.force_login(self.member)
         response = self.client.get(reverse('data.collection-summary'), {'pk': self.collection.pk})
         expected = {'summaries': [
@@ -801,6 +822,7 @@ class CollectionSummaryAPIViewTestCase(TestCase):
                 ('Collection system', self.collection.collection_system.name),
                 ('Waste category', self.collection.waste_stream.category.name),
                 ('Allowed materials', [m.name for m in self.collection.waste_stream.allowed_materials.all()]),
+                ('Connection rate', '70.0% (2020)'),
                 ('Frequency', self.collection.frequency.name),
                 ('Sources', [flyer.url for flyer in self.collection.flyers.all()]),
                 ('Comments', self.collection.description)

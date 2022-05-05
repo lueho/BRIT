@@ -1,4 +1,5 @@
 from django.core.exceptions import ValidationError
+from django.core.validators import RegexValidator
 from django.db import models
 from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
@@ -179,13 +180,19 @@ class CollectionFrequency(NamedUserObjectModel):
     pass
 
 
+YEAR_VALIDATOR = RegexValidator(r'^([0-9]{4})$', message='Year needs to be in YYYY format.', code='invalid year')
+
+
 class Collection(NamedUserObjectModel):
     collector = models.ForeignKey(Collector, on_delete=models.CASCADE, blank=True, null=True)
     catchment = models.ForeignKey(Catchment, on_delete=models.PROTECT, blank=True, null=True)
     collection_system = models.ForeignKey(CollectionSystem, on_delete=models.CASCADE, blank=True, null=True)
     waste_stream = models.ForeignKey(WasteStream, on_delete=models.SET_NULL, blank=True, null=True)
     frequency = models.ForeignKey(CollectionFrequency, on_delete=models.SET_NULL, blank=True, null=True)
+    connection_rate = models.FloatField(blank=True, null=True)
+    connection_rate_year = models.PositiveSmallIntegerField(blank=True, null=True, validators=[YEAR_VALIDATOR])
     flyers = models.ManyToManyField(WasteFlyer, related_name='collections')
+    sources = models.ManyToManyField(Source)
 
     @property
     def geom(self):

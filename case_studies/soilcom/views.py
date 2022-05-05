@@ -540,6 +540,10 @@ class CollectionCopyView(CollectionCreateView):
                 initial['waste_category'] = collection.waste_stream.category
             if collection.waste_stream.allowed_materials.exists():
                 initial['allowed_materials'] = collection.waste_stream.allowed_materials.all()
+        if collection.connection_rate:
+            initial['connection_rate'] = collection.connection_rate
+        if collection.connection_rate_year:
+            initial['connection_rate_year'] = collection.connection_rate_year
         if collection.frequency:
             initial['frequency'] = collection.frequency
         if collection.description:

@@ -61,6 +61,7 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
     collection_system = serializers.StringRelatedField()
     waste_category = serializers.CharField(source='waste_stream.category')
     allowed_materials = serializers.StringRelatedField(many=True, source='waste_stream.allowed_materials')
+    connection_rate = serializers.SerializerMethodField()
     frequency = serializers.StringRelatedField()
     sources = serializers.StringRelatedField(source='flyers', many=True)
     comments = serializers.CharField(source='description')
@@ -68,4 +69,8 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
     class Meta:
         model = models.Collection
         fields = ('id', 'catchment', 'collector', 'collection_system',
-                  'waste_category', 'allowed_materials', 'frequency', 'sources', 'comments')
+                  'waste_category', 'allowed_materials', 'connection_rate', 'frequency', 'sources', 'comments')
+
+    @staticmethod
+    def get_connection_rate(obj):
+        return f'{obj.connection_rate * 100}% ({obj.connection_rate_year})'

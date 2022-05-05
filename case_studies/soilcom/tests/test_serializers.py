@@ -108,23 +108,32 @@ class CollectionSerializerTestCase(TestCase):
         frequency = CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
         collection = Collection.objects.create(
             owner=owner,
+            name='Test Collection',
             catchment=Catchment.objects.create(owner=owner, name='Test catchment'),
             collector=Collector.objects.create(owner=owner, name='Test collector'),
             collection_system=CollectionSystem.objects.create(owner=owner, name='Test system'),
             waste_stream=waste_stream,
             frequency=frequency,
+            connection_rate=0.7,
+            connection_rate_year=2020,
             description='This is a test case.'
         )
         collection.flyers.add(waste_flyer_1)
         collection.flyers.add(waste_flyer_2)
 
     def setUp(self):
-        self.collection = Collection.objects.first()
+        self.collection = Collection.objects.get(name='Test Collection')
 
     def test_multiple_sources_in_representation(self):
-        serializer = CollectionModelSerializer(Collection.objects.first())
+        serializer = CollectionModelSerializer(self.collection)
         flyer_urls = serializer.data['sources']
         self.assertIsInstance(flyer_urls, list)
         self.assertEqual(len(flyer_urls), 2)
         for url in flyer_urls:
             self.assertIsInstance(url, str)
+
+    def test_connection_rate_is_converted_and_connected_with_year(self):
+        serializer = CollectionModelSerializer(self.collection)
+        connection_rate = serializer.data['connection_rate']
+        self.assertEqual('70.0% (2020)', connection_rate)
+

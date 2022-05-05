@@ -24,7 +24,7 @@ class TestCollectionModelForm(TestCase):
         self.material2.categories.add(self.material_group)
         self.frequency = CollectionFrequency.objects.create(owner=self.owner, name='fix')
 
-    def test_missing_data_errors(self):
+    def test_form_errors(self):
         waste_stream = WasteStream.objects.create(
             owner=self.owner,
             category=self.waste_category,
@@ -36,14 +36,20 @@ class TestCollectionModelForm(TestCase):
             collector=self.collector,
             collection_system=self.collection_system,
             waste_stream=waste_stream,
+            connection_rate=0.7,
+            connection_rate_year=2020,
             frequency=self.frequency
         )
-        form = CollectionModelForm(instance=collection, data={})
+        data = {
+            'connection_rate_year': 123
+        }
+        form = CollectionModelForm(instance=collection, data=data)
         self.assertFalse(form.is_valid())
         self.assertEqual(form.errors['catchment'][0], 'This field is required.')
         self.assertEqual(form.errors['collection_system'][0], 'This field is required.')
         self.assertEqual(form.errors['waste_category'][0], 'This field is required.')
         self.assertEqual(form.errors['allowed_materials'][0], 'This field is required.')
+        self.assertEqual('Year needs to be in YYYY format.', form.errors['connection_rate_year'][0])
 
     def test_waste_stream_get_or_create_on_save(self):
         form = CollectionModelForm(data={
@@ -52,6 +58,8 @@ class TestCollectionModelForm(TestCase):
             'collection_system': self.collection_system.id,
             'waste_category': self.waste_category.id,
             'allowed_materials': [self.material1.id, self.material2.id],
+            'connection_rate': 70,
+            'connection_rate_year': 2020,
             'frequency': self.frequency.id,
             'description': 'This is a test case'
         })
@@ -80,6 +88,23 @@ class TestCollectionModelForm(TestCase):
         self.assertEqual(instance2.waste_stream.category.id, self.waste_category.id)
         self.assertEqual(instance2.waste_stream.id, instance.waste_stream.id)
         self.assertEqual(len(WasteStream.objects.all()), 1)
+
+    def test_connection_rate_percentage_is_converted_to_fraction(self):
+        form = CollectionModelForm(data={
+            'catchment': self.catchment.id,
+            'collector': self.collector.id,
+            'collection_system': self.collection_system.id,
+            'waste_category': self.waste_category.id,
+            'allowed_materials': [self.material1.id, self.material2.id],
+            'connection_rate': 70,
+            'connection_rate_year': 2020,
+            'frequency': self.frequency.id,
+            'description': 'This is a test case'
+        })
+        self.assertTrue(form.is_valid())
+        form.instance.owner = self.owner
+        instance = form.save()
+        self.assertEqual(0.7, instance.connection_rate)
 
 
 class TestWasteFlyerModelForm(TestCase):
