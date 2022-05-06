@@ -1,13 +1,20 @@
 from django.db import models
 
-from brit.models import OwnedObjectModel, CRUDUrlsMixin
+from brit.models import OwnedObjectModel, CRUDUrlsMixin, NamedUserObjectModel
 
 
-class Licence(models.Model):
-    name = models.CharField(max_length=255)
+class Author(CRUDUrlsMixin, OwnedObjectModel):
+    first_names = models.CharField(max_length=1023)
+    last_names = models.CharField(max_length=1023)
+
+    def __str__(self):
+        return f'{self.first_names} {self.last_names}'
+
+
+class Licence(NamedUserObjectModel):
     reference_url = models.URLField()
 
-    def __str(self):
+    def __str__(self):
         return self.name
 
 

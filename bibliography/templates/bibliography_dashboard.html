@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+
+{% block title %}BRIT | Bibliography Dashboard{% endblock %}
+
+{% block content %}
+
+    <div class="row">
+        <div class="col col-12 col-md-6">
+            <div class="card shadow h-100">
+                <div class="card-header"><strong>Bibliography</strong></div>
+                <div class="card-body">
+                    <p class="card-text">
+                        This is the bibliography dashboard. All sources for the data in the database can be managed
+                        from here.
+                    </p>
+                </div>
+                <div class="card-footer">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header">
+                    <a href="{% url 'author-list' %}" class="stretched-link"><strong>Authors</strong></a>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Manage the catalogue of authors here.
+                    </p>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'author-list' %}" class="btn btn-primary">View Authors</a>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header">
+                    <a href="{% url 'licence-list' %}" class="stretched-link"><strong>Licences</strong></a>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        All data that is cited in this tool needs to have a proper open source licence in order to avoid
+                        breach of intellectual property rights. This is a catalogue of licences one of which every cited
+                        source needs to be associated.
+                    </p>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'licence-list' %}" class="btn btn-primary">View Licences</a>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header">
+                    <a href="{% url 'source-list' %}" class="stretched-link"><strong>Sources</strong></a>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Source is the general term for any item that might appear in a bibliography. Preferable peer
+                        reviewed publications should be used whenever possible. However, in some cases project or
+                        company report as well as trustworthy raw data publications are invaluable sources.
+                    </p>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'source-list' %}" class="btn btn-primary">View Sources</a>
+                </div>
+            </div>
+        </div>
+
+{% endblock content %}

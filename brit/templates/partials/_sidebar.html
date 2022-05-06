@@ -27,21 +27,28 @@
 
     <!-- Nav Item - Pages Collapse Menu -->
 
-    <!-- Bioresource explorer -->
+    <!-- Bibliography -->
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'source-list' %}">
+            <i class="fas fa-fw fa-book"></i>
+            <span>Bibliography</span></a>
+    </li>
+
+    <!-- Maps -->
     <li class="nav-item">
         <a class="nav-link" href="{% url 'maps_list' %}">
             <i class="fas fa-fw fa-globe-europe"></i>
             <span>Maps</span></a>
     </li>
 
-    <!-- Material manager -->
+    <!-- Materials -->
     <li class="nav-item">
         <a class="nav-link" href="{% url 'sample-list-featured' %}">
             <i class="fas fa-fw fa-leaf"></i>
             <span>Materials</span></a>
     </li>
 
-    <!-- Scenario builder -->
+    <!-- Inventories -->
     <li class="nav-item">
         <a class="nav-link" href="{% url 'scenario_list' %}">
             <i class="fas fa-fw fa-chart-bar"></i>

@@ -1,17 +1,139 @@
+from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.urls import reverse_lazy
+from django.views.generic import TemplateView
 
 from brit import views
+
 from . import forms
-from .models import Source
+from .models import Author, Licence, Source
 
 
-# ----------- Source CRUD ------------------------------------------------------------------------------
+class BibliographyDashboardView(TemplateView):
+    template_name = 'bibliography_dashboard.html'
+
+
+# ----------- Author CRUD ----------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class AuthorListView(views.OwnedObjectListView):
+    template_name = 'simple_list_card.html'
+    model = Author
+    permission_required = set()
+
+
+class AuthorCreateView(views.OwnedObjectCreateView):
+    template_name = 'simple_form_card.html'
+    form_class = forms.AuthorModelForm
+    success_url = reverse_lazy('author-list')
+    permission_required = 'bibliography.add_author'
+
+
+class AuthorModalCreateView(views.OwnedObjectModalCreateView):
+    template_name = 'modal_form.html'
+    form_class = forms.AuthorModalModelForm
+    success_url = reverse_lazy('author-list')
+    permission_required = 'bibliography.add_author'
+
+
+class AuthorDetailView(views.OwnedObjectDetailView):
+    template_name = 'simple_detail_card.html'
+    model = Author
+    permission_required = set()
+
+
+class AuthorModalDetailView(views.OwnedObjectModalDetailView):
+    template_name = 'modal_detail.html'
+    model = Author
+    permission_required = set()
+
+
+class AuthorUpdateView(views.OwnedObjectUpdateView):
+    template_name = 'simple_form_card.html'
+    model = Author
+    form_class = forms.AuthorModelForm
+    permission_required = 'bibliography.change_author'
+
+
+class AuthorModalUpdateView(views.OwnedObjectModalUpdateView):
+    template_name = 'modal_form.html'
+    model = Author
+    form_class = forms.AuthorModalModelForm
+    permission_required = 'bibliography.change_author'
+
+
+class AuthorModalDeleteView(views.OwnedObjectDeleteView):
+    template_name = 'modal_delete.html'
+    model = Author
+    success_message = 'Successfully deleted.'
+    success_url = reverse_lazy('author-list')
+    permission_required = 'bibliography.delete_author'
+
+
+# ----------- Licence CRUD ----------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+class LicenceListView(views.OwnedObjectListView):
+    template_name = 'simple_list_card.html'
+    model = Licence
+    permission_required = set()
+
+
+class LicenceCreateView(views.OwnedObjectCreateView):
+    template_name = 'simple_form_card.html'
+    form_class = forms.LicenceModelForm
+    success_url = reverse_lazy('licence-list')
+    permission_required = 'bibliography.add_licence'
+
+
+class LicenceModalCreateView(views.OwnedObjectModalCreateView):
+    template_name = 'modal_form.html'
+    form_class = forms.LicenceModalModelForm
+    success_url = reverse_lazy('licence-list')
+    permission_required = 'bibliography.add_licence'
+
+
+class LicenceDetailView(views.OwnedObjectDetailView):
+    template_name = 'simple_detail_card.html'
+    model = Licence
+    permission_required = set()
+
+
+class LicenceModalDetailView(views.OwnedObjectModalDetailView):
+    template_name = 'modal_detail.html'
+    model = Licence
+    permission_required = set()
+
+
+class LicenceUpdateView(views.OwnedObjectUpdateView):
+    template_name = 'simple_form_card.html'
+    model = Licence
+    form_class = forms.LicenceModelForm
+    permission_required = 'bibliography.change_licence'
+
+
+class LicenceModalUpdateView(views.OwnedObjectModalUpdateView):
+    template_name = 'modal_form.html'
+    model = Licence
+    form_class = forms.LicenceModalModelForm
+    permission_required = 'bibliography.change_licence'
+
+
+class LicenceModalDeleteView(views.OwnedObjectDeleteView):
+    template_name = 'modal_delete.html'
+    model = Licence
+    success_message = 'Successfully deleted.'
+    success_url = reverse_lazy('licence-list')
+    permission_required = 'bibliography.delete_licence'
+
+
+# ----------- Source CRUD ----------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 class SourceListView(views.OwnedObjectListView):
     template_name = 'source_list_card.html'
     model = Source
-    permission_required = 'bibliography.view_source'
+    permission_required = set()
 
 
 class SourceCreateView(views.OwnedObjectCreateView):
