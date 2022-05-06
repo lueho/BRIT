@@ -4,7 +4,10 @@ from django.db.models import Max, Q
 from django.forms import modelformset_factory
 from django.http import HttpResponseRedirect, JsonResponse
 from django.urls import reverse_lazy
+from django.shortcuts import render
 from django.views.generic import TemplateView
+
+from django_filters.views import FilterMixin, FilterView
 from rest_framework.views import APIView, Response
 
 from bibliography.views import (SourceListView,
@@ -19,6 +22,7 @@ from brit import views
 from maps.forms import NutsAndLauCatchmentQueryForm
 from maps.models import Catchment, GeoDataset
 from maps.views import GeoDatasetDetailView, GeoDataSetMixin, GeoDataSetFormMixin
+from . import filters
 from . import forms
 from . import models
 from . import serializers
@@ -447,6 +451,33 @@ class CollectionListView(views.OwnedObjectListView):
     template_name = 'simple_list_card.html'
     model = models.Collection
     permission_required = 'soilcom.view_collection'
+
+
+# class CollectionFilterView(PermissionRequiredMixin, FilterView):
+#     template_name = 'collection_filter.html'
+#     queryset = models.Collection.objects.filter(catchment__name__icontains='Hamburg')
+#     filterset_class = filters.CollectionFilter
+#     permission_required = set()
+
+
+class CollectionFilterView(views.OwnedObjectListView):
+    template_name = 'collection_filter.html'
+    model = models.Collection
+    queryset = models.Collection.objects.all()
+    # filterset_class = filters.CollectionFilter
+    permission_required = set()
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        filter = filters.CollectionFilter(self.request.GET, queryset)
+        return filter.qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        queryset = self.get_queryset()
+        filter = filters.CollectionFilter(self.request.GET, queryset)
+        context['filter'] = filter
+        return context
 
 
 class ModelFormAndModelFormSetMixin:

@@ -277,3 +277,57 @@ class CollectionFilterForm(forms.Form):
         self.fields['countries'].choices = set(
             sorted(set((c.catchment.region.country_code, c.catchment.region.country_code) for c in
                        models.Collection.objects.all())))
+
+
+class CollectionFilterFormHelper(FormHelper):
+    form_method = 'GET'
+    include_media = False
+    layout = Layout(
+        'catchment',
+        'collector',
+        'collection_system',
+        'country',
+        'waste_category',
+        'allowed_materials',
+        Submit('submit', 'Filter'),
+    )
+
+
+class CollectionForm(forms.Form):
+    catchment = forms.ModelChoiceField(
+        queryset=models.Catchment.objects.all(),
+        widget=autocomplete.ModelSelect2(url='catchment-autocomplete'),
+        required=False
+    )
+    collector = forms.ModelChoiceField(
+        queryset=models.Collector.objects.all(),
+        widget=autocomplete.ModelSelect2(url='collector-autocomplete'),
+        required=False
+    )
+    waste_category = forms.ModelMultipleChoiceField(
+        queryset=models.WasteCategory.objects.all(),
+        widget=forms.CheckboxSelectMultiple,
+        required=False
+    )
+    country = forms.MultipleChoiceField(
+        choices=set(),
+        required=False
+    )
+    allowed_materials = forms.ModelMultipleChoiceField(
+        queryset=models.WasteComponent.objects.all(),
+        widget=forms.CheckboxSelectMultiple,
+        required=False
+    )
+
+    class Meta:
+        model = models.Collection
+        fields = ('catchment', 'collector', 'collection_system', 'country', 'waste_category', 'allowed_materials')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = CollectionFilterFormHelper()
+        self.fields['catchment'].widget.attrs = {'data-theme': 'bootstrap4'}
+        self.fields['collector'].widget.attrs = {'data-theme': 'bootstrap4'}
+        self.fields['country'].choices = set(
+            sorted(set((c.catchment.region.country_code, c.catchment.region.country_code) for c in
+                       models.Collection.objects.all())))

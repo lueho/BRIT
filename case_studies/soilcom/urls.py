@@ -81,6 +81,7 @@ urlpatterns = [
     path('flyers/<int:pk>/update/modal/', views.WasteFlyerModalUpdateView.as_view(), name='wasteflyer-update-modal'),
     path('flyers/<int:pk>/delete/modal/', views.WasteFlyerModalDeleteView.as_view(), name='wasteflyer-delete-modal'),
     path('collections/', views.CollectionListView.as_view(), name='collection-list'),
+    path('collections/filter/', views.CollectionFilterView.as_view(), name='collection-filter'),
     path('collections/create/', views.CollectionCreateView.as_view(), name='collection-create'),
     path('collections/<int:pk>/', views.CollectionDetailView.as_view(), name='collection-detail'),
     path('collections/<int:pk>/modal/', views.CollectionModalDetailView.as_view(), name='collection-detail-modal'),

@@ -1,0 +1,73 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+
+    <div class="row">
+        <div class="col">
+            <div class="card">
+                <div class="card-header"><strong>Collections</strong></div>
+                <div class="card-body">
+                    <table class="table">
+                        <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Description</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for object in filter.qs %}
+                            <tr>
+                                <td>
+                                    <a href="{{ object.get_absolute_url }}">{{ object.name }}</a>
+                                </td>
+                                <td><p>{{ object.collector }} - {{ object.catchment }}
+                                    - {{ object.collection_system }}</p></td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                        <tfoot>
+                        </tfoot>
+                    </table>
+                    <div class="pagination">
+                        <span class="step-links">
+                            {% if page_obj.has_previous %}
+                                <a href="?page=1">&laquo; first</a>
+                                <a href="?page={{ page_obj.previous_page_number }}">previous</a>
+                            {% endif %}
+
+                            <span class="current">
+                                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.
+                            </span>
+
+                            {% if page_obj.has_next %}
+                                <a href="?page={{ page_obj.next_page_number }}">next</a>
+                                <a href="?page={{ page_obj.paginator.num_pages }}">last &raquo;</a>
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+                <div class="card-footer"></div>
+            </div>
+        </div>
+        <div class="col-3">
+            <div class="card shadow">
+                <div class="card-header"><strong>Filter</strong></div>
+                <div class="card-body">
+                    <form method="get">
+                        {% crispy filter.form %}
+                    </form>
+                </div>
+                <div class="card-footer"></div>
+            </div>
+        </div>
+    </div>
+
+{% endblock content %}
+
+{% block javascript %}
+    {{ block.super }}
+    {{ filter.form.media }}
+    <link href="{% static 'lib/select2-bootstrap-theme/select2-bootstrap4.min.css' %}" rel="stylesheet">
+{% endblock %}

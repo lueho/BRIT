@@ -1,0 +1,43 @@
+from dal import autocomplete
+from django.db.models import Q
+from django.forms import CheckboxSelectMultiple
+from django_filters import ModelChoiceFilter, ModelMultipleChoiceFilter, FilterSet, ChoiceFilter
+
+from .forms import CollectionForm
+from .models import Catchment, Collection, Collector, WasteCategory, WasteComponent
+
+
+
+
+
+class CollectionFilter(FilterSet):
+    catchment = ModelChoiceFilter(queryset=Catchment.objects.all(),
+                                  widget=autocomplete.ModelSelect2(url='catchment-autocomplete'))
+    collector = ModelChoiceFilter(queryset=Collector.objects.all(),
+                                  widget=autocomplete.ModelSelect2(url='collector-autocomplete'))
+    country = ChoiceFilter(choices=set(), label='Country', method='filter_by_country')
+    waste_category = ModelMultipleChoiceFilter(queryset=WasteCategory.objects.all(),
+                                               field_name='waste_stream__category',
+                                               label='Waste categories',
+                                               widget=CheckboxSelectMultiple)
+    allowed_materials = ModelMultipleChoiceFilter(queryset=WasteComponent.objects.all(),
+                                                  field_name='waste_stream__allowed_materials',
+                                                  label='Allowed materials',
+                                                  widget=CheckboxSelectMultiple)
+
+    class Meta:
+        model = Collection
+        fields = ('catchment', 'collector', 'collection_system', 'country', 'waste_category', 'allowed_materials')
+        form = CollectionForm
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.form.fields['country'].choices = set(
+            sorted(set((c.catchment.region.country_code, c.catchment.region.country_code) for c in
+                       Collection.objects.all())))
+
+    def filter_by_country(self, qs, name, value):
+        qs = qs.filter(
+            Q(catchment__region__nutsregion__cntr_code=value) |
+            Q(catchment__region__lauregion__cntr_code=value))
+        return qs

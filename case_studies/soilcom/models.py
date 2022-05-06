@@ -21,6 +21,9 @@ class CollectionSystem(NamedUserObjectModel):
     class Meta:
         verbose_name = 'Waste Collection System'
 
+    def __str__(self):
+        return self.name
+
 
 class WasteCategory(NamedUserObjectModel):
     class Meta:
