@@ -137,3 +137,15 @@ class CollectionSerializerTestCase(TestCase):
         connection_rate = serializer.data['connection_rate']
         self.assertEqual('70.0% (2020)', connection_rate)
 
+    def test_connection_rate_non_returns_without_error(self):
+        self.collection.connection_rate = None
+        self.collection.save()
+        serializer = CollectionModelSerializer(self.collection)
+        self.assertIsNone(serializer.data['connection_rate'])
+
+    def test_connection_rate_returns_without_year_if_year_is_not_given(self):
+        self.collection.connection_rate_year = None
+        self.collection.save()
+        serializer = CollectionModelSerializer(self.collection)
+        self.assertEqual('70.0%', serializer.data['connection_rate'])
+
