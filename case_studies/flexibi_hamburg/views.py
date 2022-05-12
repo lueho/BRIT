@@ -12,7 +12,7 @@ from .serializers import HamburgRoadsideTreeGeometrySerializer
 
 class RoadsideTreesMapView(GeoDatasetDetailView):
     feature_url = reverse_lazy('data.hamburg_roadside_trees')
-    filter_class = TreeFilter
+    filterset_class = TreeFilter
     load_features = False
     marker_style = {
         'color': '#63c36c',

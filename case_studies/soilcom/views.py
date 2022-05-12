@@ -749,7 +749,7 @@ class CollectionGeometryAPI(GenericAPIView):
 # class CollectionSummaryAPI(ListAPIView):
 #     queryset = models.Collection.objects.all()
 #     serializer_class = serializers.CollectionModelSerializer
-    filter_backends = (rf_filters.DjangoFilterBackend,)
+#     filter_backends = (rf_filters.DjangoFilterBackend,)
 #     filterset_class = filters.CollectionFilter
 
 class CollectionSummaryAPI(APIView):
