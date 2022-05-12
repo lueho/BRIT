@@ -91,22 +91,39 @@ function orderLayers() {
     }
 }
 
+function transformSearchParams(params) {
+    if (params instanceof URLSearchParams) {
+        return params;
+    } else {
+        const result = new URLSearchParams();
+        for (const [key, value] of Object.entries(params)) {
+            if (Array.isArray(value)) {
+                value.forEach(value_item => result.append(key, value_item));
+            } else {
+                result.append(key, value.toString());
+            }
+        }
+        return result;
+    }
+}
+
 async function fetchRegionGeometry(params) {
-    const url = mapConfig.region_url + '?' + $.param(params).toString();
+    const url = mapConfig.region_url + '?' + transformSearchParams(params).toString();
     const response = await fetch(url);
     const json = await response.json();
     renderRegion(json.geoJson);
 }
 
 async function fetchCatchmentGeometry(params) {
-    const url = mapConfig.catchment_url + '?' + $.param(params).toString();
+    const url = mapConfig.catchment_url + '?' + transformSearchParams(params).toString();
     const response = await fetch(url);
     const json = await response.json();
     renderCatchment(json.geoJson);
 }
 
 async function fetchFeatureGeometries(params) {
-    const url = mapConfig.feature_url + '?' + $.param(params).toString();
+    const url = mapConfig.feature_url + '?' + transformSearchParams(params).toString();
+    console.log(url);
     const response = await fetch(url);
     const json = await response.json();
     renderFeatures(json.geoJson);
@@ -215,22 +232,22 @@ async function clickedFeature(event) {
 }
 
 function parseFilterParameters() {
-    const params = {};
+    const params = new URLSearchParams();
     if ('form_fields' in mapConfig) {
         const form_fields = mapConfig.form_fields;
         Object.keys(form_fields).forEach(key => {
             switch (form_fields[key]) {
             case 'SelectMultiple':
-                params[key] = readSelectMultiple(key);
+                readSelectMultiple(key).forEach((value) => {params.append(key, value);});
                 break;
             case 'RadioSelect':
-                params[key] = readRadioSelect(key);
+                params.append(key, readRadioSelect(key));
                 break;
             case 'CheckboxSelectMultiple':
-                params[key] = readCheckboxSelectMultiple(key);
+                readCheckboxSelectMultiple(key).forEach((value) => {params.append(key, value);});
                 break;
             default:
-                params[key] = document.getElementsByName(key)[0].value;
+                params.append(key, document.getElementsByName(key)[0].value);
             }
         });
     }
