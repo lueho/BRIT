@@ -291,6 +291,12 @@ class CollectionFilterFormHelper(FormHelper):
         'allowed_materials',
     )
 
+COUNTRY_CHOICES = (
+    ('DE', 'DE'),
+    ('UK', 'UK'),
+    ('NL', 'NL'),
+    ('DK', 'DK')
+)
 
 class CollectionFilterForm(forms.Form):
     catchment = forms.ModelChoiceField(
@@ -309,7 +315,7 @@ class CollectionFilterForm(forms.Form):
         required=False
     )
     country = forms.MultipleChoiceField(
-        choices=set(),
+        choices=COUNTRY_CHOICES,
         required=False
     )
     allowed_materials = forms.ModelMultipleChoiceField(
@@ -327,6 +333,6 @@ class CollectionFilterForm(forms.Form):
         self.helper = CollectionFilterFormHelper()
         self.fields['catchment'].widget.attrs = {'data-theme': 'bootstrap4'}
         self.fields['collector'].widget.attrs = {'data-theme': 'bootstrap4'}
-        self.fields['country'].choices = set(
-            sorted(set((c.catchment.region.country_code, c.catchment.region.country_code) for c in
-                       models.Collection.objects.all())))
+        # self.fields['country'].choices = set(
+        #     sorted(set((c.catchment.region.country_code, c.catchment.region.country_code) for c in
+        #                models.Collection.objects.all())))

@@ -710,10 +710,10 @@ class WasteCollectionMapView(GeoDatasetDetailView):
     def get_initial(self):
         initial = super().get_initial()
         initial.update({
-            'collection_system': self.request.GET.getlist('collection_system[]'),
-            'waste_category': self.request.GET.getlist('waste_category[]'),
-            'countries': self.request.GET.getlist('countries[]'),
-            'allowed_materials': self.request.GET.getlist('allowed_materials[]')
+            'collection_system': self.request.GET.getlist('collection_system'),
+            'waste_category': self.request.GET.getlist('waste_category'),
+            'countries': self.request.GET.getlist('countries'),
+            'allowed_materials': self.request.GET.getlist('allowed_materials')
         })
         return initial
 

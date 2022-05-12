@@ -7,13 +7,20 @@ from django_filters import rest_framework as rf_filters
 from .forms import CollectionFilterForm
 from .models import Catchment, Collection, Collector, WasteCategory, WasteComponent
 
+COUNTRY_CHOICES = (
+    ('DE', 'DE'),
+    ('UK', 'UK'),
+    ('NL', 'NL'),
+    ('DK', 'DK')
+)
+
 
 class CollectionFilter(FilterSet):
     catchment = ModelChoiceFilter(queryset=Catchment.objects.all(),
                                   widget=autocomplete.ModelSelect2(url='catchment-autocomplete'))
     collector = ModelChoiceFilter(queryset=Collector.objects.all(),
                                   widget=autocomplete.ModelSelect2(url='collector-autocomplete'))
-    country = ChoiceFilter(choices=set(), label='Country', method='filter_by_country')
+    country = ChoiceFilter(choices=COUNTRY_CHOICES, label='Country', method='filter_by_country')
     waste_category = ModelMultipleChoiceFilter(queryset=WasteCategory.objects.all(),
                                                field_name='waste_stream__category',
                                                label='Waste categories',
@@ -27,12 +34,6 @@ class CollectionFilter(FilterSet):
         model = Collection
         fields = ('catchment', 'collector', 'collection_system', 'country', 'waste_category', 'allowed_materials')
         form = CollectionFilterForm
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.form.fields['country'].choices = set(
-            sorted(set((c.catchment.region.country_code, c.catchment.region.country_code) for c in
-                       Collection.objects.all())))
 
     def filter_by_country(self, qs, name, value):
         qs = qs.filter(
