@@ -1,6 +1,7 @@
 from django.http import JsonResponse
 from django.urls import reverse_lazy
-from rest_framework.views import APIView
+from rest_framework.generics import GenericAPIView
+from django_filters import rest_framework as rf_filters
 
 from maps.models import GeoDataset
 from maps.views import GeoDatasetDetailView
@@ -25,44 +26,15 @@ class RoadsideTreesMapView(GeoDatasetDetailView):
         return super().get_object(**kwargs)
 
 
-def is_valid_queryparam(param):
-    return param != '' and param is not None
+class HamburgRoadsideTreeAPIView(GenericAPIView):
+    queryset = HamburgRoadsideTrees.objects.all()
+    serializer_class = HamburgRoadsideTreeGeometrySerializer
+    filter_backends = (rf_filters.DjangoFilterBackend,)
+    filterset_class = TreeFilter
 
-
-class HamburgRoadsideTreeAPIView(APIView):
-
-    @staticmethod
-    def get(request):
-        qs = HamburgRoadsideTrees.objects.all()
-
-        # Tree genus filter
-        exclude = ['Linde', 'Eiche', 'Ahorn']
-        gattung_deutsch_query = request.query_params.getlist('gattung_deutsch[]')
-        if is_valid_queryparam(gattung_deutsch_query):
-            if 'Other' in gattung_deutsch_query:
-                gattung_deutsch_query.remove('Other')
-                for tree_type in gattung_deutsch_query:
-                    exclude.remove(tree_type)
-                qs = qs.exclude(gattung_deutsch__in=exclude)
-            else:
-                qs = qs.filter(gattung_deutsch__in=gattung_deutsch_query)
-
-        # City district filter
-        district_query = request.query_params.getlist('bezirk[]')
-        if is_valid_queryparam(district_query):
-            qs = qs.filter(bezirk__in=district_query)
-
-        # Year of plantation filter
-        pflanzjahr_min_query = request.GET.get('pflanzjahr_min')
-        pflanzjahr_max_query = request.GET.get('pflanzjahr_max')
-
-        if is_valid_queryparam(pflanzjahr_min_query):
-            qs = qs.filter(pflanzjahr__gte=pflanzjahr_min_query)
-
-        if is_valid_queryparam(pflanzjahr_max_query):
-            qs = qs.filter(pflanzjahr__lte=pflanzjahr_max_query)
-
-        serializer = HamburgRoadsideTreeGeometrySerializer(qs, many=True)
+    def get(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = self.get_serializer(queryset, many=True)
         data = {
             'geoJson': serializer.data,
             'summaries': [{
@@ -72,5 +44,4 @@ class HamburgRoadsideTreeAPIView(APIView):
                 },
             }]
         }
-
         return JsonResponse(data)

@@ -9,8 +9,10 @@ from django.urls import reverse
 from django.urls import reverse_lazy
 from django.views.generic import DetailView, UpdateView
 from django.views.generic import TemplateView
+from django_filters import rest_framework as rf_filters
 from django_tables2 import table_factory
 from extra_views import CreateWithInlinesView, UpdateWithInlinesView
+from rest_framework.generics import GenericAPIView
 from rest_framework.views import APIView
 
 from brit.views import DualUserListView, UserOwnsObjectMixin, NextOrSuccessUrlMixin
@@ -18,11 +20,11 @@ from maps.models import GeoDataset
 from maps.views import GeoDatasetDetailView
 from materials.models import MaterialComponentGroup
 from users.models import get_default_owner
+from .filters import GreenhouseFilter
 from .forms import (CultureModelForm,
                     GreenhouseModalModelForm,
                     GreenhouseGrowthCycle,
                     UpdateGreenhouseGrowthCycleValuesForm,
-                    NantesGreenhousesFilterForm,
                     GrowthCycleCreateForm,
                     GrowthTimestepInline,
                     GrowthShareFormSetHelper,
@@ -296,7 +298,9 @@ class UpdateGreenhouseGrowthCycleValuesView(LoginRequiredMixin, UpdateView):
 
 class GreenhousesMapView(GeoDatasetDetailView):
     feature_url = reverse_lazy('data.nantes_greenhouses')
-    form_class = NantesGreenhousesFilterForm
+    # form_class = NantesGreenhousesFilterForm
+    filter_class = GreenhouseFilter
+    filterset_class = GreenhouseFilter
     load_features = True
     marker_style = {
         'color': '#4061d2',
@@ -310,60 +314,83 @@ class GreenhousesMapView(GeoDatasetDetailView):
         return super().get_object(**kwargs)
 
 
-class NantesGreenhousesAPIView(APIView):
+class NantesGreenhousesAPIView(GenericAPIView):
+    queryset = NantesGreenhouses.objects.all()
+    serializer_class = NantesGreenhousesGeometrySerializer
+    filter_backends = (rf_filters.DjangoFilterBackend,)
+    filterset_class = GreenhouseFilter
 
-    @staticmethod
-    def get(request):
-        qs = NantesGreenhouses.objects.all()
-
-        if request.GET.get('lighting') == '2':
-            qs = qs.filter(lighted=True)
-        elif request.GET.get('lighting') == '3':
-            qs = qs.filter(lighted=False)
-
-        if request.GET.get('heating') == '2':
-            qs = qs.filter(heated=True)
-        elif request.GET.get('heating') == '3':
-            qs = qs.filter(heated=False)
-
-        if request.GET.get('prod_mode') == '2':
-            qs = qs.filter(above_ground=False)
-        elif request.GET.get('prod_mode') == '3':
-            qs = qs.filter(above_ground=True)
-
-        if request.GET.get('cult_man') == '2':
-            qs = qs.filter(high_wire=False)
-        elif request.GET.get('cult_man') == '3':
-            qs = qs.filter(heated=True)
-
-        crops_query = request.query_params.getlist('crops[]')
-
-        crops = []
-        if '1' in crops_query:
-            crops.append('Cucumber')
-        if '2' in crops_query:
-            crops.append('Tomato')
-
-        qs = qs.filter(culture_1__in=crops)
-
-        serializer = NantesGreenhousesGeometrySerializer(qs, many=True)
-        greenhouse_count = len(serializer.data['features'])
-        greenhouse_area_qs = qs.aggregate(Sum('surface_ha'))['surface_ha__sum']
-        greenhouse_area = 0
-        if greenhouse_area_qs is not None:
-            greenhouse_area = round(greenhouse_area_qs, 1)
+    def get(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = self.get_serializer(queryset, many=True)
         data = {
             'geoJson': serializer.data,
-            'summaries': [{
-                'gh_count': {
-                    'label': 'Number of greenhouses',
-                    'value': str(greenhouse_count),
-                },
-                'gh_surface': {
-                    'label': 'Total growth surface',
-                    'value': str(greenhouse_area) + ' ha'
-                }
-            }]
+            'summaries': [
+                # {
+                #     'tree_count': {
+                #         'label': 'Number of trees',
+                #         'value': len(serializer.data['features'])
+                #     },
+                # }
+            ]
         }
-
         return JsonResponse(data)
+
+
+# class NantesGreenhousesAPIView(APIView):
+#
+#     @staticmethod
+#     def get(request):
+#         qs = NantesGreenhouses.objects.all()
+#
+#         if request.GET.get('lighting') == '2':
+#             qs = qs.filter(lighted=True)
+#         elif request.GET.get('lighting') == '3':
+#             qs = qs.filter(lighted=False)
+#
+#         if request.GET.get('heating') == '2':
+#             qs = qs.filter(heated=True)
+#         elif request.GET.get('heating') == '3':
+#             qs = qs.filter(heated=False)
+#
+#         if request.GET.get('prod_mode') == '2':
+#             qs = qs.filter(above_ground=False)
+#         elif request.GET.get('prod_mode') == '3':
+#             qs = qs.filter(above_ground=True)
+#
+#         if request.GET.get('cult_man') == '2':
+#             qs = qs.filter(high_wire=False)
+#         elif request.GET.get('cult_man') == '3':
+#             qs = qs.filter(heated=True)
+#
+#         crops_query = request.query_params.getlist('crops[]')
+#
+#         crops = []
+#         if '1' in crops_query:
+#             crops.append('Cucumber')
+#         if '2' in crops_query:
+#             crops.append('Tomato')
+#
+#         qs = qs.filter(culture_1__in=crops)
+#
+#         serializer = NantesGreenhousesGeometrySerializer(qs, many=True)
+#         greenhouse_count = len(serializer.data['features'])
+#         greenhouse_area_qs = qs.aggregate(Sum('surface_ha'))['surface_ha__sum']
+#         greenhouse_area = 0
+#         if greenhouse_area_qs is not None:
+#             greenhouse_area = round(greenhouse_area_qs, 1)
+#         data = {
+#             'geoJson': serializer.data,
+#             'summaries': [{
+#                 'gh_count': {
+#                     'label': 'Number of greenhouses',
+#                     'value': str(greenhouse_count),
+#                 },
+#                 'gh_surface': {
+#                     'label': 'Total growth surface',
+#                     'value': str(greenhouse_area) + ' ha'
+#                 }
+#             }]
+#         }
+#
+#         return JsonResponse(data)

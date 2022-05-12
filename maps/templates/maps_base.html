@@ -20,10 +20,13 @@
             <div class="col">
                 <div class="card shadow">
                     <div class="card-header"><b>
-                        {{ map_title }}
+                        {% block map_card_header %}{{ map_title }}{% endblock %}
                     </b></div>
                     <div class="card-body p-0">
                         {% leaflet_map "main" %}
+                    </div>
+                    <div class="card-footer">
+                        {% block map_card_footer %}{% endblock %}
                     </div>
                 </div>
             </div>

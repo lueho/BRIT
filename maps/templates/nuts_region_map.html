@@ -28,14 +28,13 @@
 
         async function updateFeatureSummary(feature) {
             const summaries = await fetchFeatureSummaries(feature);
-            console.log(summaries);
             renderSummaries(summaries);
         }
 
         async function fetchSelectOptions(api_url, params) {
             // fetch options for children of selection
             params['direction'] = 'children';
-            let dataurl = api_url + '?' + $.param(params);
+            let dataurl = api_url + '?' + $.param(params).toString();
             let response = await fetch(dataurl);
             let children = await response.json();
             Object.keys(children).forEach(key => {
@@ -82,7 +81,7 @@
                 target = selectors.eq(selectors.index(target) - 1)[0];
             }
             if (target.value) {
-                let params = {id: target.value};
+                const params = {id: target.value};
                 if (target.hasAttribute('data-optionsapi')) {
                     await fetchSelectOptions(target.dataset['optionsapi'], params);
                 }

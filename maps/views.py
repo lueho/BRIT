@@ -217,7 +217,7 @@ class GeoDataSetMixin:
 
 
 class GeoDataSetFormMixin(FormMixin):
-    filter_class = None
+    filterset_class = None
     form_class = None
 
     def get_context_data(self, **kwargs):
@@ -233,14 +233,14 @@ class GeoDataSetFormMixin(FormMixin):
     def get_form(self, form_class=None):
         if self.form_class is not None:
             return self.form_class(**self.get_form_kwargs())
-        if self.filter_class is not None:
-            return self.filter_class(self.request.GET).form
+        if self.filterset_class is not None:
+            return self.filterset_class(self.request.GET).form
 
     def get_filter_fields(self):
-        return {key: type(value.field.widget).__name__ for key, value in self.filter_class.base_filters.items()}
+        return {key: type(value.field.widget).__name__ for key, value in self.filterset_class.base_filters.items()}
 
     def get_form_fields(self):
-        if self.form_class is None and self.filter_class is not None:
+        if self.form_class is None and self.filterset_class is not None:
             return self.get_filter_fields()
         return {key: type(value.widget).__name__ for key, value in self.form_class.base_fields.items()}
 

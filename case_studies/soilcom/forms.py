@@ -250,7 +250,7 @@ class CollectionModelForm(forms.ModelForm):
             return super().save(commit=False)
 
 
-class CollectionFilterForm(forms.Form):
+class CollectionFilterForm2(forms.Form):
     collection_system = forms.ModelMultipleChoiceField(
         queryset=models.CollectionSystem.objects.all(),
         widget=forms.CheckboxSelectMultiple,
@@ -280,7 +280,7 @@ class CollectionFilterForm(forms.Form):
 
 
 class CollectionFilterFormHelper(FormHelper):
-    form_method = 'GET'
+    form_tag = False
     include_media = False
     layout = Layout(
         'catchment',
@@ -289,11 +289,10 @@ class CollectionFilterFormHelper(FormHelper):
         'country',
         'waste_category',
         'allowed_materials',
-        Submit('submit', 'Filter'),
     )
 
 
-class CollectionForm(forms.Form):
+class CollectionFilterForm(forms.Form):
     catchment = forms.ModelChoiceField(
         queryset=models.Catchment.objects.all(),
         widget=autocomplete.ModelSelect2(url='catchment-autocomplete'),

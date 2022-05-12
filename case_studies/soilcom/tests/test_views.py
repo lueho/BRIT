@@ -807,13 +807,13 @@ class CollectionSummaryAPIViewTestCase(TestCase):
 
     def test_get_http_200_ok_for_group_members(self):
         self.client.force_login(self.member)
-        response = self.client.get(reverse('data.collection-summary'), {'pk': self.collection.pk})
+        response = self.client.get(reverse('collection-summary-api'), {'pk': self.collection.pk})
         self.assertEqual(response.status_code, 200)
 
     def test_get_returns_correct_summary_on_existing_collection_pk(self):
         self.maxDiff = None
         self.client.force_login(self.member)
-        response = self.client.get(reverse('data.collection-summary'), {'pk': self.collection.pk})
+        response = self.client.get(reverse('collection-summary-api'), {'pk': self.collection.pk})
         expected = {'summaries': [
             OrderedDict([
                 ('id', self.collection.id),

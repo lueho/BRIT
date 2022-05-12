@@ -2,12 +2,10 @@ from dal import autocomplete
 from django.db.models import Q
 from django.forms import CheckboxSelectMultiple
 from django_filters import ModelChoiceFilter, ModelMultipleChoiceFilter, FilterSet, ChoiceFilter
+from django_filters import rest_framework as rf_filters
 
-from .forms import CollectionForm
+from .forms import CollectionFilterForm
 from .models import Catchment, Collection, Collector, WasteCategory, WasteComponent
-
-
-
 
 
 class CollectionFilter(FilterSet):
@@ -28,7 +26,7 @@ class CollectionFilter(FilterSet):
     class Meta:
         model = Collection
         fields = ('catchment', 'collector', 'collection_system', 'country', 'waste_category', 'allowed_materials')
-        form = CollectionForm
+        form = CollectionFilterForm
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

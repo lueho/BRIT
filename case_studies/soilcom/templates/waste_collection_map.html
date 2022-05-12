@@ -1,122 +1,168 @@
 {% extends 'maps_base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
 
+{% block map_card_footer %}
+    <a href="javascript:void(0)" onclick="clickedListLink()"><i class="fa fa-fw fa-list"></i> View as list</a>
+{% endblock %}
+
+{% block filter_form %}
+    <form method="get">
+        {% crispy filter.form %}
+    </form>
+{% endblock %}
 
 {% block extra_cards %}
 
-    {% if 'soilcom.add_collection' in perms or 'soilcom.change_collection' in perms %}
 
-        <div class="card shadow">
+    <div class="card shadow">
 
-            <div class="card-header"
-                 role="button"
-                 data-toggle="collapse"
-                 href="#options-body"
-                 aria-expanded="true"
-                 aria-controls="options-body">
-                <b>Options</b>
-            </div>
-
-            <div class="card-body collapse" id="options-body">
-
-                {% if 'soilcom.add_collection' in perms %}
-                    <div class="row">
-                        <div class="col">
-                            <div class="text-center">
-                                <a id="btn-collection-create"
-                                   class="btn btn-primary w-75"
-                                   data-href-template="{% url 'catchment-selection' %}"
-                                   href="{% url 'catchment-selection' %}">
-                                    Add new collection
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                {% endif %}
-
-                {% if 'soilcom.add_collection' in perms %}
-                    <div class="row mt-3">
-                        <div class="col">
-                            <div class="text-center">
-                                <a id="btn-collection-copy"
-                                   class="btn btn-primary w-75"
-                                   data-hreftemplate="/waste_collection/collections/__pk__/copy/"
-                                   href="javascript:void(0)">
-                                    Copy selected collection
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                {% endif %}
-
-                {% if 'soilcom.change_collection' in perms %}
-                    <div class="row mt-3">
-                        <div class="col">
-                            <div class="text-center">
-                                <a id="btn-collection-update"
-                                   class="btn btn-primary w-75"
-                                   href="javascript:void(0)"
-                                   data-hreftemplate="/waste_collection/collections/__pk__/update/">
-                                    Edit selected collection
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                {% endif %}
-
-                {% if 'soilcom.change_collection' in perms %}
-                    <div class="row mt-3">
-                        <div class="col">
-                            <div class="text-center">
-                                <a class="btn btn-primary w-75"
-                                   href="{% url 'waste-collection-home' %}">
-                                    Waste collection dashboard
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                {% endif %}
-
-            </div>
+        <div class="card-header"
+             role="button"
+             data-toggle="collapse"
+             href="#options-body"
+             aria-expanded="true"
+             aria-controls="options-body">
+            <b>Options</b>
         </div>
 
-    {% endif %}
+        <div class="card-body collapse" id="options-body">
+
+            <div class="row">
+                <div class="col">
+                    <div class="text-center">
+                        <a id="btn-collection-create"
+                           class="btn btn-primary w-75"
+                           data-href-template="{% url 'collection-list' %}"
+                           href="{% url 'collection-list' %}">
+                            View as list
+                        </a>
+                    </div>
+                </div>
+            </div>
+
+            {% if 'soilcom.change_collection' in perms %}
+                <div class="row mt-3">
+                    <div class="col">
+                        <div class="text-center">
+                            <a class="btn btn-primary w-75"
+                               href="{% url 'waste-collection-home' %}">
+                                Waste collection dashboard
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
+            {% if 'soilcom.add_collection' in perms %}
+                <div class="row mt-3">
+                    <div class="col">
+                        <div class="text-center">
+                            <a id="btn-collection-create"
+                               class="btn btn-primary w-75"
+                               data-href-template="{% url 'catchment-selection' %}"
+                               href="javascript:void(0)"
+                                onclick="clickedCreateButton()">
+                                Add new collection
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
+            {% if 'soilcom.add_collection' in perms %}
+                <div class="row mt-3">
+                    <div class="col">
+                        <div class="text-center">
+                            <a id="btn-collection-copy"
+                               class="btn btn-primary w-75"
+                               data-href-template="/waste_collection/collections/__pk__/copy/"
+                               href="javascript:void(0)">
+                                Copy selected collection
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
+            {% if 'soilcom.change_collection' in perms %}
+                <div class="row mt-3">
+                    <div class="col">
+                        <div class="text-center">
+                            <a id="btn-collection-update"
+                               class="btn btn-primary w-75"
+                               href="javascript:void(0)"
+                               data-href-template="/waste_collection/collections/__pk__/update/">
+                                Edit selected collection
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
+            {% if 'soilcom.delete_collection' in perms %}
+                <div class="row mt-3">
+                    <div class="col">
+                        <div class="text-center">
+                            <a id="btn-collection-delete"
+                               class="btn btn-danger modal-link w-75"
+                               href="javascript:void(0)"
+                               data-href-template="/waste_collection/collections/__pk__/delete/modal/">
+                                Delete selected collection
+                            </a>
+                        </div>
+                    </div>
+                </div>
+            {% endif %}
+
+        </div>
+    </div>
 
 {% endblock extra_cards %}
 
 
-
 {% block javascript %}
     {{ block.super }}
+    {{ filter.form.media }}
+    <link href="{% static 'lib/select2-bootstrap-theme/select2-bootstrap4.min.css' %}" rel="stylesheet">
     <script type="text/javascript">
 
-        document.getElementById('btn-collection-create').addEventListener("click", function (e) {
-            e.preventDefault();
-            let filter_params = parseFilterParameters();
-            filter_params.load_features = true;
-            let params = {'next': '/waste_collection/collections/map/?' + $.param(filter_params)};
-            location.href = e.target.dataset['hrefTemplate'] + '?' + $.param(params);
+        function updateUrls(feature_id) {
+            const filter_params = parseFilterParameters();
+            filter_params.append('load_features', 'true')
+            const params = new URLSearchParams();
+            params.append('next', '/waste_collection/collections/map/?' + filter_params.toString());
 
-        })
+            const create_button = document.getElementById('btn-collection-create');
+            const create_url = create_button.dataset.hrefTemplate + '?' + params.toString();
+            create_button.setAttribute('href', create_url);
 
-        function updateCreateUrl(btn) {
-            let filter_params = parseFilterParameters();
-            filter_params.load_features = true;
-            let params = {'next': '/waste_collection/collections/map/?' + $.param(filter_params)};
-            let create_url = btn.href + '?' + $.param(params);
-            btn.setAttribute('href', create_url)
+            const update_button = document.getElementById('btn-collection-update');
+            const update_url = update_button.dataset.hrefTemplate.replace('__pk__', feature_id.toString()) + '?' + params.toString();
+            update_button.setAttribute('href', update_url);
+
+            const copy_button = document.getElementById('btn-collection-copy');
+            let copy_url = copy_button.dataset.hrefTemplate.replace('__pk__', feature_id.toString()) + '?' + params.toString();
+            copy_button.setAttribute('href', copy_url);
+
+            const delete_button = document.getElementById('btn-collection-delete');
+            const delete_url = delete_button.dataset.hrefTemplate.replace('__pk__', feature_id.toString()) + '?' + params.toString();
+            $('#btn-collection-delete').modalForm({
+                    formURL: delete_url,
+                    errorClass: ".is-invalid"
+                });
         }
 
-        function updateUrls(feature_id) {
-            let filter_params = parseFilterParameters();
-            filter_params.load_features = true;
-            let params = {'next': '/waste_collection/collections/map/?' + $.param(filter_params)};
-            let update_button = document.getElementById('btn-collection-update')
-            let update_url = update_button.dataset['hreftemplate'].replace('__pk__', feature_id.toString()) + '?' + $.param(params);
-            update_button.setAttribute('href', update_url)
+    function clickedCreateButton() {
+            const filter_params = parseFilterParameters();
+            filter_params.append('load_features', 'true');
+            const params = new URLSearchParams();
+            params.append('next', window.location.href + '?' + filter_params.toString());
+            window.location.href = "{% url 'catchment-selection' %}" + '?' + params.toString();
+        }
 
-            let copy_button = document.getElementById('btn-collection-copy')
-            let copy_url = copy_button.dataset['hreftemplate'].replace('__pk__', feature_id.toString()) + '?' + $.param(params);
-            copy_button.setAttribute('href', copy_url)
+    function clickedListLink() {
+            window.location.href = "{% url 'collection-list' %}" + '?' + parseFilterParameters().toString();
         }
 
     </script>

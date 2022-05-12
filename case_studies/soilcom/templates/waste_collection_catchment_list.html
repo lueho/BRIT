@@ -20,12 +20,10 @@
 
         async function updateUrls(region_id) {
             const next = new URLSearchParams(window.location.search).get('next')
-            const params = {
-                'next': next,
-                'region_id': region_id
-            }
+            const params = new URLSearchParams({'region_id': region_id.toString()});
+            if (next !== null) {params.append('next', next.toString())}
             const create_button = document.getElementById('btn-collection-create');
-            const url = create_button.dataset['hrefTemplate'] + '?' + $.param(params);
+            const url = create_button.dataset.hrefTemplate + '?' + params.toString();
             create_button.setAttribute('href', url);
         }
 

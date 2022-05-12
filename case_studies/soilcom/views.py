@@ -1,13 +1,12 @@
 from dal import autocomplete
 from django.contrib.auth.mixins import PermissionRequiredMixin
-from django.db.models import Max, Q
+from django.db.models import Max
 from django.forms import modelformset_factory
 from django.http import HttpResponseRedirect, JsonResponse
 from django.urls import reverse_lazy
-from django.shortcuts import render
 from django.views.generic import TemplateView
-
-from django_filters.views import FilterMixin, FilterView
+from django_filters import rest_framework as rf_filters
+from rest_framework.generics import GenericAPIView, ListAPIView
 from rest_framework.views import APIView, Response
 
 from bibliography.views import (SourceListView,
@@ -448,35 +447,21 @@ class FrequencyModalDeleteView(views.OwnedObjectDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 class CollectionListView(views.OwnedObjectListView):
-    template_name = 'simple_list_card.html'
+    template_name = 'collection_list.html'
     model = models.Collection
-    permission_required = 'soilcom.view_collection'
-
-
-# class CollectionFilterView(PermissionRequiredMixin, FilterView):
-#     template_name = 'collection_filter.html'
-#     queryset = models.Collection.objects.filter(catchment__name__icontains='Hamburg')
-#     filterset_class = filters.CollectionFilter
-#     permission_required = set()
-
-
-class CollectionFilterView(views.OwnedObjectListView):
-    template_name = 'collection_filter.html'
-    model = models.Collection
-    queryset = models.Collection.objects.all()
-    # filterset_class = filters.CollectionFilter
+    queryset = models.Collection.objects.order_by('id')
+    filterset_class = filters.CollectionFilter
+    filterset = None
     permission_required = set()
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        filter = filters.CollectionFilter(self.request.GET, queryset)
-        return filter.qs
+        self.filterset = self.filterset_class(self.request.GET, queryset=queryset)
+        return self.filterset.qs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        queryset = self.get_queryset()
-        filter = filters.CollectionFilter(self.request.GET, queryset)
-        context['filter'] = filter
+        context['filter'] = self.filterset
         return context
 
 
@@ -710,9 +695,9 @@ class CatchmentSelectView(GeoDataSetFormMixin, GeoDataSetMixin, TemplateView):
 
 class WasteCollectionMapView(GeoDatasetDetailView):
     template_name = 'waste_collection_map.html'
-    feature_url = reverse_lazy('data.collections')
-    feature_summary_url = reverse_lazy('data.collection-summary')
-    form_class = forms.CollectionFilterForm
+    feature_url = reverse_lazy('collection-geometry-api')
+    feature_summary_url = reverse_lazy('collection-summary-api')
+    filterset_class = filters.CollectionFilter
     load_features = False
     adjust_bounds_to_features = True
     load_region = False
@@ -732,6 +717,13 @@ class WasteCollectionMapView(GeoDatasetDetailView):
         })
         return initial
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        queryset = models.Collection.objects.all()
+        filterset = self.filterset_class(self.request.GET, queryset=queryset)
+        context['filter'] = filterset
+        return context
+
     def get_object(self, **kwargs):
         self.kwargs.update({'pk': GeoDataset.objects.get(model_name='WasteCollection').pk})
         return super().get_object(**kwargs)
@@ -741,44 +733,26 @@ class WasteCollectionMapView(GeoDatasetDetailView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class WasteCollectionAPIView(APIView):
+class CollectionGeometryAPI(GenericAPIView):
+    queryset = models.Collection.objects.all()
+    serializer_class = serializers.WasteCollectionGeometrySerializer
+    filter_backends = (rf_filters.DjangoFilterBackend,)
+    filterset_class = filters.CollectionFilter
 
-    @staticmethod
-    def get(request):
-        if request.query_params:
-            qs = models.Collection.objects.all()
-        else:
-            qs = models.Collection.objects.none()
-
-        countries = request.query_params.getlist('countries[]')
-        if countries:
-            qs = qs.filter(
-                Q(catchment__region__nutsregion__cntr_code__in=countries) |
-                Q(catchment__region__lauregion__cntr_code__in=countries))
-
-        collection_system = request.query_params.getlist('collection_system[]')
-        if collection_system:
-            qs = qs.filter(collection_system_id__in=collection_system)
-
-        waste_category = request.query_params.getlist('waste_category[]')
-        if waste_category:
-            qs = qs.filter(waste_stream__category_id__in=waste_category)
-
-        allowed_materials_ids = request.query_params.getlist('allowed_materials[]')
-        if allowed_materials_ids:
-            for material_id in allowed_materials_ids:
-                qs = qs.filter(waste_stream__allowed_materials__id=material_id)
-
-        last_editor = request.query_params.getlist('last_editor[]')
-        if last_editor:
-            qs = qs.filter(lastmodified_by__in=last_editor)
-
-        serializer = serializers.WasteCollectionGeometrySerializer(qs, many=True)
+    def get(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        serializer = self.get_serializer(queryset, many=True)
         data = {'geoJson': serializer.data}
         return JsonResponse(data)
 
 
-class WasteCollectionSummaryAPIView(APIView):
+# class CollectionSummaryAPI(ListAPIView):
+#     queryset = models.Collection.objects.all()
+#     serializer_class = serializers.CollectionModelSerializer
+    filter_backends = (rf_filters.DjangoFilterBackend,)
+#     filterset_class = filters.CollectionFilter
+
+class CollectionSummaryAPI(APIView):
 
     @staticmethod
     def get(request):
@@ -790,12 +764,3 @@ class WasteCollectionSummaryAPIView(APIView):
             field_labels_as_keys=True,
             context={'request': request})
         return Response({'summaries': serializer.data})
-
-
-class WasteCollectionPopupDetailView(views.OwnedObjectDetailView):
-    template_name = 'waste_collection_popup.html'
-    model = models.Collection
-    permission_required = 'soilcom.view_collection'
-
-    def get_object(self, **kwargs):
-        return self.model.objects.get(id=self.request.GET.get('pk'))

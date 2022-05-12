@@ -1,5 +1,6 @@
 {% extends 'base.html' %}
 {% load static %}
+{% load custom_tags %}
 {% load crispy_forms_tags %}
 
 {% block content %}
@@ -12,18 +13,19 @@
                     <table class="table">
                         <thead>
                         <tr>
-                            <th>Name</th>
-                            <th>Description</th>
+                            <th>Id</th>
+                            <th>Collector</th>
+                            <th>Category</th>
+                            <th>Collection system</th>
                         </tr>
                         </thead>
                         <tbody>
-                        {% for object in filter.qs %}
+                        {% for object in object_list %}
                             <tr>
-                                <td>
-                                    <a href="{{ object.get_absolute_url }}">{{ object.name }}</a>
-                                </td>
-                                <td><p>{{ object.collector }} - {{ object.catchment }}
-                                    - {{ object.collection_system }}</p></td>
+                                <td><a href="{{ object.get_absolute_url }}">{{ object.id }}</a></td>
+                                <td><a href="{{ object.collector.get_absolute_url }}">{{ object.collector }}</a></td>
+                                <td><a href="{{ object.waste_stream.category.get_absolute_url }}">{{ object.waste_stream.category }}</a></td>
+                                <td><a href="{{ object.collection_system.get_absolute_url }}">{{ object.collection_system }}</a></td>
                             </tr>
                         {% endfor %}
                         </tbody>
@@ -33,8 +35,8 @@
                     <div class="pagination">
                         <span class="step-links">
                             {% if page_obj.has_previous %}
-                                <a href="?page=1">&laquo; first</a>
-                                <a href="?page={{ page_obj.previous_page_number }}">previous</a>
+                                <a href="?{% param_replace page=1 %}">&laquo; first</a>
+                                <a href="?{% param_replace page=page_obj.previous_page_number %}">previous</a>
                             {% endif %}
 
                             <span class="current">
@@ -42,21 +44,27 @@
                             </span>
 
                             {% if page_obj.has_next %}
-                                <a href="?page={{ page_obj.next_page_number }}">next</a>
-                                <a href="?page={{ page_obj.paginator.num_pages }}">last &raquo;</a>
+                                <a href="?{% param_replace page=page_obj.next_page_number %}">next</a>
+                                <a href="?{% param_replace page=page_obj.paginator.num_pages %}">last &raquo;</a>
                             {% endif %}
                         </span>
                     </div>
                 </div>
-                <div class="card-footer"></div>
+                <div class="card-footer">
+                    <a href="{% url 'WasteCollection' %}?{{ request.GET.urlencode }}&load_features=true">
+                        <i class="fa fa-fw fa-map"></i>
+                        View as map
+                    </a>
+                </div>
             </div>
         </div>
-        <div class="col-3">
+        <div class="col col-sm-3">
             <div class="card shadow">
                 <div class="card-header"><strong>Filter</strong></div>
                 <div class="card-body">
                     <form method="get">
                         {% crispy filter.form %}
+                        <button id="btn-filter" class="btn btn-primary" type="submit">Filter</button>
                     </form>
                 </div>
                 <div class="card-footer"></div>
