@@ -14,6 +14,7 @@
                         <thead>
                         <tr>
                             <th>Id</th>
+                            <th>Catchment</th>
                             <th>Collector</th>
                             <th>Category</th>
                             <th>Collection system</th>
@@ -23,6 +24,7 @@
                         {% for object in object_list %}
                             <tr>
                                 <td><a href="{{ object.get_absolute_url }}">{{ object.id }}</a></td>
+                                <td>{{ object.catchment }}</td>
                                 <td><a href="{{ object.collector.get_absolute_url }}">{{ object.collector }}</a></td>
                                 <td><a href="{{ object.waste_stream.category.get_absolute_url }}">{{ object.waste_stream.category }}</a></td>
                                 <td><a href="{{ object.collection_system.get_absolute_url }}">{{ object.collection_system }}</a></td>
@@ -59,15 +61,55 @@
             </div>
         </div>
         <div class="col col-sm-3">
-            <div class="card shadow">
-                <div class="card-header"><strong>Filter</strong></div>
-                <div class="card-body">
-                    <form method="get">
-                        {% crispy filter.form %}
-                        <button id="btn-filter" class="btn btn-primary" type="submit">Filter</button>
-                    </form>
+            <div class="accordion">
+                <div class="card shadow">
+                    <div class="card-header"><strong>Filter</strong></div>
+                    <div class="card-body">
+                        <form method="get">
+                            {% crispy filter.form %}
+                            <button id="btn-filter" class="btn btn-primary" type="submit">Filter</button>
+                        </form>
+                    </div>
+                    <div class="card-footer"></div>
                 </div>
-                <div class="card-footer"></div>
+                <div class="card shadow">
+                    <div class="card-header"
+                         role="button"
+                         data-toggle="collapse"
+                         href="#options-body"
+                         aria-expanded="true"
+                         aria-controls="options-body">
+                        <b>Options</b>
+                    </div>
+                    <div class="card-body collapse" id="options-body">
+                        <div class="row">
+                            <div class="col">
+                                <div class="text-center">
+                                    <a id="btn-collection-create"
+                                       class="btn btn-primary w-75"
+                                       href="{% url 'WasteCollection' %}?{{ request.GET.urlencode }}&load_features=true">
+                                        View as Map
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+
+                        {% if 'soilcom.add_collection' in perms %}
+                            <div class="row mt-3">
+                                <div class="col">
+                                    <div class="text-center">
+                                        <a id="btn-collection-create"
+                                           class="btn btn-primary w-75"
+                                           href="{% url 'collection-create' %}?next={{ request.get_full_path|urlencode }}">
+                                            Add new collection
+                                        </a>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endif %}
+                    </div>
+                    <div class="card-footer"></div>
+                </div>
             </div>
         </div>
     </div>
