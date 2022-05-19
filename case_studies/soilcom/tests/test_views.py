@@ -529,32 +529,6 @@ class CollectionCopyViewTestCase(TestCase):
         response = self.client.get(reverse('collection-copy', kwargs={'pk': self.collection.id}))
         self.assertEqual(response.status_code, 200)
 
-    def test_get_get_initial(self):
-        request = RequestFactory().get(reverse('collection-copy', kwargs={'pk': self.collection.id}))
-        view = views.CollectionCopyView()
-        view.setup(request)
-        view.kwargs = {'pk': self.collection.id}
-        expected = {
-            'catchment': self.collection.catchment,
-            'collector': self.collection.collector,
-            'collection_system': self.collection.collection_system,
-            'waste_category': self.collection.waste_stream.category,
-            'connection_rate': self.collection.connection_rate,
-            'connection_rate_year': self.collection.connection_rate_year,
-            'frequency': self.collection.frequency,
-            'allowed_materials': self.collection.waste_stream.allowed_materials.all(),
-            'description': self.collection.description
-        }
-        initial = view.get_initial()
-        self.assertEqual(set(expected.keys()), set(initial.keys()))
-        for key, value in expected.items():
-            if key == 'allowed_materials':
-                self.assertIn(key, initial)
-                self.assertEqual(set(expected[key]), set(initial[key]))
-            else:
-                self.assertIn(key, initial)
-                self.assertEqual(value, initial[key])
-
     def test_get_object(self):
         request = RequestFactory().get(reverse('collection-copy', kwargs={'pk': self.collection.id}))
         view = views.CollectionCopyView()

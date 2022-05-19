@@ -162,7 +162,7 @@ class CollectionModelForm(forms.ModelForm):
         queryset=models.CollectionSystem.objects.all(),
         required=True)
     catchment = forms.ModelChoiceField(
-        queryset=models.Catchment.objects.all().order_by('region__nutsregion__nuts_id'),
+        queryset=models.Catchment.objects.all().order_by('name'),
         widget=autocomplete.ModelSelect2(url='catchment-autocomplete'),
         required=True
     )
@@ -188,12 +188,32 @@ class CollectionModelForm(forms.ModelForm):
         }
 
     def __init__(self, *args, **kwargs):
+        instance = kwargs.get('instance')
+        if instance:
+            initial = {}
+            if instance.catchment:
+                initial['catchment'] = instance.catchment
+            if instance.collector:
+                initial['collector'] = instance.collector
+            if instance.collection_system:
+                initial['collection_system'] = instance.collection_system
+            if instance.waste_stream:
+                if instance.waste_stream.category:
+                    initial['waste_category'] = instance.waste_stream.category
+                if instance.waste_stream.allowed_materials.exists():
+                    initial['allowed_materials'] = instance.waste_stream.allowed_materials.all()
+            if instance.connection_rate:
+                initial['connection_rate'] = instance.connection_rate * 100
+            if instance.connection_rate_year:
+                initial['connection_rate_year'] = instance.connection_rate_year
+            if instance.frequency:
+                initial['frequency'] = instance.frequency
+            if instance.description:
+                initial['description'] = instance.description
+            kwargs.update({'initial': initial})
         super().__init__(*args, **kwargs)
         self.fields['collector'].widget.attrs = {'data-theme': 'bootstrap4'}
         self.fields['catchment'].widget.attrs = {'data-theme': 'bootstrap4'}
-        initial = kwargs.get('initial', {})
-        if 'catchment' in initial:
-            self.fields['catchment'].queryset = models.Catchment.objects.filter(id=initial['catchment'].id)
 
     def clean_connection_rate(self):
         connection_rate = self.cleaned_data.get('connection_rate')
