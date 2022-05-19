@@ -291,12 +291,15 @@ class CollectionFilterFormHelper(FormHelper):
         'allowed_materials',
     )
 
+
 COUNTRY_CHOICES = (
+    ('BE', 'BE'),
     ('DE', 'DE'),
-    ('UK', 'UK'),
+    ('DK', 'DK'),
     ('NL', 'NL'),
-    ('DK', 'DK')
+    ('UK', 'UK'),
 )
+
 
 class CollectionFilterForm(forms.Form):
     catchment = forms.ModelChoiceField(

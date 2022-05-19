@@ -8,10 +8,11 @@ from .forms import CollectionFilterForm
 from .models import Catchment, Collection, Collector, WasteCategory, WasteComponent
 
 COUNTRY_CHOICES = (
+    ('BE', 'BE'),
     ('DE', 'DE'),
-    ('UK', 'UK'),
+    ('DK', 'DK'),
     ('NL', 'NL'),
-    ('DK', 'DK')
+    ('UK', 'UK'),
 )
 
 
