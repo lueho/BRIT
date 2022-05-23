@@ -42,6 +42,7 @@ INSTALLED_APPS = [
     'case_studies.flexibi_nantes.apps.CaseStudyNantesConfig',
     'case_studies.flexibi_hamburg.apps.FlexibiHamburgConfig',
     'case_studies.soilcom.apps.SoilcomConfig',
+    'interfaces.simucf.apps.SimucfConfig',
     'django.forms',
     'django_filters',
     'crispy_forms',

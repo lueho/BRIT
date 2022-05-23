@@ -20,6 +20,7 @@ urlpatterns = [
     path('maps/', include('maps.urls')),
     path('materials/', include('materials.urls')),
     path('inventories/', include('inventories.urls')),
+    path('interfaces/simucf/', include('interfaces.simucf.urls')),
     path('case_studies/nantes/', include('case_studies.flexibi_nantes.urls')),
     path('waste_collection/', include('case_studies.soilcom.urls')),
     path('bibliography/', include('bibliography.urls')),
