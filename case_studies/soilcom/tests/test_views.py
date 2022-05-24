@@ -443,6 +443,7 @@ class CollectionCreateViewTestCase(TestCase):
         self.assertTrue('Year needs to be in YYYY format.' in response.context['form'].errors['connection_rate_year'])
 
     def test_post_with_valid_form_data(self):
+        self.assertEqual(Collection.objects.count(), 1)
         self.client.force_login(self.member)
         response = self.client.post(
             reverse('collection-create'),
@@ -464,8 +465,9 @@ class CollectionCreateViewTestCase(TestCase):
                 'form-1-id': ''
             }
         )
-        # self.assertRedirects(response, reverse('WasteCollection'))
         self.assertEqual(response.status_code, 302)
+        self.assertRedirects(response, reverse('WasteCollection'))
+        self.assertEqual(Collection.objects.count(), 2)
 
 
 @modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
@@ -473,9 +475,9 @@ class CollectionCopyViewTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = User.objects.create(username='owner', password='very-secure!')
-        User.objects.create(username='outsider', password='very-secure!')
-        member = User.objects.create(username='member', password='very-secure!')
+        owner = get_default_owner()
+        User.objects.create(username='outsider')
+        member = User.objects.create(username='member')
         member.user_permissions.add(Permission.objects.get(codename='add_collection'))
 
         MaterialCategory.objects.create(owner=owner, name='Biowaste component')
@@ -510,10 +512,11 @@ class CollectionCopyViewTestCase(TestCase):
         collection.flyers.add(waste_flyer)
 
     def setUp(self):
-        self.collection = Collection.objects.get(name='collection1')
-        self.flyer = self.collection.flyers.get(url='https://www.test-flyer.org')
+        self.owner = get_default_owner()
         self.outsider = User.objects.get(username='outsider')
         self.member = User.objects.get(username='member')
+        self.collection = Collection.objects.get(name='collection1')
+        self.flyer = self.collection.flyers.get(url='https://www.test-flyer.org')
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(reverse('collection-copy', kwargs={'pk': self.collection.id}))
@@ -593,6 +596,47 @@ class CollectionCopyViewTestCase(TestCase):
         self.client.force_login(self.outsider)
         response = self.client.post(reverse('collection-copy', kwargs={'pk': self.collection.id}))
         self.assertEqual(response.status_code, 403)
+
+    def test_post_http_302_redirect_for_member(self):
+        self.client.force_login(self.member)
+        data = {
+            'catchment': Catchment.objects.first().id,
+            'collector': Collector.objects.create(owner=self.owner, name='New Test Collector').id,
+            'collection_system': CollectionSystem.objects.first().id,
+            'waste_category': WasteCategory.objects.first().id,
+            'allowed_materials': [c.id for c in WasteComponent.objects.all()],
+            'connection_rate': 0.7,
+            'connection_rate_year': 2020,
+            'frequency': CollectionFrequency.objects.first().id,
+            'description': 'This is a test case that should pass!',
+            'form-INITIAL_FORMS': '0',
+            'form-TOTAL_FORMS': '0',
+        }
+        response = self.client.post(reverse('collection-copy', kwargs={'pk': self.collection.id}), data=data)
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_creates_new_copy(self):
+        self.client.force_login(self.member)
+        self.assertEqual(Collection.objects.count(), 1)
+        get_response = self.client.get(reverse('collection-copy', kwargs={'pk': self.collection.pk}))
+        initial = get_response.context['form'].initial
+        data = {
+            'catchment': initial['catchment'].id,
+            'collector': initial['collector'].id,
+            'collection_system': initial['collection_system'].id,
+            'waste_category': initial['waste_category'].id,
+            'allowed_materials': [c.id for c in initial['allowed_materials']],
+            'connection_rate': initial['connection_rate'],
+            'connection_rate_year': initial['connection_rate_year'],
+            'frequency': initial['frequency'].id,
+            'description': initial['description'],
+            'form-INITIAL_FORMS': '0',
+            'form-TOTAL_FORMS': '0',
+        }
+        post_response = self.client.post(reverse('collection-copy', kwargs={'pk': self.collection.pk}), data=data)
+        self.assertEqual(post_response.status_code, 302)
+        self.assertRedirects(post_response, reverse('WasteCollection'))
+        self.assertEqual(Collection.objects.count(), 2)
 
 
 @modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})

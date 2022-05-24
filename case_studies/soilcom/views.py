@@ -542,12 +542,29 @@ class CollectionCopyView(CollectionCreateView):
         })
         return super().get_formset_kwargs(**kwargs)
 
-    def get_form_kwargs(self):
-        self.object = self.get_object()
-        kwargs = super().get_form_kwargs()
-        if hasattr(self, 'object'):
-            kwargs.update({'instance': self.object})
-        return kwargs
+    def get_initial(self):
+        object = self.get_object()
+        initial = {}
+        if object.catchment:
+            initial['catchment'] = object.catchment
+        if object.collector:
+            initial['collector'] = object.collector
+        if object.collection_system:
+            initial['collection_system'] = object.collection_system
+        if object.waste_stream:
+            if object.waste_stream.category:
+                initial['waste_category'] = object.waste_stream.category
+            if object.waste_stream.allowed_materials.exists():
+                initial['allowed_materials'] = object.waste_stream.allowed_materials.all()
+        if object.connection_rate:
+            initial['connection_rate'] = object.connection_rate * 100
+        if object.connection_rate_year:
+            initial['connection_rate_year'] = object.connection_rate_year
+        if object.frequency:
+            initial['frequency'] = object.frequency
+        if object.description:
+            initial['description'] = object.description
+        return initial
 
 
 class CollectionDetailView(views.OwnedObjectDetailView):
