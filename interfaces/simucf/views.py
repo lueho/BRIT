@@ -1,3 +1,9 @@
-from django.shortcuts import render
+from django.http import HttpResponse
 
-# Create your views here.
+
+def download_input_file(request):
+    file_data = "some text"
+    response = HttpResponse(file_data, content_type='application/text charset=utf-8')
+    response['Content-Disposition'] = 'attachement; filename="simucf-input.txt"'
+    return response
+
