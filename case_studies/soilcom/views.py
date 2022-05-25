@@ -56,7 +56,6 @@ class CollectorModalCreateView(views.OwnedObjectModalCreateView):
 
 
 class CollectorDetailView(views.OwnedObjectDetailView):
-    template_name = 'simple_detail_card.html'
     model = models.Collector
     permission_required = 'soilcom.view_collector'
 
@@ -513,6 +512,8 @@ class CollectionCreateView(ModelFormAndModelFormSetMixin, views.OwnedObjectCreat
             region_id = self.request.GET.get('region_id')
             catchment = Catchment.objects.get(id=region_id)
             initial['catchment'] = catchment
+        if 'collector' in self.request.GET:
+            initial['collector'] = models.Collector.objects.get(id=self.request.GET.get('collector'))
         return initial
 
     def post(self, request, *args, **kwargs):
