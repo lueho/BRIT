@@ -8,26 +8,32 @@
             <div class="card shadow">
                 <div class="card-header"><strong>{{ model_name }} details</strong></div>
                 <div class="card-body">
-                    <p class="card-text"><strong>Name:</strong><br>{{ object.name }}</p>
-                    <p class="card-text"><strong>Description:</strong><br>{{ object.description }}</p>
+                    {% block detail_body %}
+                        <p class="card-text"><strong>Name:</strong><br>{{ object.name }}</p>
+                        {% if object.description %}
+                            <p class="card-text"><strong>Description:</strong><br>{{ object.description }}</p>
+                        {% endif %}
+                    {% endblock detail_body %}
                 </div>
                 <div class="card-footer">
-                    <a href="javascript:history.go(-1)" class="nowrap">
-                        <i class="fas fa-fw fa-arrow-left">
-                        </i> back
-                    </a>
-                    <a href="{{ object.list_url }}" class="ml-3">
-                        <i class="fas fa-fw fa-list">
-                        </i> see all
-                    </a>
-                    <a href="{{ object.update_url}}" class="ml-3">
-                        <i class="fas fa-fw fa-edit">
-                        </i> edit
-                    </a>
-                    <a href="{{ object.modal_delete_url}}" class="modal-link ml-3">
-                        <i class="fas fa-fw fa-trash">
-                        </i> delete
-                    </a>
+                    {% block detail_footer %}
+                        <a href="javascript:history.go(-1)" class="nowrap">
+                            <i class="fas fa-fw fa-arrow-left">
+                            </i> back
+                        </a>
+                        <a href="{{ object.list_url }}" class="ml-3">
+                            <i class="fas fa-fw fa-list">
+                            </i> see all
+                        </a>
+                        <a href="{{ object.update_url }}" class="ml-3">
+                            <i class="fas fa-fw fa-edit">
+                            </i> edit
+                        </a>
+                        <a href="{{ object.modal_delete_url }}" class="modal-link ml-3">
+                            <i class="fas fa-fw fa-trash">
+                            </i> delete
+                        </a>
+                    {% endblock detail_footer %}
                 </div>
             </div>
         </div>
