@@ -1,7 +1,7 @@
 from django.urls import path
 
-from .views import download_input_file
+from .views import SimuCFFormView
 
 urlpatterns = [
-    path('download_inputfile/', download_input_file, name='simucf-inputfile'),
+    path('form/', SimuCFFormView.as_view(), name='simucf-form'),
 ]
