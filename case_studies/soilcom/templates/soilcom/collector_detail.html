@@ -1,0 +1,27 @@
+{% extends 'simple_detail_card.html' %}
+
+{% block detail_body %}
+    <p class="card-text"><strong>Name:</strong><br>{{ object.name }}</p>
+    <p class="card-text">
+        <strong>Website:</strong><br>
+        <a href="{{ object.website }}" target="blank">{{ object.website }}</a>
+    </p>
+    {% if object.comments %}
+        <p class="card-text"><strong>Comments:</strong><br>{{ object.description }}</p>
+    {% endif %}
+
+        <p class="card-text"><strong>Collections:</strong><br>
+    {% if object.collection_set.exists %}
+        </p>
+        <ul>
+            {% for collection in object.collection_set.all %}
+                <li><a href="{{ collection.get_absolute_url }}">{{ collection.name }}</a></li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        No collections so far<br></p>
+    {% endif %}
+    <a href="{% url 'collection-create' %}?collector={{ object.pk }}">
+        <i class="fas fa-fw fa-plus"></i> Create a new collection for this collector
+    </a>
+{% endblock %}

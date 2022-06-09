@@ -1,3 +1,8 @@
 .select2-container {
     min-width: 10em !important
 }
+
+.nowrap {
+    white-space: nowrap;
+    overflow: hidden;
+}
