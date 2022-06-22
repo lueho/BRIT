@@ -760,7 +760,7 @@ class CollectionCSVAPIView(GenericAPIView):
             content_type='text/csv',
             headers={'Content-Disposition': 'attachment; filename="collections.csv"'},
         )
-        field_names = ['Catchment', 'Collector', 'Collection System', 'Country', 'Waste Category', 'Allowed Materials',
+        field_names = ['Catchment', 'NUTS Id', 'Collector', 'Collection System', 'Country', 'Waste Category', 'Allowed Materials',
                        'Connection Rate', 'Connection Rate Year', 'Frequency', 'Comments', 'Sources']
         writer = csv.DictWriter(response, fieldnames=field_names, delimiter='\t')
         writer.writeheader()
@@ -777,6 +777,10 @@ class CollectionCSVAPIView(GenericAPIView):
                 if collection.catchment:
                     values['Catchment'] = collection.catchment.name
                     values['Country'] = collection.catchment.region.country_code
+                    try:
+                        values['NUTS Id'] = collection.catchment.region.nutsregion.nuts_id
+                    except:
+                        values['NUTS Id'] = ''
                 else:
                     values['Catchment'] = ''
                 if collection.collector:
