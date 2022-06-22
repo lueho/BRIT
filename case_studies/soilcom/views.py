@@ -1,12 +1,14 @@
+import csv
+
 from dal import autocomplete
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db.models import Max
 from django.forms import modelformset_factory
-from django.http import HttpResponseRedirect, JsonResponse
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.urls import reverse_lazy
 from django.views.generic import TemplateView
 from django_filters import rest_framework as rf_filters
-from rest_framework.generics import GenericAPIView, ListAPIView
+from rest_framework.generics import GenericAPIView
 from rest_framework.views import APIView, Response
 
 from bibliography.views import (SourceListView,
@@ -745,6 +747,52 @@ class CollectionGeometryAPI(GenericAPIView):
         serializer = self.get_serializer(queryset, many=True)
         data = {'geoJson': serializer.data}
         return JsonResponse(data)
+
+
+class CollectionCSVAPIView(GenericAPIView):
+    queryset = models.Collection.objects.all()
+    serializer_class = serializers.WasteCollectionGeometrySerializer
+    filter_backends = (rf_filters.DjangoFilterBackend,)
+    filterset_class = filters.CollectionFilter
+
+    def get(self, request, *args, **kwargs):
+        response = HttpResponse(
+            content_type='text/csv',
+            headers={'Content-Disposition': 'attachment; filename="collections.csv"'},
+        )
+        field_names = ['Catchment', 'Collector', 'Collection System', 'Country', 'Waste Category', 'Allowed Materials',
+                       'Connection Rate', 'Connection Rate Year', 'Frequency', 'Comments', 'Sources']
+        writer = csv.DictWriter(response, fieldnames=field_names, delimiter='\t')
+        writer.writeheader()
+        for collection in self.filter_queryset(self.get_queryset()):
+            for allowed_material in collection.waste_stream.allowed_materials.all():
+                values = {
+                    'Allowed Materials': allowed_material,
+                    'Waste Category': collection.waste_stream.category,
+                    'Connection Rate': collection.connection_rate,
+                    'Connection Rate Year': collection.connection_rate_year,
+                    'Comments': collection.description.replace('\n', '').replace('\r', ''),
+                    'Sources': f'{", ".join([flyer.url for flyer in collection.flyers.all()])}'
+                }
+                if collection.catchment:
+                    values['Catchment'] = collection.catchment.name
+                    values['Country'] = collection.catchment.region.country_code
+                else:
+                    values['Catchment'] = ''
+                if collection.collector:
+                    values['Collector'] = collection.collector.name
+                else:
+                    values['Collector'] = ''
+                if collection.collection_system:
+                    values['Collection System'] = collection.collection_system.name
+                else:
+                    values['Collection System'] = ''
+                if collection.frequency:
+                    values['Frequency'] = collection.frequency.name
+                else:
+                    values['Frequency'] = ''
+                writer.writerow(values)
+        return response
 
 
 # class CollectionSummaryAPI(ListAPIView):

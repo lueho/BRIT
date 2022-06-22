@@ -1,123 +1,56 @@
-{% extends 'base.html' %}
-{% load static %}
-{% load custom_tags %}
+{% extends 'filtered_list.html' %}
 {% load crispy_forms_tags %}
 
-{% block content %}
+{% block title %}BRIT | Household waste collection list{% endblock %}
 
-    <div class="row">
-        <div class="col">
-            <div class="card">
-                <div class="card-header"><strong>Collections</strong></div>
-                <div class="card-body">
-                    <table class="table">
-                        <thead>
-                        <tr>
-                            <th>Id</th>
-                            <th>Catchment</th>
-                            <th>Collector</th>
-                            <th>Category</th>
-                            <th>Collection system</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {% for object in object_list %}
-                            <tr>
-                                <td><a href="{{ object.get_absolute_url }}">{{ object.id }}</a></td>
-                                <td>{{ object.catchment }}</td>
-                                <td><a href="{{ object.collector.get_absolute_url }}">{{ object.collector }}</a></td>
-                                <td><a href="{{ object.waste_stream.category.get_absolute_url }}">{{ object.waste_stream.category }}</a></td>
-                                <td><a href="{{ object.collection_system.get_absolute_url }}">{{ object.collection_system }}</a></td>
-                            </tr>
-                        {% endfor %}
-                        </tbody>
-                        <tfoot>
-                        </tfoot>
-                    </table>
-                    <div class="pagination">
-                        <span class="step-links">
-                            {% if page_obj.has_previous %}
-                                <a href="?{% param_replace page=1 %}">&laquo; first</a>
-                                <a href="?{% param_replace page=page_obj.previous_page_number %}">previous</a>
-                            {% endif %}
+{% block list_body %}
+    <table class="table">
+        <thead>
+        <tr>
+            <th>Id</th>
+            <th>Catchment</th>
+            <th>Collector</th>
+            <th>Category</th>
+            <th>Collection system</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for object in object_list %}
+            <tr>
+                <td><a href="{{ object.get_absolute_url }}">{{ object.id }}</a></td>
+                <td>{{ object.catchment }}</td>
+                <td><a href="{{ object.collector.get_absolute_url }}">{{ object.collector }}</a></td>
+                <td><a href="{{ object.waste_stream.category.get_absolute_url }}">{{ object.waste_stream.category }}</a>
+                </td>
+                <td><a href="{{ object.collection_system.get_absolute_url }}">{{ object.collection_system }}</a></td>
+            </tr>
+        {% endfor %}
+        </tbody>
+        <tfoot>
+        </tfoot>
+    </table>
+{% endblock list_body %}
 
-                            <span class="current">
-                                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.
-                            </span>
+{% block list_footer %}
+    <a href="{% url 'WasteCollection' %}?{{ request.GET.urlencode }}&load_features=true">
+        <i class="fa fa-fw fa-map"></i>
+        View as map
+    </a>
+    {% if 'soilcom.add_collection' in perms %}
+        <a class="ml-2" href="{% url 'collection-create' %}?next={{ request.get_full_path|urlencode }}">
+            <i class="fa fa-fw fa-plus"></i>
+            Add new collection
+        </a>
+    {% endif %}
+    <a class="ml-2" href="{% url 'collection-list-download-csv' %}?{{ request.GET.urlencode }}">
+        <i class="fa fa-fw fa-file-download"></i>
+        Download as CSV
+    </a>
+{% endblock list_footer %}
 
-                            {% if page_obj.has_next %}
-                                <a href="?{% param_replace page=page_obj.next_page_number %}">next</a>
-                                <a href="?{% param_replace page=page_obj.paginator.num_pages %}">last &raquo;</a>
-                            {% endif %}
-                        </span>
-                    </div>
-                </div>
-                <div class="card-footer">
-                    <a href="{% url 'WasteCollection' %}?{{ request.GET.urlencode }}&load_features=true">
-                        <i class="fa fa-fw fa-map"></i>
-                        View as map
-                    </a>
-                </div>
-            </div>
-        </div>
-        <div class="col col-sm-3">
-            <div class="accordion">
-                <div class="card shadow">
-                    <div class="card-header"><strong>Filter</strong></div>
-                    <div class="card-body">
-                        <form method="get">
-                            {% crispy filter.form %}
-                            <button id="btn-filter" class="btn btn-primary" type="submit">Filter</button>
-                        </form>
-                    </div>
-                    <div class="card-footer"></div>
-                </div>
-                <div class="card shadow">
-                    <div class="card-header"
-                         role="button"
-                         data-toggle="collapse"
-                         href="#options-body"
-                         aria-expanded="true"
-                         aria-controls="options-body">
-                        <b>Options</b>
-                    </div>
-                    <div class="card-body collapse" id="options-body">
-                        <div class="row">
-                            <div class="col">
-                                <div class="text-center">
-                                    <a id="btn-collection-create"
-                                       class="btn btn-primary w-75"
-                                       href="{% url 'WasteCollection' %}?{{ request.GET.urlencode }}&load_features=true">
-                                        View as Map
-                                    </a>
-                                </div>
-                            </div>
-                        </div>
-
-                        {% if 'soilcom.add_collection' in perms %}
-                            <div class="row mt-3">
-                                <div class="col">
-                                    <div class="text-center">
-                                        <a id="btn-collection-create"
-                                           class="btn btn-primary w-75"
-                                           href="{% url 'collection-create' %}?next={{ request.get_full_path|urlencode }}">
-                                            Add new collection
-                                        </a>
-                                    </div>
-                                </div>
-                            </div>
-                        {% endif %}
-                    </div>
-                    <div class="card-footer"></div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-{% endblock content %}
-
-{% block javascript %}
-    {{ block.super }}
-    {{ filter.form.media }}
-    <link href="{% static 'lib/select2-bootstrap-theme/select2-bootstrap4.min.css' %}" rel="stylesheet">
-{% endblock %}
+{% block filter_body %}
+    <form method="get">
+        {% crispy filter.form %}
+        <button id="btn-filter" class="btn btn-primary" type="submit">Filter</button>
+    </form>
+{% endblock filter_body %}

@@ -6,7 +6,7 @@ from django.test import RequestFactory, TestCase, modify_settings
 from django.urls import reverse
 
 from maps.models import Catchment, Region
-from materials.models import MaterialCategory
+from materials.models import Material, MaterialCategory
 from users.models import get_default_owner, Group
 from .. import views
 from ..forms import CollectionModelForm
@@ -777,6 +777,9 @@ class CollectionUpdateViewTestCase(TestCase):
         self.assertIn(WasteFlyer.objects.get(url='https://www.test-flyer.org'), self.collection.flyers.all())
         self.assertEqual(WasteFlyer.objects.count(), 2)
 
+# ----------- Collection utils ------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
 
 class CollectionSummaryAPIViewTestCase(TestCase):
 
@@ -848,6 +851,62 @@ class CollectionSummaryAPIViewTestCase(TestCase):
         ]
         }
         self.assertDictEqual(response.data, expected)
+
+
+class CollectionCSVAPIViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = get_default_owner()
+        User.objects.create(username='outsider')
+        member = User.objects.create(username='member')
+        member.user_permissions.add(Permission.objects.get(codename='add_collection'))
+
+        MaterialCategory.objects.create(owner=owner, name='Biowaste component')
+        material1 = WasteComponent.objects.create(owner=owner, name='Test material 1')
+        material2 = WasteComponent.objects.create(owner=owner, name='Test material 2')
+        waste_stream = WasteStream.objects.create(
+            owner=owner,
+            name='Test waste stream',
+            category=WasteCategory.objects.create(owner=owner, name='Test category'),
+        )
+        waste_stream.allowed_materials.add(material1)
+        waste_stream.allowed_materials.add(material2)
+
+        waste_flyer = WasteFlyer.objects.create(
+            owner=owner,
+            abbreviation='WasteFlyer123',
+            url='https://www.test-flyer.org'
+        )
+        frequency = CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
+        for i in range(1, 2):
+            collection = Collection.objects.create(
+                owner=owner,
+                name=f'collection{i}',
+                catchment=Catchment.objects.create(owner=owner, name='Test catchment'),
+                collector=Collector.objects.create(owner=owner, name='Test collector'),
+                collection_system=CollectionSystem.objects.create(owner=owner, name='Test system'),
+                waste_stream=waste_stream,
+                connection_rate=0.7,
+                connection_rate_year=2020,
+                frequency=frequency,
+                description='This is a test case.'
+            )
+            collection.flyers.add(waste_flyer)
+
+    def setUp(self):
+        self.collection_list = Collection.objects.all()
+
+    def test_get_http_200_ok_for_anonymous(self):
+        response = self.client.get(reverse('collection-list-download-csv'))
+        self.assertEqual(200, response.status_code)
+
+    def test_get_returns_file(self):
+        params = {
+        }
+
+        response = self.client.get(reverse('collection-list-download-csv'), params=params)
+        self.assertEqual(response.get('Content-Disposition'), 'attachment; filename="collections.csv"')
 
 
 class WasteFlyerListViewTestCase(TestCase):
