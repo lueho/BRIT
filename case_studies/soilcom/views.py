@@ -771,8 +771,7 @@ class CollectionCSVAPIView(GenericAPIView):
                     'Waste Category': collection.waste_stream.category,
                     'Connection Rate': collection.connection_rate,
                     'Connection Rate Year': collection.connection_rate_year,
-                    'Comments': collection.description.replace('\n', '').replace('\r', ''),
-                    'Sources': f'{", ".join([flyer.url for flyer in collection.flyers.all()])}'
+                    'Sources': f'{", ".join([flyer.url for flyer in collection.flyers.all() if type(flyer.url) == str])}'
                 }
                 if collection.catchment:
                     values['Catchment'] = collection.catchment.name
@@ -795,6 +794,10 @@ class CollectionCSVAPIView(GenericAPIView):
                     values['Frequency'] = collection.frequency.name
                 else:
                     values['Frequency'] = ''
+                if collection.description:
+                    values['Comments'] = collection.description.replace('\n', '').replace('\r', '')
+                else:
+                    values['Comments'] = ''
                 writer.writerow(values)
         return response
 
