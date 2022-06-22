@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}BRIT | Sources{% endblock %}
+
+{% block content %}
+    <div class="row">
+        <div class="col">
+            <div class="card shadow">
+                <div class="card-header">
+                    {% block list_header %}<b>{{ header }}</b>{% endblock %}
+                </div>
+                <div class="card-body">
+                    {% block list_body %}{% endblock %}
+                    <div class="pagination">
+                        <span class="step-links">
+                            {% if page_obj.has_previous %}
+                                <a href="?page=1">&laquo; first</a>
+                                <a href="?page={{ page_obj.previous_page_number }}">previous</a>
+                            {% endif %}
+
+                            <span class="current">
+                                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.
+                            </span>
+
+                            {% if page_obj.has_next %}
+                                <a href="?page={{ page_obj.next_page_number }}">next</a>
+                                <a href="?page={{ page_obj.paginator.num_pages }}">last &raquo;</a>
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    {% block list_footer %}{% endblock %}
+                </div>
+            </div>
+        </div>
+        <div class="col col-sm-3">
+            <div class="card shadow">
+                <div class="card-header">
+                    {% block filter_header %}<strong>Filter</strong>{% endblock %}
+                </div>
+                <div class="card-body">
+                    {% block fiter_body %}
+                        <form method="get">
+                            {% crispy filter.form %}
+                            <button id="btn-filter" class="btn btn-primary" type="submit">Filter</button>
+                        </form>
+                    {% endblock %}
+                </div>
+                {% block filter_footer %}<div class="card-footer"></div>{% endblock %}
+            </div>
+        {% block extra_options %}{% endblock extra_options %}
+        </div>
+    </div>
+{% endblock %}
+
+{% block javascript %}
+    {{ block.super }}
+    {{ filter.form.media }}
+    <link href="{% static 'lib/select2-bootstrap-theme/select2-bootstrap4.min.css' %}" rel="stylesheet">
+{% endblock %}
