@@ -6,7 +6,7 @@
 {% block content %}
     <div class="row">
         <div class="col col-12 col-md-6">
-            <div class="card h-100">
+            <div class="card shadow h-100">
                 <div class="card-header"><b>Welcome!</b></div>
                 <div class="card-body">
                     <p><strong>Welcome to the Bioresource Information Tool!</strong></p>
@@ -23,7 +23,7 @@
             </div>
         </div>
         <div class="col d-none d-md-block">
-            <div class="card h-100">
+            <div class="card shadow h-100">
                 <div class="card-header"><b>Updates</b></div>
                 <div class="card-body">
                     <p class="card-text"><strong>19.04.2022 - Update 2214</strong></p>
@@ -66,12 +66,31 @@
     </div>
     <div class="row">
         <div class="col col-12 col-md-6 col-lg-3 mt-4">
-            <div class="card h-100">
+            <div class="card shadow h-100">
+                <div class="card-header"><a href="{% url 'source-list' %}"><b>Bibliography</b></a></div>
+                <div class="card-img-top">
+                    <a class="d-flex align-items-center justify-content-center stretched-link"
+                       href="{% url 'source-list' %}">
+                        <img class="w-100 m-0" src="{% static 'img/bibliography_cover_card.png' %}"
+                             alt="Bibliography Module Cover Image">
+                    </a>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        This is a library of sources that contain valuable information about bioresources. The
+                        sources can be explored and managed here. Any source from the library can be referred to
+                        in the respective models in the other modules.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
                 <div class="card-header"><a href="{% url 'maps_list' %}"><b>Maps</b></a></div>
                 <div class="card-img-top">
                     <a class="d-flex align-items-center justify-content-center stretched-link"
                        href="{% url 'maps_list' %}">
-                        <img class="w-100 m-0" src="{% static 'img/cover_card_maps.png' %}"
+                        <img class="w-100 m-0" src="{% static 'img/maps_cover_card.png' %}"
                              alt="Maps Module Cover Image">
                     </a>
                 </div>
@@ -84,12 +103,12 @@
             </div>
         </div>
         <div class="col col-12 col-md-6 col-lg-3 mt-4">
-            <div class="card h-100">
+            <div class="card shadow h-100">
                 <div class="card-header"><a href="{% url 'sample-list-featured' %}"><b>Materials</b></a></div>
                 <div class="card-img">
                     <a class="d-flex align-items-center justify-content-center stretched-link"
                        href="{% url 'sample-list-featured' %}">
-                        <img class="w-100 m-0" src="{% static 'img/cover_card_materials.jpg' %}"
+                        <img class="w-100 m-0" src="{% static 'img/materials_cover_card.png' %}"
                              alt="Materials Module Cover Image">
                     </a>
                 </div>
@@ -102,7 +121,7 @@
             </div>
         </div>
         <div class="col col-12 col-md-6 col-lg-3 mt-4">
-            <div class="card h-100">
+            <div class="card shadow h-100">
                 <div class="card-header"><a href="{% url 'scenario_list' %}"><b>Inventories</b></a></div>
                 <div class="card-img">
                     <a class="d-flex align-items-center justify-content-center stretched-link"
@@ -120,14 +139,14 @@
             </div>
         </div>
         <div class="col col-12 col-md-6 col-lg-3 mt-4">
-            <div class="card h-100">
+            <div class="card shadow h-100">
                 <div class="card-header"><a href="{% url 'WasteCollection' %}"><b>SOILCOM biowaste collection
                     map</b></a></div>
                 <div class="card-img">
                     <a class="d-flex align-items-center justify-content-center stretched-link"
                        href="{% url 'WasteCollection' %}">
                         <img class="w-100 m-0 p-1" src="{% static 'img/maps_nuts_regions.png' %}"
-                             alt="Inventories Module Cover Image">
+                             alt="Household Waste Collection Module Cover Image">
                     </a>
                 </div>
                 <div class="card-body">
@@ -141,7 +160,7 @@
     </div>
     <div class="row mt-4">
         <div class="col d-md-none">
-            <div class="card">
+            <div class="card shadow">
                 <div class="card-header"><b>Updates</b></div>
                 <div class="card-body">
                     <p class="card-text"><strong>19.04.2022 - Update 2214</strong></p>
