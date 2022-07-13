@@ -1,3 +1,6 @@
+from crispy_forms.helper import FormHelper
+from crispy_forms.layout import Layout
+from django.forms import Form
 from brit.forms import CustomModalModelForm, OwnedObjectModelForm
 
 from .models import Author, Licence, Source
@@ -38,3 +41,30 @@ class SourceModalModelForm(CustomModalModelForm):
     class Meta:
         model = Source
         fields = '__all__'
+
+
+class SourceFilterFormHelper(FormHelper):
+    form_tag = False
+    include_media = False
+    layout = Layout(
+        'abbreviation',
+        'authors',
+        'title',
+        'type',
+        'year'
+    )
+
+
+class SourceFilterForm(Form):
+
+    class Meta:
+        model = Source
+        fields = ('abbreviation', 'authors', 'title', 'type', 'year')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = SourceFilterFormHelper()
+        self.fields['abbreviation'].widget.attrs = {'data-theme': 'bootstrap4'}
+        self.fields['authors'].widget.attrs = {'data-theme': 'bootstrap4'}
+        self.fields['title'].widget.attrs = {'data-theme': 'bootstrap4'}
+

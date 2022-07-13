@@ -24,7 +24,7 @@ SOURCE_TYPES = (
     ('book', 'book'),
     ('website', 'website'),
     ('custom', 'custom'),
-    ('waste_flyer', 'waste_flyer')
+    # ('waste_flyer', 'waste_flyer')
 )
 
 

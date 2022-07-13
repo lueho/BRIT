@@ -1,3 +1,4 @@
+from dal import autocomplete
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.urls import reverse_lazy
 from django.views.generic import TemplateView
@@ -5,7 +6,8 @@ from django.views.generic import TemplateView
 from brit import views
 
 from . import forms
-from .models import Author, Licence, Source
+from .filters import SourceFilter
+from .models import Author, Licence, Source, SOURCE_TYPES
 
 
 class BibliographyDashboardView(TemplateView):
@@ -133,7 +135,20 @@ class LicenceModalDeleteView(views.OwnedObjectDeleteView):
 class SourceListView(views.OwnedObjectListView):
     template_name = 'source_list_card.html'
     model = Source
+    queryset = Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by('abbreviation')
+    filterset_class = SourceFilter
+    filterset = None
     permission_required = set()
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        self.filterset = self.filterset_class(self.request.GET, queryset=queryset)
+        return self.filterset.qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['filter'] = self.filterset
+        return context
 
 
 class SourceCreateView(views.OwnedObjectCreateView):

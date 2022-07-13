@@ -1,46 +1,39 @@
-{% extends 'base.html' %}
+{% extends 'filtered_list.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
 
 {% block title %}BRIT | Sources{% endblock %}
 
-{% block content %}
-    <div class="row">
-        <div class="col">
-            <div class="card shadow mb-3">
-                <div class="card-header"><b>{{ header }}</b></div>
-                <div class="card-body overflow-auto">
-                    <table class="table">
-                        {% for object in object_list %}
-                            <tr>
-                                <td>
-                                    <a href="{{ object.get_absolute_url }}">{{ object.abbreviation }}</a>
-                                </td>
-                            </tr>
-                        {% endfor %}
-                    </table>
-                    <div class="pagination">
-                        <span class="step-links">
-                            {% if page_obj.has_previous %}
-                                <a href="?page=1">&laquo; first</a>
-                                <a href="?page={{ page_obj.previous_page_number }}">previous</a>
-                            {% endif %}
+{% block list_body %}
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Abbreviation</th>
+                <th>Authors</th>
+                <th>Title</th>
+                <th>Type</th>
+            </tr>
+        </thead>
+        {% for object in object_list %}
+            <tr>
+                <td><a href="{{ object.get_absolute_url }}">{{ object.abbreviation }}</a></td>
+                <td><a href="{{ object.get_absolute_url }}">{{ object.authors }}</a></td>
+                <td><a href="{{ object.get_absolute_url }}">{{ object.title }}</a></td>
+                <td>{{ object.type }}</td>
+            </tr>
+        {% endfor %}
+    </table>
+{% endblock list_body %}
 
-                            <span class="current">
-                                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.
-                            </span>
+{% block list_footer %}
+    <a href="{{ create_url }}">
+        <i class="fas fa-fw fa-plus"></i> {{ create_url_text }}
+    </a>
+{% endblock list_footer %}
 
-                            {% if page_obj.has_next %}
-                                <a href="?page={{ page_obj.next_page_number }}">next</a>
-                                <a href="?page={{ page_obj.paginator.num_pages }}">last &raquo;</a>
-                            {% endif %}
-                        </span>
-                    </div>
-                </div>
-                <div class="card-footer">
-                    <a href="{{ create_url }}">
-                        <i class="fas fa-fw fa-plus"></i> {{ create_url_text }}
-                    </a>
-                </div>
-            </div>
-        </div>
-    </div>
-{% endblock %}
+{% block filter_body %}
+    <form method="get">
+        {% crispy filter.form %}
+        <button id="btn-filter" class="btn btn-primary" type="submit">Filter</button>
+    </form>
+{% endblock filter_body %}
