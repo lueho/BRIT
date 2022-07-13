@@ -247,35 +247,6 @@ class CollectionModelForm(forms.ModelForm):
             return super().save(commit=False)
 
 
-class CollectionFilterForm2(forms.Form):
-    collection_system = forms.ModelMultipleChoiceField(
-        queryset=models.CollectionSystem.objects.all(),
-        widget=forms.CheckboxSelectMultiple,
-        required=False
-    )
-    waste_category = forms.ModelMultipleChoiceField(
-        queryset=models.WasteCategory.objects.all(),
-        widget=forms.CheckboxSelectMultiple,
-        required=False
-    )
-    countries = forms.MultipleChoiceField(
-        choices=set(),
-        widget=forms.CheckboxSelectMultiple,
-        required=False
-    )
-    allowed_materials = forms.ModelMultipleChoiceField(
-        queryset=models.WasteComponent.objects.all(),
-        widget=forms.CheckboxSelectMultiple,
-        required=False
-    )
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['countries'].choices = set(
-            sorted(set((c.catchment.region.country_code, c.catchment.region.country_code) for c in
-                       models.Collection.objects.all())))
-
-
 class CollectionFilterFormHelper(FormHelper):
     form_tag = False
     include_media = False
