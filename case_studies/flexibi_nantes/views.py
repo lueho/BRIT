@@ -322,16 +322,16 @@ class NantesGreenhousesAPIView(GenericAPIView):
 
     def get(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
+        area = queryset.aggregate(Sum('surface_ha'))['surface_ha__sum']
+        area = str(round(area, 1)) if area else str(0)
         serializer = self.get_serializer(queryset, many=True)
         data = {
             'geoJson': serializer.data,
             'summaries': [
-                # {
-                #     'tree_count': {
-                #         'label': 'Number of trees',
-                #         'value': len(serializer.data['features'])
-                #     },
-                # }
+                {
+                    'greenhouse_count': {'label': 'Number of greenhouses', 'value': f'{len(serializer.data["features"])}'},
+                    'growth_area': {'label': 'Total growth area', 'value': f'{area} ha'}
+                 },
             ]
         }
         return JsonResponse(data)
