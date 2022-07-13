@@ -1,5 +1,6 @@
+pg_dump $(heroku config:get $HEROKU_POSTGRESQL_COLOR_URL -a $HEROKU_APP_NAME) -Fc --no-acl --no-owner -n public > latest.dump
 dropdb --if-exists -h db -p $POSTGRES_PORT -U $POSTGRES_USER -w $POSTGRES_DB
 createdb -h db -p $POSTGRES_PORT -U $POSTGRES_USER -w $POSTGRES_DB
 psql -h db -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB -w -c 'CREATE EXTENSION POSTGIS'
-pg_dump $(heroku config:get $HEROKU_POSTGRESQL_COLOR_URL -a $HEROKU_APP_NAME) -Fc --no-acl --no-owner -n public > latest.dump
 pg_restore --no-acl --no-owner -h db -p $POSTGRES_PORT -U $POSTGRES_USER -d $POSTGRES_DB latest.dump
+docker cp brit_db_admin_1:latest.dump .
