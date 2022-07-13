@@ -100,9 +100,11 @@
 
         $(document).ready(function () {
 
-            if ($("#allow-edit").data()['editable'] === "True") {
-                $(".toggle-edit").show()
-            }
+            {#if ($("#allow-edit").data()['editable'] === "True") {#}
+            {#    $(".toggle-edit").show()#}
+            //}
+
+            $(".toggle-edit").hide();
 
             $(".modal-link").each(function () {
                 $(this).modalForm({
