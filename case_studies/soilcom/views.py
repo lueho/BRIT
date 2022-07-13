@@ -335,6 +335,7 @@ class WasteStreamModalDeleteView(views.OwnedObjectDeleteView):
 class WasteFlyerListView(SourceListView):
     template_name = 'waste_flyers_list.html'
     model = models.WasteFlyer
+    queryset = models.WasteFlyer.objects.all().order_by('abbreviation')
     permission_required = 'soilcom.view_wasteflyer'
 
 
