@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+
+{% load static %}
+
+{% block title %}BRIT | Sources{% endblock %}
+
+{% block content %}
+    <div class="row">
+        <div class="col col-12 col-md-6">
+            <div class="card shadow h-100">
+                <div class="card-header"><b>Sources</b></div>
+                <div class="card-body">
+                    <p>
+                        This module contains source models that describe the generation and/or collection of
+                        bioresources.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="row">
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header"><a href="{% url 'collection-list' %}"><b>Household Waste Collection</b></a></div>
+                <div class="card-img-top">
+                    <a class="d-flex align-items-center justify-content-center stretched-link"
+                       href="{% url 'collection-list' %}">
+                        <img class="w-100 m-0" src="{% static 'img/waste_collection_cover_card.png' %}"
+                             alt="Household Waste Collection Source Model Cover Image">
+                    </a>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        The interactive biowaste collection map is being built within the SOILCOM project to learn
+                        more about the way biowaste is collected in European countries.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header"><a href="{% url 'greenhouse_list' %}"><b>Greenhouses</b></a></div>
+                <div class="card-img-top">
+                    <a class="d-flex align-items-center justify-content-center stretched-link"
+                       href="{% url 'greenhouse_list' %}">
+                        <img class="w-100 m-0" src="{% static 'img/greenhouses_cover_card.png' %}"
+                             alt="Greenhouse Source Model Cover Image">
+                    </a>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Greenhouses produce a substantial amount of biogenic residues both during growth cycles and
+                        during harvest. This model stems from the FLEXIBI project and was created to describe the
+                        greenhouses in the vicinity of Nantes, France.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock content %}

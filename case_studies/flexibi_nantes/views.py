@@ -141,7 +141,7 @@ class GreenhouseCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, BSModalCre
         return super().form_valid(form)
 
 
-class GreenhouseDetailView(UserOwnsObjectMixin, DetailView):
+class GreenhouseDetailView(DetailView):
     model = Greenhouse
     template_name = 'greenhouse_detail.html'
 

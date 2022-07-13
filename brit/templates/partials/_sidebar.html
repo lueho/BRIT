@@ -1,10 +1,10 @@
 {% load static %}
 
-<ul class="navbar-nav bg-gradient-primary sidebar sidebar-light accordion" id="accordionSidebar">
+<ul class="navbar-nav sidebar sidebar-light accordion" id="accordionSidebar">
 
     <!-- Sidebar - Brand -->
     <a class="sidebar-brand d-flex align-items-center justify-content-center mx-0" href="{% url 'home' %}">
-        <img class="sidebar-brand-icon img-fluid" src="{% static 'img/LOGO_Flexibi_Farbe.png' %}" alt="Flexibi logo">
+        {#        <img class="sidebar-brand-icon img-fluid" src="{% static 'img/LOGO_Flexibi_Farbe.png' %}" alt="Flexibi logo">#}
     </a>
 
     <!-- Divider -->
@@ -46,6 +46,13 @@
         <a class="nav-link" href="{% url 'sample-list-featured' %}">
             <i class="fas fa-fw fa-leaf"></i>
             <span>Materials</span></a>
+    </li>
+
+    <!-- Sources -->
+    <li class="nav-item">
+        <a class="nav-link" href="{% url 'sources-list' %}">
+            <i class="fas fa-fw fa-expand-arrows-alt"></i>
+            <span>Sources</span></a>
     </li>
 
     <!-- Inventories -->

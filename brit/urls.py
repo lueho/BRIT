@@ -19,6 +19,7 @@ urlpatterns = [
     path('contributors/', ContributorsView.as_view(), name='contributors'),
     path('maps/', include('maps.urls')),
     path('materials/', include('materials.urls')),
+    path('sources/', include('sources.urls')),
     path('inventories/', include('inventories.urls')),
     path('interfaces/simucf/', include('interfaces.simucf.urls')),
     path('case_studies/nantes/', include('case_studies.flexibi_nantes.urls')),
