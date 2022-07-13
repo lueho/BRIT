@@ -295,6 +295,7 @@ COUNTRY_CHOICES = (
     ('DK', 'DK'),
     ('NL', 'NL'),
     ('UK', 'UK'),
+    ('SE', 'SE'),
 )
 
 
