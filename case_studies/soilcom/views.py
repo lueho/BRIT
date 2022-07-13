@@ -776,7 +776,10 @@ class CollectionCSVAPIView(GenericAPIView):
                 }
                 if collection.catchment:
                     values['Catchment'] = collection.catchment.name
-                    values['Country'] = collection.catchment.region.country_code
+                    try:
+                        values['Country'] = collection.catchment.region.country_code
+                    except AttributeError:
+                        values['Country'] = ''
                     try:
                         values['NUTS Id'] = collection.catchment.region.nutsregion.nuts_id
                     except:
