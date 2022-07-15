@@ -49,6 +49,10 @@ class ContributorsView(TemplateView):
     template_name = 'contributors.html'
 
 
+class PrivacyPolicyView(TemplateView):
+    template_name = 'privacy_policy.html'
+
+
 class DualUserListView(TemplateView):
     model = None
 

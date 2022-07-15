@@ -5,7 +5,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.views.generic import RedirectView
 
-from .views import HomeView, ContributorsView
+from .views import HomeView, ContributorsView, PrivacyPolicyView
 
 admin.autodiscover()
 admin.site.enable_nav_sidebar = False
@@ -26,6 +26,7 @@ urlpatterns = [
     path('waste_collection/', include('case_studies.soilcom.urls')),
     path('bibliography/', include('bibliography.urls')),
     path('cookies/', include('cookie_consent.urls')),
+    path('privacy_policy/', PrivacyPolicyView.as_view(), name='privacypolicy'),
 ]
 
 if settings.DEBUG:
