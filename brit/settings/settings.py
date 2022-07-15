@@ -71,6 +71,7 @@ TEMPLATES = [
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
         'DIRS': [
             os.path.join(BASE_DIR, 'users', 'templates'),
+            os.path.join(BASE_DIR, 'brit', 'templates'),
         ],
         'APP_DIRS': True,
         'OPTIONS': {
@@ -170,3 +171,5 @@ EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL')
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL')
 
 GOOGLE_ANALYTICS_KEY = os.environ.get("GOOGLE_ANALYTICS_KEY")
+
+COOKIE_CONSENT_NAME = "cookie_consent"
