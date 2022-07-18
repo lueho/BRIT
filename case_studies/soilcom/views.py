@@ -499,7 +499,6 @@ class CollectionCreateView(ModelFormAndModelFormSetMixin, views.OwnedObjectCreat
     formset_model = models.WasteFlyer
     formset_class = forms.WasteFlyerModelFormSet
     formset_form_class = forms.WasteFlyerModelForm
-    success_url = reverse_lazy('WasteCollection')
     permission_required = 'soilcom.add_collection'
 
     def get_formset_kwargs(self, **kwargs):
