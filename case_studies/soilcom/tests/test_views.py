@@ -553,6 +553,7 @@ class CollectionCopyViewTestCase(TestCase):
         view = views.CollectionCopyView()
         view.setup(request)
         view.kwargs = {'pk': self.collection.id}
+        view.original_object = view.get_original_object()
         expected = {}
         initial = view.get_initial()
         self.assertEqual(set(expected.keys()), set(initial.keys()))
@@ -569,7 +570,7 @@ class CollectionCopyViewTestCase(TestCase):
         view = views.CollectionCopyView()
         view.setup(request)
         view.kwargs = {'pk': self.collection.id}
-        view.object = view.get_object()
+        view.original_object = view.get_original_object()
         expected = {
             'queryset': self.collection.flyers.all(),
             'parent_object': self.collection
@@ -637,6 +638,32 @@ class CollectionCopyViewTestCase(TestCase):
         self.assertEqual(post_response.status_code, 302)
         self.assertRedirects(post_response, reverse('WasteCollection'))
         self.assertEqual(Collection.objects.count(), 2)
+
+    def test_post_copy_is_still_associated_with_unchanged_original_flyers(self):
+        self.client.force_login(self.member)
+        self.assertEqual(Collection.objects.count(), 1)
+        get_response = self.client.get(reverse('collection-copy', kwargs={'pk': self.collection.pk}))
+        initial = get_response.context['form'].initial
+        data = {
+            'catchment': initial['catchment'].id,
+            'collector': initial['collector'].id,
+            'collection_system': initial['collection_system'].id,
+            'waste_category': initial['waste_category'].id,
+            'allowed_materials': [c.id for c in initial['allowed_materials']],
+            'connection_rate': initial['connection_rate'],
+            'connection_rate_year': initial['connection_rate_year'],
+            'frequency': initial['frequency'].id,
+            'description': 'This is the copy.',
+            'form-INITIAL_FORMS': '1',
+            'form-TOTAL_FORMS': '1',
+            'form-0-url': self.flyer.url,
+            'form-0-id': self.flyer.id,
+        }
+        self.client.post(reverse('collection-copy', kwargs={'pk': self.collection.pk}), data=data)
+        copy = Collection.objects.get(description='This is the copy.')
+        self.assertEqual(copy.flyers.count(), 1)
+        flyer = copy.flyers.first()
+        self.assertEqual(flyer.url, self.flyer.url)
 
 
 @modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})

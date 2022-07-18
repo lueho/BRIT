@@ -529,6 +529,11 @@ class CollectionCreateView(ModelFormAndModelFormSetMixin, views.OwnedObjectCreat
             for form in formset:
                 form.instance.owner = request.user
             flyers = formset.save()
+            # The save() method of formset only returns instances that have been changed or newly created. We want
+            # to keep the unchanged previously existing flyers as well.
+            for form in formset.initial_forms:
+                if form.instance.pk and not form.has_changed():
+                    flyers.append(form.instance)
             self.object.flyers.set(list(flyers))
             return HttpResponseRedirect(self.get_success_url())
         else:
@@ -538,37 +543,48 @@ class CollectionCreateView(ModelFormAndModelFormSetMixin, views.OwnedObjectCreat
 
 class CollectionCopyView(CollectionCreateView):
     model = models.Collection
+    original_object = None
+
+    def get_original_object(self):
+        return self.model.objects.get(pk=self.kwargs.get('pk'))
 
     def get_formset_kwargs(self, **kwargs):
         kwargs.update({
-            'parent_object': self.object,
-            'queryset': self.formset_model.objects.filter(collections=self.kwargs['pk'])
+            'parent_object': self.original_object,
+            'queryset': self.formset_model.objects.filter(collections=self.original_object)
         })
         return super().get_formset_kwargs(**kwargs)
 
     def get_initial(self):
-        object = self.get_object()
         initial = {}
-        if object.catchment:
-            initial['catchment'] = object.catchment
-        if object.collector:
-            initial['collector'] = object.collector
-        if object.collection_system:
-            initial['collection_system'] = object.collection_system
-        if object.waste_stream:
-            if object.waste_stream.category:
-                initial['waste_category'] = object.waste_stream.category
-            if object.waste_stream.allowed_materials.exists():
-                initial['allowed_materials'] = object.waste_stream.allowed_materials.all()
-        if object.connection_rate:
-            initial['connection_rate'] = object.connection_rate * 100
-        if object.connection_rate_year:
-            initial['connection_rate_year'] = object.connection_rate_year
-        if object.frequency:
-            initial['frequency'] = object.frequency
-        if object.description:
-            initial['description'] = object.description
+        if self.original_object.catchment:
+            initial['catchment'] = self.original_object.catchment
+        if self.original_object.collector:
+            initial['collector'] = self.original_object.collector
+        if self.original_object.collection_system:
+            initial['collection_system'] = self.original_object.collection_system
+        if self.original_object.waste_stream:
+            if self.original_object.waste_stream.category:
+                initial['waste_category'] = self.original_object.waste_stream.category
+            if self.original_object.waste_stream.allowed_materials.exists():
+                initial['allowed_materials'] = self.original_object.waste_stream.allowed_materials.all()
+        if self.original_object.connection_rate:
+            initial['connection_rate'] = self.original_object.connection_rate * 100
+        if self.original_object.connection_rate_year:
+            initial['connection_rate_year'] = self.original_object.connection_rate_year
+        if self.original_object.frequency:
+            initial['frequency'] = self.original_object.frequency
+        if self.original_object.description:
+            initial['description'] = self.original_object.description
         return initial
+
+    def get(self, request, *args, **kwargs):
+        self.original_object = self.get_original_object()
+        return self.render_to_response(self.get_context_data())
+
+    def post(self, request, *args, **kwargs):
+        self.original_object = self.get_original_object()
+        return super().post(request, *args, **kwargs)
 
 
 class CollectionDetailView(views.OwnedObjectDetailView):
