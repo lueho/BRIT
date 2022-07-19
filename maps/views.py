@@ -50,7 +50,7 @@ class MapsListView(ListView):
 
     def get_queryset(self):
         user_groups = self.request.user.groups.all()
-        return GeoDataset.objects.filter(Q(visible_to_groups__in=user_groups) | Q(publish=True))
+        return GeoDataset.objects.filter(Q(visible_to_groups__in=user_groups) | Q(publish=True)).distinct()
 
 
 # ----------- Catchment CRUD--------------------------------------------------------------------------------------------
