@@ -466,7 +466,6 @@ class CollectionCreateViewTestCase(TestCase):
             }
         )
         self.assertEqual(response.status_code, 302)
-        self.assertRedirects(response, reverse('WasteCollection'))
         self.assertEqual(Collection.objects.count(), 2)
 
 
@@ -636,7 +635,6 @@ class CollectionCopyViewTestCase(TestCase):
         }
         post_response = self.client.post(reverse('collection-copy', kwargs={'pk': self.collection.pk}), data=data)
         self.assertEqual(post_response.status_code, 302)
-        self.assertRedirects(post_response, reverse('WasteCollection'))
         self.assertEqual(Collection.objects.count(), 2)
 
     def test_post_copy_is_still_associated_with_unchanged_original_flyers(self):
