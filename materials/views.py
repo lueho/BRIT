@@ -8,6 +8,7 @@ from django.urls import reverse, reverse_lazy
 from django.views.generic import ListView, TemplateView, RedirectView
 from django.views.generic.detail import SingleObjectMixin
 from extra_views import UpdateWithInlinesView
+from rest_framework.viewsets import ReadOnlyModelViewSet
 
 from brit.views import (
     OwnedObjectListView,
@@ -23,6 +24,7 @@ from brit.views import UserOwnsObjectMixin, NextOrSuccessUrlMixin
 from distributions.models import TemporalDistribution
 from distributions.plots import DoughnutChart
 from . import forms
+from .filters import CompositionFilterSet, MaterialFilterSet, SampleFilterSet, SampleSeriesFilterSet
 from .forms import (
     AddComponentModalForm,
     AddCompositionModalForm,
@@ -42,7 +44,8 @@ from .models import (
     MaterialComponent,
     MaterialComponentGroup,
     MaterialCategory, WeightShare, MaterialProperty, MaterialPropertyValue, )
-from .serializers import CompositionDoughnutChartSerializer, SampleModelSerializer, SampleSeriesModelSerializer
+from .serializers import CompositionDoughnutChartSerializer, SampleModelSerializer, SampleSeriesModelSerializer, \
+    CompositionAPISerializer, SampleAPISerializer, SampleSeriesAPISerializer, MaterialAPISerializer
 
 
 class MaterialsDashboardView(PermissionRequiredMixin, TemplateView):
@@ -901,3 +904,31 @@ class FeaturedMaterialListView(ListView):
     def get_queryset(self):
         user_groups = self.request.user.groups.all()
         return SampleSeries.objects.filter(Q(visible_to_groups__in=user_groups) | Q(publish=True))
+
+
+# ----------- API ------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class MaterialViewSet(ReadOnlyModelViewSet):
+    queryset = Material.objects.all()
+    serializer_class = MaterialAPISerializer
+    filterset_class = MaterialFilterSet
+
+
+class CompositionViewSet(ReadOnlyModelViewSet):
+    queryset = Composition.objects.all()
+    serializer_class = CompositionAPISerializer
+    filterset_class = CompositionFilterSet
+
+
+class SampleViewSet(ReadOnlyModelViewSet):
+    queryset = Sample.objects.all()
+    serializer_class = SampleAPISerializer
+    filterset_class = SampleFilterSet
+
+
+class SampleSeriesViewSet(ReadOnlyModelViewSet):
+    queryset = SampleSeries.objects.all()
+    serializer_class = SampleSeriesAPISerializer
+    filterset_class = SampleSeriesFilterSet

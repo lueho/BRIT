@@ -3,7 +3,15 @@ from rest_framework.serializers import PrimaryKeyRelatedField, ReadOnlyField, St
 
 from bibliography.serializers import SourceAbbreviationSerializer
 from distributions.models import TemporalDistribution
-from .models import Composition, MaterialPropertyValue, Sample, WeightShare, SampleSeries, MaterialComponent
+from .models import (
+    Material,
+    MaterialComponent,
+    SampleSeries,
+    Sample,
+    MaterialPropertyValue,
+    Composition,
+    WeightShare,
+)
 
 
 class WeightShareModelSerializer(ModelSerializer):
@@ -145,3 +153,61 @@ class SampleModelSerializer(ModelSerializer):
             'name', 'material', 'material_name', 'material_url', 'series', 'series_name', 'series_url', 'timestep',
             'taken_at', 'preview',
             'compositions', 'properties', 'sources')
+
+
+# ----------- API ------------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class MaterialAPISerializer(ModelSerializer):
+    categories = StringRelatedField(many=True)
+
+    class Meta:
+        model = Material
+        fields = ('name', 'categories')
+
+
+class MaterialPropertyAPISerializer(ModelSerializer):
+    name = StringRelatedField(source='property')
+    unit = StringRelatedField(source='property.unit')
+
+    class Meta:
+        model = MaterialPropertyValue
+        fields = ('name', 'unit', 'average', 'standard_deviation')
+
+
+class WeightShareAPISerializer(ModelSerializer):
+    component = StringRelatedField()
+
+    class Meta:
+        model = WeightShare
+        fields = ('component', 'average', 'standard_deviation')
+
+
+class CompositionAPISerializer(ModelSerializer):
+    group = StringRelatedField()
+    fractions_of = StringRelatedField()
+    shares = WeightShareAPISerializer(many=True)
+
+    class Meta:
+        model = Composition
+        fields = ('group', 'fractions_of', 'shares')
+
+
+class SampleAPISerializer(ModelSerializer):
+    timestep = StringRelatedField()
+    properties = MaterialPropertyAPISerializer(many=True)
+    compositions = CompositionAPISerializer(many=True)
+
+    class Meta:
+        model = Sample
+        fields = ('name', 'timestep', 'properties', 'compositions')
+
+
+class SampleSeriesAPISerializer(ModelSerializer):
+    material = MaterialAPISerializer()
+    samples = SampleAPISerializer(many=True)
+
+    class Meta:
+        model = SampleSeries
+        fields = ('material', 'samples')

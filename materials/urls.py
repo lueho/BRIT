@@ -1,6 +1,7 @@
-from django.urls import path
+from django.urls import path, include
 
 from . import views
+from .router import router
 
 urlpatterns = [
     path('', views.MaterialsDashboardView.as_view(), name='material-dashboard'),
@@ -85,4 +86,5 @@ urlpatterns = [
     path('materialcomponentgroups/settings/<int:pk>/add_seasonal_variation/', views.AddSeasonalVariationView.as_view(), name='add_seasonal_variation'),
     path('materialcomponentgroups/settings/<int:pk>/remove_seasonal_variation/<int:distribution_pk>/', views.RemoveSeasonalVariationView.as_view(), name='remove_seasonal_variation'),
     path('weightshares/<int:pk>/delete/', views.WeightShareModalDeleteView.as_view(), name='weightshare-delete-modal'),
+    path('api/', include(router.urls)),
 ]

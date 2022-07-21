@@ -7,6 +7,8 @@ from django.views.generic import RedirectView
 
 from .views import HomeView, ContributorsView, PrivacyPolicyView
 
+from rest_framework.authtoken.views import obtain_auth_token
+
 admin.autodiscover()
 admin.site.enable_nav_sidebar = False
 
@@ -27,6 +29,7 @@ urlpatterns = [
     path('bibliography/', include('bibliography.urls')),
     path('cookies/', include('cookie_consent.urls')),
     path('privacy_policy/', PrivacyPolicyView.as_view(), name='privacypolicy'),
+    path('api-token-auth/', obtain_auth_token, name='api-token-auth'),
 ]
 
 if settings.DEBUG:

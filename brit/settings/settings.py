@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     'extra_views',
     'django_tables2',
     'rest_framework',
+    'rest_framework.authtoken',
     'rest_framework_gis',
     'leaflet',
     'cookie_consent',
@@ -134,6 +135,15 @@ DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
 ACCOUNT_ACTIVATION_DAYS = 2
 REGISTRATION_AUTO_LOGIN = True
 REGISTRATION_DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL')
+
+REST_FRAMEWORK = {
+    'DEFAULT_PERMISSION_CLASSES': ('rest_framework.permissions.IsAuthenticated',),
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework.authentication.TokenAuthentication',
+        'rest_framework.authentication.SessionAuthentication',
+    ),
+    'DEFAULT_FILTER_BACKENDS': ('django_filters.rest_framework.DjangoFilterBackend',)
+}
 
 LEAFLET_CONFIG = {
     'DEFAULT_CENTER': (50.08178260774763, 14.432086500224534),
