@@ -31,6 +31,8 @@ class HamburgRoadsideTreeAPIView(GenericAPIView):
     serializer_class = HamburgRoadsideTreeGeometrySerializer
     filter_backends = (rf_filters.DjangoFilterBackend,)
     filterset_class = TreeFilter
+    authentication_classes = []
+    permission_classes = []
 
     def get(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())

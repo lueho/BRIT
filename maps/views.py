@@ -327,6 +327,9 @@ class RegionGeometryAPI(APIView):
 
 class NutsRegionSummaryAPIView(APIView):
 
+    authentication_classes = []
+    permission_classes = []
+
     @staticmethod
     def get(request):
         obj = NutsRegion.objects.filter(id=request.query_params.get('pk'))
@@ -487,6 +490,9 @@ class NutsAndLauCatchmentPedigreeAPI(APIView):
     This API is used to reduce options in select widgets of filters. It returns only the ID and name of the
     region and not the geometry.
     """
+
+    authentication_classes = []
+    permission_classes = []
 
     @staticmethod
     def get(request):
