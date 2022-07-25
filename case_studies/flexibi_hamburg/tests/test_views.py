@@ -32,7 +32,6 @@ class HamburgRoadSideTreeAPITestCase(APITestCase):
     def test_no_query_params_return_all_entries(self):
         response = self.client.get(reverse('data.hamburg_roadside_trees'))
         json = response.json()
-        print(json)
         self.assertIn('geoJson', json)
         self.assertIn('features', json['geoJson'])
         self.assertIn('summaries', json)
