@@ -3,11 +3,21 @@ from django.db import models
 from django.test import TestCase
 from rest_framework.serializers import ModelSerializer, Serializer, CharField, IntegerField
 
-from maps.models import Catchment
+from maps.models import Catchment, NutsRegion, LauRegion
 from maps.serializers import FieldLabelMixin
 from materials.models import MaterialCategory
-from ..models import Collector, WasteComponent, WasteStream, WasteCategory, WasteFlyer, CollectionSystem, Collection, CollectionFrequency
-from ..serializers import CollectionModelSerializer
+
+from ..models import (
+    Collection,
+    CollectionFrequency,
+    CollectionSystem,
+    Collector,
+    WasteCategory,
+    WasteComponent,
+    WasteFlyer,
+    WasteStream
+)
+from ..serializers import CollectionModelSerializer, CollectionFlatSerializer
 
 
 class FieldLabelMixinTestCase(TestCase):
@@ -149,3 +159,110 @@ class CollectionSerializerTestCase(TestCase):
         serializer = CollectionModelSerializer(self.collection)
         self.assertEqual('70.0%', serializer.data['connection_rate'])
 
+
+class CollectionFlatSerializerTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = User.objects.create(username='owner', password='very-secure!')
+
+        MaterialCategory.objects.create(owner=owner, name='Biowaste component')
+        material1 = WasteComponent.objects.create(owner=owner, name='Test material 1')
+        material2 = WasteComponent.objects.create(owner=owner, name='Test material 2')
+        waste_stream = WasteStream.objects.create(
+            owner=owner,
+            name='Test waste stream',
+            category=WasteCategory.objects.create(owner=owner, name='Test Category'),
+        )
+        waste_stream.allowed_materials.add(material1)
+        waste_stream.allowed_materials.add(material2)
+
+        waste_flyer_1 = WasteFlyer.objects.create(
+            owner=owner,
+            abbreviation='WasteFlyer123',
+            url='https://www.test-flyer.org'
+        )
+        waste_flyer_2 = WasteFlyer.objects.create(
+            owner=owner,
+            abbreviation='WasteFlyer456',
+            url='https://www.best-flyer.org'
+        )
+        frequency = CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
+
+        nutsregion = NutsRegion.objects.create(owner=owner, name='Hamburg', cntr_code='DE', nuts_id='DE600')
+        catchment1 = Catchment.objects.create(owner=owner, name='Test Catchment', region=nutsregion.region_ptr)
+        collection1 = Collection.objects.create(
+            owner=owner,
+            created_by=owner,
+            lastmodified_by=owner,
+            name='Test Collection Nuts',
+            catchment=catchment1,
+            collector=Collector.objects.create(owner=owner, name='Test Collector'),
+            collection_system=CollectionSystem.objects.create(owner=owner, name='Test System'),
+            waste_stream=waste_stream,
+            frequency=frequency,
+            connection_rate=0.7,
+            connection_rate_year=2020,
+            description='This is a test case.'
+        )
+        collection1.flyers.add(waste_flyer_1)
+        collection1.flyers.add(waste_flyer_2)
+
+        lauregion = LauRegion.objects.create(owner=owner, name='Shetland Islands', cntr_code='UK', lau_id='S30000041')
+        catchment2 = Catchment.objects.create(owner=owner, name='Test Catchment', region=lauregion.region_ptr)
+        collection2 = Collection.objects.create(
+            owner=owner,
+            created_by=owner,
+            lastmodified_by=owner,
+            name='Test Collection Lau',
+            catchment=catchment2,
+            collector=Collector.objects.create(owner=owner, name='Test Collector'),
+            collection_system=CollectionSystem.objects.create(owner=owner, name='Test System'),
+            waste_stream=waste_stream,
+            frequency=frequency,
+            connection_rate=0.7,
+            connection_rate_year=2020,
+            description='This is a test case.'
+        )
+        collection2.flyers.add(waste_flyer_1)
+        collection2.flyers.add(waste_flyer_2)
+
+    def setUp(self):
+        self.collection_nuts = Collection.objects.get(name='Test Collection Nuts')
+        self.collection_lau = Collection.objects.get(name='Test Collection Lau')
+
+    def test_serializer_data_contains_all_fields(self):
+        serializer = CollectionFlatSerializer(self.collection_nuts)
+        keys = {'catchment', 'nuts_or_lau_id', 'collector', 'collection_system', 'country', 'waste_category',
+                'allowed_materials', 'connection_rate', 'connection_rate_year', 'frequency', 'comments', 'sources',
+                'created_by', 'created_at', 'lastmodified_by', 'lastmodified_at'}
+        self.assertSetEqual(keys, set(serializer.data.keys()))
+
+    def test_serializer_gets_information_from_foreign_keys_correctly(self):
+        serializer = CollectionFlatSerializer(self.collection_nuts)
+        self.assertEqual('Test Catchment', serializer.data['catchment'])
+        self.assertEqual('Test Collector', serializer.data['collector'])
+        self.assertEqual('Test System', serializer.data['collection_system'])
+        self.assertEqual('Test Category', serializer.data['waste_category'])
+        self.assertEqual('Test material 1, Test material 2', serializer.data['allowed_materials'])
+        self.assertEqual('Test Frequency', serializer.data['frequency'])
+        self.assertEqual('https://www.test-flyer.org, https://www.best-flyer.org', serializer.data['sources'])
+        self.assertEqual('owner', serializer.data['created_by'])
+        self.assertEqual()
+        self.assertEqual('owner', serializer.data['lastmodified_by'])
+
+    def test_nuts_id_is_read_correctly(self):
+        serializer = CollectionFlatSerializer(self.collection_nuts)
+        self.assertEqual('DE600', serializer.data['nuts_or_lau_id'])
+
+    def test_country_is_read_correctly_from_nutsregion(self):
+        serializer = CollectionFlatSerializer(self.collection_nuts)
+        self.assertEqual('DE', serializer.data['country'])
+
+    def test_lau_id_is_read_correctly(self):
+        serializer = CollectionFlatSerializer(self.collection_lau)
+        self.assertEqual('S30000041', serializer.data['nuts_or_lau_id'])
+
+    def test_country_is_read_correctly_from_lauregion(self):
+        serializer = CollectionFlatSerializer(self.collection_lau)
+        self.assertEqual('UK', serializer.data['country'])

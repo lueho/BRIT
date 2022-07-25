@@ -35,7 +35,9 @@ django-registration-redux==2.9
 django-storages==1.12.1
 django-tables2==2.4.1
 djangorestframework==3.12.4
+djangorestframework-csv==2.1.1
 djangorestframework-gis==0.17
+drf_excel==2.1.0
 factory-boy==3.2.0
 Faker==9.3.1
 flower==1.0.0

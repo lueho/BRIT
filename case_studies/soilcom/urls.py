@@ -1,5 +1,6 @@
-from django.urls import path
+from django.urls import path, include
 
+from .router import router
 from . import views
 
 urlpatterns = [
@@ -81,7 +82,6 @@ urlpatterns = [
     path('flyers/<int:pk>/update/modal/', views.WasteFlyerModalUpdateView.as_view(), name='wasteflyer-update-modal'),
     path('flyers/<int:pk>/delete/modal/', views.WasteFlyerModalDeleteView.as_view(), name='wasteflyer-delete-modal'),
     path('collections/', views.CollectionListView.as_view(), name='collection-list'),
-    path('collections/download/csv', views.CollectionCSVAPIView.as_view(), name='collection-list-download-csv'),
     path('collections/create/', views.CollectionCreateView.as_view(), name='collection-create'),
     path('collections/<int:pk>/', views.CollectionDetailView.as_view(), name='collection-detail'),
     path('collections/<int:pk>/modal/', views.CollectionModalDetailView.as_view(), name='collection-detail-modal'),
@@ -92,5 +92,6 @@ urlpatterns = [
     path('collections/map/', views.WasteCollectionMapView.as_view(), name='WasteCollection'),
     path('collections/api/geometries/', views.CollectionGeometryAPI.as_view(), name='collection-geometry-api'),
     path('collections/api/summaries/', views.CollectionSummaryAPI.as_view(), name='collection-summary-api'),
-    path('catchment_selection/', views.CatchmentSelectView.as_view(), name='catchment-selection')
+    path('catchment_selection/', views.CatchmentSelectView.as_view(), name='catchment-selection'),
+    path('api/', include(router.urls)),
 ]

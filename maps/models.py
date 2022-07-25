@@ -45,6 +45,17 @@ class Region(NamedUserObjectModel):
         except Region.lauregion.RelatedObjectDoesNotExist:
             return None
 
+    @property
+    def nuts_or_lau_id(self):
+        try:
+            return self.nutsregion.nuts_id
+        except Region.nutsregion.RelatedObjectDoesNotExist:
+            pass
+        try:
+            return self.lauregion.lau_id
+        except Region.lauregion.RelatedObjectDoesNotExist:
+            return None
+
     @staticmethod
     def get_absolute_url(**kwargs):
         return reverse('catchment_list')

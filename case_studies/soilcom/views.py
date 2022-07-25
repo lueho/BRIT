@@ -1,15 +1,18 @@
-import csv
-
 from dal import autocomplete
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db.models import Max
 from django.forms import modelformset_factory
-from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
+from django.http import HttpResponseRedirect, JsonResponse
 from django.urls import reverse_lazy
 from django.views.generic import TemplateView
 from django_filters import rest_framework as rf_filters
 from rest_framework.generics import GenericAPIView
-from rest_framework.views import APIView, Response
+from rest_framework.views import APIView
+from rest_framework.response import Response
+from rest_framework.viewsets import ReadOnlyModelViewSet
+from rest_framework.decorators import action
+from rest_framework_csv.renderers import CSVRenderer
+from drf_excel.renderers import XLSXRenderer
 
 from bibliography.views import (SourceListView,
                                 SourceCreateView,
@@ -27,6 +30,8 @@ from . import filters
 from . import forms
 from . import models
 from . import serializers
+from .models import Collection
+from .serializers import CollectionFlatSerializer
 
 
 class CollectionHomeView(PermissionRequiredMixin, TemplateView):
@@ -765,67 +770,69 @@ class CollectionGeometryAPI(GenericAPIView):
         return JsonResponse(data)
 
 
-class CollectionCSVAPIView(GenericAPIView):
-    queryset = models.Collection.objects.all()
-    serializer_class = serializers.WasteCollectionGeometrySerializer
+class CollectionCSVRenderer(CSVRenderer):
+    writer_opts = {
+        'delimiter': '\t'
+    }
+    header = ['catchment', 'country', 'nuts_id', 'collector', 'collection_system', 'waste_category',
+              'allowed_materials', 'connection_rate', 'connection_rate_year', 'frequency', 'comments', 'sources',
+              'created_by', 'created_at', 'lastmodified_by', 'lastmodified_at']
+    labels = {
+        'catchment': 'Catchment',
+        'nuts_id': 'NUTS Id',
+        'collector': 'Collector',
+        'collection_system': 'Collection System',
+        'country': 'Country',
+        'waste_category': 'Waste Category',
+        'allowed_materials': 'Allowed Materials',
+        'connection_rate': 'Connection Rate',
+        'connection_rate_year': 'Connection Rate Year',
+        'frequency': 'Frequency',
+        'comments': 'Comments',
+        'sources': 'Sources',
+        'created_by': 'Created by',
+        'created_at': 'Created at',
+        'lastmodified_by': 'Last modified by',
+        'lastmodified_at': 'Last modified at'
+    }
+
+
+class CollectionViewSet(ReadOnlyModelViewSet):
+    queryset = Collection.objects.all()
+    serializer_class = CollectionFlatSerializer
     filter_backends = (rf_filters.DjangoFilterBackend,)
     filterset_class = filters.CollectionFilter
+    xlsx_use_labels = True
+    column_header = {
+        'style': {
+            'font': {
+                'bold': True
+            }
+        }
+    }
 
-    def get(self, request, *args, **kwargs):
-        response = HttpResponse(
-            content_type='text/csv',
-            headers={'Content-Disposition': 'attachment; filename="collections.csv"'},
+    @action(methods=['get'], detail=False, renderer_classes=(CollectionCSVRenderer,))
+    def download_csv(self, *args, **kwargs):
+        qs = self.filter_queryset(self.get_queryset())
+        serializer = self.get_serializer(qs, many=True)
+        response = Response(
+            serializer.data,
+            content_type='text/csv'
         )
-        field_names = ['Catchment', 'NUTS Id', 'Collector', 'Collection System', 'Country', 'Waste Category', 'Allowed Materials',
-                       'Connection Rate', 'Connection Rate Year', 'Frequency', 'Comments', 'Sources']
-        writer = csv.DictWriter(response, fieldnames=field_names, delimiter='\t')
-        writer.writeheader()
-        for collection in self.filter_queryset(self.get_queryset()):
-            for allowed_material in collection.waste_stream.allowed_materials.all():
-                values = {
-                    'Allowed Materials': allowed_material,
-                    'Waste Category': collection.waste_stream.category,
-                    'Connection Rate': collection.connection_rate,
-                    'Connection Rate Year': collection.connection_rate_year,
-                    'Sources': f'{", ".join([flyer.url for flyer in collection.flyers.all() if type(flyer.url) == str])}'
-                }
-                if collection.catchment:
-                    values['Catchment'] = collection.catchment.name
-                    try:
-                        values['Country'] = collection.catchment.region.country_code
-                    except AttributeError:
-                        values['Country'] = ''
-                    try:
-                        values['NUTS Id'] = collection.catchment.region.nutsregion.nuts_id
-                    except:
-                        values['NUTS Id'] = ''
-                else:
-                    values['Catchment'] = ''
-                if collection.collector:
-                    values['Collector'] = collection.collector.name
-                else:
-                    values['Collector'] = ''
-                if collection.collection_system:
-                    values['Collection System'] = collection.collection_system.name
-                else:
-                    values['Collection System'] = ''
-                if collection.frequency:
-                    values['Frequency'] = collection.frequency.name
-                else:
-                    values['Frequency'] = ''
-                if collection.description:
-                    values['Comments'] = collection.description.replace('\n', '').replace('\r', '')
-                else:
-                    values['Comments'] = ''
-                writer.writerow(values)
+        response['Content-Disposition'] = 'attachment; filename="collections.csv"'
         return response
 
+    @action(methods=['get'], detail=False, renderer_classes=(XLSXRenderer,))
+    def download_xlsx(self, *args, **kwargs):
+        qs = self.filter_queryset(self.get_queryset())
+        serializer = self.get_serializer(qs, many=True)
+        response = Response(
+            serializer.data,
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = 'attachment; filename="collections.xlsx"'
+        return response
 
-# class CollectionSummaryAPI(ListAPIView):
-#     queryset = models.Collection.objects.all()
-#     serializer_class = serializers.CollectionModelSerializer
-#     filter_backends = (rf_filters.DjangoFilterBackend,)
-#     filterset_class = filters.CollectionFilter
 
 class CollectionSummaryAPI(APIView):
 

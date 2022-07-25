@@ -32,20 +32,26 @@
 {% endblock list_body %}
 
 {% block list_footer %}
-    <a href="{% url 'WasteCollection' %}?{{ request.GET.urlencode }}&load_features=true">
+    <a class="mr-2" href="{% url 'WasteCollection' %}?{{ request.GET.urlencode }}&load_features=true">
         <i class="fa fa-fw fa-map"></i>
         View as map
     </a>
     {% if 'soilcom.add_collection' in perms %}
-        <a class="ml-2" href="{% url 'collection-create' %}?next={{ request.get_full_path|urlencode }}">
+        <a class="mr-2" href="{% url 'collection-create' %}?next={{ request.get_full_path|urlencode }}">
             <i class="fa fa-fw fa-plus"></i>
             Add new collection
         </a>
     {% endif %}
-    <a class="ml-2" href="{% url 'collection-list-download-csv' %}?{{ request.GET.urlencode }}">
-        <i class="fa fa-fw fa-file-download"></i>
-        Download as CSV
-    </a>
+    {% if user.is_authenticated %}
+        <a class="mr-2" href="{% url 'api-collection-download-csv' %}?{{ request.GET.urlencode }}">
+            <i class="fa fa-fw fa-file-download"></i>
+            Download as CSV
+        </a>
+        <a class="mr-2" href="{% url 'api-collection-download-xlsx' %}?{{ request.GET.urlencode }}">
+            <i class="fa fa-fw fa-file-download"></i>
+            Download as XLSX
+        </a>
+    {% endif %}
 {% endblock list_footer %}
 
 {% block filter_body %}
