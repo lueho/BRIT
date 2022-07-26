@@ -1,8 +1,9 @@
 from dal import autocomplete
 from django.contrib.auth.mixins import PermissionRequiredMixin
+from django.core.paginator import Paginator
 from django.db.models import Max
 from django.forms import modelformset_factory
-from django.http import HttpResponseRedirect, JsonResponse
+from django.http import HttpResponseRedirect, StreamingHttpResponse, JsonResponse
 from django.urls import reverse_lazy
 from django.views.generic import TemplateView
 from django_filters import rest_framework as rf_filters
@@ -11,7 +12,7 @@ from rest_framework.views import APIView
 from rest_framework.response import Response
 from rest_framework.viewsets import ReadOnlyModelViewSet
 from rest_framework.decorators import action
-from rest_framework_csv.renderers import CSVRenderer
+from rest_framework_csv.renderers import CSVStreamingRenderer
 from drf_excel.renderers import XLSXRenderer
 
 from bibliography.views import (SourceListView,
@@ -770,7 +771,17 @@ class CollectionGeometryAPI(GenericAPIView):
         return JsonResponse(data)
 
 
-class CollectionCSVRenderer(CSVRenderer):
+class Echo(object):
+    """An object that implements just the write method of the file-like
+    interface.
+    """
+
+    def write(self, value):
+        """Write the value by returning it, instead of storing in a buffer."""
+        return value
+
+
+class CollectionCSVRenderer(CSVStreamingRenderer):
     writer_opts = {
         'delimiter': '\t'
     }
@@ -802,6 +813,7 @@ class CollectionViewSet(ReadOnlyModelViewSet):
     serializer_class = CollectionFlatSerializer
     filter_backends = (rf_filters.DjangoFilterBackend,)
     filterset_class = filters.CollectionFilter
+    PAGE_SIZE = 20
     xlsx_use_labels = True
     column_header = {
         'style': {
@@ -812,14 +824,14 @@ class CollectionViewSet(ReadOnlyModelViewSet):
     }
 
     @action(methods=['get'], detail=False, renderer_classes=(CollectionCSVRenderer,))
-    def download_csv(self, *args, **kwargs):
-        qs = self.filter_queryset(self.get_queryset())
-        serializer = self.get_serializer(qs, many=True)
-        response = Response(
-            serializer.data,
-            content_type='text/csv'
+    def download_csv(self, request, *args, **kwargs):
+        queryset = self.filter_queryset(self.get_queryset())
+        response = StreamingHttpResponse(
+            request.accepted_renderer.render(self._stream_serialized_data(queryset)),
+            status=200,
+            content_type="text/csv",
         )
-        response['Content-Disposition'] = 'attachment; filename="collections.csv"'
+        response["Content-Disposition"] = 'attachment; filename="collections.csv"'
         return response
 
     @action(methods=['get'], detail=False, renderer_classes=(XLSXRenderer,))
@@ -832,6 +844,12 @@ class CollectionViewSet(ReadOnlyModelViewSet):
         )
         response['Content-Disposition'] = 'attachment; filename="collections.xlsx"'
         return response
+
+    def _stream_serialized_data(self, queryset):
+        serializer = self.get_serializer_class()
+        paginator = Paginator(queryset, self.PAGE_SIZE)
+        for page in paginator.page_range:
+            yield from serializer(paginator.page(page).object_list, many=True).data
 
 
 class CollectionSummaryAPI(APIView):

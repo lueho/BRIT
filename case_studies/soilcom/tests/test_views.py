@@ -945,23 +945,55 @@ class CollectionViewSetDownloadCSVTestCase(TestCase):
         response = self.client.get(reverse('api-collection-download-csv'), params={})
         self.assertEqual('text/csv', response.headers.get('Content-Type'))
 
+    def test_pagination_of_streaming_content(self):
+        owner = get_default_owner()
+        for i in range(30):
+            collection = Collection.objects.create(
+                owner=owner,
+                name=f'collection{i}',
+                catchment=Catchment.objects.first(),
+                collector=Collector.objects.first(),
+                collection_system=CollectionSystem.objects.first(),
+                waste_stream=WasteStream.objects.first(),
+                connection_rate=0.7,
+                connection_rate_year=2020,
+                frequency=CollectionFrequency.objects.first(),
+                description=f'This is additional test record {i}.'
+            )
+            for flyer in WasteFlyer.objects.all():
+                collection.flyers.add(flyer)
+        self.client.force_login(self.member)
+        params = {}
+        response = self.client.get(reverse('api-collection-download-csv'), params=params)
+        content = ''
+        for partial_content in response:
+            content += partial_content.decode('utf-8')
+        reader = csv.DictReader(io.StringIO(content), delimiter='\t')
+        self.assertEqual(Collection.objects.count(), len(list(reader)))
+
     def test_file_content(self):
         self.client.force_login(self.member)
         params = {}
         response = self.client.get(reverse('api-collection-download-csv'), params=params)
         # For some reason, the content needs to be decoded and again encoded to work. Why?
-        reader = csv.DictReader(io.StringIO(response.content.decode('utf-8')), delimiter='\t')
+        content = ''
+        for partial_content in response:
+            content += partial_content.decode('utf-8')
+        reader = csv.DictReader(io.StringIO(content), delimiter='\t')
         fieldnames = ['Catchment', 'Country', 'NUTS Id', 'Collector', 'Collection System', 'Waste Category',
                       'Allowed Materials', 'Connection Rate', 'Connection Rate Year', 'Frequency', 'Comments',
                       'Sources', 'Created by', 'Created at', 'Last modified by', 'Last modified at']
         self.assertListEqual(fieldnames, list(reader.fieldnames))
         self.assertEqual(2, sum(1 for _ in reader))
 
-    def test_allowed_materials_formated_as_comma_separated_list_in_one_field(self):
+    def test_allowed_materials_formatted_as_comma_separated_list_in_one_field(self):
         self.client.force_login(self.member)
         params = {}
         response = self.client.get(reverse('api-collection-download-csv'), params=params)
-        reader = csv.DictReader(io.StringIO(response.content.decode('utf-8')), delimiter='\t')
+        content = ''
+        for partial_content in response:
+            content += partial_content.decode('utf-8')
+        reader = csv.DictReader(io.StringIO(content), delimiter='\t')
         for row in reader:
             self.assertEqual('Test material 1, Test material 2', row['Allowed Materials'])
 
