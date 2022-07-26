@@ -785,12 +785,12 @@ class CollectionCSVRenderer(CSVStreamingRenderer):
     writer_opts = {
         'delimiter': '\t'
     }
-    header = ['catchment', 'country', 'nuts_id', 'collector', 'collection_system', 'waste_category',
+    header = ['catchment', 'country', 'nuts_or_lau_id', 'collector', 'collection_system', 'waste_category',
               'allowed_materials', 'connection_rate', 'connection_rate_year', 'frequency', 'comments', 'sources',
               'created_by', 'created_at', 'lastmodified_by', 'lastmodified_at']
     labels = {
         'catchment': 'Catchment',
-        'nuts_id': 'NUTS Id',
+        'nuts_or_lau_id': 'NUTS/LAU Id',
         'collector': 'Collector',
         'collection_system': 'Collection System',
         'country': 'Country',
