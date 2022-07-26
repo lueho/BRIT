@@ -266,3 +266,11 @@ class CollectionFlatSerializerTestCase(TestCase):
     def test_country_is_read_correctly_from_lauregion(self):
         serializer = CollectionFlatSerializer(self.collection_lau)
         self.assertEqual('UK', serializer.data['country'])
+
+    def test_newline_characters_are_replaced_with_semicolons_in_comments(self):
+        self.collection_nuts.description = 'This \n contains \r no newline \r\n characters.'
+        self.collection_nuts.save()
+        serializer = CollectionFlatSerializer(self.collection_nuts)
+        print(serializer.data)
+        self.assertNotIn('\n', serializer.data['comments'])
+        self.assertNotIn('\r', serializer.data['comments'])

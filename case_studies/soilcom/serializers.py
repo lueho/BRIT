@@ -92,7 +92,7 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
     connection_rate = serializers.StringRelatedField(label='Connection Rate')
     connection_rate_year = serializers.StringRelatedField(label='Connection Rate Year')
     frequency = serializers.StringRelatedField(label='Frequency')
-    comments = serializers.StringRelatedField(source='description', label='Comments')
+    comments = serializers.SerializerMethodField(source='description', label='Comments')
     sources = serializers.SerializerMethodField(label='Sources')
     created_by = serializers.StringRelatedField(source='created_by.username', label='Created by')
     created_at = serializers.DateTimeField(label='Created at')
@@ -111,3 +111,14 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
     @staticmethod
     def get_sources(obj):
         return ', '.join([f.url for f in obj.flyers.all()])
+
+    @staticmethod
+    def get_comments(obj):
+        if obj.description:
+            comments = obj.description
+            comments = comments.replace('\r\n', '; ')
+            comments = comments.replace('\r', '; ')
+            comments = comments.replace('\n', '; ')
+            return comments
+        else:
+            return ''
