@@ -997,6 +997,18 @@ class CollectionViewSetDownloadCSVTestCase(TestCase):
         for row in reader:
             self.assertEqual('Test material 1, Test material 2', row['Allowed Materials'])
 
+    def test_regression_flyers_without_urls_dont_raise_type_error(self):
+        rogue_flyer = WasteFlyer.objects.create(owner=self.owner, title='Rogue fLyer without url', abbreviation='RF')
+        defected_collection = Collection.objects.get(name='collection1')
+        defected_collection.flyers.add(rogue_flyer)
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('api-collection-download-csv'), params={})
+        content = ''
+        for partial_content in response:
+            content += partial_content.decode('utf-8')
+        reader = csv.DictReader(io.StringIO(content), delimiter='\t')
+        self.assertEqual(Collection.objects.count(), len(list(reader)))
+
 
 class CollectionViewSetDownloadXLSXTestCase(TestCase):
 

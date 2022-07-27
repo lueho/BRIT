@@ -106,11 +106,11 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_allowed_materials(obj):
-        return ', '.join([m.name for m in obj.waste_stream.allowed_materials.all()])
+        return ', '.join([m.name for m in obj.waste_stream.allowed_materials.all() if m.name])
 
     @staticmethod
     def get_sources(obj):
-        return ', '.join([f.url for f in obj.flyers.all()])
+        return ', '.join([f.url for f in obj.flyers.all() if f.url])
 
     @staticmethod
     def get_comments(obj):
