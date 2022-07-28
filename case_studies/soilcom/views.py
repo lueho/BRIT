@@ -1,21 +1,23 @@
-from dal import autocomplete
+import json
+
 from celery.result import AsyncResult
+from dal import autocomplete
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.paginator import Paginator
 from django.db.models import Max
 from django.forms import modelformset_factory
-from django.http import HttpResponseRedirect, StreamingHttpResponse, JsonResponse, FileResponse, HttpResponse
+from django.http import HttpResponseRedirect, StreamingHttpResponse, JsonResponse, HttpResponse
 from django.urls import reverse_lazy
 from django.views import View
 from django.views.generic import TemplateView
 from django_filters import rest_framework as rf_filters
-from rest_framework.generics import GenericAPIView
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.viewsets import ReadOnlyModelViewSet
-from rest_framework.decorators import action
-from rest_framework_csv.renderers import CSVStreamingRenderer
 from drf_excel.renderers import XLSXRenderer
+from rest_framework.decorators import action
+from rest_framework.generics import GenericAPIView
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework.viewsets import ReadOnlyModelViewSet
+from rest_framework_csv.renderers import CSVStreamingRenderer
 
 from bibliography.views import (SourceListView,
                                 SourceCreateView,
