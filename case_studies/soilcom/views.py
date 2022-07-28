@@ -1,4 +1,5 @@
 from dal import autocomplete
+from celery.result import AsyncResult
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.paginator import Paginator
 from django.db.models import Max
@@ -33,6 +34,7 @@ from . import models
 from . import serializers
 from .models import Collection
 from .serializers import CollectionFlatSerializer
+from .tasks import export_collections_to_xlsx
 
 
 class CollectionHomeView(PermissionRequiredMixin, TemplateView):
@@ -850,6 +852,27 @@ class CollectionViewSet(ReadOnlyModelViewSet):
         paginator = Paginator(queryset, self.PAGE_SIZE)
         for page in paginator.page_range:
             yield from serializer(paginator.page(page).object_list, many=True).data
+
+
+class CollectionExportXlsxView(View):
+
+    def get(self, request, *args, **kwargs):
+        query_params = dict(request.GET)
+        query_params.pop('page', None)
+        task = export_collections_to_xlsx.delay(query_params)
+        response_data = {
+            'task_id': task.task_id
+        }
+        return HttpResponse(json.dumps(response_data), content_type='application/json')
+
+
+def get_task_progress(request, task_id):
+    result = AsyncResult(task_id)
+    response_data = {
+        'state': result.state,
+        'details': result.info,
+    }
+    return HttpResponse(json.dumps(response_data), content_type='application/json')
 
 
 class CollectionSummaryAPI(APIView):

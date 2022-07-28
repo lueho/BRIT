@@ -44,13 +44,15 @@
     {% endif %}
     {% if user.is_authenticated %}
         <a class="mr-2" href="{% url 'api-collection-download-csv' %}?{{ request.GET.urlencode }}">
-            <i class="fa fa-fw fa-file-download"></i>
+            <i class="fa fa-fw fa-file-csv"></i>
             Download as CSV
         </a>
-        <a class="mr-2" href="{% url 'api-collection-download-xlsx' %}?{{ request.GET.urlencode }}">
-            <i class="fa fa-fw fa-file-download"></i>
-            Download as XLSX
-        </a>
+        <span id="export_xlsx">
+            <a href="javascript:void(0)" onclick="export_to_file()">
+                <i class="fa fa-fw fa-file-excel"></i>
+                Export to XLSX
+            </a>
+        </span>
     {% endif %}
 {% endblock list_footer %}
 
@@ -60,3 +62,73 @@
         <button id="btn-filter" class="btn btn-primary" type="submit">Filter</button>
     </form>
 {% endblock filter_body %}
+
+{% block javascript %}
+    {{ block.super }}
+
+    <script type="text/javascript">
+
+        async function get_task_progress(url, count = 0) {
+            const response = await fetch(url);
+            const data = await response.json();
+            if (data["state"] === "PENDING") {
+
+                const outer_span = document.createElement('span');
+
+                const i = document.createElement('i');
+                i.className = "fa fa-fw fa-file-excel";
+                outer_span.appendChild(i);
+
+                const inner_span = document.createElement('span');
+                inner_span.innerText = " Exporting to XLSX" + ".".repeat(++count % 4);
+                outer_span.appendChild(inner_span);
+
+                document.getElementById("export_xlsx").innerHTML = "";
+                document.getElementById("export_xlsx").appendChild(outer_span);
+                setTimeout(get_task_progress, 500, url, count);
+            } else if (data["state"] === "SUCCESS") {
+
+                const a = document.createElement('a');
+                a.href = data["details"];
+
+                const i = document.createElement('i');
+                i.className = "fa fa-fw fa-file-excel";
+                a.appendChild(i);
+
+                const span = document.createElement('span');
+                span.innerText = " Download XLSX";
+                a.appendChild(span);
+
+                document.getElementById("export_xlsx").innerHTML = "";
+                document.getElementById("export_xlsx").appendChild(a);
+                return data;
+            } else if (data["state"] === "FAILURE") {
+                const a = document.createElement('a');
+                a.href = "javascript:void(0)";
+                const i = document.createElement('i');
+                i.className = "fa fa-fw fa-file-excel"
+                a.appendChild(i);
+                const span = document.createElement('span');
+                span.innerText = " Export to XLSX";
+                a.appendChild(span);
+                document.getElementById("export_xlsx").appendChild(a);
+            }
+        }
+
+        async function start_task() {
+            const url = "{% url 'collection-export-xlsx' %}" + window.location.search;
+            const response = await fetch(url);
+            const data = await response.json();
+            return data["task_id"];
+        }
+
+        async function export_to_file() {
+            const task_id = await start_task();
+            document.getElementById("export_xlsx").innerText = 'Exporting to XLSX'
+            const url = "{% url 'get_task_progress' task_id=0 %}".replace('0', task_id);
+            get_task_progress(url);
+        }
+
+    </script>
+
+{% endblock javascript %}
