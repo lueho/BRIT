@@ -4,8 +4,9 @@ from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.core.paginator import Paginator
 from django.db.models import Max
 from django.forms import modelformset_factory
-from django.http import HttpResponseRedirect, StreamingHttpResponse, JsonResponse
+from django.http import HttpResponseRedirect, StreamingHttpResponse, JsonResponse, FileResponse, HttpResponse
 from django.urls import reverse_lazy
+from django.views import View
 from django.views.generic import TemplateView
 from django_filters import rest_framework as rf_filters
 from rest_framework.generics import GenericAPIView
