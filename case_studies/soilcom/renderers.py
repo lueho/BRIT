@@ -1,4 +1,5 @@
 import xlsxwriter
+from rest_framework_csv.renderers import CSVStreamingRenderer
 
 
 class BaseXLSXRenderer:
@@ -48,3 +49,109 @@ class CollectionXLSXRenderer(BaseXLSXRenderer):
     }
 
 
+class CollectionCSVRenderer(CSVStreamingRenderer):
+    writer_opts = {
+        'delimiter': '\t'
+    }
+    header = ['catchment', 'country', 'nuts_or_lau_id', 'collector', 'collection_system', 'waste_category',
+              'allowed_materials', 'connection_rate', 'connection_rate_year', 'frequency', 'comments', 'sources',
+              'created_by', 'created_at', 'lastmodified_by', 'lastmodified_at']
+    labels = {
+        'catchment': 'Catchment',
+        'nuts_or_lau_id': 'NUTS/LAU Id',
+        'collector': 'Collector',
+        'collection_system': 'Collection System',
+        'country': 'Country',
+        'waste_category': 'Waste Category',
+        'allowed_materials': 'Allowed Materials',
+        'connection_rate': 'Connection Rate',
+        'connection_rate_year': 'Connection Rate Year',
+        'frequency': 'Frequency',
+        'comments': 'Comments',
+        'sources': 'Sources',
+        'created_by': 'Created by',
+        'created_at': 'Created at',
+        'lastmodified_by': 'Last modified by',
+        'lastmodified_at': 'Last modified at'
+    }
+
+
+class CollectionCSVRenderer(CSVStreamingRenderer):
+    writer_opts = {
+        'delimiter': '\t'
+    }
+    header = ['catchment', 'country', 'nuts_or_lau_id', 'collector', 'collection_system', 'waste_category',
+              'allowed_materials', 'connection_rate', 'connection_rate_year', 'frequency', 'comments', 'sources',
+              'created_by', 'created_at', 'lastmodified_by', 'lastmodified_at']
+    labels = {
+        'catchment': 'Catchment',
+        'nuts_or_lau_id': 'NUTS/LAU Id',
+        'collector': 'Collector',
+        'collection_system': 'Collection System',
+        'country': 'Country',
+        'waste_category': 'Waste Category',
+        'allowed_materials': 'Allowed Materials',
+        'connection_rate': 'Connection Rate',
+        'connection_rate_year': 'Connection Rate Year',
+        'frequency': 'Frequency',
+        'comments': 'Comments',
+        'sources': 'Sources',
+        'created_by': 'Created by',
+        'created_at': 'Created at',
+        'lastmodified_by': 'Last modified by',
+        'lastmodified_at': 'Last modified at'
+    }
+
+
+class CollectionCSVRenderer(CSVStreamingRenderer):
+    writer_opts = {
+        'delimiter': '\t'
+    }
+    header = ['catchment', 'country', 'nuts_or_lau_id', 'collector', 'collection_system', 'waste_category',
+              'allowed_materials', 'connection_rate', 'connection_rate_year', 'frequency', 'comments', 'sources',
+              'created_by', 'created_at', 'lastmodified_by', 'lastmodified_at']
+    labels = {
+        'catchment': 'Catchment',
+        'nuts_or_lau_id': 'NUTS/LAU Id',
+        'collector': 'Collector',
+        'collection_system': 'Collection System',
+        'country': 'Country',
+        'waste_category': 'Waste Category',
+        'allowed_materials': 'Allowed Materials',
+        'connection_rate': 'Connection Rate',
+        'connection_rate_year': 'Connection Rate Year',
+        'frequency': 'Frequency',
+        'comments': 'Comments',
+        'sources': 'Sources',
+        'created_by': 'Created by',
+        'created_at': 'Created at',
+        'lastmodified_by': 'Last modified by',
+        'lastmodified_at': 'Last modified at'
+    }
+
+
+class CollectionCSVRenderer(CSVStreamingRenderer):
+    writer_opts = {
+        'delimiter': '\t'
+    }
+    header = ['catchment', 'country', 'nuts_or_lau_id', 'collector', 'collection_system', 'waste_category',
+              'allowed_materials', 'connection_rate', 'connection_rate_year', 'frequency', 'comments', 'sources',
+              'created_by', 'created_at', 'lastmodified_by', 'lastmodified_at']
+    labels = {
+        'catchment': 'Catchment',
+        'nuts_or_lau_id': 'NUTS/LAU Id',
+        'collector': 'Collector',
+        'collection_system': 'Collection System',
+        'country': 'Country',
+        'waste_category': 'Waste Category',
+        'allowed_materials': 'Allowed Materials',
+        'connection_rate': 'Connection Rate',
+        'connection_rate_year': 'Connection Rate Year',
+        'frequency': 'Frequency',
+        'comments': 'Comments',
+        'sources': 'Sources',
+        'created_by': 'Created by',
+        'created_at': 'Created at',
+        'lastmodified_by': 'Last modified by',
+        'lastmodified_at': 'Last modified at'
+    }
