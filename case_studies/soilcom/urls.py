@@ -1,7 +1,7 @@
 from django.urls import path, include
 
-from .router import router
 from . import views
+from .router import router
 
 urlpatterns = [
     path('', views.CollectionHomeView.as_view(), name='waste-collection-home'),
@@ -94,6 +94,6 @@ urlpatterns = [
     path('collections/api/summaries/', views.CollectionSummaryAPI.as_view(), name='collection-summary-api'),
     path('catchment_selection/', views.CatchmentSelectView.as_view(), name='catchment-selection'),
     path('api/', include(router.urls)),
-    path('collections/export/xlsx/', views.CollectionExportXlsxView.as_view(), name='collection-export-xlsx'),
+    path('collections/export/', views.CollectionListFileExportView.as_view(), name='collection-export'),
     path('get_task_progress/<str:task_id>/', views.get_task_progress, name='get_task_progress')
 ]

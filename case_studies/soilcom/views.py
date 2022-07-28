@@ -3,21 +3,17 @@ import json
 from celery.result import AsyncResult
 from dal import autocomplete
 from django.contrib.auth.mixins import PermissionRequiredMixin
-from django.core.paginator import Paginator
 from django.db.models import Max
 from django.forms import modelformset_factory
-from django.http import HttpResponseRedirect, StreamingHttpResponse, JsonResponse, HttpResponse
+from django.http import HttpResponseRedirect, JsonResponse, HttpResponse
 from django.urls import reverse_lazy
 from django.views import View
 from django.views.generic import TemplateView
 from django_filters import rest_framework as rf_filters
-from drf_excel.renderers import XLSXRenderer
-from rest_framework.decorators import action
 from rest_framework.generics import GenericAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ReadOnlyModelViewSet
-from rest_framework_csv.renderers import CSVStreamingRenderer
 
 from bibliography.views import (SourceListView,
                                 SourceCreateView,
@@ -37,7 +33,7 @@ from . import models
 from . import serializers
 from .models import Collection
 from .serializers import CollectionFlatSerializer
-from .tasks import export_collections_to_xlsx
+from .tasks import export_collections_to_file
 
 
 class CollectionHomeView(PermissionRequiredMixin, TemplateView):
@@ -786,83 +782,20 @@ class Echo(object):
         return value
 
 
-class CollectionCSVRenderer(CSVStreamingRenderer):
-    writer_opts = {
-        'delimiter': '\t'
-    }
-    header = ['catchment', 'country', 'nuts_or_lau_id', 'collector', 'collection_system', 'waste_category',
-              'allowed_materials', 'connection_rate', 'connection_rate_year', 'frequency', 'comments', 'sources',
-              'created_by', 'created_at', 'lastmodified_by', 'lastmodified_at']
-    labels = {
-        'catchment': 'Catchment',
-        'nuts_or_lau_id': 'NUTS/LAU Id',
-        'collector': 'Collector',
-        'collection_system': 'Collection System',
-        'country': 'Country',
-        'waste_category': 'Waste Category',
-        'allowed_materials': 'Allowed Materials',
-        'connection_rate': 'Connection Rate',
-        'connection_rate_year': 'Connection Rate Year',
-        'frequency': 'Frequency',
-        'comments': 'Comments',
-        'sources': 'Sources',
-        'created_by': 'Created by',
-        'created_at': 'Created at',
-        'lastmodified_by': 'Last modified by',
-        'lastmodified_at': 'Last modified at'
-    }
-
-
 class CollectionViewSet(ReadOnlyModelViewSet):
     queryset = Collection.objects.all()
     serializer_class = CollectionFlatSerializer
     filter_backends = (rf_filters.DjangoFilterBackend,)
     filterset_class = filters.CollectionFilter
-    PAGE_SIZE = 20
-    xlsx_use_labels = True
-    column_header = {
-        'style': {
-            'font': {
-                'bold': True
-            }
-        }
-    }
-
-    @action(methods=['get'], detail=False, renderer_classes=(CollectionCSVRenderer,))
-    def download_csv(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        response = StreamingHttpResponse(
-            request.accepted_renderer.render(self._stream_serialized_data(queryset)),
-            status=200,
-            content_type="text/csv",
-        )
-        response["Content-Disposition"] = 'attachment; filename="collections.csv"'
-        return response
-
-    @action(methods=['get'], detail=False, renderer_classes=(XLSXRenderer,))
-    def download_xlsx(self, *args, **kwargs):
-        qs = self.filter_queryset(self.get_queryset())
-        serializer = self.get_serializer(qs, many=True)
-        response = Response(
-            serializer.data,
-            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-        )
-        response['Content-Disposition'] = 'attachment; filename="collections.xlsx"'
-        return response
-
-    def _stream_serialized_data(self, queryset):
-        serializer = self.get_serializer_class()
-        paginator = Paginator(queryset, self.PAGE_SIZE)
-        for page in paginator.page_range:
-            yield from serializer(paginator.page(page).object_list, many=True).data
 
 
-class CollectionExportXlsxView(View):
+class CollectionListFileExportView(View):
 
     def get(self, request, *args, **kwargs):
-        query_params = dict(request.GET)
-        query_params.pop('page', None)
-        task = export_collections_to_xlsx.delay(query_params)
+        params = dict(request.GET)
+        file_format = params.pop('format', 'csv')[0]
+        params.pop('page', None)
+        task = export_collections_to_file.delay(file_format, params)
         response_data = {
             'task_id': task.task_id
         }
