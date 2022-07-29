@@ -32,27 +32,27 @@
 {% endblock list_body %}
 
 {% block list_footer %}
-    <a class="mr-2" href="{% url 'WasteCollection' %}?{{ request.GET.urlencode }}&load_features=true">
+    <a class="mr-2 text-nowrap" href="{% url 'WasteCollection' %}?{{ request.GET.urlencode }}&load_features=true">
         <i class="fa fa-fw fa-map"></i>
-        View as map
+        <span class="text-nowrap">View as map</span>
     </a>
     {% if 'soilcom.add_collection' in perms %}
-        <a class="mr-2" href="{% url 'collection-create' %}?next={{ request.get_full_path|urlencode }}">
+        <a class="mr-2 text-nowrap" href="{% url 'collection-create' %}?next={{ request.get_full_path|urlencode }}">
             <i class="fa fa-fw fa-plus"></i>
-            Add new collection
+            <span>Add new collection</span>
         </a>
     {% endif %}
     {% if user.is_authenticated %}
-        <span id="export_csv">
+        <span id="export_csv text-nowrap" style="display: inline-block; width: 10em">
             <a href="javascript:void(0)" onclick="export_to_file('csv')">
                 <i class="fa fa-fw fa-file-csv"></i>
-                Export to csv
+                <span>Export to csv</span>
             </a>
         </span>
-        <span id="export_xlsx">
+        <span id="export_xlsx" class="text-nowrap" style="display: inline-block; width: 10em">
             <a href="javascript:void(0)" onclick="export_to_file('xlsx')">
                 <i class="fa fa-fw fa-file-excel"></i>
-                Export to xlsx
+                <span>Export to xlsx</span>
             </a>
         </span>
     {% endif %}
@@ -70,72 +70,24 @@
 
     <script type="text/javascript">
 
-        async function get_task_progress(url, format, count = 0) {
+        async function monitor_task_progress(url, format, count = 0) {
             const response = await fetch(url);
             const data = await response.json();
+            const elExportWrapper = document.getElementById('export_' + format);
+            const elExportLink = elExportWrapper.children[0];
+            const elExportLinkText = elExportLink.children[1];
             if (data["state"] === "PENDING") {
-
-                const outer_span = document.createElement('span');
-
-                const i = document.createElement('i');
-                if (format === 'xlsx') {
-                    i.className = "fa fa-fw fa-file-excel";
-                } else if (format === 'csv') {
-                    i.className = "fa fa-fw fa-file-csv";
-                } else {
-                    i.className = "fa fa-fw fa-file";
-                }
-
-                outer_span.appendChild(i);
-
-                const inner_span = document.createElement('span');
-                inner_span.innerText = " Exporting to " + format + ".".repeat(++count % 4);
-                outer_span.appendChild(inner_span);
-
-                const element_id = "export_" + format
-                document.getElementById(element_id).innerHTML = "";
-                document.getElementById(element_id).appendChild(outer_span);
-                setTimeout(get_task_progress, 500, url, format, count);
+                elExportLinkText.innerText = "Exporting to " + format + ".".repeat(count++ % 4);
+                elExportLink.classList.add("processing-link");
+                setTimeout(monitor_task_progress, 500, url, format, count);
             } else if (data["state"] === "SUCCESS") {
-
-                const a = document.createElement('a');
-                a.href = data["details"];
-
-                const i = document.createElement('i');
-                if (format === 'xlsx') {
-                    i.className = "fa fa-fw fa-file-excel";
-                } else if (format === 'csv') {
-                    i.className = "fa fa-fw fa-file-csv";
-                } else {
-                    i.className = "fa fa-fw fa-file";
-                }
-                a.appendChild(i);
-
-                const span = document.createElement('span');
-                span.innerText = " Download " + format;
-                a.appendChild(span);
-
-                const element_id = "export_" + format;
-                document.getElementById(element_id).innerHTML = "";
-                document.getElementById(element_id).appendChild(a);
-                return data;
+                elExportLinkText.innerText = "Download " + format;
+                elExportLink.removeAttribute("onclick");
+                elExportLink.href = data["details"];
+                elExportLink.classList.remove("processing-link");
             } else if (data["state"] === "FAILURE") {
-                const a = document.createElement('a');
-                a.href = "javascript:void(0)";
-                const i = document.createElement('i');
-                if (format === 'xlsx') {
-                    i.className = "fa fa-fw fa-file-excel";
-                } else if (format === 'csv') {
-                    i.className = "fa fa-fw fa-file-csv";
-                } else {
-                    i.className = "fa fa-fw fa-file";
-                }
-                a.appendChild(i);
-                const span = document.createElement('span');
-                span.innerText = " Export to " + format;
-                a.appendChild(span);
-                const element_id = "export_" + format
-                document.getElementById(element_id).appendChild(a);
+                elExportLinkText.innerText = "Export to " + format;
+                elExportLink.classList.remove("processing-link");
             }
         }
 
@@ -149,11 +101,9 @@
         }
 
         async function export_to_file(format) {
-            const task_id = await start_task(format);
-            const element_id = "export_" + format;
-            document.getElementById(element_id).innerText = 'Exporting to ' + format;
-            const url = "{% url 'get_task_progress' task_id=0 %}".replace('0', task_id);
-            get_task_progress(url, format);
+            const taskId = await start_task(format);
+            const url = "{% url 'collection-export-progress' task_id=0 %}".replace('0', taskId);
+            monitor_task_progress(url, format);
         }
 
     </script>

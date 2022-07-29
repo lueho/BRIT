@@ -1,8 +1,14 @@
 .select2-container {
-    min-width: 10em !important
+    min-width: 10em !important;
 }
 
 .nowrap {
     white-space: nowrap;
     overflow: hidden;
+}
+
+.processing-link {
+    pointer-events: none !important;
+    text-decoration: none !important;
+    color: inherit !important;
 }

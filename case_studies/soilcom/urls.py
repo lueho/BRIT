@@ -95,5 +95,5 @@ urlpatterns = [
     path('catchment_selection/', views.CatchmentSelectView.as_view(), name='catchment-selection'),
     path('api/', include(router.urls)),
     path('collections/export/', views.CollectionListFileExportView.as_view(), name='collection-export'),
-    path('get_task_progress/<str:task_id>/', views.get_task_progress, name='get_task_progress')
+    path('collections/export/<str:task_id>/progress/', views.CollectionListFileExportProgressView.as_view(), name='collection-export-progress')
 ]

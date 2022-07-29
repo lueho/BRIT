@@ -1,5 +1,3 @@
-import json
-
 from celery.result import AsyncResult
 from dal import autocomplete
 from django.contrib.auth.mixins import PermissionRequiredMixin
@@ -10,6 +8,7 @@ from django.urls import reverse_lazy
 from django.views import View
 from django.views.generic import TemplateView
 from django_filters import rest_framework as rf_filters
+import json
 from rest_framework.generics import GenericAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -772,16 +771,6 @@ class CollectionGeometryAPI(GenericAPIView):
         return JsonResponse(data)
 
 
-class Echo(object):
-    """An object that implements just the write method of the file-like
-    interface.
-    """
-
-    def write(self, value):
-        """Write the value by returning it, instead of storing in a buffer."""
-        return value
-
-
 class CollectionViewSet(ReadOnlyModelViewSet):
     queryset = Collection.objects.all()
     serializer_class = CollectionFlatSerializer
@@ -791,7 +780,8 @@ class CollectionViewSet(ReadOnlyModelViewSet):
 
 class CollectionListFileExportView(View):
 
-    def get(self, request, *args, **kwargs):
+    @staticmethod
+    def get(request, *args, **kwargs):
         params = dict(request.GET)
         file_format = params.pop('format', 'csv')[0]
         params.pop('page', None)
@@ -802,13 +792,16 @@ class CollectionListFileExportView(View):
         return HttpResponse(json.dumps(response_data), content_type='application/json')
 
 
-def get_task_progress(request, task_id):
-    result = AsyncResult(task_id)
-    response_data = {
-        'state': result.state,
-        'details': result.info,
-    }
-    return HttpResponse(json.dumps(response_data), content_type='application/json')
+class CollectionListFileExportProgressView(View):
+
+    @staticmethod
+    def get(request, task_id):
+        result = AsyncResult(task_id)
+        response_data = {
+            'state': result.state,
+            'details': result.info,
+        }
+        return HttpResponse(json.dumps(response_data), content_type='application/json')
 
 
 class CollectionSummaryAPI(APIView):
