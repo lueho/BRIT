@@ -74,7 +74,7 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
     @staticmethod
     def get_connection_rate(obj):
         if obj.connection_rate:
-            value = f'{obj.connection_rate * 100}%'
+            value = f'{obj.connection_rate * 100}\u00A0%'
             if obj.connection_rate_year:
                 value += f' ({obj.connection_rate_year})'
             return value

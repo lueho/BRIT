@@ -23,14 +23,12 @@ class TestCollectionModelForm(TestCase):
         self.material2 = WasteComponent.objects.create(owner=self.owner, name='Material 2')
         self.material2.categories.add(self.material_group)
         self.frequency = CollectionFrequency.objects.create(owner=self.owner, name='fix')
-
-    def test_form_errors(self):
         waste_stream = WasteStream.objects.create(
             owner=self.owner,
             category=self.waste_category,
         )
         waste_stream.allowed_materials.set([self.material1, self.material2])
-        collection = Collection.objects.create(
+        self.collection = Collection.objects.create(
             owner=self.owner,
             catchment=self.catchment,
             collector=self.collector,
@@ -40,10 +38,12 @@ class TestCollectionModelForm(TestCase):
             connection_rate_year=2020,
             frequency=self.frequency
         )
+
+    def test_form_errors(self):
         data = {
             'connection_rate_year': 123
         }
-        form = CollectionModelForm(instance=collection, data=data)
+        form = CollectionModelForm(instance=self.collection, data=data)
         self.assertFalse(form.is_valid())
         self.assertEqual(form.errors['catchment'][0], 'This field is required.')
         self.assertEqual(form.errors['collection_system'][0], 'This field is required.')
@@ -105,6 +105,10 @@ class TestCollectionModelForm(TestCase):
         form.instance.owner = self.owner
         instance = form.save()
         self.assertEqual(0.7, instance.connection_rate)
+
+    def test_connection_rate_is_converted_to_percentage_for_initial_values(self):
+        form = CollectionModelForm(instance=self.collection)
+        self.assertEqual(form.initial['connection_rate'], self.collection.connection_rate * 100)
 
 
 class TestWasteFlyerModelForm(TestCase):

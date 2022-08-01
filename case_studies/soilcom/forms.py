@@ -191,6 +191,8 @@ class CollectionModelForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['collector'].widget.attrs = {'data-theme': 'bootstrap4'}
         self.fields['catchment'].widget.attrs = {'data-theme': 'bootstrap4'}
+        if 'connection_rate' in self.initial:
+            self.initial['connection_rate'] *= 100
 
     def clean_connection_rate(self):
         connection_rate = self.cleaned_data.get('connection_rate')

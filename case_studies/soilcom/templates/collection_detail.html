@@ -31,7 +31,7 @@
                     {% if object.connection_rate %}
                     <p class="card-text">
                         <strong>Connection Rate:</strong><br>
-                        {{ object.connection_rate }}
+                        {{ object.connection_rate_string_representation }}
                         {% if object.connection_rate_year %} ({{ object.connection_rate_year }}){% endif %}
                     </p>
                     {% endif %}

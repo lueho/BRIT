@@ -200,3 +200,7 @@ class Collection(NamedUserObjectModel):
     @property
     def geom(self):
         return self.catchment.geom
+
+    @property
+    def connection_rate_string_representation(self):
+        return f'{self.connection_rate * 100}\u00A0%'
