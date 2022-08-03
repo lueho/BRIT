@@ -261,6 +261,9 @@ class GeoDatasetDetailView(GeoDataSetFormMixin, GeoDataSetMixin, DetailView):
 
 class CatchmentGeometryAPI(APIView):
 
+    authentication_classes = []
+    permission_classes = []
+
     @staticmethod
     def get(request, *args, **kwargs):
         if 'catchment' in request.query_params:
@@ -293,6 +296,9 @@ class CatchmentGeometryAPI(APIView):
 
 class CatchmentOptionGeometryAPI(APIView):
 
+    authentication_classes = []
+    permission_classes = []
+
     @staticmethod
     def get(request):
         qs = Catchment.objects.all()
@@ -310,6 +316,9 @@ class RegionGeometryAPI(APIView):
     """
     Takes the id of a region and returns its geometry as GeoJSON.
     """
+
+    authentication_classes = []
+    permission_classes = []
 
     @staticmethod
     def get(request, *args, **kwargs):
@@ -347,6 +356,9 @@ class CatchmentRegionGeometryAPI(APIView):
     and returns the geometry of the associated Region.
     """
 
+    authentication_classes = []
+    permission_classes = []
+
     @staticmethod
     def get(request, *args, **kwargs):
         if 'pk' in request.query_params:
@@ -359,6 +371,9 @@ class CatchmentRegionGeometryAPI(APIView):
 
 
 class CatchmentRegionSummaryAPIView(APIView):
+
+    authentication_classes = []
+    permission_classes = []
 
     @staticmethod
     def get(request, *args, **kwargs):
@@ -413,6 +428,9 @@ class NutsRegionMapView(GeoDatasetDetailView):
 
 class NutsRegionAPIView(APIView):
 
+    authentication_classes = []
+    permission_classes = []
+
     @staticmethod
     def get(request):
         qs = NutsRegion.objects.all()
@@ -435,6 +453,9 @@ class NutsRegionPedigreeAPI(APIView):
     This API is used to reduce options in select widgets of filters. It returns only the ID and name of the
     region and not the geometry.
     """
+
+    authentication_classes = []
+    permission_classes = []
 
     @staticmethod
     def get(request):
@@ -474,6 +495,9 @@ class LauRegionOptionsAPI(APIView):
     This API is used to reduce options in select widgets of filters. It returns only the ID and name of the
     region and not the geometry.
     """
+
+    authentication_classes = []
+    permission_classes = []
 
     @staticmethod
     def get(request):

@@ -319,6 +319,7 @@ class NantesGreenhousesAPIView(GenericAPIView):
     serializer_class = NantesGreenhousesGeometrySerializer
     filter_backends = (rf_filters.DjangoFilterBackend,)
     filterset_class = GreenhouseFilter
+    permission_classes = set()
 
     def get(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
