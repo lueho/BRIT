@@ -2,7 +2,7 @@ from celery.result import AsyncResult
 from dal import autocomplete
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db.models import Max
-from django.forms import modelformset_factory
+from django.forms import modelformset_factory, formset_factory
 from django.http import HttpResponseRedirect, JsonResponse, HttpResponse
 from django.urls import reverse_lazy
 from django.views import View
@@ -499,20 +499,41 @@ class ModelFormAndModelFormSetMixin:
         return super().get_context_data(**kwargs)
 
 
-class CollectionCreateView(ModelFormAndModelFormSetMixin, views.OwnedObjectCreateView):
-    template_name = 'collection_form_card.html'
-    form_class = forms.CollectionModelForm
-    formset_model = models.WasteFlyer
-    formset_class = forms.WasteFlyerModelFormSet
-    formset_form_class = forms.WasteFlyerModelForm
-    permission_required = 'soilcom.add_collection'
+class ModelFormAndFormSetMixin:
+    object = None
+    formset_class = None
+    formset_form_class = None
+    request = None
+
+    def get_formset(self, **kwargs):
+        FormSet = formset_factory(
+            form=self.formset_form_class,
+            formset=self.formset_class
+        )
+        return FormSet(**self.get_formset_kwargs())
 
     def get_formset_kwargs(self, **kwargs):
-        if 'queryset' not in kwargs:
+        if self.request.method in ("POST", "PUT"):
             kwargs.update({
-                'queryset': self.formset_model.objects.none()
+                'owner': self.request.user,
+                'data': self.request.POST.copy(),
+                'parent_object': self.object
             })
-        return super().get_formset_kwargs(**kwargs)
+        return kwargs
+
+    def get_context_data(self, **kwargs):
+        if 'formset' not in kwargs:
+            kwargs['formset'] = self.get_formset()
+        kwargs['formset_helper'] = forms.FormSetHelper()
+        return super().get_context_data(**kwargs)
+
+
+class CollectionCreateView(ModelFormAndFormSetMixin, views.OwnedObjectCreateView):
+    template_name = 'collection_form_card.html'
+    form_class = forms.CollectionModelForm
+    formset_class = forms.BaseWasteFlyerUrlFormSet
+    formset_form_class = forms.UrlForm
+    permission_required = 'soilcom.add_collection'
 
     def get_initial(self):
         initial = super().get_initial()
@@ -531,15 +552,9 @@ class CollectionCreateView(ModelFormAndModelFormSetMixin, views.OwnedObjectCreat
         if form.is_valid() and formset.is_valid():
             form.instance.owner = self.request.user
             self.object = form.save()
-            for form in formset:
-                form.instance.owner = request.user
-            flyers = formset.save()
-            # The save() method of formset only returns instances that have been changed or newly created. We want
-            # to keep the unchanged previously existing flyers as well.
-            for form in formset.initial_forms:
-                if form.instance.pk and not form.has_changed():
-                    flyers.append(form.instance)
-            self.object.flyers.set(list(flyers))
+            formset = self.get_formset()
+            formset.is_valid()
+            formset.save()
             return HttpResponseRedirect(self.get_success_url())
         else:
             context = self.get_context_data(form=form, formset=formset)
@@ -556,7 +571,6 @@ class CollectionCopyView(CollectionCreateView):
     def get_formset_kwargs(self, **kwargs):
         kwargs.update({
             'parent_object': self.original_object,
-            'queryset': self.formset_model.objects.filter(collections=self.original_object)
         })
         return super().get_formset_kwargs(**kwargs)
 
@@ -604,19 +618,18 @@ class CollectionModalDetailView(views.OwnedObjectModalDetailView):
     permission_required = 'soilcom.view_collection'
 
 
-class CollectionUpdateView(ModelFormAndModelFormSetMixin, views.OwnedObjectUpdateView):
+class CollectionUpdateView(ModelFormAndFormSetMixin, views.OwnedObjectUpdateView):
     model = models.Collection
     form_class = forms.CollectionModelForm
-    formset_model = models.WasteFlyer
-    formset_class = forms.WasteFlyerModelFormSet
-    formset_form_class = forms.WasteFlyerModelForm
+    formset_class = forms.BaseWasteFlyerUrlFormSet
+    formset_form_class = forms.UrlForm
     permission_required = 'soilcom.change_collection'
     template_name = 'collection_form_card.html'
 
     def get_formset_kwargs(self, **kwargs):
         kwargs.update({
             'parent_object': self.object,
-            'queryset': self.formset_model.objects.filter(collections=self.kwargs['pk'])
+            'owner': self.request.user,
         })
         return super().get_formset_kwargs(**kwargs)
 
@@ -634,13 +647,8 @@ class CollectionUpdateView(ModelFormAndModelFormSetMixin, views.OwnedObjectUpdat
         formset = self.get_formset()
 
         if form.is_valid() and formset.is_valid():
-            collection = form.save()
-            for form in formset:
-                form.instance.owner = request.user
-            flyers = formset.save()
-            for flyer in flyers:
-                if flyer not in collection.flyers.all():
-                    collection.flyers.add(flyer)
+            form.save()
+            formset.save()
             return HttpResponseRedirect(self.get_success_url())
         else:
             context = self.get_context_data(form=form, formset=formset)

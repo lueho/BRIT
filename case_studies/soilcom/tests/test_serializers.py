@@ -145,7 +145,7 @@ class CollectionSerializerTestCase(TestCase):
     def test_connection_rate_is_converted_and_connected_with_year(self):
         serializer = CollectionModelSerializer(self.collection)
         connection_rate = serializer.data['connection_rate']
-        self.assertEqual('70.0% (2020)', connection_rate)
+        self.assertEqual('70.0\u00A0% (2020)', connection_rate)
 
     def test_connection_rate_non_returns_without_error(self):
         self.collection.connection_rate = None
@@ -157,7 +157,7 @@ class CollectionSerializerTestCase(TestCase):
         self.collection.connection_rate_year = None
         self.collection.save()
         serializer = CollectionModelSerializer(self.collection)
-        self.assertEqual('70.0%', serializer.data['connection_rate'])
+        self.assertEqual('70.0\u00A0%', serializer.data['connection_rate'])
 
 
 class CollectionFlatSerializerTestCase(TestCase):
@@ -248,7 +248,6 @@ class CollectionFlatSerializerTestCase(TestCase):
         self.assertEqual('Test Frequency', serializer.data['frequency'])
         self.assertEqual('https://www.test-flyer.org, https://www.best-flyer.org', serializer.data['sources'])
         self.assertEqual('owner', serializer.data['created_by'])
-        self.assertEqual()
         self.assertEqual('owner', serializer.data['lastmodified_by'])
 
     def test_nuts_id_is_read_correctly(self):
@@ -271,6 +270,5 @@ class CollectionFlatSerializerTestCase(TestCase):
         self.collection_nuts.description = 'This \n contains \r no newline \r\n characters.'
         self.collection_nuts.save()
         serializer = CollectionFlatSerializer(self.collection_nuts)
-        print(serializer.data)
         self.assertNotIn('\n', serializer.data['comments'])
         self.assertNotIn('\r', serializer.data['comments'])

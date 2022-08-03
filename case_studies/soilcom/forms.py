@@ -2,12 +2,13 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Column, Field, Layout, Row, Submit
 from dal import autocomplete
 from django import forms
-from django.forms import BaseModelFormSet
+from django.forms import BaseModelFormSet, BaseFormSet
 from extra_views import InlineFormSetFactory
 
 from bibliography.models import Source
 from brit.forms import CustomModelForm, CustomModalModelForm
 from materials.models import Material, MaterialCategory
+from users.models import get_default_owner
 from . import models
 
 
@@ -108,31 +109,39 @@ class WasteFlyerModelForm(CustomModelForm):
             return super().save(commit=False)
 
 
-class WasteFlyerModelFormSet(BaseModelFormSet):
-    parent_object = None
-
-    def __init__(self, **kwargs):
-        self.parent_object = kwargs.pop('parent_object', None)
-        super().__init__(**kwargs)
-
-    def clean(self):
-        if any(self.errors):
-            return
-        for form in self.forms:
-            if not form.cleaned_data.get('url') and form.cleaned_data.get('id'):
-                flyer = form.cleaned_data.get('id')
-                if self.parent_object:
-                    self.parent_object.flyers.remove(flyer)
-                if not flyer.collections.exists():
-                    form.cleaned_data.get('id').delete()
-                self.forms.remove(form)
-
-
 class WasteFlyerModalModelForm(CustomModelForm):
     class Meta:
         model = Source
         fields = ('publisher', 'title', 'year', 'abbreviation', 'url', 'last_accessed',)
         labels = {'url': 'Sources'}
+
+
+class UrlForm(forms.Form):
+    url = forms.URLField(required=False)
+
+
+class BaseWasteFlyerUrlFormSet(BaseFormSet):
+
+    def __init__(self, *args, **kwargs):
+        self.collection = kwargs.pop('parent_object', None)
+        self.owner = kwargs.pop('owner', get_default_owner())
+        flyers = self.collection.flyers.all() if self.collection else []
+        initial = [{'url': flyer.url} for flyer in flyers]
+        super().__init__(*args, initial=initial, **kwargs)
+
+    def clean(self):
+        if any(self.errors):
+            return
+
+    def save(self, commit=True):
+        flyers = []
+        for form in self.forms:
+            if 'url' in form.cleaned_data and form.cleaned_data['url'] != '':
+                flyer, _ = models.WasteFlyer.objects.get_or_create(owner=self.owner, url=form.cleaned_data['url'])
+                flyers.append(flyer)
+        self.collection.flyers.set(flyers)
+        models.WasteFlyer.objects.filter(collections=None).delete()
+        return flyers
 
 
 class FormSetHelper(FormHelper):
@@ -143,21 +152,15 @@ class FormSetHelper(FormHelper):
         self.add_input(Submit("submit", "Save"))
 
 
-class InlineWasteFlyerFormset(InlineFormSetFactory):
-    model = models.WasteFlyer
-    fields = ('url',)
-
-    factory_kwargs = {
-        'extra': 1,
-        'can_delete': True,
-    }
-
-
 class ForeignkeyField(Field):
     template = 'foreignkey-field.html'
 
 
 class CollectionModelForm(forms.ModelForm):
+    collector = forms.ModelChoiceField(
+        queryset=models.Collector.objects.all(),
+        required=True
+    )
     collection_system = forms.ModelChoiceField(
         queryset=models.CollectionSystem.objects.all(),
         required=True)
@@ -191,7 +194,7 @@ class CollectionModelForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.fields['collector'].widget.attrs = {'data-theme': 'bootstrap4'}
         self.fields['catchment'].widget.attrs = {'data-theme': 'bootstrap4'}
-        if 'connection_rate' in self.initial:
+        if 'connection_rate' in self.initial and self.initial['connection_rate'] is not None:
             self.initial['connection_rate'] *= 100
 
     def clean_connection_rate(self):

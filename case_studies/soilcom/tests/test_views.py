@@ -4,6 +4,7 @@ import io
 
 from django.contrib.auth.models import Permission, User
 from django.forms.formsets import BaseFormSet
+from django.http import QueryDict
 from django.test import RequestFactory, TestCase, modify_settings
 from django.urls import reverse
 
@@ -11,7 +12,7 @@ from maps.models import Catchment, Region
 from materials.models import MaterialCategory
 from users.models import get_default_owner, Group
 from .. import views
-from ..forms import CollectionModelForm
+from ..forms import CollectionModelForm, BaseWasteFlyerUrlFormSet
 from ..models import (Collection, Collector, CollectionSystem, WasteCategory, WasteComponent, WasteFlyer, WasteStream,
                       CollectionFrequency)
 
@@ -401,21 +402,14 @@ class CollectionCreateViewTestCase(TestCase):
         response = self.client.post(reverse('collection-create'), kwargs={})
         self.assertEqual(response.status_code, 302)
 
-    def test_get_get_formset_kwargs_fetches_correct_queryset_and_parent_object(self):
-        request = RequestFactory().get(reverse('collection-create'))
+    def test_post_get_formset_kwargs_fetches_correct_parent_object(self):
+        request = RequestFactory().post(reverse('collection-create'))
+        request.user = self.member
         view = views.CollectionCreateView()
         view.setup(request)
-        view.kwargs = {'pk': self.collection.id}
-        expected = {
-            'queryset': WasteFlyer.objects.none(),
-        }
+        view.object = self.collection
         formset_kwargs = view.get_formset_kwargs()
-        self.assertEqual(set(expected.keys()), set(formset_kwargs.keys()))
-        for key, value in expected.items():
-            if key == 'queryset':
-                self.assertEqual(set(expected[key]), set(formset_kwargs[key]))
-            else:
-                self.assertEqual(value, formset_kwargs[key])
+        self.assertEqual(formset_kwargs['parent_object'], self.collection)
 
     def test_get_formset_has_correct_queryset(self):
         self.client.force_login(self.member)
@@ -438,7 +432,7 @@ class CollectionCreateViewTestCase(TestCase):
 
         error_msg = 'This field is required.'
         self.assertTrue(error_msg in response.context['form'].errors['catchment'])
-        # self.assertTrue(error_msg in response.context['form'].errors['collector'])
+        self.assertTrue(error_msg in response.context['form'].errors['collector'])
         self.assertTrue(error_msg in response.context['form'].errors['collection_system'])
         self.assertTrue(error_msg in response.context['form'].errors['waste_category'])
         self.assertTrue(error_msg in response.context['form'].errors['allowed_materials'])
@@ -566,23 +560,16 @@ class CollectionCopyViewTestCase(TestCase):
                 self.assertIn(key, initial)
                 self.assertEqual(value, initial[key])
 
-    def test_get_get_formset_kwargs_fetches_correct_queryset_and_parent_object(self):
+    def test_get_get_formset_kwargs_fetches_and_parent_object(self):
         request = RequestFactory().get(reverse('collection-copy', kwargs={'pk': self.collection.id}))
         view = views.CollectionCopyView()
         view.setup(request)
         view.kwargs = {'pk': self.collection.id}
         view.original_object = view.get_original_object()
         expected = {
-            'queryset': self.collection.flyers.all(),
             'parent_object': self.collection
         }
-        formset_kwargs = view.get_formset_kwargs()
-        self.assertEqual(set(expected.keys()), set(formset_kwargs.keys()))
-        for key, value in expected.items():
-            if key == 'queryset':
-                self.assertEqual(set(expected[key]), set(formset_kwargs[key]))
-            else:
-                self.assertEqual(value, formset_kwargs[key])
+        self.assertDictEqual(expected, view.get_formset_kwargs())
 
     def test_get_formset_has_correct_queryset(self):
         self.client.force_login(self.member)
@@ -671,9 +658,9 @@ class CollectionUpdateViewTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = User.objects.create(username='owner', password='very-secure!')
-        User.objects.create(username='outsider', password='very-secure!')
-        member = User.objects.create(username='member', password='very-secure!')
+        owner = get_default_owner()
+        User.objects.create(username='outsider')
+        member = User.objects.create(username='member')
         member.user_permissions.add(Permission.objects.get(codename='change_collection'))
 
         MaterialCategory.objects.create(owner=owner, name='Biowaste component')
@@ -708,6 +695,7 @@ class CollectionUpdateViewTestCase(TestCase):
         collection1.flyers.add(waste_flyer)
 
     def setUp(self):
+        self.owner = get_default_owner()
         self.outsider = User.objects.get(username='outsider')
         self.member = User.objects.get(username='member')
         self.collection = Collection.objects.first()
@@ -725,6 +713,71 @@ class CollectionUpdateViewTestCase(TestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('collection-update', kwargs={'pk': self.collection.id}))
         self.assertEqual(response.status_code, 200)
+
+    def test_get_get_formset_kwargs(self):
+        kwargs = {'pk': self.collection.pk}
+        request = RequestFactory().get(reverse('collection-update', kwargs=kwargs))
+        request.user = self.member
+        view = views.CollectionUpdateView()
+        view.setup(request)
+        view.kwargs = kwargs
+        view.object = self.collection
+        expected_formset_kwargs = {
+            'parent_object': self.collection,
+            'owner': self.member
+        }
+        self.assertDictEqual(expected_formset_kwargs, view.get_formset_kwargs())
+
+    def test_post_get_formset_kwargs(self):
+        kwargs = {'pk': self.collection.pk}
+        data = {
+            'form-INITIAL_FORMS': '0',
+            'form-TOTAL_FORMS': '2',
+            'form-0-url': 'https://www.test-flyer.org',
+            'form-1-url': 'https://www.best-flyer.org'
+        }
+        request = RequestFactory().post(reverse('collection-update', kwargs=kwargs), data=data)
+        request.user = self.member
+        view = views.CollectionUpdateView()
+        view.setup(request)
+        view.kwargs = kwargs
+        view.object = self.collection
+        query_dict = QueryDict('', mutable=True)
+        query_dict.update(data)
+        expected_formset_kwargs = {
+            'parent_object': self.collection,
+            'owner': self.member,
+            'data': query_dict
+        }
+        self.assertDictEqual(expected_formset_kwargs, view.get_formset_kwargs())
+
+    def test_get_get_formset(self):
+        kwargs = {'pk': self.collection.pk}
+        request = RequestFactory().get(reverse('collection-update', kwargs=kwargs))
+        request.user = self.member
+        view = views.CollectionUpdateView()
+        view.setup(request)
+        view.kwargs = kwargs
+        view.object = self.collection
+        formset = view.get_formset()
+        self.assertIsInstance(formset, BaseWasteFlyerUrlFormSet)
+
+    def test_post_get_formset(self):
+        kwargs = {'pk': self.collection.pk}
+        data = {
+            'form-INITIAL_FORMS': '0',
+            'form-TOTAL_FORMS': '2',
+            'form-0-url': 'https://www.test-flyer.org',
+            'form-1-url': 'https://www.best-flyer.org'
+        }
+        request = RequestFactory().post(reverse('collection-update', kwargs=kwargs), data=data)
+        request.user = self.member
+        view = views.CollectionUpdateView()
+        view.setup(request)
+        view.kwargs = kwargs
+        view.object = self.collection
+        formset = view.get_formset()
+        self.assertIsInstance(formset, BaseWasteFlyerUrlFormSet)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('collection-update', kwargs={'pk': self.collection.id}))
@@ -751,7 +804,7 @@ class CollectionUpdateViewTestCase(TestCase):
 
         error_msg = 'This field is required.'
         self.assertTrue(error_msg in response.context['form'].errors['catchment'])
-        # self.assertTrue(error_msg in response.context['form'].errors['collector'])
+        self.assertTrue(error_msg in response.context['form'].errors['collector'])
         self.assertTrue(error_msg in response.context['form'].errors['collection_system'])
         self.assertTrue(error_msg in response.context['form'].errors['waste_category'])
         self.assertTrue(error_msg in response.context['form'].errors['allowed_materials'])
@@ -774,10 +827,37 @@ class CollectionUpdateViewTestCase(TestCase):
                 'form-INITIAL_FORMS': '0',
                 'form-TOTAL_FORMS': '2',
                 'form-0-url': 'https://www.test-flyer.org',
-                'form-0-id': '',
             }
         )
         self.assertEqual(response.status_code, 302)
+
+    def test_associated_flyers_are_displayed_as_initial_values_in_formset(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('collection-update', kwargs={'pk': self.collection.pk}))
+        expected_initial = [flyer.url for flyer in self.collection.flyers.all()]
+        real_initial = [form.initial['url'] for form in response.context['formset'].initial_forms]
+        self.assertListEqual(expected_initial, real_initial)
+
+    def test_new_flyers_are_created_from_unknown_urls(self):
+        self.client.force_login(self.member)
+        data = {
+            'catchment': self.collection.catchment.id,
+            'collector': self.collection.collector.id,
+            'collection_system': self.collection.collection_system.id,
+            'waste_category': self.collection.waste_stream.category.id,
+            'allowed_materials': [m.id for m in self.collection.waste_stream.allowed_materials.all()],
+            'connection_rate': 0.7,
+            'connection_rate_year': 2020,
+            'frequency': self.collection.frequency.id,
+            'description': self.collection.description,
+            'form-INITIAL_FORMS': '1',
+            'form-TOTAL_FORMS': '2',
+            'form-0-url': 'https://www.best-flyer.org',
+            'form-1-url': 'https://www.fest-flyer.org',
+        }
+        self.client.post(reverse('collection-update', kwargs={'pk': self.collection.pk}), data=data)
+        flyer = WasteFlyer.objects.get(url='https://www.fest-flyer.org')
+        self.assertIsInstance(flyer, WasteFlyer)
 
     def test_regression_post_with_valid_data_doesnt_delete_unchanged_flyers(self):
         self.client.force_login(self.member)
