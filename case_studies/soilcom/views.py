@@ -1,6 +1,8 @@
+import json
+
 from celery.result import AsyncResult
 from dal import autocomplete
-from django.contrib.auth.mixins import PermissionRequiredMixin
+from django.contrib.auth.mixins import PermissionRequiredMixin, LoginRequiredMixin
 from django.db.models import Max
 from django.forms import modelformset_factory, formset_factory
 from django.http import HttpResponseRedirect, JsonResponse, HttpResponse
@@ -8,7 +10,6 @@ from django.urls import reverse_lazy
 from django.views import View
 from django.views.generic import TemplateView
 from django_filters import rest_framework as rf_filters
-import json
 from rest_framework.generics import GenericAPIView
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -32,7 +33,7 @@ from . import models
 from . import serializers
 from .models import Collection
 from .serializers import CollectionFlatSerializer
-from .tasks import export_collections_to_file
+import case_studies.soilcom.tasks
 
 
 class CollectionHomeView(PermissionRequiredMixin, TemplateView):
@@ -771,6 +772,8 @@ class CollectionGeometryAPI(GenericAPIView):
     serializer_class = serializers.WasteCollectionGeometrySerializer
     filter_backends = (rf_filters.DjangoFilterBackend,)
     filterset_class = filters.CollectionFilter
+    authentication_classes = []
+    permission_classes = []
 
     def get(self, request, *args, **kwargs):
         queryset = self.filter_queryset(self.get_queryset())
@@ -786,21 +789,21 @@ class CollectionViewSet(ReadOnlyModelViewSet):
     filterset_class = filters.CollectionFilter
 
 
-class CollectionListFileExportView(View):
+class CollectionListFileExportView(LoginRequiredMixin, View):
 
     @staticmethod
     def get(request, *args, **kwargs):
         params = dict(request.GET)
         file_format = params.pop('format', 'csv')[0]
         params.pop('page', None)
-        task = export_collections_to_file.delay(file_format, params)
+        task = case_studies.soilcom.tasks.export_collections_to_file.delay(file_format, params)
         response_data = {
             'task_id': task.task_id
         }
         return HttpResponse(json.dumps(response_data), content_type='application/json')
 
 
-class CollectionListFileExportProgressView(View):
+class CollectionListFileExportProgressView(LoginRequiredMixin, View):
 
     @staticmethod
     def get(request, task_id):
@@ -813,6 +816,9 @@ class CollectionListFileExportProgressView(View):
 
 
 class CollectionSummaryAPI(APIView):
+
+    authentication_classes = []
+    permission_classes = []
 
     @staticmethod
     def get(request):

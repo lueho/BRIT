@@ -1,6 +1,6 @@
 from collections import OrderedDict
-import csv
-import io
+import json
+from mock import Mock, patch
 
 from django.contrib.auth.models import Permission, User
 from django.forms.formsets import BaseFormSet
@@ -961,7 +961,8 @@ class CollectionSummaryAPIViewTestCase(TestCase):
         self.assertDictEqual(response.data, expected)
 
 
-class CollectionViewSetDownloadCSVTestCase(TestCase):
+@patch('case_studies.soilcom.tasks.export_collections_to_file.delay')
+class CollectionListFileExportViewTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
@@ -1004,157 +1005,27 @@ class CollectionViewSetDownloadCSVTestCase(TestCase):
 
     def setUp(self):
         self.member = User.objects.get(username='member')
-        self.collection_list = Collection.objects.all()
+        self.mock_task = Mock()
+        self.mock_task.task_id = '1234'
 
-    def test_get_http_401_unauthenticated_for_anonymous(self):
-        response = self.client.get(reverse('api-collection-download-csv'))
-        self.assertEqual(401, response.status_code)
+    def test_get_http_302_redirect_for_anonymous(self, mock_export):
+        mock_export.return_value = self.mock_task
+        response = self.client.get(reverse('collection-export'))
+        self.assertEqual(302, response.status_code)
 
-    def test_get_http_200_ok_for_authenticated_user(self):
+    def test_get_http_200_ok_for_authenticated_user(self, mock_export):
+        mock_export.return_value = self.mock_task
         self.client.force_login(self.member)
-        response = self.client.get(reverse('api-collection-download-csv'))
+        response = self.client.get(reverse('collection-export'))
         self.assertEqual(200, response.status_code)
 
-    def test_file_attachment(self):
+    def test_query_parameters_are_handled(self, mock_export):
+        mock_export.return_value = self.mock_task
         self.client.force_login(self.member)
-        response = self.client.get(reverse('api-collection-download-csv'), params={})
-        self.assertEqual(response.get('Content-Disposition'), 'attachment; filename="collections.csv"')
-
-    def test_file_has_content_type_csv(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('api-collection-download-csv'), params={})
-        self.assertEqual('text/csv', response.headers.get('Content-Type'))
-
-    def test_pagination_of_streaming_content(self):
-        owner = get_default_owner()
-        for i in range(30):
-            collection = Collection.objects.create(
-                owner=owner,
-                name=f'collection{i}',
-                catchment=Catchment.objects.first(),
-                collector=Collector.objects.first(),
-                collection_system=CollectionSystem.objects.first(),
-                waste_stream=WasteStream.objects.first(),
-                connection_rate=0.7,
-                connection_rate_year=2020,
-                frequency=CollectionFrequency.objects.first(),
-                description=f'This is additional test record {i}.'
-            )
-            for flyer in WasteFlyer.objects.all():
-                collection.flyers.add(flyer)
-        self.client.force_login(self.member)
-        params = {}
-        response = self.client.get(reverse('api-collection-download-csv'), params=params)
-        content = ''
-        for partial_content in response:
-            content += partial_content.decode('utf-8')
-        reader = csv.DictReader(io.StringIO(content), delimiter='\t')
-        self.assertEqual(Collection.objects.count(), len(list(reader)))
-
-    def test_file_content(self):
-        self.client.force_login(self.member)
-        params = {}
-        response = self.client.get(reverse('api-collection-download-csv'), params=params)
-        # For some reason, the content needs to be decoded and again encoded to work. Why?
-        content = ''
-        for partial_content in response:
-            content += partial_content.decode('utf-8')
-        reader = csv.DictReader(io.StringIO(content), delimiter='\t')
-        fieldnames = ['Catchment', 'Country', 'NUTS Id', 'Collector', 'Collection System', 'Waste Category',
-                      'Allowed Materials', 'Connection Rate', 'Connection Rate Year', 'Frequency', 'Comments',
-                      'Sources', 'Created by', 'Created at', 'Last modified by', 'Last modified at']
-        self.assertListEqual(fieldnames, list(reader.fieldnames))
-        self.assertEqual(2, sum(1 for _ in reader))
-
-    def test_allowed_materials_formatted_as_comma_separated_list_in_one_field(self):
-        self.client.force_login(self.member)
-        params = {}
-        response = self.client.get(reverse('api-collection-download-csv'), params=params)
-        content = ''
-        for partial_content in response:
-            content += partial_content.decode('utf-8')
-        reader = csv.DictReader(io.StringIO(content), delimiter='\t')
-        for row in reader:
-            self.assertEqual('Test material 1, Test material 2', row['Allowed Materials'])
-
-    def test_regression_flyers_without_urls_dont_raise_type_error(self):
-        rogue_flyer = WasteFlyer.objects.create(owner=self.owner, title='Rogue fLyer without url', abbreviation='RF')
-        defected_collection = Collection.objects.get(name='collection1')
-        defected_collection.flyers.add(rogue_flyer)
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('api-collection-download-csv'), params={})
-        content = ''
-        for partial_content in response:
-            content += partial_content.decode('utf-8')
-        reader = csv.DictReader(io.StringIO(content), delimiter='\t')
-        self.assertEqual(Collection.objects.count(), len(list(reader)))
-
-
-class CollectionViewSetDownloadXLSXTestCase(TestCase):
-
-    @classmethod
-    def setUpTestData(cls):
-        owner = get_default_owner()
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
-        member.user_permissions.add(Permission.objects.get(codename='add_collection'))
-
-        MaterialCategory.objects.create(owner=owner, name='Biowaste component')
-        material1 = WasteComponent.objects.create(owner=owner, name='Test material 1')
-        material2 = WasteComponent.objects.create(owner=owner, name='Test material 2')
-        waste_stream = WasteStream.objects.create(
-            owner=owner,
-            name='Test waste stream',
-            category=WasteCategory.objects.create(owner=owner, name='Test category'),
-        )
-        waste_stream.allowed_materials.add(material1)
-        waste_stream.allowed_materials.add(material2)
-
-        waste_flyer = WasteFlyer.objects.create(
-            owner=owner,
-            abbreviation='WasteFlyer123',
-            url='https://www.test-flyer.org'
-        )
-        frequency = CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
-        for i in range(1, 3):
-            collection = Collection.objects.create(
-                owner=owner,
-                name=f'collection{i}',
-                catchment=Catchment.objects.create(owner=owner, name='Test catchment'),
-                collector=Collector.objects.create(owner=owner, name='Test collector'),
-                collection_system=CollectionSystem.objects.create(owner=owner, name='Test system'),
-                waste_stream=waste_stream,
-                connection_rate=0.7,
-                connection_rate_year=2020,
-                frequency=frequency,
-                description='This is a test case.'
-            )
-            collection.flyers.add(waste_flyer)
-
-    def setUp(self):
-        self.member = User.objects.get(username='member')
-        self.collection_list = Collection.objects.all()
-
-    def test_get_http_401_unauthenticated_for_anonymous(self):
-        response = self.client.get(reverse('api-collection-download-xlsx'))
-        self.assertEqual(401, response.status_code)
-
-    def test_get_http_200_ok_for_authenticated_user(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('api-collection-download-xlsx'))
-        self.assertEqual(200, response.status_code)
-
-    def test_file_attachment(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('api-collection-download-xlsx'), params={})
-        self.assertEqual(response.get('Content-Disposition'), 'attachment; filename="collections.xlsx"')
-
-    def test_file_has_content_type_xlsx(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('api-collection-download-xlsx'), params={})
-        self.assertEqual('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', response.headers.get('Content-Type'))
-
-    # TODO: Find way to test correct file content
+        response = self.client.get(f'{reverse("collection-export")}?format=xlsx&page=1&collector=1')
+        mock_export.assert_called_once_with('xlsx', {'collector': ['1']})
+        expected_response = {'task_id': '1234'}
+        self.assertDictEqual(expected_response, json.loads(response.content))
 
 
 class WasteFlyerListViewTestCase(TestCase):
