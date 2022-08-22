@@ -589,7 +589,7 @@ class CollectionCopyView(CollectionCreateView):
             if self.original_object.waste_stream.allowed_materials.exists():
                 initial['allowed_materials'] = self.original_object.waste_stream.allowed_materials.all()
         if self.original_object.connection_rate:
-            initial['connection_rate'] = self.original_object.connection_rate * 100
+            initial['connection_rate'] = self.original_object.connection_rate
         if self.original_object.connection_rate_year:
             initial['connection_rate_year'] = self.original_object.connection_rate_year
         if self.original_object.frequency:
