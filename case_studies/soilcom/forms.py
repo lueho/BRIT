@@ -157,18 +157,19 @@ class ForeignkeyField(Field):
 
 
 class CollectionModelForm(forms.ModelForm):
+    catchment = forms.ModelChoiceField(
+        queryset=models.Catchment.objects.all(),
+        widget=autocomplete.ModelSelect2(url='catchment-autocomplete'),
+        required=True
+    )
     collector = forms.ModelChoiceField(
         queryset=models.Collector.objects.all(),
+        widget=autocomplete.ModelSelect2(url='collector-autocomplete'),
         required=True
     )
     collection_system = forms.ModelChoiceField(
         queryset=models.CollectionSystem.objects.all(),
         required=True)
-    catchment = forms.ModelChoiceField(
-        queryset=models.Catchment.objects.all().order_by('name'),
-        widget=autocomplete.ModelSelect2(url='catchment-autocomplete'),
-        required=True
-    )
     waste_category = forms.ModelChoiceField(
         queryset=models.WasteCategory.objects.all()
     )
@@ -186,14 +187,11 @@ class CollectionModelForm(forms.ModelForm):
             'connection_rate': 'Connection rate [%]',
             'connection_rate_year': 'Year'
         }
-        widgets = {
-            'collector': autocomplete.ModelSelect2(url='collector-autocomplete')
-        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['collector'].widget.attrs = {'data-theme': 'bootstrap4'}
         self.fields['catchment'].widget.attrs = {'data-theme': 'bootstrap4'}
+        self.fields['collector'].widget.attrs = {'data-theme': 'bootstrap4'}
         if 'connection_rate' in self.initial and self.initial['connection_rate'] is not None:
             self.initial['connection_rate'] *= 100
 

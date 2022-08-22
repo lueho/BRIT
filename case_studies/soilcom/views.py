@@ -102,7 +102,7 @@ class CollectorModalDeleteView(views.OwnedObjectDeleteView):
 
 class CollectorAutoCompleteView(autocomplete.Select2QuerySetView):
     def get_queryset(self):
-        qs = models.Collector.objects.all()
+        qs = models.Collector.objects.order_by('name')
         if self.q:
             qs = qs.filter(name__icontains=self.q)
         return qs
