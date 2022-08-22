@@ -22,11 +22,14 @@ from bibliography.views import (SourceListView,
                                 SourceModalDetailView,
                                 SourceUpdateView,
                                 SourceModalUpdateView,
-                                SourceModalDeleteView)
+                                SourceModalDeleteView,
+                                SourceCheckUrlView,
+                                SourceListCheckUrlsView)
 from brit import views
 from maps.forms import NutsAndLauCatchmentQueryForm
 from maps.models import Catchment, GeoDataset
 from maps.views import GeoDatasetDetailView, GeoDataSetMixin, GeoDataSetFormMixin
+from .filters import WasteFlyerFilter
 from . import filters
 from . import forms
 from . import models
@@ -339,11 +342,22 @@ class WasteStreamModalDeleteView(views.OwnedObjectDeleteView):
 # ----------- Waste Collection Flyer CRUD ------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class WasteFlyerListView(SourceListView):
-    template_name = 'waste_flyers_list.html'
+class WasteFlyerListView(views.OwnedObjectListView):
     model = models.WasteFlyer
-    queryset = models.WasteFlyer.objects.all().order_by('abbreviation')
+    queryset = models.WasteFlyer.objects.order_by('id')
+    filterset_class = WasteFlyerFilter
+    filterset = None
     permission_required = 'soilcom.view_wasteflyer'
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        self.filterset = self.filterset_class(self.request.GET, queryset=queryset)
+        return self.filterset.qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['filter'] = self.filterset
+        return context
 
 
 class WasteFlyerCreateView(SourceCreateView):
@@ -366,10 +380,9 @@ class WasteFlyerModalCreateView(SourceModalCreateView):
         return super().form_valid(form)
 
 
-class WasteFlyerDetailView(SourceDetailView):
-    template_name = 'waste_flyer_detail.html'
+class WasteFlyerDetailView(views.OwnedObjectDetailView):
     model = models.WasteFlyer
-    permission_required = 'soilcom.view_wasteflyer'
+    permission_required = set()
 
 
 class WasteFlyerModalDetailView(SourceModalDetailView):
@@ -393,6 +406,21 @@ class WasteFlyerModalUpdateView(SourceModalUpdateView):
 class WasteFlyerModalDeleteView(SourceModalDeleteView):
     success_url = reverse_lazy('wasteflyer-list')
     permission_required = 'soilcom.delete_wasteflyer'
+
+
+# ----------- Waste Collection Flyer utils -----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class WasteFlyerCheckUrlView(SourceCheckUrlView):
+    model = models.WasteFlyer
+    permission_required = 'soilcom.change_wasteflyer'
+
+
+class WasteFlyerListCheckUrlsView(SourceListCheckUrlsView):
+    model = models.WasteFlyer
+    filterset_class = WasteFlyerFilter
+    permission_required = 'soilcom.change_wasteflyer'
 
 
 # ----------- Frequency CRUD -------------------------------------------------------------------------------------------

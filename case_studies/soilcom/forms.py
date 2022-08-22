@@ -311,3 +311,20 @@ class CollectionFilterForm(forms.Form):
         # self.fields['country'].choices = set(
         #     sorted(set((c.catchment.region.country_code, c.catchment.region.country_code) for c in
         #                models.Collection.objects.all())))
+
+
+class FlyerFilterFormHelper(FormHelper):
+    form_tag = False
+    include_media = False
+
+
+class FlyerFilterForm(forms.Form):
+    url_valid = forms.BooleanField(widget=forms.RadioSelect())
+
+    class Meta:
+        model = models.WasteFlyer
+        fields = ('url_valid', )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = FlyerFilterFormHelper()

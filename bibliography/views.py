@@ -1,6 +1,10 @@
 from dal import autocomplete
-from django.contrib.auth.mixins import PermissionRequiredMixin
+from django.contrib.auth.mixins import PermissionRequiredMixin, LoginRequiredMixin
+from django.http import HttpResponseRedirect
+from django.http.request import QueryDict, MultiValueDict
 from django.urls import reverse_lazy
+from django.utils import timezone
+from django.views import View
 from django.views.generic import TemplateView
 
 from brit import views
@@ -166,7 +170,6 @@ class SourceModalCreateView(views.OwnedObjectModalCreateView):
 
 
 class SourceDetailView(views.OwnedObjectDetailView):
-    template_name = 'source_detail.html'
     model = Source
     permission_required = set()
 
@@ -212,3 +215,52 @@ class SourceModalDeleteView(views.OwnedObjectDeleteView):
     success_message = 'Successfully deleted.'
     success_url = reverse_lazy('source-list')
     permission_required = 'bibliography.delete_source'
+
+
+# ----------- Source utils ---------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class SourceCheckUrlView(PermissionRequiredMixin, View):
+    object = None
+    model = Source
+    success_url = None
+    permission_required = 'bibliography.change_source'
+
+    def get_success_url(self):
+        if self.success_url:
+            return self.success_url
+        else:
+            return self.object.get_absolute_url()
+
+    def get(self, request, *args, **kwargs):
+        self.object = self.model.objects.get(pk=kwargs.get('pk'))
+        self.object.url_valid = self.object.check_url()
+        self.object.url_checked = timezone.now()
+        self.object.save()
+        return HttpResponseRedirect(self.get_success_url())
+
+
+class SourceListCheckUrlsView(PermissionRequiredMixin, View):
+    model = Source
+    filterset_class = SourceFilter
+    success_url = None
+    permission_required = 'bibliography.change_source'
+
+    def get_success_url(self):
+        if self.success_url:
+            return self.success_url
+        else:
+            return f"{self.model.list_url}?{self.request.GET.urlencode()}"
+
+    def get(self, request, *args, **kwargs):
+        params = request.GET.copy()
+        params.pop('page', None)
+        qdict = QueryDict('', mutable=True)
+        qdict.update(MultiValueDict(params))
+        qs = self.filterset_class(qdict, self.model.objects.all()).qs
+        for obj in qs:
+            obj.valid_url = obj.check_url()
+            obj.url_checked = timezone.now()
+            obj.save()
+        return HttpResponseRedirect(self.get_success_url())

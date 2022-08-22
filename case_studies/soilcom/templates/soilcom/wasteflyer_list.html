@@ -1,0 +1,51 @@
+{% extends 'filtered_list.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}BRIT | Waste Collection Flyers{% endblock %}
+
+
+{% block list_body %}
+    <div class="table-responsive">
+        <table class="table table-hover">
+            <thead>
+            <tr>
+                <th scope="col" class="col-1">Id</th>
+                <th scope="col" class="col-9">URL</th>
+                <th scope="col">Valid</th>
+                <th scope="col">Checked</th>
+            </tr>
+            </thead>
+            <tbody>
+            {% for object in object_list %}
+                <tr>
+                    <td><a href="{{ object.get_absolute_url }}">{{ object.id }}</a></td>
+                    <td class="url-cell"><span><a href="{{ object.url }}" target="_blank">{{ object.url }}</a></span></td>
+                    <td>{{ object.url_valid }}</td>
+                    <td>{{ object.url_checked|date:'d.m.Y' }}</td>
+                </tr>
+            {% endfor %}
+            </tbody>
+            <tfoot>
+            </tfoot>
+        </table>
+    </div>
+{% endblock list_body %}
+
+{% block list_footer %}
+    {% if perms.soilcom.change_wasteflyer %}
+        <a href="{% url 'wasteflyer-list-check-urls' %}?{{ request.GET.urlencode }}" class="mr-3">
+            <i class="fas fa-fw fa-check-circle"></i> check urls
+        </a>
+    {% endif %}
+{% endblock list_footer %}
+
+{% block filter_body %}
+    <form method="get">
+        {% crispy filter.form %}
+        <button id="btn-filter" class="btn btn-primary" type="submit">Filter</button>
+    </form>
+{% endblock filter_body %}
+
+{% block javascript %}
+    {{ block.super }}
+{% endblock javascript %}

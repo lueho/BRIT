@@ -2,6 +2,8 @@ from django.contrib.auth.models import Group, User
 from django.test import TestCase, modify_settings
 from django.urls import reverse
 
+from users.models import get_default_owner
+
 from ..models import Author, Licence, Source
 
 
@@ -456,11 +458,11 @@ class LicenceDetailViewTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        User.objects.create(username='owner')
+        get_default_owner()
         User.objects.create(username='outsider')
 
     def setUp(self):
-        self.owner = User.objects.get(username='owner')
+        self.owner = get_default_owner()
         self.outsider = User.objects.get(username='outsider')
         self.licence = Licence.objects.create(
             owner=self.owner,
@@ -483,11 +485,11 @@ class LicenceModalDetailViewTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        User.objects.create(username='owner')
+        get_default_owner()
         User.objects.create(username='outsider')
 
     def setUp(self):
-        self.owner = User.objects.get(username='owner')
+        self.owner = get_default_owner()
         self.outsider = User.objects.get(username='outsider')
         self.licence = Licence.objects.create(
             owner=self.owner,
@@ -510,14 +512,14 @@ class LicenceUpdateViewTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        User.objects.create(username='owner')
+        get_default_owner()
         User.objects.create(username='outsider')
         member = User.objects.create(username='member')
         editors = Group.objects.get(name='editors')
         member.groups.add(editors)
 
     def setUp(self):
-        self.owner = User.objects.get(username='owner')
+        self.owner = get_default_owner()
         self.outsider = User.objects.get(username='outsider')
         self.member = User.objects.get(username='member')
         self.licence = Licence.objects.create(
@@ -561,14 +563,14 @@ class LicenceModalUpdateViewTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        User.objects.create(username='owner')
+        get_default_owner()
         User.objects.create(username='outsider')
         member = User.objects.create(username='member')
         editors = Group.objects.get(name='editors')
         member.groups.add(editors)
 
     def setUp(self):
-        self.owner = User.objects.get(username='owner')
+        self.owner = get_default_owner()
         self.outsider = User.objects.get(username='outsider')
         self.member = User.objects.get(username='member')
         self.licence = Licence.objects.create(
@@ -612,14 +614,14 @@ class LicenceModalDeleteViewTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        User.objects.create(username='owner')
+        get_default_owner()
         User.objects.create(username='outsider')
         member = User.objects.create(username='member')
         editors = Group.objects.get(name='editors')
         member.groups.add(editors)
 
     def setUp(self):
-        self.owner = User.objects.get(username='owner')
+        self.owner = get_default_owner()
         self.outsider = User.objects.get(username='outsider')
         self.member = User.objects.get(username='member')
         self.licence = Licence.objects.create(
@@ -780,12 +782,16 @@ class SourceDetailViewTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        User.objects.create(username='owner')
+        get_default_owner()
         User.objects.create(username='outsider')
+        member = User.objects.create(username='member')
+        editors = Group.objects.get(name='editors')
+        member.groups.add(editors)
 
     def setUp(self):
-        self.owner = User.objects.get(username='owner')
+        self.owner = get_default_owner()
         self.outsider = User.objects.get(username='outsider')
+        self.member = User.objects.get(username='member')
         self.source = Source.objects.create(
             owner=self.owner
         )
@@ -805,11 +811,11 @@ class SourceModalDetailViewTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        User.objects.create(username='owner')
+        get_default_owner()
         User.objects.create(username='outsider')
 
     def setUp(self):
-        self.owner = User.objects.get(username='owner')
+        self.owner = get_default_owner()
         self.outsider = User.objects.get(username='outsider')
         self.source = Source.objects.create(
             owner=self.owner
@@ -830,14 +836,14 @@ class SourceUpdateViewTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        User.objects.create(username='owner')
+        get_default_owner()
         User.objects.create(username='outsider')
         member = User.objects.create(username='member')
         editors = Group.objects.get(name='editors')
         member.groups.add(editors)
 
     def setUp(self):
-        self.owner = User.objects.get(username='owner')
+        self.owner = get_default_owner()
         self.outsider = User.objects.get(username='outsider')
         self.member = User.objects.get(username='member')
         self.source = Source.objects.create(
@@ -884,14 +890,14 @@ class SourceModalUpdateViewTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        User.objects.create(username='owner')
+        get_default_owner()
         User.objects.create(username='outsider')
         member = User.objects.create(username='member')
         editors = Group.objects.get(name='editors')
         member.groups.add(editors)
 
     def setUp(self):
-        self.owner = User.objects.get(username='owner')
+        self.owner = get_default_owner()
         self.outsider = User.objects.get(username='outsider')
         self.member = User.objects.get(username='member')
         self.source = Source.objects.create(
@@ -938,14 +944,14 @@ class SourceModalDeleteViewTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        User.objects.create(username='owner')
+        get_default_owner()
         User.objects.create(username='outsider')
         member = User.objects.create(username='member')
         editors = Group.objects.get(name='editors')
         member.groups.add(editors)
 
     def setUp(self):
-        self.owner = User.objects.get(username='owner')
+        self.owner = get_default_owner()
         self.outsider = User.objects.get(username='outsider')
         self.member = User.objects.get(username='member')
         self.source = Source.objects.create(
@@ -981,3 +987,113 @@ class SourceModalDeleteViewTestCase(TestCase):
         with self.assertRaises(Source.DoesNotExist):
             Source.objects.get(pk=self.source.pk)
         self.assertEqual(response.status_code, 302)
+
+
+class CheckSourceUrlViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = get_default_owner()
+        User.objects.create(username='outsider')
+        member = User.objects.create(username='member')
+        editors = Group.objects.get(name='editors')
+        member.groups.add(editors)
+        Source.objects.create(
+            owner=owner,
+            title='Test Source from the Web',
+            abbreviation='WORKING',
+            url='https://httpbin.org/status/200'
+        )
+
+    def setUp(self):
+        self.outsider = User.objects.get(username='outsider')
+        self.member = User.objects.get(username='member')
+        self.source = Source.objects.get(abbreviation='WORKING')
+
+    def test_get_http_302_redirect_to_login_for_anonymous(self):
+        request_url = reverse('source-check-url', kwargs={'pk': self.source.pk})
+        response = self.client.get(request_url, follow=True)
+        self.assertRedirects(response, f"{reverse('auth_login')}?next={request_url}", status_code=302)
+
+    def test_get_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('source-check-url', kwargs={'pk': self.source.pk}))
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_finally_redirects_to_detail_url(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('source-check-url', kwargs={'pk': self.source.pk}))
+        self.assertRedirects(
+            response,
+            reverse('source-detail', kwargs={'pk': self.source.pk}),
+            status_code=302,
+            target_status_code=200
+        )
+
+    def test_source_url_valid_shows_true_if_valid(self):
+        self.client.force_login(self.member)
+        self.client.get(reverse('source-check-url', kwargs={'pk': self.source.pk}))
+        self.assertTrue(self.source.url_valid)
+
+    def test_source_url_valid_set_to_false_if_invalid(self):
+        self.source.url = 'https://httpbin.org/status/404'
+        self.source.save()
+        self.client.force_login(self.member)
+        self.client.get(reverse('source-check-url', kwargs={'pk': self.source.pk}))
+        self.assertFalse(self.source.url_valid)
+
+
+class SourceListCheckUrlsViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = get_default_owner()
+        User.objects.create(username='outsider')
+        member = User.objects.create(username='member')
+        editors = Group.objects.get(name='editors')
+        member.groups.add(editors)
+        Source.objects.create(
+            owner=owner,
+            title='Test Source from the Web',
+            abbreviation='WORKING',
+            url='https://httpbin.org/status/200'
+        )
+        Source.objects.create(
+            owner=owner,
+            title='Test Source from the Web',
+            abbreviation='NOTWORKING',
+            url='https://httpbin.org/status/404'
+        )
+        Source.objects.create(
+            owner=owner,
+            title='Test Source from the Web',
+            abbreviation='NOTWORKING',
+            url='https://httpbin.org/status/404'
+        )
+
+    def setUp(self):
+        self.outsider = User.objects.get(username='outsider')
+        self.member = User.objects.get(username='member')
+
+    def test_get_http_302_redirect_to_login_for_anonymous(self):
+        request_url = f"{reverse('source-list-check-urls')}?url_valid=False"
+        response = self.client.get(request_url, follow=True)
+        self.assertRedirects(response, f"{reverse('auth_login')}?next={request_url}", status_code=302)
+
+    def test_get_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        request_url = f"{reverse('source-list-check-urls')}?url_valid=False"
+        response = self.client.get(request_url)
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_finally_redirects_to_list_url_and_maintains_filter_parameters(self):
+        self.client.force_login(self.member)
+        request_url = f"{reverse('source-list-check-urls')}?url_valid=False&page=1"
+        response = self.client.get(request_url)
+        redirect_url = f"{reverse('source-list')}?url_valid=False&page=1"
+        self.assertRedirects(
+            response,
+            redirect_url,
+            status_code=302,
+            target_status_code=200
+        )

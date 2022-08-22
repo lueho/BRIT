@@ -175,8 +175,9 @@ class WasteFlyer(Source):
 
 
 @receiver(pre_save, sender=WasteFlyer)
-def set_source_type(sender, instance, **kwargs):
+def set_source_type_and_check_url(sender, instance, **kwargs):
     instance.type = 'waste_flyer'
+    instance.url_valid = instance.check_url()
 
 
 class CollectionFrequency(NamedUserObjectModel):

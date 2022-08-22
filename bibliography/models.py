@@ -1,4 +1,8 @@
+import requests
 from django.db import models
+from django.db.models.signals import pre_save
+from django.dispatch import receiver
+from django.utils import timezone
 
 from brit.models import OwnedObjectModel, CRUDUrlsMixin, NamedUserObjectModel
 
@@ -41,6 +45,8 @@ class Source(CRUDUrlsMixin, OwnedObjectModel):
     licence = models.ForeignKey(Licence, on_delete=models.PROTECT, blank=True, null=True)
     attributions = models.TextField(blank=True, null=True)
     url = models.URLField(max_length=511, blank=True, null=True)
+    url_valid = models.BooleanField(default=False)
+    url_checked = models.DateField(blank=True, null=True)
     doi = models.CharField(max_length=255, blank=True, null=True)
     last_accessed = models.DateField(blank=True, null=True)
 
@@ -57,6 +63,7 @@ class Source(CRUDUrlsMixin, OwnedObjectModel):
             'Year:': {'type': 'text', 'text': self.year},
             'Abstract:': {'type': 'text', 'text': self.abstract},
             'URL:': {'type': 'link', 'href': self.url, 'text': self.url},
+            'url valid': {'type': 'text', 'text': f'{self.url_valid} ({self.url_checked.strftime("%d.%m.%Y")})'},
             'Last accessed:': {'type': 'text', 'text': self.last_accessed},
         }
         if self.doi:
@@ -66,5 +73,29 @@ class Source(CRUDUrlsMixin, OwnedObjectModel):
         d['Attributions:'] = {'type': 'text', 'text': self.attributions}
         return d
 
+    def check_url(self):
+        if not self.url:
+            return False
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:84.0) Gecko/20200101 Firefox/84.0',
+            'Accept-Language': 'en-GB,en;q=0.5',
+            'Referer': 'https://www.wikipedia.org',
+            'DNT': '1'
+        }
+        try:
+            response = requests.head(self.url, headers=headers, allow_redirects=True)
+        except requests.exceptions.RequestException:
+            return False
+        else:
+            if response.status_code == 405:
+                response = requests.get(self.url, headers=headers, allow_redirects=True)
+            return response.status_code == 200
+
     def __str__(self):
         return self.abbreviation
+
+
+@receiver(pre_save, sender=Source)
+def check_url_valid(sender, instance, **kwargs):
+    instance.url_valid = instance.check_url()
+    instance.url_checked = timezone.now()

@@ -1036,6 +1036,7 @@ class WasteFlyerListViewTestCase(TestCase):
         User.objects.create(username='outsider', password='very-secure!')
         member = User.objects.create(username='member', password='very-secure!')
         member.user_permissions.add(Permission.objects.get(codename='view_wasteflyer'))
+        member.user_permissions.add(Permission.objects.get(codename='change_wasteflyer'))
         WasteFlyer.objects.create(
             owner=owner,
             abbreviation='Flyer1',
@@ -1075,6 +1076,55 @@ class WasteFlyerListViewTestCase(TestCase):
         response = self.client.get(reverse('wasteflyer-list'))
         self.assertIn('object_list', response.context)
         self.assertEqual(len(response.context['object_list']), 3)
+
+    def test_contains_check_urls_button_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('wasteflyer-list'))
+        self.assertContains(response, 'check urls')
+
+
+class WasteFlyerDetailViewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = get_default_owner()
+        User.objects.create(username='outsider')
+        member = User.objects.create(username='member')
+        member.user_permissions.add(Permission.objects.get(codename='change_wasteflyer'))
+        WasteFlyer.objects.create(owner=owner, abbreviation='TEST')
+
+    def setUp(self):
+        self.outsider = User.objects.get(username='outsider')
+        self.member = User.objects.get(username='member')
+        self.flyer = WasteFlyer.objects.get(abbreviation='TEST')
+
+    def test_get_http_200_ok_for_anonymous(self):
+        response = self.client.get(reverse('wasteflyer-detail', kwargs={'pk': self.flyer.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_get_http_200_ok_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('wasteflyer-detail', kwargs={'pk': self.flyer.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_contains_check_url_button_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('wasteflyer-detail', kwargs={'pk': self.flyer.pk}))
+        self.assertContains(response, 'check url')
+
+    def test_does_not_contain_check_url_button_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('wasteflyer-detail', kwargs={'pk': self.flyer.pk}))
+        self.assertNotContains(response, 'check url')
+
+    @patch.object(WasteFlyer, 'check_url')
+    def test_contains_url_valid_if_previously_checked(self, mock_check_url):
+        mock_check_url.return_value = True
+        self.flyer.save()
+        self.assertTrue(self.flyer.url_valid)
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('wasteflyer-detail', kwargs={'pk': self.flyer.pk}))
+        self.assertTrue(response.context['object'].url_valid)
 
 
 @modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})

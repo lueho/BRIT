@@ -1,11 +1,15 @@
 from dal import autocomplete
 from django.db.models import Q
-from django.forms import CheckboxSelectMultiple
-from django_filters import ModelChoiceFilter, ModelMultipleChoiceFilter, FilterSet, ChoiceFilter
-from django_filters import rest_framework as rf_filters
+from django.forms import CheckboxSelectMultiple, RadioSelect, DateInput
+from django_filters import (BooleanFilter,
+                            ChoiceFilter,
+                            DateFilter,
+                            FilterSet,
+                            ModelChoiceFilter,
+                            ModelMultipleChoiceFilter, )
 
-from .forms import CollectionFilterForm
-from .models import Catchment, Collection, Collector, WasteCategory, WasteComponent
+from .forms import CollectionFilterForm, FlyerFilterForm
+from .models import Catchment, Collection, Collector, WasteCategory, WasteComponent, WasteFlyer
 
 COUNTRY_CHOICES = (
     ('BE', 'BE'),
@@ -42,3 +46,24 @@ class CollectionFilter(FilterSet):
             Q(catchment__region__nutsregion__cntr_code=value) |
             Q(catchment__region__lauregion__cntr_code=value))
         return qs
+
+
+class WasteFlyerFilter(FilterSet):
+    url_valid = BooleanFilter(widget=RadioSelect(choices=((True, 'True'), (False, 'False'))))
+    url_checked_before = DateFilter(
+        field_name='url_checked',
+        lookup_expr='lt',
+        widget=DateInput(attrs={'type': 'date'}),
+        label='Url checked before'
+    )
+    url_checked_after = DateFilter(
+        field_name='url_checked',
+        lookup_expr='gt',
+        widget=DateInput(attrs={'type': 'date'}),
+        label='Url checked after'
+    )
+
+    class Meta:
+        model = WasteFlyer
+        fields = ('url_valid', 'url_checked_before', 'url_checked_after')
+        form = FlyerFilterForm
