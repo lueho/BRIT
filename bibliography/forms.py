@@ -59,12 +59,12 @@ class SourceFilterForm(Form):
 
     class Meta:
         model = Source
-        fields = ('abbreviation', 'authors', 'title', 'type', 'year')
+        fields = ('abbreviation', 'new_authors', 'title', 'type', 'year')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper = SourceFilterFormHelper()
         self.fields['abbreviation'].widget.attrs = {'data-theme': 'bootstrap4'}
-        self.fields['authors'].widget.attrs = {'data-theme': 'bootstrap4'}
+        self.fields['new_authors'].widget.attrs = {'data-theme': 'bootstrap4'}
         self.fields['title'].widget.attrs = {'data-theme': 'bootstrap4'}
 
