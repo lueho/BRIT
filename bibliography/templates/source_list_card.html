@@ -18,7 +18,7 @@
             <tr>
                 <td><a href="{{ object.get_absolute_url }}">{{ object.abbreviation }}</a></td>
                 <td>
-                {% for author in object.new_authors.all %}
+                {% for author in object.authors.all %}
                 <a href="{{ author.get_absolute_url }}">{{ author }}</a>,
                 {% endfor %}
                 </td>

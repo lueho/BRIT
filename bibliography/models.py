@@ -34,8 +34,7 @@ SOURCE_TYPES = (
 
 class Source(CRUDUrlsMixin, OwnedObjectModel):
     type = models.CharField(max_length=255, choices=SOURCE_TYPES, default='custom')
-    authors = models.CharField(max_length=500, blank=True, null=True)
-    new_authors = models.ManyToManyField(Author, related_name='sources')
+    authors = models.ManyToManyField(Author, related_name='sources')
     publisher = models.CharField(max_length=127, blank=True, null=True)
     title = models.CharField(max_length=500, null=True)
     journal = models.CharField(max_length=500, blank=True, null=True)
@@ -56,7 +55,7 @@ class Source(CRUDUrlsMixin, OwnedObjectModel):
 
     def as_dict(self):
         d = {
-            'Author(s):': {'type': 'text', 'text': '; '.join([author.__str__() for author in self.new_authors.all()])},
+            'Author(s):': {'type': 'text', 'text': '; '.join([author.__str__() for author in self.authors.all()])},
             'Title:': {'type': 'text', 'text': self.title},
             'Publisher:': {'type': 'text', 'text': self.publisher},
             'Journal:': {'type': 'text', 'text': self.journal},
