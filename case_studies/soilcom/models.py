@@ -3,6 +3,7 @@ from django.core.validators import RegexValidator
 from django.db import models
 from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
+import celery
 
 from bibliography.models import Source
 from brit.models import NamedUserObjectModel
@@ -177,7 +178,12 @@ class WasteFlyer(Source):
 @receiver(pre_save, sender=WasteFlyer)
 def set_source_type_and_check_url(sender, instance, **kwargs):
     instance.type = 'waste_flyer'
-    instance.url_valid = instance.check_url()
+
+
+@receiver(post_save, sender=WasteFlyer)
+def check_url_valid(sender, instance, created, **kwargs):
+    if created:
+        celery.current_app.send_task('check_wasteflyer_url',  (instance.pk,))
 
 
 class CollectionFrequency(NamedUserObjectModel):

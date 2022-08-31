@@ -1,18 +1,22 @@
-import requests
 from django.db import models
-from django.db.models.signals import pre_save
+from django.db.models.signals import post_save
 from django.dispatch import receiver
-from django.utils import timezone
 
 from brit.models import OwnedObjectModel, CRUDUrlsMixin, NamedUserObjectModel
+import celery
 
 
 class Author(CRUDUrlsMixin, OwnedObjectModel):
-    first_names = models.CharField(max_length=1023)
-    last_names = models.CharField(max_length=1023)
+    first_names = models.CharField(max_length=1023, null=True, blank=True)
+    last_names = models.CharField(max_length=1023, null=True, blank=True)
 
     def __str__(self):
-        return f'{self.first_names} {self.last_names}'
+        name = ''
+        if self.last_names:
+            name += self.last_names
+        if self.first_names:
+            name += f', {self.first_names}'
+        return name
 
 
 class Licence(NamedUserObjectModel):
@@ -28,7 +32,6 @@ SOURCE_TYPES = (
     ('book', 'book'),
     ('website', 'website'),
     ('custom', 'custom'),
-    # ('waste_flyer', 'waste_flyer')
 )
 
 
@@ -53,49 +56,11 @@ class Source(CRUDUrlsMixin, OwnedObjectModel):
     class Meta:
         verbose_name = 'Source'
 
-    def as_dict(self):
-        d = {
-            'Author(s):': {'type': 'text', 'text': '; '.join([author.__str__() for author in self.authors.all()])},
-            'Title:': {'type': 'text', 'text': self.title},
-            'Publisher:': {'type': 'text', 'text': self.publisher},
-            'Journal:': {'type': 'text', 'text': self.journal},
-            'Issue:': {'type': 'text', 'text': self.issue},
-            'Year:': {'type': 'text', 'text': self.year},
-            'Abstract:': {'type': 'text', 'text': self.abstract},
-            'URL:': {'type': 'link', 'href': self.url, 'text': self.url},
-            'url valid': {'type': 'text', 'text': f'{self.url_valid} ({self.url_checked.strftime("%d.%m.%Y")})'},
-            'Last accessed:': {'type': 'text', 'text': self.last_accessed},
-        }
-        if self.doi:
-            d['DOI:'] = {'type': 'link', 'href': f'https://doi.org/{self.doi}', 'text': self.doi}
-        if self.licence:
-            d['License:'] = {'type': 'link', 'href': self.licence.reference_url, 'text': self.licence.name}
-        d['Attributions:'] = {'type': 'text', 'text': self.attributions}
-        return d
-
-    def check_url(self):
-        if not self.url:
-            return False
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:84.0) Gecko/20200101 Firefox/84.0',
-            'Accept-Language': 'en-GB,en;q=0.5',
-            'Referer': 'https://www.wikipedia.org',
-            'DNT': '1'
-        }
-        try:
-            response = requests.head(self.url, headers=headers, allow_redirects=True)
-        except requests.exceptions.RequestException:
-            return False
-        else:
-            if response.status_code == 405:
-                response = requests.get(self.url, headers=headers, allow_redirects=True)
-            return response.status_code == 200
-
     def __str__(self):
         return self.abbreviation
 
 
-@receiver(pre_save, sender=Source)
-def check_url_valid(sender, instance, **kwargs):
-    instance.url_valid = instance.check_url()
-    instance.url_checked = timezone.now()
+@receiver(post_save, sender=Source)
+def check_url_valid(sender, instance, created, **kwargs):
+    if created:
+        celery.current_app.send_task('check_source_url', (instance.pk,))

@@ -1,0 +1,44 @@
+{% extends 'base.html' %}
+
+{% block title %}BRIT | {{ object }} details{% endblock %}
+
+{% block content %}
+
+    <div class="card shadow">
+        <div class="card-header"><strong>Author Detail</strong></div>
+        <div class="card-body">
+            {% if object.last_names %}
+                <p><strong>Last names:</strong><br>
+                    {{ object.last_names }}
+                </p>
+            {% endif %}
+            {% if object.first_names %}
+                <p><strong>First names:</strong><br>
+                    {{ object.first_names }}
+                </p>
+            {% endif %}
+            {% if object.sources %}
+                <p><strong>Publications:</strong><br>
+                <ul>
+                    {% for publication in object.sources.all %}
+                        <li><a href="{{ publication.get_absolute_url }}">{{ publication.title }}</a></li>
+                    {% endfor %}
+                </ul>
+                </p>
+            {% endif %}
+        </div>
+        <div class="card-footer">
+            <a href="javascript:history.go(-1)"><i class="fas fa-fw fa-arrow-left"></i> back</a>
+            <a href="{% url 'author-list' %}" class="nowrap ml-3">
+                <i class="fas fa-fw fa-list"></i> see all</a>
+            {% if perms.bibliography.change_source %}
+                <a href="{% url 'author-update' object.id %}" class="mr-3"><i class="fas fa-fw fa-edit"></i> edit</a>
+            {% endif %}
+            {% if perms.bibliography.delete_source %}
+                <a href="{% url 'author-delete-modal' object.id %}" class="modal-link"><i
+                        class="fas fa-fw fa-trash"></i> delete</a>
+            {% endif %}
+        </div>
+    </div>
+
+{% endblock content %}

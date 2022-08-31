@@ -1,7 +1,6 @@
 from django.urls import path
 
 from . import views
-
 urlpatterns = [
     path('', views.BibliographyDashboardView.as_view(), name='bibliography-dashboard'),
     path('authors/', views.AuthorListView.as_view(), name='author-list'),
@@ -28,6 +27,8 @@ urlpatterns = [
     path('sources/<int:pk>/update/', views.SourceUpdateView.as_view(), name='source-update'),
     path('sources/<int:pk>/update/modal/', views.SourceModalUpdateView.as_view(), name='source-update-modal'),
     path('sources/<int:pk>/delete/modal/', views.SourceModalDeleteView.as_view(), name='source-delete-modal'),
-    path('sources/<int:pk>/check_url/', views.SourceCheckUrlView.as_view(), name='source-check-url'),
+    path('sources/<int:pk>/check_url_in_task/', views.SourceCheckUrlView.as_view(), name='source-check-url'),
+    path('sources/check_url_in_task/<str:task_id>/progress/', views.SourceCheckUrlProgressView.as_view(), name='source-check-url-progress'),
     path('sources/list/check_urls/', views.SourceListCheckUrlsView.as_view(), name='source-list-check-urls'),
 ]
+

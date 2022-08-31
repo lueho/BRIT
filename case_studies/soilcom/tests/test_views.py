@@ -4,7 +4,7 @@ from mock import Mock, patch
 
 from django.contrib.auth.models import Permission, User
 from django.forms.formsets import BaseFormSet
-from django.http import QueryDict
+from django.http.request import QueryDict, MultiValueDict
 from django.test import RequestFactory, TestCase, modify_settings
 from django.urls import reverse
 
@@ -1117,15 +1117,6 @@ class WasteFlyerDetailViewTestCase(TestCase):
         response = self.client.get(reverse('wasteflyer-detail', kwargs={'pk': self.flyer.pk}))
         self.assertNotContains(response, 'check url')
 
-    @patch.object(WasteFlyer, 'check_url')
-    def test_contains_url_valid_if_previously_checked(self, mock_check_url):
-        mock_check_url.return_value = True
-        self.flyer.save()
-        self.assertTrue(self.flyer.url_valid)
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('wasteflyer-detail', kwargs={'pk': self.flyer.pk}))
-        self.assertTrue(response.context['object'].url_valid)
-
 
 @modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
 class WasteCollectionMapViewTestCase(TestCase):
@@ -1203,3 +1194,40 @@ class WasteCollectionMapViewTestCase(TestCase):
         self.client.force_login(self.outsider)
         response = self.client.get(reverse('WasteCollection'))
         self.assertNotContains(response, 'Waste collection dashboard')
+
+
+class WasteFlyerListCheckUrlsView(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        owner = get_default_owner()
+        cls.member = User.objects.create(username='member')
+        members = Group.objects.create(name='members')
+        members.permissions.add(Permission.objects.get(codename='add_wasteflyer'))
+        members.permissions.add(Permission.objects.get(codename='view_wasteflyer'))
+        members.permissions.add(Permission.objects.get(codename='change_wasteflyer'))
+        members.permissions.add(Permission.objects.get(codename='delete_wasteflyer'))
+        cls.member.groups.add(members)
+        for i in range(1, 5):
+            WasteFlyer.objects.create(
+                owner=owner,
+                title=f'Waste flyer {i}',
+                abbreviation=f'WF{i}',
+                url_valid=i % 2 == 0
+            )
+
+    def setUp(self):
+        pass
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        params = {
+            'csrfmiddlewaretoken': ['Hm7MXB2NjRCOIpNbGaRKR87VCHM5KwpR1t4AdZFgaqKfqui1EJwhKKmkxFKDfL3h'],
+            'url_valid': ['False'],
+            'page': ['2']
+        }
+        qdict = QueryDict('', mutable=True)
+        qdict.update(MultiValueDict(params))
+        url = reverse('wasteflyer-list-check-urls') + '?' + qdict.urlencode()
+        response = self.client.get(url)
+        self.assertEqual(200, response.status_code)

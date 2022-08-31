@@ -8,29 +8,156 @@
     <div class="card shadow">
         <div class="card-header"><strong>{{ object|verbose_name }} Detail</strong></div>
         <div class="card-body">
-            {% for key, value in source_dict.items %}
-                {% if value.text %}
-                    <p><strong>{{ key }}</strong><br>
-                        {% if value.type == 'link' %}
-                            <a href="{{ value.href }}" target="blank">{{ value.text }}</a>
-                        {% elif value.type == 'text' %}
-                            {{ value.text }}
-                        {% endif %}
+            {% if 'abbreviation' in object_data and object_data.abbreviation %}
+                <p><strong>Abbreviation:</strong><br>
+                    {{ object_data.abbreviation }}
+                </p>
+            {% endif %}
+            {% if 'authors' in object_data and object_data.authors %}
+                <p><strong>Authors:</strong><br>
+                    {% for author in object_data.authors %}
+                        <a href="{{ author.url }}">{{ author.name }}</a>{% if not forloop.last %};{% endif %}
+                    {% endfor %}
+                </p>
+            {% endif %}
+            {% if 'title' in object_data and object_data.title %}
+                <p><strong>Title:</strong><br>
+                    {{ object_data.title }}
+                </p>
+            {% endif %}
+            {% if 'type' in object_data and object_data.type %}
+                <p><strong>Type:</strong><br>
+                    {{ object_data.type }}
+                </p>
+            {% endif %}
+            {% if 'publisher' in object_data and object_data.publisher %}
+                <p><strong>Publisher:</strong><br>
+                    {{ object_data.publisher }}
+                </p>
+            {% endif %}
+            {% if 'journal' in object_data and object_data.journal %}
+                <p><strong>Journal:</strong><br>
+                    {{ object_data.journal }}
+                </p>
+            {% endif %}
+            {% if 'issue' in object_data and object_data.issue %}
+                <p><strong>Issue:</strong><br>
+                    {{ object_data.issue }}
+                </p>
+            {% endif %}
+            {% if 'year' in object_data and object_data.year %}
+                <p><strong>Year:</strong><br>
+                    {{ object_data.year }}
+                </p>
+            {% endif %}
+            {% if 'licence' in object_data and object_data.licence %}
+                <p><strong>Licence:</strong><br>
+                    <a href="{{ object_data.licence.url }}">{{ object_data.licence.name }}</a>
+                </p>
+            {% endif %}
+            {% if 'attributions' in object_data and object_data.attributions %}
+                <p><strong>Attributions:</strong><br>
+                    {{ object_data.attributions }}
+                </p>
+            {% endif %}
+            {% if 'url' in object_data and object_data.url %}
+                <p><strong>Url:</strong><br>
+                    <a href="{{ object_data.url }}" target="_blank">{{ object_data.url }}</a>
+                </p>
+            {% endif %}
+            {% if 'url_valid' in object_data and object_data.url_valid %}
+                <p><strong>Url valid:</strong><br>
+                    {{ object_data.url_valid }}
+                    {% if 'url_checked' in object_data and object_data.url_valid %}
+                        ({{ object_data.url_checked }})
+                    {% endif %}
+                </p>
+            {% endif %}
+            {% if 'last_accessed' in object_data and object_data.last_accessed %}
+                <p><strong>Last accessed:</strong><br>
+                    {{ object_data.last_accessed }}
+                </p>
+            {% endif %}
+            {% if 'doi' in object_data %}
+                {% if 'url' in object_data.doi and object_data.doi.url %}
+                    <p><strong>DOI:</strong><br>
+                        <a href="{{ object_data.doi.url }}" target="_blank">{{ object_data.doi.name }}</a>
                     </p>
                 {% endif %}
-            {% endfor %}
+            {% endif %}
+            {% if 'abstract' in object_data and object_data.abstract %}
+                <p><strong>Abstract:</strong><br>
+                    {{ object_data.abstract }}
+                </p>
+            {% endif %}
         </div>
         <div class="card-footer">
-            <a href="{% url 'source-list' %}" class="mr-3"><i class="fas fa-fw fa-arrow-left"></i> back to
-                list</a>
+            <a href="javascript:history.go(-1)"><i class="fas fa-fw fa-arrow-left"></i> back</a>
+            <a href="{% url 'source-list' %}" class="nowrap ml-3">
+                <i class="fas fa-fw fa-list"></i> see all</a>
             {% if perms.bibliography.change_source %}
-            <a href="{% url 'source-update' object.id %}" class="mr-3"><i class="fas fa-fw fa-edit"></i> edit</a>
+                <a href="{% url 'source-update' object.id %}" class="ml-3"><i class="fas fa-fw fa-edit"></i> edit</a>
+                {% if 'url' in object_data and object_data.url %}
+                    <span id="check_url" class="text-nowrap" style="display: inline-block; width: 7em">
+                    <a href="javascript:void(0)" onclick="check_url({{ object.pk }})" class="ml-3">
+                        <i class="fas fa-fw fa-check-circle"></i>
+                        <span>check url</span>
+                    </a>
+                </span>
+                {% endif %}
             {% endif %}
             {% if perms.bibliography.delete_source %}
-            <a href="{% url 'source-delete-modal' object.id %}" class="modal-link"><i
-                    class="fas fa-fw fa-trash"></i> delete</a>
+                <a href="{% url 'source-delete-modal' object.id %}" class=" ml-3 modal-link"><i
+                        class="fas fa-fw fa-trash"></i> delete</a>
             {% endif %}
         </div>
     </div>
 
 {% endblock content %}
+
+{% block javascript %}
+    {{ block.super }}
+
+    <script type="text/javascript">
+
+        async function monitor_task_progress(url, count = 0) {
+            const response = await fetch(url);
+            const data = await response.json();
+            const elCheckLinkWrapper = document.getElementById('check_url');
+            const elCheckUrlLink = elCheckLinkWrapper.children[0];
+            const elCheckUrlLinkText = elCheckUrlLink.children[1];
+            if (data["state"] === "PENDING") {
+                elCheckUrlLinkText.innerText = "checking" + ".".repeat(count++ % 4);
+                setTimeout(monitor_task_progress, 500, url, count);
+            } else if (data["state"] === "SUCCESS") {
+                document.location.reload();
+            } else if (data["state"] === "FAILURE") {
+                elCheckUrlLinkText.innerText = "check failed";
+            }
+        }
+
+        async function start_task(pk) {
+            const url = "{% url 'source-check-url' 0 %}".replace('0', pk);
+            const response = await fetch(url);
+            const data = await response.json();
+            return data["task_id"];
+        }
+
+        function block_link() {
+            const elCheckLinkWrapper = document.getElementById('check_url');
+            const elCheckUrlLink = elCheckLinkWrapper.children[0];
+            const elCheckUrlLinkText = elCheckUrlLink.children[1];
+            elCheckUrlLinkText.innerText = "checking";
+            elCheckUrlLink.classList.add("processing-link");
+        }
+
+        async function check_url(pk) {
+            block_link();
+            const taskId = await start_task(pk);
+            const url = "{% url 'source-check-url-progress' task_id=1 %}".replace('1', taskId);
+            monitor_task_progress(url);
+        }
+
+    </script>
+
+{% endblock javascript %}

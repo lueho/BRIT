@@ -1,9 +1,9 @@
-from dal import autocomplete
-from django.contrib.auth.mixins import PermissionRequiredMixin, LoginRequiredMixin
-from django.http import HttpResponseRedirect
-from django.http.request import QueryDict, MultiValueDict
+from celery.result import AsyncResult
+import json
+
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.http import HttpResponse
 from django.urls import reverse_lazy
-from django.utils import timezone
 from django.views import View
 from django.views.generic import TemplateView
 
@@ -12,6 +12,8 @@ from brit import views
 from . import forms
 from .filters import SourceFilter
 from .models import Author, Licence, Source, SOURCE_TYPES
+from .serializers import HyperlinkedSourceSerializer
+from .tasks import check_source_url, check_source_urls
 
 
 class BibliographyDashboardView(TemplateView):
@@ -43,7 +45,6 @@ class AuthorModalCreateView(views.OwnedObjectModalCreateView):
 
 
 class AuthorDetailView(views.OwnedObjectDetailView):
-    template_name = 'simple_detail_card.html'
     model = Author
     permission_required = set()
 
@@ -137,7 +138,6 @@ class LicenceModalDeleteView(views.OwnedObjectDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 class SourceListView(views.OwnedObjectListView):
-    template_name = 'source_list_card.html'
     model = Source
     queryset = Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by('abbreviation')
     filterset_class = SourceFilter
@@ -175,8 +175,9 @@ class SourceDetailView(views.OwnedObjectDetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        serializer = HyperlinkedSourceSerializer(self.object, context={'request': self.request})
         context.update({
-            'source_dict': self.object.as_dict()
+            'object_data': serializer.data
         })
         return context
 
@@ -188,9 +189,10 @@ class SourceModalDetailView(views.OwnedObjectModalDetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        serializer = HyperlinkedSourceSerializer(self.object, context={'request': self.request})
         context.update({
-            'modal_title': f'{self.object._meta.verbose_name} Details',
-            'source_dict': self.object.as_dict()
+            'modal_title': 'Source details',
+            'object_data': serializer.data
         })
         return context
 
@@ -224,21 +226,27 @@ class SourceModalDeleteView(views.OwnedObjectDeleteView):
 class SourceCheckUrlView(PermissionRequiredMixin, View):
     object = None
     model = Source
-    success_url = None
     permission_required = 'bibliography.change_source'
-
-    def get_success_url(self):
-        if self.success_url:
-            return self.success_url
-        else:
-            return self.object.get_absolute_url()
 
     def get(self, request, *args, **kwargs):
         self.object = self.model.objects.get(pk=kwargs.get('pk'))
-        self.object.url_valid = self.object.check_url()
-        self.object.url_checked = timezone.now()
-        self.object.save()
-        return HttpResponseRedirect(self.get_success_url())
+        task = check_source_url.delay(self.object.pk)
+        response_data = {
+            'task_id': task.task_id
+        }
+        return HttpResponse(json.dumps(response_data), content_type='application/json')
+
+
+class SourceCheckUrlProgressView(LoginRequiredMixin, View):
+
+    @staticmethod
+    def get(request, task_id):
+        result = AsyncResult(task_id)
+        response_data = {
+            'state': result.state,
+            'details': result.info,
+        }
+        return HttpResponse(json.dumps(response_data), content_type='application/json')
 
 
 class SourceListCheckUrlsView(PermissionRequiredMixin, View):
@@ -246,21 +254,13 @@ class SourceListCheckUrlsView(PermissionRequiredMixin, View):
     filterset_class = SourceFilter
     success_url = None
     permission_required = 'bibliography.change_source'
-
-    def get_success_url(self):
-        if self.success_url:
-            return self.success_url
-        else:
-            return f"{self.model.list_url}?{self.request.GET.urlencode()}"
+    check_task = check_source_urls
 
     def get(self, request, *args, **kwargs):
         params = request.GET.copy()
         params.pop('page', None)
-        qdict = QueryDict('', mutable=True)
-        qdict.update(MultiValueDict(params))
-        qs = self.filterset_class(qdict, self.model.objects.all()).qs
-        for obj in qs:
-            obj.valid_url = obj.check_url()
-            obj.url_checked = timezone.now()
-            obj.save()
-        return HttpResponseRedirect(self.get_success_url())
+        task = self.check_task.delay(params)
+        response_data = {
+            'task_id': task.task_id
+        }
+        return HttpResponse(json.dumps(response_data), content_type='application/json')

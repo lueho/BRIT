@@ -5,17 +5,88 @@
     </button>
 </div>
 <div class="modal-body">
-    {% for key, value in source_dict.items %}
-        {% if value.text %}
-            <p><strong>{{ key }}</strong><br>
-                {% if value.type == 'link' %}
-                    <a href="{{ value.href }}" target="blank">{{ value.text }}</a>
-                {% elif value.type == 'text' %}
-                    {{ value.text }}
+    {% if 'abbreviation' in object_data and object_data.abbreviation %}
+                <p><strong>Abbreviation:</strong><br>
+                    {{ object_data.abbreviation }}
+                </p>
+            {% endif %}
+            {% if 'authors' in object_data and object_data.authors %}
+                <p><strong>Authors:</strong><br>
+                    {% for author in object_data.authors %}
+                        <a href="{{ author.url }}">{{ author.name }}</a>{% if not forloop.last %};{% endif %}
+                    {% endfor %}
+                </p>
+            {% endif %}
+            {% if 'title' in object_data and object_data.title %}
+                <p><strong>Title:</strong><br>
+                    {{ object_data.title }}
+                </p>
+            {% endif %}
+            {% if 'type' in object_data and object_data.type %}
+                <p><strong>Type:</strong><br>
+                    {{ object_data.type }}
+                </p>
+            {% endif %}
+            {% if 'publisher' in object_data and object_data.publisher %}
+                <p><strong>Publisher:</strong><br>
+                    {{ object_data.publisher }}
+                </p>
+            {% endif %}
+            {% if 'journal' in object_data and object_data.journal %}
+                <p><strong>Journal:</strong><br>
+                    {{ object_data.journal }}
+                </p>
+            {% endif %}
+            {% if 'issue' in object_data and object_data.issue %}
+                <p><strong>Issue:</strong><br>
+                    {{ object_data.issue }}
+                </p>
+            {% endif %}
+            {% if 'year' in object_data and object_data.year %}
+                <p><strong>Year:</strong><br>
+                    {{ object_data.year }}
+                </p>
+            {% endif %}
+            {% if 'licence' in object_data and object_data.licence %}
+                <p><strong>Licence:</strong><br>
+                    <a href="{{ object_data.licence.url }}">{{ object_data.licence.name }}</a>
+                </p>
+            {% endif %}
+            {% if 'attributions' in object_data and object_data.attributions %}
+                <p><strong>Attributions:</strong><br>
+                    {{ object_data.attributions }}
+                </p>
+            {% endif %}
+            {% if 'url' in object_data and object_data.url %}
+                <p><strong>Url:</strong><br>
+                    <a href="{{ object_data.url }}" target="_blank">{{ object_data.url }}</a>
+                </p>
+            {% endif %}
+            {% if 'url_valid' in object_data and object_data.url_valid %}
+                <p><strong>Url valid:</strong><br>
+                    {{ object_data.url_valid }}
+                    {% if 'url_checked' in object_data and object_data.url_valid %}
+                        ({{ object_data.url_checked }})
+                    {% endif %}
+                </p>
+            {% endif %}
+            {% if 'last_accessed' in object_data and object_data.last_accessed %}
+                <p><strong>Last accessed:</strong><br>
+                    {{ object_data.last_accessed }}
+                </p>
+            {% endif %}
+            {% if 'doi' in object_data %}
+                {% if 'url' in object_data.doi and object_data.doi.url %}
+                    <p><strong>DOI:</strong><br>
+                        <a href="{{ object_data.doi.url }}" target="_blank">{{ object_data.doi.name }}</a>
+                    </p>
                 {% endif %}
-            </p>
-        {% endif %}
-    {% endfor %}
+            {% endif %}
+            {% if 'abstract' in object_data and object_data.abstract %}
+                <p><strong>Abstract:</strong><br>
+                    {{ object_data.abstract }}
+                </p>
+            {% endif %}
 </div>
 
 <div class="modal-footer">

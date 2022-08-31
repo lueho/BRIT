@@ -19,7 +19,8 @@
             {% for object in object_list %}
                 <tr>
                     <td><a href="{{ object.get_absolute_url }}">{{ object.id }}</a></td>
-                    <td class="url-cell"><span><a href="{{ object.url }}" target="_blank">{{ object.url }}</a></span></td>
+                    <td class="url-cell"><span><a href="{{ object.url }}" target="_blank">{{ object.url }}</a></span>
+                    </td>
                     <td>{{ object.url_valid }}</td>
                     <td>{{ object.url_checked|date:'d.m.Y' }}</td>
                 </tr>
@@ -33,9 +34,12 @@
 
 {% block list_footer %}
     {% if perms.soilcom.change_wasteflyer %}
-        <a href="{% url 'wasteflyer-list-check-urls' %}?{{ request.GET.urlencode }}" class="mr-3">
-            <i class="fas fa-fw fa-check-circle"></i> check urls
-        </a>
+        <span id="check_url" class="text-nowrap" style="display: inline-block; width: 7em">
+            <a href="javascript:void(0)" onclick="check_url()" class="mr-3">
+                <i class="fas fa-fw fa-check-circle"></i>
+                <span>check urls</span>
+            </a>
+        </span>
     {% endif %}
 {% endblock list_footer %}
 
@@ -48,4 +52,48 @@
 
 {% block javascript %}
     {{ block.super }}
+
+    <script type="text/javascript">
+
+        async function monitor_task_progress(url, count = 0) {
+            const response = await fetch(url);
+            const data = await response.json();
+            const elCheckUrlLinkWrapper = document.getElementById('check_url');
+            const elCheckUrlLink = elCheckUrlLinkWrapper.children[0];
+            const elCheckUrlLinkText = elCheckUrlLink.children[1];
+            if (data["state"] === "PENDING") {
+                elCheckUrlLinkText.innerText = "checking" + ".".repeat(count++ % 4);
+                setTimeout(monitor_task_progress, 500, url, count);
+            } else if (data["state"] === "SUCCESS") {
+                document.location.reload();
+            } else if (data["state"] === "FAILURE") {
+                elCheckUrlLinkText.innerText = "check failed";
+            }
+        }
+
+        async function start_task() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const url = "{% url 'wasteflyer-list-check-urls' %}?" + urlParams.toString();
+            const response = await fetch(url);
+            const data = await response.json();
+            return data["task_id"];
+        }
+
+        function block_link() {
+            const elCheckUrlLinkWrapper = document.getElementById('check_url');
+            const elCheckUrlLink = elCheckUrlLinkWrapper.children[0];
+            const elCheckUrlLinkText = elCheckUrlLink.children[1];
+            elCheckUrlLinkText.innerText = "checking";
+            elCheckUrlLink.classList.add("processing-link");
+        }
+
+        async function check_url() {
+            block_link();
+            const taskId = await start_task();
+            const url = "{% url 'wasteflyer-list-check-urls-progress' task_id=0 %}".replace('0', taskId);
+            monitor_task_progress(url);
+        }
+
+    </script>
+
 {% endblock javascript %}

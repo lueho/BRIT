@@ -227,7 +227,7 @@ class AuthorUpdateViewTestCase(TestCase):
         response = self.client.post(reverse('author-update', kwargs={'pk': self.author.pk}), data={})
         self.assertEqual(response.status_code, 403)
 
-    def test_post_http_200_ok_for_members(self):
+    def test_post_http_302_redirect_for_members(self):
         self.client.force_login(self.member)
         data = {'last_names': 'Updated Author'}
         response = self.client.post(reverse('author-update', kwargs={'pk': self.author.pk}), data=data)
@@ -278,11 +278,11 @@ class AuthorModalUpdateViewTestCase(TestCase):
         response = self.client.post(reverse('author-update-modal', kwargs={'pk': self.author.pk}), data={})
         self.assertEqual(response.status_code, 403)
 
-    def test_post_http_200_ok_for_members(self):
+    def test_post_http_302_redirect_for_members(self):
         self.client.force_login(self.member)
         data = {'last_names': 'Updated Author'}
         response = self.client.post(reverse('author-update-modal', kwargs={'pk': self.author.pk}), data=data)
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 302)
 
 
 @modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
@@ -988,7 +988,7 @@ class SourceModalDeleteViewTestCase(TestCase):
             Source.objects.get(pk=self.source.pk)
         self.assertEqual(response.status_code, 302)
 
-
+@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
 class CheckSourceUrlViewTestCase(TestCase):
 
     @classmethod
@@ -1020,29 +1020,13 @@ class CheckSourceUrlViewTestCase(TestCase):
         response = self.client.get(reverse('source-check-url', kwargs={'pk': self.source.pk}))
         self.assertEqual(response.status_code, 403)
 
-    def test_get_finally_redirects_to_detail_url(self):
+    def test_get_http_200_ok_for_members(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('source-check-url', kwargs={'pk': self.source.pk}))
-        self.assertRedirects(
-            response,
-            reverse('source-detail', kwargs={'pk': self.source.pk}),
-            status_code=302,
-            target_status_code=200
-        )
-
-    def test_source_url_valid_shows_true_if_valid(self):
-        self.client.force_login(self.member)
-        self.client.get(reverse('source-check-url', kwargs={'pk': self.source.pk}))
-        self.assertTrue(self.source.url_valid)
-
-    def test_source_url_valid_set_to_false_if_invalid(self):
-        self.source.url = 'https://httpbin.org/status/404'
-        self.source.save()
-        self.client.force_login(self.member)
-        self.client.get(reverse('source-check-url', kwargs={'pk': self.source.pk}))
-        self.assertFalse(self.source.url_valid)
+        self.assertEqual(200, response.status_code)
 
 
+@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
 class SourceListCheckUrlsViewTestCase(TestCase):
 
     @classmethod
@@ -1086,14 +1070,8 @@ class SourceListCheckUrlsViewTestCase(TestCase):
         response = self.client.get(request_url)
         self.assertEqual(response.status_code, 403)
 
-    def test_get_finally_redirects_to_list_url_and_maintains_filter_parameters(self):
+    def test_get_http_200_ok_for_members(self):
         self.client.force_login(self.member)
         request_url = f"{reverse('source-list-check-urls')}?url_valid=False&page=1"
         response = self.client.get(request_url)
-        redirect_url = f"{reverse('source-list')}?url_valid=False&page=1"
-        self.assertRedirects(
-            response,
-            redirect_url,
-            status_code=302,
-            target_status_code=200
-        )
+        self.assertEqual(200, response.status_code)

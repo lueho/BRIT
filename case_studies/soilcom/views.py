@@ -36,6 +36,7 @@ from . import models
 from . import serializers
 from .models import Collection
 from .serializers import CollectionFlatSerializer
+from .tasks import check_wasteflyer_urls
 import case_studies.soilcom.tasks
 
 
@@ -417,10 +418,46 @@ class WasteFlyerCheckUrlView(SourceCheckUrlView):
     permission_required = 'soilcom.change_wasteflyer'
 
 
-class WasteFlyerListCheckUrlsView(SourceListCheckUrlsView):
+class WasteFlyerCheckUrlProgressView(LoginRequiredMixin, View):
+
+    @staticmethod
+    def get(request, task_id):
+        result = AsyncResult(task_id)
+        response_data = {
+            'state': result.state,
+            'details': result.info,
+        }
+        return HttpResponse(json.dumps(response_data), content_type='application/json')
+
+
+class WasteFlyerListCheckUrlsView(PermissionRequiredMixin, View):
     model = models.WasteFlyer
     filterset_class = WasteFlyerFilter
     permission_required = 'soilcom.change_wasteflyer'
+
+    @staticmethod
+    def get(request, *args, **kwargs):
+        params = request.GET.copy()
+        params.pop('csrfmiddlewaretoken', None)
+        params.pop('page', None)
+        task = check_wasteflyer_urls.delay(params)
+        callback_id = task.get()[0][0]
+        response_data = {
+            'task_id': callback_id
+        }
+        return HttpResponse(json.dumps(response_data), content_type='application/json')
+
+
+class WasteFlyerListCheckUrlsProgressView(LoginRequiredMixin, View):
+
+    @staticmethod
+    def get(request, task_id):
+        result = AsyncResult(task_id)
+        response_data = {
+            'state': result.state,
+            'details': result.info,
+        }
+        return HttpResponse(json.dumps(response_data), content_type='application/json')
 
 
 # ----------- Frequency CRUD -------------------------------------------------------------------------------------------

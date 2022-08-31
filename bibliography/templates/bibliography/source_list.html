@@ -9,7 +9,7 @@
         <thead>
             <tr>
                 <th>Abbreviation</th>
-                <th>Authors</th>
+                <th>Authors/Publisher</th>
                 <th>Title</th>
                 <th>Type</th>
             </tr>
@@ -18,9 +18,13 @@
             <tr>
                 <td><a href="{{ object.get_absolute_url }}">{{ object.abbreviation }}</a></td>
                 <td>
-                {% for author in object.authors.all %}
-                <a href="{{ author.get_absolute_url }}">{{ author }}</a>,
-                {% endfor %}
+                {% if object.authors.exists %}
+                    {% for author in object.authors.all %}
+                    <a href="{{ author.get_absolute_url }}">{{ author }}</a>{% if not forloop.last %};{% endif %}
+                    {% endfor %}
+                {% elif object.publisher %}
+                    {{ object.publisher }}
+                {% endif %}
                 </td>
                 <td><a href="{{ object.get_absolute_url }}">{{ object.title }}</a></td>
                 <td>{{ object.type }}</td>
