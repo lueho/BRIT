@@ -1,0 +1,31 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}BRIT | Bibliography | Authors{% endblock %}
+
+{% block content %}
+    <div class="row">
+        <div class="col">
+            <div class="card shadow">
+                <div class="card-header"><strong>Authors</strong></div>
+                <div class="card-body">
+                    <table class="table">
+                        <thead>
+                        <tr>
+                            <th>Name</th>
+                        </tr>
+                        </thead>
+                        {% for object in object_list %}
+                            <tr>
+                                <td><a href="{{ object.get_absolute_url }}">{{ object }}</a></td>
+                            </tr>
+                        {% endfor %}
+                    </table>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'author-create' %}">
+                        <i class="fas fa-fw fa-plus"></i> Create new author
+                    </a>
+                </div>
+            </div>
+{% endblock content %}

@@ -32,10 +32,10 @@
             <a href="{% url 'author-list' %}" class="nowrap ml-3">
                 <i class="fas fa-fw fa-list"></i> see all</a>
             {% if perms.bibliography.change_source %}
-                <a href="{% url 'author-update' object.id %}" class="mr-3"><i class="fas fa-fw fa-edit"></i> edit</a>
+                <a href="{% url 'author-update' object.id %}" class="ml-3"><i class="fas fa-fw fa-edit"></i> edit</a>
             {% endif %}
             {% if perms.bibliography.delete_source %}
-                <a href="{% url 'author-delete-modal' object.id %}" class="modal-link"><i
+                <a href="{% url 'author-delete-modal' object.id %}" class="ml-3 modal-link"><i
                         class="fas fa-fw fa-trash"></i> delete</a>
             {% endif %}
         </div>

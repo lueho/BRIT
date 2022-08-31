@@ -25,7 +25,6 @@ class BibliographyDashboardView(TemplateView):
 
 
 class AuthorListView(views.OwnedObjectListView):
-    template_name = 'simple_list_card.html'
     model = Author
     permission_required = set()
 
@@ -33,14 +32,12 @@ class AuthorListView(views.OwnedObjectListView):
 class AuthorCreateView(views.OwnedObjectCreateView):
     template_name = 'simple_form_card.html'
     form_class = forms.AuthorModelForm
-    success_url = reverse_lazy('author-list')
     permission_required = 'bibliography.add_author'
 
 
 class AuthorModalCreateView(views.OwnedObjectModalCreateView):
     template_name = 'modal_form.html'
     form_class = forms.AuthorModalModelForm
-    success_url = reverse_lazy('author-list')
     permission_required = 'bibliography.add_author'
 
 
@@ -50,7 +47,7 @@ class AuthorDetailView(views.OwnedObjectDetailView):
 
 
 class AuthorModalDetailView(views.OwnedObjectModalDetailView):
-    template_name = 'modal_detail.html'
+    template_name = 'author_detail_modal.html'
     model = Author
     permission_required = set()
 
@@ -81,7 +78,6 @@ class AuthorModalDeleteView(views.OwnedObjectDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 class LicenceListView(views.OwnedObjectListView):
-    template_name = 'simple_list_card.html'
     model = Licence
     permission_required = set()
 
@@ -89,25 +85,22 @@ class LicenceListView(views.OwnedObjectListView):
 class LicenceCreateView(views.OwnedObjectCreateView):
     template_name = 'simple_form_card.html'
     form_class = forms.LicenceModelForm
-    success_url = reverse_lazy('licence-list')
     permission_required = 'bibliography.add_licence'
 
 
 class LicenceModalCreateView(views.OwnedObjectModalCreateView):
     template_name = 'modal_form.html'
     form_class = forms.LicenceModalModelForm
-    success_url = reverse_lazy('licence-list')
     permission_required = 'bibliography.add_licence'
 
 
 class LicenceDetailView(views.OwnedObjectDetailView):
-    template_name = 'simple_detail_card.html'
     model = Licence
     permission_required = set()
 
 
 class LicenceModalDetailView(views.OwnedObjectModalDetailView):
-    template_name = 'modal_detail.html'
+    template_name = 'licence_detail_modal.html'
     model = Licence
     permission_required = set()
 
@@ -158,14 +151,12 @@ class SourceListView(views.OwnedObjectListView):
 class SourceCreateView(views.OwnedObjectCreateView):
     template_name = 'simple_form_card.html'
     form_class = forms.SourceModelForm
-    success_url = reverse_lazy('source-list')
     permission_required = 'bibliography.add_source'
 
 
 class SourceModalCreateView(views.OwnedObjectModalCreateView):
     template_name = 'modal_form.html'
     form_class = forms.SourceModalModelForm
-    success_url = reverse_lazy('source-list')
     permission_required = 'bibliography.add_source'
 
 
@@ -183,7 +174,7 @@ class SourceDetailView(views.OwnedObjectDetailView):
 
 
 class SourceModalDetailView(views.OwnedObjectModalDetailView):
-    template_name = 'modal_source_detail.html'
+    template_name = 'source_detail_modal.html'
     model = Source
     permission_required = set()
 

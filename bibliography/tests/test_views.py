@@ -1,7 +1,7 @@
 from django.contrib.auth.models import Group, User
-from django.test import TestCase, modify_settings
 from django.urls import reverse
 
+from brit.tests import UserLoginTestCase
 from users.models import get_default_owner
 
 from ..models import Author, Licence, Source
@@ -11,17 +11,13 @@ from ..models import Author, Licence, Source
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-# CurrentUserMiddleware is used to track object creation and change. It causes errors in the TestCases with
-# logins. Can be disabled here because it is not relevant for these tests.
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class AuthorListViewTestCase(TestCase):
+class AuthorListViewTestCase(UserLoginTestCase):
+
+    outsider = None
 
     @classmethod
     def setUpTestData(cls):
-        User.objects.create(username='outsider')
-
-    def setUp(self):
-        self.outsider = User.objects.get(username='outsider')
+        cls.outsider = User.objects.create(username='outsider')
 
     def test_get_http_200_redirect_for_anonymous(self):
         response = self.client.get(reverse('author-list'))
@@ -33,24 +29,26 @@ class AuthorListViewTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class AuthorCreateViewTestCase(TestCase):
+class AuthorCreateViewTestCase(UserLoginTestCase):
+
+    outsider = None
+    member = None
 
     @classmethod
     def setUpTestData(cls):
-        User.objects.create(username='owner')
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
+        cls.outsider = User.objects.create(username='outsider')
+        cls.member = User.objects.create(username='member')
         editors = Group.objects.get(name='editors')
-        member.groups.add(editors)
+        cls.member.groups.add(editors)
 
-    def setUp(self):
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
-
-    def test_get_http_302_redirect_for_anonymous(self):
+    def test_get_http_302_redirect_to_login_for_anonymous(self):
         response = self.client.get(reverse('author-create'))
-        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(
+            response,
+            f"{reverse('auth_login')}?next={reverse('author-create')}",
+            status_code=302,
+            target_status_code=200
+        )
 
     def test_get_http_403_forbidden_for_outsiders(self):
         self.client.force_login(self.outsider)
@@ -64,37 +62,44 @@ class AuthorCreateViewTestCase(TestCase):
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('author-create'), data={})
-        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(
+            response,
+            f"{reverse('auth_login')}?next={reverse('author-create')}",
+            status_code=302,
+            target_status_code=200
+        )
 
     def test_post_http_403_forbidden_for_outsiders(self):
         self.client.force_login(self.outsider)
         response = self.client.post(reverse('author-create'), data={})
         self.assertEqual(response.status_code, 403)
 
-    def test_post_http_302_redirect_for_members_with_minimal_data(self):
+    def test_post_success_and_http_302_redirect_for_members_with_minimal_data(self):
         self.client.force_login(self.member)
         data = {
             'first_names': 'Test',
             'last_names': 'Author'
         }
-        response = self.client.post(reverse('author-create'), data=data)
-        self.assertEqual(response.status_code, 302)
+        response = self.client.post(reverse('author-create'), data=data, follow=True)
+        self.assertRedirects(
+            response,
+            f"{reverse('author-detail', kwargs={'pk': Author.objects.first().pk})}",
+            status_code=302,
+            target_status_code=200
+        )
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class AuthorModalCreateViewTestCase(TestCase):
+class AuthorModalCreateViewTestCase(UserLoginTestCase):
+
+    outsider = None
+    member = None
 
     @classmethod
     def setUpTestData(cls):
-        User.objects.create(username='owner')
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
+        cls.outsider = User.objects.create(username='outsider')
+        cls.member = User.objects.create(username='member')
         editors = Group.objects.get(name='editors')
-        member.groups.add(editors)
-
-    def setUp(self):
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
+        cls.member.groups.add(editors)
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(reverse('author-create-modal'))
@@ -119,29 +124,31 @@ class AuthorModalCreateViewTestCase(TestCase):
         response = self.client.post(reverse('author-create-modal'), data={})
         self.assertEqual(response.status_code, 403)
 
-    def test_post_http_302_redirect_for_members_with_minimal_data(self):
+    def test_post_success_and_http_302_redirect_for_members_with_minimal_data(self):
         self.client.force_login(self.member)
         data = {
             'first_names': 'Test',
             'last_names': 'Author'
         }
-        response = self.client.post(reverse('author-create-modal'), data=data)
-        self.assertEqual(response.status_code, 302)
+        response = self.client.post(reverse('author-create'), data=data, follow=True)
+        self.assertRedirects(
+            response,
+            f"{reverse('author-detail', kwargs={'pk': Author.objects.first().pk})}",
+            status_code=302,
+            target_status_code=200
+        )
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class AuthorDetailViewTestCase(TestCase):
+class AuthorDetailViewTestCase(UserLoginTestCase):
+
+    outsider = None
+    author = None
 
     @classmethod
     def setUpTestData(cls):
-        User.objects.create(username='owner')
-        User.objects.create(username='outsider')
-
-    def setUp(self):
-        self.owner = User.objects.get(username='owner')
-        self.outsider = User.objects.get(username='outsider')
-        self.author = Author.objects.create(
-            owner=self.owner,
+        cls.outsider = User.objects.create(username='outsider')
+        cls.author = Author.objects.create(
+            owner=get_default_owner(),
             first_names='Test',
             last_names='Author',
         )
@@ -156,19 +163,16 @@ class AuthorDetailViewTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class AuthorModalDetailViewTestCase(TestCase):
+class AuthorModalDetailViewTestCase(UserLoginTestCase):
+
+    outsider = None
+    author = None
 
     @classmethod
     def setUpTestData(cls):
-        User.objects.create(username='owner')
-        User.objects.create(username='outsider')
-
-    def setUp(self):
-        self.owner = User.objects.get(username='owner')
-        self.outsider = User.objects.get(username='outsider')
-        self.author = Author.objects.create(
-            owner=self.owner,
+        cls.outsider = User.objects.create(username='outsider')
+        cls.author = Author.objects.create(
+            owner=get_default_owner(),
             first_names='Test',
             last_names='Author',
         )
@@ -183,30 +187,32 @@ class AuthorModalDetailViewTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class AuthorUpdateViewTestCase(TestCase):
+class AuthorUpdateViewTestCase(UserLoginTestCase):
+
+    outsider = None
+    member = None
+    author = None
 
     @classmethod
     def setUpTestData(cls):
-        User.objects.create(username='owner')
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
+        cls.outsider = User.objects.create(username='outsider')
+        cls.member = User.objects.create(username='member')
         editors = Group.objects.get(name='editors')
-        member.groups.add(editors)
-
-    def setUp(self):
-        self.owner = User.objects.get(username='owner')
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
-        self.author = Author.objects.create(
-            owner=self.owner,
+        cls.member.groups.add(editors)
+        cls.author = Author.objects.create(
+            owner=get_default_owner(),
             first_names='Test',
             last_names='Author',
         )
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(reverse('author-update', kwargs={'pk': self.author.pk}))
-        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(
+            response,
+            f"{reverse('auth_login')}?next={reverse('author-update', kwargs={'pk': self.author.pk})}",
+            status_code=302,
+            target_status_code=200
+        )
 
     def test_get_http_403_forbidden_for_outsiders(self):
         self.client.force_login(self.outsider)
@@ -220,37 +226,44 @@ class AuthorUpdateViewTestCase(TestCase):
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('author-update', kwargs={'pk': self.author.pk}), data={})
-        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(
+            response,
+            f"{reverse('auth_login')}?next={reverse('author-update', kwargs={'pk': self.author.pk})}",
+            status_code=302,
+            target_status_code=200
+        )
 
     def test_post_http_403_forbidden_for_outsiders(self):
         self.client.force_login(self.outsider)
         response = self.client.post(reverse('author-update', kwargs={'pk': self.author.pk}), data={})
         self.assertEqual(response.status_code, 403)
 
-    def test_post_http_302_redirect_for_members(self):
+    def test_post_success_and_http_302_redirect_for_members(self):
         self.client.force_login(self.member)
         data = {'last_names': 'Updated Author'}
-        response = self.client.post(reverse('author-update', kwargs={'pk': self.author.pk}), data=data)
-        self.assertEqual(response.status_code, 200)
+        response = self.client.post(reverse('author-update', kwargs={'pk': self.author.pk}), data=data, follow=True)
+        self.assertRedirects(
+            response,
+            f"{reverse('author-detail', kwargs={'pk': self.author.pk})}",
+            status_code=302,
+            target_status_code=200
+        )
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class AuthorModalUpdateViewTestCase(TestCase):
+class AuthorModalUpdateViewTestCase(UserLoginTestCase):
+
+    outsider = None
+    member = None
+    author = None
 
     @classmethod
     def setUpTestData(cls):
-        User.objects.create(username='owner')
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
+        cls.outsider = User.objects.create(username='outsider')
+        cls.member = User.objects.create(username='member')
         editors = Group.objects.get(name='editors')
-        member.groups.add(editors)
-
-    def setUp(self):
-        self.owner = User.objects.get(username='owner')
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
-        self.author = Author.objects.create(
-            owner=self.owner,
+        cls.member.groups.add(editors)
+        cls.author = Author.objects.create(
+            owner=get_default_owner(),
             first_names='Test',
             last_names='Author',
         )
@@ -278,30 +291,32 @@ class AuthorModalUpdateViewTestCase(TestCase):
         response = self.client.post(reverse('author-update-modal', kwargs={'pk': self.author.pk}), data={})
         self.assertEqual(response.status_code, 403)
 
-    def test_post_http_302_redirect_for_members(self):
+    def test_post_success_and_http_302_redirect_for_members(self):
         self.client.force_login(self.member)
         data = {'last_names': 'Updated Author'}
-        response = self.client.post(reverse('author-update-modal', kwargs={'pk': self.author.pk}), data=data)
-        self.assertEqual(response.status_code, 302)
+        response = self.client.post(reverse('author-update', kwargs={'pk': self.author.pk}), data=data, follow=True)
+        self.assertRedirects(
+            response,
+            f"{reverse('author-detail', kwargs={'pk': self.author.pk})}",
+            status_code=302,
+            target_status_code=200
+        )
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class AuthorModalDeleteViewTestCase(TestCase):
+class AuthorModalDeleteViewTestCase(UserLoginTestCase):
+
+    outsider = None
+    member = None
+    author = None
 
     @classmethod
     def setUpTestData(cls):
-        User.objects.create(username='owner')
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
+        cls.outsider = User.objects.create(username='outsider')
+        cls.member = User.objects.create(username='member')
         editors = Group.objects.get(name='editors')
-        member.groups.add(editors)
-
-    def setUp(self):
-        self.owner = User.objects.get(username='owner')
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
-        self.author = Author.objects.create(
-            owner=self.owner,
+        cls.member.groups.add(editors)
+        cls.author = Author.objects.create(
+            owner=get_default_owner(),
             first_names='Test',
             last_names='Author',
         )
@@ -334,24 +349,25 @@ class AuthorModalDeleteViewTestCase(TestCase):
         response = self.client.post(reverse('author-delete-modal', kwargs={'pk': self.author.pk}))
         with self.assertRaises(Author.DoesNotExist):
             Author.objects.get(pk=self.author.pk)
-        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(
+            response,
+            f"{reverse('author-list')}",
+            status_code=302,
+            target_status_code=200
+        )
 
 
 # ----------- Licence CRUD ---------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-# CurrentUserMiddleware is used to track object creation and change. It causes errors in the TestCases with
-# logins. Can be disabled here because it is not relevant for these tests.
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class LicenceListViewTestCase(TestCase):
+class LicenceListViewTestCase(UserLoginTestCase):
+
+    outsider = None
 
     @classmethod
     def setUpTestData(cls):
-        User.objects.create(username='outsider')
-
-    def setUp(self):
-        self.outsider = User.objects.get(username='outsider')
+        cls.outsider = User.objects.create(username='outsider')
 
     def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse('licence-list'))
@@ -363,24 +379,25 @@ class LicenceListViewTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class LicenceCreateViewTestCase(TestCase):
+class LicenceCreateViewTestCase(UserLoginTestCase):
+    outsider = None
+    member = None
 
     @classmethod
     def setUpTestData(cls):
-        User.objects.create(username='owner')
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
+        cls.outsider = User.objects.create(username='outsider')
+        cls.member = User.objects.create(username='member')
         editors = Group.objects.get(name='editors')
-        member.groups.add(editors)
-
-    def setUp(self):
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
+        cls.member.groups.add(editors)
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(reverse('licence-create'))
-        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(
+            response,
+            f"{reverse('auth_login')}?next={reverse('licence-create')}",
+            status_code=302,
+            target_status_code=200
+        )
 
     def test_get_http_403_forbidden_for_outsiders(self):
         self.client.force_login(self.outsider)
@@ -394,34 +411,41 @@ class LicenceCreateViewTestCase(TestCase):
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('licence-create'), data={})
-        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(
+            response,
+            f"{reverse('auth_login')}?next={reverse('licence-create')}",
+            status_code=302,
+            target_status_code=200
+        )
 
     def test_post_http_403_forbidden_for_outsiders(self):
         self.client.force_login(self.outsider)
         response = self.client.post(reverse('licence-create'), data={})
         self.assertEqual(response.status_code, 403)
 
-    def test_post_http_200_ok_for_members_with_minimal_data(self):
+    def test_post_success_and_http_302_redirect_for_members_with_minimal_data(self):
         self.client.force_login(self.member)
         data = {'name': 'Test Licence'}
         response = self.client.post(reverse('licence-create'), data=data)
-        self.assertEqual(response.status_code, 200)
+        self.assertRedirects(
+            response,
+            f"{reverse('licence-detail', kwargs={'pk': Licence.objects.first().pk})}",
+            status_code=302,
+            target_status_code=200
+        )
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class LicenceModalCreateViewTestCase(TestCase):
+class LicenceModalCreateViewTestCase(UserLoginTestCase):
+
+    outsider = None
+    member = None
 
     @classmethod
     def setUpTestData(cls):
-        User.objects.create(username='owner')
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
+        cls.outsider = User.objects.create(username='outsider')
+        cls.member = User.objects.create(username='member')
         editors = Group.objects.get(name='editors')
-        member.groups.add(editors)
-
-    def setUp(self):
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
+        cls.member.groups.add(editors)
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(reverse('licence-create-modal'))
@@ -446,28 +470,30 @@ class LicenceModalCreateViewTestCase(TestCase):
         response = self.client.post(reverse('licence-create-modal'), data={})
         self.assertEqual(response.status_code, 403)
 
-    def test_post_http_200_ok_for_members_with_minimal_data(self):
+    def test_post_success_and_http_302_redirect_for_members_with_minimal_data(self):
         self.client.force_login(self.member)
         data = {'name': 'Test Licence'}
-        response = self.client.post(reverse('licence-create-modal'), data=data)
-        self.assertEqual(response.status_code, 200)
+        response = self.client.post(reverse('licence-create-modal'), data=data, follow=True)
+        self.assertRedirects(
+            response,
+            f"{reverse('licence-detail', kwargs={'pk': Licence.objects.first().pk})}",
+            status_code=302,
+            target_status_code=200
+        )
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class LicenceDetailViewTestCase(TestCase):
+class LicenceDetailViewTestCase(UserLoginTestCase):
+
+    outsider = None
+    licence = None
 
     @classmethod
     def setUpTestData(cls):
-        get_default_owner()
-        User.objects.create(username='outsider')
-
-    def setUp(self):
-        self.owner = get_default_owner()
-        self.outsider = User.objects.get(username='outsider')
-        self.licence = Licence.objects.create(
-            owner=self.owner,
+        cls.outsider = User.objects.create(username='outsider')
+        cls.licence = Licence.objects.create(
+            owner=get_default_owner(),
             name='Test Licence',
-            reference_url='https://www.test_licence.org'
+            reference_url='https://www.reference-url.org',
         )
 
     def test_get_http_200_ok_for_anonymous(self):
@@ -480,21 +506,18 @@ class LicenceDetailViewTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class LicenceModalDetailViewTestCase(TestCase):
+class LicenceModalDetailViewTestCase(UserLoginTestCase):
+
+    outsider = None
+    licence = None
 
     @classmethod
     def setUpTestData(cls):
-        get_default_owner()
-        User.objects.create(username='outsider')
-
-    def setUp(self):
-        self.owner = get_default_owner()
-        self.outsider = User.objects.get(username='outsider')
-        self.licence = Licence.objects.create(
-            owner=self.owner,
+        cls.outsider = User.objects.create(username='outsider')
+        cls.licence = Licence.objects.create(
+            owner=get_default_owner(),
             name='Test Licence',
-            reference_url='https://www.test_licence.org'
+            reference_url='https://www.reference-url.org',
         )
 
     def test_get_http_200_ok_for_anonymous(self):
@@ -507,30 +530,32 @@ class LicenceModalDetailViewTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class LicenceUpdateViewTestCase(TestCase):
+class LicenceUpdateViewTestCase(UserLoginTestCase):
+
+    outsider = None
+    member = None
+    licence = None
 
     @classmethod
     def setUpTestData(cls):
-        get_default_owner()
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
+        cls.outsider = User.objects.create(username='outsider')
+        cls.member = User.objects.create(username='member')
         editors = Group.objects.get(name='editors')
-        member.groups.add(editors)
-
-    def setUp(self):
-        self.owner = get_default_owner()
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
-        self.licence = Licence.objects.create(
-            owner=self.owner,
+        cls.member.groups.add(editors)
+        cls.licence = Licence.objects.create(
+            owner=get_default_owner(),
             name='Test Licence',
-            reference_url='https://www.test_licence.org'
+            reference_url='https://www.reference-url.org',
         )
 
     def test_get_http_302_redirect_for_anonymous(self):
-        response = self.client.get(reverse('licence-update', kwargs={'pk': self.licence.pk}))
-        self.assertEqual(response.status_code, 302)
+        response = self.client.get(reverse('licence-update', kwargs={'pk': self.licence.pk}), follow=True)
+        self.assertRedirects(
+            response,
+            f"{reverse('auth_login')}?next={reverse('licence-update', kwargs={'pk': self.licence.pk})}",
+            status_code=302,
+            target_status_code=200
+        )
 
     def test_get_http_403_forbidden_for_outsiders(self):
         self.client.force_login(self.outsider)
@@ -543,40 +568,47 @@ class LicenceUpdateViewTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_post_http_302_redirect_for_anonymous(self):
-        response = self.client.post(reverse('licence-update', kwargs={'pk': self.licence.pk}), data={})
-        self.assertEqual(response.status_code, 302)
+        response = self.client.post(reverse('licence-update', kwargs={'pk': self.licence.pk}), data={}, follow=True)
+        self.assertRedirects(
+            response,
+            f"{reverse('auth_login')}?next={reverse('licence-update', kwargs={'pk': self.licence.pk})}",
+            status_code=302,
+            target_status_code=200
+        )
 
     def test_post_http_403_forbidden_for_outsiders(self):
         self.client.force_login(self.outsider)
         response = self.client.post(reverse('licence-update', kwargs={'pk': self.licence.pk}), data={})
         self.assertEqual(response.status_code, 403)
 
-    def test_post_http_200_ok_for_members(self):
+    def test_post_success_and_http_302_redirect_for_members(self):
         self.client.force_login(self.member)
         data = {'name': 'Updated Test Licence'}
-        response = self.client.post(reverse('licence-update', kwargs={'pk': self.licence.pk}), data=data)
-        self.assertEqual(response.status_code, 200)
+        response = self.client.post(reverse('licence-update', kwargs={'pk': self.licence.pk}), data=data, follow=True)
+        self.assertRedirects(
+            response,
+            f"{reverse('licence-detail', kwargs={'pk': self.licence.pk})}",
+            status_code=302,
+            target_status_code=200
+        )
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class LicenceModalUpdateViewTestCase(TestCase):
+class LicenceModalUpdateViewTestCase(UserLoginTestCase):
+
+    outsider = None
+    member = None
+    licence = None
 
     @classmethod
     def setUpTestData(cls):
-        get_default_owner()
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
+        cls.outsider = User.objects.create(username='outsider')
+        cls.member = User.objects.create(username='member')
         editors = Group.objects.get(name='editors')
-        member.groups.add(editors)
-
-    def setUp(self):
-        self.owner = get_default_owner()
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
-        self.licence = Licence.objects.create(
-            owner=self.owner,
+        cls.member.groups.add(editors)
+        cls.licence = Licence.objects.create(
+            owner=get_default_owner(),
             name='Test Licence',
-            reference_url='https://www.test_licence.org'
+            reference_url='https://www.reference-url.org',
         )
 
     def test_get_http_302_redirect_for_anonymous(self):
@@ -602,32 +634,34 @@ class LicenceModalUpdateViewTestCase(TestCase):
         response = self.client.post(reverse('licence-update-modal', kwargs={'pk': self.licence.pk}), data={})
         self.assertEqual(response.status_code, 403)
 
-    def test_post_http_200_ok_for_members(self):
+    def test_post_success_and_http_302_redirect_for_members(self):
         self.client.force_login(self.member)
         data = {'name': 'Updated Test Licence'}
-        response = self.client.post(reverse('licence-update-modal', kwargs={'pk': self.licence.pk}), data=data)
-        self.assertEqual(response.status_code, 200)
+        response = self.client.post(reverse('licence-update-modal', kwargs={'pk': self.licence.pk}), data=data, follow=True)
+        self.assertRedirects(
+            response,
+            f"{reverse('licence-detail', kwargs={'pk': self.licence.pk})}",
+            status_code=302,
+            target_status_code=200
+        )
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class LicenceModalDeleteViewTestCase(TestCase):
+class LicenceModalDeleteViewTestCase(UserLoginTestCase):
+
+    outsider = None
+    member = None
+    licence = None
 
     @classmethod
     def setUpTestData(cls):
-        get_default_owner()
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
+        cls.outsider = User.objects.create(username='outsider')
+        cls.member = User.objects.create(username='member')
         editors = Group.objects.get(name='editors')
-        member.groups.add(editors)
-
-    def setUp(self):
-        self.owner = get_default_owner()
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
-        self.licence = Licence.objects.create(
-            owner=self.owner,
+        cls.member.groups.add(editors)
+        cls.licence = Licence.objects.create(
+            owner=get_default_owner(),
             name='Test Licence',
-            reference_url='https://www.test_licence.org'
+            reference_url='https://www.reference-url.org',
         )
 
     def test_get_http_302_redirect_for_anonymous(self):
@@ -658,24 +692,25 @@ class LicenceModalDeleteViewTestCase(TestCase):
         response = self.client.post(reverse('licence-delete-modal', kwargs={'pk': self.licence.pk}))
         with self.assertRaises(Licence.DoesNotExist):
             Licence.objects.get(pk=self.licence.pk)
-        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(
+            response,
+            f"{reverse('licence-list')}",
+            status_code=302,
+            target_status_code=200
+        )
 
 
 # ----------- Source CRUD ----------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-# CurrentUserMiddleware is used to track object creation and change. It causes errors in the TestCases with
-# logins. Can be disabled here because it is not relevant for these tests.
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class SourceListViewTestCase(TestCase):
+class SourceListViewTestCase(UserLoginTestCase):
+
+    outsider = None
 
     @classmethod
     def setUpTestData(cls):
-        User.objects.create(username='outsider')
-
-    def setUp(self):
-        self.outsider = User.objects.get(username='outsider')
+        cls.outsider = User.objects.create(username='outsider')
 
     def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse('source-list'))
@@ -687,24 +722,26 @@ class SourceListViewTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class SourceCreateViewTestCase(TestCase):
+class SourceCreateViewTestCase(UserLoginTestCase):
+
+    outsider = None
+    member = None
 
     @classmethod
     def setUpTestData(cls):
-        User.objects.create(username='owner')
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
+        cls.outsider = User.objects.create(username='outsider')
+        cls.member = User.objects.create(username='member')
         editors = Group.objects.get(name='editors')
-        member.groups.add(editors)
-
-    def setUp(self):
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
+        cls.member.groups.add(editors)
 
     def test_get_http_302_redirect_for_anonymous(self):
-        response = self.client.get(reverse('source-create'))
-        self.assertEqual(response.status_code, 302)
+        response = self.client.get(reverse('source-create'), follow=True)
+        self.assertRedirects(
+            response,
+            f"{reverse('auth_login')}?next={reverse('source-create')}",
+            status_code=302,
+            target_status_code=200
+        )
 
     def test_get_http_403_forbidden_for_outsiders(self):
         self.client.force_login(self.outsider)
@@ -717,35 +754,42 @@ class SourceCreateViewTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_post_http_302_redirect_for_anonymous(self):
-        response = self.client.post(reverse('source-create'), data={})
-        self.assertEqual(response.status_code, 302)
+        response = self.client.post(reverse('source-create'), data={}, follow=True)
+        self.assertRedirects(
+            response,
+            f"{reverse('auth_login')}?next={reverse('source-create')}",
+            status_code=302,
+            target_status_code=200
+        )
 
     def test_post_http_403_forbidden_for_outsiders(self):
         self.client.force_login(self.outsider)
         response = self.client.post(reverse('source-create'), data={})
         self.assertEqual(response.status_code, 403)
 
-    def test_post_http_200_ok_members_with_minimal_data(self):
+    def test_post_success_and_http_302_redirect_for_members_with_minimal_data(self):
         self.client.force_login(self.member)
-        data = {'type': 'article'}
-        response = self.client.post(reverse('source-create'), data=data)
-        self.assertEqual(response.status_code, 200)
+        data = {'abbreviation': 'TS1', 'type': 'article', 'title': 'Test Source'}
+        response = self.client.post(reverse('source-create'), data=data, follow=True)
+        self.assertRedirects(
+            response,
+            f"{reverse('source-detail', kwargs={'pk': Source.objects.first().pk})}",
+            status_code=302,
+            target_status_code=200
+        )
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class SourceModalCreateViewTestCase(TestCase):
+class SourceModalCreateViewTestCase(UserLoginTestCase):
+
+    outsider = None
+    member = None
 
     @classmethod
     def setUpTestData(cls):
-        User.objects.create(username='owner')
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
+        cls.outsider = User.objects.create(username='outsider')
+        cls.member = User.objects.create(username='member')
         editors = Group.objects.get(name='editors')
-        member.groups.add(editors)
-
-    def setUp(self):
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
+        cls.member.groups.add(editors)
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(reverse('source-create-modal'))
@@ -770,30 +814,31 @@ class SourceModalCreateViewTestCase(TestCase):
         response = self.client.post(reverse('source-create-modal'), data={})
         self.assertEqual(response.status_code, 403)
 
-    def test_post_http_200_ok_members_with_minimal_data(self):
+    def test_post_success_and_http_302_redirect_members_with_minimal_data(self):
         self.client.force_login(self.member)
-        data = {'type': 'article'}
+        data = {'abbreviation': 'TS1', 'type': 'article', 'title': 'Test Source'}
         response = self.client.post(reverse('source-create-modal'), data=data)
-        self.assertEqual(response.status_code, 200)
+        self.assertRedirects(
+            response,
+            f"{reverse('source-detail', kwargs={'pk': Source.objects.first().pk})}",
+            status_code=302,
+            target_status_code=200
+        )
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class SourceDetailViewTestCase(TestCase):
+class SourceDetailViewTestCase(UserLoginTestCase):
+
+    outsider = None
+    source = None
 
     @classmethod
     def setUpTestData(cls):
-        get_default_owner()
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
-        editors = Group.objects.get(name='editors')
-        member.groups.add(editors)
-
-    def setUp(self):
-        self.owner = get_default_owner()
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
-        self.source = Source.objects.create(
-            owner=self.owner
+        cls.outsider = User.objects.create(username='outsider')
+        cls.source = Source.objects.create(
+            owner=get_default_owner(),
+            abbreviation='TS1',
+            type='article',
+            title='Test Source'
         )
 
     def test_get_http_200_ok_for_anonymous(self):
@@ -806,19 +851,19 @@ class SourceDetailViewTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class SourceModalDetailViewTestCase(TestCase):
+class SourceModalDetailViewTestCase(UserLoginTestCase):
+
+    outsider = None
+    source = None
 
     @classmethod
     def setUpTestData(cls):
-        get_default_owner()
-        User.objects.create(username='outsider')
-
-    def setUp(self):
-        self.owner = get_default_owner()
-        self.outsider = User.objects.get(username='outsider')
-        self.source = Source.objects.create(
-            owner=self.owner
+        cls.outsider = User.objects.create(username='outsider')
+        cls.source = Source.objects.create(
+            owner=get_default_owner(),
+            abbreviation='TS1',
+            type='article',
+            title='Test Source'
         )
 
     def test_get_http_200_ok_for_anonymous(self):
@@ -831,28 +876,33 @@ class SourceModalDetailViewTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class SourceUpdateViewTestCase(TestCase):
+class SourceUpdateViewTestCase(UserLoginTestCase):
+
+    member = None
+    outsider = None
+    source = None
 
     @classmethod
     def setUpTestData(cls):
-        get_default_owner()
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
+        cls.outsider = User.objects.create(username='outsider')
+        cls.member = User.objects.create(username='member')
         editors = Group.objects.get(name='editors')
-        member.groups.add(editors)
-
-    def setUp(self):
-        self.owner = get_default_owner()
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
-        self.source = Source.objects.create(
-            owner=self.owner
+        cls.member.groups.add(editors)
+        cls.source = Source.objects.create(
+            owner=get_default_owner(),
+            abbreviation='TS1',
+            type='article',
+            title='Test Source'
         )
 
     def test_get_http_302_redirect_for_anonymous(self):
-        response = self.client.get(reverse('source-update', kwargs={'pk': self.source.pk}))
-        self.assertEqual(response.status_code, 302)
+        response = self.client.get(reverse('source-update', kwargs={'pk': self.source.pk}), follow=True)
+        self.assertRedirects(
+            response,
+            f"{reverse('auth_login')}?next={reverse('source-update', kwargs={'pk': self.source.pk})}",
+            status_code=302,
+            target_status_code=200
+        )
 
     def test_get_http_403_forbidden_for_outsiders(self):
         self.client.force_login(self.outsider)
@@ -865,8 +915,13 @@ class SourceUpdateViewTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_post_http_302_redirect_for_anonymous(self):
-        response = self.client.post(reverse('source-update', kwargs={'pk': self.source.pk}), data={})
-        self.assertEqual(response.status_code, 302)
+        response = self.client.post(reverse('source-update', kwargs={'pk': self.source.pk}), data={}, follow=True)
+        self.assertRedirects(
+            response,
+            f"{reverse('auth_login')}?next={reverse('source-update', kwargs={'pk': self.source.pk})}",
+            status_code=302,
+            target_status_code=200
+        )
 
     def test_post_http_403_forbidden_for_outsiders(self):
         self.client.force_login(self.outsider)
@@ -876,32 +931,39 @@ class SourceUpdateViewTestCase(TestCase):
         response = self.client.post(reverse('source-update', kwargs={'pk': self.source.pk}), data=data)
         self.assertEqual(response.status_code, 403)
 
-    def test_post_http_200_ok_for_members(self):
+    def test_post_success_and_http_302_redirect_for_members(self):
         self.client.force_login(self.member)
         data = {
-            'type': 'article'
+            'abbreviation': self.source.abbreviation,
+            'type': self.source.type,
+            'title': 'Updated Test Source'
         }
         response = self.client.post(reverse('source-update', kwargs={'pk': self.source.pk}), data=data)
-        self.assertEqual(response.status_code, 200)
+        self.assertRedirects(
+            response,
+            f"{reverse('source-detail', kwargs={'pk': self.source.pk})}",
+            status_code=302,
+            target_status_code=200
+        )
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class SourceModalUpdateViewTestCase(TestCase):
+class SourceModalUpdateViewTestCase(UserLoginTestCase):
+
+    member = None
+    outsider = None
+    source = None
 
     @classmethod
     def setUpTestData(cls):
-        get_default_owner()
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
+        cls.outsider = User.objects.create(username='outsider')
+        cls.member = User.objects.create(username='member')
         editors = Group.objects.get(name='editors')
-        member.groups.add(editors)
-
-    def setUp(self):
-        self.owner = get_default_owner()
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
-        self.source = Source.objects.create(
-            owner=self.owner
+        cls.member.groups.add(editors)
+        cls.source = Source.objects.create(
+            owner=get_default_owner(),
+            abbreviation='TS1',
+            type='article',
+            title='Test Source'
         )
 
     def test_get_http_302_redirect_for_anonymous(self):
@@ -924,38 +986,42 @@ class SourceModalUpdateViewTestCase(TestCase):
 
     def test_post_http_403_forbidden_for_outsiders(self):
         self.client.force_login(self.outsider)
-        data = {
-            'type': 'article'
-        }
-        response = self.client.post(reverse('source-update-modal', kwargs={'pk': self.source.pk}), data=data)
+        response = self.client.post(reverse('source-update-modal', kwargs={'pk': self.source.pk}), data={})
         self.assertEqual(response.status_code, 403)
 
-    def test_post_http_200_ok_for_members(self):
+    def test_post_success_and_http_302_redirect_for_members(self):
         self.client.force_login(self.member)
         data = {
-            'type': 'article'
+            'abbreviation': self.source.abbreviation,
+            'type': self.source.type,
+            'title': 'Updated Test Source'
         }
         response = self.client.post(reverse('source-update-modal', kwargs={'pk': self.source.pk}), data=data)
-        self.assertEqual(response.status_code, 200)
+        self.assertRedirects(
+            response,
+            f"{reverse('source-detail', kwargs={'pk': self.source.pk})}",
+            status_code=302,
+            target_status_code=200
+        )
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class SourceModalDeleteViewTestCase(TestCase):
+class SourceModalDeleteViewTestCase(UserLoginTestCase):
+
+    outsider = None
+    member = None
+    source = None
 
     @classmethod
     def setUpTestData(cls):
-        get_default_owner()
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
+        cls.outsider = User.objects.create(username='outsider')
+        cls.member = User.objects.create(username='member')
         editors = Group.objects.get(name='editors')
-        member.groups.add(editors)
-
-    def setUp(self):
-        self.owner = get_default_owner()
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
-        self.source = Source.objects.create(
-            owner=self.owner
+        cls.member.groups.add(editors)
+        cls.source = Source.objects.create(
+            owner=get_default_owner(),
+            abbreviation='TS1',
+            type='article',
+            title='Test Source'
         )
 
     def test_get_http_302_redirect_for_anonymous(self):
@@ -986,34 +1052,42 @@ class SourceModalDeleteViewTestCase(TestCase):
         response = self.client.post(reverse('source-delete-modal', kwargs={'pk': self.source.pk}))
         with self.assertRaises(Source.DoesNotExist):
             Source.objects.get(pk=self.source.pk)
-        self.assertEqual(response.status_code, 302)
+        self.assertRedirects(
+            response,
+            f"{reverse('source-list')}",
+            status_code=302,
+            target_status_code=200
+        )
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class CheckSourceUrlViewTestCase(TestCase):
+
+class CheckSourceUrlViewTestCase(UserLoginTestCase):
+
+    outsider = None
+    member = None
+    source = None
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
+        cls.outsider = User.objects.create(username='outsider')
+        cls.member = User.objects.create(username='member')
         editors = Group.objects.get(name='editors')
-        member.groups.add(editors)
-        Source.objects.create(
-            owner=owner,
+        cls.member.groups.add(editors)
+        cls.source = Source.objects.create(
+            owner=get_default_owner(),
             title='Test Source from the Web',
             abbreviation='WORKING',
             url='https://httpbin.org/status/200'
         )
 
-    def setUp(self):
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
-        self.source = Source.objects.get(abbreviation='WORKING')
-
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         request_url = reverse('source-check-url', kwargs={'pk': self.source.pk})
         response = self.client.get(request_url, follow=True)
-        self.assertRedirects(response, f"{reverse('auth_login')}?next={request_url}", status_code=302)
+        self.assertRedirects(
+            response,
+            f"{reverse('auth_login')}?next={reverse('source-check-url', kwargs={'pk': self.source.pk})}",
+            status_code=302,
+            target_status_code=200
+        )
 
     def test_get_http_403_forbidden_for_outsiders(self):
         self.client.force_login(self.outsider)
@@ -1026,16 +1100,18 @@ class CheckSourceUrlViewTestCase(TestCase):
         self.assertEqual(200, response.status_code)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class SourceListCheckUrlsViewTestCase(TestCase):
+class SourceListCheckUrlsViewTestCase(UserLoginTestCase):
+
+    outsider = None
+    member = None
 
     @classmethod
     def setUpTestData(cls):
         owner = get_default_owner()
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
+        cls.outsider = User.objects.create(username='outsider')
+        cls.member = User.objects.create(username='member')
         editors = Group.objects.get(name='editors')
-        member.groups.add(editors)
+        cls.member.groups.add(editors)
         Source.objects.create(
             owner=owner,
             title='Test Source from the Web',
@@ -1054,10 +1130,6 @@ class SourceListCheckUrlsViewTestCase(TestCase):
             abbreviation='NOTWORKING',
             url='https://httpbin.org/status/404'
         )
-
-    def setUp(self):
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         request_url = f"{reverse('source-list-check-urls')}?url_valid=False"

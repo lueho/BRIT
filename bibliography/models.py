@@ -20,7 +20,7 @@ class Author(CRUDUrlsMixin, OwnedObjectModel):
 
 
 class Licence(NamedUserObjectModel):
-    reference_url = models.URLField()
+    reference_url = models.URLField(null=True, blank=True)
 
     def __str__(self):
         return self.name
@@ -39,11 +39,11 @@ class Source(CRUDUrlsMixin, OwnedObjectModel):
     type = models.CharField(max_length=255, choices=SOURCE_TYPES, default='custom')
     authors = models.ManyToManyField(Author, related_name='sources')
     publisher = models.CharField(max_length=127, blank=True, null=True)
-    title = models.CharField(max_length=500, null=True)
+    title = models.CharField(max_length=500)
     journal = models.CharField(max_length=500, blank=True, null=True)
     issue = models.CharField(max_length=255, blank=True, null=True)
-    year = models.IntegerField(null=True)
-    abbreviation = models.CharField(max_length=50, null=True)
+    year = models.IntegerField(blank=True, null=True)
+    abbreviation = models.CharField(max_length=50)
     abstract = models.TextField(blank=True, null=True)
     licence = models.ForeignKey(Licence, on_delete=models.PROTECT, blank=True, null=True)
     attributions = models.TextField(blank=True, null=True)

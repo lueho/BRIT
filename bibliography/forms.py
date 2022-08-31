@@ -1,6 +1,6 @@
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout
-from django.forms import DateInput, Form
+from django.forms import DateInput, Form, ModelMultipleChoiceField
 from brit.forms import CustomModalModelForm, OwnedObjectModelForm
 
 from .models import Author, Licence, Source
@@ -31,6 +31,8 @@ class LicenceModalModelForm(CustomModalModelForm):
 
 
 class SourceModelForm(OwnedObjectModelForm):
+    authors = ModelMultipleChoiceField(queryset=Author.objects.all(), required=False)
+
     class Meta:
         model = Source
         fields = (
@@ -43,9 +45,18 @@ class SourceModelForm(OwnedObjectModelForm):
 
 
 class SourceModalModelForm(CustomModalModelForm):
+    authors = ModelMultipleChoiceField(queryset=Author.objects.all(), required=False)
+
     class Meta:
         model = Source
-        fields = '__all__'
+        fields = (
+            'abbreviation', 'authors', 'publisher', 'title', 'type', 'journal', 'issue', 'year', 'licence',
+            'attributions',
+            'url', 'url_valid', 'url_checked', 'doi', 'last_accessed')
+        widgets = {
+            'url_checked': DateInput(attrs={'type': 'date'}),
+            'last_accessed': DateInput(attrs={'type': 'date'})
+        }
 
 
 class SourceFilterFormHelper(FormHelper):
