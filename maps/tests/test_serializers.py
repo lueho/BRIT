@@ -34,6 +34,7 @@ class NutsRegionSummarySerializerTestCase(TestCase):
             date=datetime.date(2019, 1, 1)
         )
         Attribute.objects.get_or_create(owner=owner, name='Urban rural remoteness', unit='')
+        Attribute.objects.create(owner=owner, name='Population', unit='')
 
     def setUp(self):
         self.owner = get_default_owner()
@@ -44,6 +45,23 @@ class NutsRegionSummarySerializerTestCase(TestCase):
         data = NutsRegionSummarySerializer(self.region).data
         self.assertIn('nuts_id', data)
         self.assertIn('name', data)
+
+    def test_population_method_field_returns_value_as_integer(self):
+        RegionAttributeValue.objects.create(
+            owner=self.owner,
+            attribute=Attribute.objects.get(name='Population'),
+            region=self.region,
+            value=123321,
+            date=datetime.date(2021, 12, 31)
+        )
+        data = NutsRegionSummarySerializer(self.region).data
+        self.assertIn('population', data)
+        self.assertTrue(type(data['population'] == int))
+
+    def test_population_method_field_returns_non_for_non_existing(self):
+        data = NutsRegionSummarySerializer(self.region).data
+        self.assertIn('population', data)
+        self.assertFalse(data['population'])
 
     def test_population_density_method_field_returns_newest_value(self):
         data = NutsRegionSummarySerializer(self.region).data

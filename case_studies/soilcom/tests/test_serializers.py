@@ -3,7 +3,7 @@ from django.db import models
 from django.test import TestCase
 from rest_framework.serializers import ModelSerializer, Serializer, CharField, IntegerField
 
-from maps.models import Catchment, NutsRegion, LauRegion
+from maps.models import Attribute, RegionAttributeValue, Catchment, NutsRegion, LauRegion
 from maps.serializers import FieldLabelMixin
 from materials.models import MaterialCategory
 
@@ -190,6 +190,10 @@ class CollectionFlatSerializerTestCase(TestCase):
         frequency = CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
 
         nutsregion = NutsRegion.objects.create(owner=owner, name='Hamburg', cntr_code='DE', nuts_id='DE600')
+        population = Attribute.objects.create(owner=owner, name='Population', unit='')
+        population_density = Attribute.objects.create(owner=owner, name='Population density', unit='1/km')
+        RegionAttributeValue(owner=owner, region=nutsregion, attribute=population, value=123321)
+        RegionAttributeValue(owner=owner, region=nutsregion, attribute=population_density, value=123.5)
         catchment1 = Catchment.objects.create(owner=owner, name='Test Catchment', region=nutsregion.region_ptr)
         collection1 = Collection.objects.create(
             owner=owner,
@@ -234,8 +238,9 @@ class CollectionFlatSerializerTestCase(TestCase):
     def test_serializer_data_contains_all_fields(self):
         serializer = CollectionFlatSerializer(self.collection_nuts)
         keys = {'catchment', 'nuts_or_lau_id', 'collector', 'collection_system', 'country', 'waste_category',
-                'allowed_materials', 'connection_rate', 'connection_rate_year', 'frequency', 'comments', 'sources',
-                'created_by', 'created_at', 'lastmodified_by', 'lastmodified_at'}
+                'allowed_materials', 'connection_rate', 'connection_rate_year', 'frequency', 'population',
+                'population_density', 'comments', 'sources', 'created_by', 'created_at', 'lastmodified_by',
+                'lastmodified_at'}
         self.assertSetEqual(keys, set(serializer.data.keys()))
 
     def test_serializer_gets_information_from_foreign_keys_correctly(self):

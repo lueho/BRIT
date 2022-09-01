@@ -134,12 +134,22 @@ class NutsRegionCatchmentOptionSerializer(ModelSerializer):
 
 class NutsRegionSummarySerializer(FieldLabelModelSerializer):
     name = CharField(source='name_latn')
+    population = SerializerMethodField()
     population_density = SerializerMethodField()
     urban_rural_remoteness = SerializerMethodField()
 
     class Meta:
         model = NutsRegion
-        fields = ('nuts_id', 'name', 'population_density', 'urban_rural_remoteness')
+        fields = ('nuts_id', 'name', 'population', 'population_density', 'urban_rural_remoteness')
+
+    @staticmethod
+    def get_population(obj):
+        qs = obj.regionattributevalue_set.filter(attribute__name='Population').order_by('-date')
+        if qs.exists():
+            pop = qs[0]
+            return f'{int(pop.value)} ({pop.date.year})'
+        else:
+            return None
 
     @staticmethod
     def get_population_density(obj):

@@ -70,8 +70,9 @@ class CollectionCSVRendererTestCase(TestCase):
         self.file.seek(0)
         reader = csv.DictReader(codecs.getreader('utf-8')(self.file), delimiter='\t')
         fieldnames = ['Catchment', 'Country', 'NUTS/LAU Id', 'Collector', 'Collection System', 'Waste Category',
-                      'Allowed Materials', 'Connection Rate', 'Connection Rate Year', 'Frequency', 'Comments',
-                      'Sources', 'Created by', 'Created at', 'Last modified by', 'Last modified at']
+                      'Allowed Materials', 'Connection Rate', 'Connection Rate Year', 'Frequency', 'Population',
+                      'Population Density', 'Comments', 'Sources', 'Created by', 'Created at', 'Last modified by',
+                      'Last modified at']
         self.assertListEqual(fieldnames, list(reader.fieldnames))
         self.assertEqual(2, sum(1 for _ in reader))
 
@@ -158,6 +159,8 @@ class CollectionXLSXRendererTestCase(TestCase):
             'connection_rate': 'Connection Rate',
             'connection_rate_year': 'Connection Rate Year',
             'frequency': 'Frequency',
+            'population': 'Population',
+            'population_density': 'Population Density',
             'comments': 'Comments',
             'sources': 'Sources',
             'created_by': 'Created by',

@@ -92,6 +92,8 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
     connection_rate = serializers.StringRelatedField(label='Connection Rate')
     connection_rate_year = serializers.StringRelatedField(label='Connection Rate Year')
     frequency = serializers.StringRelatedField(label='Frequency')
+    population = serializers.SerializerMethodField()
+    population_density = serializers.SerializerMethodField()
     comments = serializers.SerializerMethodField(source='description', label='Comments')
     sources = serializers.SerializerMethodField(label='Sources')
     created_by = serializers.StringRelatedField(source='created_by.username', label='Created by')
@@ -100,13 +102,33 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = models.Collection
-        fields = ('catchment', 'nuts_or_lau_id', 'country', 'collector', 'collection_system',  'waste_category',
-                  'allowed_materials', 'connection_rate', 'connection_rate_year', 'frequency', 'comments', 'sources',
-                  'created_by', 'created_at', 'lastmodified_by', 'lastmodified_at')
+        fields = ('catchment', 'nuts_or_lau_id', 'country', 'collector', 'collection_system', 'waste_category',
+                  'allowed_materials', 'connection_rate', 'connection_rate_year', 'frequency', 'population',
+                  'population_density', 'comments', 'sources', 'created_by', 'created_at', 'lastmodified_by',
+                  'lastmodified_at')
 
     @staticmethod
     def get_allowed_materials(obj):
         return ', '.join([m.name for m in obj.waste_stream.allowed_materials.all() if m.name])
+
+    @staticmethod
+    def get_population(obj):
+        qs = obj.catchment.region.regionattributevalue_set.filter(attribute__name='Population').order_by('-date')
+        if qs.exists():
+            pop = qs[0]
+            return int(pop.value)
+        else:
+            return None
+
+    @staticmethod
+    def get_population_density(obj):
+        qs = obj.catchment.region.regionattributevalue_set.filter(attribute__name='Population density').order_by(
+            '-date')
+        if qs.exists():
+            pd = qs[0]
+            return pd.value
+        else:
+            return None
 
     @staticmethod
     def get_sources(obj):
