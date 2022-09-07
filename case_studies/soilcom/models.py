@@ -13,6 +13,7 @@ from materials.models import Material, MaterialCategory, SampleSeries
 
 class Collector(NamedUserObjectModel):
     website = models.URLField(max_length=511, blank=True, null=True)
+    catchment = models.ForeignKey(Catchment, blank=True, null=True, on_delete=models.CASCADE)
 
     class Meta:
         verbose_name = 'Waste Collector'
