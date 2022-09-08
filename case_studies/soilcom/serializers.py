@@ -113,11 +113,13 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
 
     @staticmethod
     def get_population(obj):
-        qs = obj.catchment.region.regionattributevalue_set.filter(attribute__name='Population').order_by('-date')
-        if qs.exists():
-            pop = qs[0]
-            return int(pop.value)
-        else:
+        try:
+            qs = obj.catchment.region.regionattributevalue_set.filter(attribute__name='Population').order_by('-date')
+            if qs.exists():
+                return int(qs[0].value)
+            else:
+                return None
+        except AttributeError:
             return None
 
     @staticmethod

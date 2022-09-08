@@ -6,7 +6,7 @@ from mock import patch, Mock
 from django.http.request import QueryDict, MultiValueDict
 from django.urls import reverse
 
-from maps.models import Catchment
+from maps.models import Catchment, Region
 from users.models import get_default_owner
 
 from ..models import (Collection, CollectionSystem, CollectionFrequency, Collector, MaterialCategory, WasteCategory,
@@ -43,11 +43,13 @@ class ExportCollectionToFileTestCase(TestCase):
             url='https://www.test-flyer.org'
         )
         frequency = CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
+        region = Region.objects.create(owner=owner, name='Test Region')
+        catchment = Catchment.objects.create(owner=owner, name='Test catchment', region=region)
         for i in range(1, 3):
             collection = Collection.objects.create(
                 owner=owner,
                 name=f'collection{i}',
-                catchment=Catchment.objects.create(owner=owner, name='Test catchment'),
+                catchment=catchment,
                 collector=Collector.objects.create(owner=owner, name=f'collector{i}'),
                 collection_system=CollectionSystem.objects.create(owner=owner, name='Test system'),
                 waste_stream=waste_stream,
