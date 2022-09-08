@@ -26,7 +26,7 @@ class CollectionFilter(FilterSet):
                                   widget=autocomplete.ModelSelect2(url='catchment-autocomplete'))
     collector = ModelChoiceFilter(queryset=Collector.objects.all(),
                                   widget=autocomplete.ModelSelect2(url='collector-autocomplete'))
-    country = ChoiceFilter(choices=COUNTRY_CHOICES, label='Country', method='filter_by_country')
+    country = ChoiceFilter(choices=COUNTRY_CHOICES, field_name='catchment__region__country', label='Country')
     waste_category = ModelMultipleChoiceFilter(queryset=WasteCategory.objects.all(),
                                                field_name='waste_stream__category',
                                                label='Waste categories',
@@ -40,12 +40,6 @@ class CollectionFilter(FilterSet):
         model = Collection
         fields = ('catchment', 'collector', 'collection_system', 'country', 'waste_category', 'allowed_materials')
         form = CollectionFilterForm
-
-    def filter_by_country(self, qs, name, value):
-        qs = qs.filter(
-            Q(catchment__region__nutsregion__cntr_code=value) |
-            Q(catchment__region__lauregion__cntr_code=value))
-        return qs
 
 
 class WasteFlyerFilter(FilterSet):
