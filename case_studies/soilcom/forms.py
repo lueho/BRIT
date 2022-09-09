@@ -2,8 +2,7 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Column, Field, Layout, Row, Submit
 from dal import autocomplete
 from django import forms
-from django.forms import BaseModelFormSet, BaseFormSet
-from extra_views import InlineFormSetFactory
+from django.forms import BaseFormSet, Form
 
 from bibliography.models import Source
 from brit.forms import CustomModelForm, CustomModalModelForm
@@ -13,15 +12,53 @@ from . import models
 
 
 class CollectorModelForm(CustomModelForm):
+
+    catchment = forms.ModelChoiceField(
+        queryset=models.Catchment.objects.all(),
+        widget=autocomplete.ModelSelect2(url='catchment-autocomplete'),
+        required=False
+    )
+
     class Meta:
         model = models.Collector
-        fields = ('name', 'website', 'description')
+        fields = ('name', 'website', 'catchment', 'description')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['catchment'].widget.attrs = {'data-theme': 'bootstrap4'}
 
 
 class CollectorModalModelForm(CustomModalModelForm):
+
+    catchment = forms.ModelChoiceField(
+        queryset=models.Catchment.objects.all(),
+        widget=autocomplete.ModelSelect2(url='catchment-autocomplete'),
+        required=False
+    )
+
     class Meta:
         model = models.Collector
-        fields = ('name', 'website', 'description')
+        fields = ('name', 'website', 'catchment', 'description')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['catchment'].widget.attrs = {'data-theme': 'bootstrap4'}
+
+class CollectorFilterFormHelper(FormHelper):
+    form_tag = False
+    include_media = False
+    layout = Layout(
+        'name',
+        'catchment',
+    )
+
+class CollectorFilterForm(Form):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = CollectorFilterFormHelper()
+        self.fields['name'].widget.attrs = {'data-theme': 'bootstrap4'}
+        self.fields['catchment'].widget.attrs = {'data-theme': 'bootstrap4'}
 
 
 class CollectionSystemModelForm(CustomModelForm):

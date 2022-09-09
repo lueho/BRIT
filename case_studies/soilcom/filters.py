@@ -1,15 +1,25 @@
 from dal import autocomplete
-from django.db.models import Q
 from django.forms import CheckboxSelectMultiple, RadioSelect, DateInput
 from django_filters import (BooleanFilter,
+                            CharFilter,
                             ChoiceFilter,
                             DateFilter,
                             FilterSet,
                             ModelChoiceFilter,
                             ModelMultipleChoiceFilter, )
 
-from .forms import CollectionFilterForm, FlyerFilterForm
+from .forms import CollectionFilterForm, CollectorFilterForm, FlyerFilterForm
 from .models import Catchment, Collection, Collector, WasteCategory, WasteComponent, WasteFlyer
+
+
+class CollectorFilter(FilterSet):
+    name = CharFilter(lookup_expr='icontains')
+    catchment = CharFilter(lookup_expr='catchment__name__icontains')
+
+    class Meta:
+        model = Collector
+        fields = ('name', 'catchment')
+        form = CollectorFilterForm
 
 COUNTRY_CHOICES = (
     ('BE', 'BE'),

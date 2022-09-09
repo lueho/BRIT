@@ -49,9 +49,21 @@ class CollectionHomeView(PermissionRequiredMixin, TemplateView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 class CollectorListView(views.OwnedObjectListView):
-    template_name = 'simple_list_card.html'
     model = models.Collector
-    permission_required = 'soilcom.view_collector'
+    queryset = models.Collector.objects.order_by('name')
+    filterset_class = filters.CollectorFilter
+    filterset = None
+    permission_required = set()
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        self.filterset = self.filterset_class(self.request.GET, queryset=queryset)
+        return self.filterset.qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['filter'] = self.filterset
+        return context
 
 
 class CollectorCreateView(views.OwnedObjectCreateView):

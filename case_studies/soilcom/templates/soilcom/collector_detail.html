@@ -6,6 +6,9 @@
         <strong>Website:</strong><br>
         <a href="{{ object.website }}" target="blank">{{ object.website }}</a>
     </p>
+    {% if object.catchment %}
+        <p class="card-text"><strong>Catchment:</strong><br>{{ object.catchment }}</p>
+    {% endif %}
     {% if object.comments %}
         <p class="card-text"><strong>Comments:</strong><br>{{ object.description }}</p>
     {% endif %}

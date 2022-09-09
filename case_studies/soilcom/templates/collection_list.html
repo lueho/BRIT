@@ -42,6 +42,12 @@
             <span>Add new collection</span>
         </a>
     {% endif %}
+    {% if 'soilcom.change_collection' in perms %}
+        <a class="mr-2 text-nowrap" href="{% url 'waste-collection-home' %}">
+            <i class="fas fa-fw fa-cog"></i>
+            <span>Dashboard</span>
+        </a>
+    {% endif %}
     {% if user.is_authenticated %}
         <span id="export_csv" class="text-nowrap" style="display: inline-block; width: 10em">
             <a href="javascript:void(0)" onclick="export_to_file('csv')">
