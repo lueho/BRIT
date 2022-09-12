@@ -212,3 +212,33 @@ class Collection(NamedUserObjectModel):
     @property
     def connection_rate_string_representation(self):
         return f'{self.connection_rate * 100}\u00A0%'
+
+    def construct_name(self):
+        catchment = self.catchment.name if self.catchment else 'Unknown catchment'
+        system = self.collection_system.name if self.collection_system else 'Unknown collection system'
+        category = 'Unknown waste category'
+        if self.waste_stream:
+            if self.waste_stream.category:
+                category = self.waste_stream.category.name
+        return f'{catchment} {category} {system}'
+
+    def __str__(self):
+        return self.construct_name()
+
+
+@receiver(pre_save, sender=Collection)
+def name_collection(sender, instance, **kwargs):
+    instance.name = instance.construct_name()
+
+
+@receiver(post_save, sender=WasteStream)
+@receiver(post_save, sender=WasteCategory)
+@receiver(post_save, sender=CollectionSystem)
+@receiver(post_save, sender=Catchment)
+def update_collection_names(sender, instance, created, **kwargs):
+    if sender == WasteCategory:
+        collections = Collection.objects.filter(waste_stream__category=instance)
+    else:
+        collections = instance.collection_set.all()
+    for collection in collections:
+        collection.save()

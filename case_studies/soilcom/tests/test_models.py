@@ -2,8 +2,11 @@ from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 
-from case_studies.soilcom.models import WasteStream, WasteCategory, WasteFlyer
+from maps.models import Catchment
 from materials.models import Material
+from users.models import get_default_owner
+
+from ..models import Collection, CollectionSystem, WasteStream, WasteCategory, WasteFlyer
 
 
 def comparable_model_dict(instance):
@@ -211,3 +214,57 @@ class WasteFlyerTestCase(TestCase):
     def test_str_returns_url(self):
         flyer = WasteFlyer.objects.get(abbreviation='WasteFlyer007')
         self.assertEqual(flyer.__str__(), 'https://www.super-test-flyer.org')
+
+
+class CollectionTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        collection_system = CollectionSystem.objects.create(owner=get_default_owner(), name='System')
+        catchment = Catchment.objects.create(owner=get_default_owner(), name='Catchment')
+        category = WasteCategory.objects.create(owner=get_default_owner(), name='Category')
+        waste_stream = WasteStream.objects.create(owner=get_default_owner(), category=category)
+        cls.collection = Collection.objects.create(
+            owner=get_default_owner(),
+            catchment=catchment,
+            collection_system=collection_system,
+            waste_stream=waste_stream
+        )
+
+    def test_collection_is_named_automatically_on_creation(self):
+        self.assertEqual('Catchment Category System', self.collection.name)
+
+    def test_collection_name_is_updated_on_model_update(self):
+        self.collection.collection_system = CollectionSystem.objects.create(owner=get_default_owner(), name='New System')
+        self.collection.save()
+        self.assertEqual('Catchment Category New System', self.collection.name)
+
+    def test_collection_name_is_updated_when_collection_system_model_is_changed(self):
+        system = CollectionSystem.objects.get(name='System')
+        system.name = 'Updated System'
+        system.save()
+        self.collection.refresh_from_db()
+        self.assertEqual('Catchment Category Updated System', self.collection.name)
+
+    def test_collection_name_is_updated_when_waste_stream_model_is_changed(self):
+        waste_stream = WasteStream.objects.get(category__name='Category')
+        category = WasteCategory.objects.create(owner=get_default_owner(), name='New Category')
+        waste_stream.category = category
+        waste_stream.save()
+        self.collection.refresh_from_db()
+        self.assertEqual('Catchment New Category System', self.collection.name)
+
+    def test_collection_name_is_updated_when_waste_category_model_is_changed(self):
+        category = WasteCategory.objects.get(name='Category')
+        category.name = 'Updated Category'
+        category.save()
+        self.collection.refresh_from_db()
+        self.assertEqual('Catchment Updated Category System', self.collection.name)
+
+    def test_collection_name_is_updated_when_catchment_model_is_changed(self):
+        catchment = Catchment.objects.get(name='Catchment')
+        catchment.name = 'Updated Catchment'
+        catchment.save()
+        self.collection.refresh_from_db()
+        self.assertEqual('Updated Catchment Category System', self.collection.name)
+
