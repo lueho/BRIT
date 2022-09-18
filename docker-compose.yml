@@ -6,7 +6,7 @@ services:
     ports:
       - "5433:5432"
     volumes:
-      - brit_db/:/var/lib/postgresql/data/
+      - brit_db:/var/lib/postgresql/data/
     env_file:
       - brit/settings/.env
   web:
