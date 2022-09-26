@@ -1,0 +1,35 @@
+{% extends 'simple_list_card.html' %}
+
+{% block title %}BRIT | Materials | List{% endblock %}
+
+{% block card_body %}
+    <table class="table">
+        <thead>
+        <tr>
+            <th>Material</th>
+            <th>Categories</th>
+            <th>Description</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for object in object_list %}
+            <tr>
+                <td><a href="{% url 'material-detail' object.pk %}">{{ object.name }}</a></td>
+                <td>
+                    {% for category in object.categories.all %}
+                        <a href="{% url 'materialcategory-detail' category.pk %}">{{ category }}</a>
+                        {% if not forloop.last %},{% endif %}
+                    {% endfor %}
+                </td>
+                <td>{{ object.description }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+{% endblock card_body %}
+
+{% block card_footer %}
+    {% if 'materials.add_material' in perms %}
+        <a href="{% url 'material-create' %}"><i class="fas fa-fw fa-plus"></i> new material</a>
+    {% endif %}
+{% endblock card_footer %}

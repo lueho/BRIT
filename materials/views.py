@@ -1,5 +1,6 @@
 from bootstrap_modal_forms.generic import BSModalFormView, BSModalReadView, BSModalUpdateView, BSModalDeleteView
 from crispy_forms.helper import FormHelper
+from dal import autocomplete
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db.models import Q
@@ -11,6 +12,7 @@ from extra_views import UpdateWithInlinesView
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
 from brit.views import (
+    BRITFilterView,
     OwnedObjectListView,
     OwnedObjectCreateView,
     OwnedObjectModalCreateView,
@@ -25,7 +27,7 @@ from brit.views import (
 from distributions.models import TemporalDistribution
 from distributions.plots import DoughnutChart
 from . import forms
-from .filters import CompositionFilterSet, MaterialFilterSet, SampleFilterSet, SampleSeriesFilterSet
+from .filters import CompositionFilterSet, MaterialFilterSet, SampleFilter, SampleFilterSet, SampleSeriesFilterSet
 from .forms import (
     AddComponentModalForm,
     AddCompositionModalForm,
@@ -114,8 +116,8 @@ class MaterialCategoryModalDeleteView(OwnedObjectModalDeleteView):
 
 
 class MaterialListView(OwnedObjectListView):
-    template_name = 'simple_list_card.html'
     model = Material
+    queryset = Material.objects.filter(type='material')
     permission_required = set()
 
 
@@ -163,6 +165,19 @@ class MaterialModalDeleteView(OwnedObjectModalDeleteView):
     success_message = 'Successfully deleted.'
     success_url = reverse_lazy('material-list')
     permission_required = 'materials.delete_material'
+
+
+# ----------- Material Utils -------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class MaterialAutocompleteView(autocomplete.Select2QuerySetView):
+    def get_queryset(self):
+        qs = Material.objects.filter(type='material').order_by('id')
+        if self.q:
+            qs = qs.filter(name__icontains=self.q)
+        return qs
+
 
 
 # ----------- Material Components CRUD ---------------------------------------------------------------------------------
@@ -434,9 +449,10 @@ class SampleSeriesModalCreateDuplicateView(OwnedObjectModalUpdateView):
 # ----------- Sample CRUD ----------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class SampleListView(OwnedObjectListView):
-    template_name = 'simple_list_card.html'
+class SampleListView(BRITFilterView):
     model = Sample
+    filterset_class = SampleFilter
+    ordering = 'id'
     permission_required = set()
 
 

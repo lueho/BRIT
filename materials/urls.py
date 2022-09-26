@@ -13,6 +13,7 @@ urlpatterns = [
     path('<int:pk>/update/', views.MaterialUpdateView.as_view(), name='material-update'),
     path('<int:pk>/update/modal/', views.MaterialModalUpdateView.as_view(), name='material-update-modal'),
     path('<int:pk>/delete/', views.MaterialModalDeleteView.as_view(), name='material-delete-modal'),
+    path('catchments/autocomplete/', views.MaterialAutocompleteView.as_view(), name='material-autocomplete'),
     path('sample_series/', views.SampleSeriesListView.as_view(), name='sampleseries-list'),
     path('sample_series/featured', views.FeaturedMaterialListView.as_view(), name='sampleseries-list-featured'),
     path('sample_series/create/', views.SampleSeriesCreateView.as_view(), name='sampleseries-create'),
