@@ -3,6 +3,8 @@ from django.contrib.auth.models import User, Group
 from django.db import models
 from django.urls import reverse, exceptions
 
+from users.models import get_default_owner
+
 
 class ReadableQueryset(models.QuerySet):
 
@@ -23,8 +25,12 @@ class AccessManager(models.Manager):
         return self.get_queryset().readable(user)
 
 
+def get_default_owner_pk():
+    return get_default_owner().pk
+
+
 class OwnedObjectModel(CommonInfo):
-    owner = models.ForeignKey(User, on_delete=models.PROTECT)
+    owner = models.ForeignKey(User, on_delete=models.PROTECT, default=get_default_owner_pk)
     visible_to_groups = models.ManyToManyField(Group)
 
     objects = AccessManager()

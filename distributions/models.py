@@ -1,6 +1,7 @@
 from django.contrib.auth.models import User
 from django.db import models
 
+from brit.models import NamedUserObjectModel
 from users.models import get_default_owner
 
 
@@ -9,14 +10,11 @@ class TemporalDistributionManager(models.Manager):
         return self.get_queryset().get(name='Average', owner=get_default_owner())
 
 
-class TemporalDistribution(models.Model):
+class TemporalDistribution(NamedUserObjectModel):
     """
     Model to organize timesteps into named distributions (e.g. months are timesteps of the temporal distribution 'months
     of the year').
     """
-    name = models.CharField(max_length=255, blank=True, null=True)
-    owner = models.ForeignKey(User, on_delete=models.CASCADE)
-    description = models.TextField(blank=True, null=True)
 
     objects = TemporalDistributionManager()
 
@@ -32,12 +30,10 @@ class TimestepManager(models.Manager):
         return self.get_queryset().get(name='Average', owner=get_default_owner())
 
 
-class Timestep(models.Model):
+class Timestep(NamedUserObjectModel):
     """
     Defines a timestep for organisation of seasonal distributions
     """
-    name = models.CharField(max_length=255, blank=True, null=True)
-    owner = models.ForeignKey(User, on_delete=models.CASCADE)
     distribution = models.ForeignKey(TemporalDistribution, on_delete=models.CASCADE)
 
     objects = TimestepManager()
