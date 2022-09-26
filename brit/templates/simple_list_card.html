@@ -8,26 +8,28 @@
             <div class="card shadow mb-3">
                 <div class="card-header"><b>{{ header }}</b></div>
                 <div class="card-body overflow-auto">
-                    <table class="table">
-                        <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Description</th>
-                        </tr>
-                        </thead>
-                        <tbody>
-                        {% for object in object_list %}
+                    {% block card_body %}
+                        <table class="table">
+                            <thead>
                             <tr>
-                                <td>
-                                    <a href="{{ object.get_absolute_url }}">{{ object.name }}</a>
-                                </td>
-                                <td>{{ object.description }}</td>
+                                <th>Name</th>
+                                <th>Description</th>
                             </tr>
-                        {% endfor %}
-                        </tbody>
-                        <tfoot>
-                        </tfoot>
-                    </table>
+                            </thead>
+                            <tbody>
+                            {% for object in object_list %}
+                                <tr>
+                                    <td>
+                                        <a href="{{ object.get_absolute_url }}">{{ object.name }}</a>
+                                    </td>
+                                    <td>{{ object.description }}</td>
+                                </tr>
+                            {% endfor %}
+                            </tbody>
+                            <tfoot>
+                            </tfoot>
+                        </table>
+                    {% endblock card_body %}
                     <div class="pagination">
                         <span class="step-links">
                             {% if page_obj.has_previous %}
@@ -48,9 +50,11 @@
                 </div>
 
                 <div class="card-footer">
-                    <a href="{{ create_url }}">
-                        <i class="fas fa-fw fa-plus"></i> {{ create_url_text }}
-                    </a>
+                    {% block card_footer %}
+                        <a href="{{ create_url }}">
+                            <i class="fas fa-fw fa-plus"></i> {{ create_url_text }}
+                        </a>
+                    {% endblock card_footer %}
                 </div>
             </div>
         </div>

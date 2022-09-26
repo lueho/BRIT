@@ -2,6 +2,7 @@ from bootstrap_modal_forms.forms import BSModalModelForm, BSModalForm
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Row, Field
 from django import forms
+from django.forms import Form
 from django.core.exceptions import ValidationError
 from django.forms.models import BaseInlineFormSet
 from django.utils.safestring import mark_safe
@@ -92,6 +93,22 @@ class MaterialPropertyValueModalModelForm(CustomModalModelForm):
     class Meta:
         model = MaterialPropertyValue
         fields = ('property', 'average', 'standard_deviation',)
+
+
+class SampleFilterFormHelper(FormHelper):
+    form_tag = False
+    include_media = False
+    layout = Layout(
+        'material',
+        'timestep'
+    )
+
+class SampleFilterForm(Form):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = SampleFilterFormHelper()
+        self.fields['material'].widget.attrs = {'data-theme': 'bootstrap4'}
 
 
 class SampleSeriesModelForm(CustomModelForm):

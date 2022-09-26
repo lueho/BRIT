@@ -275,6 +275,7 @@ class MaterialCategoryModalDeleteViewTestCase(ViewWithPermissionsTestCase):
 
 
 class MaterialListViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'add_material'
 
     def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse('material-list'))
@@ -285,6 +286,15 @@ class MaterialListViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('material-list'))
         self.assertEqual(response.status_code, 200)
 
+    def test_create_button_available_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('material-list'))
+        self.assertContains(response, reverse('material-create'))
+
+    def test_create_button_not_available_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('material-list'))
+        self.assertNotContains(response, reverse('material-create'))
 
 class MaterialCreateViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = 'add_material'

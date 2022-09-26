@@ -1,0 +1,60 @@
+{% extends 'filtered_list.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}BRIT | Materials | Samples{% endblock %}
+
+{% block list_header %}<strong>Samples</strong>{% endblock %}
+
+{% block list_body %}
+    <table class="table">
+        <thead>
+        <tr>
+            <th>Id</th>
+            <th>Sample Series</th>
+            <th>Material</th>
+            <th>Timestep</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for object in object_list %}
+            <tr>
+                <td><a href="{{ object.get_absolute_url }}">{{ object.id }}</a></td>
+                <td><a href="{% url 'sampleseries-detail' object.series.pk %}">{{ object.series.name }}</a></td>
+                <td>
+                    <a href="{% url 'material-detail' object.series.material.pk %}">
+                        {{ object.series.material.name }}
+                    </a>
+                </td>
+                <td>{{ object.timestep.name }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+        <tfoot>
+        </tfoot>
+    </table>
+{% endblock list_body %}
+
+{% block list_footer %}
+    {% if 'materials.add_sample' in perms %}
+        <a href="{% url 'sample-create' %}" class="nowrap">
+            <i class="fa fa-fw fa-plus"></i>
+            <span>Add new sample</span>
+        </a>
+    {% endif %}
+    {% if 'materials.change_sample' in perms %}
+        <a href="{% url 'material-dashboard' %}" class="ml-3 nowrap">
+            <i class="fas fa-fw fa-cog"></i> Dashboard
+        </a>
+    {% endif %}
+{% endblock list_footer %}
+
+{% block filter_body %}
+    <form method="get">
+        {% crispy filter.form %}
+        <button id="btn-filter" class="btn btn-primary" type="submit">Filter</button>
+    </form>
+{% endblock filter_body %}
+
+{% block javascript %}
+    {{ block.super }}
+{% endblock javascript %}

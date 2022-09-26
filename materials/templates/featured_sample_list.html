@@ -18,8 +18,11 @@
                     </p>
                 </div>
                 <div class="card-footer">
+                    <a href="{% url 'sample-list' %}" class="nowrap">
+                        <i class="fas fa-fw fa-list"></i> see as list
+                    </a>
                     {% if perms.materials %}
-                        <a href="{% url 'material-dashboard' %}">
+                        <a href="{% url 'material-dashboard' %}" class="nowrap ml-3">
                             <nobr><i class="fas fa-fw fa-cog"></i> Dashboard</nobr>
                         </a>
                     {% endif %}
