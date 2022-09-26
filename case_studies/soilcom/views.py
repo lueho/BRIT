@@ -15,29 +15,28 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
-from bibliography.views import (SourceListView,
-                                SourceCreateView,
+import case_studies.soilcom.tasks
+from bibliography.views import (SourceCreateView,
                                 SourceModalCreateView,
-                                SourceDetailView,
                                 SourceModalDetailView,
                                 SourceUpdateView,
                                 SourceModalUpdateView,
                                 SourceModalDeleteView,
-                                SourceCheckUrlView,
-                                SourceListCheckUrlsView)
+                                SourceCheckUrlView)
 from brit import views
+from brit.views import BRITFilterView
 from maps.forms import NutsAndLauCatchmentQueryForm
 from maps.models import Catchment, GeoDataset
 from maps.views import GeoDatasetDetailView, GeoDataSetMixin, GeoDataSetFormMixin
-from .filters import WasteFlyerFilter
 from . import filters
 from . import forms
 from . import models
 from . import serializers
+from .filters import CollectionFilter, CollectorFilter, WasteFlyerFilter
 from .models import Collection
+from .models import Collector, WasteFlyer
 from .serializers import CollectionFlatSerializer
 from .tasks import check_wasteflyer_urls
-import case_studies.soilcom.tasks
 
 
 class CollectionHomeView(PermissionRequiredMixin, TemplateView):
@@ -48,22 +47,11 @@ class CollectionHomeView(PermissionRequiredMixin, TemplateView):
 # ----------- Collector CRUD -------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class CollectorListView(views.OwnedObjectListView):
-    model = models.Collector
-    queryset = models.Collector.objects.order_by('name')
-    filterset_class = filters.CollectorFilter
-    filterset = None
-    permission_required = set()
 
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        self.filterset = self.filterset_class(self.request.GET, queryset=queryset)
-        return self.filterset.qs
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['filter'] = self.filterset
-        return context
+class CollectorListView(BRITFilterView):
+    model = Collector
+    filterset_class = CollectorFilter
+    ordering = 'name'
 
 
 class CollectorCreateView(views.OwnedObjectCreateView):
@@ -105,7 +93,7 @@ class CollectorModalUpdateView(views.OwnedObjectModalUpdateView):
     permission_required = 'soilcom.change_collector'
 
 
-class CollectorModalDeleteView(views.OwnedObjectDeleteView):
+class CollectorModalDeleteView(views.OwnedObjectModalDeleteView):
     template_name = 'modal_delete.html'
     model = models.Collector
     success_message = 'Successfully deleted.'
@@ -173,7 +161,7 @@ class CollectionSystemModalUpdateView(views.OwnedObjectModalUpdateView):
     permission_required = 'soilcom.change_collectionsystem'
 
 
-class CollectionSystemModalDeleteView(views.OwnedObjectDeleteView):
+class CollectionSystemModalDeleteView(views.OwnedObjectModalDeleteView):
     template_name = 'modal_delete.html'
     model = models.CollectionSystem
     success_message = 'Successfully deleted.'
@@ -230,7 +218,7 @@ class WasteCategoryModalUpdateView(views.OwnedObjectModalUpdateView):
     permission_required = 'soilcom.change_wastecategory'
 
 
-class WasteCategoryModalDeleteView(views.OwnedObjectDeleteView):
+class WasteCategoryModalDeleteView(views.OwnedObjectModalDeleteView):
     template_name = 'modal_delete.html'
     model = models.WasteCategory
     success_message = 'Successfully deleted.'
@@ -287,7 +275,7 @@ class WasteComponentModalUpdateView(views.OwnedObjectModalUpdateView):
     permission_required = 'soilcom.change_wastecomponent'
 
 
-class WasteComponentModalDeleteView(views.OwnedObjectDeleteView):
+class WasteComponentModalDeleteView(views.OwnedObjectModalDeleteView):
     template_name = 'modal_delete.html'
     model = models.WasteComponent
     success_message = 'Successfully deleted.'
@@ -344,7 +332,7 @@ class WasteStreamModalUpdateView(views.OwnedObjectModalUpdateView):
     permission_required = 'soilcom.change_wastestream'
 
 
-class WasteStreamModalDeleteView(views.OwnedObjectDeleteView):
+class WasteStreamModalDeleteView(views.OwnedObjectModalDeleteView):
     template_name = 'modal_delete.html'
     model = models.WasteStream
     success_message = 'Successfully deleted.'
@@ -355,22 +343,10 @@ class WasteStreamModalDeleteView(views.OwnedObjectDeleteView):
 # ----------- Waste Collection Flyer CRUD ------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class WasteFlyerListView(views.OwnedObjectListView):
-    model = models.WasteFlyer
-    queryset = models.WasteFlyer.objects.order_by('id')
+class WasteFlyerListView(BRITFilterView):
+    model = WasteFlyer
     filterset_class = WasteFlyerFilter
-    filterset = None
-    permission_required = 'soilcom.view_wasteflyer'
-
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        self.filterset = self.filterset_class(self.request.GET, queryset=queryset)
-        return self.filterset.qs
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['filter'] = self.filterset
-        return context
+    ordering = 'id'
 
 
 class WasteFlyerCreateView(SourceCreateView):
@@ -521,7 +497,7 @@ class FrequencyModalUpdateView(views.OwnedObjectModalUpdateView):
     permission_required = 'soilcom.change_collectionfrequency'
 
 
-class FrequencyModalDeleteView(views.OwnedObjectDeleteView):
+class FrequencyModalDeleteView(views.OwnedObjectModalDeleteView):
     template_name = 'modal_delete.html'
     model = models.CollectionFrequency
     success_message = 'Successfully deleted.'
@@ -532,23 +508,10 @@ class FrequencyModalDeleteView(views.OwnedObjectDeleteView):
 # ----------- Collection CRUD ------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class CollectionListView(views.OwnedObjectListView):
-    template_name = 'collection_list.html'
-    model = models.Collection
-    queryset = models.Collection.objects.order_by('id')
-    filterset_class = filters.CollectionFilter
-    filterset = None
-    permission_required = set()
-
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        self.filterset = self.filterset_class(self.request.GET, queryset=queryset)
-        return self.filterset.qs
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['filter'] = self.filterset
-        return context
+class CollectionListView(BRITFilterView):
+    model = Collection
+    filterset_class = CollectionFilter
+    ordering = 'id'
 
 
 class ModelFormAndModelFormSetMixin:
@@ -760,7 +723,7 @@ class WasteCategoryOptions(SelectNewlyCreatedObjectModelSelectOptionsView):
     permission_required = 'soilcom.view_wastecategory'
 
 
-class CollectionModalDeleteView(views.OwnedObjectDeleteView):
+class CollectionModalDeleteView(views.OwnedObjectModalDeleteView):
     template_name = 'modal_delete.html'
     model = models.Collection
     success_message = 'Successfully deleted.'

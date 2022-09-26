@@ -1,0 +1,63 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load leaflet_tags %}
+
+{% block title %}BRIT | Maps | Catchment: {{ object.name }}{% endblock %}
+
+{% block content %}
+
+    {% leaflet_js %}
+    {% leaflet_css %}
+
+    <div class="row">
+        <div class="col">
+            <div class="card shadow">
+                <div class="card-header"><strong>{{ object.name }}</strong></div>
+                <div class="card-img-top">{% leaflet_map "main" %}</div>
+                <div class="card-body">
+                    <p class="card-text"><strong>Name:</strong><br>{{ object.name }}</p>
+                    <p class="card-text"><strong>Type:</strong><br>{{ object.type }}</p>
+                    {% if object.description %}
+                        <p class="card-text"><strong>Description:</strong><br>{{ object.description }}</p>
+                    {% endif %}
+                </div>
+                <div class="card-footer">
+                    <a href="javascript:history.go(-1)" class="nowrap">
+                        <i class="fas fa-fw fa-arrow-left"></i> back
+                    </a>
+                    <a href="{% url 'catchment-list' %}" class="nowrap ml-3">
+                        <i class="fas fa-fw fa-list"></i> see all
+                    </a>
+                    {% if 'maps.change_catchment' in perms %}
+                        <a href="{% url 'catchment-update' object.pk %}" class="nowrap ml-3">
+                            <i class="fas fa-fw fa-edit"></i> edit
+                        </a>
+                    {% endif %}
+                    {% if 'maps.delete_catchment' in perms %}
+                        <a href="{% url 'catchment-delete-modal' object.pk %}" class="nowrap modal-link ml-3">
+                            <i class="fas fa-fw fa-trash"></i> delete
+                        </a>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+{% endblock content %}
+
+{% block javascript %}
+    {{ block.super }}
+    <script src="{% static 'js/maps.js' %}"></script>
+    {{ map_config|json_script:"mapConfig" }}
+    <script type="text/javascript">
+
+        function parseFilterParameters() {
+            const params = new URLSearchParams();
+            params.append('catchment', {{ object.pk }});
+            return params
+        }
+
+        const mapConfig = JSON.parse(document.getElementById("mapConfig").textContent);
+        window.onload = () => loadMap(mapConfig);
+    </script>
+{% endblock javascript %}

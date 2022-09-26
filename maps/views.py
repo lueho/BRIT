@@ -1,14 +1,15 @@
 from dal import autocomplete
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.mixins import PermissionRequiredMixin
 from django.db.models import Q
 from django.http import JsonResponse
-from django.urls import reverse, reverse_lazy
-from django.views.generic import CreateView, DetailView, ListView, UpdateView, TemplateView
+from django.urls import reverse_lazy
+from django.views.generic import DetailView, ListView, TemplateView
 from django.views.generic.edit import FormMixin
 from rest_framework.exceptions import ParseError, NotFound
 from rest_framework.views import APIView, Response
 
 from brit.views import (
+    BRITFilterView,
     OwnedObjectListView,
     OwnedObjectCreateView,
     OwnedObjectModalCreateView,
@@ -24,6 +25,7 @@ from maps.serializers import (
     NutsRegionCatchmentOptionSerializer, NutsRegionSummarySerializer, LauRegionOptionSerializer,
     LauRegionSummarySerializer,
     NutsRegionOptionSerializer)
+from .filters import CatchmentFilter
 from .forms import (
     AttributeModelForm,
     AttributeModalModelForm,
@@ -44,6 +46,47 @@ from .models import (
 )
 
 
+class MapMixin:
+    """
+    Provides functionality for the integration of maps with leaflet.
+    """
+    region_url = None
+    feature_url = None
+    load_region = True
+    load_features = True
+    adjust_bounds_to_features = True
+    marker_style = None
+    region_id = None
+
+    def get_marker_style(self):
+        if not self.marker_style:
+            self.marker_style = {}
+        return self.marker_style
+
+    def get_region_id(self):
+        return self.region_id
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'map_config': {
+                'region_url': self.region_url,
+                'feature_url': self.feature_url,
+                'load_features': self.load_features,
+                'adjust_bounds_to_features': self.adjust_bounds_to_features,
+                'region_id': self.get_region_id(),
+                'load_region': self.load_region,
+                'markerStyle': self.get_marker_style()
+            }
+        })
+        return context
+
+
+class MapsDashboardView(PermissionRequiredMixin, TemplateView):
+    template_name = 'maps_dashboard.html'
+    permission_required = 'maps.change_geodataset'
+
+
 class MapsListView(ListView):
     template_name = 'maps_list.html'
 
@@ -58,7 +101,7 @@ class MapsListView(ListView):
 class CatchmentBrowseView(FormMixin, TemplateView):
     model = Catchment
     form_class = CatchmentQueryForm
-    template_name = 'catchment_list.html'
+    template_name = 'catchment_map.html'
     region_url = reverse_lazy('ajax_region_geometries')
     feature_url = reverse_lazy('data.catchment-options')
     filter_class = None
@@ -109,35 +152,37 @@ class CatchmentBrowseView(FormMixin, TemplateView):
         return 3
 
 
-class CatchmentCreateView(LoginRequiredMixin, CreateView):
-    template_name = 'catchment_create.html'
+class CatchmentListView(BRITFilterView):
+    model = Catchment
+    filterset_class = CatchmentFilter
+    ordering = 'id'
+
+
+class CatchmentDetailView(MapMixin, DetailView):
+    model = Catchment
+    feature_url = reverse_lazy('ajax_catchment_geometries')
+    load_region = False
+    load_catchment = False
+
+
+class CatchmentCreateView(OwnedObjectCreateView):
+    template_name = 'simple_form_card.html'
     form_class = CatchmentModelForm
-    success_url = reverse_lazy('catchment_list')
-
-    def form_valid(self, form):
-        form.instance.owner = self.request.user
-        return super().form_valid(form)
+    permission_required = 'maps.add_catchment'
 
 
-class CatchmentUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
+class CatchmentUpdateView(OwnedObjectUpdateView):
+    template_name = 'simple_form_card.html'
     model = Catchment
     form_class = CatchmentModelForm
-
-    def get_success_url(self):
-        return reverse('catchment_list')
-
-    def test_func(self):
-        catchment = Catchment.objects.get(id=self.kwargs.get('pk'))
-        return self.request.user == catchment.owner
+    permission_required = 'maps.change_catchment'
 
 
 class CatchmentModalDeleteView(OwnedObjectModalDeleteView):
     model = Catchment
-    success_url = reverse_lazy('catchment_list')
-
-    def test_func(self):
-        catchment = Catchment.objects.get(id=self.kwargs.get('pk'))
-        return catchment.owner == self.request.user
+    success_url = reverse_lazy('catchment-list')
+    success_message = 'deletion successful'
+    permission_required = 'maps.delete_catchment'
 
 
 # ----------- Catchment utilities---------------------------------------------------------------------------------------
@@ -259,7 +304,6 @@ class GeoDatasetDetailView(GeoDataSetFormMixin, GeoDataSetMixin, DetailView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 class CatchmentGeometryAPI(APIView):
-
     authentication_classes = []
     permission_classes = []
 
@@ -294,7 +338,6 @@ class CatchmentGeometryAPI(APIView):
 
 
 class CatchmentOptionGeometryAPI(APIView):
-
     authentication_classes = []
     permission_classes = []
 
@@ -334,7 +377,6 @@ class RegionGeometryAPI(APIView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 class NutsRegionSummaryAPIView(APIView):
-
     authentication_classes = []
     permission_classes = []
 
@@ -370,7 +412,6 @@ class CatchmentRegionGeometryAPI(APIView):
 
 
 class CatchmentRegionSummaryAPIView(APIView):
-
     authentication_classes = []
     permission_classes = []
 
@@ -426,7 +467,6 @@ class NutsRegionMapView(GeoDatasetDetailView):
 
 
 class NutsRegionAPIView(APIView):
-
     authentication_classes = []
     permission_classes = []
 

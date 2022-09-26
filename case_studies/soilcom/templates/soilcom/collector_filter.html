@@ -1,0 +1,53 @@
+{% extends 'filtered_list.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}BRIT | Waste collecting entities{% endblock %}
+
+{% block list_header %}<strong>Collectors</strong>{% endblock %}
+
+{% block list_body %}
+    <table class="table">
+        <thead>
+        <tr>
+            <th>Name</th>
+            <th>Catchment</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for object in object_list %}
+            <tr>
+                <td><a href="{{ object.get_absolute_url }}">{{ object.name }}</a></td>
+                <td>{{ object.catchment }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+        <tfoot>
+        </tfoot>
+    </table>
+{% endblock list_body %}
+
+{% block list_footer %}
+    {% if 'soilcom.add_collector' in perms %}
+        <a class="mr-2 text-nowrap" href="{% url 'collector-create' %}?next={{ request.get_full_path|urlencode }}">
+            <i class="fa fa-fw fa-plus"></i>
+            <span>Add new collector</span>
+        </a>
+    {% endif %}
+    {% if 'soilcom.change_collector' in perms %}
+        <a class="mr-2 text-nowrap" href="{% url 'waste-collection-home' %}">
+            <i class="fas fa-fw fa-cog"></i>
+            <span>Dashboard</span>
+        </a>
+    {% endif %}
+{% endblock list_footer %}
+
+{% block filter_body %}
+    <form method="get">
+        {% crispy filter.form %}
+        <button id="btn-filter" class="btn btn-primary" type="submit">Filter</button>
+    </form>
+{% endblock filter_body %}
+
+{% block javascript %}
+    {{ block.super }}
+{% endblock javascript %}

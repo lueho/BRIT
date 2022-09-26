@@ -15,6 +15,7 @@ from users.models import get_default_owner
 class MaterialCategory(NamedUserObjectModel):
     pass
 
+
 class BaseMaterial(NamedUserObjectModel):
     """
     Base for all specialized models of material

@@ -107,7 +107,7 @@
                         <b>Options</b>
                     </div>
                     <div class="card-body collapse show" id="options-card-body">
-                        <a href="{% url 'catchment_definition' %}">
+                        <a href="{% url 'catchment-create' %}">
                             <i class="fas fa-fw fa-plus"></i> Create a new catchment
                         </a>
                         <a id="update-link" href="#" style="display: none;">
@@ -151,7 +151,7 @@
 
         function updateUrls(catchment_id) {
             let updateLink = document.getElementById("update-link");
-            updateLink.href = "{% url 'catchment_update' pk=0 %}".replace("0", catchment_id.toString());
+            updateLink.href = "{% url 'catchment-update' pk=0 %}".replace("0", catchment_id.toString());
             if (catchment_id === "") {
                 updateLink.style.display = "none";
             } else {
@@ -159,10 +159,10 @@
             }
 
             form = document.getElementById("delete-confirmation-form")
-            form.action = "{% url 'catchment_delete' pk=0%}".replace("0", catchment_id.toString());
+            form.action = "{% url 'catchment-delete-modal' pk=0%}".replace("0", catchment_id.toString());
 
             let deleteLink = document.getElementById("delete-link");
-            deleteLink.href = "{% url 'catchment_delete' pk=0 %}".replace("0", catchment_id.toString());
+            deleteLink.href = "{% url 'catchment-delete-modal' pk=0 %}".replace("0", catchment_id.toString());
             if (catchment_id === "") {
                 deleteLink.style.display = "none";
             } else {

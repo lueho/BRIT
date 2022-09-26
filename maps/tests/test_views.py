@@ -1,27 +1,190 @@
-from django.contrib.auth.models import Group, User, Permission
-from django.test import TestCase, modify_settings
+from django.conf import settings
+from django.test import TestCase
 from django.urls import reverse
 from rest_framework.test import APITestCase
 
-from users.models import get_default_owner
+from brit.tests.testcases import ViewWithPermissionsTestCase
 from ..models import Attribute, RegionAttributeValue, Catchment, LauRegion, NutsRegion, Region, GeoDataset
+
+
+class CatchmentListViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['add_catchment', 'change_catchment']
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.catchment = Catchment.objects.create(name='Test Catchment')
+
+    def test_get_http_200_ok_for_anonymous(self):
+        response = self.client.get(reverse('catchment-list'))
+        self.assertEqual(200, response.status_code)
+
+    def test_add_and_dashboard_button_not_available_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('catchment-list'))
+        self.assertNotContains(response, reverse('catchment-create'))
+        self.assertNotContains(response, reverse('maps-dashboard'))
+
+    def test_add_and_dashboard_button_available_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('catchment-list'))
+        self.assertContains(response, reverse('catchment-create'))
+        self.assertContains(response, reverse('maps-dashboard'))
+
+
+class CatchmentCreateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'add_catchment'
+
+    def test_get_http_302_redirect_to_login_for_anonymous(self):
+        url = reverse('catchment-create')
+        response = self.client.get(url, follow=True)
+        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
+
+    def test_get_http_403_forbidden_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('catchment-create'))
+        self.assertEqual(403, response.status_code)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('catchment-create'))
+        self.assertEqual(200, response.status_code)
+
+    def test_post_http_302_redirect_to_login_for_anonymous(self):
+        url = reverse('catchment-create')
+        response = self.client.post(url, data={}, follow=True)
+        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
+
+    def test_post_http_403_forbidden_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(reverse('catchment-create'))
+        self.assertEqual(403, response.status_code)
+
+    def test_post_success_and_http_302_redirect_to_success_url_for_member(self):
+        self.client.force_login(self.member)
+        data = {'name': 'Updated Test Catchment', 'type': 'custom'}
+        response = self.client.post(reverse('catchment-create'), data, follow=True)
+        self.assertRedirects(response, reverse('catchment-detail',
+                                               kwargs={'pk': list(response.context.get('messages'))[0].message}))
+
+
+class CatchmentDetailViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['change_catchment', 'delete_catchment']
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.catchment = Catchment.objects.create(name='Test Catchment')
+
+    def test_get_http_200_pk_for_anonymous(self):
+        response = self.client.get(reverse('catchment-detail', kwargs={'pk': self.catchment.pk}))
+        self.assertEqual(200, response.status_code)
+        self.assertTemplateUsed(response, 'maps/catchment_detail.html')
+
+    def test_edit_and_delete_button_not_available_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('catchment-detail', kwargs={'pk': self.catchment.pk}))
+        self.assertNotContains(response, reverse('catchment-update', kwargs={'pk': self.catchment.pk}))
+        self.assertNotContains(response, reverse('catchment-delete-modal', kwargs={'pk': self.catchment.pk}))
+
+    def test_edit_button_available_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('catchment-detail', kwargs={'pk': self.catchment.pk}))
+        self.assertContains(response, reverse('catchment-update', kwargs={'pk': self.catchment.pk}))
+        self.assertContains(response, reverse('catchment-delete-modal', kwargs={'pk': self.catchment.pk}))
+
+
+class CatchmentUpdateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'change_catchment'
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.catchment = Catchment.objects.create(name='Test Catchment')
+
+    def test_get_http_302_redirect_to_login_for_anonymous(self):
+        url = reverse('catchment-update', kwargs={'pk': self.catchment.pk})
+        response = self.client.get(url, follow=True)
+        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
+
+    def test_get_http_403_forbidden_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('catchment-update', kwargs={'pk': self.catchment.pk}))
+        self.assertEqual(403, response.status_code)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('catchment-update', kwargs={'pk': self.catchment.pk}))
+        self.assertEqual(200, response.status_code)
+
+    def test_post_http_302_redirect_to_login_for_anonymous(self):
+        url = reverse('catchment-update', kwargs={'pk': self.catchment.pk})
+        response = self.client.post(url, data={}, follow=True)
+        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
+
+    def test_post_http_403_forbidden_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(reverse('catchment-update', kwargs={'pk': self.catchment.pk}), data={})
+        self.assertEqual(403, response.status_code)
+
+    def test_post_success_and_http_302_redirect_to_success_url_for_member(self):
+        self.client.force_login(self.member)
+        data = {'name': 'Updated Test Catchment', 'type': 'custom'}
+        response = self.client.post(reverse('catchment-update', kwargs={'pk': self.catchment.pk}), data, follow=True)
+        self.assertRedirects(response, reverse('catchment-detail', kwargs={'pk': self.catchment.pk}))
+
+
+class CatchmentModalDeleteViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'delete_catchment'
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.catchment = Catchment.objects.create(name='Test Catchment')
+
+    def test_get_http_302_redirect_to_login_for_anonymous(self):
+        url = reverse('catchment-delete-modal', kwargs={'pk': self.catchment.pk})
+        response = self.client.get(url)
+        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
+
+    def test_get_http_403_forbidden_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('catchment-delete-modal', kwargs={'pk': self.catchment.pk}))
+        self.assertEqual(403, response.status_code)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('catchment-delete-modal', kwargs={'pk': self.catchment.pk}))
+        self.assertEqual(200, response.status_code)
+
+    def test_post_http_302_redirect_to_login_for_anonymous(self):
+        url = reverse('catchment-delete-modal', kwargs={'pk': self.catchment.pk})
+        response = self.client.post(url, data={})
+        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
+
+    def test_post_http_403_forbidden_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(reverse('catchment-delete-modal', kwargs={'pk': self.catchment.pk}), data={})
+        self.assertEqual(403, response.status_code)
+
+    def test_post_success_and_http_302_redirect_to_success_url_for_member(self):
+        self.client.force_login(self.member)
+        response = self.client.post(reverse('catchment-delete-modal', kwargs={'pk': self.catchment.pk}), {})
+        self.assertRedirects(response, reverse('catchment-list'))
+        with self.assertRaises(Catchment.DoesNotExist):
+            Catchment.objects.get(pk=self.category.pk)
 
 
 class NutsRegionMapViewTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        region = Region.objects.create(owner=owner, name='Test Region')
-        dataset = GeoDataset.objects.create(
-            owner=owner,
+        region = Region.objects.create(name='Test Region')
+        GeoDataset.objects.create(
             name='Test Dataset',
             region=region,
             model_name='NutsRegion'
         )
-
-    def setUp(self):
-        pass
 
     def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse('NutsRegion'))
@@ -29,110 +192,88 @@ class NutsRegionMapViewTestCase(TestCase):
 
 
 class NutsRegionPedigreeAPITestCase(APITestCase):
+    member_permissions = 'add_collection'
 
     @classmethod
     def setUpTestData(cls):
-        owner = User.objects.create(username='owner', password='very-secure!')
-        User.objects.create(username='outsider', password='very-secure!')
-        member = User.objects.create(username='member', password='very-secure!')
-        member.user_permissions.add(Permission.objects.get(codename='add_collection'))
-
         uk = NutsRegion.objects.create(
-            owner=owner,
             nuts_id='UK',
             levl_code=0,
             name_latn='United Kingdom'
         )
         Catchment.objects.create(
-            owner=owner,
             region=uk.region_ptr
         )
         ukh = NutsRegion.objects.create(
-            owner=owner,
             nuts_id='UKH',
             levl_code=1,
             name_latn='East of England',
             parent=uk
         )
         Catchment.objects.create(
-            owner=owner,
             region=ukh.region_ptr,
             parent_region=uk.region_ptr
         )
         ukh1 = NutsRegion.objects.create(
-            owner=owner,
             nuts_id='UKH1',
             levl_code=2,
             name_latn='East Anglia',
             parent=ukh
         )
         Catchment.objects.create(
-            owner=owner,
             region=ukh1.region_ptr,
             parent_region=ukh.region_ptr
         )
         ukh2 = NutsRegion.objects.create(
-            owner=owner,
             nuts_id='UKH2',
             levl_code=2,
             name_latn='Bedfordshire and Hertfordshire',
             parent=ukh
         )
         Catchment.objects.create(
-            owner=owner,
             region=ukh2.region_ptr,
             parent_region=ukh.region_ptr
         )
         ukh11 = NutsRegion.objects.create(
-            owner=owner,
             nuts_id='UKH11',
             levl_code=3,
             name_latn='Peterborough',
             parent=ukh1
         )
         Catchment.objects.create(
-            owner=owner,
             region=ukh11.region_ptr,
             parent_region=ukh1.region_ptr
         )
         ukh14 = NutsRegion.objects.create(
-            owner=owner,
             nuts_id='UKH14',
             levl_code=3,
             name_latn='Suffolk',
             parent=ukh1
         )
         Catchment.objects.create(
-            owner=owner,
             region=ukh14.region_ptr,
             parent_region=ukh1.region_ptr
         )
         babergh = LauRegion.objects.create(
-            owner=owner,
             lau_id='E07000200',
             lau_name='Babergh',
             nuts_parent=ukh14
         )
         Catchment.objects.create(
-            owner=owner,
             region=babergh.region_ptr,
             parent_region=ukh14.region_ptr
         )
         ipswich = LauRegion.objects.create(
-            owner=owner,
             lau_id='E07000202',
             lau_name='Ipswich',
             nuts_parent=ukh14
         )
         Catchment.objects.create(
-            owner=owner,
             region=ipswich.region_ptr,
             parent_region=ukh14.region_ptr
         )
 
     def setUp(self):
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
         self.uk = Catchment.objects.get(region__nutsregion__nuts_id='UK')
         self.ukh = Catchment.objects.get(region__nutsregion__nuts_id='UKH')
         self.ukh1 = Catchment.objects.get(region__nutsregion__nuts_id='UKH1')
@@ -181,14 +322,11 @@ class NutsRegionPedigreeAPITestCase(APITestCase):
         self.assertIn('id_level_4', response.data)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
 class NutsRegionSummaryAPIViewTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
         NutsRegion.objects.create(
-            owner=owner,
             nuts_id='TE57',
             name_latn='Test NUTS'
         )
@@ -209,15 +347,7 @@ class NutsRegionSummaryAPIViewTestCase(TestCase):
 # ----------- Attribute CRUD -------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class AttributeListViewTestCase(TestCase):
-
-    @classmethod
-    def setUpTestData(cls):
-        User.objects.create(username='outsider')
-
-    def setUp(self):
-        self.outsider = User.objects.get(username='outsider')
+class AttributeListViewTestCase(ViewWithPermissionsTestCase):
 
     def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse('attribute-list'))
@@ -229,20 +359,8 @@ class AttributeListViewTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class AttributeCreateViewTestCase(TestCase):
-
-    @classmethod
-    def setUpTestData(cls):
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
-        members = Group.objects.create(name='members')
-        members.permissions.add(Permission.objects.get(codename='add_attribute'))
-        member.groups.add(members)
-
-    def setUp(self):
-        self.member = User.objects.get(username='member')
-        self.outsider = User.objects.get(username='outsider')
+class AttributeCreateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'add_attribute'
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(reverse('attribute-create'))
@@ -274,20 +392,8 @@ class AttributeCreateViewTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class AttributeModalCreateViewTestCase(TestCase):
-
-    @classmethod
-    def setUpTestData(cls):
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
-        members = Group.objects.create(name='members')
-        members.permissions.add(Permission.objects.get(codename='add_attribute'))
-        member.groups.add(members)
-
-    def setUp(self):
-        self.member = User.objects.get(username='member')
-        self.outsider = User.objects.get(username='outsider')
+class AttributeModalCreateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'add_attribute'
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(reverse('attribute-create-modal'))
@@ -319,19 +425,12 @@ class AttributeModalCreateViewTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class AttributeDetailViewTestCase(TestCase):
+class AttributeDetailViewTestCase(ViewWithPermissionsTestCase):
 
     @classmethod
     def setUpTestData(cls):
-        User.objects.create(username='owner')
-        User.objects.create(username='outsider')
-
-    def setUp(self):
-        self.owner = User.objects.get(username='owner')
-        self.outsider = User.objects.get(username='outsider')
-        self.attribute = Attribute.objects.create(
-            owner=self.owner,
+        super().setUpTestData()
+        cls.attribute = Attribute.objects.create(
             name='Test Attribute',
             unit='Test Unit',
             description='This ist a test element'
@@ -347,19 +446,12 @@ class AttributeDetailViewTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class AttributeModalDetailViewTestCase(TestCase):
+class AttributeModalDetailViewTestCase(ViewWithPermissionsTestCase):
 
     @classmethod
     def setUpTestData(cls):
-        User.objects.create(username='owner')
-        User.objects.create(username='outsider')
-
-    def setUp(self):
-        self.owner = User.objects.get(username='owner')
-        self.outsider = User.objects.get(username='outsider')
-        self.attribute = Attribute.objects.create(
-            owner=self.owner,
+        super().setUpTestData()
+        cls.attribute = Attribute.objects.create(
             name='Test Attribute',
             unit='Test Unit',
             description='This ist a test element'
@@ -375,24 +467,13 @@ class AttributeModalDetailViewTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class AttributeUpdateViewTestCase(TestCase):
+class AttributeUpdateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'change_attribute'
 
     @classmethod
     def setUpTestData(cls):
-        User.objects.create(username='owner')
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
-        members = Group.objects.create(name='members')
-        members.permissions.add(Permission.objects.get(codename='change_attribute'))
-        member.groups.add(members)
-
-    def setUp(self):
-        self.owner = User.objects.get(username='owner')
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
-        self.attribute = Attribute.objects.create(
-            owner=self.owner,
+        super().setUpTestData()
+        cls.attribute = Attribute.objects.create(
             name='Test Attribute',
             unit='Test Unit',
             description='This ist a test element'
@@ -429,24 +510,13 @@ class AttributeUpdateViewTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class AttributeModalUpdateViewTestCase(TestCase):
+class AttributeModalUpdateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'change_attribute'
 
     @classmethod
     def setUpTestData(cls):
-        User.objects.create(username='owner')
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
-        members = Group.objects.create(name='members')
-        members.permissions.add(Permission.objects.get(codename='change_attribute'))
-        member.groups.add(members)
-
-    def setUp(self):
-        self.owner = User.objects.get(username='owner')
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
-        self.attribute = Attribute.objects.create(
-            owner=self.owner,
+        super().setUpTestData()
+        cls.attribute = Attribute.objects.create(
             name='Test Attribute',
             unit='Test Unit',
             description='This ist a test element'
@@ -483,24 +553,13 @@ class AttributeModalUpdateViewTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class AttributeModalDeleteViewTestCase(TestCase):
+class AttributeModalDeleteViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'delete_attribute'
 
     @classmethod
     def setUpTestData(cls):
-        User.objects.create(username='owner')
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
-        members = Group.objects.create(name='members')
-        members.permissions.add(Permission.objects.get(codename='delete_attribute'))
-        member.groups.add(members)
-
-    def setUp(self):
-        self.owner = User.objects.get(username='owner')
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
-        self.attribute = Attribute.objects.create(
-            owner=self.owner,
+        super().setUpTestData()
+        cls.attribute = Attribute.objects.create(
             name='Test Attribute',
             unit='Test Unit',
             description='This ist a test element'
@@ -540,15 +599,7 @@ class AttributeModalDeleteViewTestCase(TestCase):
 # ----------- Region Attribute Value CRUD ------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class RegionAttributeValueListViewTestCase(TestCase):
-
-    @classmethod
-    def setUpTestData(cls):
-        User.objects.create(username='outsider')
-
-    def setUp(self):
-        self.outsider = User.objects.get(username='outsider')
+class RegionAttributeValueListViewTestCase(ViewWithPermissionsTestCase):
 
     def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse('regionattributevalue-list'))
@@ -560,25 +611,14 @@ class RegionAttributeValueListViewTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class RegionAttributeValueCreateViewTestCase(TestCase):
+class RegionAttributeValueCreateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'add_regionattributevalue'
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
-        members = Group.objects.create(name='members')
-        members.permissions.add(Permission.objects.get(codename='add_regionattributevalue'))
-        member.groups.add(members)
-        Region.objects.create(owner=owner, name='Test Region')
-        Attribute.objects.create(owner=owner, name='Test Attribute', unit='Test Unit')
-
-    def setUp(self):
-        self.member = User.objects.get(username='member')
-        self.outsider = User.objects.get(username='outsider')
-        self.region = Region.objects.get(name='Test Region')
-        self.attribute = Attribute.objects.get(name='Test Attribute')
+        super().setUpTestData()
+        cls.region = Region.objects.create(name='Test Region')
+        cls.attribute = Attribute.objects.create(name='Test Attribute', unit='Test Unit')
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(reverse('regionattributevalue-create'))
@@ -615,26 +655,14 @@ class RegionAttributeValueCreateViewTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class RegionAttributeValueModalCreateViewTestCase(TestCase):
+class RegionAttributeValueModalCreateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'add_regionattributevalue'
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
-        members = Group.objects.create(name='members')
-        members.permissions.add(Permission.objects.get(codename='add_regionattributevalue'))
-        member.groups.add(members)
-        Region.objects.create(owner=owner, name='Test Region')
-        Attribute.objects.create(owner=owner, name='Test Attribute', unit='Test Unit')
-
-    def setUp(self):
-        self.owner = get_default_owner()
-        self.member = User.objects.get(username='member')
-        self.outsider = User.objects.get(username='outsider')
-        self.region = Region.objects.get(name='Test Region')
-        self.attribute = Attribute.objects.get(name='Test Attribute')
+        super().setUpTestData()
+        cls.region = Region.objects.create(name='Test Region')
+        cls.attribute = Attribute.objects.create(name='Test Attribute', unit='Test Unit')
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(reverse('regionattributevalue-create-modal'))
@@ -671,26 +699,18 @@ class RegionAttributeValueModalCreateViewTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class RegionAttributeValueDetailViewTestCase(TestCase):
+class RegionAttributeValueDetailViewTestCase(ViewWithPermissionsTestCase):
+    value = None
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        User.objects.create(username='outsider')
-        Region.objects.create(owner=owner, name='Test Region')
-        Attribute.objects.create(owner=owner, name='Test Attribute', unit='Test Unit')
-
-    def setUp(self):
-        self.owner = get_default_owner()
-        self.outsider = User.objects.get(username='outsider')
-        self.region = Region.objects.get(name='Test Region')
-        self.attribute = Attribute.objects.get(name='Test Attribute')
-        self.value = RegionAttributeValue.objects.create(
-            owner=self.owner,
+        super().setUpTestData()
+        region = Region.objects.create(name='Test Region')
+        attribute = Attribute.objects.create(name='Test Attribute', unit='Test Unit')
+        cls.value = RegionAttributeValue.objects.create(
             name='Test Value',
-            region=self.region,
-            attribute=self.attribute,
+            region=region,
+            attribute=attribute,
             value=123.312
         )
 
@@ -704,27 +724,18 @@ class RegionAttributeValueDetailViewTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class RegionAttributeValueModalDetailViewTestCase(TestCase):
+class RegionAttributeValueModalDetailViewTestCase(ViewWithPermissionsTestCase):
+    value = None
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        User.objects.create(username='owner')
-        User.objects.create(username='outsider')
-        Region.objects.create(owner=owner, name='Test Region')
-        Attribute.objects.create(owner=owner, name='Test Attribute', unit='Test Unit')
-
-    def setUp(self):
-        self.owner = get_default_owner()
-        self.outsider = User.objects.get(username='outsider')
-        self.region = Region.objects.get(name='Test Region')
-        self.attribute = Attribute.objects.get(name='Test Attribute')
-        self.value = RegionAttributeValue.objects.create(
-            owner=self.owner,
+        super().setUpTestData()
+        region = Region.objects.create(name='Test Region')
+        attribute = Attribute.objects.create(name='Test Attribute', unit='Test Unit')
+        cls.value = RegionAttributeValue.objects.create(
             name='Test Value',
-            region=self.region,
-            attribute=self.attribute,
+            region=region,
+            attribute=attribute,
             value=123.312
         )
 
@@ -738,32 +749,21 @@ class RegionAttributeValueModalDetailViewTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class RegionAttributeValueUpdateViewTestCase(TestCase):
+class RegionAttributeValueUpdateViewTestCase(ViewWithPermissionsTestCase):
+    attribute = None
+    region = None
+    value = None
+    member_permissions = 'change_regionattributevalue'
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        User.objects.create(username='owner')
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
-        members = Group.objects.create(name='members')
-        members.permissions.add(Permission.objects.get(codename='change_regionattributevalue'))
-        member.groups.add(members)
-        Region.objects.create(owner=owner, name='Test Region')
-        Attribute.objects.create(owner=owner, name='Test Attribute', unit='Test Unit')
-
-    def setUp(self):
-        self.owner = get_default_owner()
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
-        self.region = Region.objects.get(name='Test Region')
-        self.attribute = Attribute.objects.get(name='Test Attribute')
-        self.value = RegionAttributeValue.objects.create(
-            owner=self.owner,
+        super().setUpTestData()
+        cls.region = Region.objects.create(name='Test Region')
+        cls.attribute = Attribute.objects.create(name='Test Attribute', unit='Test Unit')
+        cls.value = RegionAttributeValue.objects.create(
             name='Test Value',
-            region=self.region,
-            attribute=self.attribute,
+            region=cls.region,
+            attribute=cls.attribute,
             value=123.312
         )
 
@@ -808,31 +808,21 @@ class RegionAttributeValueUpdateViewTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class RegionAttributeValueModalUpdateViewTestCase(TestCase):
+class RegionAttributeValueModalUpdateViewTestCase(ViewWithPermissionsTestCase):
+    attribute = None
+    region = None
+    value = None
+    member_permissions = 'change_regionattributevalue'
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
-        members = Group.objects.create(name='members')
-        members.permissions.add(Permission.objects.get(codename='change_regionattributevalue'))
-        member.groups.add(members)
-        Region.objects.create(owner=owner, name='Test Region')
-        Attribute.objects.create(owner=owner, name='Test Attribute', unit='Test Unit')
-
-    def setUp(self):
-        self.owner = get_default_owner()
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
-        self.region = Region.objects.get(name='Test Region')
-        self.attribute = Attribute.objects.get(name='Test Attribute')
-        self.value = RegionAttributeValue.objects.create(
-            owner=self.owner,
+        super().setUpTestData()
+        cls.region = Region.objects.create(name='Test Region')
+        cls.attribute = Attribute.objects.create(name='Test Attribute', unit='Test Unit')
+        cls.value = RegionAttributeValue.objects.create(
             name='Test Value',
-            region=self.region,
-            attribute=self.attribute,
+            region=cls.region,
+            attribute=cls.attribute,
             value=123.312
         )
 
@@ -883,32 +873,17 @@ class RegionAttributeValueModalUpdateViewTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class RegionAttributeValueModalDeleteViewTestCase(TestCase):
+class RegionAttributeValueModalDeleteViewTestCase(ViewWithPermissionsTestCase):
+    value = None
+    member_permissions = 'delete_regionattributevalue'
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        User.objects.create(username='owner')
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
-        members = Group.objects.create(name='members')
-        members.permissions.add(Permission.objects.get(codename='delete_regionattributevalue'))
-        member.groups.add(members)
-        Region.objects.create(owner=owner, name='Test Region')
-        Attribute.objects.create(owner=owner, name='Test Attribute', unit='Test Unit')
-
-    def setUp(self):
-        self.owner = get_default_owner()
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
-        self.region = Region.objects.get(name='Test Region')
-        self.attribute = Attribute.objects.get(name='Test Attribute')
-        self.value = RegionAttributeValue.objects.create(
-            owner=self.owner,
+        super().setUpTestData()
+        cls.value = RegionAttributeValue.objects.create(
             name='Test Value',
-            region=self.region,
-            attribute=self.attribute,
+            region=Region.objects.create(name='Test Region'),
+            attribute=Attribute.objects.create(name='Test Attribute', unit='Test Unit'),
             value=123.312
         )
 

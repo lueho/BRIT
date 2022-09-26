@@ -10,9 +10,8 @@ from django.forms import (Form,
 from django.forms.widgets import CheckboxSelectMultiple, RadioSelect
 from django.urls import reverse
 
-from brit.forms import CustomModelForm, CustomModalModelForm, ModalFormHelper
-
-from .models import Attribute, Region, Catchment, NutsRegion, LauRegion, RegionAttributeValue
+from brit.forms import CustomModelForm, CustomModalModelForm
+from .models import Attribute, Region, Catchment, NutsRegion, RegionAttributeValue
 
 
 class AttributeModelForm(CustomModelForm):
@@ -46,7 +45,7 @@ class RegionAttributeValueModalModelForm(CustomModalModelForm):
 class CatchmentModelForm(ModelForm):
     class Meta:
         model = Catchment
-        fields = ('name', 'description', 'parent_region', 'region')
+        fields = ('name', 'type', 'description')
         # fields = ('parent_region', 'name', 'description', 'geom',)
         # widgets = {'geom': LeafletWidget()}
 
@@ -94,6 +93,23 @@ class NutsRegionQueryForm(Form):
             Field('level_3', data_optionsapi=f'{reverse("data.nuts_region_options")}', data_lvl=3),
         )
         return helper
+
+
+class CatchmentFilterFormHelper(FormHelper):
+    form_tag = False
+    include_media = False
+    layout = Layout(
+        'name',
+        'type',
+    )
+
+
+class CatchmentFilterForm(Form):
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.helper = CatchmentFilterFormHelper()
+        self.fields['name'].widget.attrs = {'data-theme': 'bootstrap4'}
 
 
 class NutsAndLauCatchmentQueryForm(Form):

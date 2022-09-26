@@ -1,21 +1,23 @@
 {% extends 'filtered_list.html' %}
 {% load crispy_forms_tags %}
 
-{% block title %}BRIT | Waste collecting entities{% endblock %}
+{% block title %}BRIT | Maps | Catchments{% endblock %}
+
+{% block list_header %}<strong>Catchments</strong>{% endblock %}
 
 {% block list_body %}
     <table class="table">
         <thead>
         <tr>
             <th>Name</th>
-            <th>Catchment</th>
+            <th>Type</th>
         </tr>
         </thead>
         <tbody>
         {% for object in object_list %}
             <tr>
                 <td><a href="{{ object.get_absolute_url }}">{{ object.name }}</a></td>
-                <td>{{ object.catchment }}</td>
+                <td>{{ object.type }}</td>
             </tr>
         {% endfor %}
         </tbody>
@@ -25,16 +27,18 @@
 {% endblock list_body %}
 
 {% block list_footer %}
-    {% if 'soilcom.add_collector' in perms %}
-        <a class="mr-2 text-nowrap" href="{% url 'collector-create' %}?next={{ request.get_full_path|urlencode }}">
+    {#    <a class="nowrap" href="{% url 'catchment-map' %}?{{ request.GET.urlencode }}&load_features=true">#}
+    {#        <i class="fa fa-fw fa-map"></i> View as map#}
+    {#    </a>#}
+    {% if 'maps.add_catchment' in perms %}
+        <a href="{% url 'catchment-create' %}?next={{ request.get_full_path|urlencode }}" class="nowrap">
             <i class="fa fa-fw fa-plus"></i>
-            <span>Add new collector</span>
+            <span>Add new catchment</span>
         </a>
     {% endif %}
-    {% if 'soilcom.change_collector' in perms %}
-        <a class="mr-2 text-nowrap" href="{% url 'waste-collection-home' %}">
-            <i class="fas fa-fw fa-cog"></i>
-            <span>Dashboard</span>
+    {% if 'maps.change_catchment' in perms %}
+        <a href="{% url 'maps-dashboard' %}" class="ml-3 nowrap">
+            <i class="fas fa-fw fa-cog"></i> Dashboard
         </a>
     {% endif %}
 {% endblock list_footer %}

@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block title %}BRIT | Maps | Dashboard{% endblock %}
+
+{% block content %}
+
+    <div class="row">
+        <div class="col col-12 col-md-6">
+            <div class="card shadow h-100">
+                <div class="card-header"><strong>Maps Dashboard</strong></div>
+                <div class="card-body">
+                    <p class="card-text">
+                        The maps module provides all the basic tools for building and managing maps.
+                    </p>
+                </div>
+                <div class="card-footer">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header">
+                    <a href="{% url 'maps_list' %}" class="stretched-link"><strong>Datasets</strong></a>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        These datasets contain geo-referenced data that is the basis for bioresource sources.
+                        The dataset can be filtered with respect to the information that is available in each,
+                        respectively.
+                    </p>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'maps_list' %}" class="btn btn-primary">View datasets</a>
+                </div>
+            </div>
+        </div>
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header">
+                    <a href="{% url 'catchment-list' %}" class="stretched-link"><strong>Catchments</strong></a>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        A catchment is the area that a collection is dedicated to. Usually they are administrative
+                        regions, such as counties.
+                    </p>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'catchment-list' %}" class="btn btn-primary">View catchments</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+{% endblock content %}

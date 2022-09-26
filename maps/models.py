@@ -58,7 +58,7 @@ class Region(NamedUserObjectModel):
 
     @staticmethod
     def get_absolute_url(**kwargs):
-        return reverse('catchment_list')
+        return reverse('catchment-list')
 
     def __str__(self):
         try:
@@ -130,10 +130,6 @@ class Catchment(NamedUserObjectModel):
             return self.region.nutsregion.levl_code
         if hasattr(self.region, 'lauregion'):
             return 4
-
-    @staticmethod
-    def get_absolute_url(**kwargs):
-        return reverse('catchment_list')
 
     def __str__(self):
         return self.name if self.name else self.region.__str__()

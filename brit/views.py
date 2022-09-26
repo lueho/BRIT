@@ -1,10 +1,12 @@
 from bootstrap_modal_forms.generic import BSModalCreateView, BSModalUpdateView, BSModalDeleteView, BSModalReadView
 from django.contrib.auth.mixins import UserPassesTestMixin, PermissionRequiredMixin
+from django.contrib.messages.views import SuccessMessageMixin
 from django.core.exceptions import FieldError
 from django.http import JsonResponse
 from django.template.loader import render_to_string
 from django.views.generic import CreateView, UpdateView
 from django.views.generic import TemplateView, ListView, DetailView
+from django_filters.views import FilterView
 from django_tables2 import table_factory
 
 from users.models import get_default_owner
@@ -82,6 +84,10 @@ class ModalMessageView(TemplateView):
             'message': self.message
         })
         return context
+
+
+class BRITFilterView(FilterView):
+    paginate_by = 10
 
 
 class OwnedObjectListView(PermissionRequiredMixin, ListView):

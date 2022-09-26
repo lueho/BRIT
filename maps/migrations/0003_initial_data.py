@@ -10,7 +10,7 @@ def create_initial_data(apps, schema_editor):
     ContentType = apps.get_model("contenttypes", "ContentType")
     Permission = apps.get_model('auth', 'Permission')
 
-    models = ['Attribute', 'RegionAttributeValue',]
+    models = ['Attribute', 'Catchment', 'RegionAttributeValue', ]
     permission_prefixes = ['add', 'view', 'change', 'delete']
 
     editors, _ = Group.objects.get_or_create(name='editors')

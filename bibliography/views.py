@@ -1,6 +1,6 @@
-from celery.result import AsyncResult
 import json
 
+from celery.result import AsyncResult
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.http import HttpResponse
 from django.urls import reverse_lazy
@@ -8,7 +8,6 @@ from django.views import View
 from django.views.generic import TemplateView
 
 from brit import views
-
 from . import forms
 from .filters import SourceFilter
 from .models import Author, Licence, Source, SOURCE_TYPES
@@ -66,7 +65,7 @@ class AuthorModalUpdateView(views.OwnedObjectModalUpdateView):
     permission_required = 'bibliography.change_author'
 
 
-class AuthorModalDeleteView(views.OwnedObjectDeleteView):
+class AuthorModalDeleteView(views.OwnedObjectModalDeleteView):
     template_name = 'modal_delete.html'
     model = Author
     success_message = 'Successfully deleted.'
@@ -119,7 +118,7 @@ class LicenceModalUpdateView(views.OwnedObjectModalUpdateView):
     permission_required = 'bibliography.change_licence'
 
 
-class LicenceModalDeleteView(views.OwnedObjectDeleteView):
+class LicenceModalDeleteView(views.OwnedObjectModalDeleteView):
     template_name = 'modal_delete.html'
     model = Licence
     success_message = 'Successfully deleted.'
@@ -202,7 +201,7 @@ class SourceModalUpdateView(views.OwnedObjectModalUpdateView):
     permission_required = 'bibliography.change_source'
 
 
-class SourceModalDeleteView(views.OwnedObjectDeleteView):
+class SourceModalDeleteView(views.OwnedObjectModalDeleteView):
     template_name = 'modal_delete.html'
     model = Source
     success_message = 'Successfully deleted.'

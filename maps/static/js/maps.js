@@ -123,7 +123,7 @@ async function fetchCatchmentGeometry(params) {
 
 async function fetchFeatureGeometries(params) {
     const url = mapConfig.feature_url + '?' + transformSearchParams(params).toString();
-    console.log(url);
+    console.log(url)
     const response = await fetch(url);
     const json = await response.json();
     renderFeatures(json.geoJson);
