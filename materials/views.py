@@ -18,9 +18,10 @@ from brit.views import (
     OwnedObjectModalDetailView,
     OwnedObjectUpdateView,
     OwnedObjectModalUpdateView,
-    OwnedObjectDeleteView,
+    OwnedObjectModalDeleteView,
+    UserOwnsObjectMixin,
+    NextOrSuccessUrlMixin
 )
-from brit.views import UserOwnsObjectMixin, NextOrSuccessUrlMixin
 from distributions.models import TemporalDistribution
 from distributions.plots import DoughnutChart
 from . import forms
@@ -50,7 +51,7 @@ from .serializers import CompositionDoughnutChartSerializer, SampleModelSerializ
 
 class MaterialsDashboardView(PermissionRequiredMixin, TemplateView):
     template_name = 'materials_dashboard.html'
-    permission_required = 'materials.view_material'
+    permission_required = 'materials.change_material'
 
 
 # ----------- Material Category CRUD ----------------------------------------------------------------------------------
@@ -65,14 +66,12 @@ class MaterialCategoryListView(OwnedObjectListView):
 class MaterialCategoryCreateView(OwnedObjectCreateView):
     template_name = 'simple_form_card.html'
     form_class = forms.MaterialCategoryModelForm
-    success_url = reverse_lazy('materialcategory-list')
     permission_required = 'materials.add_materialcategory'
 
 
 class MaterialCategoryModalCreateView(OwnedObjectModalCreateView):
     template_name = 'modal_form.html'
     form_class = forms.MaterialCategoryModalModelForm
-    success_url = reverse_lazy('materialcategory-list')
     permission_required = 'materials.add_materialcategory'
 
 
@@ -102,7 +101,7 @@ class MaterialCategoryModalUpdateView(OwnedObjectModalUpdateView):
     permission_required = 'materials.change_materialcategory'
 
 
-class MaterialCategoryModalDeleteView(OwnedObjectDeleteView):
+class MaterialCategoryModalDeleteView(OwnedObjectModalDeleteView):
     template_name = 'modal_delete.html'
     model = MaterialCategory
     success_message = 'Successfully deleted.'
@@ -123,14 +122,12 @@ class MaterialListView(OwnedObjectListView):
 class MaterialCreateView(OwnedObjectCreateView):
     template_name = 'simple_form_card.html'
     form_class = forms.MaterialModelForm
-    success_url = reverse_lazy('material-list')
     permission_required = 'materials.add_material'
 
 
 class MaterialModalCreateView(OwnedObjectModalCreateView):
     template_name = 'modal_form.html'
     form_class = forms.MaterialModalModelForm
-    success_url = reverse_lazy('material-list')
     permission_required = 'materials.add_material'
 
 
@@ -160,7 +157,7 @@ class MaterialModalUpdateView(OwnedObjectModalUpdateView):
     permission_required = 'materials.change_material'
 
 
-class MaterialModalDeleteView(OwnedObjectDeleteView):
+class MaterialModalDeleteView(OwnedObjectModalDeleteView):
     template_name = 'modal_delete.html'
     model = Material
     success_message = 'Successfully deleted.'
@@ -180,14 +177,12 @@ class ComponentListView(OwnedObjectListView):
 class ComponentCreateView(OwnedObjectCreateView):
     template_name = 'simple_form_card.html'
     form_class = ComponentModelForm
-    success_url = reverse_lazy('materialcomponent-list')
     permission_required = 'materials.add_materialcomponent'
 
 
 class ComponentModalCreateView(OwnedObjectModalCreateView):
     template_name = 'modal_form.html'
     form_class = ComponentModalModelForm
-    success_url = reverse_lazy('materialcomponent-list')
     permission_required = 'materials.add_materialcomponent'
 
 
@@ -217,7 +212,7 @@ class ComponentModalUpdateView(OwnedObjectModalUpdateView):
     permission_required = 'materials.change_materialcomponent'
 
 
-class ComponentModalDeleteView(OwnedObjectDeleteView):
+class ComponentModalDeleteView(OwnedObjectModalDeleteView):
     template_name = 'modal_delete.html'
     model = MaterialComponent
     success_message = 'Successfully deleted.'
@@ -238,7 +233,6 @@ class ComponentGroupListView(OwnedObjectListView):
 class ComponentGroupCreateView(OwnedObjectCreateView):
     template_name = 'simple_form_card.html'
     form_class = ComponentGroupModelForm
-    success_url = reverse_lazy('materialcomponentgroup-list')
     permission_required = 'materials.add_materialcomponentgroup'
 
 
@@ -251,7 +245,6 @@ class ComponentGroupDetailView(OwnedObjectDetailView):
 class ComponentGroupModalCreateView(OwnedObjectModalCreateView):
     template_name = 'modal_form.html'
     form_class = ComponentGroupModalModelForm
-    success_url = reverse_lazy('materialcomponentgroup-list')
     permission_required = 'materials.add_materialcomponentgroup'
 
 
@@ -275,7 +268,7 @@ class ComponentGroupModalUpdateView(OwnedObjectModalUpdateView):
     permission_required = 'materials.change_materialcomponentgroup'
 
 
-class ComponentGroupModalDeleteView(OwnedObjectDeleteView):
+class ComponentGroupModalDeleteView(OwnedObjectModalDeleteView):
     template_name = 'modal_delete.html'
     model = MaterialComponentGroup
     success_message = 'Successfully deleted.'
@@ -295,14 +288,12 @@ class MaterialPropertyListView(OwnedObjectListView):
 class MaterialPropertyCreateView(OwnedObjectCreateView):
     template_name = 'simple_form_card.html'
     form_class = forms.MaterialPropertyModelForm
-    success_url = reverse_lazy('materialproperty-list')
     permission_required = 'materials.add_materialproperty'
 
 
 class MaterialPropertyModalCreateView(OwnedObjectModalCreateView):
     template_name = 'modal_form.html'
     form_class = forms.MaterialPropertyModalModelForm
-    success_url = reverse_lazy('materialproperty-list')
     permission_required = 'materials.add_materialproperty'
 
 
@@ -332,7 +323,7 @@ class MaterialPropertyModalUpdateView(OwnedObjectModalUpdateView):
     permission_required = 'materials.change_materialproperty'
 
 
-class MaterialPropertyModalDeleteView(OwnedObjectDeleteView):
+class MaterialPropertyModalDeleteView(OwnedObjectModalDeleteView):
     template_name = 'modal_delete.html'
     model = MaterialProperty
     success_message = 'Successfully deleted.'
@@ -344,7 +335,7 @@ class MaterialPropertyModalDeleteView(OwnedObjectDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class MaterialPropertyValueModalDeleteView(OwnedObjectDeleteView):
+class MaterialPropertyValueModalDeleteView(OwnedObjectModalDeleteView):
     template_name = 'modal_delete.html'
     model = MaterialPropertyValue
     success_message = 'Successfully deleted.'
@@ -364,14 +355,12 @@ class SampleSeriesListView(OwnedObjectListView):
 class SampleSeriesCreateView(OwnedObjectCreateView):
     template_name = 'simple_form_card.html'
     form_class = forms.SampleSeriesModelForm
-    success_url = reverse_lazy('sampleseries-list')
     permission_required = 'materials.add_sampleseries'
 
 
 class SampleSeriesModalCreateView(OwnedObjectModalCreateView):
     template_name = 'modal_form.html'
     form_class = forms.SampleSeriesModalModelForm
-    success_url = reverse_lazy('sampleseries-list')
     permission_required = 'materials.add_sampleseries'
 
 
@@ -405,7 +394,7 @@ class SampleSeriesModalUpdateView(OwnedObjectModalUpdateView):
     permission_required = 'materials.change_sampleseries'
 
 
-class SampleSeriesModalDeleteView(OwnedObjectDeleteView):
+class SampleSeriesModalDeleteView(OwnedObjectModalDeleteView):
     template_name = 'modal_delete.html'
     model = SampleSeries
     success_message = 'Successfully deleted.'
@@ -425,14 +414,8 @@ class SampleSeriesCreateDuplicateView(OwnedObjectUpdateView):
     object = None
 
     def form_valid(self, form):
-        self.object = self.object.duplicate(
-            creator=self.request.user,
-            **form.cleaned_data
-        )
-        return HttpResponseRedirect(self.get_success_url())
-
-    def get_success_url(self):
-        return reverse('sampleseries-detail', kwargs={'pk': self.object.pk})
+        self.object = self.object.duplicate(creator=self.request.user, **form.cleaned_data)
+        return super().form_valid(form)
 
 
 class SampleSeriesModalCreateDuplicateView(OwnedObjectModalUpdateView):
@@ -444,14 +427,8 @@ class SampleSeriesModalCreateDuplicateView(OwnedObjectModalUpdateView):
 
     def form_valid(self, form):
         if not self.request.is_ajax():
-            self.object = self.object.duplicate(
-                creator=self.request.user,
-                **form.cleaned_data
-            )
-        return HttpResponseRedirect(self.get_success_url())
-
-    def get_success_url(self):
-        return reverse('sampleseries-detail', kwargs={'pk': self.object.pk})
+            self.object = self.object.duplicate(creator=self.request.user, **form.cleaned_data)
+        return super().form_valid(form)
 
 
 # ----------- Sample CRUD ----------------------------------------------------------------------------------------------
@@ -473,14 +450,12 @@ class FeaturedSampleListView(OwnedObjectListView):
 class SampleCreateView(OwnedObjectCreateView):
     template_name = 'simple_form_card.html'
     form_class = forms.SampleModelForm
-    success_url = reverse_lazy('sample-list')
     permission_required = 'materials.add_sample'
 
 
 class SampleModalCreateView(OwnedObjectModalCreateView):
     template_name = 'modal_form.html'
     form_class = forms.SampleModalModelForm
-    success_url = reverse_lazy('sample-list')
     permission_required = 'materials.add_sample'
 
 
@@ -524,7 +499,7 @@ class SampleModalUpdateView(OwnedObjectModalUpdateView):
     permission_required = 'materials.change_sample'
 
 
-class SampleModalDeleteView(OwnedObjectDeleteView):
+class SampleModalDeleteView(OwnedObjectModalDeleteView):
     template_name = 'modal_delete.html'
     model = Sample
     success_message = 'Successfully deleted.'
@@ -577,14 +552,8 @@ class SampleCreateDuplicateView(OwnedObjectUpdateView):
     object = None
 
     def form_valid(self, form):
-        self.object = self.object.duplicate(
-            creator=self.request.user,
-            **form.cleaned_data
-        )
-        return HttpResponseRedirect(self.get_success_url())
-
-    def get_success_url(self):
-        return reverse('sample-detail', kwargs={'pk': self.object.pk})
+        self.object = self.object.duplicate(creator=self.request.user, **form.cleaned_data)
+        return super().form_valid(form)
 
 
 class SampleModalCreateDuplicateView(OwnedObjectModalUpdateView):
@@ -596,14 +565,8 @@ class SampleModalCreateDuplicateView(OwnedObjectModalUpdateView):
 
     def form_valid(self, form):
         if not self.request.is_ajax():
-            self.object = self.object.duplicate(
-                creator=self.request.user,
-                **form.cleaned_data
-            )
-        return HttpResponseRedirect(self.get_success_url())
-
-    def get_success_url(self):
-        return reverse('sample-detail', kwargs={'pk': self.object.pk})
+            self.object = self.object.duplicate(creator=self.request.user, **form.cleaned_data)
+        return super().form_valid(form)
 
 
 # ----------- Composition CRUD -----------------------------------------------------------------------------------------
@@ -618,14 +581,12 @@ class CompositionListView(OwnedObjectListView):
 class CompositionCreateView(OwnedObjectCreateView):
     template_name = 'simple_form_card.html'
     form_class = forms.CompositionModelForm
-    success_url = reverse_lazy('composition-list')
     permission_required = 'materials.add_composition'
 
 
 class CompositionModalCreateView(OwnedObjectModalCreateView):
     template_name = 'modal_form.html'
     form_class = forms.CompositionModalModelForm
-    success_url = reverse_lazy('composition-list')
     permission_required = 'materials.add_composition'
 
 
@@ -689,12 +650,15 @@ class CompositionModalUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin,
         return super().get_context_data(**context)
 
 
-class CompositionModalDeleteView(OwnedObjectDeleteView):
+class CompositionModalDeleteView(OwnedObjectModalDeleteView):
     model = Composition
     template_name = 'modal_delete.html'
     success_message = 'Successfully removed'
     success_url = reverse_lazy('composition-list')
     permission_required = 'materials.delete_composition'
+
+    def get_success_url(self):
+        return reverse('sample-detail', kwargs={'pk': self.object.sample.pk})
 
 
 # ----------- Composition utilities ------------------------------------------------------------------------------------
@@ -754,14 +718,14 @@ class CompositionOrderDownView(PermissionRequiredMixin, SingleObjectMixin, Redir
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class WeightShareModalDeleteView(OwnedObjectDeleteView):
+class WeightShareModalDeleteView(OwnedObjectModalDeleteView):
     template_name = 'modal_delete.html'
     model = WeightShare
     success_message = 'Successfully deleted.'
     permission_required = 'materials.delete_weightshare'
 
     def get_success_url(self):
-        return reverse('sampleseries-detail', kwargs={'pk': self.object.composition.sample.series.pk})
+        return reverse('sample-detail', kwargs={'pk': self.object.composition.sample.pk})
 
 
 # ----------- Materials/Components/Groups Relation -----------------------------------------------------------------

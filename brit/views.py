@@ -109,7 +109,7 @@ class CreateOwnedObjectMixin(PermissionRequiredMixin, NextOrSuccessUrlMixin):
         return super().form_valid(form)
 
 
-class OwnedObjectCreateView(CreateOwnedObjectMixin, CreateView):
+class OwnedObjectCreateView(CreateOwnedObjectMixin, SuccessMessageMixin, CreateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -117,6 +117,9 @@ class OwnedObjectCreateView(CreateOwnedObjectMixin, CreateView):
             'form_title': f'Create New {self.form_class._meta.model._meta.verbose_name}',
         })
         return context
+
+    def get_success_message(self, cleaned_data):
+        return str(self.object.pk)
 
 
 class OwnedObjectModalCreateView(CreateOwnedObjectMixin, BSModalCreateView):
@@ -128,6 +131,9 @@ class OwnedObjectModalCreateView(CreateOwnedObjectMixin, BSModalCreateView):
             'submit_button_text': 'Save'
         })
         return context
+
+    def get_success_message(self, cleaned_data):
+        return str(self.object.pk)
 
 
 class OwnedObjectDetailView(PermissionRequiredMixin, DetailView):
@@ -149,7 +155,7 @@ class OwnedObjectModalDetailView(PermissionRequiredMixin, BSModalReadView):
         return context
 
 
-class OwnedObjectUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin, UpdateView):
+class OwnedObjectUpdateView(PermissionRequiredMixin, SuccessMessageMixin, NextOrSuccessUrlMixin, UpdateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -158,6 +164,9 @@ class OwnedObjectUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin, Upda
             'submit_button_text': 'Save'
         })
         return context
+
+    def get_success_message(self, cleaned_data):
+        return str(self.object.pk)
 
 
 class OwnedObjectModalUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
@@ -170,8 +179,12 @@ class OwnedObjectModalUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin,
         })
         return context
 
+    def get_success_message(self, cleaned_data):
+        return str(self.object.pk)
 
-class OwnedObjectDeleteView(PermissionRequiredMixin, NextOrSuccessUrlMixin, BSModalDeleteView):
+
+class OwnedObjectModalDeleteView(PermissionRequiredMixin, NextOrSuccessUrlMixin, BSModalDeleteView):
+    template_name = 'modal_delete.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

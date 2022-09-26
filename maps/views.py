@@ -1,11 +1,10 @@
+from dal import autocomplete
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.db.models import Q
 from django.http import JsonResponse
 from django.urls import reverse, reverse_lazy
-from django.views.generic import CreateView, DeleteView, DetailView, ListView, UpdateView, TemplateView
+from django.views.generic import CreateView, DetailView, ListView, UpdateView, TemplateView
 from django.views.generic.edit import FormMixin
-
-from dal import autocomplete
 from rest_framework.exceptions import ParseError, NotFound
 from rest_framework.views import APIView, Response
 
@@ -17,7 +16,7 @@ from brit.views import (
     OwnedObjectModalDetailView,
     OwnedObjectUpdateView,
     OwnedObjectModalUpdateView,
-    OwnedObjectDeleteView,
+    OwnedObjectModalDeleteView,
     OwnedObjectModelSelectOptionsView
 )
 from maps.serializers import (
@@ -132,7 +131,7 @@ class CatchmentUpdateView(LoginRequiredMixin, UserPassesTestMixin, UpdateView):
         return self.request.user == catchment.owner
 
 
-class CatchmentDeleteView(LoginRequiredMixin, UserPassesTestMixin, DeleteView):
+class CatchmentModalDeleteView(OwnedObjectModalDeleteView):
     model = Catchment
     success_url = reverse_lazy('catchment_list')
 
@@ -606,7 +605,7 @@ class AttributeModalUpdateView(OwnedObjectModalUpdateView):
     permission_required = 'maps.change_attribute'
 
 
-class AttributeModalDeleteView(OwnedObjectDeleteView):
+class AttributeModalDeleteView(OwnedObjectModalDeleteView):
     template_name = 'modal_delete.html'
     model = Attribute
     success_message = 'Successfully deleted.'
@@ -663,7 +662,7 @@ class RegionAttributeValueModalUpdateView(OwnedObjectModalUpdateView):
     permission_required = 'maps.change_regionattributevalue'
 
 
-class RegionAttributeValueModalDeleteView(OwnedObjectDeleteView):
+class RegionAttributeValueModalDeleteView(OwnedObjectModalDeleteView):
     template_name = 'modal_delete.html'
     model = RegionAttributeValue
     success_message = 'Successfully deleted.'
