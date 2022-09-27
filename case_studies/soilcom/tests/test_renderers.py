@@ -46,7 +46,6 @@ class CollectionCSVRendererTestCase(TestCase):
         catchment = Catchment.objects.create(owner=owner, name='Test catchment', region=nuts.region_ptr)
         for i in range(1, 3):
             collection = Collection.objects.create(
-                owner=owner,
                 name=f'collection{i}',
                 catchment=catchment,
                 collector=Collector.objects.create(owner=owner, name=f'collector{1}'),
@@ -60,7 +59,6 @@ class CollectionCSVRendererTestCase(TestCase):
             collection.flyers.add(waste_flyer)
 
     def setUp(self):
-        self.owner = get_default_owner()
         self.file = BytesIO()
         self.content = CollectionFlatSerializer(Collection.objects.all(), many=True).data
 

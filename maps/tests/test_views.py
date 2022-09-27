@@ -172,7 +172,7 @@ class CatchmentModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.post(reverse('catchment-delete-modal', kwargs={'pk': self.catchment.pk}), {})
         self.assertRedirects(response, reverse('catchment-list'))
         with self.assertRaises(Catchment.DoesNotExist):
-            Catchment.objects.get(pk=self.category.pk)
+            Catchment.objects.get(pk=self.catchment.pk)
 
 
 class NutsRegionMapViewTestCase(TestCase):

@@ -12,32 +12,30 @@ from ..models import (Collection, Collector, CollectionFrequency, CollectionSyst
 
 class TestCollectionModelForm(TestCase):
 
-    def setUp(self):
-        self.owner = User.objects.create(username='owner', password='very-secure!')
-        self.catchment = Catchment.objects.create(owner=self.owner, name='Catchment')
-        self.collector = Collector.objects.create(owner=self.owner, name='Collector')
-        self.collection_system = CollectionSystem.objects.create(owner=self.owner, name='System')
-        self.waste_category = WasteCategory.objects.create(owner=self.owner, name='Category')
-        self.material_group = MaterialCategory.objects.create(owner=self.owner, name='Biowaste component')
-        self.material1 = WasteComponent.objects.create(owner=self.owner, name='Material 1')
-        self.material1.categories.add(self.material_group)
-        self.material2 = WasteComponent.objects.create(owner=self.owner, name='Material 2')
-        self.material2.categories.add(self.material_group)
-        self.frequency = CollectionFrequency.objects.create(owner=self.owner, name='fix')
+    @classmethod
+    def setUpTestData(cls):
+        cls.catchment = Catchment.objects.create(name='Catchment')
+        cls.collector = Collector.objects.create(name='Collector')
+        cls.collection_system = CollectionSystem.objects.create(name='System')
+        cls.waste_category = WasteCategory.objects.create(name='Category')
+        cls.material_group = MaterialCategory.objects.create(name='Biowaste component')
+        cls.material1 = WasteComponent.objects.create(name='Material 1')
+        cls.material1.categories.add(cls.material_group)
+        cls.material2 = WasteComponent.objects.create(name='Material 2')
+        cls.material2.categories.add(cls.material_group)
+        cls.frequency = CollectionFrequency.objects.create(name='fix')
         waste_stream = WasteStream.objects.create(
-            owner=self.owner,
-            category=self.waste_category,
+            category=cls.waste_category,
         )
-        waste_stream.allowed_materials.set([self.material1, self.material2])
-        self.collection = Collection.objects.create(
-            owner=self.owner,
-            catchment=self.catchment,
-            collector=self.collector,
-            collection_system=self.collection_system,
+        waste_stream.allowed_materials.set([cls.material1, cls.material2])
+        cls.collection = Collection.objects.create(
+            catchment=cls.catchment,
+            collector=cls.collector,
+            collection_system=cls.collection_system,
             waste_stream=waste_stream,
             connection_rate=0.7,
             connection_rate_year=2020,
-            frequency=self.frequency
+            frequency=cls.frequency
         )
 
     def test_form_errors(self):
@@ -65,7 +63,7 @@ class TestCollectionModelForm(TestCase):
             'description': 'This is a test case'
         })
         self.assertTrue(form.is_valid())
-        form.instance.owner = self.owner
+        form.instance.owner = self.collection.owner
         instance = form.save()
         self.assertIsInstance(instance, Collection)
         self.assertEqual(instance.name, f'{self.catchment} {self.waste_category} {self.collection_system}')
@@ -83,7 +81,7 @@ class TestCollectionModelForm(TestCase):
             'description': 'This is a test case'
         })
         self.assertTrue(equal_form.is_valid())
-        equal_form.instance.owner = self.owner
+        equal_form.instance.owner = self.collection.owner
         instance2 = equal_form.save()
         self.assertIsInstance(instance2.waste_stream, WasteStream)
         self.assertEqual(instance2.waste_stream.category.id, self.waste_category.id)
@@ -103,7 +101,7 @@ class TestCollectionModelForm(TestCase):
             'description': 'This is a test case'
         })
         self.assertTrue(form.is_valid())
-        form.instance.owner = self.owner
+        form.instance.owner = self.collection.owner
         instance = form.save()
         self.assertEqual(0.7, instance.connection_rate)
 
@@ -120,54 +118,43 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
         flyer_1 = WasteFlyer.objects.create(
-            owner=owner,
             url='https://www.test-flyers.org'
         )
         flyer_2 = WasteFlyer.objects.create(
-            owner=owner,
             url='https://www.best-flyers.org'
         )
         flyer_3 = WasteFlyer.objects.create(
-            owner=owner,
             url='https://www.rest-flyers.org'
         )
-        Catchment.objects.create(owner=owner, name='Catchment')
-        collector = Collector.objects.create(owner=owner, name='Collector')
-        collection_system = CollectionSystem.objects.create(owner=owner, name='System')
-        waste_category = WasteCategory.objects.create(owner=owner, name='Category')
-        material_group = MaterialCategory.objects.create(owner=owner, name='Biowaste component')
-        material1 = WasteComponent.objects.create(owner=owner, name='Material 1')
+        Catchment.objects.create(name='Catchment')
+        collector = Collector.objects.create(name='Collector')
+        collection_system = CollectionSystem.objects.create(name='System')
+        waste_category = WasteCategory.objects.create(name='Category')
+        material_group = MaterialCategory.objects.create(name='Biowaste component')
+        material1 = WasteComponent.objects.create(name='Material 1')
         material1.categories.add(material_group)
-        material2 = WasteComponent.objects.create(owner=owner, name='Material 2')
+        material2 = WasteComponent.objects.create(name='Material 2')
         material2.categories.add(material_group)
         waste_stream = WasteStream.objects.create(
-            owner=owner,
             category=waste_category,
         )
         waste_stream.allowed_materials.set([material1, material2])
-        collection1 = Collection.objects.create(
-            owner=owner,
+        cls.collection = Collection.objects.create(
             name='collection1',
             collector=collector,
             collection_system=collection_system,
             waste_stream=waste_stream,
         )
-        collection1.flyers.set([flyer_1, flyer_2])
-        collection1.flyers.add(flyer_3)
+        cls.collection.flyers.set([flyer_1, flyer_2])
+        cls.collection.flyers.add(flyer_3)
         collection2 = Collection.objects.create(
-            owner=owner,
             name='collection2',
             collector=collector,
             collection_system=collection_system,
             waste_stream=waste_stream,
         )
         collection2.flyers.set([flyer_1, flyer_2])
-
-    def setUp(self):
-        self.owner = get_default_owner()
-        self.collection = Collection.objects.get(name='collection1')
 
     def test_associated_flyer_urls_are_shown_as_initial_values(self):
         initial_urls = [{'url': flyer.url} for flyer in self.collection.flyers.all()]
@@ -204,7 +191,7 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             'form-3-url': 'https://www.fest-flyers.org',
         }
         UrlFormSet = formset_factory(UrlForm, formset=BaseWasteFlyerUrlFormSet)
-        formset = UrlFormSet(parent_object=self.collection, owner=self.owner, data=data)
+        formset = UrlFormSet(parent_object=self.collection, owner=self.collection.owner, data=data)
         self.assertTrue(formset.is_valid())
         formset.save()
         WasteFlyer.objects.get(url='https://www.fest-flyers.org')
@@ -220,7 +207,7 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             'form-2-url': initial_urls[2]['url'],
         }
         UrlFormSet = formset_factory(UrlForm, formset=BaseWasteFlyerUrlFormSet)
-        formset = UrlFormSet(parent_object=self.collection, owner=self.owner, data=data)
+        formset = UrlFormSet(parent_object=self.collection, owner=self.collection.owner, data=data)
         self.assertTrue(formset.is_valid())
         original_flyer_count = WasteFlyer.objects.count()
         formset.save()
@@ -238,7 +225,7 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             'form-2-url': '',
         }
         UrlFormSet = formset_factory(UrlForm, formset=BaseWasteFlyerUrlFormSet)
-        formset = UrlFormSet(parent_object=self.collection, owner=self.owner, data=data)
+        formset = UrlFormSet(parent_object=self.collection,data=data)
         self.assertTrue(formset.is_valid())
         original_flyer_count = WasteFlyer.objects.count()
         formset.save()
@@ -256,7 +243,7 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             'form-0-url': url,
             'form-1-url': url,
         }
-        formset = UrlFormSet(data=data, parent_object=self.collection, owner=self.owner)
+        formset = UrlFormSet(data=data, parent_object=self.collection)
         self.assertTrue(formset.is_valid())
         original_flyer_count = WasteFlyer.objects.count()
         formset.save()

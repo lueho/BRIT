@@ -1,16 +1,15 @@
-from collections import OrderedDict
 import json
-from mock import Mock, patch
+from collections import OrderedDict
 
-from django.contrib.auth.models import Permission, User
 from django.forms.formsets import BaseFormSet
 from django.http.request import QueryDict, MultiValueDict
-from django.test import RequestFactory, TestCase, modify_settings
+from django.test import RequestFactory
 from django.urls import reverse
+from mock import Mock, patch
 
+from brit.tests.testcases import ViewWithPermissionsTestCase
 from maps.models import Catchment, Region
 from materials.models import MaterialCategory
-from users.models import get_default_owner, Group
 from .. import views
 from ..forms import CollectionModelForm, BaseWasteFlyerUrlFormSet
 from ..models import (Collection, Collector, CollectionSystem, WasteCategory, WasteComponent, WasteFlyer, WasteStream,
@@ -20,15 +19,7 @@ from ..models import (Collection, Collector, CollectionSystem, WasteCategory, Wa
 # ----------- Collection Frequency CRUD --------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class CollectionFrequencyListViewTestCase(TestCase):
-
-    @classmethod
-    def setUpTestData(cls):
-        User.objects.create(username='outsider')
-
-    def setUp(self):
-        self.outsider = User.objects.get(username='outsider')
+class CollectionFrequencyListViewTestCase(ViewWithPermissionsTestCase):
 
     def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse('collectionfrequency-list'))
@@ -40,20 +31,8 @@ class CollectionFrequencyListViewTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class CollectionFrequencyCreateViewTestCase(TestCase):
-
-    @classmethod
-    def setUpTestData(cls):
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
-        members = Group.objects.create(name='members')
-        members.permissions.add(Permission.objects.get(codename='add_collectionfrequency'))
-        member.groups.add(members)
-
-    def setUp(self):
-        self.member = User.objects.get(username='member')
-        self.outsider = User.objects.get(username='outsider')
+class CollectionFrequencyCreateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'add_collectionfrequency'
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(reverse('collectionfrequency-create'))
@@ -85,20 +64,8 @@ class CollectionFrequencyCreateViewTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class CollectionFrequencyModalCreateViewTestCase(TestCase):
-
-    @classmethod
-    def setUpTestData(cls):
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
-        members = Group.objects.create(name='members')
-        members.permissions.add(Permission.objects.get(codename='add_collectionfrequency'))
-        member.groups.add(members)
-
-    def setUp(self):
-        self.member = User.objects.get(username='member')
-        self.outsider = User.objects.get(username='outsider')
+class CollectionFrequencyModalCreateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'add_collectionfrequency'
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(reverse('collectionfrequency-create-modal'))
@@ -130,20 +97,12 @@ class CollectionFrequencyModalCreateViewTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class CollectionFrequencyDetailViewTestCase(TestCase):
+class CollectionFrequencyDetailViewTestCase(ViewWithPermissionsTestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        User.objects.create(username='owner')
-        User.objects.create(username='outsider')
-        CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
-
-    def setUp(self):
-        self.owner = get_default_owner()
-        self.outsider = User.objects.get(username='outsider')
-        self.frequency = CollectionFrequency.objects.get(name='Test Frequency')
+        super().setUpTestData()
+        cls.frequency = CollectionFrequency.objects.create(name='Test Frequency')
 
     def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse('collectionfrequency-detail', kwargs={'pk': self.frequency.pk}))
@@ -155,19 +114,12 @@ class CollectionFrequencyDetailViewTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class CollectionFrequencyModalDetailViewTestCase(TestCase):
+class CollectionFrequencyModalDetailViewTestCase(ViewWithPermissionsTestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        User.objects.create(username='owner')
-        User.objects.create(username='outsider')
-        CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
-
-    def setUp(self):
-        self.outsider = User.objects.get(username='outsider')
-        self.frequency = CollectionFrequency.objects.get(name='Test Frequency')
+        super().setUpTestData()
+        cls.frequency = CollectionFrequency.objects.create(name='Test Frequency')
 
     def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse('collectionfrequency-detail-modal', kwargs={'pk': self.frequency.pk}))
@@ -179,23 +131,13 @@ class CollectionFrequencyModalDetailViewTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class CollectionFrequencyUpdateViewTestCase(TestCase):
+class CollectionFrequencyUpdateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'change_collectionfrequency'
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
-        members = Group.objects.create(name='members')
-        members.permissions.add(Permission.objects.get(codename='change_collectionfrequency'))
-        member.groups.add(members)
-        CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
-
-    def setUp(self):
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
-        self.frequency = CollectionFrequency.objects.get(name='Test Frequency')
+        super().setUpTestData()
+        cls.frequency = CollectionFrequency.objects.create(name='Test Frequency')
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(reverse('collectionfrequency-update', kwargs={'pk': self.frequency.pk}))
@@ -228,23 +170,13 @@ class CollectionFrequencyUpdateViewTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class CollectionFrequencyModalUpdateViewTestCase(TestCase):
+class CollectionFrequencyModalUpdateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'change_collectionfrequency'
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
-        members = Group.objects.create(name='members')
-        members.permissions.add(Permission.objects.get(codename='change_collectionfrequency'))
-        member.groups.add(members)
-        CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
-
-    def setUp(self):
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
-        self.frequency = CollectionFrequency.objects.get(name='Test Frequency')
+        super().setUpTestData()
+        cls.frequency = CollectionFrequency.objects.create(name='Test Frequency')
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(reverse('collectionfrequency-update-modal', kwargs={'pk': self.frequency.pk}))
@@ -283,23 +215,13 @@ class CollectionFrequencyModalUpdateViewTestCase(TestCase):
         self.assertEqual(response.status_code, 302)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class CollectionFrequencyModalDeleteViewTestCase(TestCase):
+class CollectionFrequencyModalDeleteViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'delete_collectionfrequency'
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
-        members = Group.objects.create(name='members')
-        members.permissions.add(Permission.objects.get(codename='delete_collectionfrequency'))
-        member.groups.add(members)
-        CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
-
-    def setUp(self):
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
-        self.frequency = CollectionFrequency.objects.get(name='Test Frequency')
+        super().setUpTestData()
+        cls.frequency = CollectionFrequency.objects.create(name='Test Frequency')
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(reverse('collectionfrequency-delete-modal', kwargs={'pk': self.frequency.pk}))
@@ -336,53 +258,40 @@ class CollectionFrequencyModalDeleteViewTestCase(TestCase):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-# CurrentUserMiddleware is used to track object creation and change. It causes errors in the TestCases with
-# logins. Can be disabled here because it is not relevant for these tests.
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class CollectionCreateViewTestCase(TestCase):
+class CollectionCreateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'add_collection'
 
     @classmethod
     def setUpTestData(cls):
-        owner = User.objects.create(username='owner', password='very-secure!')
-        User.objects.create(username='outsider', password='very-secure!')
-        member = User.objects.create(username='member', password='very-secure!')
-        member.user_permissions.add(Permission.objects.get(codename='add_collection'))
+        super().setUpTestData()
 
-        MaterialCategory.objects.create(owner=owner, name='Biowaste component')
-        material1 = WasteComponent.objects.create(owner=owner, name='Test material 1')
-        material2 = WasteComponent.objects.create(owner=owner, name='Test material 2')
+        MaterialCategory.objects.create(name='Biowaste component')
+        material1 = WasteComponent.objects.create(name='Test material 1')
+        material2 = WasteComponent.objects.create(name='Test material 2')
         waste_stream = WasteStream.objects.create(
-            owner=owner,
             name='Test waste stream',
-            category=WasteCategory.objects.create(owner=owner, name='Test category'),
+            category=WasteCategory.objects.create(name='Test category'),
         )
         waste_stream.allowed_materials.add(material1)
         waste_stream.allowed_materials.add(material2)
 
         waste_flyer = WasteFlyer.objects.create(
-            owner=owner,
             abbreviation='WasteFlyer123',
             url='https://www.test-flyer.org'
         )
-        frequency = CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
-        collection1 = Collection.objects.create(
-            owner=owner,
+        frequency = CollectionFrequency.objects.create(name='Test Frequency')
+        cls.collection = Collection.objects.create(
             name='collection1',
-            catchment=Catchment.objects.create(owner=owner, name='Test catchment'),
-            collector=Collector.objects.create(owner=owner, name='Test collector'),
-            collection_system=CollectionSystem.objects.create(owner=owner, name='Test system'),
+            catchment=Catchment.objects.create(name='Test catchment'),
+            collector=Collector.objects.create(name='Test collector'),
+            collection_system=CollectionSystem.objects.create(name='Test system'),
             waste_stream=waste_stream,
             connection_rate=0.7,
             connection_rate_year=2020,
             frequency=frequency,
             description='This is a test case.'
         )
-        collection1.flyers.add(waste_flyer)
-
-    def setUp(self):
-        self.collection = Collection.objects.first()
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
+        cls.collection.flyers.add(waste_flyer)
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(reverse('collection-create'))
@@ -465,53 +374,40 @@ class CollectionCreateViewTestCase(TestCase):
         self.assertEqual(Collection.objects.count(), 2)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class CollectionCopyViewTestCase(TestCase):
+class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'add_collection'
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
-        member.user_permissions.add(Permission.objects.get(codename='add_collection'))
+        super().setUpTestData()
 
-        MaterialCategory.objects.create(owner=owner, name='Biowaste component')
-        material1 = WasteComponent.objects.create(owner=owner, name='Test material 1')
-        material2 = WasteComponent.objects.create(owner=owner, name='Test material 2')
+        MaterialCategory.objects.create(name='Biowaste component')
+        material1 = WasteComponent.objects.create(name='Test material 1')
+        material2 = WasteComponent.objects.create(name='Test material 2')
         waste_stream = WasteStream.objects.create(
-            owner=owner,
             name='Test waste stream',
-            category=WasteCategory.objects.create(owner=owner, name='Test category'),
+            category=WasteCategory.objects.create(name='Test category'),
         )
         waste_stream.allowed_materials.add(material1)
         waste_stream.allowed_materials.add(material2)
 
-        waste_flyer = WasteFlyer.objects.create(
-            owner=owner,
+        cls.flyer = WasteFlyer.objects.create(
             abbreviation='WasteFlyer123',
             url='https://www.test-flyer.org'
         )
-        frequency = CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
-        collection = Collection.objects.create(
-            owner=owner,
+        frequency = CollectionFrequency.objects.create(name='Test Frequency')
+        cls.collection = Collection.objects.create(
             name='collection1',
-            catchment=Catchment.objects.create(owner=owner, name='Test catchment'),
-            collector=Collector.objects.create(owner=owner, name='Test collector'),
-            collection_system=CollectionSystem.objects.create(owner=owner, name='Test system'),
+            catchment=Catchment.objects.create(name='Test catchment'),
+            collector=Collector.objects.create(name='Test collector'),
+            collection_system=CollectionSystem.objects.create(name='Test system'),
             waste_stream=waste_stream,
             connection_rate=0.7,
             connection_rate_year=2020,
             frequency=frequency,
             description='This is a test case.'
         )
-        collection.flyers.add(waste_flyer)
-
-    def setUp(self):
-        self.owner = get_default_owner()
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
-        self.collection = Collection.objects.get(name='collection1')
-        self.flyer = self.collection.flyers.get(url='https://www.test-flyer.org')
+        cls.collection.flyers.add(cls.flyer)
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(reverse('collection-copy', kwargs={'pk': self.collection.id}))
@@ -590,7 +486,7 @@ class CollectionCopyViewTestCase(TestCase):
         self.client.force_login(self.member)
         data = {
             'catchment': Catchment.objects.first().id,
-            'collector': Collector.objects.create(owner=self.owner, name='New Test Collector').id,
+            'collector': Collector.objects.create(name='New Test Collector').id,
             'collection_system': CollectionSystem.objects.first().id,
             'waste_category': WasteCategory.objects.first().id,
             'allowed_materials': [c.id for c in WasteComponent.objects.all()],
@@ -653,52 +549,39 @@ class CollectionCopyViewTestCase(TestCase):
         self.assertEqual(flyer.url, self.flyer.url)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class CollectionUpdateViewTestCase(TestCase):
+class CollectionUpdateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'change_collection'
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
-        member.user_permissions.add(Permission.objects.get(codename='change_collection'))
-
-        MaterialCategory.objects.create(owner=owner, name='Biowaste component')
-        material1 = WasteComponent.objects.create(owner=owner, name='Test material 1')
-        material2 = WasteComponent.objects.create(owner=owner, name='Test material 2')
+        super().setUpTestData()
+        MaterialCategory.objects.create(name='Biowaste component')
+        material1 = WasteComponent.objects.create(name='Test material 1')
+        material2 = WasteComponent.objects.create(name='Test material 2')
         waste_stream = WasteStream.objects.create(
-            owner=owner,
             name='Test waste stream',
-            category=WasteCategory.objects.create(owner=owner, name='Test category'),
+            category=WasteCategory.objects.create(name='Test category'),
         )
         waste_stream.allowed_materials.add(material1)
         waste_stream.allowed_materials.add(material2)
 
         waste_flyer = WasteFlyer.objects.create(
-            owner=owner,
             abbreviation='WasteFlyer123',
             url='https://www.test-flyer.org'
         )
-        frequency = CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
-        collection1 = Collection.objects.create(
-            owner=owner,
+        frequency = CollectionFrequency.objects.create(name='Test Frequency')
+        cls.collection = Collection.objects.create(
             name='collection1',
-            catchment=Catchment.objects.create(owner=owner, name='Test catchment'),
-            collector=Collector.objects.create(owner=owner, name='Test collector'),
-            collection_system=CollectionSystem.objects.create(owner=owner, name='Test system'),
+            catchment=Catchment.objects.create(name='Test catchment'),
+            collector=Collector.objects.create(name='Test collector'),
+            collection_system=CollectionSystem.objects.create(name='Test system'),
             waste_stream=waste_stream,
             connection_rate=0.7,
             connection_rate_year=2020,
             frequency=frequency,
             description='This is a test case.'
         )
-        collection1.flyers.add(waste_flyer)
-
-    def setUp(self):
-        self.owner = get_default_owner()
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
-        self.collection = Collection.objects.first()
+        cls.collection.flyers.add(waste_flyer)
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(reverse('collection-update', kwargs={'pk': self.collection.id}))
@@ -889,50 +772,40 @@ class CollectionUpdateViewTestCase(TestCase):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CollectionSummaryAPIViewTestCase(TestCase):
+class CollectionSummaryAPIViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'change_collection'
 
     @classmethod
     def setUpTestData(cls):
-        owner = User.objects.create(username='owner', password='very-secure!')
-        User.objects.create(username='outsider', password='very-secure!')
-        member = User.objects.create(username='member', password='very-secure!')
-        member.user_permissions.add(Permission.objects.get(codename='change_collection'))
+        super().setUpTestData()
 
-        MaterialCategory.objects.create(owner=owner, name='Biowaste component')
-        material1 = WasteComponent.objects.create(owner=owner, name='Test material 1')
-        material2 = WasteComponent.objects.create(owner=owner, name='Test material 2')
+        MaterialCategory.objects.create(name='Biowaste component')
+        material1 = WasteComponent.objects.create(name='Test material 1')
+        material2 = WasteComponent.objects.create(name='Test material 2')
         waste_stream = WasteStream.objects.create(
-            owner=owner,
             name='Test waste stream',
-            category=WasteCategory.objects.create(owner=owner, name='Test category'),
+            category=WasteCategory.objects.create(name='Test category'),
         )
         waste_stream.allowed_materials.add(material1)
         waste_stream.allowed_materials.add(material2)
 
         waste_flyer = WasteFlyer.objects.create(
-            owner=owner,
             abbreviation='WasteFlyer123',
             url='https://www.test-flyer.org'
         )
-        frequency = CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
-        collection1 = Collection.objects.create(
-            owner=owner,
+        frequency = CollectionFrequency.objects.create(name='Test Frequency')
+        cls.collection = Collection.objects.create(
             name='collection1',
-            catchment=Catchment.objects.create(owner=owner, name='Test catchment'),
-            collector=Collector.objects.create(owner=owner, name='Test collector'),
-            collection_system=CollectionSystem.objects.create(owner=owner, name='Test system'),
+            catchment=Catchment.objects.create(name='Test catchment'),
+            collector=Collector.objects.create(name='Test collector'),
+            collection_system=CollectionSystem.objects.create(name='Test system'),
             waste_stream=waste_stream,
             connection_rate=0.7,
             connection_rate_year=2020,
             frequency=frequency,
             description='This is a test case.'
         )
-        collection1.flyers.add(waste_flyer)
-
-    def setUp(self):
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
-        self.collection = Collection.objects.first()
+        cls.collection.flyers.add(waste_flyer)
 
     def test_get_http_200_ok_for_group_members(self):
         self.client.force_login(self.member)
@@ -962,39 +835,32 @@ class CollectionSummaryAPIViewTestCase(TestCase):
 
 
 @patch('case_studies.soilcom.tasks.export_collections_to_file.delay')
-class CollectionListFileExportViewTestCase(TestCase):
+class CollectionListFileExportViewTestCase(ViewWithPermissionsTestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
-        member.user_permissions.add(Permission.objects.get(codename='add_collection'))
-
-        MaterialCategory.objects.create(owner=owner, name='Biowaste component')
-        material1 = WasteComponent.objects.create(owner=owner, name='Test material 1')
-        material2 = WasteComponent.objects.create(owner=owner, name='Test material 2')
+        super().setUpTestData()
+        MaterialCategory.objects.create(name='Biowaste component')
+        material1 = WasteComponent.objects.create(name='Test material 1')
+        material2 = WasteComponent.objects.create(name='Test material 2')
         waste_stream = WasteStream.objects.create(
-            owner=owner,
             name='Test waste stream',
-            category=WasteCategory.objects.create(owner=owner, name='Test category'),
+            category=WasteCategory.objects.create(name='Test category'),
         )
         waste_stream.allowed_materials.add(material1)
         waste_stream.allowed_materials.add(material2)
 
         waste_flyer = WasteFlyer.objects.create(
-            owner=owner,
             abbreviation='WasteFlyer123',
             url='https://www.test-flyer.org'
         )
-        frequency = CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
+        frequency = CollectionFrequency.objects.create(name='Test Frequency')
         for i in range(1, 3):
             collection = Collection.objects.create(
-                owner=owner,
                 name=f'collection{i}',
-                catchment=Catchment.objects.create(owner=owner, name='Test catchment'),
-                collector=Collector.objects.create(owner=owner, name='Test collector'),
-                collection_system=CollectionSystem.objects.create(owner=owner, name='Test system'),
+                catchment=Catchment.objects.create(name='Test catchment'),
+                collector=Collector.objects.create(name='Test collector'),
+                collection_system=CollectionSystem.objects.create(name='Test system'),
                 waste_stream=waste_stream,
                 connection_rate=0.7,
                 connection_rate_year=2020,
@@ -1004,7 +870,6 @@ class CollectionListFileExportViewTestCase(TestCase):
             collection.flyers.add(waste_flyer)
 
     def setUp(self):
-        self.member = User.objects.get(username='member')
         self.mock_task = Mock()
         self.mock_task.task_id = '1234'
 
@@ -1028,46 +893,26 @@ class CollectionListFileExportViewTestCase(TestCase):
         self.assertDictEqual(expected_response, json.loads(response.content))
 
 
-class WasteFlyerListViewTestCase(TestCase):
+class WasteFlyerListViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ('view_wasteflyer', 'change_wasteflyer',)
 
     @classmethod
     def setUpTestData(cls):
-        owner = User.objects.create(username='owner', password='very-secure!')
-        User.objects.create(username='outsider', password='very-secure!')
-        member = User.objects.create(username='member', password='very-secure!')
-        member.user_permissions.add(Permission.objects.get(codename='view_wasteflyer'))
-        member.user_permissions.add(Permission.objects.get(codename='change_wasteflyer'))
+        super().setUpTestData()
         WasteFlyer.objects.create(
-            owner=owner,
             abbreviation='Flyer1',
             url='https://www.test-flyer.org'
         )
         WasteFlyer.objects.create(
-            owner=owner,
             abbreviation='Flyer2',
             url='https://www.best-flyer.org'
         )
         WasteFlyer.objects.create(
-            owner=owner,
             abbreviation='Flyer3',
             url='https://www.rest-flyer.org'
         )
 
-    def setUp(self):
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
-
-    def test_get_http_302_redirect_for_anonymous(self):
-        response = self.client.get(reverse('wasteflyer-list'))
-        self.assertEqual(response.status_code, 302)
-
-    def test_get_http_403_forbidden_for_outsider(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('wasteflyer-list'))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_member(self):
-        self.client.force_login(self.member)
+    def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse('wasteflyer-list'))
         self.assertEqual(response.status_code, 200)
 
@@ -1083,20 +928,13 @@ class WasteFlyerListViewTestCase(TestCase):
         self.assertContains(response, 'check urls')
 
 
-class WasteFlyerDetailViewTestCase(TestCase):
+class WasteFlyerDetailViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'change_wasteflyer'
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
-        member.user_permissions.add(Permission.objects.get(codename='change_wasteflyer'))
-        WasteFlyer.objects.create(owner=owner, abbreviation='TEST')
-
-    def setUp(self):
-        self.outsider = User.objects.get(username='outsider')
-        self.member = User.objects.get(username='member')
-        self.flyer = WasteFlyer.objects.get(abbreviation='TEST')
+        super().setUpTestData()
+        cls.flyer = WasteFlyer.objects.create(abbreviation='TEST')
 
     def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse('wasteflyer-detail', kwargs={'pk': self.flyer.pk}))
@@ -1118,28 +956,15 @@ class WasteFlyerDetailViewTestCase(TestCase):
         self.assertNotContains(response, 'check url')
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
-class WasteCollectionMapViewTestCase(TestCase):
+class WasteCollectionMapViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ('add_collection', 'view_collection', 'change_collection', 'delete_collection')
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
-        members = Group.objects.create(name='members')
-        members.permissions.add(Permission.objects.get(codename='add_collection'))
-        members.permissions.add(Permission.objects.get(codename='view_collection'))
-        members.permissions.add(Permission.objects.get(codename='change_collection'))
-        members.permissions.add(Permission.objects.get(codename='delete_collection'))
-        member.groups.add(members)
-        region = Region.objects.create(owner=owner, name='Test Region')
-        catchment = Catchment.objects.create(owner=owner, name='Test Catchment', region=region)
-        Collection.objects.create(owner=owner, name='Test Collection', catchment=catchment)
-
-    def setUp(self):
-        self.member = User.objects.get(username='member')
-        self.outsider = User.objects.get(username='outsider')
-        self.collection = Collection.objects.get(name='Test Collection')
+        super().setUpTestData()
+        region = Region.objects.create(name='Test Region')
+        catchment = Catchment.objects.create(name='Test Catchment', region=region)
+        cls.collection = Collection.objects.create(name='Test Collection', catchment=catchment)
 
     def test_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse('WasteCollection'))
@@ -1196,28 +1021,18 @@ class WasteCollectionMapViewTestCase(TestCase):
         self.assertNotContains(response, 'Waste collection dashboard')
 
 
-class WasteFlyerListCheckUrlsView(TestCase):
+class WasteFlyerListCheckUrlsView(ViewWithPermissionsTestCase):
+    member_permissions = 'change_wasteflyer'
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        cls.member = User.objects.create(username='member')
-        members = Group.objects.create(name='members')
-        members.permissions.add(Permission.objects.get(codename='add_wasteflyer'))
-        members.permissions.add(Permission.objects.get(codename='view_wasteflyer'))
-        members.permissions.add(Permission.objects.get(codename='change_wasteflyer'))
-        members.permissions.add(Permission.objects.get(codename='delete_wasteflyer'))
-        cls.member.groups.add(members)
+        super().setUpTestData()
         for i in range(1, 5):
             WasteFlyer.objects.create(
-                owner=owner,
                 title=f'Waste flyer {i}',
                 abbreviation=f'WF{i}',
                 url_valid=i % 2 == 0
             )
-
-    def setUp(self):
-        pass
 
     def test_get_http_200_ok_for_members(self):
         self.client.force_login(self.member)
