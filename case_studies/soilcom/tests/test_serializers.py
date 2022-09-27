@@ -22,13 +22,14 @@ from ..serializers import CollectionModelSerializer, CollectionFlatSerializer
 
 class FieldLabelMixinTestCase(TestCase):
 
-    def setUp(self):
+    @classmethod
+    def setUp(cls):
         class TestSerializer(FieldLabelMixin, Serializer):
             char = CharField(label='Text')
             integer = IntegerField(label='Number')
 
-        self.data = {'char': 'abc', 'integer': 123}
-        self.serializer = TestSerializer
+        cls.data = {'char': 'abc', 'integer': 123}
+        cls.serializer = TestSerializer
 
         class TestModel(models.Model):
             char = models.CharField(verbose_name='Text')
@@ -39,12 +40,11 @@ class FieldLabelMixinTestCase(TestCase):
                 model = Collector
                 fields = ('name', 'website')
 
-        self.model_serializer = TestModelSerializer
-        self.model = TestModel
+        cls.model_serializer = TestModelSerializer
+        cls.model = TestModel
         # self.object = TestModel.objects.create(**self.data)
-        owner = User.objects.create(username='owner', password='very-secure!')
-        self.tdata = {'name': 'Test collector', 'website': 'https://www.flyer.org'}
-        self.object = Collector.objects.create(owner=owner, **self.tdata)
+        cls.tdata = {'name': 'Test collector', 'website': 'https://www.flyer.org'}
+        cls.object = Collector.objects.create(**cls.tdata)
 
     def test_serializer_init_sets_label_names_as_keys_attribute(self):
         serializer = self.serializer(field_labels_as_keys=True)
@@ -92,47 +92,38 @@ class CollectionSerializerTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = User.objects.create(username='owner', password='very-secure!')
-
-        MaterialCategory.objects.create(owner=owner, name='Biowaste component')
-        material1 = WasteComponent.objects.create(owner=owner, name='Test material 1')
-        material2 = WasteComponent.objects.create(owner=owner, name='Test material 2')
+        MaterialCategory.objects.create(name='Biowaste component')
+        material1 = WasteComponent.objects.create(name='Test material 1')
+        material2 = WasteComponent.objects.create(name='Test material 2')
         waste_stream = WasteStream.objects.create(
-            owner=owner,
             name='Test waste stream',
-            category=WasteCategory.objects.create(owner=owner, name='Test category'),
+            category=WasteCategory.objects.create(name='Test category'),
         )
         waste_stream.allowed_materials.add(material1)
         waste_stream.allowed_materials.add(material2)
 
         waste_flyer_1 = WasteFlyer.objects.create(
-            owner=owner,
             abbreviation='WasteFlyer123',
             url='https://www.test-flyer.org'
         )
         waste_flyer_2 = WasteFlyer.objects.create(
-            owner=owner,
             abbreviation='WasteFlyer456',
             url='https://www.best-flyer.org'
         )
-        frequency = CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
-        collection = Collection.objects.create(
-            owner=owner,
+        frequency = CollectionFrequency.objects.create(name='Test Frequency')
+        cls.collection = Collection.objects.create(
             name='Test Collection',
-            catchment=Catchment.objects.create(owner=owner, name='Test catchment'),
-            collector=Collector.objects.create(owner=owner, name='Test collector'),
-            collection_system=CollectionSystem.objects.create(owner=owner, name='Test system'),
+            catchment=Catchment.objects.create(name='Test catchment'),
+            collector=Collector.objects.create(name='Test collector'),
+            collection_system=CollectionSystem.objects.create(name='Test system'),
             waste_stream=waste_stream,
             frequency=frequency,
             connection_rate=0.7,
             connection_rate_year=2020,
             description='This is a test case.'
         )
-        collection.flyers.add(waste_flyer_1)
-        collection.flyers.add(waste_flyer_2)
-
-    def setUp(self):
-        self.collection = Collection.objects.get(name='Test Collection')
+        cls.collection.flyers.add(waste_flyer_1)
+        cls.collection.flyers.add(waste_flyer_2)
 
     def test_multiple_sources_in_representation(self):
         serializer = CollectionModelSerializer(self.collection)
@@ -195,8 +186,7 @@ class CollectionFlatSerializerTestCase(TestCase):
         RegionAttributeValue(owner=owner, region=nutsregion, attribute=population, value=123321)
         RegionAttributeValue(owner=owner, region=nutsregion, attribute=population_density, value=123.5)
         catchment1 = Catchment.objects.create(owner=owner, name='Test Catchment', region=nutsregion.region_ptr)
-        collection1 = Collection.objects.create(
-            owner=owner,
+        cls.collection_nuts = Collection.objects.create(
             created_by=owner,
             lastmodified_by=owner,
             name='Test Collection Nuts',
@@ -209,13 +199,12 @@ class CollectionFlatSerializerTestCase(TestCase):
             connection_rate_year=2020,
             description='This is a test case.'
         )
-        collection1.flyers.add(waste_flyer_1)
-        collection1.flyers.add(waste_flyer_2)
+        cls.collection_nuts.flyers.add(waste_flyer_1)
+        cls.collection_nuts.flyers.add(waste_flyer_2)
 
         lauregion = LauRegion.objects.create(owner=owner, name='Shetland Islands', cntr_code='UK', lau_id='S30000041')
         catchment2 = Catchment.objects.create(owner=owner, name='Test Catchment', region=lauregion.region_ptr)
-        collection2 = Collection.objects.create(
-            owner=owner,
+        cls.collection_lau = Collection.objects.create(
             created_by=owner,
             lastmodified_by=owner,
             name='Test Collection Lau',
@@ -228,12 +217,8 @@ class CollectionFlatSerializerTestCase(TestCase):
             connection_rate_year=2020,
             description='This is a test case.'
         )
-        collection2.flyers.add(waste_flyer_1)
-        collection2.flyers.add(waste_flyer_2)
-
-    def setUp(self):
-        self.collection_nuts = Collection.objects.get(name='Test Collection Nuts')
-        self.collection_lau = Collection.objects.get(name='Test Collection Lau')
+        cls.collection_lau.flyers.add(waste_flyer_1)
+        cls.collection_lau.flyers.add(waste_flyer_2)
 
     def test_serializer_data_contains_all_fields(self):
         serializer = CollectionFlatSerializer(self.collection_nuts)
