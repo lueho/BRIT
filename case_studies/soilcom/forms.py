@@ -5,7 +5,7 @@ from django import forms
 from django.forms import BaseFormSet, Form
 
 from bibliography.models import Source
-from brit.forms import CustomModelForm, CustomModalModelForm
+from brit.forms import CustomModelForm, CustomModalModelForm, ForeignkeyField
 from materials.models import Material, MaterialCategory
 from users.models import get_default_owner
 from . import models
@@ -187,10 +187,6 @@ class FormSetHelper(FormHelper):
         self.template = 'bootstrap4/dynamic_table_inline_formset.html'
         self.form_method = 'post'
         self.add_input(Submit("submit", "Save"))
-
-
-class ForeignkeyField(Field):
-    template = 'foreignkey-field.html'
 
 
 class CollectionModelForm(forms.ModelForm):
