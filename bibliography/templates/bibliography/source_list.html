@@ -19,9 +19,15 @@
                 <td><a href="{{ object.get_absolute_url }}">{{ object.abbreviation }}</a></td>
                 <td>
                 {% if object.authors.exists %}
-                    {% for author in object.authors.all %}
-                    <a href="{{ author.get_absolute_url }}">{{ author.abbreviated_full_name }}</a>{% if not forloop.last %};{% endif %}
-                    {% endfor %}
+                    {% if object.authors.count > 2 %}
+                        {% for author in object.authors.all %}
+                        <a href="{{ author.get_absolute_url }}">{{ author.abbreviated_full_name }}</a>{% if not forloop.last %};{% endif %}
+                        {% endfor %}
+                    {% else %}
+                        {% for author in object.authors.all %}
+                        <a href="{{ author.get_absolute_url }}">{{ author }}</a>{% if not forloop.last %};{% endif %}
+                        {% endfor %}
+                    {% endif %}
                 {% elif object.publisher %}
                     {{ object.publisher }}
                 {% endif %}
