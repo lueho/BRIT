@@ -25,7 +25,9 @@
                         {{ object.series.material.name }}
                     </a>
                 </td>
-                <td>{{ object.timestep.name }}</td>
+                <td><a href="{% url 'timestep-detail-modal' object.timestep.pk %}" class="modal-link">
+                    {{ object.timestep.name }}
+                </a></td>
             </tr>
         {% endfor %}
         </tbody>

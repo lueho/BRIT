@@ -19,6 +19,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('users/', include('users.urls')),
     path('contributors/', ContributorsView.as_view(), name='contributors'),
+    path('distributions/', include('distributions.urls')),
     path('maps/', include('maps.urls')),
     path('materials/', include('materials.urls')),
     path('sources/', include('sources.urls')),
