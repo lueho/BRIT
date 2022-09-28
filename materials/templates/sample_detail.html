@@ -18,13 +18,15 @@
                 <div class="card-body">
                     <p class="card-text">
                         <b>Material:</b><br>
-                        <a href="{{ data.material_url }}" class="modal-link">{{ data.material_name }}</a>
+                        <a href="{% url 'material-detail-modal' object.series.material.pk %}"
+                           class="modal-link">{{ object.series.material.name }}</a>
                     </p>
 
-                    {% if data.series_name %}
+                    {% if object.series %}
                         <p class="card-text">
                             <b>Series:</b><br>
-                            <a href="{{ data.series_url }}" class="modal-link">{{ data.series_name }}</a>
+                            <a href="{% url 'sampleseries-detail-modal' object.series.pk %}"
+                               class="modal-link">{{ object.series.name }}</a>
                         </p>
                     {% endif %}
 
@@ -52,7 +54,7 @@
                     {% if data.sources %}
                         <p class="card-text">
                             <b>Sources:</b><br>
-                            {% for source in data.sources %}
+                            {% for source in object.sources.all %}
                                 <a href="{% url 'source-detail-modal' source.pk %}" class="modal-link">
                                     {{ source.abbreviation }}{% if not forloop.last %},{% endif %}
                                 </a>
@@ -62,8 +64,8 @@
 
                     {% if perms.materials %}
                         <p class="card-text"><strong><label for="id_toggle_edit">Edit:</label></strong><br>
-                        <span data-toggle="collapse" data-target=".multi-collapse" aria-expanded="false"
-                              aria-controls="add-component-group">
+                            <span data-toggle="collapse" data-target=".multi-collapse" aria-expanded="false"
+                                  aria-controls="add-component-group">
                                 <input id="id_toggle_edit" type="checkbox" data-toggle="toggle" data-on="On"
                                        data-off="Off" data-onstyle="primary" data-offstyle="secondary" data-size="mini">
                         </span>
@@ -73,17 +75,30 @@
                 </div>
                 <div class="card-footer">
                     <div class="collapse multi-collapse">
-                        <a href="{% url 'sample-update-modal' object.id %}?next={{ request.path }}"
-                           class="modal-link">
-                            <i class="fas fa-fw fa-edit"></i> Edit
-                        </a>
-                        <a href="{% url 'sample-duplicate-modal' object.id %}"
-                           class="modal-link">
-                            <i class="fas fa-fw fa-copy"></i> Duplicate
-                        </a>
-                        <a href="{% url 'material-dashboard' %}">
-                            <i class="fas fa-fw fa-cog"></i> Dashboard
-                        </a>
+                        {% if 'materials.change_sample' in perms %}
+                            <a href="{% url 'sample-update-modal' object.id %}?next={{ request.path }}"
+                               class="modal-link nowrap mr-3">
+                                <i class="fas fa-fw fa-edit"></i> Edit
+                            </a>
+                        {% endif %}
+                        {% if 'materials.change_sample' in perms %}
+                            <a href="{% url 'sample-add-source' object.pk %}"
+                               class="nowrap mr-3">
+                                <i class="fas fa-fw fa-book-open"></i> Add source
+                            </a>
+                        {% endif %}
+                        {% if 'materials.add_sample' in perms %}
+                            <a href="{% url 'sample-duplicate-modal' object.id %}"
+                               class="modal-link nowrap mr-3">
+                                <i class="fas fa-fw fa-copy"></i> Duplicate
+                            </a>
+                        {% endif %}
+                        {% if 'materials.view_material' in perms %}
+                            <a href="{% url 'material-dashboard' %}"
+                               class="nowrap mr-3">
+                                <i class="fas fa-fw fa-cog"></i> Dashboard
+                            </a>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -104,11 +119,12 @@
                         </tr>
                         </thead>
                         <tbody>
-                        {% for property in data.properties %}
+                        {% for property in object.properties.all %}
                             <tr>
-                                <td><a href="{{ property.property_url }}"
-                                       class="modal-link">{{ property.property_name }}</a></td>
-                                <td>{{ property.average }} ± {{ property.standard_deviation }} {{ property.unit }}</td>
+                                <td><a href="{% url 'materialproperty-detail-modal' property.property.pk %}"
+                                       class="modal-link">{{ property.property.name }}</a></td>
+                                <td>{{ property.average }}
+                                    ± {{ property.standard_deviation }} {{ property.property.unit }}</td>
 
                                 <td class="collapse multi-collapse">
                                     <div class="collapse multi-collapse">
@@ -265,20 +281,20 @@
         const charts = JSON.parse(document.getElementById("charts").textContent);
 
         Object.keys(charts).forEach(key => {
-            let container = document.getElementById(key)
-            let canvas = document.createElement('canvas')
-            canvas.setAttribute('id', key)
-            container.appendChild(canvas)
+            let container = document.getElementById(key);
+            let canvas = document.createElement('canvas');
+            canvas.setAttribute('id', key);
+            container.appendChild(canvas);
             new Chart(canvas.getContext('2d'), charts[key]);
-        })
+        });
 
-        window.onload = function () {
+        window.onload = function() {
             {% if 'materials.change_material' in perms %}
-                const btn = document.getElementById('id_toggle_edit')
-                btn.click()
-                $('#id_toggle_edit').bootstrapToggle('on')
+                const btn = document.getElementById('id_toggle_edit');
+                btn.click();
+                $('#id_toggle_edit').bootstrapToggle('on');
             {% endif %}
-        }
+        };
 
     </script>
 

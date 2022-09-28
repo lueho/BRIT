@@ -2,13 +2,13 @@ from bootstrap_modal_forms.forms import BSModalModelForm, BSModalForm
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Row, Field
 from django import forms
-from django.forms import Form
+from django.forms import Form, ModelMultipleChoiceField
 from django.core.exceptions import ValidationError
 from django.forms.models import BaseInlineFormSet
 from django.utils.safestring import mark_safe
 from extra_views import InlineFormSetFactory
 
-from bibliography.models import Source
+from bibliography.models import Source, SOURCE_TYPES
 from brit.forms import CustomModelForm, CustomModalModelForm, ModalFormHelper
 from distributions.models import TemporalDistribution
 from .models import (
@@ -132,9 +132,13 @@ class SampleModelForm(CustomModelForm):
 
 
 class SampleModalModelForm(CustomModalModelForm):
+    sources = ModelMultipleChoiceField(
+        queryset=Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by('abbreviation'),
+        required=False
+    )
     class Meta:
         model = Sample
-        fields = ('name', 'series', 'timestep', 'taken_at', 'description', 'preview')
+        fields = ('name', 'series', 'timestep', 'taken_at', 'description', 'preview', 'sources')
 
 
 class CompositionModelForm(CustomModelForm):

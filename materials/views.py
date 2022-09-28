@@ -24,8 +24,10 @@ from brit.views import (
     UserOwnsObjectMixin,
     NextOrSuccessUrlMixin
 )
+from bibliography.forms import SourceSimpleFilterForm
 from distributions.models import TemporalDistribution
 from distributions.plots import DoughnutChart
+
 from . import forms
 from .filters import CompositionFilterSet, MaterialFilterSet, SampleFilter, SampleFilterSet, SampleSeriesFilterSet
 from .forms import (
@@ -558,6 +560,18 @@ class SampleModalAddPropertyView(OwnedObjectModalCreateView):
 
     def get_success_url(self):
         return reverse('sample-detail', kwargs={'pk': self.kwargs.get('pk')})
+
+
+class SampleAddSourceView(OwnedObjectUpdateView):
+    model = Sample
+    form_class = SourceSimpleFilterForm
+    template_name = 'simple_form_card.html'
+    permission_required = 'materials.change_sample'
+
+    def form_valid(self, form):
+        if not self.request.is_ajax():
+            self.object.sources.add(form.cleaned_data['source'])
+        return HttpResponseRedirect(self.get_success_url())
 
 
 class SampleCreateDuplicateView(OwnedObjectUpdateView):
