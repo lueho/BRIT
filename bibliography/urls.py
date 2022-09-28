@@ -30,5 +30,6 @@ urlpatterns = [
     path('sources/<int:pk>/check_url_in_task/', views.SourceCheckUrlView.as_view(), name='source-check-url'),
     path('sources/check_url_in_task/<str:task_id>/progress/', views.SourceCheckUrlProgressView.as_view(), name='source-check-url-progress'),
     path('sources/list/check_urls/', views.SourceListCheckUrlsView.as_view(), name='source-list-check-urls'),
+    path('sources/autocomplete/', views.SourceAutocompleteView.as_view(), name='source-autocomplete'),
 ]
 
