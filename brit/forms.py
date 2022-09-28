@@ -37,3 +37,6 @@ class CustomModalModelForm(BSModalModelForm):
     @property
     def helper(self):
         return ModalFormHelper()
+
+class ForeignkeyField(Field):
+    template = 'foreignkey-field.html'
