@@ -8,7 +8,9 @@
 </div>
 <div class="modal-body">
     <p class="card-text"><strong>Name:</strong><br>{{ object.name }}</p>
-    <p class="card-text"><strong>Description:</strong><br>{{ object.description }}</p>
+    {% if object.description %}
+        <p class="card-text"><strong>Description:</strong><br>{{ object.description }}</p>
+    {% endif %}
 </div>
 
 <div class="modal-footer">
