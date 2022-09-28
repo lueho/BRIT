@@ -1,7 +1,9 @@
+from dal.autocomplete import Select2QuerySetView
 import json
 
 from celery.result import AsyncResult
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.db.models import Q
 from django.http import HttpResponse
 from django.urls import reverse_lazy
 from django.views import View
@@ -254,3 +256,12 @@ class SourceListCheckUrlsView(PermissionRequiredMixin, View):
             'task_id': task.task_id
         }
         return HttpResponse(json.dumps(response_data), content_type='application/json')
+
+
+class SourceAutocompleteView(Select2QuerySetView):
+    def get_queryset(self):
+
+        qs = Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by('abbreviation')
+        if self.q:
+            qs = qs.filter(Q(title__icontains=self.q) | Q(authors__last_names__icontains=self.q) | Q(authors__first_names__icontains=self.q)).distinct()
+        return qs

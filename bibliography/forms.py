@@ -1,7 +1,8 @@
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout
-from django.forms import DateInput, Form, ModelMultipleChoiceField
-from brit.forms import CustomModalModelForm, OwnedObjectModelForm
+from crispy_forms.layout import Field, Layout, Submit
+from dal.autocomplete import ModelSelect2
+from django.forms import DateInput, Form, ModelChoiceField, ModelMultipleChoiceField
+from brit.forms import CustomModelForm, CustomModalModelForm, OwnedObjectModelForm
 
 from .models import Author, Licence, Source
 
@@ -82,3 +83,27 @@ class SourceFilterForm(Form):
         self.fields['abbreviation'].widget.attrs = {'data-theme': 'bootstrap4'}
         self.fields['authors'].widget.attrs = {'data-theme': 'bootstrap4'}
         self.fields['title'].widget.attrs = {'data-theme': 'bootstrap4'}
+
+
+class SourceSimpleFilterFormHelper(FormHelper):
+    form_tag = False
+    include_media = False
+    layout = Layout(
+        Field('source'),
+        Submit('submit', 'Add')
+    )
+
+class SourceSimpleFilterForm(CustomModelForm):
+    source = ModelChoiceField(queryset=Source.objects.all(), widget=ModelSelect2(url='source-autocomplete'))
+
+    class Meta:
+        model = Source
+        fields = ('source',)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['source'].widget.attrs = {'data-theme': 'bootstrap4'}
+
+    @property
+    def helper(self):
+        return SourceSimpleFilterFormHelper()
