@@ -118,7 +118,7 @@ class SampleSeries(NamedUserObjectModel):
     distribution of material properties and compositions over time can be described.
     """
     material = models.ForeignKey(Material, on_delete=models.PROTECT)
-    preview = models.ImageField(default='materials/img/generic_material.jpg', null=False)
+    preview = models.ImageField(blank=True, null=True)
     publish = models.BooleanField(default=False)
     standard = models.BooleanField(default=True)
     temporal_distributions = models.ManyToManyField(TemporalDistribution)
