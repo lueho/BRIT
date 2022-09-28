@@ -18,6 +18,16 @@ class Author(CRUDUrlsMixin, OwnedObjectModel):
             name += f', {self.first_names}'
         return name
 
+    @property
+    def abbreviated_full_name(self):
+        name = ''
+        if self.last_names:
+            name += self.last_names
+        if self.first_names:
+            first_names = '. '.join([name.strip().replace('.', '')[0].upper() for name in self.first_names.split(' ')])
+            name += f', {first_names}.'
+        return name
+
 
 class Licence(NamedUserObjectModel):
     reference_url = models.URLField(null=True, blank=True)
@@ -58,6 +68,8 @@ class Source(CRUDUrlsMixin, OwnedObjectModel):
 
     def __str__(self):
         return self.abbreviation
+
+
 
 
 @receiver(post_save, sender=Source)
