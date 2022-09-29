@@ -40,7 +40,8 @@ from .forms import (
     Composition,
     ComponentShareDistributionFormSetHelper,
     WeightShareUpdateFormSetHelper,
-    InlineWeightShare, ComponentModalModelForm, ComponentGroupModalModelForm, ModalInlineComponentShare
+    InlineWeightShare, ComponentModalModelForm, ComponentGroupModalModelForm, ModalInlineComponentShare,
+    SampleSeriesAddTemporalDistributionModalModelForm
 )
 from .models import (
     Material,
@@ -446,6 +447,19 @@ class SampleSeriesModalCreateDuplicateView(OwnedObjectModalUpdateView):
         if not self.request.is_ajax():
             self.object = self.object.duplicate(creator=self.request.user, **form.cleaned_data)
         return super().form_valid(form)
+
+
+class SampleSeriesModalAddDistributionView(OwnedObjectModalUpdateView):
+    template_name = 'modal_form.html'
+    model = SampleSeries
+    form_class = SampleSeriesAddTemporalDistributionModalModelForm
+    permission_required = 'materials.change_sampleseries'
+
+    def form_valid(self, form):
+        if not self.request.is_ajax():
+            self.object.temporal_distributions.add(form.cleaned_data['distribution'])
+        return HttpResponseRedirect(self.get_success_url())
+
 
 
 # ----------- Sample CRUD ----------------------------------------------------------------------------------------------

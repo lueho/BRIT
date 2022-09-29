@@ -2,7 +2,7 @@ from bootstrap_modal_forms.forms import BSModalModelForm, BSModalForm
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Row, Field
 from django import forms
-from django.forms import Form, ModelMultipleChoiceField
+from django.forms import Form, ModelChoiceField, ModelMultipleChoiceField
 from django.core.exceptions import ValidationError
 from django.forms.models import BaseInlineFormSet
 from django.utils.safestring import mark_safe
@@ -123,6 +123,18 @@ class SampleSeriesModalModelForm(CustomModalModelForm):
         model = SampleSeries
         fields = ('name', 'material', 'publish', 'description', 'preview')
         labels = {'publish': 'featured'}
+
+
+class SampleSeriesAddTemporalDistributionModalModelForm(CustomModalModelForm):
+    distribution = ModelChoiceField(queryset=TemporalDistribution.objects.all())
+
+    class Meta:
+        model = SampleSeries
+        fields = ('distribution',)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['distribution'].queryset = TemporalDistribution.objects.difference(self.instance.temporal_distributions.all())
 
 
 class SampleModelForm(CustomModelForm):
