@@ -11,7 +11,7 @@
                 </div>
                 {% if object.preview %}
                     <div class="card-img-top">
-                        <img class="w-100 m-0" src="{{ object.preview.url }}" alt="Materials Module Cover Image">
+                        <img class="w-100 m-0" src="{{ object.preview.url }}" alt="Image of {{ object.material.name }}">
                     </div>
                 {% endif %}
                 <div class="card-body">
@@ -31,6 +31,7 @@
 
                     {% if object.material.description %}
                         <p class="card-text">
+                            <strong>Description:</strong><br>
                             {{ object.material.description }}
                         </p>
                     {% endif %}
@@ -47,21 +48,35 @@
                 </div>
                 <div class="card-footer">
                     <div id="btn-edit-sample-series" class="collapse multi-collapse">
-                        <a href="{% url 'sampleseries-update-modal' object.pk %}?next={{ request.path }}"
-                           class="modal-link">
-                            <nobr><i class="fas fa-fw fa-edit"></i> Edit</nobr>
-                        </a>
-                        <a href="{% url 'sampleseries-duplicate-modal' object.pk %}"
-                           class="modal-link">
-                            <nobr><i class="fas fa-fw fa-copy"></i> Duplicate</nobr>
-                        </a>
-                        <a href="{% url 'material-dashboard' %}">
-                            <nobr><i class="fas fa-fw fa-cog"></i> Dashboard</nobr>
-                        </a>
-                        <a href="{% url 'sampleseries-delete-modal' object.pk %}"
-                           class="modal-link">
-                            <nobr><i class="fas fa-fw fa-trash"></i> Delete</nobr>
-                        </a>
+                        {% if 'materials.change_sampleseries' in perms %}
+                            <a href="{% url 'sampleseries-update-modal' object.pk %}?next={{ request.path }}"
+                               class="modal-link nowrap mr-3">
+                                <i class="fas fa-fw fa-edit"></i> Edit
+                            </a>
+                        {% endif %}
+                        {% if 'materials.add_sampleseries' in perms %}
+                            <a href="{% url 'sampleseries-duplicate-modal' object.pk %}"
+                               class="modal-link nowrap mr-3">
+                                <i class="fas fa-fw fa-copy"></i> Duplicate
+                            </a>
+                        {% endif %}
+                        {% if 'materials.view_material' in perms %}
+                            <a href="{% url 'material-dashboard' %}" class="nowrap mr-3">
+                                <i class="fas fa-fw fa-cog"></i> Dashboard
+                            </a>
+                        {% endif %}
+                        {% if 'materials.change_sampleseries' in perms %}
+                            <a href="{% url 'sampleseries-add-distribution-modal' object.pk %}"
+                               class="modal-link nowrap mr-3">
+                                <i class="fas fa-fw fa-plus-circle"></i> Add distribution
+                            </a>
+                        {% endif %}
+                        {% if 'materials.delete_sampleseries' in perms %}
+                            <a href="{% url 'sampleseries-delete-modal' object.pk %}"
+                               class="modal-link nowrap mr-3">
+                                <i class="fas fa-fw fa-trash"></i> Delete
+                            </a>
+                        {% endif %}
                     </div>
                 </div>
             </div>
@@ -96,12 +111,12 @@
     {{ block.super }}
 
     <script>
-        window.onload = function () {
+        window.onload = function() {
             {% if 'materials.change_material' in perms %}
-                const btn = document.getElementById('id_toggle_edit')
-                btn.click()
-                $('#id_toggle_edit').bootstrapToggle('on')
+                const btn = document.getElementById('id_toggle_edit');
+                btn.click();
+                $('#id_toggle_edit').bootstrapToggle('on');
             {% endif %}
-        }
+        };
     </script>
 {% endblock javascript %}
