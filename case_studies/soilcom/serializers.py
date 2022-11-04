@@ -84,7 +84,7 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
 class CollectionFlatSerializer(serializers.ModelSerializer):
     catchment = serializers.StringRelatedField(label='Catchment')
     nuts_or_lau_id = serializers.StringRelatedField(source='catchment.region.nuts_or_lau_id', label='NUTS/LAU Id')
-    country = serializers.StringRelatedField(source='catchment.region.country_code', label='Country')
+    country = serializers.StringRelatedField(source='catchment.region.country', label='Country')
     collector = serializers.StringRelatedField(label='Collector')
     collection_system = serializers.StringRelatedField(label='Collection System')
     waste_category = serializers.StringRelatedField(source='waste_stream.category', label='Waste Category')
