@@ -41,6 +41,12 @@
                         {{ object.frequency }}
                     </p>
                     {% endif %}
+                    {% if object.fee_system %}
+                        <p class="card-text">
+                            <strong>Fee System:</strong>
+                            {{ object.fee_system }}
+                        </p>
+                    {% endif %}
                     <p class="card-text"><strong>Sources:</strong><br>
                     <ul>
                         {% for flyer in object.flyers.all %}

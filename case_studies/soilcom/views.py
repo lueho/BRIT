@@ -632,6 +632,8 @@ class CollectionCopyView(CollectionCreateView):
             initial['connection_rate'] = self.original_object.connection_rate
         if self.original_object.connection_rate_year:
             initial['connection_rate_year'] = self.original_object.connection_rate_year
+        if self.original_object.fee_system:
+            initial['fee_system'] = self.original_object.fee_system
         if self.original_object.frequency:
             initial['frequency'] = self.original_object.frequency
         if self.original_object.description:

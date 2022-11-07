@@ -180,7 +180,7 @@ class CollectionFlatSerializerTestCase(TestCase):
         )
         frequency = CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
 
-        nutsregion = NutsRegion.objects.create(owner=owner, name='Hamburg', cntr_code='DE', nuts_id='DE600')
+        nutsregion = NutsRegion.objects.create(owner=owner, name='Hamburg', country='DE', nuts_id='DE600')
         population = Attribute.objects.create(owner=owner, name='Population', unit='')
         population_density = Attribute.objects.create(owner=owner, name='Population density', unit='1/km')
         RegionAttributeValue(owner=owner, region=nutsregion, attribute=population, value=123321)
@@ -194,6 +194,7 @@ class CollectionFlatSerializerTestCase(TestCase):
             collector=Collector.objects.create(owner=owner, name='Test Collector'),
             collection_system=CollectionSystem.objects.create(owner=owner, name='Test System'),
             waste_stream=waste_stream,
+            fee_system='Fixed fee',
             frequency=frequency,
             connection_rate=0.7,
             connection_rate_year=2020,
@@ -202,7 +203,7 @@ class CollectionFlatSerializerTestCase(TestCase):
         cls.collection_nuts.flyers.add(waste_flyer_1)
         cls.collection_nuts.flyers.add(waste_flyer_2)
 
-        lauregion = LauRegion.objects.create(owner=owner, name='Shetland Islands', cntr_code='UK', lau_id='S30000041')
+        lauregion = LauRegion.objects.create(owner=owner, name='Shetland Islands', country='UK', lau_id='S30000041')
         catchment2 = Catchment.objects.create(owner=owner, name='Test Catchment', region=lauregion.region_ptr)
         cls.collection_lau = Collection.objects.create(
             created_by=owner,
@@ -212,6 +213,7 @@ class CollectionFlatSerializerTestCase(TestCase):
             collector=Collector.objects.create(owner=owner, name='Test Collector'),
             collection_system=CollectionSystem.objects.create(owner=owner, name='Test System'),
             waste_stream=waste_stream,
+            fee_system='Fixed fee',
             frequency=frequency,
             connection_rate=0.7,
             connection_rate_year=2020,
@@ -222,8 +224,9 @@ class CollectionFlatSerializerTestCase(TestCase):
 
     def test_serializer_data_contains_all_fields(self):
         serializer = CollectionFlatSerializer(self.collection_nuts)
+        print(serializer.data)
         keys = {'catchment', 'nuts_or_lau_id', 'collector', 'collection_system', 'country', 'waste_category',
-                'allowed_materials', 'connection_rate', 'connection_rate_year', 'frequency', 'population',
+                'allowed_materials', 'connection_rate', 'connection_rate_year', 'fee_system', 'frequency', 'population',
                 'population_density', 'comments', 'sources', 'created_by', 'created_at', 'lastmodified_by',
                 'lastmodified_at'}
         self.assertSetEqual(keys, set(serializer.data.keys()))

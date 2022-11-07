@@ -48,7 +48,8 @@ class CollectionFilter(FilterSet):
 
     class Meta:
         model = Collection
-        fields = ('catchment', 'collector', 'collection_system', 'country', 'waste_category', 'allowed_materials')
+        fields = ('catchment', 'collector', 'collection_system', 'country', 'waste_category', 'allowed_materials',
+                  'fee_system')
         form = CollectionFilterForm
 
 

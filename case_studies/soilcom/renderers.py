@@ -14,6 +14,7 @@ class CollectionXLSXRenderer(BaseXLSXRenderer):
         'allowed_materials': 'Allowed Materials',
         'connection_rate': 'Connection Rate',
         'connection_rate_year': 'Connection Rate Year',
+        'fee_system': 'Fee System',
         'frequency': 'Frequency',
         'population': 'Population',
         'population_density': 'Population Density',
@@ -36,7 +37,7 @@ class CollectionCSVRenderer(CSVRenderer):
         'delimiter': '\t'
     }
     header = ['catchment', 'country', 'nuts_or_lau_id', 'collector', 'collection_system', 'waste_category',
-              'allowed_materials', 'connection_rate', 'connection_rate_year', 'frequency', 'population',
+              'allowed_materials', 'connection_rate', 'connection_rate_year', 'fee_system', 'frequency', 'population',
               'population_density', 'comments', 'sources', 'created_by', 'created_at', 'lastmodified_by',
               'lastmodified_at']
     labels = {
@@ -49,6 +50,7 @@ class CollectionCSVRenderer(CSVRenderer):
         'allowed_materials': 'Allowed Materials',
         'connection_rate': 'Connection Rate',
         'connection_rate_year': 'Connection Rate Year',
+        'fee_system': 'Fee System',
         'frequency': 'Frequency',
         'population': 'Population',
         'population_density': 'Population Density',

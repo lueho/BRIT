@@ -193,6 +193,12 @@ class CollectionFrequency(NamedUserObjectModel):
 
 YEAR_VALIDATOR = RegexValidator(r'^([0-9]{4})$', message='Year needs to be in YYYY format.', code='invalid year')
 
+FEE_SYSTEMS = (
+    ('No fee', 'No fee'),
+    ('Fixed fee', 'Fixed fee',),
+    ('Pay as you throw (PAYT)', 'Pay as you throw (PAYT)',)
+)
+
 
 class Collection(NamedUserObjectModel):
     collector = models.ForeignKey(Collector, on_delete=models.CASCADE, blank=True, null=True)
@@ -202,6 +208,7 @@ class Collection(NamedUserObjectModel):
     frequency = models.ForeignKey(CollectionFrequency, on_delete=models.SET_NULL, blank=True, null=True)
     connection_rate = models.FloatField(blank=True, null=True)
     connection_rate_year = models.PositiveSmallIntegerField(blank=True, null=True, validators=[YEAR_VALIDATOR])
+    fee_system = models.CharField(max_length=32, choices=FEE_SYSTEMS, blank=True, null=True)
     flyers = models.ManyToManyField(WasteFlyer, related_name='collections')
     sources = models.ManyToManyField(Source)
 

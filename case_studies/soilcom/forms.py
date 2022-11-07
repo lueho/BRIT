@@ -12,7 +12,6 @@ from . import models
 
 
 class CollectorModelForm(CustomModelForm):
-
     catchment = forms.ModelChoiceField(
         queryset=models.Catchment.objects.all(),
         widget=autocomplete.ModelSelect2(url='catchment-autocomplete'),
@@ -29,7 +28,6 @@ class CollectorModelForm(CustomModelForm):
 
 
 class CollectorModalModelForm(CustomModalModelForm):
-
     catchment = forms.ModelChoiceField(
         queryset=models.Catchment.objects.all(),
         widget=autocomplete.ModelSelect2(url='catchment-autocomplete'),
@@ -44,6 +42,7 @@ class CollectorModalModelForm(CustomModalModelForm):
         super().__init__(*args, **kwargs)
         self.fields['catchment'].widget.attrs = {'data-theme': 'bootstrap4'}
 
+
 class CollectorFilterFormHelper(FormHelper):
     form_tag = False
     include_media = False
@@ -51,6 +50,7 @@ class CollectorFilterFormHelper(FormHelper):
         'name',
         'catchment',
     )
+
 
 class CollectorFilterForm(Form):
 
@@ -214,7 +214,7 @@ class CollectionModelForm(forms.ModelForm):
     class Meta:
         model = models.Collection
         fields = ('catchment', 'collector', 'collection_system', 'waste_category', 'allowed_materials',
-                  'connection_rate', 'connection_rate_year', 'frequency', 'description')
+                  'connection_rate', 'connection_rate_year', 'frequency', 'fee_system', 'description')
         labels = {
             'description': 'Comments',
             'connection_rate': 'Connection rate [%]',
@@ -252,6 +252,7 @@ class CollectionModelForm(forms.ModelForm):
                 Column(Field('connection_rate')),
                 Column(Field('connection_rate_year'))
             ),
+            Field('fee_system'),
             ForeignkeyField('frequency'),
             Field('description')
         )
@@ -263,8 +264,7 @@ class CollectionModelForm(forms.ModelForm):
         data = self.cleaned_data
 
         # Create a name
-        name = f'{data["catchment"]} {data["waste_category"]} {data["collection_system"]}'
-        instance.name = name
+        instance.name = f'{data["catchment"]} {data["waste_category"]} {data["collection_system"]}'
 
         # Associate with a new or existing waste stream
         waste_stream, created = models.WasteStream.objects.get_or_create(
@@ -293,6 +293,7 @@ class CollectionFilterFormHelper(FormHelper):
         'country',
         'waste_category',
         'allowed_materials',
+        'fee_system'
     )
 
 
@@ -334,7 +335,8 @@ class CollectionFilterForm(forms.Form):
 
     class Meta:
         model = models.Collection
-        fields = ('catchment', 'collector', 'collection_system', 'country', 'waste_category', 'allowed_materials')
+        fields = ('catchment', 'collector', 'collection_system', 'country', 'waste_category', 'allowed_materials',
+                  'fee_system')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -356,7 +358,7 @@ class FlyerFilterForm(forms.Form):
 
     class Meta:
         model = models.WasteFlyer
-        fields = ('url_valid', )
+        fields = ('url_valid',)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

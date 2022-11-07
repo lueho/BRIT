@@ -91,6 +91,7 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
     allowed_materials = serializers.SerializerMethodField(label='Allowed Materials')
     connection_rate = serializers.StringRelatedField(label='Connection Rate')
     connection_rate_year = serializers.StringRelatedField(label='Connection Rate Year')
+    fee_system = serializers.CharField(label='Fee system')
     frequency = serializers.StringRelatedField(label='Frequency')
     population = serializers.SerializerMethodField()
     population_density = serializers.SerializerMethodField()
@@ -103,9 +104,9 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.Collection
         fields = ('catchment', 'nuts_or_lau_id', 'country', 'collector', 'collection_system', 'waste_category',
-                  'allowed_materials', 'connection_rate', 'connection_rate_year', 'frequency', 'population',
-                  'population_density', 'comments', 'sources', 'created_by', 'created_at', 'lastmodified_by',
-                  'lastmodified_at')
+                  'allowed_materials', 'connection_rate', 'connection_rate_year', 'fee_system', 'frequency',
+                  'population', 'population_density', 'comments', 'sources', 'created_by', 'created_at',
+                  'lastmodified_by', 'lastmodified_at')
 
     @staticmethod
     def get_allowed_materials(obj):

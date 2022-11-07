@@ -53,6 +53,7 @@ class CollectionCSVRendererTestCase(TestCase):
                 waste_stream=waste_stream,
                 connection_rate=0.7,
                 connection_rate_year=2020,
+                fee_system='Fixed fee',
                 frequency=frequency,
                 description='This is a test case.'
             )
@@ -68,9 +69,9 @@ class CollectionCSVRendererTestCase(TestCase):
         self.file.seek(0)
         reader = csv.DictReader(codecs.getreader('utf-8')(self.file), delimiter='\t')
         fieldnames = ['Catchment', 'Country', 'NUTS/LAU Id', 'Collector', 'Collection System', 'Waste Category',
-                      'Allowed Materials', 'Connection Rate', 'Connection Rate Year', 'Frequency', 'Population',
-                      'Population Density', 'Comments', 'Sources', 'Created by', 'Created at', 'Last modified by',
-                      'Last modified at']
+                      'Allowed Materials', 'Connection Rate', 'Connection Rate Year', 'Fee System', 'Frequency',
+                      'Population', 'Population Density', 'Comments', 'Sources', 'Created by', 'Created at',
+                      'Last modified by', 'Last modified at']
         self.assertListEqual(fieldnames, list(reader.fieldnames))
         self.assertEqual(2, sum(1 for _ in reader))
 
@@ -83,8 +84,8 @@ class CollectionCSVRendererTestCase(TestCase):
             self.assertEqual('Test material 1, Test material 2', row['Allowed Materials'])
 
     def test_regression_flyers_without_urls_dont_raise_type_error(self):
-        rogue_flyer = WasteFlyer.objects.create(owner=self.owner, title='Rogue flyer without url', abbreviation='RF')
-        defected_collection = Collection.objects.get(name='collection1')
+        defected_collection = Collection.objects.first()
+        rogue_flyer = WasteFlyer.objects.create(title='Rogue flyer without url', abbreviation='RF')
         defected_collection.flyers.add(rogue_flyer)
         renderer = CollectionCSVRenderer()
         renderer.render(self.file, self.content)
@@ -156,6 +157,7 @@ class CollectionXLSXRendererTestCase(TestCase):
             'allowed_materials': 'Allowed Materials',
             'connection_rate': 'Connection Rate',
             'connection_rate_year': 'Connection Rate Year',
+            'fee_system': 'Fee System',
             'frequency': 'Frequency',
             'population': 'Population',
             'population_density': 'Population Density',
