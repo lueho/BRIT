@@ -1,19 +1,16 @@
-from celery.result import ResultBase
-from celery import group, chord
-from django.test import TestCase, override_settings
+from celery import chord
 from django.contrib.auth.models import User, Permission
-from mock import patch, Mock
 from django.http.request import QueryDict, MultiValueDict
-from django.urls import reverse
+from django.test import TestCase
+from mock import patch, Mock
 
 from maps.models import Catchment, Region
-from users.models import get_default_owner
-
 from ..models import (Collection, CollectionSystem, CollectionFrequency, Collector, MaterialCategory, WasteCategory,
                       WasteComponent, WasteFlyer, WasteStream)
 from ..renderers import CollectionXLSXRenderer
 from ..serializers import CollectionFlatSerializer
-from ..tasks import export_collections_to_file, check_wasteflyer_urls, check_wasteflyer_url, check_wasteflyer_urls_callback
+from ..tasks import (export_collections_to_file, check_wasteflyer_urls, check_wasteflyer_url,
+                     check_wasteflyer_urls_callback)
 
 
 @patch('brit.storages.write_file_for_download')
@@ -21,37 +18,33 @@ class ExportCollectionToFileTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
         User.objects.create(username='outsider')
         member = User.objects.create(username='member')
         member.user_permissions.add(Permission.objects.get(codename='add_collection'))
 
-        MaterialCategory.objects.create(owner=owner, name='Biowaste component')
-        material1 = WasteComponent.objects.create(owner=owner, name='Test material 1')
-        material2 = WasteComponent.objects.create(owner=owner, name='Test material 2')
+        MaterialCategory.objects.create(name='Biowaste component')
+        material1 = WasteComponent.objects.create(name='Test material 1')
+        material2 = WasteComponent.objects.create(name='Test material 2')
         waste_stream = WasteStream.objects.create(
-            owner=owner,
             name='Test waste stream',
-            category=WasteCategory.objects.create(owner=owner, name='Test category'),
+            category=WasteCategory.objects.create(name='Test category'),
         )
         waste_stream.allowed_materials.add(material1)
         waste_stream.allowed_materials.add(material2)
 
         waste_flyer = WasteFlyer.objects.create(
-            owner=owner,
             abbreviation='WasteFlyer123',
             url='https://www.test-flyer.org'
         )
-        frequency = CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
-        region = Region.objects.create(owner=owner, name='Test Region')
-        catchment = Catchment.objects.create(owner=owner, name='Test catchment', region=region)
+        frequency = CollectionFrequency.objects.create(name='Test Frequency')
+        region = Region.objects.create(name='Test Region')
+        catchment = Catchment.objects.create(name='Test catchment', region=region)
         for i in range(1, 3):
             collection = Collection.objects.create(
-                owner=owner,
                 name=f'collection{i}',
                 catchment=catchment,
-                collector=Collector.objects.create(owner=owner, name=f'collector{i}'),
-                collection_system=CollectionSystem.objects.create(owner=owner, name='Test system'),
+                collector=Collector.objects.create(name=f'collector{i}'),
+                collection_system=CollectionSystem.objects.create(name='Test system'),
                 waste_stream=waste_stream,
                 connection_rate=0.7,
                 connection_rate_year=2020,
@@ -89,10 +82,8 @@ class CheckWasteFlyerUrlsTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
         for i in range(1, 5):
             WasteFlyer.objects.create(
-                owner=owner,
                 title=f'Waste flyer {i}',
                 abbreviation=f'WF{i}',
                 url_valid=i % 2 == 0
@@ -102,18 +93,10 @@ class CheckWasteFlyerUrlsTestCase(TestCase):
         self.flyer = WasteFlyer.objects.first
 
     def test_initial(self):
-        self.assertEqual(4, WasteFlyer.objects.count())
-        params = {
-            'csrfmiddlewaretoken': ['Hm7MXB2NjRCOIpNbGaRKR87VCHM5KwpR1t4AdZFgaqKfqui1EJwhKKmkxFKDfL3h'],
-            'url_valid': ['False'],
-            'page': ['2']
-        }
+        params = {'url_valid': ['False']}
         qdict = QueryDict('', mutable=True)
         qdict.update(MultiValueDict(params))
-        newparams = qdict.copy()
-        newparams.pop('csrfmiddlewaretoken')
-        newparams.pop('page')
-        result = check_wasteflyer_urls.apply(args=[newparams])
+        result = check_wasteflyer_urls.apply(args=[qdict])
         while result.status == 'PENDING':
             self.assertEqual('PENDING', result.status)
         if result.status == 'FAILURE':
