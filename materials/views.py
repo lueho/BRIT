@@ -543,6 +543,14 @@ class SampleModalDeleteView(OwnedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+class SampleAutoCompleteView(autocomplete.Select2QuerySetView):
+    def get_queryset(self):
+        qs = Sample.objects.order_by('name')
+        if self.q:
+            qs = qs.filter(name__icontains=self.q)
+        return qs
+
+
 class SampleAddPropertyView(OwnedObjectCreateView):
     form_class = forms.MaterialPropertyValueModelForm
     template_name = 'simple_form_card.html'
