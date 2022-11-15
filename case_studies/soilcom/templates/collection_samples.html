@@ -1,0 +1,55 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+
+    <div class="row">
+        <div class="col">
+            <div class="card shadow">
+                <div class="card-header"><strong>Manage waste samples</strong></div>
+                <div class="card-body">
+                    <p class="card-text">
+                        <strong>Collection:</strong><br>
+                        <a href="{{ object.get_absolute_url }}">{{ object.name }}</a>
+                    </p>
+                    <p class="card-text">
+                        <strong>Samples</strong><br>
+                        {% if object.samples.exists %}
+                            <ul>
+                                {% for sample in object.samples.all %}
+                                    <li><a href="{{ sample.get_absolute_url }}">{{ sample.name }}</a></li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            No connected samples
+                        {% endif %}
+                    </p>
+                    <p class="card-text"><strong>Add sample</strong><br>
+                    <div id="form-container">
+                        <form method="post">
+                            {% crispy form_add %}
+                        </form>
+                    </div>
+                    </p>
+                    <p class="card-text"><strong>Remove sample</strong></p>
+                    <div id="form-container-2">
+                        <form method="post">
+                            {% crispy form_remove %}
+                        </form>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <a href="{{ object.get_absolute_url }}"><i class="fas fa-fw fa-arrow-left"></i> back to collection</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+{% endblock %}
+
+{% block javascript %}
+    {{ block.super }}
+    {{ form.media }}
+    <link href="{% static 'lib/select2-bootstrap-theme/select2-bootstrap4.min.css' %}" rel="stylesheet">
+{% endblock %}

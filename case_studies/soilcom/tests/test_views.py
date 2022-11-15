@@ -9,7 +9,7 @@ from mock import Mock, patch
 
 from brit.tests.testcases import ViewWithPermissionsTestCase
 from maps.models import Catchment, Region
-from materials.models import MaterialCategory
+from materials.models import Material, MaterialCategory, Sample, SampleSeries
 from .. import views
 from ..forms import CollectionModelForm, BaseWasteFlyerUrlFormSet
 from ..models import (Collection, Collector, CollectionSystem, WasteCategory, WasteComponent, WasteFlyer, WasteStream,
@@ -891,6 +891,61 @@ class CollectionListFileExportViewTestCase(ViewWithPermissionsTestCase):
         mock_export.assert_called_once_with('xlsx', {'collector': ['1']})
         expected_response = {'task_id': '1234'}
         self.assertDictEqual(expected_response, json.loads(response.content))
+
+
+class CollectionWasteSamplesViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'change_collection'
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.collection = Collection.objects.create(name='Test Collection')
+        material = Material.objects.create(name='Test Material')
+        series = SampleSeries.objects.create(name='Test Series', material=material)
+        cls.collection.samples.add(Sample.objects.create(name='Test Sample 1', series=series))
+        Sample.objects.create(name='Test Sample 2', series=series)
+        cls.url = reverse('collection-wastesamples', kwargs={'pk': cls.collection.pk})
+
+    def test_get_http_302_redirect_to_login_for_anonymous(self):
+        response = self.client.get(self.url)
+        self.assertRedirects(response, f'{reverse("auth_login")}?next={self.url}')
+
+    def test_get_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(self.url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_http_302_redirect_to_login_for_anonymous(self):
+        response = self.client.post(self.url, {})
+        self.assertRedirects(response, f'{reverse("auth_login")}?next={self.url}')
+
+    def test_post_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(self.url)
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_success_and_http_302_redirect_on_submit_of_add_form(self):
+        self.client.force_login(self.member)
+        sample = Sample.objects.get(name='Test Sample 2')
+        data = {'sample': sample.pk, 'submit': 'Add'}
+        response = self.client.post(self.url, data, follow=True)
+        self.assertRedirects(response, self.url)
+
+    def test_post_success_and_http_302_redirect_on_submit_of_remove_form(self):
+        self.client.force_login(self.member)
+        sample = Sample.objects.get(name='Test Sample 1')
+        data = {'sample': sample.pk, 'submit': 'Remove'}
+        response = self.client.post(self.url, data, follow=True)
+        self.assertRedirects(response, self.url)
+
+
+# ----------- WasteFlyer CRUD ------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 class WasteFlyerListViewTestCase(ViewWithPermissionsTestCase):

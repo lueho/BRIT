@@ -1,12 +1,12 @@
 import json
 
 from celery.result import AsyncResult
-from dal import autocomplete
+from dal.autocomplete import Select2QuerySetView
 from django.contrib.auth.mixins import PermissionRequiredMixin, LoginRequiredMixin
 from django.db.models import Max
 from django.forms import modelformset_factory, formset_factory
 from django.http import HttpResponseRedirect, JsonResponse, HttpResponse
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.views import View
 from django.views.generic import TemplateView
 from django_filters import rest_framework as rf_filters
@@ -104,7 +104,7 @@ class CollectorModalDeleteView(views.OwnedObjectModalDeleteView):
 # ----------- Collector utilities --------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class CollectorAutoCompleteView(autocomplete.Select2QuerySetView):
+class CollectorAutoCompleteView(Select2QuerySetView):
     def get_queryset(self):
         qs = models.Collector.objects.order_by('name')
         if self.q:
@@ -650,7 +650,6 @@ class CollectionCopyView(CollectionCreateView):
 
 
 class CollectionDetailView(views.OwnedObjectDetailView):
-    template_name = 'collection_detail.html'
     model = models.Collection
     permission_required = 'soilcom.view_collection'
 
@@ -698,9 +697,22 @@ class CollectionUpdateView(ModelFormAndFormSetMixin, views.OwnedObjectUpdateView
             return self.render_to_response(context)
 
 
+class CollectionModalDeleteView(views.OwnedObjectModalDeleteView):
+    template_name = 'modal_delete.html'
+    model = models.Collection
+    success_message = 'Successfully deleted.'
+    success_url = reverse_lazy('collection-list')
+    permission_required = 'soilcom.delete_collection'
+
+
+# ----------- Collection utils ------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
 class SelectNewlyCreatedObjectModelSelectOptionsView(views.OwnedObjectModelSelectOptionsView):
 
     def get_selected_object(self):
+        # TODO: Improve this by adding owner to
         created_at = self.model.objects.aggregate(max_created_at=Max('created_at'))['max_created_at']
         return self.model.objects.get(created_at=created_at)
 
@@ -725,12 +737,35 @@ class WasteCategoryOptions(SelectNewlyCreatedObjectModelSelectOptionsView):
     permission_required = 'soilcom.view_wastecategory'
 
 
-class CollectionModalDeleteView(views.OwnedObjectModalDeleteView):
-    template_name = 'modal_delete.html'
-    model = models.Collection
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('collection-list')
-    permission_required = 'soilcom.delete_collection'
+class CollectionWasteSamplesView(views.OwnedObjectUpdateView):
+    template_name = 'collection_samples.html'
+    model = Collection
+    form_class = forms.CollectionAddWasteSampleForm
+    permission_required = 'soilcom.change_collection'
+
+    def get_success_url(self):
+        return reverse('collection-wastesamples', kwargs={'pk': self.object.pk})
+
+    def get_form(self, form_class=None):
+        if self.request.method in ('POST', 'PUT'):
+            if self.request.POST['submit'] == 'Add':
+                return forms.CollectionAddWasteSampleForm(**self.get_form_kwargs())
+            if self.request.POST['submit'] == 'Remove':
+                return forms.CollectionRemoveWasteSampleForm(**self.get_form_kwargs())
+        else:
+            return super().get_form(self.get_form_class())
+
+    def get_context_data(self, **kwargs):
+        kwargs['form_add'] = forms.CollectionAddWasteSampleForm(**self.get_form_kwargs())
+        kwargs['form_remove'] = forms.CollectionRemoveWasteSampleForm(**self.get_form_kwargs())
+        return super().get_context_data(**kwargs)
+
+    def form_valid(self, form):
+        if self.request.POST['submit'] == 'Add':
+            self.object.samples.add(form.cleaned_data['sample'])
+        if self.request.POST['submit'] == 'Remove':
+            self.object.samples.remove(form.cleaned_data['sample'])
+        return HttpResponseRedirect(self.get_success_url())
 
 
 # ----------- Maps -----------------------------------------------------------------------------------------------------

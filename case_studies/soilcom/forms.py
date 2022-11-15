@@ -6,8 +6,9 @@ from django.forms import BaseFormSet, Form
 
 from bibliography.models import Source
 from brit.forms import CustomModelForm, CustomModalModelForm, ForeignkeyField
-from materials.models import Material, MaterialCategory
+from materials.models import Material, MaterialCategory, Sample
 from users.models import get_default_owner
+
 from . import models
 
 
@@ -363,3 +364,43 @@ class FlyerFilterForm(forms.Form):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper = FlyerFilterFormHelper()
+
+
+class CollectionAddWasteSampleFormHelper(FormHelper):
+    form_tag = False
+    include_media = False
+    layout = Layout(
+        Field('sample'),
+        Submit('submit', 'Add')
+    )
+
+
+class CollectionAddWasteSampleForm(CustomModelForm):
+    sample = forms.ModelChoiceField(queryset=Sample.objects.all(),
+                                    widget=autocomplete.ModelSelect2(url='sample-autocomplete'))
+
+    class Meta:
+        model = Sample
+        fields = ('sample',)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['sample'].widget.attrs = {'data-theme': 'bootstrap4'}
+
+    @property
+    def helper(self):
+        return CollectionAddWasteSampleFormHelper()
+
+
+class CollectionRemoveWasteSampleForm(forms.ModelForm):
+    sample = forms.ModelChoiceField(queryset=Sample.objects.all())
+
+    class Meta:
+        model = models.Collection
+        fields = ('sample',)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['sample'].queryset = Sample.objects.filter(collections=self.instance)
+        self.helper = FormHelper()
+        self.helper.add_input(Submit('submit', 'Remove'))

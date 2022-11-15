@@ -21,13 +21,13 @@
                         <strong>Waste Category:</strong><br>
                         <a href="{{ object.waste_stream.category.get_absolute_url }}">{{ object.waste_stream.category }}</a>
                     </p>
-                    <p class="card-text"><strong>Allowed Materials:</strong><br>
+                    <p class="card-text"><strong>Allowed Materials:</strong></p>
                     <ul>
                         {% for material in object.waste_stream.allowed_materials.all %}
                             <li><a href="{{ material.get_absolute_url }}">{{ material }}</a></li>
                         {% endfor %}
                     </ul>
-                    </p>
+
                     {% if object.connection_rate %}
                     <p class="card-text">
                         <strong>Connection Rate:</strong><br>
@@ -47,14 +47,26 @@
                             {{ object.fee_system }}
                         </p>
                     {% endif %}
-                    <p class="card-text"><strong>Sources:</strong><br>
+
+                    {% if object.samples.exists %}
+                        <p class="card-text"><strong>Samples</strong></p>
+                        <ul>
+                            {% for sample in object.samples.all %}
+                                <li><a href="{{ sample.get_absolute_url }}">{{ sample.name }}</a></li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+
+
+                    <p class="card-text"><strong>Sources:</strong></p>
                     <ul>
                         {% for flyer in object.flyers.all %}
                             <li><a href="{{ flyer.url }}" target="blank">{{ flyer.url }}</a></li>
                         {% endfor %}
                     </ul>
-                    </p>
+
                     <p class="card-text"><strong>Comments:</strong><br>{{ object.description }}</p>
+
                 </div>
                 <div class="card-footer">
                     <a href="javascript:history.go(-1)"><i class="fas fa-fw fa-arrow-left"></i> back</a>
@@ -62,6 +74,8 @@
                         <i class="fas fa-fw fa-list"></i> see all</a>
                     <a href="{% url 'collection-update' object.id %}" class="nowrap ml-3">
                         <i class="fas fa-fw fa-edit"></i> edit</a>
+                    <a href="{% url 'collection-wastesamples' object.id %}" class="nowrap ml-3">
+                        <i class="fas fa-fw fa-edit"></i> manage samples</a>
                     <a href="{% url 'collection-copy' object.id %}" class="nowrap ml-3">
                        <i class="fas fa-fw fa-copy"></i> duplicate</a>
                     <a href="{% url 'collection-delete-modal' object.id %}" class="nowrap modal-link ml-3">

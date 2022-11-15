@@ -8,7 +8,7 @@ import celery
 from bibliography.models import Source
 from brit.models import NamedUserObjectModel
 from maps.models import Catchment
-from materials.models import Material, MaterialCategory, SampleSeries
+from materials.models import Material, MaterialCategory, Sample, SampleSeries
 
 
 class Collector(NamedUserObjectModel):
@@ -209,6 +209,7 @@ class Collection(NamedUserObjectModel):
     connection_rate = models.FloatField(blank=True, null=True)
     connection_rate_year = models.PositiveSmallIntegerField(blank=True, null=True, validators=[YEAR_VALIDATOR])
     fee_system = models.CharField(max_length=32, choices=FEE_SYSTEMS, blank=True, null=True)
+    samples = models.ManyToManyField(Sample, related_name='collections')
     flyers = models.ManyToManyField(WasteFlyer, related_name='collections')
     sources = models.ManyToManyField(Source)
 
