@@ -2,6 +2,7 @@ import json
 from collections import OrderedDict
 
 from django.forms.formsets import BaseFormSet
+from django.http import JsonResponse
 from django.http.request import QueryDict, MultiValueDict
 from django.test import RequestFactory
 from django.urls import reverse
@@ -770,6 +771,29 @@ class CollectionUpdateViewTestCase(ViewWithPermissionsTestCase):
 
 # ----------- Collection utils ------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
+
+
+class CollectionAutocompleteViewTestCase(ViewWithPermissionsTestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        Collection.objects.create(catchment=Catchment.objects.create(name='Hamburg'))
+        Collection.objects.create(catchment=Catchment.objects.create(name='Berlin'))
+
+    def test_get_http_200_ok_for_anonymous(self):
+        response = self.client.get(reverse('collection-autocomplete'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_get_returns_json_response(self):
+        response = self.client.get(reverse('collection-autocomplete'))
+        self.assertIsInstance(response, JsonResponse)
+
+    def test_get_returns_only_collections_with_names_containing_filter_string(self):
+        response = self.client.get(reverse('collection-autocomplete') + '?q=Ham')
+        self.assertContains(response, 'Hamburg')
+        self.assertNotContains(response, 'Berlin')
+
 
 
 class CollectionSummaryAPIViewTestCase(ViewWithPermissionsTestCase):

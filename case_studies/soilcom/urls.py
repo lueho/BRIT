@@ -91,6 +91,7 @@ urlpatterns = [
     path('collections/<int:pk>/copy/', views.CollectionCopyView.as_view(), name='collection-copy'),
     path('collections/<int:pk>/delete/modal/', views.CollectionModalDeleteView.as_view(), name='collection-delete-modal'),
     path('collections/<int:pk>/wastesamples/', views.CollectionWasteSamplesView.as_view(), name='collection-wastesamples'),
+    path('collections/autocomplete/', views.CollectionAutoCompleteView.as_view(), name='collection-autocomplete'),
     path('collections/map/', views.WasteCollectionMapView.as_view(), name='WasteCollection'),
     path('collections/api/geometries/', views.CollectionGeometryAPI.as_view(), name='collection-geometry-api'),
     path('collections/api/summaries/', views.CollectionSummaryAPI.as_view(), name='collection-summary-api'),

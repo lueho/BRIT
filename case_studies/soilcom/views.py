@@ -709,6 +709,14 @@ class CollectionModalDeleteView(views.OwnedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+class CollectionAutoCompleteView(Select2QuerySetView):
+    def get_queryset(self):
+        qs = models.Collection.objects.order_by('name')
+        if self.q:
+            qs = qs.filter(name__icontains=self.q)
+        return qs
+
+
 class SelectNewlyCreatedObjectModelSelectOptionsView(views.OwnedObjectModelSelectOptionsView):
 
     def get_selected_object(self):
