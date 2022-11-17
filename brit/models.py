@@ -141,3 +141,33 @@ class NamedUserObjectModel(CRUDUrlsMixin, OwnedObjectModel):
 
     def __str__(self):
         return self.name
+
+
+class Property(NamedUserObjectModel):
+    """
+    Defines properties that can be shared among other models. Allows to compare instances of different models that share
+    the same properties while enforcing the use of matching units.
+    """
+    unit = models.CharField(max_length=63)
+
+    def __str__(self):
+        return f'{self.name} [{self.unit}]'
+
+
+class PropertyValue(CRUDUrlsMixin, OwnedObjectModel):
+    """
+    Serves to link any abstract property definition (see "Property" class) to a concrete instance
+    of any other model with a concrete value. Intended to be related to other models through many-to-many relations.
+    """
+    property = models.ForeignKey(Property, on_delete=models.PROTECT)
+    average = models.FloatField()
+    standard_deviation = models.FloatField(blank=True, null=True)
+
+    class Meta:
+        abstract = True
+
+    def __str__(self):
+        name = f'{self.property}: {self.average}'
+        if self.standard_deviation:
+            name += f' ± {self.standard_deviation}'
+        return name
