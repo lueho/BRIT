@@ -1,6 +1,7 @@
 from django.contrib.auth.models import User
 from django.db import models
 from django.test import TestCase
+from django.test.utils import isolate_apps
 from rest_framework.serializers import ModelSerializer, Serializer, CharField, IntegerField
 
 from maps.models import Attribute, RegionAttributeValue, Catchment, NutsRegion, LauRegion
@@ -31,9 +32,10 @@ class FieldLabelMixinTestCase(TestCase):
         cls.data = {'char': 'abc', 'integer': 123}
         cls.serializer = TestSerializer
 
-        class TestModel(models.Model):
-            char = models.CharField(verbose_name='Text')
-            integer = models.IntegerField(verbose_name='Number')
+        with isolate_apps('case_studies.soilcom'):
+            class TestModel(models.Model):
+                char = models.CharField(verbose_name='Text')
+                integer = models.IntegerField(verbose_name='Number')
 
         class TestModelSerializer(ModelSerializer):
             class Meta:
