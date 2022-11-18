@@ -10,6 +10,9 @@ class Author(CRUDUrlsMixin, OwnedObjectModel):
     first_names = models.CharField(max_length=1023, null=True, blank=True)
     last_names = models.CharField(max_length=1023, null=True, blank=True)
 
+    class Meta:
+        ordering = ['last_names', 'first_names']
+
     def __str__(self):
         name = ''
         if self.last_names:
