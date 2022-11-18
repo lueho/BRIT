@@ -3,7 +3,7 @@ from django.db import models
 from django.urls import reverse
 
 from bibliography.models import Source
-from brit.models import NamedUserObjectModel
+from utils.models import NamedUserObjectModel
 
 TYPES = (
     ('administrative', 'administrative'),

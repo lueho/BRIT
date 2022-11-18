@@ -10,7 +10,7 @@ from django.forms import (Form,
 from django.forms.widgets import CheckboxSelectMultiple, RadioSelect
 from django.urls import reverse
 
-from brit.forms import CustomModelForm, CustomModalModelForm
+from utils.forms import CustomModelForm, CustomModalModelForm
 from .models import Attribute, Region, Catchment, NutsRegion, RegionAttributeValue
 
 

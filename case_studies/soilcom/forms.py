@@ -5,7 +5,7 @@ from django import forms
 from django.forms import BaseFormSet, Form
 
 from bibliography.models import Source
-from brit.forms import CustomModelForm, CustomModalModelForm, ForeignkeyField
+from utils.forms import CustomModelForm, CustomModalModelForm, ForeignkeyField
 from materials.models import Material, MaterialCategory, Sample
 from users.models import get_default_owner
 

@@ -8,7 +8,7 @@ from django.test import RequestFactory
 from django.urls import reverse
 from mock import Mock, patch
 
-from brit.tests.testcases import ViewWithPermissionsTestCase
+from utils.tests.testcases import ViewWithPermissionsTestCase
 from maps.models import Catchment, Region
 from materials.models import Material, MaterialCategory, Sample, SampleSeries
 from .. import views

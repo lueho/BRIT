@@ -9,7 +9,7 @@ from django.utils.safestring import mark_safe
 from extra_views import InlineFormSetFactory
 
 from bibliography.models import Source, SOURCE_TYPES
-from brit.forms import CustomModelForm, CustomModalModelForm, ModalFormHelper
+from utils.forms import CustomModelForm, CustomModalModelForm, ModalFormHelper
 from distributions.models import TemporalDistribution
 from .models import (
     Material,

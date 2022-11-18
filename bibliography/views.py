@@ -9,7 +9,7 @@ from django.urls import reverse_lazy
 from django.views import View
 from django.views.generic import TemplateView
 
-from brit import views
+from utils import views
 from . import forms
 from .filters import SourceFilter
 from .models import Author, Licence, Source, SOURCE_TYPES

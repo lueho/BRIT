@@ -8,18 +8,9 @@ from django.views.generic.edit import FormMixin
 from rest_framework.exceptions import ParseError, NotFound
 from rest_framework.views import APIView, Response
 
-from brit.views import (
-    BRITFilterView,
-    OwnedObjectListView,
-    OwnedObjectCreateView,
-    OwnedObjectModalCreateView,
-    OwnedObjectDetailView,
-    OwnedObjectModalDetailView,
-    OwnedObjectUpdateView,
-    OwnedObjectModalUpdateView,
-    OwnedObjectModalDeleteView,
-    OwnedObjectModelSelectOptionsView
-)
+from utils.views import (BRITFilterView, OwnedObjectListView, OwnedObjectCreateView, OwnedObjectModalCreateView,
+    OwnedObjectDetailView, OwnedObjectModalDetailView, OwnedObjectUpdateView, OwnedObjectModalUpdateView,
+    OwnedObjectModalDeleteView, OwnedObjectModelSelectOptionsView)
 from maps.serializers import (
     RegionSerializer, CatchmentSerializer, NutsRegionGeometrySerializer,
     NutsRegionCatchmentOptionSerializer, NutsRegionSummarySerializer, LauRegionOptionSerializer,

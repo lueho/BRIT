@@ -23,11 +23,10 @@ from bibliography.views import (SourceCreateView,
                                 SourceModalUpdateView,
                                 SourceModalDeleteView,
                                 SourceCheckUrlView)
-from brit import views
-from brit.views import BRITFilterView
 from maps.forms import NutsAndLauCatchmentQueryForm
 from maps.models import Catchment, GeoDataset
 from maps.views import GeoDatasetDetailView, GeoDataSetMixin, GeoDataSetFormMixin
+from utils import views
 from . import filters
 from . import forms
 from . import models
@@ -48,7 +47,7 @@ class CollectionHomeView(PermissionRequiredMixin, TemplateView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CollectorListView(BRITFilterView):
+class CollectorListView(views.BRITFilterView):
     model = Collector
     filterset_class = CollectorFilter
     ordering = 'name'
@@ -343,7 +342,7 @@ class WasteStreamModalDeleteView(views.OwnedObjectModalDeleteView):
 # ----------- Waste Collection Flyer CRUD ------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class WasteFlyerListView(BRITFilterView):
+class WasteFlyerListView(views.BRITFilterView):
     model = WasteFlyer
     filterset_class = WasteFlyerFilter
     ordering = 'id'
@@ -508,7 +507,7 @@ class FrequencyModalDeleteView(views.OwnedObjectModalDeleteView):
 # ----------- Collection CRUD ------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class CollectionListView(BRITFilterView):
+class CollectionListView(views.BRITFilterView):
     model = Collection
     filterset_class = CollectionFilter
     ordering = 'id'

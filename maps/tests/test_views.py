@@ -3,7 +3,7 @@ from django.test import TestCase
 from django.urls import reverse
 from rest_framework.test import APITestCase
 
-from brit.tests.testcases import ViewWithPermissionsTestCase
+from utils.tests.testcases import ViewWithPermissionsTestCase
 from ..models import Attribute, RegionAttributeValue, Catchment, LauRegion, NutsRegion, Region, GeoDataset
 
 

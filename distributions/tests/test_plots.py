@@ -1,6 +1,6 @@
 from unittest import TestCase as NativeTestCase
 
-from brit.exceptions import UnitMismatchError
+from utils.exceptions import UnitMismatchError
 from ..plots import BaseChart, BarChart, BaseDataSet
 
 

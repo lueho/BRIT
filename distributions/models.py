@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from django.db import models
 
-from brit.models import NamedUserObjectModel
+from utils.models import NamedUserObjectModel
 from users.models import get_default_owner
 
 

@@ -1,4 +1,4 @@
-from brit.exceptions import UnitMismatchError
+from utils.exceptions import UnitMismatchError
 from distributions.models import TemporalDistribution
 from distributions.plots import BarChart, DataSet
 from layer_manager.models import LayerAggregatedDistribution

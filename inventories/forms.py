@@ -1,10 +1,9 @@
-from bootstrap_modal_forms.forms import BSModalModelForm
 from crispy_forms.helper import FormHelper
 from django.forms import (
     ModelForm,
     HiddenInput)
 
-from brit.forms import CustomModelForm, CustomModalModelForm
+from utils.forms import CustomModalModelForm
 
 from distributions.models import TemporalDistribution
 from maps.models import Region, Catchment, GeoDataset

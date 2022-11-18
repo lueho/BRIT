@@ -6,7 +6,7 @@ from django.dispatch import receiver
 import celery
 
 from bibliography.models import Source
-from brit.models import NamedUserObjectModel
+from utils.models import PropertyValue, NamedUserObjectModel
 from maps.models import Catchment
 from materials.models import Material, MaterialCategory, Sample, SampleSeries
 

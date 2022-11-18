@@ -1,7 +1,7 @@
 from django.contrib.auth.models import Group, User
 from django.urls import reverse
 
-from brit.tests import UserLoginTestCase
+from utils.tests.testcases import UserLoginTestCase
 from users.models import get_default_owner
 
 from ..models import Author, Licence, Source

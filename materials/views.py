@@ -11,19 +11,9 @@ from django.views.generic.detail import SingleObjectMixin
 from extra_views import UpdateWithInlinesView
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
-from brit.views import (
-    BRITFilterView,
-    OwnedObjectListView,
-    OwnedObjectCreateView,
-    OwnedObjectModalCreateView,
-    OwnedObjectDetailView,
-    OwnedObjectModalDetailView,
-    OwnedObjectUpdateView,
-    OwnedObjectModalUpdateView,
-    OwnedObjectModalDeleteView,
-    UserOwnsObjectMixin,
-    NextOrSuccessUrlMixin
-)
+from utils.views import (NextOrSuccessUrlMixin, UserOwnsObjectMixin, BRITFilterView, OwnedObjectListView,
+    OwnedObjectCreateView, OwnedObjectModalCreateView, OwnedObjectDetailView, OwnedObjectModalDetailView,
+    OwnedObjectUpdateView, OwnedObjectModalUpdateView, OwnedObjectModalDeleteView)
 from bibliography.forms import SourceSimpleFilterForm
 from distributions.models import TemporalDistribution
 from distributions.plots import DoughnutChart

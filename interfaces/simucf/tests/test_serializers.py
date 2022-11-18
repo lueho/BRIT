@@ -45,5 +45,4 @@ class MaterialSerializerTestCase(TestCase):
 
     def test_serializer_list_field_method(self):
         simucf = SimuCF(material=self.input_material, amount=100, length_of_treatment=10)
-        serializer = SimuCFSerializer(simucf)
-        print(serializer.data)
+        SimuCFSerializer(simucf)

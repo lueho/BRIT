@@ -1,10 +1,8 @@
-from celery.result import ResultBase
-from celery import group, chord
-from django.test import TestCase, override_settings
+from celery import chord
 from django.contrib.auth.models import User, Permission
-from mock import patch, Mock
 from django.http.request import QueryDict, MultiValueDict
-from django.urls import reverse
+from django.test import TestCase
+from mock import patch, Mock
 
 from maps.models import Catchment, Region
 from users.models import get_default_owner
@@ -13,10 +11,11 @@ from ..models import (Collection, CollectionSystem, CollectionFrequency, Collect
                       WasteComponent, WasteFlyer, WasteStream)
 from ..renderers import CollectionXLSXRenderer
 from ..serializers import CollectionFlatSerializer
-from ..tasks import export_collections_to_file, check_wasteflyer_urls, check_wasteflyer_url, check_wasteflyer_urls_callback
+from ..tasks import (export_collections_to_file, check_wasteflyer_urls, check_wasteflyer_url,
+                     check_wasteflyer_urls_callback)
 
 
-@patch('brit.storages.write_file_for_download')
+@patch('utils.storages.write_file_for_download')
 class ExportCollectionToFileTestCase(TestCase):
 
     @classmethod

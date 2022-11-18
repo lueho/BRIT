@@ -1,6 +1,6 @@
 from django.urls import reverse
 
-from brit.tests.testcases import ViewWithPermissionsTestCase
+from utils.tests.testcases import ViewWithPermissionsTestCase
 from distributions.models import Timestep, TemporalDistribution
 from ..models import (Composition, Material, MaterialCategory, MaterialComponent, MaterialComponentGroup,
                       MaterialProperty, MaterialPropertyValue, Sample, SampleSeries, WeightShare)

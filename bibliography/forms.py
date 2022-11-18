@@ -2,7 +2,7 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Field, Layout, Submit
 from dal.autocomplete import ModelSelect2
 from django.forms import DateInput, Form, ModelChoiceField, ModelMultipleChoiceField
-from brit.forms import CustomModelForm, CustomModalModelForm, OwnedObjectModelForm
+from utils.forms import CustomModelForm, CustomModalModelForm, OwnedObjectModelForm
 
 from .models import Author, Licence, Source
 

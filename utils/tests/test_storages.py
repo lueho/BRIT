@@ -2,8 +2,8 @@ from django.test import SimpleTestCase, TestCase
 
 import requests
 
-from ..renderers import BaseXLSXRenderer
-from ..storages import TempUserFileDownloadStorage, write_file_for_download
+from utils.renderers import BaseXLSXRenderer
+from utils.storages import TempUserFileDownloadStorage, write_file_for_download
 
 
 class TemporaryUserCreatedFileStorageTestCase(SimpleTestCase):

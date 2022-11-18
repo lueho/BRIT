@@ -12,7 +12,7 @@ from django.views.generic.base import TemplateResponseMixin
 from django.views.generic.edit import ModelFormMixin
 from rest_framework.views import APIView
 
-from brit.views import DualUserListView, UserOwnsObjectMixin, NextOrSuccessUrlMixin, OwnedObjectModalUpdateView
+from utils.views import NextOrSuccessUrlMixin, UserOwnsObjectMixin, DualUserListView, OwnedObjectModalUpdateView
 from layer_manager.models import Layer
 from maps.models import Catchment, GeoDataset
 from maps.serializers import BaseResultMapSerializer

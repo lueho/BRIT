@@ -4,7 +4,7 @@ import django.db.models.deletion
 from django.conf import settings
 from django.db import migrations, models
 
-import brit.models
+from utils.models import get_default_owner_pk
 
 
 class Migration(migrations.Migration):
@@ -17,55 +17,55 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='basematerial',
             name='owner',
-            field=models.ForeignKey(default=brit.models.get_default_owner_pk,
+            field=models.ForeignKey(default=get_default_owner_pk,
                                     on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL),
         ),
         migrations.AlterField(
             model_name='composition',
             name='owner',
-            field=models.ForeignKey(default=brit.models.get_default_owner_pk,
+            field=models.ForeignKey(default=get_default_owner_pk,
                                     on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL),
         ),
         migrations.AlterField(
             model_name='materialcategory',
             name='owner',
-            field=models.ForeignKey(default=brit.models.get_default_owner_pk,
+            field=models.ForeignKey(default=get_default_owner_pk,
                                     on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL),
         ),
         migrations.AlterField(
             model_name='materialcomponentgroup',
             name='owner',
-            field=models.ForeignKey(default=brit.models.get_default_owner_pk,
+            field=models.ForeignKey(default=get_default_owner_pk,
                                     on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL),
         ),
         migrations.AlterField(
             model_name='materialproperty',
             name='owner',
-            field=models.ForeignKey(default=brit.models.get_default_owner_pk,
+            field=models.ForeignKey(default=get_default_owner_pk,
                                     on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL),
         ),
         migrations.AlterField(
             model_name='materialpropertyvalue',
             name='owner',
-            field=models.ForeignKey(default=brit.models.get_default_owner_pk,
+            field=models.ForeignKey(default=get_default_owner_pk,
                                     on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL),
         ),
         migrations.AlterField(
             model_name='sample',
             name='owner',
-            field=models.ForeignKey(default=brit.models.get_default_owner_pk,
+            field=models.ForeignKey(default=get_default_owner_pk,
                                     on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL),
         ),
         migrations.AlterField(
             model_name='sampleseries',
             name='owner',
-            field=models.ForeignKey(default=brit.models.get_default_owner_pk,
+            field=models.ForeignKey(default=get_default_owner_pk,
                                     on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL),
         ),
         migrations.AlterField(
             model_name='weightshare',
             name='owner',
-            field=models.ForeignKey(default=brit.models.get_default_owner_pk,
+            field=models.ForeignKey(default=get_default_owner_pk,
                                     on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL),
         ),
     ]

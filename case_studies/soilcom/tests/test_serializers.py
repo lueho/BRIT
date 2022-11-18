@@ -226,7 +226,6 @@ class CollectionFlatSerializerTestCase(TestCase):
 
     def test_serializer_data_contains_all_fields(self):
         serializer = CollectionFlatSerializer(self.collection_nuts)
-        print(serializer.data)
         keys = {'catchment', 'nuts_or_lau_id', 'collector', 'collection_system', 'country', 'waste_category',
                 'allowed_materials', 'connection_rate', 'connection_rate_year', 'fee_system', 'frequency', 'population',
                 'population_density', 'comments', 'sources', 'created_by', 'created_at', 'lastmodified_by',

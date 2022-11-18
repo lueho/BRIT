@@ -6,39 +6,6 @@ from django.urls import reverse, exceptions
 from users.models import get_default_owner
 
 
-class ReadableQueryset(models.QuerySet):
-
-    def readable(self, user):
-        qs = self.filter(visible_to_groups__in=Group.objects.filter(name='public'))
-        if user.is_authenticated:
-            qs = qs.union(self.filter(visible_to_groups__in=user.groups.all()))
-            qs = qs.union(self.filter(owner=user))
-        return qs
-
-
-class AccessManager(models.Manager):
-
-    def get_queryset(self):
-        return ReadableQueryset(self.model, using=self._db)
-
-    def readable(self, user):
-        return self.get_queryset().readable(user)
-
-
-def get_default_owner_pk():
-    return get_default_owner().pk
-
-
-class OwnedObjectModel(CommonInfo):
-    owner = models.ForeignKey(User, on_delete=models.PROTECT, default=get_default_owner_pk)
-    visible_to_groups = models.ManyToManyField(Group)
-
-    objects = AccessManager()
-
-    class Meta:
-        abstract = True
-
-
 class CRUDUrlsMixin(models.Model):
     class Meta:
         abstract = True
@@ -132,6 +99,39 @@ class CRUDUrlsMixin(models.Model):
             return None
 
 
+class AccessManager(models.Manager):
+
+    def get_queryset(self):
+        return ReadableQueryset(self.model, using=self._db)
+
+    def readable(self, user):
+        return self.get_queryset().readable(user)
+
+
+class ReadableQueryset(models.QuerySet):
+
+    def readable(self, user):
+        qs = self.filter(visible_to_groups__in=Group.objects.filter(name='public'))
+        if user.is_authenticated:
+            qs = qs.union(self.filter(visible_to_groups__in=user.groups.all()))
+            qs = qs.union(self.filter(owner=user))
+        return qs
+
+
+def get_default_owner_pk():
+    return get_default_owner().pk
+
+
+class OwnedObjectModel(CommonInfo):
+    owner = models.ForeignKey(User, on_delete=models.PROTECT, default=get_default_owner_pk)
+    visible_to_groups = models.ManyToManyField(Group)
+
+    objects = AccessManager()
+
+    class Meta:
+        abstract = True
+
+
 class NamedUserObjectModel(CRUDUrlsMixin, OwnedObjectModel):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
@@ -154,7 +154,7 @@ class Property(NamedUserObjectModel):
         return f'{self.name} [{self.unit}]'
 
 
-class PropertyValue(CRUDUrlsMixin, OwnedObjectModel):
+class PropertyValue(NamedUserObjectModel):
     """
     Serves to link any abstract property definition (see "Property" class) to a concrete instance
     of any other model with a concrete value. Intended to be related to other models through many-to-many relations.

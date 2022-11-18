@@ -2,7 +2,7 @@ from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-from brit.models import OwnedObjectModel, CRUDUrlsMixin, NamedUserObjectModel
+from utils.models import NamedUserObjectModel, CRUDUrlsMixin, OwnedObjectModel
 import celery
 
 
