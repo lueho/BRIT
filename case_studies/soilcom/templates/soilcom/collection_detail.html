@@ -48,6 +48,24 @@
                         </p>
                     {% endif %}
 
+                    {% if object.collectionpropertyvalue_set.exists %}
+                        {% regroup object.collectionpropertyvalue_set.all by property as property_list %}
+                        {% for prop in property_list %}
+                            <p class="card-text"><strong>{{ prop.grouper.name|title }}:</strong></p>
+                            <ul>
+                            {% for val in prop.list|dictsortreversed:"year" %}
+                                <li><a href="{{ val.get_absolute_url }}">
+                                {% if val.standard_deviation %}
+                                    {{ val.average }} ± {{ val.standard_deviation }} {{ val.property.unit }} ({{ val.year }})
+                                {% else %}
+                                    {{ val.average }} {{ val.property.unit }} ({{ val.year }})
+                                {% endif %}
+                                </a></li>
+                            {% endfor %}
+                            </ul>
+                        {% endfor %}
+                    {% endif %}
+
                     {% if object.samples.exists %}
                         <p class="card-text"><strong>Samples</strong></p>
                         <ul>
@@ -76,6 +94,8 @@
                         <i class="fas fa-fw fa-edit"></i> edit</a>
                     <a href="{% url 'collection-wastesamples' object.id %}" class="nowrap ml-3">
                         <i class="fas fa-fw fa-edit"></i> manage samples</a>
+                    <a href="{% url 'collection-add-property' object.id %}" class="nowrap ml-3">
+                        <i class="fas fa-fw fa-plus-circle"></i> add property</a>
                     <a href="{% url 'collection-copy' object.id %}" class="nowrap ml-3">
                        <i class="fas fa-fw fa-copy"></i> duplicate</a>
                     <a href="{% url 'collection-delete-modal' object.id %}" class="nowrap modal-link ml-3">

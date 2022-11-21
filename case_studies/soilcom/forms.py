@@ -10,6 +10,7 @@ from materials.models import Material, MaterialCategory, Sample
 from users.models import get_default_owner
 
 from . import models
+from .models import CollectionPropertyValue
 
 
 class CollectorModelForm(CustomModelForm):
@@ -188,6 +189,22 @@ class FormSetHelper(FormHelper):
         self.template = 'bootstrap4/dynamic_table_inline_formset.html'
         self.form_method = 'post'
         self.add_input(Submit("submit", "Save"))
+
+
+class CollectionPropertyValueModelForm(CustomModelForm):
+    collection = forms.ModelChoiceField(
+        queryset=models.Collection.objects.all(),
+        widget=autocomplete.ModelSelect2(url='collection-autocomplete'),
+        required=True
+    )
+
+    class Meta:
+        model = CollectionPropertyValue
+        fields = ('collection', 'property', 'year', 'average', 'standard_deviation')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['collection'].widget.attrs = {'data-theme': 'bootstrap4'}
 
 
 class CollectionModelForm(forms.ModelForm):

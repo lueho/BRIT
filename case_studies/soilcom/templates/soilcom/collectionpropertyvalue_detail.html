@@ -1,0 +1,28 @@
+{% extends 'simple_detail_card.html' %}
+
+{% block detail_body %}
+    <p class="card-text">
+        <strong>Collection:</strong><br>
+        <a href="{{ object.collection.get_absolute_url }}">{{ object.collection }}</a>
+    </p>
+    <p class="card-text"><strong>Property:</strong><br>{{ object.property }}</p>
+    <p class="card-text"><strong>Year:</strong><br>{{ object.year }}</p>
+    {% if object.standard_deviation %}
+        <p class="card-text"><strong>Value:</strong><br>{{ object.average }} ± {{ object.standard_deviation }} {{ object.property.unit }}</p>
+    {% else %}
+        <p class="card-text"><strong>Value:</strong><br>{{ object.average }} {{ object.property.unit }}</p>
+    {% endif %}
+{% endblock %}
+
+{% block detail_footer %}
+    {% if perms.soilcom.change_collectionpropertyvalue %}
+        <a href="{% url 'collectionpropertyvalue-update' object.pk %}" class="mr-3">
+            <i class="fas fa-fw fa-edit"></i> edit
+        </a>
+    {% endif %}
+    {% if perms.soilcom.delete_collectionpropertyvalue %}
+        <a href="{% url 'collectionpropertyvalue-delete-modal' object.pk %}" class="mr-3 modal-link">
+            <i class="fas fa-fw fa-trash"></i> delete
+        </a>
+    {% endif %}
+{% endblock %}

@@ -8,13 +8,14 @@ from django.test import RequestFactory
 from django.urls import reverse
 from mock import Mock, patch
 
+from utils.models import Property
 from utils.tests.testcases import ViewWithPermissionsTestCase
 from maps.models import Catchment, Region
 from materials.models import Material, MaterialCategory, Sample, SampleSeries
 from .. import views
 from ..forms import CollectionModelForm, BaseWasteFlyerUrlFormSet
 from ..models import (Collection, Collector, CollectionSystem, WasteCategory, WasteComponent, WasteFlyer, WasteStream,
-                      CollectionFrequency)
+                      CollectionFrequency, CollectionPropertyValue)
 
 
 # ----------- Collection Frequency CRUD --------------------------------------------------------------------------------
@@ -252,6 +253,176 @@ class CollectionFrequencyModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.post(reverse('collectionfrequency-delete-modal', kwargs={'pk': self.frequency.pk}))
         with self.assertRaises(CollectionFrequency.DoesNotExist):
             CollectionFrequency.objects.get(pk=self.frequency.pk)
+        self.assertEqual(response.status_code, 302)
+
+
+# ----------- CollectionPropertyValue CRUD --------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class CollectionPropertyValueCreateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'add_collectionpropertyvalue'
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.collection = Collection.objects.create(name='Test Collection')
+        cls.prop = Property.objects.create(name='Test Property', unit='Test Unit')
+
+    def test_get_http_302_redirect_for_anonymous(self):
+        response = self.client.get(reverse('collectionpropertyvalue-create'))
+        self.assertEqual(response.status_code, 302)
+
+    def test_get_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('collectionpropertyvalue-create'))
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('collectionpropertyvalue-create'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_http_302_redirect_for_anonymous(self):
+        response = self.client.post(reverse('collectionpropertyvalue-create'))
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(reverse('collectionpropertyvalue-create'))
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_http_302_redirect_for_members_with_minimal_data(self):
+        self.client.force_login(self.member)
+        data = {
+            'collection': self.collection.pk,
+            'property': self.prop.pk,
+            'year': 2022,
+            'average': 123.5,
+            'standard_deviation': 12.6
+        }
+        response = self.client.post(reverse('collectionpropertyvalue-create'), data=data)
+        self.assertEqual(response.status_code, 302)
+
+
+class CollectionPropertyValueDetailViewTestCase(ViewWithPermissionsTestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        collection = Collection.objects.create(name='Test Collection')
+        prop = Property.objects.create(name='Test Property', unit='Test Unit')
+        cls.val = CollectionPropertyValue.objects.create(
+            collection=collection,
+            property=prop,
+            average=123.5,
+            standard_deviation=12.54
+        )
+
+    def test_get_http_200_ok_for_anonymous(self):
+        response = self.client.get(reverse('collectionpropertyvalue-detail', kwargs={'pk': self.val.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_get_http_200_ok_for_logged_in_users(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('collectionpropertyvalue-detail', kwargs={'pk': self.val.pk}))
+        self.assertEqual(response.status_code, 200)
+
+
+class CollectionPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'change_collectionpropertyvalue'
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.collection = Collection.objects.create(name='Test Collection')
+        cls.prop = Property.objects.create(name='Test Property', unit='Test Unit')
+        cls.val = CollectionPropertyValue.objects.create(
+            collection=cls.collection,
+            property=cls.prop,
+            average=123.5,
+            standard_deviation=12.54
+        )
+
+    def test_get_http_302_redirect_for_anonymous(self):
+        response = self.client.get(reverse('collectionpropertyvalue-update', kwargs={'pk': self.val.pk}))
+        self.assertEqual(response.status_code, 302)
+
+    def test_get_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('collectionpropertyvalue-update', kwargs={'pk': self.val.pk}))
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('collectionpropertyvalue-update', kwargs={'pk': self.val.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_http_302_redirect_for_anonymous(self):
+        response = self.client.post(reverse('collectionpropertyvalue-update', kwargs={'pk': self.val.pk}))
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(reverse('collectionpropertyvalue-update', kwargs={'pk': self.val.pk}))
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_http_302_redirect_for_members(self):
+        self.client.force_login(self.member)
+        data = {
+            'collection': self.collection.pk,
+            'property': self.prop.pk,
+            'year': 2022,
+            'average': 123.5,
+            'standard_deviation': 32.2
+        }
+        response = self.client.post(reverse('collectionpropertyvalue-update', kwargs={'pk': self.val.pk}), data=data)
+        self.assertEqual(response.status_code, 302)
+
+
+class CollectionPropertyValueModalDeleteViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'delete_collectionpropertyvalue'
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        collection = Collection.objects.create(name='Test Collection')
+        prop = Property.objects.create(name='Test Property', unit='Test Unit')
+        cls.val = CollectionPropertyValue.objects.create(
+            collection=collection,
+            property=prop,
+            average=123.5,
+            standard_deviation=12.54
+        )
+
+    def test_get_http_302_redirect_for_anonymous(self):
+        response = self.client.get(reverse('collectionpropertyvalue-delete-modal', kwargs={'pk': self.val.pk}))
+        self.assertEqual(response.status_code, 302)
+
+    def test_get_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('collectionpropertyvalue-delete-modal', kwargs={'pk': self.val.pk}))
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('collectionpropertyvalue-delete-modal', kwargs={'pk': self.val.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_http_302_redirect_for_anonymous(self):
+        response = self.client.post(reverse('collectionpropertyvalue-delete-modal', kwargs={'pk': self.val.pk}))
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(reverse('collectionpropertyvalue-delete-modal', kwargs={'pk': self.val.pk}))
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_successful_delete_and_http_302_and_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.post(reverse('collectionpropertyvalue-delete-modal', kwargs={'pk': self.val.pk}))
+        with self.assertRaises(CollectionPropertyValue.DoesNotExist):
+            CollectionPropertyValue.objects.get(pk=self.val.pk)
         self.assertEqual(response.status_code, 302)
 
 
@@ -793,6 +964,65 @@ class CollectionAutocompleteViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('collection-autocomplete') + '?q=Ham')
         self.assertContains(response, 'Hamburg')
         self.assertNotContains(response, 'Berlin')
+
+
+class CollectionAddPropertyValueViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'add_collectionpropertyvalue'
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.collection = Collection.objects.create(name='Test Collection')
+        cls.prop = Property.objects.create(name='Test Property', unit='Test Unit')
+
+    def test_get_http_302_redirect_for_anonymous(self):
+        response = self.client.get(reverse('collection-add-property', kwargs={'pk': self.collection.pk}))
+        self.assertEqual(response.status_code, 302)
+
+    def test_get_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('collection-add-property', kwargs={'pk': self.collection.pk}))
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('collection-add-property', kwargs={'pk': self.collection.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_get_initial_has_collection_and_property(self):
+        request = RequestFactory().get(reverse('collection-add-property', kwargs={'pk': self.collection.id}))
+        view = views.CollectionAddPropertyValueView()
+        view.setup(request)
+        view.kwargs = {'pk': self.collection.id}
+        initial = view.get_initial()
+        expected = {
+            'collection': self.collection.pk,
+            'property': Property.objects.get(name='specific waste generation').pk
+        }
+        self.assertDictEqual(expected, initial)
+
+    def test_post_http_302_redirect_for_anonymous(self):
+        response = self.client.post(reverse('collection-add-property', kwargs={'pk': self.collection.pk}))
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(reverse('collection-add-property', kwargs={'pk': self.collection.pk}))
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_http_302_redirect_for_members_with_minimal_data(self):
+        self.client.force_login(self.member)
+        data = {
+            'collection': self.collection.pk,
+            'property': self.prop.pk,
+            'year': 2022,
+            'average': 123.5,
+            'standard_deviation': 12.6
+        }
+        response = self.client.post(reverse('collection-add-property', kwargs={'pk': self.collection.pk}), data=data)
+        self.assertEqual(response.status_code, 302)
+
+
 
 
 

@@ -250,3 +250,8 @@ def update_collection_names(sender, instance, created, **kwargs):
         collections = instance.collection_set.all()
     for collection in collections:
         collection.save()
+
+
+class CollectionPropertyValue(PropertyValue):
+    collection = models.ForeignKey(Collection, on_delete=models.CASCADE)
+    year = models.PositiveSmallIntegerField(null=True, validators=[YEAR_VALIDATOR])

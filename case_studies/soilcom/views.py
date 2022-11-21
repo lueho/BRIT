@@ -27,6 +27,8 @@ from maps.forms import NutsAndLauCatchmentQueryForm
 from maps.models import Catchment, GeoDataset
 from maps.views import GeoDatasetDetailView, GeoDataSetMixin, GeoDataSetFormMixin
 from utils import views
+from utils.models import Property
+
 from . import filters
 from . import forms
 from . import models
@@ -504,6 +506,37 @@ class FrequencyModalDeleteView(views.OwnedObjectModalDeleteView):
     permission_required = 'soilcom.delete_collectionfrequency'
 
 
+# ----------- CollectionPropertyValue CRUD -----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class CollectionPropertyValueCreateView(views.OwnedObjectCreateView):
+    template_name = 'simple_form_card.html'
+    form_class = forms.CollectionPropertyValueModelForm
+    permission_required = 'soilcom.add_collectionpropertyvalue'
+
+
+class CollectionPropertyValueDetailView(views.OwnedObjectDetailView):
+    model = models.CollectionPropertyValue
+    permission_required = set()
+
+
+class CollectionPropertyValueUpdateView(views.OwnedObjectUpdateView):
+    template_name = 'simple_form_card.html'
+    model = models.CollectionPropertyValue
+    form_class = forms.CollectionPropertyValueModelForm
+    permission_required = 'soilcom.change_collectionpropertyvalue'
+
+
+class CollectionPropertyValueModalDeleteView(views.OwnedObjectModalDeleteView):
+    model = models.CollectionPropertyValue
+    success_message = 'Successfully deleted.'
+    permission_required = 'soilcom.delete_collectionpropertyvalue'
+
+    def get_success_url(self):
+        return reverse('collection-detail', kwargs={'pk': self.object.collection.pk})
+
+
 # ----------- Collection CRUD ------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -715,6 +748,21 @@ class CollectionAutoCompleteView(Select2QuerySetView):
             qs = qs.filter(name__icontains=self.q)
         return qs
 
+
+class CollectionAddPropertyValueView(CollectionPropertyValueCreateView):
+
+    def get_initial(self):
+        initial = super().get_initial()
+        prop, _ = Property.objects.get_or_create(
+            name='specific waste generation',
+            defaults = {'unit': 'kg/(cap.*a)'}
+        )
+        initial['property'] = prop.pk
+        initial['collection'] = self.kwargs['pk']
+        return initial
+
+    def get_success_url(self):
+        return reverse('collection-detail', kwargs={'pk': self.kwargs['pk']})
 
 class SelectNewlyCreatedObjectModelSelectOptionsView(views.OwnedObjectModelSelectOptionsView):
 
