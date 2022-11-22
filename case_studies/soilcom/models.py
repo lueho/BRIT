@@ -255,3 +255,8 @@ def update_collection_names(sender, instance, created, **kwargs):
 class CollectionPropertyValue(PropertyValue):
     collection = models.ForeignKey(Collection, on_delete=models.CASCADE)
     year = models.PositiveSmallIntegerField(null=True, validators=[YEAR_VALIDATOR])
+
+
+class AggregatedCollectionPropertyValue(PropertyValue):
+    collections = models.ManyToManyField(Collection)
+    year = models.PositiveSmallIntegerField(null=True, validators=[YEAR_VALIDATOR])

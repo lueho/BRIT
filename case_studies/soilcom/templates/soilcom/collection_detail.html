@@ -66,6 +66,24 @@
                         {% endfor %}
                     {% endif %}
 
+                    {% if object.aggregatedcollectionpropertyvalue_set.exists %}
+                        {% regroup object.aggregatedcollectionpropertyvalue_set.all by property as property_list %}
+                        {% for prop in property_list %}
+                            <p class="card-text"><strong>{{ prop.grouper.name|title }}:</strong></p>
+                            <ul>
+                            {% for val in prop.list|dictsortreversed:"year" %}
+                                <li><a href="{{ val.get_absolute_url }}">
+                                {% if val.standard_deviation %}
+                                    {{ val.average }} ± {{ val.standard_deviation }} {{ val.property.unit }} ({{ val.year }})
+                                {% else %}
+                                    {{ val.average }} {{ val.property.unit }} ({{ val.year }})
+                                {% endif %}
+                                </a></li>
+                            {% endfor %}
+                            </ul>
+                        {% endfor %}
+                    {% endif %}
+
                     {% if object.samples.exists %}
                         <p class="card-text"><strong>Samples</strong></p>
                         <ul>

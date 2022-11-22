@@ -15,7 +15,7 @@ from materials.models import Material, MaterialCategory, Sample, SampleSeries
 from .. import views
 from ..forms import CollectionModelForm, BaseWasteFlyerUrlFormSet
 from ..models import (Collection, Collector, CollectionSystem, WasteCategory, WasteComponent, WasteFlyer, WasteStream,
-                      CollectionFrequency, CollectionPropertyValue)
+                      CollectionFrequency, CollectionPropertyValue, AggregatedCollectionPropertyValue)
 
 
 # ----------- Collection Frequency CRUD --------------------------------------------------------------------------------
@@ -306,6 +306,7 @@ class CollectionPropertyValueCreateViewTestCase(ViewWithPermissionsTestCase):
 
 
 class CollectionPropertyValueDetailViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ('change_collectionpropertyvalue', 'delete_collectionpropertyvalue')
 
     @classmethod
     def setUpTestData(cls):
@@ -322,6 +323,18 @@ class CollectionPropertyValueDetailViewTestCase(ViewWithPermissionsTestCase):
     def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse('collectionpropertyvalue-detail', kwargs={'pk': self.val.pk}))
         self.assertEqual(response.status_code, 200)
+
+    def test_template_contains_edit_and_delete_button_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('collectionpropertyvalue-detail', kwargs={'pk': self.val.pk}))
+        self.assertContains(response, reverse('collectionpropertyvalue-update', kwargs={'pk': self.val.pk}))
+        self.assertContains(response, reverse('collectionpropertyvalue-delete-modal', kwargs={'pk': self.val.pk}))
+
+    def test_template_does_not_contain_edit_and_delete_button_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('collectionpropertyvalue-detail', kwargs={'pk': self.val.pk}))
+        self.assertNotContains(response, reverse('collectionpropertyvalue-update', kwargs={'pk': self.val.pk}))
+        self.assertNotContains(response, reverse('collectionpropertyvalue-delete-modal', kwargs={'pk': self.val.pk}))
 
     def test_get_http_200_ok_for_logged_in_users(self):
         self.client.force_login(self.outsider)
@@ -423,6 +436,197 @@ class CollectionPropertyValueModalDeleteViewTestCase(ViewWithPermissionsTestCase
         response = self.client.post(reverse('collectionpropertyvalue-delete-modal', kwargs={'pk': self.val.pk}))
         with self.assertRaises(CollectionPropertyValue.DoesNotExist):
             CollectionPropertyValue.objects.get(pk=self.val.pk)
+        self.assertEqual(response.status_code, 302)
+
+
+# ----------- AggregatedCollectionPropertyValue CRUD --------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class AggregatedCollectionPropertyValueCreateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'add_aggregatedcollectionpropertyvalue'
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        Collection.objects.create(name='Test Collection 1')
+        Collection.objects.create(name='Test Collection 2')
+        cls.prop = Property.objects.create(name='Test Property', unit='Test Unit')
+
+    def test_get_http_302_redirect_for_anonymous(self):
+        response = self.client.get(reverse('aggregatedcollectionpropertyvalue-create'))
+        self.assertEqual(response.status_code, 302)
+
+    def test_get_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('aggregatedcollectionpropertyvalue-create'))
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('aggregatedcollectionpropertyvalue-create'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_http_302_redirect_for_anonymous(self):
+        response = self.client.post(reverse('aggregatedcollectionpropertyvalue-create'))
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(reverse('aggregatedcollectionpropertyvalue-create'))
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_http_302_redirect_for_members_with_minimal_data(self):
+        self.client.force_login(self.member)
+        data = {
+            'collections': [collection.pk for collection in Collection.objects.all()],
+            'property': self.prop.pk,
+            'year': 2022,
+            'average': 123.5,
+            'standard_deviation': 12.6
+        }
+        response = self.client.post(reverse('aggregatedcollectionpropertyvalue-create'), data=data)
+        self.assertEqual(response.status_code, 302)
+
+
+class AggregatedCollectionPropertyValueDetailViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ('change_aggregatedcollectionpropertyvalue', 'delete_aggregatedcollectionpropertyvalue')
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.prop = Property.objects.create(name='Test Property', unit='Test Unit')
+        cls.val = AggregatedCollectionPropertyValue.objects.create(
+            property=cls.prop,
+            average=123.5,
+            standard_deviation=12.54
+        )
+        cls.val.collections.add(Collection.objects.create(name='Test Collection 1'))
+        cls.val.collections.add(Collection.objects.create(name='Test Collection 2'))
+
+    def test_get_http_200_ok_for_anonymous(self):
+        response = self.client.get(reverse('aggregatedcollectionpropertyvalue-detail', kwargs={'pk': self.val.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_template_contains_edit_and_delete_button_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('aggregatedcollectionpropertyvalue-detail', kwargs={'pk': self.val.pk}))
+        self.assertContains(response, reverse('aggregatedcollectionpropertyvalue-update', kwargs={'pk': self.val.pk}))
+        self.assertContains(response, reverse('aggregatedcollectionpropertyvalue-delete-modal', kwargs={'pk': self.val.pk}))
+
+    def test_template_does_not_contain_edit_and_delete_button_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('aggregatedcollectionpropertyvalue-detail', kwargs={'pk': self.val.pk}))
+        self.assertNotContains(response, reverse('aggregatedcollectionpropertyvalue-update', kwargs={'pk': self.val.pk}))
+        self.assertNotContains(response, reverse('aggregatedcollectionpropertyvalue-delete-modal', kwargs={'pk': self.val.pk}))
+
+    def test_get_http_200_ok_for_logged_in_users(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('aggregatedcollectionpropertyvalue-detail', kwargs={'pk': self.val.pk}))
+        self.assertEqual(response.status_code, 200)
+
+
+class AggregatedCollectionPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'change_aggregatedcollectionpropertyvalue'
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.prop = Property.objects.create(name='Test Property', unit='Test Unit')
+        cls.val = AggregatedCollectionPropertyValue.objects.create(
+            property=cls.prop,
+            average=123.5,
+            standard_deviation=12.54
+        )
+        cls.val.collections.add(Collection.objects.create(name='Test Collection 1'))
+        cls.val.collections.add(Collection.objects.create(name='Test Collection 2'))
+
+    def test_get_http_302_redirect_for_anonymous(self):
+        response = self.client.get(reverse('aggregatedcollectionpropertyvalue-update', kwargs={'pk': self.val.pk}))
+        self.assertEqual(response.status_code, 302)
+
+    def test_get_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('aggregatedcollectionpropertyvalue-update', kwargs={'pk': self.val.pk}))
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('aggregatedcollectionpropertyvalue-update', kwargs={'pk': self.val.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_http_302_redirect_for_anonymous(self):
+        response = self.client.post(reverse('aggregatedcollectionpropertyvalue-update', kwargs={'pk': self.val.pk}))
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(reverse('aggregatedcollectionpropertyvalue-update', kwargs={'pk': self.val.pk}))
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_http_302_redirect_for_members(self):
+        self.client.force_login(self.member)
+        data = {
+            'collections': [self.val.collections.first().pk],
+            'property': self.prop.pk,
+            'year': 2022,
+            'average': 555,
+            'standard_deviation': 32.2
+        }
+        response = self.client.post(reverse('aggregatedcollectionpropertyvalue-update', kwargs={'pk': self.val.pk}), data=data)
+        self.assertEqual(response.status_code, 302)
+
+
+class AggregatedCollectionPropertyValueModalDeleteViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'delete_aggregatedcollectionpropertyvalue'
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        prop = Property.objects.create(name='Test Property', unit='Test Unit')
+        cls.val = AggregatedCollectionPropertyValue.objects.create(
+            property=prop,
+            average=123.5,
+            standard_deviation=12.54
+        )
+        cls.val.collections.add(Collection.objects.create())
+        cls.val.collections.add(Collection.objects.create())
+
+    def test_get_http_302_redirect_for_anonymous(self):
+        response = self.client.get(reverse('aggregatedcollectionpropertyvalue-delete-modal', kwargs={'pk': self.val.pk}))
+        self.assertEqual(response.status_code, 302)
+
+    def test_get_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('aggregatedcollectionpropertyvalue-delete-modal', kwargs={'pk': self.val.pk}))
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('aggregatedcollectionpropertyvalue-delete-modal', kwargs={'pk': self.val.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_post_http_302_redirect_for_anonymous(self):
+        response = self.client.post(reverse('aggregatedcollectionpropertyvalue-delete-modal', kwargs={'pk': self.val.pk}))
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(reverse('aggregatedcollectionpropertyvalue-delete-modal', kwargs={'pk': self.val.pk}))
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_successful_delete_and_http_302_and_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.post(reverse('aggregatedcollectionpropertyvalue-delete-modal', kwargs={'pk': self.val.pk}))
+        with self.assertRaises(AggregatedCollectionPropertyValue.DoesNotExist):
+            AggregatedCollectionPropertyValue.objects.get(pk=self.val.pk)
+        self.assertEqual(response.status_code, 302)
+
+    def test_collections_are_not_deleted(self):
+        self.client.force_login(self.member)
+        self.assertEqual(Collection.objects.count(), 2)
+        response = self.client.post(reverse('aggregatedcollectionpropertyvalue-delete-modal', kwargs={'pk': self.val.pk}))
+        self.assertEqual(Collection.objects.count(), 2)
         self.assertEqual(response.status_code, 302)
 
 

@@ -10,7 +10,7 @@ from materials.models import Material, MaterialCategory, Sample
 from users.models import get_default_owner
 
 from . import models
-from .models import CollectionPropertyValue
+from .models import CollectionPropertyValue, AggregatedCollectionPropertyValue
 
 
 class CollectorModelForm(CustomModelForm):
@@ -205,6 +205,22 @@ class CollectionPropertyValueModelForm(CustomModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['collection'].widget.attrs = {'data-theme': 'bootstrap4'}
+
+
+class AggregatedCollectionPropertyValueModelForm(CustomModelForm):
+    collections = forms.ModelMultipleChoiceField(
+        queryset=models.Collection.objects.all(),
+        widget=autocomplete.ModelSelect2Multiple(url='collection-autocomplete'),
+        required=True
+    )
+
+    class Meta:
+        model = AggregatedCollectionPropertyValue
+        fields = ('collections', 'property', 'year', 'average', 'standard_deviation')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['collections'].widget.attrs = {'data-theme': 'bootstrap4'}
 
 
 class CollectionModelForm(forms.ModelForm):

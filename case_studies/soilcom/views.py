@@ -537,6 +537,37 @@ class CollectionPropertyValueModalDeleteView(views.OwnedObjectModalDeleteView):
         return reverse('collection-detail', kwargs={'pk': self.object.collection.pk})
 
 
+# ----------- AggregatedCollectionPropertyValue CRUD -----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class AggregatedCollectionPropertyValueCreateView(views.OwnedObjectCreateView):
+    template_name = 'simple_form_card.html'
+    form_class = forms.AggregatedCollectionPropertyValueModelForm
+    permission_required = 'soilcom.add_aggregatedcollectionpropertyvalue'
+
+
+class AggregatedCollectionPropertyValueDetailView(views.OwnedObjectDetailView):
+    model = models.AggregatedCollectionPropertyValue
+    permission_required = set()
+
+
+class AggregatedCollectionPropertyValueUpdateView(views.OwnedObjectUpdateView):
+    template_name = 'simple_form_card.html'
+    model = models.AggregatedCollectionPropertyValue
+    form_class = forms.AggregatedCollectionPropertyValueModelForm
+    permission_required = 'soilcom.change_aggregatedcollectionpropertyvalue'
+
+
+class AggregatedCollectionPropertyValueModalDeleteView(views.OwnedObjectModalDeleteView):
+    model = models.AggregatedCollectionPropertyValue
+    success_message = 'Successfully deleted.'
+    permission_required = 'soilcom.delete_aggregatedcollectionpropertyvalue'
+
+    def get_success_url(self):
+        return reverse('collection-list')
+
+
 # ----------- Collection CRUD ------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
