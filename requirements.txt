@@ -34,6 +34,7 @@ django-model-utils==4.1.1
 django-registration-redux==2.9
 django-storages==1.12.1
 django-tables2==2.4.1
+django-tree-queries==0.11.0
 djangorestframework==3.12.4
 djangorestframework-csv==2.1.1
 djangorestframework-gis==0.17
