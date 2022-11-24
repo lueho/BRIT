@@ -188,13 +188,6 @@ class OwnedObjectModalDeleteView(PermissionRequiredMixin, NextOrSuccessUrlMixin,
         return context
 
 
-class RestrictedAccessListView(PermissionRequiredMixin, ListView):
-
-    def get_queryset(self):
-        user = self.request.user
-        return self.model.objects.readable(user)
-
-
 class ModelSelectOptionsView(ListView):
     """
     Returns a pre-rendered list of options for a select DOM element as json response. This is useful for updating

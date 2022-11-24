@@ -99,25 +99,6 @@ class CRUDUrlsMixin(models.Model):
             return None
 
 
-class AccessManager(models.Manager):
-
-    def get_queryset(self):
-        return ReadableQueryset(self.model, using=self._db)
-
-    def readable(self, user):
-        return self.get_queryset().readable(user)
-
-
-class ReadableQueryset(models.QuerySet):
-
-    def readable(self, user):
-        qs = self.filter(visible_to_groups__in=Group.objects.filter(name='public'))
-        if user.is_authenticated:
-            qs = qs.union(self.filter(visible_to_groups__in=user.groups.all()))
-            qs = qs.union(self.filter(owner=user))
-        return qs
-
-
 def get_default_owner_pk():
     return get_default_owner().pk
 
@@ -125,8 +106,6 @@ def get_default_owner_pk():
 class OwnedObjectModel(CommonInfo):
     owner = models.ForeignKey(User, on_delete=models.PROTECT, default=get_default_owner_pk)
     visible_to_groups = models.ManyToManyField(Group)
-
-    objects = AccessManager()
 
     class Meta:
         abstract = True
