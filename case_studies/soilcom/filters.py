@@ -9,7 +9,7 @@ from django_filters import (BooleanFilter,
                             ModelMultipleChoiceFilter, )
 
 from .forms import CollectionFilterForm, CollectorFilterForm, FlyerFilterForm
-from .models import Catchment, Collection, Collector, WasteCategory, WasteComponent, WasteFlyer
+from .models import CollectionCatchment, Collection, Collector, WasteCategory, WasteComponent, WasteFlyer
 
 
 class CollectorFilter(FilterSet):
@@ -32,8 +32,9 @@ COUNTRY_CHOICES = (
 
 
 class CollectionFilter(FilterSet):
-    catchment = ModelChoiceFilter(queryset=Catchment.objects.all(),
-                                  widget=autocomplete.ModelSelect2(url='catchment-autocomplete'))
+    catchment = ModelChoiceFilter(queryset=CollectionCatchment.objects.all(),
+                                  widget=autocomplete.ModelSelect2(url='catchment-autocomplete'),
+                                  method='catchment_filter')
     collector = ModelChoiceFilter(queryset=Collector.objects.all(),
                                   widget=autocomplete.ModelSelect2(url='collector-autocomplete'))
     country = ChoiceFilter(choices=COUNTRY_CHOICES, field_name='catchment__region__country', label='Country')
@@ -51,6 +52,13 @@ class CollectionFilter(FilterSet):
         fields = ('catchment', 'collector', 'collection_system', 'country', 'waste_category', 'allowed_materials',
                   'fee_system')
         form = CollectionFilterForm
+
+    @staticmethod
+    def catchment_filter(queryset, name, value):
+        qs = value.downstream_collections.order_by('name')
+        if not qs.exists():
+            qs = value.upstream_collections.order_by('name')
+        return qs
 
 
 class WasteFlyerFilter(FilterSet):

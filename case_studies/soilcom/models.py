@@ -11,9 +11,28 @@ from maps.models import Catchment
 from materials.models import Material, MaterialCategory, Sample, SampleSeries
 
 
+class CollectionCatchment(Catchment):
+
+    class Meta:
+        proxy = True
+
+    @property
+    def downstream_collections(self):
+        qs = Collection.objects.filter(catchment__in=self.descendants(include_self=True))
+        qs = qs.select_related('catchment', 'collector', 'waste_stream__category', 'collection_system')
+        return qs
+
+
+    @property
+    def upstream_collections(self):
+        qs = Collection.objects.filter(catchment__in=self.ancestors())
+        qs = qs.select_related('catchment', 'collector', 'waste_stream__category', 'collection_system')
+        return qs
+
+
 class Collector(NamedUserObjectModel):
     website = models.URLField(max_length=511, blank=True, null=True)
-    catchment = models.ForeignKey(Catchment, blank=True, null=True, on_delete=models.CASCADE)
+    catchment = models.ForeignKey(CollectionCatchment, blank=True, null=True, on_delete=models.CASCADE)
 
     class Meta:
         verbose_name = 'Waste Collector'
@@ -202,10 +221,10 @@ FEE_SYSTEMS = (
 
 class Collection(NamedUserObjectModel):
     collector = models.ForeignKey(Collector, on_delete=models.CASCADE, blank=True, null=True)
-    catchment = models.ForeignKey(Catchment, on_delete=models.PROTECT, blank=True, null=True)
-    collection_system = models.ForeignKey(CollectionSystem, on_delete=models.CASCADE, blank=True, null=True)
-    waste_stream = models.ForeignKey(WasteStream, on_delete=models.SET_NULL, blank=True, null=True)
-    frequency = models.ForeignKey(CollectionFrequency, on_delete=models.SET_NULL, blank=True, null=True)
+    catchment = models.ForeignKey(CollectionCatchment, on_delete=models.PROTECT, blank=True, null=True, related_name='collections')
+    collection_system = models.ForeignKey(CollectionSystem, on_delete=models.CASCADE, blank=True, null=True, related_name='collections')
+    waste_stream = models.ForeignKey(WasteStream, on_delete=models.SET_NULL, blank=True, null=True, related_name='collections')
+    frequency = models.ForeignKey(CollectionFrequency, on_delete=models.SET_NULL, blank=True, null=True, related_name='collections')
     connection_rate = models.FloatField(blank=True, null=True)
     connection_rate_year = models.PositiveSmallIntegerField(blank=True, null=True, validators=[YEAR_VALIDATOR])
     fee_system = models.CharField(max_length=32, choices=FEE_SYSTEMS, blank=True, null=True)
@@ -243,11 +262,12 @@ def name_collection(sender, instance, **kwargs):
 @receiver(post_save, sender=WasteCategory)
 @receiver(post_save, sender=CollectionSystem)
 @receiver(post_save, sender=Catchment)
+@receiver(post_save, sender=CollectionCatchment)
 def update_collection_names(sender, instance, created, **kwargs):
     if sender == WasteCategory:
         collections = Collection.objects.filter(waste_stream__category=instance)
     else:
-        collections = instance.collection_set.all()
+        collections = instance.collections.all()
     for collection in collections:
         collection.save()
 

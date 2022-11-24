@@ -1,12 +1,11 @@
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.test import TestCase
+from django.urls import reverse
 
-from maps.models import Catchment
 from materials.models import Material
 from users.models import get_default_owner
-
-from ..models import Collection, CollectionSystem, WasteStream, WasteCategory, WasteFlyer
+from ..models import Collection, CollectionCatchment, CollectionSystem, WasteStream, WasteCategory, WasteFlyer
 
 
 def comparable_model_dict(instance):
@@ -15,6 +14,50 @@ def comparable_model_dict(instance):
     """
     return {k: v for k, v in instance.__dict__.items() if
             k not in ('_state', 'lastmodified_at', '_prefetched_objects_cache')}
+
+
+class CollectionCatchmentTestCase(TestCase):
+
+    catchment = None
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.catchment = CollectionCatchment.objects.create(name='Test Catchment')
+        cls.child_catchment = CollectionCatchment.objects.create(parent=cls.catchment)
+        cls.grandchild_catchment = CollectionCatchment.objects.create(parent=cls.child_catchment)
+        cls.great_grandchild_catchment = CollectionCatchment.objects.create(parent=cls.grandchild_catchment)
+        cls.collection = Collection.objects.create(catchment=cls.catchment)
+        cls.child_collection = Collection.objects.create(catchment=cls.child_catchment)
+        cls.grandchild_collection = Collection.objects.create(catchment=cls.grandchild_catchment)
+        cls.unrelated_collection = Collection.objects.create(catchment=CollectionCatchment.objects.create())
+
+    def test_downstream_collections_contains_collections_of_self(self):
+        collections = self.catchment.downstream_collections
+        self.assertIn(self.collection, collections)
+
+    def test_downstream_collections_contains_collections_of_child_catchment(self):
+        collections = self.catchment.downstream_collections
+        self.assertIn(self.child_collection, collections)
+
+    def test_downstream_collections_contains_collections_of_grandchild_catchment(self):
+        collections = self.catchment.downstream_collections
+        self.assertIn(self.grandchild_collection, collections)
+
+    def test_downstream_collections_excludes_unrelated_collection(self):
+        collections = self.catchment.downstream_collections
+        self.assertNotIn(self.unrelated_collection, collections)
+
+    def test_upstream_collections_includes_collections_from_all_ancestor_catchments(self):
+        collections = self.great_grandchild_catchment.upstream_collections
+        self.assertIn(self.collection, collections)
+        self.assertIn(self.child_collection, collections)
+        self.assertIn(self.grandchild_collection, collections)
+
+    def test_get_absolute_url(self):
+        self.assertEqual(
+            reverse('collectioncatchment-detail', kwargs={'pk': self.catchment.pk}),
+            self.collection.catchment.get_absolute_url()
+        )
 
 
 class WasteStreamQuerysetTestCase(TestCase):
@@ -221,7 +264,7 @@ class CollectionTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         collection_system = CollectionSystem.objects.create(owner=get_default_owner(), name='System')
-        catchment = Catchment.objects.create(owner=get_default_owner(), name='Catchment')
+        catchment = CollectionCatchment.objects.create(owner=get_default_owner(), name='Catchment')
         category = WasteCategory.objects.create(owner=get_default_owner(), name='Category')
         waste_stream = WasteStream.objects.create(owner=get_default_owner(), category=category)
         cls.collection = Collection.objects.create(
@@ -262,7 +305,7 @@ class CollectionTestCase(TestCase):
         self.assertEqual('Catchment Updated Category System', self.collection.name)
 
     def test_collection_name_is_updated_when_catchment_model_is_changed(self):
-        catchment = Catchment.objects.get(name='Catchment')
+        catchment = CollectionCatchment.objects.get(name='Catchment')
         catchment.name = 'Updated Catchment'
         catchment.save()
         self.collection.refresh_from_db()

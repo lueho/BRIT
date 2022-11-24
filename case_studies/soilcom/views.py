@@ -24,18 +24,16 @@ from bibliography.views import (SourceCreateView,
                                 SourceModalDeleteView,
                                 SourceCheckUrlView)
 from maps.forms import NutsAndLauCatchmentQueryForm
-from maps.models import Catchment, GeoDataset
-from maps.views import GeoDatasetDetailView, GeoDataSetMixin, GeoDataSetFormMixin
+from maps.models import GeoDataset
+from maps.views import CatchmentDetailView, GeoDatasetDetailView, GeoDataSetMixin, GeoDataSetFormMixin
 from utils import views
 from utils.models import Property
-
 from . import filters
 from . import forms
 from . import models
 from . import serializers
 from .filters import CollectionFilter, CollectorFilter, WasteFlyerFilter
-from .models import Collection
-from .models import Collector, WasteFlyer
+from .models import Collection, CollectionCatchment, Collector, WasteFlyer
 from .serializers import CollectionFlatSerializer
 from .tasks import check_wasteflyer_urls
 
@@ -43,6 +41,15 @@ from .tasks import check_wasteflyer_urls
 class CollectionHomeView(PermissionRequiredMixin, TemplateView):
     template_name = 'waste_collection_home.html'
     permission_required = 'soilcom.view_collection'
+
+
+# ----------- CollectionCatchment CRUD ---------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class CollectionCatchmentDetailView(CatchmentDetailView):
+    model = CollectionCatchment
+    permission_required = set()
 
 
 # ----------- Collector CRUD -------------------------------------------------------------------------------------------
@@ -574,7 +581,7 @@ class AggregatedCollectionPropertyValueModalDeleteView(views.OwnedObjectModalDel
 class CollectionListView(views.BRITFilterView):
     model = Collection
     filterset_class = CollectionFilter
-    ordering = 'id'
+    ordering = 'name'
 
 
 class ModelFormAndModelFormSetMixin:
@@ -643,7 +650,7 @@ class CollectionCreateView(ModelFormAndFormSetMixin, views.OwnedObjectCreateView
         initial = super().get_initial()
         if 'region_id' in self.request.GET:
             region_id = self.request.GET.get('region_id')
-            catchment = Catchment.objects.get(id=region_id)
+            catchment = CollectionCatchment.objects.get(id=region_id)
             initial['catchment'] = catchment
         if 'collector' in self.request.GET:
             initial['collector'] = models.Collector.objects.get(id=self.request.GET.get('collector'))
@@ -879,7 +886,7 @@ class CatchmentSelectView(GeoDataSetFormMixin, GeoDataSetMixin, TemplateView):
         region_id = self.get_region_id()
         catchment_id = self.request.GET.get('catchment')
         if catchment_id:
-            catchment = Catchment.objects.get(id=catchment_id)
+            catchment = CollectionCatchment.objects.get(id=catchment_id)
             initial['parent_region'] = catchment.parent_region.id
             initial['catchment'] = catchment.id
         elif region_id:

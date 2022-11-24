@@ -6,12 +6,12 @@ from openpyxl import load_workbook
 from django.contrib.auth.models import User, Permission
 from django.test import TestCase
 
-from maps.models import Catchment, NutsRegion
+from maps.models import NutsRegion
 from materials.models import MaterialCategory
 from users.models import get_default_owner
 
-from ..models import (Collection, Collector, CollectionSystem, WasteCategory, WasteComponent, WasteFlyer, WasteStream,
-                      CollectionFrequency)
+from ..models import (Collection, CollectionCatchment, Collector, CollectionSystem, WasteCategory, WasteComponent,
+                      WasteFlyer, WasteStream, CollectionFrequency)
 from ..renderers import CollectionCSVRenderer, CollectionXLSXRenderer
 from ..serializers import CollectionFlatSerializer
 
@@ -43,7 +43,7 @@ class CollectionCSVRendererTestCase(TestCase):
         )
         frequency = CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
         nuts = NutsRegion.objects.create(owner=owner, name='Test NUTS', nuts_id='DE123', cntr_code='DE')
-        catchment = Catchment.objects.create(owner=owner, name='Test catchment', region=nuts.region_ptr)
+        catchment = CollectionCatchment.objects.create(owner=owner, name='Test catchment', region=nuts.region_ptr)
         for i in range(1, 3):
             collection = Collection.objects.create(
                 name=f'collection{i}',
@@ -121,7 +121,7 @@ class CollectionXLSXRendererTestCase(TestCase):
         )
         frequency = CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
         nuts = NutsRegion.objects.create(owner=owner, name='Test NUTS', nuts_id='DE123', cntr_code='DE')
-        catchment = Catchment.objects.create(owner=owner, name='Test catchment', region=nuts.region_ptr)
+        catchment = CollectionCatchment.objects.create(owner=owner, name='Test catchment', region=nuts.region_ptr)
         for i in range(1, 3):
             collection = Collection.objects.create(
                 owner=owner,

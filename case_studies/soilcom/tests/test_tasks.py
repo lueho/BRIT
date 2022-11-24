@@ -4,11 +4,11 @@ from django.http.request import QueryDict, MultiValueDict
 from django.test import TestCase
 from mock import patch, Mock
 
-from maps.models import Catchment, Region
+from maps.models import Region
 from users.models import get_default_owner
 
-from ..models import (Collection, CollectionSystem, CollectionFrequency, Collector, MaterialCategory, WasteCategory,
-                      WasteComponent, WasteFlyer, WasteStream)
+from ..models import (Collection, CollectionCatchment, CollectionSystem, CollectionFrequency, Collector,
+                      MaterialCategory, WasteCategory, WasteComponent, WasteFlyer, WasteStream)
 from ..renderers import CollectionXLSXRenderer
 from ..serializers import CollectionFlatSerializer
 from ..tasks import (export_collections_to_file, check_wasteflyer_urls, check_wasteflyer_url,
@@ -43,7 +43,7 @@ class ExportCollectionToFileTestCase(TestCase):
         )
         frequency = CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
         region = Region.objects.create(owner=owner, name='Test Region')
-        catchment = Catchment.objects.create(owner=owner, name='Test catchment', region=region)
+        catchment = CollectionCatchment.objects.create(owner=owner, name='Test catchment', region=region)
         for i in range(1, 3):
             collection = Collection.objects.create(
                 owner=owner,

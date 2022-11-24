@@ -10,12 +10,39 @@ from mock import Mock, patch
 
 from utils.models import Property
 from utils.tests.testcases import ViewWithPermissionsTestCase
-from maps.models import Catchment, Region
+from maps.models import Region
 from materials.models import Material, MaterialCategory, Sample, SampleSeries
 from .. import views
 from ..forms import CollectionModelForm, BaseWasteFlyerUrlFormSet
-from ..models import (Collection, Collector, CollectionSystem, WasteCategory, WasteComponent, WasteFlyer, WasteStream,
-                      CollectionFrequency, CollectionPropertyValue, AggregatedCollectionPropertyValue)
+from ..models import (Collection, CollectionCatchment, Collector, CollectionSystem, WasteCategory, WasteComponent,
+                      WasteFlyer, WasteStream, CollectionFrequency, CollectionPropertyValue,
+                      AggregatedCollectionPropertyValue)
+
+
+# ----------- Collection Catchment CRUD --------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class CollectionCatchmentDetailViewTestCase(ViewWithPermissionsTestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        region = Region.objects.create(name='Test Region')
+        cls.catchment = CollectionCatchment.objects.create(name='Test Catchment', region=region)
+
+    def test_get_http_200_ok_for_anonymous(self):
+        response = self.client.get(reverse('collectioncatchment-detail', kwargs={'pk': self.catchment.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_get_http_200_ok_for_logged_in_users(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('collectioncatchment-detail', kwargs={'pk': self.catchment.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_collectioncatchment_template_is_used(self):
+        response = self.client.get(reverse('collectioncatchment-detail', kwargs={'pk': self.catchment.pk}))
+        self.assertTemplateUsed(response, 'soilcom/collectioncatchment_detail.html')
 
 
 # ----------- Collection Frequency CRUD --------------------------------------------------------------------------------
@@ -658,7 +685,7 @@ class CollectionCreateViewTestCase(ViewWithPermissionsTestCase):
         frequency = CollectionFrequency.objects.create(name='Test Frequency')
         cls.collection = Collection.objects.create(
             name='collection1',
-            catchment=Catchment.objects.create(name='Test catchment'),
+            catchment=CollectionCatchment.objects.create(name='Test catchment'),
             collector=Collector.objects.create(name='Test collector'),
             collection_system=CollectionSystem.objects.create(name='Test system'),
             waste_stream=waste_stream,
@@ -729,7 +756,7 @@ class CollectionCreateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.post(
             reverse('collection-create'),
             data={
-                'catchment': Catchment.objects.first().id,
+                'catchment': CollectionCatchment.objects.first().id,
                 'collector': Collector.objects.first().id,
                 'collection_system': CollectionSystem.objects.first().id,
                 'waste_category': WasteCategory.objects.first().id,
@@ -774,7 +801,7 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
         frequency = CollectionFrequency.objects.create(name='Test Frequency')
         cls.collection = Collection.objects.create(
             name='collection1',
-            catchment=Catchment.objects.create(name='Test catchment'),
+            catchment=CollectionCatchment.objects.create(name='Test catchment'),
             collector=Collector.objects.create(name='Test collector'),
             collection_system=CollectionSystem.objects.create(name='Test system'),
             waste_stream=waste_stream,
@@ -861,7 +888,7 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
     def test_post_http_302_redirect_for_member(self):
         self.client.force_login(self.member)
         data = {
-            'catchment': Catchment.objects.first().id,
+            'catchment': CollectionCatchment.objects.first().id,
             'collector': Collector.objects.create(name='New Test Collector').id,
             'collection_system': CollectionSystem.objects.first().id,
             'waste_category': WasteCategory.objects.first().id,
@@ -948,7 +975,7 @@ class CollectionUpdateViewTestCase(ViewWithPermissionsTestCase):
         frequency = CollectionFrequency.objects.create(name='Test Frequency')
         cls.collection = Collection.objects.create(
             name='collection1',
-            catchment=Catchment.objects.create(name='Test catchment'),
+            catchment=CollectionCatchment.objects.create(name='Test catchment'),
             collector=Collector.objects.create(name='Test collector'),
             collection_system=CollectionSystem.objects.create(name='Test system'),
             waste_stream=waste_stream,
@@ -1074,7 +1101,7 @@ class CollectionUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.post(
             reverse('collection-update', kwargs={'pk': self.collection.id}),
             data={
-                'catchment': Catchment.objects.first().id,
+                'catchment': CollectionCatchment.objects.first().id,
                 'collector': Collector.objects.first().id,
                 'collection_system': CollectionSystem.objects.first().id,
                 'waste_category': WasteCategory.objects.first().id,
@@ -1153,8 +1180,8 @@ class CollectionAutocompleteViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        Collection.objects.create(catchment=Catchment.objects.create(name='Hamburg'))
-        Collection.objects.create(catchment=Catchment.objects.create(name='Berlin'))
+        Collection.objects.create(catchment=CollectionCatchment.objects.create(name='Hamburg'))
+        Collection.objects.create(catchment=CollectionCatchment.objects.create(name='Berlin'))
 
     def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse('collection-autocomplete'))
@@ -1254,7 +1281,7 @@ class CollectionSummaryAPIViewTestCase(ViewWithPermissionsTestCase):
         frequency = CollectionFrequency.objects.create(name='Test Frequency')
         cls.collection = Collection.objects.create(
             name='collection1',
-            catchment=Catchment.objects.create(name='Test catchment'),
+            catchment=CollectionCatchment.objects.create(name='Test catchment'),
             collector=Collector.objects.create(name='Test collector'),
             collection_system=CollectionSystem.objects.create(name='Test system'),
             waste_stream=waste_stream,
@@ -1316,7 +1343,7 @@ class CollectionListFileExportViewTestCase(ViewWithPermissionsTestCase):
         for i in range(1, 3):
             collection = Collection.objects.create(
                 name=f'collection{i}',
-                catchment=Catchment.objects.create(name='Test catchment'),
+                catchment=CollectionCatchment.objects.create(name='Test catchment'),
                 collector=Collector.objects.create(name='Test collector'),
                 collection_system=CollectionSystem.objects.create(name='Test system'),
                 waste_stream=waste_stream,
@@ -1476,7 +1503,7 @@ class WasteCollectionMapViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         region = Region.objects.create(name='Test Region')
-        catchment = Catchment.objects.create(name='Test Catchment', region=region)
+        catchment = CollectionCatchment.objects.create(name='Test Catchment', region=region)
         cls.collection = Collection.objects.create(name='Test Collection', catchment=catchment)
 
     def test_http_200_ok_for_anonymous(self):

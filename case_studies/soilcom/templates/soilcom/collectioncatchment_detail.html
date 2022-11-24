@@ -1,0 +1,10 @@
+{% extends 'maps/catchment_detail.html' %}
+
+{% block additional_details %}
+    <p class="card-text"><strong>Collections:</strong></p>
+    <ul>
+    {% for collection in object.downstream_collections.all %}
+        <li><a href="{% url 'collection-detail' collection.pk %}">{{ collection.name }}</a></li>
+    {% endfor %}
+    </ul>
+{% endblock %}

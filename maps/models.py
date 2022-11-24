@@ -1,6 +1,7 @@
 from django.contrib.gis.db.models import MultiPolygonField, PointField
 from django.db import models
 from django.urls import reverse
+from tree_queries.models import TreeNode
 
 from bibliography.models import Source
 from utils.models import NamedUserObjectModel
@@ -115,7 +116,7 @@ class LauRegion(Region):
         return f'{self.lau_name} ({self.lau_id})'
 
 
-class Catchment(NamedUserObjectModel):
+class Catchment(NamedUserObjectModel, TreeNode):
     parent_region = models.ForeignKey(Region, on_delete=models.CASCADE, related_name='child_catchments', null=True)
     region = models.ForeignKey(Region, on_delete=models.CASCADE, null=True)
     type = models.CharField(max_length=14, choices=TYPES, default='custom')

@@ -4,12 +4,13 @@ from django.test import TestCase
 from django.test.utils import isolate_apps
 from rest_framework.serializers import ModelSerializer, Serializer, CharField, IntegerField
 
-from maps.models import Attribute, RegionAttributeValue, Catchment, NutsRegion, LauRegion
+from maps.models import Attribute, RegionAttributeValue, NutsRegion, LauRegion
 from maps.serializers import FieldLabelMixin
 from materials.models import MaterialCategory
 
 from ..models import (
     Collection,
+    CollectionCatchment,
     CollectionFrequency,
     CollectionSystem,
     Collector,
@@ -115,7 +116,7 @@ class CollectionSerializerTestCase(TestCase):
         frequency = CollectionFrequency.objects.create(name='Test Frequency')
         cls.collection = Collection.objects.create(
             name='Test Collection',
-            catchment=Catchment.objects.create(name='Test catchment'),
+            catchment=CollectionCatchment.objects.create(name='Test catchment'),
             collector=Collector.objects.create(name='Test collector'),
             collection_system=CollectionSystem.objects.create(name='Test system'),
             waste_stream=waste_stream,
@@ -187,7 +188,7 @@ class CollectionFlatSerializerTestCase(TestCase):
         population_density = Attribute.objects.create(owner=owner, name='Population density', unit='1/km')
         RegionAttributeValue(owner=owner, region=nutsregion, attribute=population, value=123321)
         RegionAttributeValue(owner=owner, region=nutsregion, attribute=population_density, value=123.5)
-        catchment1 = Catchment.objects.create(owner=owner, name='Test Catchment', region=nutsregion.region_ptr)
+        catchment1 = CollectionCatchment.objects.create(owner=owner, name='Test Catchment', region=nutsregion.region_ptr)
         cls.collection_nuts = Collection.objects.create(
             created_by=owner,
             lastmodified_by=owner,
@@ -206,7 +207,7 @@ class CollectionFlatSerializerTestCase(TestCase):
         cls.collection_nuts.flyers.add(waste_flyer_2)
 
         lauregion = LauRegion.objects.create(owner=owner, name='Shetland Islands', country='UK', lau_id='S30000041')
-        catchment2 = Catchment.objects.create(owner=owner, name='Test Catchment', region=lauregion.region_ptr)
+        catchment2 = CollectionCatchment.objects.create(owner=owner, name='Test Catchment', region=lauregion.region_ptr)
         cls.collection_lau = Collection.objects.create(
             created_by=owner,
             lastmodified_by=owner,

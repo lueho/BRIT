@@ -15,7 +15,7 @@ from .models import CollectionPropertyValue, AggregatedCollectionPropertyValue
 
 class CollectorModelForm(CustomModelForm):
     catchment = forms.ModelChoiceField(
-        queryset=models.Catchment.objects.all(),
+        queryset=models.CollectionCatchment.objects.all(),
         widget=autocomplete.ModelSelect2(url='catchment-autocomplete'),
         required=False
     )
@@ -31,7 +31,7 @@ class CollectorModelForm(CustomModelForm):
 
 class CollectorModalModelForm(CustomModalModelForm):
     catchment = forms.ModelChoiceField(
-        queryset=models.Catchment.objects.all(),
+        queryset=models.CollectionCatchment.objects.all(),
         widget=autocomplete.ModelSelect2(url='catchment-autocomplete'),
         required=False
     )
@@ -225,7 +225,7 @@ class AggregatedCollectionPropertyValueModelForm(CustomModelForm):
 
 class CollectionModelForm(forms.ModelForm):
     catchment = forms.ModelChoiceField(
-        queryset=models.Catchment.objects.all(),
+        queryset=models.CollectionCatchment.objects.all(),
         widget=autocomplete.ModelSelect2(url='catchment-autocomplete'),
         required=True
     )
@@ -343,7 +343,7 @@ COUNTRY_CHOICES = (
 
 class CollectionFilterForm(forms.Form):
     catchment = forms.ModelChoiceField(
-        queryset=models.Catchment.objects.all(),
+        queryset=models.CollectionCatchment.objects.all(),
         widget=autocomplete.ModelSelect2(url='catchment-autocomplete'),
         required=False
     )

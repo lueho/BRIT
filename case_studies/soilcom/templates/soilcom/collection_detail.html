@@ -8,7 +8,10 @@
             <div class="card shadow">
                 <div class="card-header"><strong>Collection Details</strong></div>
                 <div class="card-body">
-                    <p class="card-text"><strong>Catchment:</strong><br>{{ object.catchment.name }}</p>
+                    <p class="card-text">
+                        <strong>Catchment:</strong><br>
+                        <a href="{{ object.catchment.get_absolute_url }}">{{ object.catchment.name }}</a>
+                    </p>
                     <p class="card-text">
                         <strong>Collector:</strong><br>
                         <a href="{{ object.collector.get_absolute_url }}">{{ object.collector.name }}</a>

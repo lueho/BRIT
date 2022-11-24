@@ -1,20 +1,17 @@
-from django.contrib.auth.models import User
 from django.forms import formset_factory
 from django.test import TestCase
 
-from maps.models import Catchment
 from materials.models import MaterialCategory
-from users.models import get_default_owner
 from ..forms import CollectionModelForm, UrlForm, BaseWasteFlyerUrlFormSet
-from ..models import (Collection, Collector, CollectionFrequency, CollectionSystem, WasteCategory, WasteComponent,
-                      WasteFlyer, WasteStream)
+from ..models import (Collection, CollectionCatchment, Collector, CollectionFrequency, CollectionSystem, WasteCategory,
+                      WasteComponent, WasteFlyer, WasteStream)
 
 
 class TestCollectionModelForm(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.catchment = Catchment.objects.create(name='Catchment')
+        cls.catchment = CollectionCatchment.objects.create(name='Catchment')
         cls.collector = Collector.objects.create(name='Collector')
         cls.collection_system = CollectionSystem.objects.create(name='System')
         cls.waste_category = WasteCategory.objects.create(name='Category')
@@ -127,7 +124,7 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
         flyer_3 = WasteFlyer.objects.create(
             url='https://www.rest-flyers.org'
         )
-        Catchment.objects.create(name='Catchment')
+        CollectionCatchment.objects.create(name='Catchment')
         collector = Collector.objects.create(name='Collector')
         collection_system = CollectionSystem.objects.create(name='System')
         waste_category = WasteCategory.objects.create(name='Category')
