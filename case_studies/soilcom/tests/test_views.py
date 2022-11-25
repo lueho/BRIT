@@ -1254,7 +1254,66 @@ class CollectionAddPropertyValueViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 302)
 
 
+class CollectionAddAggregatedPropertyValueViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'add_aggregatedcollectionpropertyvalue'
 
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.catchment = CollectionCatchment.objects.create()
+        Collection.objects.create(catchment=CollectionCatchment.objects.create(parent=cls.catchment))
+        Collection.objects.create(catchment=CollectionCatchment.objects.create(parent=cls.catchment))
+        cls.prop = Property.objects.create(name='Test Property', unit='Test Unit')
+
+    def test_get_http_302_redirect_for_anonymous(self):
+        response = self.client.get(reverse('collectioncatchment-add-aggregatedpropertyvalue', kwargs={'pk': self.catchment.pk}))
+        self.assertEqual(response.status_code, 302)
+
+    def test_get_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('collectioncatchment-add-aggregatedpropertyvalue', kwargs={'pk': self.catchment.pk}))
+        self.assertEqual(response.status_code, 403)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('collectioncatchment-add-aggregatedpropertyvalue', kwargs={'pk': self.catchment.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_get_initial_has_collections_and_property(self):
+        request = RequestFactory().get(reverse('collectioncatchment-add-aggregatedpropertyvalue', kwargs={'pk': self.catchment.id}))
+        view = views.CollectionCatchmentAddAggregatedPropertyView()
+        view.setup(request)
+        view.kwargs = {'pk': self.catchment.id}
+        initial = view.get_initial()
+        expected = {
+            'collections': self.catchment.downstream_collections,
+            'property': Property.objects.get(name='specific waste generation')
+        }
+        self.assertIn('collections', initial)
+        self.assertIn('property', initial)
+        self.assertQuerysetEqual(expected['collections'].order_by('id'), initial['collections'].order_by('id'))
+        self.assertEqual(expected['property'], initial['property'])
+
+    def test_post_http_302_redirect_for_anonymous(self):
+        response = self.client.post(reverse('collectioncatchment-add-aggregatedpropertyvalue', kwargs={'pk': self.catchment.pk}))
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_http_403_forbidden_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(reverse('collectioncatchment-add-aggregatedpropertyvalue', kwargs={'pk': self.catchment.pk}))
+        self.assertEqual(response.status_code, 403)
+
+    def test_post_http_302_redirect_for_members_with_minimal_data(self):
+        self.client.force_login(self.member)
+        data = {
+            'collections': [collection.pk for collection in self.catchment.downstream_collections],
+            'property': self.prop.pk,
+            'year': 2022,
+            'average': 123.5,
+            'standard_deviation': 12.6
+        }
+        response = self.client.post(reverse('collectioncatchment-add-aggregatedpropertyvalue', kwargs={'pk': self.catchment.pk}), data=data)
+        self.assertEqual(response.status_code, 302)
 
 
 class CollectionSummaryAPIViewTestCase(ViewWithPermissionsTestCase):

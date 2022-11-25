@@ -35,19 +35,19 @@
 {% endblock %}
 
 {% block detail_footer %}
-    <a href="javascript:history.go(-1)" class="nowrap">
+    <a href="javascript:history.go(-1)" class="nowrap mr-2">
         <i class="fas fa-fw fa-arrow-left"></i> back
     </a>
-    <a href="{% url 'catchment-list' %}" class="nowrap ml-3">
+    <a href="{% url 'catchment-list' %}" class="nowrap mr-2">
         <i class="fas fa-fw fa-list"></i> see all
     </a>
     {% if 'maps.change_catchment' in perms %}
-        <a href="{% url 'catchment-update' object.pk %}" class="nowrap ml-3">
+        <a href="{% url 'catchment-update' object.pk %}" class="nowrap mr-2">
             <i class="fas fa-fw fa-edit"></i> edit
         </a>
     {% endif %}
     {% if 'maps.delete_catchment' in perms %}
-        <a href="{% url 'catchment-delete-modal' object.pk %}" class="nowrap modal-link ml-3">
+        <a href="{% url 'catchment-delete-modal' object.pk %}" class="nowrap modal-link mr-2">
             <i class="fas fa-fw fa-trash"></i> delete
         </a>
     {% endif %}

@@ -8,3 +8,12 @@
     {% endfor %}
     </ul>
 {% endblock %}
+
+{% block detail_footer %}
+    {{ block.super }}
+    {% if perms.soilcom.add_aggregatedcollectionpropertyvalue %}
+        <a href="{% url 'collectioncatchment-add-aggregatedpropertyvalue' object.pk %}">
+            <i class="fas fa-fw fa-plus-circle"></i> add property
+        </a>
+    {% endif %}
+{% endblock %}

@@ -802,6 +802,21 @@ class CollectionAddPropertyValueView(CollectionPropertyValueCreateView):
     def get_success_url(self):
         return reverse('collection-detail', kwargs={'pk': self.kwargs['pk']})
 
+
+class CollectionCatchmentAddAggregatedPropertyView(AggregatedCollectionPropertyValueCreateView):
+
+    def get_initial(self):
+        initial = super().get_initial()
+        catchment = CollectionCatchment.objects.get(pk=self.kwargs.get('pk'))
+        initial['collections'] = catchment.downstream_collections
+        prop, _ = Property.objects.get_or_create(
+            name='specific waste generation',
+            defaults={'unit': 'kg/(cap.*a)'}
+        )
+        initial['property'] = prop
+        return initial
+
+
 class SelectNewlyCreatedObjectModelSelectOptionsView(views.OwnedObjectModelSelectOptionsView):
 
     def get_selected_object(self):

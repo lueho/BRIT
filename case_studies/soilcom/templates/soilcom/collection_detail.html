@@ -77,9 +77,9 @@
                             {% for val in prop.list|dictsortreversed:"year" %}
                                 <li><a href="{{ val.get_absolute_url }}">
                                 {% if val.standard_deviation %}
-                                    {{ val.average }} ± {{ val.standard_deviation }} {{ val.property.unit }} ({{ val.year }})
+                                    {{ val.average }} ± {{ val.standard_deviation }} {{ val.property.unit }} ({{ val.year }}) (aggregated)
                                 {% else %}
-                                    {{ val.average }} {{ val.property.unit }} ({{ val.year }})
+                                    {{ val.average }} {{ val.property.unit }} ({{ val.year }}) (aggregated)
                                 {% endif %}
                                 </a></li>
                             {% endfor %}

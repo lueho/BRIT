@@ -6,6 +6,7 @@ from .router import router
 urlpatterns = [
     path('', views.CollectionHomeView.as_view(), name='waste-collection-home'),
     path('catchments/<int:pk>/', views.CollectionCatchmentDetailView.as_view(), name='collectioncatchment-detail'),
+    path('catchments/<int:pk>/add_aggregated_property/', views.CollectionCatchmentAddAggregatedPropertyView.as_view(), name='collectioncatchment-add-aggregatedpropertyvalue'),
     path('collectors/', views.CollectorListView.as_view(), name='collector-list'),
     path('collectors/create/', views.CollectorCreateView.as_view(), name='collector-create'),
     path('collectors/create/modal/', views.CollectorModalCreateView.as_view(), name='collector-create-modal'),
