@@ -16,6 +16,18 @@
 {% block detail_body %}
     <p class="card-text"><strong>Name:</strong><br>{{ object.name }}</p>
     <p class="card-text"><strong>Type:</strong><br>{{ object.type }}</p>
+    {% if object.region %}
+        <p class="card-text">
+            <strong>Region:</strong><br>
+            {{ object.region }}
+        </p>
+    {% endif %}
+    {% if object.parent_region %}
+        <p class="card-text">
+            <strong>Parent region:</strong><br>
+            {{ object.parent_region }}
+        </p>
+    {% endif %}
     {% if object.description %}
         <p class="card-text"><strong>Description:</strong><br>{{ object.description }}</p>
     {% endif %}

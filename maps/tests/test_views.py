@@ -1,10 +1,15 @@
 from django.conf import settings
 from django.test import TestCase
 from django.urls import reverse
+from django.utils.http import urlencode
 from rest_framework.test import APITestCase
 
 from utils.tests.testcases import ViewWithPermissionsTestCase
 from ..models import Attribute, RegionAttributeValue, Catchment, LauRegion, NutsRegion, Region, GeoDataset
+
+
+# ----------- Catchment CRUD--------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 class CatchmentListViewTestCase(ViewWithPermissionsTestCase):
@@ -62,7 +67,7 @@ class CatchmentCreateViewTestCase(ViewWithPermissionsTestCase):
 
     def test_post_success_and_http_302_redirect_to_success_url_for_member(self):
         self.client.force_login(self.member)
-        data = {'name': 'Updated Test Catchment', 'type': 'custom'}
+        data = {'name': 'Updated Test Catchment', 'type': 'custom', 'region': Region.objects.create().pk}
         response = self.client.post(reverse('catchment-create'), data, follow=True)
         self.assertRedirects(response, reverse('catchment-detail',
                                                kwargs={'pk': list(response.context.get('messages'))[0].message}))
@@ -100,6 +105,7 @@ class CatchmentUpdateViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
+        cls.region = Region.objects.create()
         cls.catchment = Catchment.objects.create(name='Test Catchment')
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
@@ -129,7 +135,7 @@ class CatchmentUpdateViewTestCase(ViewWithPermissionsTestCase):
 
     def test_post_success_and_http_302_redirect_to_success_url_for_member(self):
         self.client.force_login(self.member)
-        data = {'name': 'Updated Test Catchment', 'type': 'custom'}
+        data = {'name': 'Updated Test Catchment', 'type': 'custom', 'region': self.region.pk}
         response = self.client.post(reverse('catchment-update', kwargs={'pk': self.catchment.pk}), data, follow=True)
         self.assertRedirects(response, reverse('catchment-detail', kwargs={'pk': self.catchment.pk}))
 
@@ -173,6 +179,22 @@ class CatchmentModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         self.assertRedirects(response, reverse('catchment-list'))
         with self.assertRaises(Catchment.DoesNotExist):
             Catchment.objects.get(pk=self.catchment.pk)
+
+
+# ----------- Catchment API---------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class CatchmentGeometryAPITestCase(ViewWithPermissionsTestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.catchment = Catchment.objects.create(name='Test Catchment')
+
+    def test_get_http_200_ok_for_anonymous(self):
+        response = self.client.get(reverse('ajax_catchment_geometries') + '?' + urlencode({'catchment': self.catchment.pk}))
+        self.assertEqual(200, response.status_code)
 
 
 class NutsRegionMapViewTestCase(TestCase):

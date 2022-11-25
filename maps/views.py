@@ -146,7 +146,7 @@ class CatchmentBrowseView(FormMixin, TemplateView):
 class CatchmentListView(BRITFilterView):
     model = Catchment
     filterset_class = CatchmentFilter
-    ordering = 'id'
+    ordering = 'name'
 
 
 class CatchmentDetailView(MapMixin, DetailView):
@@ -291,8 +291,17 @@ class GeoDatasetDetailView(GeoDataSetFormMixin, GeoDataSetMixin, DetailView):
         return self.object.region.id
 
 
-# ----------- Regions --------------------------------------------------------------------------------------------------
+# ----------- Region Utils ---------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
+
+
+class RegionAutocompleteView(autocomplete.Select2QuerySetView):
+    def get_queryset(self):
+        qs = Region.objects.all().order_by('name')
+        if self.q:
+            qs = qs.filter(name__icontains=self.q)
+        return qs
+
 
 class CatchmentGeometryAPI(APIView):
     authentication_classes = []
@@ -317,12 +326,14 @@ class CatchmentGeometryAPI(APIView):
                         'label': 'Description',
                         'value': catchment.description
                     },
-                    'parent_region': {
-                        'label': 'Parent region',
-                        'value': catchment.parent_region.name
-                    }
                 }
             }
+            if catchment.parent_region:
+                data['info']['parent_region'] = {
+                    'label': 'Parent region',
+                    'value': catchment.parent_region.name
+                }
+
             return JsonResponse(data)
 
         return JsonResponse({})

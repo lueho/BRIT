@@ -1,12 +1,7 @@
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Field, Layout
-from django.forms import (Form,
-                          ModelChoiceField,
-                          ModelForm,
-                          MultipleChoiceField,
-                          ChoiceField,
-                          IntegerField,
-                          )
+from dal.autocomplete import ModelSelect2
+from django.forms import (ChoiceField, Form, IntegerField, ModelChoiceField, MultipleChoiceField)
 from django.forms.widgets import CheckboxSelectMultiple, RadioSelect
 from django.urls import reverse
 
@@ -42,23 +37,28 @@ class RegionAttributeValueModalModelForm(CustomModalModelForm):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CatchmentModelForm(ModelForm):
+class CatchmentModelForm(CustomModelForm):
+
+    parent_region = ModelChoiceField(
+        queryset=Region.objects.all(),
+        widget=ModelSelect2(url='region-autocomplete'),
+        required=False
+    )
+
+    region = ModelChoiceField(
+        queryset=Region.objects.all(),
+        widget=ModelSelect2(url='region-autocomplete'),
+        required=True
+    )
+
     class Meta:
         model = Catchment
-        fields = ('name', 'type', 'description')
-        # fields = ('parent_region', 'name', 'description', 'geom',)
-        # widgets = {'geom': LeafletWidget()}
+        fields = ('name', 'type', 'parent_region', 'region', 'description')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        # self.fields['geom'].label = ''
-
-    # def clean(self):
-    #     catchment = super().clean()
-    #     region = catchment.get('parent_region')
-    #     if region and catchment:
-    #         if not region.geom.contains(catchment.get('geom')):
-    #             self.add_error('geom', 'The catchment must be inside the region.')
+        self.fields['parent_region'].widget.attrs = {'data-theme': 'bootstrap4'}
+        self.fields['region'].widget.attrs = {'data-theme': 'bootstrap4'}
 
 
 class CatchmentQueryForm(Form):
