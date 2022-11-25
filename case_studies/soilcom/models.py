@@ -250,7 +250,7 @@ class Collection(NamedUserObjectModel):
         return f'{catchment} {category} {system}'
 
     def __str__(self):
-        return self.construct_name()
+        return self.name
 
 
 @receiver(pre_save, sender=Collection)
