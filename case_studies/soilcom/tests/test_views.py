@@ -88,7 +88,7 @@ class CollectionFrequencyCreateViewTestCase(ViewWithPermissionsTestCase):
 
     def test_post_http_302_redirect_for_members_with_minimal_data(self):
         self.client.force_login(self.member)
-        data = {'name': 'Test Frequency'}
+        data = {'name': 'Test Frequency', 'type': 'Fixed-Seasonal'}
         response = self.client.post(reverse('collectionfrequency-create'), data=data)
         self.assertEqual(response.status_code, 302)
 
@@ -121,7 +121,7 @@ class CollectionFrequencyModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
     def test_post_http_302_redirect_for_members_with_minimal_data(self):
         self.client.force_login(self.member)
-        data = {'name': 'Test Frequency'}
+        data = {'name': 'Test Frequency', 'type': 'Fixed-Seasonal'}
         response = self.client.post(reverse('collectionfrequency-create-modal'), data=data)
         self.assertEqual(response.status_code, 302)
 
@@ -183,18 +183,17 @@ class CollectionFrequencyUpdateViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_post_http_302_redirect_for_anonymous(self):
-        response = self.client.post(reverse('collectionfrequency-update', kwargs={'pk': self.frequency.pk}), data={})
+        response = self.client.post(reverse('collectionfrequency-update', kwargs={'pk': self.frequency.pk}))
         self.assertEqual(response.status_code, 302)
 
     def test_post_http_403_forbidden_for_outsiders(self):
         self.client.force_login(self.outsider)
-        data = {'name': 'Updated Test Frequency'}
-        response = self.client.post(reverse('collectionfrequency-update', kwargs={'pk': self.frequency.pk}), data=data)
+        response = self.client.post(reverse('collectionfrequency-update', kwargs={'pk': self.frequency.pk}))
         self.assertEqual(response.status_code, 403)
 
     def test_post_http_302_redirect_for_members(self):
         self.client.force_login(self.member)
-        data = {'name': 'Updated Test Frequency'}
+        data = {'name': 'Updated Test Frequency', 'type': 'Fixed-Seasonal'}
         response = self.client.post(reverse('collectionfrequency-update', kwargs={'pk': self.frequency.pk}), data=data)
         self.assertEqual(response.status_code, 302)
 
@@ -236,7 +235,7 @@ class CollectionFrequencyModalUpdateViewTestCase(ViewWithPermissionsTestCase):
 
     def test_post_http_302_redirect_for_members(self):
         self.client.force_login(self.member)
-        data = {'name': 'Update Test Frequency'}
+        data = {'name': 'Updated Test Frequency', 'type': 'Fixed-Seasonal'}
         response = self.client.post(
             reverse('collectionfrequency-update-modal', kwargs={'pk': self.frequency.pk}),
             data=data

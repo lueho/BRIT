@@ -9,7 +9,8 @@ from django_filters import (BooleanFilter,
                             ModelMultipleChoiceFilter, )
 
 from .forms import CollectionFilterForm, CollectorFilterForm, FlyerFilterForm
-from .models import CollectionCatchment, Collection, Collector, WasteCategory, WasteComponent, WasteFlyer
+from .models import (CollectionCatchment, Collection, Collector, FREQUENCY_TYPES, WasteCategory, WasteComponent,
+                     WasteFlyer)
 
 
 class CollectorFilter(FilterSet):
@@ -20,6 +21,7 @@ class CollectorFilter(FilterSet):
         model = Collector
         fields = ('name', 'catchment')
         form = CollectorFilterForm
+
 
 COUNTRY_CHOICES = (
     ('BE', 'BE'),
@@ -47,10 +49,12 @@ class CollectionFilter(FilterSet):
                                                   label='Allowed materials',
                                                   widget=CheckboxSelectMultiple)
 
+    frequency_type = ChoiceFilter(choices=FREQUENCY_TYPES, field_name='frequency__type', label='Frequency type')
+
     class Meta:
         model = Collection
         fields = ('catchment', 'collector', 'collection_system', 'country', 'waste_category', 'allowed_materials',
-                  'fee_system')
+                  'frequency_type', 'fee_system')
         form = CollectionFilterForm
 
     @staticmethod

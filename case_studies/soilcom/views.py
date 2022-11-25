@@ -460,7 +460,6 @@ class WasteFlyerListCheckUrlsProgressView(LoginRequiredMixin, View):
 # ----------------------------------------------------------------------------------------------------------------------
 
 class FrequencyListView(views.OwnedObjectListView):
-    template_name = 'simple_list_card.html'
     model = models.CollectionFrequency
     permission_required = set()
 
@@ -480,7 +479,6 @@ class FrequencyModalCreateView(views.OwnedObjectModalCreateView):
 
 
 class FrequencyDetailView(views.OwnedObjectDetailView):
-    template_name = 'simple_detail_card.html'
     model = models.CollectionFrequency
     permission_required = set()
 

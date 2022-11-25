@@ -206,8 +206,19 @@ def check_url_valid(sender, instance, created, **kwargs):
         celery.current_app.send_task('check_wasteflyer_url',  (instance.pk,))
 
 
+FREQUENCY_TYPES = (
+    ('Fixed', 'Fixed'),
+    ('Fixed-Flexible', 'Fixed-Flexible'),
+    ('Fixed-Seasonal', 'Fixed-Seasonal'),
+    ('Seasonal', 'Seasonal'),
+)
+
+
 class CollectionFrequency(NamedUserObjectModel):
-    pass
+    type = models.CharField(max_length=16, choices=FREQUENCY_TYPES, default='Fixed')
+
+    class Meta:
+        verbose_name_plural = 'collection frequencies'
 
 
 YEAR_VALIDATOR = RegexValidator(r'^([0-9]{4})$', message='Year needs to be in YYYY format.', code='invalid year')

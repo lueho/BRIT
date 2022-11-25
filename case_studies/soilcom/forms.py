@@ -10,7 +10,7 @@ from materials.models import Material, MaterialCategory, Sample
 from users.models import get_default_owner
 
 from . import models
-from .models import CollectionPropertyValue, AggregatedCollectionPropertyValue
+from .models import (AggregatedCollectionPropertyValue, CollectionPropertyValue, FREQUENCY_TYPES)
 
 
 class CollectorModelForm(CustomModelForm):
@@ -120,13 +120,13 @@ class WasteStreamModalModelForm(CustomModalModelForm):
 class CollectionFrequencyModelForm(CustomModelForm):
     class Meta:
         model = models.CollectionFrequency
-        fields = ('name', 'description')
+        fields = ('name', 'type', 'description')
 
 
 class CollectionFrequencyModalModelForm(CustomModalModelForm):
     class Meta:
         model = models.CollectionFrequency
-        fields = ('name', 'description')
+        fields = ('name', 'type', 'description')
 
 
 class WasteFlyerModelForm(CustomModelForm):
@@ -327,7 +327,8 @@ class CollectionFilterFormHelper(FormHelper):
         'country',
         'waste_category',
         'allowed_materials',
-        'fee_system'
+        'fee_system',
+        'frequency_type'
     )
 
 
@@ -366,11 +367,12 @@ class CollectionFilterForm(forms.Form):
         widget=forms.CheckboxSelectMultiple,
         required=False
     )
+    frequency_type = forms.ChoiceField(choices=FREQUENCY_TYPES, required=False)
 
     class Meta:
         model = models.Collection
         fields = ('catchment', 'collector', 'collection_system', 'country', 'waste_category', 'allowed_materials',
-                  'fee_system')
+                  'frequency_type', 'fee_system')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

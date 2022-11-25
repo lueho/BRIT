@@ -1,0 +1,24 @@
+{% extends 'simple_list_card.html' %}
+
+{% block card_body %}
+    <table class="table">
+        <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for object in object_list %}
+            <tr>
+                <td>
+                    <a href="{{ object.get_absolute_url }}">{{ object.name }}</a>
+                </td>
+                <td>{{ object.type }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+        <tfoot>
+        </tfoot>
+    </table>
+{% endblock card_body %}
