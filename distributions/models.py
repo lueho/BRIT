@@ -1,7 +1,7 @@
 from django.contrib.auth.models import User
 from django.db import models
 
-from utils.models import NamedUserObjectModel
+from utils.models import NamedUserObjectModel, OwnedObjectModel
 from users.models import get_default_owner
 
 
@@ -48,5 +48,18 @@ class Timestep(NamedUserObjectModel):
     def __str__(self):
         return self.name
 
+
+class Period(OwnedObjectModel):
+    """
+    A period is a part of a full temporal distribution. Any temporal distribution can be divided into an arbitrary
+    number of periods, each of which has a start and stop timestep.
+    """
+    distribution = models.ForeignKey(TemporalDistribution, on_delete=models.PROTECT)
+    first_timestep = models.ForeignKey(Timestep, on_delete=models.PROTECT, related_name='first_of_periods')
+    last_timestep = models.ForeignKey(Timestep, on_delete=models.PROTECT, related_name='last_of_periods')
+
     class Meta:
-        unique_together = [['name', 'owner']]
+        unique_together = [['distribution', 'first_timestep', 'last_timestep']]
+
+    def __str__(self):
+        return f'Period: {self.first_timestep.abbreviated}. through {self.last_timestep.abbreviated}.'

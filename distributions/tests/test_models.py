@@ -1,24 +1,27 @@
 from django.db.utils import IntegrityError
 from django.test import TestCase
-from users.models import get_default_owner
 
-from ..models import TemporalDistribution, Timestep
+from ..models import Period, TemporalDistribution, Timestep
 
 
 class InitialDataTestCase(TestCase):
 
     def test_base_distribution_is_created_from_migrations(self):
         TemporalDistribution.objects.get(name='Average')
-        self.assertEqual(TemporalDistribution.objects.all().count(), 1)
 
     def test_base_timestep_is_created_from_migrations(self):
         Timestep.objects.get(name='Average')
-        self.assertEqual(Timestep.objects.all().count(), 1)
 
     def test_base_timestep_is_added_to_base_temporal_distribution_during_migrations(self):
         distribution = TemporalDistribution.objects.get(name='Average')
         timestep = Timestep.objects.get(name='Average')
         self.assertEqual(timestep.distribution, distribution)
+
+    def test_months_of_the_year_distribution_from_migrations(self):
+        distribution = TemporalDistribution.objects.get(name='Months of the year')
+        for month in ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October',
+                      'November', 'December'):
+            distribution.timestep_set.get(name=month)
 
 
 class TemporalDistributionTestCase(TestCase):
@@ -53,3 +56,25 @@ class TimeStepTestCase(TestCase):
 
     def test_abbreviated(self):
         self.assertEqual('Jan', Timestep.objects.get(name='January').abbreviated)
+
+
+class PeriodTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.period = Period.objects.create(
+            distribution=TemporalDistribution.objects.get(name='Months of the year'),
+            first_timestep=Timestep.objects.get(name='January'),
+            last_timestep=Timestep.objects.get(name='December')
+        )
+
+    def test_unique_together(self):
+        with self.assertRaises(IntegrityError):
+            Period.objects.create(
+                distribution=self.period.distribution,
+                first_timestep=self.period.first_timestep,
+                last_timestep=self.period.last_timestep
+            )
+
+    def test_str_contains_start_and_end(self):
+        self.assertEqual('Period: Jan. through Dec.', self.period.__str__())
