@@ -103,7 +103,7 @@ def get_default_owner_pk():
     return get_default_owner().pk
 
 
-class OwnedObjectModel(CommonInfo):
+class OwnedObjectModel(CRUDUrlsMixin, CommonInfo):
     owner = models.ForeignKey(User, on_delete=models.PROTECT, default=get_default_owner_pk)
     visible_to_groups = models.ManyToManyField(Group)
 
@@ -111,7 +111,7 @@ class OwnedObjectModel(CommonInfo):
         abstract = True
 
 
-class NamedUserObjectModel(CRUDUrlsMixin, OwnedObjectModel):
+class NamedUserObjectModel(OwnedObjectModel):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
 

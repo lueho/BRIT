@@ -6,7 +6,7 @@ from utils.models import NamedUserObjectModel, CRUDUrlsMixin, OwnedObjectModel
 import celery
 
 
-class Author(CRUDUrlsMixin, OwnedObjectModel):
+class Author(OwnedObjectModel):
     first_names = models.CharField(max_length=1023, null=True, blank=True)
     last_names = models.CharField(max_length=1023, null=True, blank=True)
 
@@ -48,7 +48,7 @@ SOURCE_TYPES = (
 )
 
 
-class Source(CRUDUrlsMixin, OwnedObjectModel):
+class Source(OwnedObjectModel):
     type = models.CharField(max_length=255, choices=SOURCE_TYPES, default='custom')
     authors = models.ManyToManyField(Author, related_name='sources')
     publisher = models.CharField(max_length=127, blank=True, null=True)
