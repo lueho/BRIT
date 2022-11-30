@@ -176,6 +176,11 @@ class CollectionModelForm(AutoCompleteModelForm):
         queryset=WasteComponent.objects.all(),
         widget=CheckboxSelectMultiple
     )
+    frequency = ModelChoiceField(
+        queryset=CollectionFrequency.objects.all(),
+        widget=autocomplete.ModelSelect2(url='collectionfrequency-autocomplete'),
+        required=False
+    )
 
     class Meta:
         model = Collection

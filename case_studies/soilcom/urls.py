@@ -65,6 +65,7 @@ urlpatterns = [
     path('wastestreams/<int:pk>/update/modal/', views.WasteStreamModalUpdateView.as_view(), name='wastestream-update-modal'),
     path('wastestreams/<int:pk>/delete/modal/', views.WasteStreamModalDeleteView.as_view(), name='wastestream-delete-modal'),
     path('frequencies/', views.FrequencyListView.as_view(), name='collectionfrequency-list'),
+    path('frequencies/autocomplete/', views.FrequencyAutoCompleteView.as_view(), name='collectionfrequency-autocomplete'),
     path('frequencies/create/', views.FrequencyCreateView.as_view(), name='collectionfrequency-create'),
     path('frequencies/create/modal/', views.FrequencyModalCreateView.as_view(), name='collectionfrequency-create-modal'),
     path('frequencies/<int:pk>/', views.FrequencyDetailView.as_view(), name='collectionfrequency-detail'),

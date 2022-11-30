@@ -507,6 +507,18 @@ class FrequencyModalDeleteView(views.OwnedObjectModalDeleteView):
     permission_required = 'soilcom.delete_collectionfrequency'
 
 
+# ----------- Frequency Utils ------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class FrequencyAutoCompleteView(Select2QuerySetView):
+    def get_queryset(self):
+        qs = models.CollectionFrequency.objects.order_by('name')
+        if self.q:
+            qs = qs.filter(name__icontains=self.q)
+        return qs
+
+
 # ----------- CollectionPropertyValue CRUD -----------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
