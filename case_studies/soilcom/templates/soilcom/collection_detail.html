@@ -96,31 +96,40 @@
                         </ul>
                     {% endif %}
 
+                    {% if object.flyers.exists %}
+                        <p class="card-text"><strong>Sources:</strong></p>
+                        <ul>
+                            {% for flyer in object.flyers.all %}
+                                <li><a href="{{ flyer.url }}" target="blank">{{ flyer.url }}</a></li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
 
-                    <p class="card-text"><strong>Sources:</strong></p>
-                    <ul>
-                        {% for flyer in object.flyers.all %}
-                            <li><a href="{{ flyer.url }}" target="blank">{{ flyer.url }}</a></li>
-                        {% endfor %}
-                    </ul>
-
-                    <p class="card-text"><strong>Comments:</strong><br>{{ object.description }}</p>
+                    {% if object.description %}
+                        <p class="card-text"><strong>Comments:</strong><br>{{ object.description }}</p>
+                    {% endif %}
 
                 </div>
                 <div class="card-footer">
                     <a href="javascript:history.go(-1)"><i class="fas fa-fw fa-arrow-left"></i> back</a>
                     <a href="{% url 'collection-list' %}" class="nowrap ml-3">
                         <i class="fas fa-fw fa-list"></i> see all</a>
+                    {% if 'soilcom.change_collection' in perms %}
                     <a href="{% url 'collection-update' object.id %}" class="nowrap ml-3">
                         <i class="fas fa-fw fa-edit"></i> edit</a>
                     <a href="{% url 'collection-wastesamples' object.id %}" class="nowrap ml-3">
                         <i class="fas fa-fw fa-edit"></i> manage samples</a>
                     <a href="{% url 'collection-add-property' object.id %}" class="nowrap ml-3">
                         <i class="fas fa-fw fa-plus-circle"></i> add property</a>
+                    {% endif %}
+                    {% if 'soilcom.add_collection' in perms %}
                     <a href="{% url 'collection-copy' object.id %}" class="nowrap ml-3">
                        <i class="fas fa-fw fa-copy"></i> duplicate</a>
+                    {% endif %}
+                    {% if 'soilcom.delete_collection' in perms %}
                     <a href="{% url 'collection-delete-modal' object.id %}" class="nowrap modal-link ml-3">
                         <i class="fas fa-fw fa-trash"></i> delete</a>
+                    {% endif %}
                 </div>
             </div>
         </div>
