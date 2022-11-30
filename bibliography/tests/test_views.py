@@ -234,6 +234,11 @@ class AuthorUpdateViewTestCase(UserLoginTestCase):
         response = self.client.get(reverse('author-update', kwargs={'pk': self.author.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('author-update', kwargs={'pk': self.author.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('author-update', kwargs={'pk': self.author.pk}), data={})
         self.assertRedirects(
@@ -292,6 +297,11 @@ class AuthorModalUpdateViewTestCase(UserLoginTestCase):
         response = self.client.get(reverse('author-update-modal', kwargs={'pk': self.author.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('author-update-modal', kwargs={'pk': self.author.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('author-update-modal', kwargs={'pk': self.author.pk}), data={})
         self.assertEqual(response.status_code, 302)
@@ -344,6 +354,11 @@ class AuthorModalDeleteViewTestCase(UserLoginTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('author-delete-modal', kwargs={'pk': self.author.pk}))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('author-delete-modal', kwargs={'pk': self.author.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('author-delete-modal', kwargs={'pk': self.author.pk}))
