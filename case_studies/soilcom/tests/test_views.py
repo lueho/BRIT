@@ -4,7 +4,7 @@ from collections import OrderedDict
 from django.forms.formsets import BaseFormSet
 from django.http import JsonResponse
 from django.http.request import QueryDict, MultiValueDict
-from django.test import RequestFactory
+from django.test import RequestFactory, tag
 from django.urls import reverse
 from mock import Mock, patch
 
@@ -1703,7 +1703,7 @@ class WasteCollectionMapViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('WasteCollection'))
         self.assertNotContains(response, 'Waste collection dashboard')
 
-
+@tag('slow')
 class WasteFlyerListCheckUrlsView(ViewWithPermissionsTestCase):
     member_permissions = 'change_wasteflyer'
 
