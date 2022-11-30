@@ -38,6 +38,13 @@ class Timestep(NamedUserObjectModel):
 
     objects = TimestepManager()
 
+    class Meta:
+        unique_together = [['name', 'owner']]
+
+    @property
+    def abbreviated(self):
+        return self.name[:3]
+
     def __str__(self):
         return self.name
 

@@ -14,6 +14,11 @@ def create_initial_data(apps, schema_editor):
     Timestep = apps.get_model('distributions', 'Timestep')
     timestep, _ = Timestep.objects.get_or_create(name='Average', distribution=distribution, owner=owner)
 
+    months, _ = TemporalDistribution.objects.get_or_create(name='Months of the year', owner=owner)
+    for month in ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October',
+                  'November', 'December'):
+        Timestep.objects.get_or_create(distribution=months, name=month, owner=owner)
+
 
 class Migration(migrations.Migration):
 

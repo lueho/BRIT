@@ -50,3 +50,6 @@ class TimeStepTestCase(TestCase):
                 name=default_timestep.name,
                 distribution=default_distribution
             )
+
+    def test_abbreviated(self):
+        self.assertEqual('Jan', Timestep.objects.get(name='January').abbreviated)
