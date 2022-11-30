@@ -377,7 +377,7 @@ class MaterialModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
     def test_get_http_200_ok_for_members(self):
         self.client.force_login(self.member)
-        response = self.client.get(reverse('material-create-modal'))
+        response = self.client.get(reverse('material-create'))
         self.assertEqual(response.status_code, 200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
