@@ -715,7 +715,7 @@ class CollectionAddPropertyValueView(CollectionPropertyValueCreateView):
         initial = super().get_initial()
         prop, _ = Property.objects.get_or_create(
             name='specific waste generation',
-            defaults = {'unit': 'kg/(cap.*a)'}
+            defaults={'unit': 'kg/(cap.*a)'}
         )
         initial['property'] = prop.pk
         initial['collection'] = self.kwargs['pk']
