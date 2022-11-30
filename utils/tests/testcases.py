@@ -14,7 +14,6 @@ class UserLoginTestCase(TestCase):
     """
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
 class ViewWithPermissionsTestCase(UserLoginTestCase):
     outsider = None
     member = None
