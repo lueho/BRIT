@@ -1,6 +1,7 @@
 from bootstrap_modal_forms.mixins import CreateUpdateAjaxMixin, PopRequestMixin
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Field
+from dal_select2.widgets import Select2WidgetMixin
 from django.forms import Form, ModelForm, modelformset_factory
 
 
@@ -77,7 +78,8 @@ class AutoCompleteMixin:
         self.helper.include_media = False
 
         for name, field in self.fields.items():
-            field.widget.attrs = {'data-theme': 'bootstrap4'}
+            if isinstance(field.widget, Select2WidgetMixin):
+                field.widget.attrs = {'data-theme': 'bootstrap4'}
 
 
 class AutoCompleteForm(AutoCompleteMixin, SimpleForm):
