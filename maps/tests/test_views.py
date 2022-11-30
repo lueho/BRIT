@@ -55,6 +55,11 @@ class CatchmentCreateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('catchment-create'))
         self.assertEqual(200, response.status_code)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('catchment-create'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('catchment-create')
         response = self.client.post(url, data={}, follow=True)
@@ -123,6 +128,11 @@ class CatchmentUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('catchment-update', kwargs={'pk': self.catchment.pk}))
         self.assertEqual(200, response.status_code)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('catchment-update', kwargs={'pk': self.catchment.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('catchment-update', kwargs={'pk': self.catchment.pk})
         response = self.client.post(url, data={}, follow=True)
@@ -162,6 +172,11 @@ class CatchmentModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('catchment-delete-modal', kwargs={'pk': self.catchment.pk}))
         self.assertEqual(200, response.status_code)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('catchment-delete-modal', kwargs={'pk': self.catchment.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('catchment-delete-modal', kwargs={'pk': self.catchment.pk})
@@ -398,6 +413,11 @@ class AttributeCreateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('attribute-create'))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('attribute-create'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('attribute-create'), data={})
         self.assertEqual(response.status_code, 302)
@@ -430,6 +450,11 @@ class AttributeModalCreateViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('attribute-create-modal'))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('attribute-create-modal'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('attribute-create-modal'), data={})
@@ -515,6 +540,11 @@ class AttributeUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('attribute-update', kwargs={'pk': self.attribute.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('attribute-update', kwargs={'pk': self.attribute.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('attribute-update', kwargs={'pk': self.attribute.pk}), data={})
         self.assertEqual(response.status_code, 302)
@@ -558,6 +588,11 @@ class AttributeModalUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('attribute-update-modal', kwargs={'pk': self.attribute.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('attribute-update-modal', kwargs={'pk': self.attribute.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('attribute-update-modal', kwargs={'pk': self.attribute.pk}), data={})
         self.assertEqual(response.status_code, 302)
@@ -600,6 +635,11 @@ class AttributeModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('attribute-delete-modal', kwargs={'pk': self.attribute.pk}))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('attribute-delete-modal', kwargs={'pk': self.attribute.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('attribute-delete-modal', kwargs={'pk': self.attribute.pk}))
@@ -656,6 +696,11 @@ class RegionAttributeValueCreateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('regionattributevalue-create'))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('regionattributevalue-create'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('regionattributevalue-create'), data={})
         self.assertEqual(response.status_code, 302)
@@ -699,6 +744,11 @@ class RegionAttributeValueModalCreateViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('regionattributevalue-create-modal'))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('regionattributevalue-create-modal'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('regionattributevalue-create-modal'), data={})
@@ -803,6 +853,11 @@ class RegionAttributeValueUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('regionattributevalue-update', kwargs={'pk': self.value.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('regionattributevalue-update', kwargs={'pk': self.value.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('regionattributevalue-update', kwargs={'pk': self.value.pk}), data={})
         self.assertEqual(response.status_code, 302)
@@ -861,6 +916,11 @@ class RegionAttributeValueModalUpdateViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('regionattributevalue-update-modal', kwargs={'pk': self.value.pk}))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('regionattributevalue-update-modal', kwargs={'pk': self.value.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('regionattributevalue-update-modal', kwargs={'pk': self.value.pk}), data={})
@@ -922,6 +982,11 @@ class RegionAttributeValueModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('regionattributevalue-delete-modal', kwargs={'pk': self.value.pk}))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('regionattributevalue-delete-modal', kwargs={'pk': self.value.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('regionattributevalue-delete-modal', kwargs={'pk': self.value.pk}))

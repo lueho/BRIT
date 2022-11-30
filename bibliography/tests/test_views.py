@@ -60,6 +60,11 @@ class AuthorCreateViewTestCase(UserLoginTestCase):
         response = self.client.get(reverse('author-create'))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('author-create'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('author-create'), data={})
         self.assertRedirects(
@@ -114,6 +119,11 @@ class AuthorModalCreateViewTestCase(UserLoginTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('author-create-modal'))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('author-create-modal'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('author-create-modal'), data={})
@@ -409,6 +419,11 @@ class LicenceCreateViewTestCase(UserLoginTestCase):
         response = self.client.get(reverse('licence-create'))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('licence-create'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('licence-create'), data={})
         self.assertRedirects(
@@ -460,6 +475,11 @@ class LicenceModalCreateViewTestCase(UserLoginTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('licence-create-modal'))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('licence-create-modal'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('licence-create-modal'), data={})
@@ -567,6 +587,11 @@ class LicenceUpdateViewTestCase(UserLoginTestCase):
         response = self.client.get(reverse('licence-update', kwargs={'pk': self.licence.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('licence-update', kwargs={'pk': self.licence.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('licence-update', kwargs={'pk': self.licence.pk}), data={}, follow=True)
         self.assertRedirects(
@@ -625,6 +650,11 @@ class LicenceModalUpdateViewTestCase(UserLoginTestCase):
         response = self.client.get(reverse('licence-update-modal', kwargs={'pk': self.licence.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('licence-update-modal', kwargs={'pk': self.licence.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('licence-update-modal', kwargs={'pk': self.licence.pk}), data={})
         self.assertEqual(response.status_code, 302)
@@ -677,6 +707,11 @@ class LicenceModalDeleteViewTestCase(UserLoginTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('licence-delete-modal', kwargs={'pk': self.licence.pk}))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('licence-delete-modal', kwargs={'pk': self.licence.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('licence-delete-modal', kwargs={'pk': self.licence.pk}))
@@ -753,6 +788,11 @@ class SourceCreateViewTestCase(UserLoginTestCase):
         response = self.client.get(reverse('source-create'))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('source-create'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('source-create'), data={}, follow=True)
         self.assertRedirects(
@@ -804,6 +844,11 @@ class SourceModalCreateViewTestCase(UserLoginTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('source-create-modal'))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('source-create-modal'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('source-create-modal'), data={})
@@ -914,6 +959,11 @@ class SourceUpdateViewTestCase(UserLoginTestCase):
         response = self.client.get(reverse('source-update', kwargs={'pk': self.source.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('source-update', kwargs={'pk': self.source.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('source-update', kwargs={'pk': self.source.pk}), data={}, follow=True)
         self.assertRedirects(
@@ -980,6 +1030,11 @@ class SourceModalUpdateViewTestCase(UserLoginTestCase):
         response = self.client.get(reverse('source-update-modal', kwargs={'pk': self.source.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('source-update-modal', kwargs={'pk': self.source.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('source-update-modal', kwargs={'pk': self.source.pk}), data={})
         self.assertEqual(response.status_code, 302)
@@ -1037,6 +1092,11 @@ class SourceModalDeleteViewTestCase(UserLoginTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('source-delete-modal', kwargs={'pk': self.source.pk}))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('source-delete-modal', kwargs={'pk': self.source.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('source-delete-modal', kwargs={'pk': self.source.pk}))

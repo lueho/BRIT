@@ -77,6 +77,11 @@ class CollectionFrequencyCreateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('collectionfrequency-create'))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('collectionfrequency-create'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('collectionfrequency-create'), data={})
         self.assertEqual(response.status_code, 302)
@@ -109,6 +114,11 @@ class CollectionFrequencyModalCreateViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('collectionfrequency-create-modal'))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('collectionfrequency-create-modal'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('collectionfrequency-create-modal'), data={})
@@ -182,6 +192,11 @@ class CollectionFrequencyUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('collectionfrequency-update', kwargs={'pk': self.frequency.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('collectionfrequency-update', kwargs={'pk': self.frequency.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('collectionfrequency-update', kwargs={'pk': self.frequency.pk}))
         self.assertEqual(response.status_code, 302)
@@ -219,6 +234,11 @@ class CollectionFrequencyModalUpdateViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('collectionfrequency-update-modal', kwargs={'pk': self.frequency.pk}))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('collectionfrequency-update-modal', kwargs={'pk': self.frequency.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('collectionfrequency-update-modal', kwargs={'pk': self.frequency.pk}), data={})
@@ -265,6 +285,11 @@ class CollectionFrequencyModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('collectionfrequency-delete-modal', kwargs={'pk': self.frequency.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('collectionfrequency-delete-modal', kwargs={'pk': self.frequency.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('collectionfrequency-delete-modal', kwargs={'pk': self.frequency.pk}))
         self.assertEqual(response.status_code, 302)
@@ -308,6 +333,11 @@ class CollectionPropertyValueCreateViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('collectionpropertyvalue-create'))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('collectionpropertyvalue-create'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('collectionpropertyvalue-create'))
@@ -397,6 +427,11 @@ class CollectionPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('collectionpropertyvalue-update', kwargs={'pk': self.val.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('collectionpropertyvalue-update', kwargs={'pk': self.val.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('collectionpropertyvalue-update', kwargs={'pk': self.val.pk}))
         self.assertEqual(response.status_code, 302)
@@ -448,6 +483,11 @@ class CollectionPropertyValueModalDeleteViewTestCase(ViewWithPermissionsTestCase
         response = self.client.get(reverse('collectionpropertyvalue-delete-modal', kwargs={'pk': self.val.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('collectionpropertyvalue-delete-modal', kwargs={'pk': self.val.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('collectionpropertyvalue-delete-modal', kwargs={'pk': self.val.pk}))
         self.assertEqual(response.status_code, 302)
@@ -492,6 +532,11 @@ class AggregatedCollectionPropertyValueCreateViewTestCase(ViewWithPermissionsTes
         self.client.force_login(self.member)
         response = self.client.get(reverse('aggregatedcollectionpropertyvalue-create'))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('aggregatedcollectionpropertyvalue-create'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('aggregatedcollectionpropertyvalue-create'))
@@ -581,6 +626,11 @@ class AggregatedCollectionPropertyValueUpdateViewTestCase(ViewWithPermissionsTes
         response = self.client.get(reverse('aggregatedcollectionpropertyvalue-update', kwargs={'pk': self.val.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('aggregatedcollectionpropertyvalue-update', kwargs={'pk': self.val.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('aggregatedcollectionpropertyvalue-update', kwargs={'pk': self.val.pk}))
         self.assertEqual(response.status_code, 302)
@@ -631,6 +681,11 @@ class AggregatedCollectionPropertyValueModalDeleteViewTestCase(ViewWithPermissio
         self.client.force_login(self.member)
         response = self.client.get(reverse('aggregatedcollectionpropertyvalue-delete-modal', kwargs={'pk': self.val.pk}))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('aggregatedcollectionpropertyvalue-delete-modal', kwargs={'pk': self.val.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('aggregatedcollectionpropertyvalue-delete-modal', kwargs={'pk': self.val.pk}))
@@ -708,6 +763,11 @@ class CollectionCreateViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('collection-create'))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('collection-create'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('collection-create'), kwargs={})
@@ -824,6 +884,11 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('collection-copy', kwargs={'pk': self.collection.id}))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('collection-copy', kwargs={'pk': self.collection.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_get_object(self):
         request = RequestFactory().get(reverse('collection-copy', kwargs={'pk': self.collection.id}))
@@ -998,6 +1063,11 @@ class CollectionUpdateViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('collection-update', kwargs={'pk': self.collection.id}))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('collection-update', kwargs={'pk': self.collection.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_get_get_formset_kwargs(self):
         kwargs = {'pk': self.collection.pk}
@@ -1219,6 +1289,11 @@ class CollectionAddPropertyValueViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('collection-add-property', kwargs={'pk': self.collection.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('collection-add-property', kwargs={'pk': self.collection.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_get_initial_has_collection_and_property(self):
         request = RequestFactory().get(reverse('collection-add-property', kwargs={'pk': self.collection.id}))
         view = views.CollectionAddPropertyValueView()
@@ -1277,6 +1352,11 @@ class CollectionAddAggregatedPropertyValueViewTestCase(ViewWithPermissionsTestCa
         self.client.force_login(self.member)
         response = self.client.get(reverse('collectioncatchment-add-aggregatedpropertyvalue', kwargs={'pk': self.catchment.pk}))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('collectioncatchment-add-aggregatedpropertyvalue', kwargs={'pk': self.catchment.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_get_initial_has_collections_and_property(self):
         request = RequestFactory().get(reverse('collectioncatchment-add-aggregatedpropertyvalue', kwargs={'pk': self.catchment.id}))
@@ -1462,6 +1542,13 @@ class CollectionWasteSamplesViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_one_submit_button_for_each_form(self):
+        self.client.force_login(self.member)
+        response = self.client.get(self.url)
+        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'value="Add"')
+        self.assertContains(response, 'value="Remove"')
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         response = self.client.post(self.url, {})
