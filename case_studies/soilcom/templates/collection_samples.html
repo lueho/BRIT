@@ -29,6 +29,8 @@
                     <div id="form-container">
                         <form method="post">
                             {% crispy form_add %}
+                            <input type="submit" name="submit" value="Add" class="btn btn-primary"
+                                       id="submit-id-submit">
                         </form>
                     </div>
                     </p>
@@ -36,6 +38,8 @@
                     <div id="form-container-2">
                         <form method="post">
                             {% crispy form_remove %}
+                            <input type="submit" name="submit" value="Remove" class="btn btn-primary"
+                                       id="submit-id-submit">
                         </form>
                     </div>
                 </div>

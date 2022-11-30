@@ -857,6 +857,10 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
             abbreviation='WasteFlyer123',
             url='https://www.test-flyer.org'
         )
+        cls.flyer2 = WasteFlyer.objects.create(
+            abbreviation='WasteFlyer234',
+            url='https://www.fest-flyer.org'
+        )
         frequency = CollectionFrequency.objects.create(name='Test Frequency')
         cls.collection = Collection.objects.create(
             name='collection1',
@@ -870,6 +874,7 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
             description='This is a test case.'
         )
         cls.collection.flyers.add(cls.flyer)
+        cls.collection.flyers.add(cls.flyer2)
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(reverse('collection-copy', kwargs={'pk': self.collection.id}))
@@ -892,47 +897,33 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
 
     def test_get_object(self):
         request = RequestFactory().get(reverse('collection-copy', kwargs={'pk': self.collection.id}))
+        request.user = self.member
         view = views.CollectionCopyView()
         view.setup(request)
         view.kwargs = {'pk': self.collection.id}
         self.assertEqual(view.get_object(), self.collection)
 
-    def test_get_get_initial_handles_missing_data(self):
-        self.collection.collector = None
-        self.collection.catchment = None
-        self.collection.collection_system = None
-        self.collection.waste_stream = None
-        self.collection.connection_rate = None
-        self.collection.connection_rate_year = None
-        self.collection.frequency = None
-        self.collection.description = None
-        self.collection.save()
+    def test_get_get_formset_kwargs_fetches_initial_and_parent_object(self):
         request = RequestFactory().get(reverse('collection-copy', kwargs={'pk': self.collection.id}))
         view = views.CollectionCopyView()
         view.setup(request)
         view.kwargs = {'pk': self.collection.id}
-        view.original_object = view.get_original_object()
-        expected = {}
-        initial = view.get_initial()
-        self.assertEqual(set(expected.keys()), set(initial.keys()))
-        for key, value in expected.items():
-            if key == 'allowed_materials':
-                self.assertIn(key, initial)
-                self.assertEqual(set(expected[key]), set(initial[key]))
-            else:
-                self.assertIn(key, initial)
-                self.assertEqual(value, initial[key])
-
-    def test_get_get_formset_kwargs_fetches_and_parent_object(self):
-        request = RequestFactory().get(reverse('collection-copy', kwargs={'pk': self.collection.id}))
-        view = views.CollectionCopyView()
-        view.setup(request)
-        view.kwargs = {'pk': self.collection.id}
-        view.original_object = view.get_original_object()
+        view.object = view.get_object()
         expected = {
+            'initial': [{'url': self.flyer.url}, {'url': self.flyer2.url}],
             'parent_object': self.collection
         }
         self.assertDictEqual(expected, view.get_formset_kwargs())
+
+    def test_get_get_formset_initial_fetches_urls_of_related_flyers(self):
+        request = RequestFactory().get(reverse('collection-copy', kwargs={'pk': self.collection.pk}))
+        request.user = self.member
+        view = views.CollectionCopyView()
+        view.setup(request)
+        view.kwargs = {'pk': self.collection.pk}
+        view.object = view.get_object()
+        expected = [{'url': 'https://www.test-flyer.org'}, {'url': 'https://www.fest-flyer.org'}]
+        self.assertListEqual(expected, view.get_formset_initial())
 
     def test_get_formset_has_correct_queryset(self):
         self.client.force_login(self.member)
@@ -973,14 +964,14 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
         get_response = self.client.get(reverse('collection-copy', kwargs={'pk': self.collection.pk}))
         initial = get_response.context['form'].initial
         data = {
-            'catchment': initial['catchment'].id,
-            'collector': initial['collector'].id,
-            'collection_system': initial['collection_system'].id,
-            'waste_category': initial['waste_category'].id,
-            'allowed_materials': [c.id for c in initial['allowed_materials']],
+            'catchment': initial['catchment'],
+            'collector': initial['collector'],
+            'collection_system': initial['collection_system'],
+            'waste_category': initial['waste_category'],
+            'allowed_materials': initial['allowed_materials'],
             'connection_rate': initial['connection_rate'],
             'connection_rate_year': initial['connection_rate_year'],
-            'frequency': initial['frequency'].id,
+            'frequency': initial['frequency'],
             'description': initial['description'],
             'form-INITIAL_FORMS': '0',
             'form-TOTAL_FORMS': '0',
@@ -995,14 +986,14 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
         get_response = self.client.get(reverse('collection-copy', kwargs={'pk': self.collection.pk}))
         initial = get_response.context['form'].initial
         data = {
-            'catchment': initial['catchment'].id,
-            'collector': initial['collector'].id,
-            'collection_system': initial['collection_system'].id,
-            'waste_category': initial['waste_category'].id,
-            'allowed_materials': [c.id for c in initial['allowed_materials']],
+            'catchment': initial['catchment'],
+            'collector': initial['collector'],
+            'collection_system': initial['collection_system'],
+            'waste_category': initial['waste_category'],
+            'allowed_materials': initial['allowed_materials'],
             'connection_rate': initial['connection_rate'],
             'connection_rate_year': initial['connection_rate_year'],
-            'frequency': initial['frequency'].id,
+            'frequency': initial['frequency'],
             'description': 'This is the copy.',
             'form-INITIAL_FORMS': '1',
             'form-TOTAL_FORMS': '1',
@@ -1032,9 +1023,13 @@ class CollectionUpdateViewTestCase(ViewWithPermissionsTestCase):
         waste_stream.allowed_materials.add(material1)
         waste_stream.allowed_materials.add(material2)
 
-        waste_flyer = WasteFlyer.objects.create(
+        cls.flyer = WasteFlyer.objects.create(
             abbreviation='WasteFlyer123',
             url='https://www.test-flyer.org'
+        )
+        cls.flyer2 = WasteFlyer.objects.create(
+            abbreviation='WasteFlyer234',
+            url='https://www.rest-flyer.org'
         )
         frequency = CollectionFrequency.objects.create(name='Test Frequency')
         cls.collection = Collection.objects.create(
@@ -1048,7 +1043,8 @@ class CollectionUpdateViewTestCase(ViewWithPermissionsTestCase):
             frequency=frequency,
             description='This is a test case.'
         )
-        cls.collection.flyers.add(waste_flyer)
+        cls.collection.flyers.add(cls.flyer)
+        cls.collection.flyers.add(cls.flyer2)
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(reverse('collection-update', kwargs={'pk': self.collection.id}))
@@ -1078,6 +1074,7 @@ class CollectionUpdateViewTestCase(ViewWithPermissionsTestCase):
         view.kwargs = kwargs
         view.object = self.collection
         expected_formset_kwargs = {
+            'initial': [{'url': self.flyer.url}, {'url': self.flyer2.url}],
             'parent_object': self.collection,
             'owner': self.member
         }
@@ -1102,6 +1099,7 @@ class CollectionUpdateViewTestCase(ViewWithPermissionsTestCase):
         expected_formset_kwargs = {
             'parent_object': self.collection,
             'owner': self.member,
+            'initial': [{'url': self.flyer.url}, {'url': self.flyer2.url}],
             'data': query_dict
         }
         self.assertDictEqual(expected_formset_kwargs, view.get_formset_kwargs())

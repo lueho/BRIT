@@ -1,98 +1,77 @@
-from bootstrap_modal_forms.forms import BSModalModelForm, BSModalForm
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Layout, Row, Field
-from django import forms
-from django.forms import Form, ModelChoiceField, ModelMultipleChoiceField
 from django.core.exceptions import ValidationError
+from django.forms import HiddenInput, ModelChoiceField, ModelMultipleChoiceField, NumberInput, Widget
 from django.forms.models import BaseInlineFormSet
 from django.utils.safestring import mark_safe
 from extra_views import InlineFormSetFactory
 
 from bibliography.models import Source, SOURCE_TYPES
-from utils.forms import CustomModelForm, CustomModalModelForm, ModalFormHelper
 from distributions.models import TemporalDistribution
-from .models import (
-    Material,
-    MaterialComponent,
-    MaterialComponentGroup,
-    Composition,
-    WeightShare,
-    MaterialCategory,
-    SampleSeries, MaterialProperty,
-    Sample, MaterialPropertyValue
-)
+from utils.forms import SimpleForm, SimpleModelForm, ModalForm, ModalModelForm, ModalModelFormMixin
+
+from .models import (Composition, Material, MaterialCategory, MaterialComponent, MaterialComponentGroup,
+                     MaterialProperty, MaterialPropertyValue, Sample, SampleSeries, WeightShare)
 
 
-class MaterialCategoryModelForm(CustomModelForm):
+class MaterialCategoryModelForm(SimpleModelForm):
     class Meta:
         model = MaterialCategory
         fields = ('name', 'description')
 
 
-class MaterialCategoryModalModelForm(CustomModalModelForm):
-    class Meta:
-        model = MaterialCategory
-        fields = ('name', 'description')
+class MaterialCategoryModalModelForm(ModalModelFormMixin, MaterialCategoryModelForm):
+    pass
 
 
-class MaterialModelForm(CustomModelForm):
+class MaterialModelForm(SimpleModelForm):
     class Meta:
         model = Material
         fields = ('name', 'description', 'categories')
 
 
-class MaterialModalModelForm(CustomModalModelForm):
-    class Meta:
-        model = Material
-        fields = ('name', 'description', 'categories')
+class MaterialModalModelForm(ModalModelFormMixin, MaterialModelForm):
+    pass
 
 
-class ComponentModelForm(CustomModelForm):
+class ComponentModelForm(SimpleModelForm):
     class Meta:
         model = MaterialComponent
         fields = ('name', 'description')
 
 
-class ComponentModalModelForm(CustomModalModelForm):
-    class Meta:
-        model = MaterialComponent
-        fields = ('name', 'description',)
+class ComponentModalModelForm(ModalModelFormMixin, ComponentModelForm):
+    pass
 
 
-class ComponentGroupModelForm(CustomModelForm):
+class ComponentGroupModelForm(SimpleModelForm):
     class Meta:
         model = MaterialComponentGroup
         fields = ('name', 'description')
 
 
-class ComponentGroupModalModelForm(CustomModalModelForm):
-    class Meta:
-        model = MaterialComponentGroup
-        fields = ('name', 'description',)
+class ComponentGroupModalModelForm(ModalModelFormMixin, ComponentGroupModelForm):
+    pass
 
 
-class MaterialPropertyModelForm(CustomModelForm):
+class MaterialPropertyModelForm(SimpleModelForm):
     class Meta:
         model = MaterialProperty
         fields = ('name', 'unit', 'description')
 
 
-class MaterialPropertyModalModelForm(CustomModalModelForm):
-    class Meta:
-        model = MaterialProperty
-        fields = ('name', 'unit', 'description',)
+class MaterialPropertyModalModelForm(ModalModelFormMixin, MaterialPropertyModelForm):
+    pass
 
 
-class MaterialPropertyValueModelForm(CustomModelForm):
+class MaterialPropertyValueModelForm(SimpleModelForm):
     class Meta:
         model = MaterialPropertyValue
         fields = ('property', 'average', 'standard_deviation')
 
 
-class MaterialPropertyValueModalModelForm(CustomModalModelForm):
-    class Meta:
-        model = MaterialPropertyValue
-        fields = ('property', 'average', 'standard_deviation',)
+class MaterialPropertyValueModalModelForm(ModalModelFormMixin, MaterialPropertyValueModelForm):
+    pass
 
 
 class SampleFilterFormHelper(FormHelper):
@@ -103,7 +82,8 @@ class SampleFilterFormHelper(FormHelper):
         'timestep'
     )
 
-class SampleFilterForm(Form):
+
+class SampleFilterForm(SimpleForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -111,21 +91,18 @@ class SampleFilterForm(Form):
         self.fields['material'].widget.attrs = {'data-theme': 'bootstrap4'}
 
 
-class SampleSeriesModelForm(CustomModelForm):
+class SampleSeriesModelForm(SimpleModelForm):
     class Meta:
         model = SampleSeries
         fields = ('name', 'material', 'publish', 'description', 'preview')
         labels = {'publish': 'featured'}
 
 
-class SampleSeriesModalModelForm(CustomModalModelForm):
-    class Meta:
-        model = SampleSeries
-        fields = ('name', 'material', 'publish', 'description', 'preview')
-        labels = {'publish': 'featured'}
+class SampleSeriesModalModelForm(ModalModelFormMixin, SampleSeriesModelForm):
+    pass
 
 
-class SampleSeriesAddTemporalDistributionModalModelForm(CustomModalModelForm):
+class SampleSeriesAddTemporalDistributionModalModelForm(ModalModelForm):
     distribution = ModelChoiceField(queryset=TemporalDistribution.objects.all())
 
     class Meta:
@@ -134,40 +111,37 @@ class SampleSeriesAddTemporalDistributionModalModelForm(CustomModalModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['distribution'].queryset = TemporalDistribution.objects.difference(self.instance.temporal_distributions.all())
+        self.fields['distribution'].queryset = TemporalDistribution.objects.difference(
+            self.instance.temporal_distributions.all())
 
 
-class SampleModelForm(CustomModelForm):
-    class Meta:
-        model = Sample
-        fields = ('name', 'series', 'timestep', 'taken_at', 'description', 'preview')
-
-
-class SampleModalModelForm(CustomModalModelForm):
+class SampleModelForm(SimpleModelForm):
     sources = ModelMultipleChoiceField(
         queryset=Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by('abbreviation'),
         required=False
     )
+
     class Meta:
         model = Sample
         fields = ('name', 'series', 'timestep', 'taken_at', 'description', 'preview', 'sources')
 
+class SampleModalModelForm(ModalModelFormMixin, SampleModelForm):
+    pass
 
-class CompositionModelForm(CustomModelForm):
+
+class CompositionModelForm(SimpleModelForm):
     class Meta:
         model = Composition
         fields = ('group', 'sample', 'fractions_of')
 
 
-class CompositionModalModelForm(CustomModalModelForm):
-    class Meta:
-        model = Composition
-        fields = ('group', 'sample', 'fractions_of')
+class CompositionModalModelForm(ModalModelFormMixin, CompositionModelForm):
+    pass
 
 
-class AddCompositionModalForm(BSModalModelForm):
-    group = forms.ModelChoiceField(queryset=MaterialComponentGroup.objects.all())
-    fractions_of = forms.ModelChoiceField(queryset=MaterialComponent.objects.all())
+class AddCompositionModalForm(ModalModelForm):
+    group = ModelChoiceField(queryset=MaterialComponentGroup.objects.all())
+    fractions_of = ModelChoiceField(queryset=MaterialComponent.objects.all())
 
     class Meta:
         model = SampleSeries
@@ -178,11 +152,10 @@ class AddCompositionModalForm(BSModalModelForm):
         self.fields['group'].queryset = MaterialComponentGroup.objects.exclude(id__in=self.instance.blocked_ids)
         self.fields['fractions_of'].queryset = self.instance.components
         self.fields['fractions_of'].empty_label = None
-        self.helper = ModalFormHelper()
 
 
-class AddComponentModalForm(BSModalModelForm):
-    component = forms.ModelChoiceField(queryset=MaterialComponent.objects.all())
+class AddComponentModalForm(ModalModelForm):
+    component = ModelChoiceField(queryset=MaterialComponent.objects.all())
 
     class Meta:
         model = Composition
@@ -193,28 +166,23 @@ class AddComponentModalForm(BSModalModelForm):
         self.fields['component'].queryset = MaterialComponent.objects.exclude(
             id__in=self.instance.blocked_component_ids
         )
-        self.helper = ModalFormHelper()
 
 
-class AddLiteratureSourceForm(BSModalForm):
-    source = forms.ModelChoiceField(queryset=Source.objects.all())
+class AddLiteratureSourceForm(ModalForm):
+    source = ModelChoiceField(queryset=Source.objects.all())
 
     class Meta:
         fields = ('source',)
 
 
-class AddSeasonalVariationForm(BSModalForm):
-    temporal_distribution = forms.ModelChoiceField(queryset=TemporalDistribution.objects.all())
+class AddSeasonalVariationForm(ModalForm):
+    temporal_distribution = ModelChoiceField(queryset=TemporalDistribution.objects.all())
 
     class Meta:
         fields = ('temporal_distribution',)
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.helper = ModalFormHelper()
 
-
-class WeightShareModelForm(CustomModelForm):
+class WeightShareModelForm(SimpleModelForm):
     class Meta:
         model = WeightShare
         fields = ('component', 'average', 'standard_deviation',)
@@ -231,6 +199,13 @@ class WeightShareModelForm(CustomModelForm):
 
     def clean_standard_deviation(self):
         return self.cleaned_data.get('standard_deviation') / 100
+
+
+class WeightShareInlineForm(WeightShareModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields.get('component').label = ' '
+        self.fields.get('component').required = False
 
 
 class WeightShareInlineFormset(BaseInlineFormSet):
@@ -254,9 +229,9 @@ class InlineWeightShare(InlineFormSetFactory):
         'extra': 0,
         'can_delete': True,
         'widgets': {
-            'owner': forms.HiddenInput(),
-            'average': forms.NumberInput(attrs={'min': 0, 'max': 100, 'step': 0.01}),
-            'standard_deviation': forms.NumberInput(attrs={'min': 0, 'max': 100, 'step': 0.01})
+            'owner': HiddenInput(),
+            'average': NumberInput(attrs={'min': 0, 'max': 100, 'step': 0.01}),
+            'standard_deviation': NumberInput(attrs={'min': 0, 'max': 100, 'step': 0.01})
         }
     }
 
@@ -281,14 +256,7 @@ class WeightShareUpdateFormSetHelper(FormHelper):
         self.render_required_fields = True
 
 
-class WeightShareModalModelForm(WeightShareModelForm):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields.get('component').label = ' '
-        self.fields.get('component').required = False
-
-
-class PlainTextComponentWidget(forms.Widget):
+class PlainTextComponentWidget(Widget):
     def render(self, name, value, attrs=None, renderer=None):
         if hasattr(self, 'initial'):
             value = self.initial
@@ -308,26 +276,22 @@ class ModalInlineComponentShare(InlineFormSetFactory):
     model = WeightShare
     fields = ('component', 'average', 'standard_deviation')
     factory_kwargs = {
-        'form': WeightShareModalModelForm,
+        'form': WeightShareInlineForm,
         'formset': WeightShareInlineFormset,
         'extra': 0,
         'can_delete': True,
         'widgets': {
             'component': PlainTextComponentWidget(),
-            'average': forms.NumberInput(attrs={'min': 0, 'max': 100, 'step': 0.01}),
-            'standard_deviation': forms.NumberInput(attrs={'min': 0, 'max': 100, 'step': 0.01})
+            'average': NumberInput(attrs={'min': 0, 'max': 100, 'step': 0.01}),
+            'standard_deviation': NumberInput(attrs={'min': 0, 'max': 100, 'step': 0.01})
         }
     }
 
 
-class AddTemporalDistributionForm(BSModalModelForm):
+class AddTemporalDistributionForm(ModalModelForm):
     class Meta:
         model = Composition
         fields = '__all__'
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.helper = FormHelper()
 
 
 class ComponentShareDistributionFormSetHelper(FormHelper):

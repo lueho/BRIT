@@ -1,14 +1,9 @@
 from dal import autocomplete
 from django.forms import CheckboxSelectMultiple, RadioSelect, DateInput
-from django_filters import (BooleanFilter,
-                            CharFilter,
-                            ChoiceFilter,
-                            DateFilter,
-                            FilterSet,
-                            ModelChoiceFilter,
-                            ModelMultipleChoiceFilter, )
+from django_filters import (BooleanFilter, CharFilter, ChoiceFilter, DateFilter, FilterSet, ModelChoiceFilter,
+                            ModelMultipleChoiceFilter)
 
-from .forms import CollectionFilterForm, CollectorFilterForm, FlyerFilterForm
+from .forms import CollectionFilterForm, FlyerFilterForm
 from .models import (CollectionCatchment, Collection, Collector, FREQUENCY_TYPES, WasteCategory, WasteComponent,
                      WasteFlyer)
 
@@ -20,7 +15,6 @@ class CollectorFilter(FilterSet):
     class Meta:
         model = Collector
         fields = ('name', 'catchment')
-        form = CollectorFilterForm
 
 
 COUNTRY_CHOICES = (

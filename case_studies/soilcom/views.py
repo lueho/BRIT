@@ -4,7 +4,7 @@ from celery.result import AsyncResult
 from dal.autocomplete import Select2QuerySetView
 from django.contrib.auth.mixins import PermissionRequiredMixin, LoginRequiredMixin
 from django.db.models import Max
-from django.forms import modelformset_factory, formset_factory
+from django.forms.models import model_to_dict
 from django.http import HttpResponseRedirect, JsonResponse, HttpResponse
 from django.urls import reverse, reverse_lazy
 from django.views import View
@@ -16,17 +16,13 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
 import case_studies.soilcom.tasks
-from bibliography.views import (SourceCreateView,
-                                SourceModalCreateView,
-                                SourceModalDetailView,
-                                SourceUpdateView,
-                                SourceModalUpdateView,
-                                SourceModalDeleteView,
-                                SourceCheckUrlView)
+from bibliography.views import (SourceCreateView, SourceModalCreateView, SourceModalDetailView, SourceUpdateView,
+                                SourceModalUpdateView, SourceModalDeleteView, SourceCheckUrlView)
 from maps.forms import NutsAndLauCatchmentQueryForm
 from maps.models import GeoDataset
 from maps.views import CatchmentDetailView, GeoDatasetDetailView, GeoDataSetMixin, GeoDataSetFormMixin
 from utils import views
+from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineModelFormSetMixin
 from utils.models import Property
 from . import filters
 from . import forms
@@ -582,67 +578,20 @@ class CollectionListView(views.BRITFilterView):
     ordering = 'name'
 
 
-class ModelFormAndModelFormSetMixin:
-    object = None
-    formset_model = None
-    formset_class = None
-    formset_form_class = None
-
-    def get_formset(self, **kwargs):
-        FormSet = modelformset_factory(
-            self.formset_model,
-            form=self.formset_form_class,
-            formset=self.formset_class
-        )
-        return FormSet(**self.get_formset_kwargs())
-
-    def get_formset_kwargs(self, **kwargs):
-        if self.request.method in ("POST", "PUT"):
-            kwargs.update({'data': self.request.POST.copy()})
-        return kwargs
-
-    def get_context_data(self, **kwargs):
-        if 'formset' not in kwargs:
-            kwargs['formset'] = self.get_formset()
-        kwargs['formset_helper'] = forms.FormSetHelper()
-        return super().get_context_data(**kwargs)
-
-
-class ModelFormAndFormSetMixin:
-    object = None
-    formset_class = None
-    formset_form_class = None
-    request = None
-
-    def get_formset(self, **kwargs):
-        FormSet = formset_factory(
-            form=self.formset_form_class,
-            formset=self.formset_class
-        )
-        return FormSet(**self.get_formset_kwargs())
-
-    def get_formset_kwargs(self, **kwargs):
-        if self.request.method in ("POST", "PUT"):
-            kwargs.update({
-                'owner': self.request.user,
-                'data': self.request.POST.copy(),
-                'parent_object': self.object
-            })
-        return kwargs
-
-    def get_context_data(self, **kwargs):
-        if 'formset' not in kwargs:
-            kwargs['formset'] = self.get_formset()
-        kwargs['formset_helper'] = forms.FormSetHelper()
-        return super().get_context_data(**kwargs)
-
-
-class CollectionCreateView(ModelFormAndFormSetMixin, views.OwnedObjectCreateView):
+class CollectionCreateView(M2MInlineModelFormSetMixin, views.OwnedObjectCreateView):
     template_name = 'collection_form_card.html'
+    model = Collection
     form_class = forms.CollectionModelForm
+    formset_model = WasteFlyer
     formset_class = forms.BaseWasteFlyerUrlFormSet
-    formset_form_class = forms.UrlForm
+    formset_form_class = forms.WasteFlyerModelForm
+    formset_helper_class = DynamicTableInlineFormSetHelper
     permission_required = 'soilcom.add_collection'
+
+    def get_formset_kwargs(self, **kwargs):
+        if self.request.method in ("POST", "PUT"):
+            kwargs.update({'owner': self.request.user})
+        return super().get_formset_kwargs(**kwargs)
 
     def get_initial(self):
         initial = super().get_initial()
@@ -672,48 +621,24 @@ class CollectionCreateView(ModelFormAndFormSetMixin, views.OwnedObjectCreateView
 
 class CollectionCopyView(CollectionCreateView):
     model = models.Collection
-    original_object = None
-
-    def get_original_object(self):
-        return self.model.objects.get(pk=self.kwargs.get('pk'))
-
-    def get_formset_kwargs(self, **kwargs):
-        kwargs.update({
-            'parent_object': self.original_object,
-        })
-        return super().get_formset_kwargs(**kwargs)
 
     def get_initial(self):
-        initial = {}
-        if self.original_object.catchment:
-            initial['catchment'] = self.original_object.catchment
-        if self.original_object.collector:
-            initial['collector'] = self.original_object.collector
-        if self.original_object.collection_system:
-            initial['collection_system'] = self.original_object.collection_system
-        if self.original_object.waste_stream:
-            if self.original_object.waste_stream.category:
-                initial['waste_category'] = self.original_object.waste_stream.category
-            if self.original_object.waste_stream.allowed_materials.exists():
-                initial['allowed_materials'] = self.original_object.waste_stream.allowed_materials.all()
-        if self.original_object.connection_rate:
-            initial['connection_rate'] = self.original_object.connection_rate
-        if self.original_object.connection_rate_year:
-            initial['connection_rate_year'] = self.original_object.connection_rate_year
-        if self.original_object.fee_system:
-            initial['fee_system'] = self.original_object.fee_system
-        if self.original_object.frequency:
-            initial['frequency'] = self.original_object.frequency
-        if self.original_object.description:
-            initial['description'] = self.original_object.description
+        initial = model_to_dict(self.object)
+        initial.update({
+            'waste_category': self.object.waste_stream.category.id,
+            'allowed_materials': [mat.id for mat in self.object.waste_stream.allowed_materials.all()]
+        })
+        # Prevent the ModelFormMixin from passing the original instance into the ModelForm by removing self.object.
+        # That way, a new instance is created, instead.
+        self.object = None
         return initial
 
     def get(self, request, *args, **kwargs):
-        self.original_object = self.get_original_object()
+        self.object = self.get_object()
         return self.render_to_response(self.get_context_data())
 
     def post(self, request, *args, **kwargs):
-        self.original_object = self.get_original_object()
+        self.object = self.get_object()
         return super().post(request, *args, **kwargs)
 
 
@@ -728,26 +653,25 @@ class CollectionModalDetailView(views.OwnedObjectModalDetailView):
     permission_required = 'soilcom.view_collection'
 
 
-class CollectionUpdateView(ModelFormAndFormSetMixin, views.OwnedObjectUpdateView):
+class CollectionUpdateView(M2MInlineModelFormSetMixin, views.OwnedObjectUpdateView):
     model = models.Collection
     form_class = forms.CollectionModelForm
+    formset_model = WasteFlyer
     formset_class = forms.BaseWasteFlyerUrlFormSet
-    formset_form_class = forms.UrlForm
+    formset_form_class = forms.WasteFlyerModelForm
+    formset_helper_class = DynamicTableInlineFormSetHelper
     permission_required = 'soilcom.change_collection'
     template_name = 'collection_form_card.html'
 
     def get_formset_kwargs(self, **kwargs):
-        kwargs.update({
-            'parent_object': self.object,
-            'owner': self.request.user,
-        })
+        kwargs.update({'owner': self.request.user})
         return super().get_formset_kwargs(**kwargs)
 
     def get_initial(self):
         initial = super().get_initial()
         initial.update({
-            'waste_category': self.object.waste_stream.category,
-            'allowed_materials': self.object.waste_stream.allowed_materials.all(),
+            'waste_category': self.object.waste_stream.category.id,
+            'allowed_materials': [mat.id for mat in self.object.waste_stream.allowed_materials.all()],
         })
         return initial
 
@@ -999,7 +923,6 @@ class CollectionListFileExportProgressView(LoginRequiredMixin, View):
 
 
 class CollectionSummaryAPI(APIView):
-
     authentication_classes = []
     permission_classes = []
 

@@ -1,8 +1,5 @@
-from django_filters import (CharFilter,
-                            FilterSet,
-                            )
+from django_filters import CharFilter, FilterSet
 
-from .forms import CatchmentFilterForm
 from .models import Catchment
 
 
@@ -12,4 +9,3 @@ class CatchmentFilter(FilterSet):
     class Meta:
         model = Catchment
         fields = ('name', 'type',)
-        form = CatchmentFilterForm

@@ -2,7 +2,7 @@ from django.forms import formset_factory
 from django.test import TestCase
 
 from materials.models import MaterialCategory
-from ..forms import CollectionModelForm, UrlForm, BaseWasteFlyerUrlFormSet
+from ..forms import CollectionModelForm, BaseWasteFlyerUrlFormSet, WasteFlyerModelForm
 from ..models import (Collection, CollectionCatchment, Collector, CollectionFrequency, CollectionSystem, WasteCategory,
                       WasteComponent, WasteFlyer, WasteStream)
 
@@ -155,8 +155,8 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
 
     def test_associated_flyer_urls_are_shown_as_initial_values(self):
         initial_urls = [{'url': flyer.url} for flyer in self.collection.flyers.all()]
-        UrlFormSet = formset_factory(UrlForm, formset=BaseWasteFlyerUrlFormSet, extra=0)
-        formset = UrlFormSet(parent_object=self.collection)
+        WasteFlyerModelFormSet = formset_factory(WasteFlyerModelForm, formset=BaseWasteFlyerUrlFormSet, extra=0)
+        formset = WasteFlyerModelFormSet(parent_object=self.collection, initial=initial_urls)
         displayed_urls = [form.initial for form in formset]
         self.assertListEqual(initial_urls, displayed_urls)
 
@@ -169,8 +169,8 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             'form-1-url': initial_urls[1]['url'],
             'form-2-url': initial_urls[2]['url']
         }
-        UrlFormSet = formset_factory(UrlForm, formset=BaseWasteFlyerUrlFormSet)
-        formset = UrlFormSet(parent_object=self.collection, data=data)
+        WasteFlyerModelFormSet = formset_factory(WasteFlyerModelForm, formset=BaseWasteFlyerUrlFormSet)
+        formset = WasteFlyerModelFormSet(parent_object=self.collection, data=data)
         self.assertTrue(formset.is_valid())
         formset.save()
         for url in initial_urls:
@@ -187,8 +187,8 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             'form-2-url': initial_urls[2]['url'],
             'form-3-url': 'https://www.fest-flyers.org',
         }
-        UrlFormSet = formset_factory(UrlForm, formset=BaseWasteFlyerUrlFormSet)
-        formset = UrlFormSet(parent_object=self.collection, owner=self.collection.owner, data=data)
+        WasteFlyerModelFormSet = formset_factory(WasteFlyerModelForm, formset=BaseWasteFlyerUrlFormSet)
+        formset = WasteFlyerModelFormSet(parent_object=self.collection, owner=self.collection.owner, data=data)
         self.assertTrue(formset.is_valid())
         formset.save()
         WasteFlyer.objects.get(url='https://www.fest-flyers.org')
@@ -203,8 +203,8 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             'form-1-url': '',
             'form-2-url': initial_urls[2]['url'],
         }
-        UrlFormSet = formset_factory(UrlForm, formset=BaseWasteFlyerUrlFormSet)
-        formset = UrlFormSet(parent_object=self.collection, owner=self.collection.owner, data=data)
+        WasteFlyerModelFormSet = formset_factory(WasteFlyerModelForm, formset=BaseWasteFlyerUrlFormSet)
+        formset = WasteFlyerModelFormSet(parent_object=self.collection, owner=self.collection.owner, data=data)
         self.assertTrue(formset.is_valid())
         original_flyer_count = WasteFlyer.objects.count()
         formset.save()
@@ -221,8 +221,8 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             'form-1-url': initial_urls[1]['url'],
             'form-2-url': '',
         }
-        UrlFormSet = formset_factory(UrlForm, formset=BaseWasteFlyerUrlFormSet)
-        formset = UrlFormSet(parent_object=self.collection,data=data)
+        WasteFlyerModelFormSet = formset_factory(WasteFlyerModelForm, formset=BaseWasteFlyerUrlFormSet)
+        formset = WasteFlyerModelFormSet(parent_object=self.collection,data=data)
         self.assertTrue(formset.is_valid())
         original_flyer_count = WasteFlyer.objects.count()
         formset.save()
@@ -232,7 +232,7 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
         self.assertEqual(original_flyer_count - 1, self.collection.flyers.count())
 
     def test_save_two_new_and_equal_urls_only_once(self):
-        UrlFormSet = formset_factory(UrlForm, formset=BaseWasteFlyerUrlFormSet)
+        WasteFlyerModelFormSet = formset_factory(WasteFlyerModelForm, formset=BaseWasteFlyerUrlFormSet)
         url = 'https://www.fest-flyers.org'
         data = {
             'form-INITIAL_FORMS': '0',
@@ -240,7 +240,7 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             'form-0-url': url,
             'form-1-url': url,
         }
-        formset = UrlFormSet(data=data, parent_object=self.collection)
+        formset = WasteFlyerModelFormSet(data=data, parent_object=self.collection)
         self.assertTrue(formset.is_valid())
         original_flyer_count = WasteFlyer.objects.count()
         formset.save()

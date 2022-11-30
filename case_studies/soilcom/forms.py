@@ -1,105 +1,65 @@
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Column, Field, Layout, Row, Submit
+from crispy_forms.layout import Column, Field, Layout, Row
 from dal import autocomplete
-from django import forms
-from django.forms import BaseFormSet, Form
+from django.forms import (BaseFormSet, BooleanField, ChoiceField, CheckboxSelectMultiple, ModelChoiceField,
+                          ModelMultipleChoiceField, MultipleChoiceField, RadioSelect, URLField)
 
-from bibliography.models import Source
-from utils.forms import CustomModelForm, CustomModalModelForm, ForeignkeyField
 from materials.models import Material, MaterialCategory, Sample
 from users.models import get_default_owner
+from utils.forms import (AutoCompleteModelForm, ForeignkeyField, SimpleForm, SimpleModelForm,
+                         ModalModelFormMixin)
+from .models import (AggregatedCollectionPropertyValue, Collection, CollectionCatchment, CollectionFrequency,
+                     CollectionPropertyValue, CollectionSystem, Collector, FREQUENCY_TYPES, WasteCategory,
+                     WasteComponent, WasteFlyer, WasteStream)
 
-from . import models
-from .models import (AggregatedCollectionPropertyValue, CollectionPropertyValue, FREQUENCY_TYPES)
 
-
-class CollectorModelForm(CustomModelForm):
-    catchment = forms.ModelChoiceField(
-        queryset=models.CollectionCatchment.objects.all(),
+class CollectorModelForm(AutoCompleteModelForm):
+    catchment = ModelChoiceField(
+        queryset=CollectionCatchment.objects.all(),
         widget=autocomplete.ModelSelect2(url='catchment-autocomplete'),
         required=False
     )
 
     class Meta:
-        model = models.Collector
+        model = Collector
         fields = ('name', 'website', 'catchment', 'description')
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['catchment'].widget.attrs = {'data-theme': 'bootstrap4'}
+
+class CollectorModalModelForm(ModalModelFormMixin, CollectorModelForm):
+    pass
 
 
-class CollectorModalModelForm(CustomModalModelForm):
-    catchment = forms.ModelChoiceField(
-        queryset=models.CollectionCatchment.objects.all(),
-        widget=autocomplete.ModelSelect2(url='catchment-autocomplete'),
-        required=False
-    )
-
+class CollectionSystemModelForm(SimpleModelForm):
     class Meta:
-        model = models.Collector
-        fields = ('name', 'website', 'catchment', 'description')
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['catchment'].widget.attrs = {'data-theme': 'bootstrap4'}
-
-
-class CollectorFilterFormHelper(FormHelper):
-    form_tag = False
-    include_media = False
-    layout = Layout(
-        'name',
-        'catchment',
-    )
-
-
-class CollectorFilterForm(Form):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.helper = CollectorFilterFormHelper()
-        self.fields['name'].widget.attrs = {'data-theme': 'bootstrap4'}
-        self.fields['catchment'].widget.attrs = {'data-theme': 'bootstrap4'}
-
-
-class CollectionSystemModelForm(CustomModelForm):
-    class Meta:
-        model = models.CollectionSystem
+        model = CollectionSystem
         fields = ('name', 'description')
 
 
-class CollectionSystemModalModelForm(CustomModalModelForm):
+class CollectionSystemModalModelForm(ModalModelFormMixin, CollectionSystemModelForm):
+    pass
+
+
+class WasteCategoryModelForm(SimpleModelForm):
     class Meta:
-        model = models.CollectionSystem
+        model = WasteCategory
         fields = ('name', 'description')
 
 
-class WasteCategoryModelForm(CustomModelForm):
+class WasteCategoryModalModelForm(ModalModelFormMixin, WasteCategoryModelForm):
+    pass
+
+
+class WasteComponentModelForm(SimpleModelForm):
     class Meta:
-        model = models.WasteCategory
+        model = WasteComponent
         fields = ('name', 'description')
 
 
-class WasteCategoryModalModelForm(CustomModalModelForm):
-    class Meta:
-        model = models.WasteCategory
-        fields = ('name', 'description')
+class WasteComponentModalModelForm(ModalModelFormMixin, WasteComponentModelForm):
+    pass
 
 
-class WasteComponentModelForm(CustomModelForm):
-    class Meta:
-        model = models.WasteComponent
-        fields = ('name', 'description')
-
-
-class WasteComponentModalModelForm(CustomModalModelForm):
-    class Meta:
-        model = models.WasteComponent
-        fields = ('name', 'description')
-
-
-class WasteStreamModelForm(CustomModelForm):
+class WasteStreamModelForm(SimpleModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -107,31 +67,27 @@ class WasteStreamModelForm(CustomModelForm):
         self.fields['allowed_materials'].queryset = Material.objects.filter(categories__in=categories)
 
     class Meta:
-        model = models.WasteStream
+        model = WasteStream
         fields = ('name', 'category', 'allowed_materials', 'composition', 'description')
 
 
-class WasteStreamModalModelForm(CustomModalModelForm):
-    class Meta:
-        model = models.WasteStream
-        fields = ('name', 'category', 'allowed_materials', 'composition', 'description')
+class WasteStreamModalModelForm(ModalModelFormMixin, WasteStreamModelForm):
+    pass
 
 
-class CollectionFrequencyModelForm(CustomModelForm):
+class CollectionFrequencyModelForm(SimpleModelForm):
     class Meta:
-        model = models.CollectionFrequency
+        model = CollectionFrequency
         fields = ('name', 'type', 'description')
 
 
-class CollectionFrequencyModalModelForm(CustomModalModelForm):
-    class Meta:
-        model = models.CollectionFrequency
-        fields = ('name', 'type', 'description')
+class CollectionFrequencyModalModelForm(ModalModelFormMixin, CollectionFrequencyModelForm):
+    pass
 
 
-class WasteFlyerModelForm(CustomModelForm):
+class WasteFlyerModelForm(SimpleModelForm):
     class Meta:
-        model = models.WasteFlyer
+        model = WasteFlyer
         fields = ('url',)
         labels = {'url': 'Sources (Urls)'}
 
@@ -142,58 +98,42 @@ class WasteFlyerModelForm(CustomModelForm):
                 'title': 'Waste flyer',
                 'abbreviation': 'WasteFlyer'
             }
-            instance, _ = models.WasteFlyer.objects.get_or_create(url=self.cleaned_data['url'], defaults=defaults)
+            instance, _ = WasteFlyer.objects.get_or_create(url=self.cleaned_data['url'], defaults=defaults)
             return instance
         else:
             return super().save(commit=False)
 
 
-class WasteFlyerModalModelForm(CustomModelForm):
-    class Meta:
-        model = Source
-        fields = ('publisher', 'title', 'year', 'abbreviation', 'url', 'last_accessed',)
-        labels = {'url': 'Sources'}
-
-
-class UrlForm(forms.Form):
-    url = forms.URLField(required=False)
+class WasteFlyerModalModelForm(ModalModelFormMixin, WasteFlyerModelForm):
+    pass
 
 
 class BaseWasteFlyerUrlFormSet(BaseFormSet):
 
     def __init__(self, *args, **kwargs):
-        self.collection = kwargs.pop('parent_object', None)
+        self.parent_object = kwargs.pop('parent_object', None)
         self.owner = kwargs.pop('owner', get_default_owner())
-        flyers = self.collection.flyers.all() if self.collection else []
-        initial = [{'url': flyer.url} for flyer in flyers]
-        super().__init__(*args, initial=initial, **kwargs)
+        super().__init__(*args, **kwargs)
 
     def clean(self):
         if any(self.errors):
             return
 
     def save(self, commit=True):
-        flyers = []
+        child_objects = []
         for form in self.forms:
-            if 'url' in form.cleaned_data and form.cleaned_data['url'] != '':
-                flyer, _ = models.WasteFlyer.objects.get_or_create(owner=self.owner, url=form.cleaned_data['url'])
-                flyers.append(flyer)
-        self.collection.flyers.set(flyers)
-        models.WasteFlyer.objects.filter(collections=None).delete()
-        return flyers
+            if 'url' in form.cleaned_data and form.cleaned_data['url'] not in ('', None):
+                child_objects.append(form.save())
+        self.parent_object.flyers.set(child_objects)
+        # By using set any old flyers that where not included in the current formset are disconnected from the parent
+        # collection. By default, these should not remain in the database if they have no other relations.
+        WasteFlyer.objects.filter(collections=None).delete()
+        return child_objects
 
 
-class FormSetHelper(FormHelper):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.template = 'bootstrap4/dynamic_table_inline_formset.html'
-        self.form_method = 'post'
-        self.add_input(Submit("submit", "Save"))
-
-
-class CollectionPropertyValueModelForm(CustomModelForm):
-    collection = forms.ModelChoiceField(
-        queryset=models.Collection.objects.all(),
+class CollectionPropertyValueModelForm(AutoCompleteModelForm):
+    collection = ModelChoiceField(
+        queryset=Collection.objects.all(),
         widget=autocomplete.ModelSelect2(url='collection-autocomplete'),
         required=True
     )
@@ -202,14 +142,10 @@ class CollectionPropertyValueModelForm(CustomModelForm):
         model = CollectionPropertyValue
         fields = ('collection', 'property', 'year', 'average', 'standard_deviation')
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['collection'].widget.attrs = {'data-theme': 'bootstrap4'}
 
-
-class AggregatedCollectionPropertyValueModelForm(CustomModelForm):
-    collections = forms.ModelMultipleChoiceField(
-        queryset=models.Collection.objects.all(),
+class AggregatedCollectionPropertyValueModelForm(AutoCompleteModelForm):
+    collections = ModelMultipleChoiceField(
+        queryset=Collection.objects.all(),
         widget=autocomplete.ModelSelect2Multiple(url='collection-autocomplete'),
         required=True
     )
@@ -218,35 +154,31 @@ class AggregatedCollectionPropertyValueModelForm(CustomModelForm):
         model = AggregatedCollectionPropertyValue
         fields = ('collections', 'property', 'year', 'average', 'standard_deviation')
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['collections'].widget.attrs = {'data-theme': 'bootstrap4'}
 
-
-class CollectionModelForm(forms.ModelForm):
-    catchment = forms.ModelChoiceField(
-        queryset=models.CollectionCatchment.objects.all(),
+class CollectionModelForm(AutoCompleteModelForm):
+    catchment = ModelChoiceField(
+        queryset=CollectionCatchment.objects.all(),
         widget=autocomplete.ModelSelect2(url='catchment-autocomplete'),
         required=True
     )
-    collector = forms.ModelChoiceField(
-        queryset=models.Collector.objects.all(),
+    collector = ModelChoiceField(
+        queryset=Collector.objects.all(),
         widget=autocomplete.ModelSelect2(url='collector-autocomplete'),
         required=True
     )
-    collection_system = forms.ModelChoiceField(
-        queryset=models.CollectionSystem.objects.all(),
+    collection_system = ModelChoiceField(
+        queryset=CollectionSystem.objects.all(),
         required=True)
-    waste_category = forms.ModelChoiceField(
-        queryset=models.WasteCategory.objects.all()
+    waste_category = ModelChoiceField(
+        queryset=WasteCategory.objects.all()
     )
-    allowed_materials = forms.ModelMultipleChoiceField(
-        queryset=models.WasteComponent.objects.all(),
-        widget=forms.CheckboxSelectMultiple
+    allowed_materials = ModelMultipleChoiceField(
+        queryset=WasteComponent.objects.all(),
+        widget=CheckboxSelectMultiple
     )
 
     class Meta:
-        model = models.Collection
+        model = Collection
         fields = ('catchment', 'collector', 'collection_system', 'waste_category', 'allowed_materials',
                   'connection_rate', 'connection_rate_year', 'frequency', 'fee_system', 'description')
         labels = {
@@ -257,8 +189,6 @@ class CollectionModelForm(forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['catchment'].widget.attrs = {'data-theme': 'bootstrap4'}
-        self.fields['collector'].widget.attrs = {'data-theme': 'bootstrap4'}
         if 'connection_rate' in self.initial and self.initial['connection_rate'] is not None:
             self.initial['connection_rate'] *= 100
 
@@ -272,10 +202,6 @@ class CollectionModelForm(forms.ModelForm):
     def helper(self):
         helper = FormHelper()
         helper.form_tag = False
-        # django-crispy-forms and django-autocomplete-light conflict in the order JQuery needs to be loaded.
-        # Suppressing media inclusion here and explicitly adding {{ form.media }} in the template solves this.
-        # See https://github.com/yourlabs/django-autocomplete-light/issues/788
-        helper.include_media = False
         helper.layout = Layout(
             Field('catchment'),
             ForeignkeyField('collector'),
@@ -301,10 +227,10 @@ class CollectionModelForm(forms.ModelForm):
         instance.name = f'{data["catchment"]} {data["waste_category"]} {data["collection_system"]}'
 
         # Associate with a new or existing waste stream
-        waste_stream, created = models.WasteStream.objects.get_or_create(
+        waste_stream, created = WasteStream.objects.get_or_create(
             defaults={'owner': instance.owner},
             category=data["waste_category"],
-            allowed_materials=models.WasteComponent.objects.filter(id__in=data['allowed_materials'])
+            allowed_materials=WasteComponent.objects.filter(id__in=data['allowed_materials'])
         )
         if created:
             waste_stream.allowed_materials.add(*data['allowed_materials'])
@@ -317,21 +243,6 @@ class CollectionModelForm(forms.ModelForm):
             return super().save(commit=False)
 
 
-class CollectionFilterFormHelper(FormHelper):
-    form_tag = False
-    include_media = False
-    layout = Layout(
-        'catchment',
-        'collector',
-        'collection_system',
-        'country',
-        'waste_category',
-        'allowed_materials',
-        'fee_system',
-        'frequency_type'
-    )
-
-
 COUNTRY_CHOICES = (
     ('BE', 'BE'),
     ('DE', 'DE'),
@@ -342,100 +253,63 @@ COUNTRY_CHOICES = (
 )
 
 
-class CollectionFilterForm(forms.Form):
-    catchment = forms.ModelChoiceField(
-        queryset=models.CollectionCatchment.objects.all(),
+class CollectionFilterForm(AutoCompleteModelForm):
+    catchment = ModelChoiceField(
+        queryset=CollectionCatchment.objects.all(),
         widget=autocomplete.ModelSelect2(url='catchment-autocomplete'),
         required=False
     )
-    collector = forms.ModelChoiceField(
-        queryset=models.Collector.objects.all(),
+    collector = ModelChoiceField(
+        queryset=Collector.objects.all(),
         widget=autocomplete.ModelSelect2(url='collector-autocomplete'),
         required=False
     )
-    waste_category = forms.ModelMultipleChoiceField(
-        queryset=models.WasteCategory.objects.all(),
-        widget=forms.CheckboxSelectMultiple,
+    waste_category = ModelMultipleChoiceField(
+        queryset=WasteCategory.objects.all(),
+        widget=CheckboxSelectMultiple,
         required=False
     )
-    country = forms.MultipleChoiceField(
+    country = MultipleChoiceField(
         choices=COUNTRY_CHOICES,
         required=False
     )
-    allowed_materials = forms.ModelMultipleChoiceField(
-        queryset=models.WasteComponent.objects.all(),
-        widget=forms.CheckboxSelectMultiple,
+    allowed_materials = ModelMultipleChoiceField(
+        queryset=WasteComponent.objects.all(),
+        widget=CheckboxSelectMultiple,
         required=False
     )
-    frequency_type = forms.ChoiceField(choices=FREQUENCY_TYPES, required=False)
+    frequency_type = ChoiceField(choices=FREQUENCY_TYPES, required=False)
 
     class Meta:
-        model = models.Collection
+        model = Collection
         fields = ('catchment', 'collector', 'collection_system', 'country', 'waste_category', 'allowed_materials',
                   'frequency_type', 'fee_system')
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.helper = CollectionFilterFormHelper()
-        self.fields['catchment'].widget.attrs = {'data-theme': 'bootstrap4'}
-        self.fields['collector'].widget.attrs = {'data-theme': 'bootstrap4'}
-        # self.fields['country'].choices = set(
-        #     sorted(set((c.catchment.region.country_code, c.catchment.region.country_code) for c in
-        #                models.Collection.objects.all())))
 
-
-class FlyerFilterFormHelper(FormHelper):
-    form_tag = False
-    include_media = False
-
-
-class FlyerFilterForm(forms.Form):
-    url_valid = forms.BooleanField(widget=forms.RadioSelect())
+class FlyerFilterForm(AutoCompleteModelForm):
+    url_valid = BooleanField(widget=RadioSelect())
 
     class Meta:
-        model = models.WasteFlyer
+        model = WasteFlyer
         fields = ('url_valid',)
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.helper = FlyerFilterFormHelper()
 
-
-class CollectionAddWasteSampleFormHelper(FormHelper):
-    form_tag = False
-    include_media = False
-    layout = Layout(
-        Field('sample'),
-        Submit('submit', 'Add')
-    )
-
-
-class CollectionAddWasteSampleForm(CustomModelForm):
-    sample = forms.ModelChoiceField(queryset=Sample.objects.all(),
-                                    widget=autocomplete.ModelSelect2(url='sample-autocomplete'))
+class CollectionAddWasteSampleForm(AutoCompleteModelForm):
+    sample = ModelChoiceField(queryset=Sample.objects.all(),
+                              widget=autocomplete.ModelSelect2(url='sample-autocomplete'))
 
     class Meta:
         model = Sample
         fields = ('sample',)
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['sample'].widget.attrs = {'data-theme': 'bootstrap4'}
 
-    @property
-    def helper(self):
-        return CollectionAddWasteSampleFormHelper()
-
-
-class CollectionRemoveWasteSampleForm(forms.ModelForm):
-    sample = forms.ModelChoiceField(queryset=Sample.objects.all())
+class CollectionRemoveWasteSampleForm(SimpleModelForm):
+    sample = ModelChoiceField(queryset=Sample.objects.all())
 
     class Meta:
-        model = models.Collection
+        model = Collection
         fields = ('sample',)
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['sample'].queryset = Sample.objects.filter(collections=self.instance)
-        self.helper = FormHelper()
-        self.helper.add_input(Submit('submit', 'Remove'))

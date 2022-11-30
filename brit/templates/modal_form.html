@@ -9,14 +9,14 @@
 </div>
 
 <div class="modal-body">
-    {% if helper %}
-        {% crispy form helper %}
-    {% else %}
+    <form id="modal-form" method="post">
         {% crispy form %}
-    {% endif %}
+    </form>
 </div>
 
 <div class="modal-footer">
     <button type="button" class="btn btn-default" data-dismiss="modal">Close</button>
-    <button type="submit" class="submit-btn btn btn-primary" form="modal-form">{{ submit_button_text }}</button>
+    {% block submit_button %}
+        <button type="submit" class="submit-btn btn btn-primary" form="modal-form">{{ submit_button_text }}</button>
+    {% endblock %}
 </div>

@@ -1,36 +1,29 @@
-from crispy_forms.helper import FormHelper
-from django.forms import (
-    ModelForm,
-    HiddenInput)
-
-from utils.forms import CustomModalModelForm
+from dal.autocomplete import ModelSelect2
+from django.forms import HiddenInput, ModelChoiceField
 
 from distributions.models import TemporalDistribution
 from maps.models import Region, Catchment, GeoDataset
-from .models import (
-    InventoryAlgorithm,
-    Scenario,
-    ScenarioInventoryConfiguration,
-)
+from utils.forms import AutoCompleteModelForm, SimpleModelForm, ModalModelFormMixin
+from .models import InventoryAlgorithm, Scenario, ScenarioInventoryConfiguration
 
 
-class SeasonalDistributionModelForm(ModelForm):
+class SeasonalDistributionModelForm(SimpleModelForm):
     class Meta:
         model = TemporalDistribution
         fields = ()
 
 
-# ----------- Inventories -------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-class ScenarioModelForm(ModelForm):
-    class Meta:
-        model = Scenario
-        fields = ['name', 'description', 'region', 'catchment']
-
-
-class ScenarioModalModelForm(CustomModalModelForm):
+class ScenarioModelForm(AutoCompleteModelForm):
+    region = ModelChoiceField(
+        queryset=Region.objects.all(),
+        widget=ModelSelect2(url='region-autocomplete'),
+        required=False
+    )
+    catchment = ModelChoiceField(
+        queryset=Catchment.objects.all(),
+        widget=ModelSelect2(url='catchment-autocomplete'),
+        required=False
+    )
 
     def __init__(self, *args, **kwargs):
         region_id = kwargs.pop('region_id', None)
@@ -44,10 +37,15 @@ class ScenarioModalModelForm(CustomModalModelForm):
         fields = ['name', 'description', 'region', 'catchment']
 
 
-class ScenarioInventoryConfigurationForm(ModelForm):
+class ScenarioModalModelForm(ModalModelFormMixin, ScenarioModelForm):
+    pass
+
+
+class ScenarioInventoryConfigurationForm(SimpleModelForm):
     class Meta:
         model = ScenarioInventoryConfiguration
-        fields = '__all__'
+        fields = ('scenario', 'feedstock', 'geodataset', 'inventory_algorithm', 'inventory_parameter',
+                  'inventory_value')
 
 
 class ScenarioInventoryConfigurationAddForm(ScenarioInventoryConfigurationForm):
@@ -63,15 +61,9 @@ class ScenarioInventoryConfigurationAddForm(ScenarioInventoryConfigurationForm):
         self.fields['feedstock'].queryset = initial.get('feedstocks')
         self.fields['geodataset'].queryset = GeoDataset.objects.none()
         self.fields['inventory_algorithm'].queryset = InventoryAlgorithm.objects.none()
-        self.helper = FormHelper()
 
 
 class ScenarioInventoryConfigurationUpdateForm(ScenarioInventoryConfigurationForm):
-
-    # current_algorithm = ModelChoiceField(InventoryAlgorithm.objects.all())
-    #
-    # class Meta(ScenarioInventoryConfigurationForm.Meta):
-    #     fields = ScenarioInventoryConfigurationForm.Meta.fields + ('current_algorithm')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -92,7 +84,3 @@ class ScenarioInventoryConfigurationUpdateForm(ScenarioInventoryConfigurationFor
         self.fields['inventory_algorithm'].queryset = scenario.available_inventory_algorithms(feedstock=feedstock,
                                                                                               geodataset=geodataset)
         self.fields['inventory_algorithm'].initial = algorithm
-        # self.fields['current_algorithm'].queryset = InventoryAlgorithm.objects.all()
-        # self.fields['current_algorithm'].initial = algorithm
-        # self.fields['current_algorithm'].widget = HiddenInput()
-        self.helper = FormHelper()
