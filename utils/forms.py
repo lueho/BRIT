@@ -2,7 +2,7 @@ from bootstrap_modal_forms.mixins import CreateUpdateAjaxMixin, PopRequestMixin
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Field
 from dal_select2.widgets import Select2WidgetMixin
-from django.forms import Form, ModelForm, modelformset_factory
+from django.forms import Form, formset_factory, ModelForm, modelformset_factory
 
 
 class NoFormTagMixin:
@@ -122,18 +122,54 @@ class ForeignkeyField(Field):
     template = 'foreignkey-field.html'
 
 
-class M2MInlineModelFormSetMixin:
+class M2MInlineFormSetMixin:
     """
     Mixin for class-based views based on ModelFormView. Allows to add one additional ModelFormSet to the view.
     """
-    object = None
     formset_model = None
     formset_class = None
     formset_form_class = None
     formset_helper_class = None
+    relation_field_name = None
 
     def get_parent_object(self):
         return self.object
+
+    def get_formset(self, **kwargs):
+        FormSet = formset_factory(
+            self.formset_form_class,
+            formset=self.formset_class
+        )
+        return FormSet(**self.get_formset_kwargs())
+
+    def get_formset_kwargs(self, **kwargs):
+        kwargs.update({'parent_object': self.get_parent_object()})
+        if self.object:
+            kwargs.update({'initial': self.get_formset_initial()})
+        if self.request.method in ("POST", "PUT"):
+            kwargs.update({'data': self.request.POST.copy()})
+        return kwargs
+
+    def get_formset_initial(self):
+        related_objects = getattr(self.object, self.relation_field_name).all()
+        return [{name: getattr(obj, name) for name, _ in self.formset_form_class.base_fields.items()} for obj in related_objects]
+
+    def get_context_data(self, **kwargs):
+        if 'formset' not in kwargs:
+            kwargs['formset'] = self.get_formset()
+        kwargs['formset_helper'] = self.formset_helper_class()
+        return super().get_context_data(**kwargs)
+
+
+class M2MInlineModelFormSetMixin:
+    """
+    Mixin for class-based views based on ModelFormView. Allows to add one additional ModelFormSet to the view.
+    """
+    formset_model = None
+    formset_class = None
+    formset_form_class = None
+    formset_helper_class = None
+    relation_field_name = None
 
     def get_formset(self, **kwargs):
         FormSet = modelformset_factory(
@@ -144,16 +180,15 @@ class M2MInlineModelFormSetMixin:
         return FormSet(**self.get_formset_kwargs())
 
     def get_formset_kwargs(self, **kwargs):
-        kwargs.update({'parent_object': self.get_parent_object()})
-        kwargs.update({'initial': self.get_formset_initial()})
+        kwargs.update({'queryset': self.get_formset_queryset()})
+        if self.object:
+            kwargs.update({'parent_object': self.object})
         if self.request.method in ("POST", "PUT"):
             kwargs.update({'data': self.request.POST.copy()})
         return kwargs
 
-    def get_formset_initial(self):
-        flyers = self.object.flyers.all() if self.object else []
-        initial = [{'url': flyer.url} for flyer in flyers]
-        return initial
+    def get_formset_queryset(self):
+        return getattr(self.object, self.relation_field_name).all()
 
     def get_context_data(self, **kwargs):
         if 'formset' not in kwargs:

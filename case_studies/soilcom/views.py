@@ -22,7 +22,7 @@ from maps.forms import NutsAndLauCatchmentQueryForm
 from maps.models import GeoDataset
 from maps.views import CatchmentDetailView, GeoDatasetDetailView, GeoDataSetMixin, GeoDataSetFormMixin
 from utils import views
-from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineModelFormSetMixin
+from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineModelFormSetMixin, M2MInlineFormSetMixin
 from utils.models import Property
 from . import filters
 from . import forms
@@ -590,7 +590,7 @@ class CollectionListView(views.BRITFilterView):
     ordering = 'name'
 
 
-class CollectionCreateView(M2MInlineModelFormSetMixin, views.OwnedObjectCreateView):
+class CollectionCreateView(M2MInlineFormSetMixin, views.OwnedObjectCreateView):
     template_name = 'collection_form_card.html'
     model = Collection
     form_class = forms.CollectionModelForm
@@ -598,6 +598,7 @@ class CollectionCreateView(M2MInlineModelFormSetMixin, views.OwnedObjectCreateVi
     formset_class = forms.BaseWasteFlyerUrlFormSet
     formset_form_class = forms.WasteFlyerModelForm
     formset_helper_class = DynamicTableInlineFormSetHelper
+    relation_field_name = 'flyers'
     permission_required = 'soilcom.add_collection'
 
     def get_formset_kwargs(self, **kwargs):
@@ -665,13 +666,14 @@ class CollectionModalDetailView(views.OwnedObjectModalDetailView):
     permission_required = 'soilcom.view_collection'
 
 
-class CollectionUpdateView(M2MInlineModelFormSetMixin, views.OwnedObjectUpdateView):
+class CollectionUpdateView(M2MInlineFormSetMixin, views.OwnedObjectUpdateView):
     model = models.Collection
     form_class = forms.CollectionModelForm
     formset_model = WasteFlyer
     formset_class = forms.BaseWasteFlyerUrlFormSet
     formset_form_class = forms.WasteFlyerModelForm
     formset_helper_class = DynamicTableInlineFormSetHelper
+    relation_field_name = 'flyers'
     permission_required = 'soilcom.change_collection'
     template_name = 'collection_form_card.html'
 
