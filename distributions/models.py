@@ -1,5 +1,8 @@
 from django.contrib.auth.models import User
 from django.db import models
+from django.db.models import Max
+from django.db.models.signals import post_save
+from django.dispatch import receiver
 
 from utils.models import NamedUserObjectModel, OwnedObjectModel
 from users.models import get_default_owner
@@ -35,11 +38,13 @@ class Timestep(NamedUserObjectModel):
     Defines a timestep for organisation of seasonal distributions
     """
     distribution = models.ForeignKey(TemporalDistribution, on_delete=models.CASCADE)
+    order = models.IntegerField(default=90)
 
     objects = TimestepManager()
 
     class Meta:
         unique_together = [['name', 'owner']]
+        ordering = ['order']
 
     @property
     def abbreviated(self):
@@ -47,6 +52,14 @@ class Timestep(NamedUserObjectModel):
 
     def __str__(self):
         return self.name
+
+
+@receiver(post_save, sender=Timestep)
+def add_next_order_value(sender, instance, created, **kwargs):
+    if created:
+        timesteps = Timestep.objects.filter(distribution=instance.distribution)
+        instance.order = timesteps.aggregate(Max('order'))['order__max'] + 10
+        instance.save()
 
 
 class Period(OwnedObjectModel):
