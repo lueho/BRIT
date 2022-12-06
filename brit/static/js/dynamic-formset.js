@@ -1,3 +1,5 @@
+"use strict";
+
 function addForm() {
     const totalFormsInput = document.querySelector('[id$="-TOTAL_FORMS"]');
     const emptyForm = document.getElementById('empty-form-row').cloneNode(true);
@@ -14,22 +16,24 @@ function loadAddFormButton() {
     const addFormButton = document.getElementById('add-form');
     if (addFormButton) {
         addFormButton.addEventListener('click', (e) => {
-            if (e) e.preventDefault();
+            if (e) {
+                e.preventDefault();
+            }
             addForm();
         });
     }
 }
 
 function data_url(element) {
-            if (element['dataUrl']) {
-                return element['dataUrl'];
-            } else {
-                return element.data('options')
-            }
-        }
+    if (element.dataUrl) {
+        return element.dataUrl;
+    } else {
+        return element.data('options');
+    }
+}
 
 function setupModalForeignkeyCreateForm() {
-    $('.modal-fk-create').each(function () {
+    $('.modal-fk-create').each(function() {
         $(this).modalForm({
             formURL: $(this).data('href'),
             errorClass: '.is-invalid',
@@ -42,7 +46,7 @@ function setupModalForeignkeyCreateForm() {
                 dataKey: 'options',
                 addModalFormFunction: setupModalForeignkeyCreateForm
             }
-        })
+        });
     });
 }
 
