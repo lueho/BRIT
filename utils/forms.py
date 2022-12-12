@@ -2,7 +2,8 @@ from bootstrap_modal_forms.mixins import CreateUpdateAjaxMixin, PopRequestMixin
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Field
 from dal_select2.widgets import Select2WidgetMixin
-from django.forms import Form, formset_factory, ModelForm, modelformset_factory
+from django.core.exceptions import ImproperlyConfigured
+from django.forms import BaseFormSet, BaseModelFormSet, Form, formset_factory, ModelForm, modelformset_factory
 
 
 class NoFormTagMixin:
@@ -122,60 +123,115 @@ class ForeignkeyField(Field):
     template = 'foreignkey-field.html'
 
 
+class M2MInlineFormSet(BaseFormSet):
+
+    def __init__(self, *args, **kwargs):
+        self.parent_object = kwargs.pop('parent_object', None)
+        self.relation_field_name = kwargs.pop('relation_field_name')
+        super().__init__(*args, **kwargs)
+
+    def save(self, commit=True):
+        child_objects = []
+        for form in self.forms:
+            child = form.save()
+            if child:
+                child_objects.append(child)
+        getattr(self.parent_object, self.relation_field_name).set(child_objects)
+        return child_objects
+
+
 class M2MInlineFormSetMixin:
     """
     Mixin for class-based views based on ModelFormView. Allows to add one additional ModelFormSet to the view.
     """
+    object = None
+    form_class = None
     formset_model = None
     formset_class = None
     formset_form_class = None
     formset_helper_class = None
-    relation_field_name = None
+    formset_factory_kwargs = {}
+    relation_field_name = ''
 
-    def get_parent_object(self):
-        return self.object
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.form_class:
+            self.model = self.form_class.Meta.model
 
-    def get_formset(self, **kwargs):
+    def get_formset(self):
         FormSet = formset_factory(
             self.formset_form_class,
-            formset=self.formset_class
+            formset=self.formset_class,
+            **self.formset_factory_kwargs
         )
         return FormSet(**self.get_formset_kwargs())
 
     def get_formset_kwargs(self, **kwargs):
-        kwargs.update({'parent_object': self.get_parent_object()})
+        kwargs.update({
+            'initial': self.get_formset_initial(),
+            'relation_field_name': self.get_relation_field_name()
+        })
         if self.object:
-            kwargs.update({'initial': self.get_formset_initial()})
+            kwargs.update({'parent_object': self.object})
         if self.request.method in ("POST", "PUT"):
             kwargs.update({'data': self.request.POST.copy()})
         return kwargs
 
     def get_formset_initial(self):
-        related_objects = getattr(self.object, self.relation_field_name).all()
-        return [{name: getattr(obj, name) for name, _ in self.formset_form_class.base_fields.items()} for obj in related_objects]
+        if self.object:
+            related_objects = getattr(self.object, self.relation_field_name).all()
+            return [{name: getattr(obj, name) for name, _ in self.formset_form_class.base_fields.items()} for obj in related_objects]
+        else:
+            return []
+
+    def get_formset_helper_class(self):
+        if self.formset_helper_class:
+            return self.formset_helper_class
+        else:
+            return FormHelper
+
+    def get_relation_field_name(self):
+        if not hasattr(self.model, self.relation_field_name):
+            raise ImproperlyConfigured(
+                '%(rfn)s is not a valid relational field name of model %(cls)s'
+                % {'rfn': self.relation_field_name, 'cls': self.model.__name__}
+            )
+        return self.relation_field_name
 
     def get_context_data(self, **kwargs):
         if 'formset' not in kwargs:
             kwargs['formset'] = self.get_formset()
-        kwargs['formset_helper'] = self.formset_helper_class()
+        kwargs['formset_helper'] = self.formset_helper_class
         return super().get_context_data(**kwargs)
+
+
+class M2MInlineModelFormSet(BaseModelFormSet):
+
+    def __init__(self, *args, **kwargs):
+        self.parent_object = kwargs.pop('parent_object', None)
+        self.relation_field_name = kwargs.pop('relation_field_name', None)
+        super().__init__(*args, **kwargs)
+
 
 
 class M2MInlineModelFormSetMixin:
     """
     Mixin for class-based views based on ModelFormView. Allows to add one additional ModelFormSet to the view.
     """
+    object = None
     formset_model = None
-    formset_class = None
-    formset_form_class = None
+    formset_class = M2MInlineModelFormSet
+    formset_form_class = SimpleModelForm
+    formset_factory_kwargs = {}
     formset_helper_class = None
-    relation_field_name = None
+    relation_field_name = ''
 
     def get_formset(self, **kwargs):
         FormSet = modelformset_factory(
             self.formset_model,
             form=self.formset_form_class,
-            formset=self.formset_class
+            formset=self.formset_class,
+            **self.formset_factory_kwargs
         )
         return FormSet(**self.get_formset_kwargs())
 
@@ -188,10 +244,23 @@ class M2MInlineModelFormSetMixin:
         return kwargs
 
     def get_formset_queryset(self):
+        if not self.object:
+            return self.formset_model.objects.none()
+        if not hasattr(self.object, self.relation_field_name):
+            raise ImproperlyConfigured(
+                "The field that relates the provided model of the main form to the related model"
+                "of the formset must be provided as property 'related_field_name' and valid. "
+            )
         return getattr(self.object, self.relation_field_name).all()
+
+    def get_formset_helper_class(self):
+        if self.formset_helper_class:
+            return self.formset_helper_class
+        else:
+            return self.formset_class.helper
 
     def get_context_data(self, **kwargs):
         if 'formset' not in kwargs:
             kwargs['formset'] = self.get_formset()
-        kwargs['formset_helper'] = self.formset_helper_class()
+            kwargs['formset_helper'] = self.get_formset_helper_class()()
         return super().get_context_data(**kwargs)

@@ -6,9 +6,11 @@ from django.dispatch import receiver
 import celery
 
 from bibliography.models import Source
-from utils.models import PropertyValue, NamedUserObjectModel
+from distributions.models import Period, TemporalDistribution, Timestep
+from utils.models import NamedUserObjectModel, OwnedObjectModel, PropertyValue
 from maps.models import Catchment
 from materials.models import Material, MaterialCategory, Sample, SampleSeries
+from users.models import get_default_owner
 
 
 class CollectionCatchment(Catchment):
@@ -206,6 +208,24 @@ def check_url_valid(sender, instance, created, **kwargs):
         celery.current_app.send_task('check_wasteflyer_url',  (instance.pk,))
 
 
+class CollectionSeasonManager(models.Manager):
+
+    def get_queryset(self):
+        distribution = TemporalDistribution.objects.get(owner=get_default_owner(), name='Months of the year')
+        return super().get_queryset().filter(distribution=distribution)
+
+
+class CollectionSeason(Period):
+
+    objects=CollectionSeasonManager()
+
+    class Meta:
+        proxy = True
+
+    def __str__(self):
+        return f'{self.first_timestep.name} - {self.last_timestep.name}'
+
+
 FREQUENCY_TYPES = (
     ('Fixed', 'Fixed'),
     ('Fixed-Flexible', 'Fixed-Flexible'),
@@ -216,9 +236,28 @@ FREQUENCY_TYPES = (
 
 class CollectionFrequency(NamedUserObjectModel):
     type = models.CharField(max_length=16, choices=FREQUENCY_TYPES, default='Fixed')
+    seasons = models.ManyToManyField(CollectionSeason, through='CollectionCountOptions')
 
     class Meta:
         verbose_name_plural = 'collection frequencies'
+
+
+class CollectionCountOptions(OwnedObjectModel):
+    """
+    The available options of how many collections  will be provided within a given season. Is used as 'through' model
+    for the many-to-many relation of CollectionFrequency and CollectionSeason.
+    """
+    frequency = models.ForeignKey(CollectionFrequency, on_delete=models.CASCADE, null=False)
+    season = models.ForeignKey(CollectionSeason, on_delete=models.CASCADE, null=False)
+    standard = models.PositiveSmallIntegerField(blank=True, null=True)
+    option_1 = models.PositiveSmallIntegerField(blank=True, null=True)
+    option_2 = models.PositiveSmallIntegerField(blank=True, null=True)
+    option_3 = models.PositiveSmallIntegerField(blank=True, null=True)
+
+    @property
+    def non_standard_options(self):
+        return [option for option in (self.option_1, self.option_2, self.option_3) if option]
+
 
 
 YEAR_VALIDATOR = RegexValidator(r'^([0-9]{4})$', message='Year needs to be in YYYY format.', code='invalid year')

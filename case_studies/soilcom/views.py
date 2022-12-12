@@ -18,18 +18,21 @@ from rest_framework.viewsets import ReadOnlyModelViewSet
 import case_studies.soilcom.tasks
 from bibliography.views import (SourceCreateView, SourceModalCreateView, SourceModalDetailView, SourceUpdateView,
                                 SourceModalUpdateView, SourceModalDeleteView, SourceCheckUrlView)
+from distributions.models import TemporalDistribution, Timestep
 from maps.forms import NutsAndLauCatchmentQueryForm
 from maps.models import GeoDataset
 from maps.views import CatchmentDetailView, GeoDatasetDetailView, GeoDataSetMixin, GeoDataSetFormMixin
 from utils import views
 from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineModelFormSetMixin, M2MInlineFormSetMixin
 from utils.models import Property
+from utils.views import OwnedObjectCreateView, OwnedObjectUpdateView
 from . import filters
 from . import forms
 from . import models
 from . import serializers
 from .filters import CollectionFilter, CollectorFilter, WasteFlyerFilter
-from .models import Collection, CollectionCatchment, Collector, WasteFlyer
+from .models import (Collection, CollectionCatchment, CollectionCountOptions, CollectionFrequency, Collector,
+                     WasteFlyer, CollectionSeason)
 from .serializers import CollectionFlatSerializer
 from .tasks import check_wasteflyer_urls
 
@@ -460,18 +463,37 @@ class FrequencyListView(views.OwnedObjectListView):
     permission_required = set()
 
 
-class FrequencyCreateView(views.OwnedObjectCreateView):
-    template_name = 'simple_form_card.html'
+class FrequencyCreateView(M2MInlineFormSetMixin, OwnedObjectCreateView):
     form_class = forms.CollectionFrequencyModelForm
-    success_url = reverse_lazy('collectionfrequency-list')
+    formset_model = CollectionSeason
+    formset_class = forms.CollectionSeasonFormSet
+    formset_form_class = forms.CollectionSeasonForm
+    formset_helper_class = forms.CollectionSeasonFormHelper
+    formset_factory_kwargs = {'extra': 0}
+    relation_field_name = 'seasons'
     permission_required = 'soilcom.add_collectionfrequency'
 
+    def get_formset_initial(self):
+        return list(CollectionSeason.objects.filter(
+            distribution__name='Months of the year',
+            first_timestep__name='January',
+            last_timestep__name='December'
+        ).values('distribution', 'first_timestep', 'last_timestep'))
 
-class FrequencyModalCreateView(views.OwnedObjectModalCreateView):
-    template_name = 'modal_form.html'
-    form_class = forms.CollectionFrequencyModalModelForm
-    success_url = reverse_lazy('collectionfrequency-list')
-    permission_required = 'soilcom.add_collectionfrequency'
+    def post(self, request, *args, **kwargs):
+        form = self.get_form()
+        formset = self.get_formset()
+
+        if form.is_valid() and formset.is_valid():
+            form.instance.owner = self.request.user
+            self.object = form.save()
+            formset = self.get_formset()
+            formset.is_valid()
+            formset.save()
+            return HttpResponseRedirect(self.get_success_url())
+        else:
+            context = self.get_context_data(form=form, formset=formset)
+            return self.render_to_response(context)
 
 
 class FrequencyDetailView(views.OwnedObjectDetailView):
@@ -485,11 +507,44 @@ class FrequencyModalDetailView(views.OwnedObjectModalDetailView):
     permission_required = set()
 
 
-class FrequencyUpdateView(views.OwnedObjectUpdateView):
-    template_name = 'simple_form_card.html'
-    model = models.CollectionFrequency
+class FrequencyUpdateView(M2MInlineFormSetMixin, OwnedObjectUpdateView):
+    model = CollectionFrequency
     form_class = forms.CollectionFrequencyModelForm
+    formset_model = CollectionSeason
+    formset_class = forms.CollectionSeasonFormSet
+    formset_form_class = forms.CollectionSeasonForm
+    formset_helper_class = forms.CollectionSeasonFormHelper
+    formset_factory_kwargs = {'extra': 0}
+    relation_field_name = 'seasons'
     permission_required = 'soilcom.change_collectionfrequency'
+
+    def get_formset_initial(self):
+        initial = []
+        for season in self.object.seasons.all():
+            options = CollectionCountOptions.objects.get(frequency=self.object, season=season)
+            initial.append({
+                'distribution': season.distribution,
+                'first_timestep': season.first_timestep,
+                'last_timestep': season.last_timestep,
+                'standard': options.standard,
+                'option_1': options.option_1,
+                'option_2': options.option_2,
+                'option_3': options.option_3,
+            })
+        return initial
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        form = self.get_form()
+        formset = self.get_formset()
+
+        if form.is_valid() and formset.is_valid():
+            form.save()
+            formset.save()
+            return HttpResponseRedirect(self.get_success_url())
+        else:
+            context = self.get_context_data(form=form, formset=formset)
+            return self.render_to_response(context)
 
 
 class FrequencyModalUpdateView(views.OwnedObjectModalUpdateView):
@@ -591,7 +646,7 @@ class CollectionListView(views.BRITFilterView):
 
 
 class CollectionCreateView(M2MInlineFormSetMixin, views.OwnedObjectCreateView):
-    template_name = 'collection_form_card.html'
+    template_name = 'form_and_formset.html'
     model = Collection
     form_class = forms.CollectionModelForm
     formset_model = WasteFlyer

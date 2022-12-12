@@ -1,16 +1,19 @@
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Column, Field, Layout, Row
+from crispy_forms.layout import Column, Field, Layout, Row, HTML, Div
 from dal import autocomplete
-from django.forms import (BaseFormSet, BooleanField, ChoiceField, CheckboxSelectMultiple, ModelChoiceField,
-                          ModelMultipleChoiceField, MultipleChoiceField, RadioSelect, URLField)
+from django.core.exceptions import ValidationError
+from django.forms import (BooleanField, ChoiceField, CheckboxSelectMultiple, HiddenInput, ModelChoiceField,
+                          ModelMultipleChoiceField, MultipleChoiceField, RadioSelect, DecimalField, IntegerField)
+from django.utils.translation import gettext as _
 
+from distributions.models import TemporalDistribution, Timestep
 from materials.models import Material, MaterialCategory, Sample
 from users.models import get_default_owner
-from utils.forms import (AutoCompleteModelForm, ForeignkeyField, SimpleForm, SimpleModelForm,
-                         ModalModelFormMixin)
-from .models import (AggregatedCollectionPropertyValue, Collection, CollectionCatchment, CollectionFrequency,
-                     CollectionPropertyValue, CollectionSystem, Collector, FREQUENCY_TYPES, WasteCategory,
-                     WasteComponent, WasteFlyer, WasteStream)
+from utils.forms import (AutoCompleteModelForm, ForeignkeyField, M2MInlineFormSet,
+                         M2MInlineModelFormSet, ModalModelFormMixin, SimpleForm, SimpleModelForm)
+from .models import (AggregatedCollectionPropertyValue, Collection, CollectionCatchment, CollectionCountOptions,
+                     CollectionFrequency, CollectionPropertyValue, CollectionSeason, CollectionSystem, Collector,
+                     FREQUENCY_TYPES, WasteCategory, WasteComponent, WasteFlyer, WasteStream)
 
 
 class CollectorModelForm(AutoCompleteModelForm):
@@ -85,6 +88,97 @@ class CollectionFrequencyModalModelForm(ModalModelFormMixin, CollectionFrequency
     pass
 
 
+class CollectionSeasonFormHelper(FormHelper):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.form_tag = False
+        self.disable_csrf = True
+        self.layout = Layout(
+            Div(
+                HTML('<p><strong class="title-strong">Season {{ forloop.counter }}</strong></p>'),
+                'distribution',
+                Row(Column(Field('first_timestep')), Column(Field('last_timestep'))),
+                HTML('<p>Total collections in this season</p>'),
+                Row(
+                    Column(Field('standard')),
+                    Column(Field('option_1')),
+                    Column(Field('option_2')),
+                    Column(Field('option_3')),
+                    css_class='formset-form'
+                )
+            )
+        )
+
+
+class CollectionSeasonForm(SimpleForm):
+    distribution = ModelChoiceField(
+        queryset=TemporalDistribution.objects.filter(name='Months of the year'),
+        initial=TemporalDistribution.objects.get(name='Months of the year'),
+        empty_label=None,
+        widget=HiddenInput()
+    )
+    first_timestep = ModelChoiceField(
+        queryset=Timestep.objects.filter(distribution=TemporalDistribution.objects.get(name='Months of the year')),
+        label='Start'
+    )
+    last_timestep = ModelChoiceField(
+        queryset=Timestep.objects.filter(distribution=TemporalDistribution.objects.get(name='Months of the year')),
+        label='End'
+    )
+    standard = IntegerField(required=False)
+    option_1 = IntegerField(required=False)
+    option_2 = IntegerField(required=False)
+    option_3 = IntegerField(required=False)
+
+    class Meta:
+        fields = ('distribution', 'first_timestep', 'last_timestep', 'standard', 'option_1', 'option_2', 'option_3')
+
+    # @property
+    # def helper(self):
+    #     helper = FormHelper()
+    #     helper.layout = Layout(
+    #         Row(Column(Field('first_timestep')), Column(Field('last_timestep'))),
+    #         Row(Column(Field('cpw_standard')))
+    #     )
+    #     helper.nam = 'Hello'
+    #     return helper
+
+    def save(self):
+        self.instance, _ = CollectionSeason.objects.get_or_create(
+            distribution=self.cleaned_data['distribution'],
+            first_timestep=self.cleaned_data['first_timestep'],
+            last_timestep=self.cleaned_data['last_timestep']
+        )
+        return self.instance
+
+
+class CollectionSeasonFormSet(M2MInlineFormSet):
+
+    def clean(self):
+        for i, form in enumerate(self.forms):
+            if i > 0 and self.forms[i - 1].cleaned_data.get('last_timestep').order >= self.forms[i].cleaned_data.get(
+                    'first_timestep').order:
+                raise ValidationError(_('The seasons must not overlap and must be given in order.'), code='invalid')
+
+    def save(self, commit=True):
+        child_objects = super().save(commit=commit)
+
+        for form in self.forms:
+            options = CollectionCountOptions.objects.get(frequency=self.parent_object, season=form.instance)
+            options.standard = form.cleaned_data['standard']
+            options.option_1 = form.cleaned_data['option_1']
+            options.option_2 = form.cleaned_data['option_2']
+            options.option_3 = form.cleaned_data['option_3']
+            options.save()
+
+        CollectionSeason.objects.exclude(
+            distribution=TemporalDistribution.objects.get(name='Months of the year'),
+            first_timestep=Timestep.objects.get(name='January'),
+            last_timestep=Timestep.objects.get(name='December')
+        ).filter(collectionfrequency=None).delete()
+        return child_objects
+
+
 class WasteFlyerModelForm(SimpleModelForm):
     class Meta:
         model = WasteFlyer
@@ -98,8 +192,10 @@ class WasteFlyerModelForm(SimpleModelForm):
                 'title': 'Waste flyer',
                 'abbreviation': 'WasteFlyer'
             }
-            instance, _ = WasteFlyer.objects.get_or_create(url=self.cleaned_data['url'], defaults=defaults)
-            return instance
+            url = self.cleaned_data.get('url')
+            if url:
+                instance, _ = WasteFlyer.objects.get_or_create(url=self.cleaned_data['url'], defaults=defaults)
+                return instance
         else:
             return super().save(commit=False)
 
@@ -108,25 +204,14 @@ class WasteFlyerModalModelForm(ModalModelFormMixin, WasteFlyerModelForm):
     pass
 
 
-class BaseWasteFlyerUrlFormSet(BaseFormSet):
+class BaseWasteFlyerUrlFormSet(M2MInlineFormSet):
 
     def __init__(self, *args, **kwargs):
-        self.parent_object = kwargs.pop('parent_object', None)
         self.owner = kwargs.pop('owner', get_default_owner())
         super().__init__(*args, **kwargs)
 
-    def clean(self):
-        if any(self.errors):
-            return
-
     def save(self, commit=True):
-        child_objects = []
-        for form in self.forms:
-            if 'url' in form.cleaned_data and form.cleaned_data['url'] not in ('', None):
-                child_objects.append(form.save())
-        self.parent_object.flyers.set(child_objects)
-        # By using set any old flyers that where not included in the current formset are disconnected from the parent
-        # collection. By default, these should not remain in the database if they have no other relations.
+        child_objects = super().save(commit=commit)
         WasteFlyer.objects.filter(collections=None).delete()
         return child_objects
 

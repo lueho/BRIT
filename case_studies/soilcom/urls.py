@@ -67,7 +67,6 @@ urlpatterns = [
     path('frequencies/', views.FrequencyListView.as_view(), name='collectionfrequency-list'),
     path('frequencies/autocomplete/', views.FrequencyAutoCompleteView.as_view(), name='collectionfrequency-autocomplete'),
     path('frequencies/create/', views.FrequencyCreateView.as_view(), name='collectionfrequency-create'),
-    path('frequencies/create/modal/', views.FrequencyModalCreateView.as_view(), name='collectionfrequency-create-modal'),
     path('frequencies/<int:pk>/', views.FrequencyDetailView.as_view(), name='collectionfrequency-detail'),
     path('frequencies/<int:pk>/modal/', views.FrequencyModalDetailView.as_view(), name='collectionfrequency-detail-modal'),
     path('frequencies/<int:pk>/update/', views.FrequencyUpdateView.as_view(), name='collectionfrequency-update'),

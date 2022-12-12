@@ -1,11 +1,14 @@
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
+from django.db.utils import IntegrityError
 from django.test import TestCase
 from django.urls import reverse
 
+from distributions.models import Period, TemporalDistribution, Timestep
 from materials.models import Material
 from users.models import get_default_owner
-from ..models import Collection, CollectionCatchment, CollectionSystem, WasteStream, WasteCategory, WasteFlyer
+from ..models import (Collection, CollectionCatchment, CollectionSystem, WasteStream, WasteCategory, WasteFlyer,
+                      CollectionSeason)
 
 
 def comparable_model_dict(instance):
@@ -17,7 +20,6 @@ def comparable_model_dict(instance):
 
 
 class CollectionCatchmentTestCase(TestCase):
-
     catchment = None
 
     @classmethod
@@ -278,7 +280,8 @@ class CollectionTestCase(TestCase):
         self.assertEqual('Catchment Category System', self.collection.name)
 
     def test_collection_name_is_updated_on_model_update(self):
-        self.collection.collection_system = CollectionSystem.objects.create(owner=get_default_owner(), name='New System')
+        self.collection.collection_system = CollectionSystem.objects.create(owner=get_default_owner(),
+                                                                            name='New System')
         self.collection.save()
         self.assertEqual('Catchment Category New System', self.collection.name)
 
@@ -311,3 +314,25 @@ class CollectionTestCase(TestCase):
         self.collection.refresh_from_db()
         self.assertEqual('Updated Catchment Category System', self.collection.name)
 
+
+class CollectionSeasonTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.distribution = TemporalDistribution.objects.get(name='Months of the year')
+        CollectionSeason.objects.create(
+            distribution=cls.distribution,
+            first_timestep=Timestep.objects.get(name='January'),
+            last_timestep=Timestep.objects.get(name='December')
+        )
+
+    def test_get_queryset_only_returns_from_months_of_the_year_distribution(self):
+        Period.objects.create(
+            distribution=TemporalDistribution.objects.default(),
+            first_timestep=Timestep.objects.default(),
+            last_timestep=Timestep.objects.default()
+        )
+        self.assertQuerysetEqual(
+            Period.objects.filter(distribution=self.distribution),
+            CollectionSeason.objects.all()
+        )
