@@ -1,20 +1,20 @@
+import celery
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
+from django.db.models import Count, Q
 from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
-import celery
 
 from bibliography.models import Source
 from distributions.models import Period, TemporalDistribution, Timestep
-from utils.models import NamedUserObjectModel, OwnedObjectModel, PropertyValue
 from maps.models import Catchment
 from materials.models import Material, MaterialCategory, Sample, SampleSeries
 from users.models import get_default_owner
+from utils.models import NamedUserObjectModel, OwnedObjectModel, PropertyValue
 
 
 class CollectionCatchment(Catchment):
-
     class Meta:
         proxy = True
 
@@ -23,7 +23,6 @@ class CollectionCatchment(Catchment):
         qs = Collection.objects.filter(catchment__in=self.descendants(include_self=True))
         qs = qs.select_related('catchment', 'collector', 'waste_stream__category', 'collection_system')
         return qs
-
 
     @property
     def upstream_collections(self):
@@ -205,7 +204,7 @@ def set_source_type_and_check_url(sender, instance, **kwargs):
 @receiver(post_save, sender=WasteFlyer)
 def check_url_valid(sender, instance, created, **kwargs):
     if created:
-        celery.current_app.send_task('check_wasteflyer_url',  (instance.pk,))
+        celery.current_app.send_task('check_wasteflyer_url', (instance.pk,))
 
 
 class CollectionSeasonManager(models.Manager):
@@ -216,8 +215,7 @@ class CollectionSeasonManager(models.Manager):
 
 
 class CollectionSeason(Period):
-
-    objects=CollectionSeasonManager()
+    objects = CollectionSeasonManager()
 
     class Meta:
         proxy = True
@@ -241,6 +239,18 @@ class CollectionFrequency(NamedUserObjectModel):
     class Meta:
         verbose_name_plural = 'collection frequencies'
 
+    @property
+    def has_options(self):
+        frequencies_with_options = CollectionCountOptions.objects.filter(
+            Q(option_1__isnull=False) | Q(option_2__isnull=False) | Q(option_3__isnull=False)
+        ).values_list('frequency')
+        return self.id in [f[0] for f in frequencies_with_options]
+
+    @property
+    def seasonal(self):
+        qs = CollectionFrequency.objects.annotate(season_count=Count('seasons')).filter(season_count__gt=1)
+        return self in qs
+
 
 class CollectionCountOptions(OwnedObjectModel):
     """
@@ -257,7 +267,6 @@ class CollectionCountOptions(OwnedObjectModel):
     @property
     def non_standard_options(self):
         return [option for option in (self.option_1, self.option_2, self.option_3) if option]
-
 
 
 YEAR_VALIDATOR = RegexValidator(r'^([0-9]{4})$', message='Year needs to be in YYYY format.', code='invalid year')

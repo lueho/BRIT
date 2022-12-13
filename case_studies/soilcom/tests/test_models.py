@@ -1,14 +1,13 @@
 from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
-from django.db.utils import IntegrityError
 from django.test import TestCase
 from django.urls import reverse
 
 from distributions.models import Period, TemporalDistribution, Timestep
 from materials.models import Material
 from users.models import get_default_owner
-from ..models import (Collection, CollectionCatchment, CollectionSystem, WasteStream, WasteCategory, WasteFlyer,
-                      CollectionSeason)
+from ..models import (Collection, CollectionCatchment, CollectionCountOptions, CollectionFrequency, CollectionSystem,
+                      WasteStream, WasteCategory, WasteFlyer, CollectionSeason)
 
 
 def comparable_model_dict(instance):
@@ -336,3 +335,46 @@ class CollectionSeasonTestCase(TestCase):
             Period.objects.filter(distribution=self.distribution),
             CollectionSeason.objects.all()
         )
+
+
+class CollectionFrequencyTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        distribution = TemporalDistribution.objects.get(name='Months of the year')
+        cls.january = Timestep.objects.get(name='January')
+        cls.june = Timestep.objects.get(name='June')
+        cls.july = Timestep.objects.get(name='July')
+        cls.december = Timestep.objects.get(name='December')
+        whole_year = CollectionSeason.objects.create(
+            distribution=distribution,
+            first_timestep=cls.january,
+            last_timestep=cls.december
+        )
+        first_half_year = CollectionSeason.objects.create(
+            distribution=distribution,
+            first_timestep=cls.january,
+            last_timestep=cls.june
+        )
+        second_half_year = CollectionSeason.objects.create(
+            distribution=distribution,
+            first_timestep=cls.july,
+            last_timestep=cls.december
+        )
+        cls.not_seasonal = CollectionFrequency.objects.create(name='Non-Seasonal Test Frequency')
+        CollectionCountOptions.objects.create(frequency=cls.not_seasonal, season=whole_year, standard=35, option_1=70)
+        cls.seasonal = CollectionFrequency.objects.create(name='Seasonal Test Frequency')
+        CollectionCountOptions.objects.create(frequency=cls.seasonal, season=first_half_year, standard=17)
+        CollectionCountOptions.objects.create(frequency=cls.seasonal, season=second_half_year, standard=18)
+
+    def test_seasonal_returns_true_for_seasonal_frequency_object(self):
+        self.assertTrue(self.seasonal.seasonal)
+
+    def test_seasonal_returns_false_for_non_seasonal_frequency_object(self):
+        self.assertFalse(self.not_seasonal.seasonal)
+
+    def test_has_options_returns_true_for_frequency_with_optional_collection_count(self):
+        self.assertTrue(self.not_seasonal.has_options)
+
+    def test_has_options_returns_false_for_frequency_without_optional_collection_count(self):
+        self.assertFalse(self.seasonal.has_options)
