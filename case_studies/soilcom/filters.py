@@ -1,11 +1,12 @@
 from dal import autocomplete
+from django.db.models import Count, Q
 from django.forms import CheckboxSelectMultiple, RadioSelect, DateInput
 from django_filters import (BooleanFilter, CharFilter, ChoiceFilter, DateFilter, FilterSet, ModelChoiceFilter,
                             ModelMultipleChoiceFilter)
 
-from .forms import CollectionFilterForm, FlyerFilterForm
-from .models import (CollectionCatchment, Collection, Collector, FREQUENCY_TYPES, WasteCategory, WasteComponent,
-                     WasteFlyer)
+from .forms import CollectionFilterForm, FlyerFilterForm, SEASONAL_FREQUENCY_CHOICES, OPTIONAL_FREQUENCY_CHOICES
+from .models import (Collection, CollectionCatchment, CollectionCountOptions, Collector, FREQUENCY_TYPES, WasteCategory,
+                     WasteComponent, WasteFlyer, )
 
 
 class CollectorFilter(FilterSet):
@@ -44,11 +45,20 @@ class CollectionFilter(FilterSet):
                                                   widget=CheckboxSelectMultiple)
 
     frequency_type = ChoiceFilter(choices=FREQUENCY_TYPES, field_name='frequency__type', label='Frequency type')
+    seasonal_frequency = BooleanFilter(widget=RadioSelect(
+        choices=SEASONAL_FREQUENCY_CHOICES),
+        label='Seasonal frequency',
+        method='get_seasonal_frequency')
+    optional_frequency = BooleanFilter(widget=RadioSelect(
+        choices=OPTIONAL_FREQUENCY_CHOICES),
+        label='Optional frequency',
+        method='get_optional_frequency')
+
 
     class Meta:
         model = Collection
         fields = ('catchment', 'collector', 'collection_system', 'country', 'waste_category', 'allowed_materials',
-                  'frequency_type', 'fee_system')
+                  'frequency_type', 'seasonal_frequency', 'optional_frequency', 'fee_system')
         form = CollectionFilterForm
 
     @staticmethod
@@ -57,6 +67,29 @@ class CollectionFilter(FilterSet):
         if not qs.exists():
             qs = value.upstream_collections.order_by('name')
         return qs
+
+    @staticmethod
+    def get_seasonal_frequency(queryset, name, value):
+        if value is None:
+            return queryset
+        queryset = queryset.annotate(season_count=Count('frequency__seasons'))
+        if value is True:
+            return queryset.filter(season_count__gt=1)
+        elif value is False:
+            return queryset.filter(season_count__lte=1)
+
+    @staticmethod
+    def get_optional_frequency(queryset, name, value):
+        if value is None:
+            return queryset
+        if value is True:
+            opts = CollectionCountOptions.objects.filter(Q(option_1__isnull=False) | Q(option_2__isnull=False) |
+                                                         Q(option_3__isnull=False))
+            return queryset.filter(frequency__in=opts.values_list('frequency'))
+        elif value is False:
+            opts = CollectionCountOptions.objects.filter(Q(option_1__isnull=True) & Q(option_2__isnull=True) &
+                                                         Q(option_3__isnull=True))
+            return queryset.filter(frequency__in=opts.values_list('frequency'))
 
 
 class WasteFlyerFilter(FilterSet):

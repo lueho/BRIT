@@ -342,6 +342,29 @@ COUNTRY_CHOICES = (
     ('SE', 'SE'),
 )
 
+SEASONAL_FREQUENCY_CHOICES = (
+    ('', 'All'),
+    (True, 'Seasonal'),
+    (False, 'Not seasonal'),
+)
+OPTIONAL_FREQUENCY_CHOICES = (
+    ('', 'All'),
+    (True, 'Options'),
+    (False, 'No options'),
+)
+
+
+class CollectionFilterFormHelper(FormHelper):
+    layout = Layout(
+        'catchment',
+        'collector',
+        'collection_system',
+        'waste_category',
+        'allowed_materials',
+        Row(Column(Field('seasonal_frequency')), Column(Field('optional_frequency'))),
+        'fee_system'
+    )
+
 
 class CollectionFilterForm(AutoCompleteModelForm):
     catchment = ModelChoiceField(
@@ -369,11 +392,22 @@ class CollectionFilterForm(AutoCompleteModelForm):
         required=False
     )
     frequency_type = ChoiceField(choices=FREQUENCY_TYPES, required=False)
+    seasonal_frequency = BooleanField(widget=RadioSelect(
+        choices=SEASONAL_FREQUENCY_CHOICES),
+        label='Seasonal frequency')
+    optional_frequency = BooleanField(widget=RadioSelect(
+        choices=OPTIONAL_FREQUENCY_CHOICES),
+        label='Optional frequency')
 
     class Meta:
         model = Collection
         fields = ('catchment', 'collector', 'collection_system', 'country', 'waste_category', 'allowed_materials',
-                  'frequency_type', 'fee_system')
+                  'frequency_type', 'seasonal_frequency', 'optional_frequency', 'fee_system')
+
+    def __init__(self, *args, **kwargs):
+        self.helper = CollectionFilterFormHelper()
+        super().__init__(*args, **kwargs)
+
 
 
 class FlyerFilterForm(AutoCompleteModelForm):
