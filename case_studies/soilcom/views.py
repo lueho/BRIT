@@ -646,7 +646,6 @@ class CollectionListView(views.BRITFilterView):
 
 
 class CollectionCreateView(M2MInlineFormSetMixin, views.OwnedObjectCreateView):
-    template_name = 'form_and_formset.html'
     model = Collection
     form_class = forms.CollectionModelForm
     formset_model = WasteFlyer
@@ -730,7 +729,6 @@ class CollectionUpdateView(M2MInlineFormSetMixin, views.OwnedObjectUpdateView):
     formset_helper_class = DynamicTableInlineFormSetHelper
     relation_field_name = 'flyers'
     permission_required = 'soilcom.change_collection'
-    template_name = 'collection_form_card.html'
 
     def get_formset_kwargs(self, **kwargs):
         kwargs.update({'owner': self.request.user})
