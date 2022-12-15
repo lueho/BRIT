@@ -2,6 +2,10 @@
 {% load static %}
 {% load crispy_forms_tags %}
 
+{% block style_sheets %}
+    <link rel="stylesheet" href="{% static 'range_slider.css' %}">
+{% endblock %}
+
 {% block map_card_footer %}
     <a href="javascript:void(0)" onclick="clickedListLink()"><i class="fa fa-fw fa-list"></i> View as list</a>
 {% endblock %}
@@ -166,5 +170,6 @@
         }
 
     </script>
+    <script src="{% static 'range_slider.js' %}"></script>
 
 {% endblock javascript %}
