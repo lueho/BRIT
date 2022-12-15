@@ -245,6 +245,11 @@ function parseFilterParameters() {
             case 'CheckboxSelectMultiple':
                 readCheckboxSelectMultiple(key).forEach((value) => {params.append(key, value);});
                 break;
+            case 'RangeSlider':
+                const [min, max] = readRangeSlider(key);
+                params.append(key + '_min', min);
+                params.append(key + '_max', max);
+                break;
             default:
                 params.append(key, document.getElementsByName(key)[0].value);
             }
@@ -284,6 +289,12 @@ function readRadioSelect(name) {
         }
     }
     return heating;
+}
+
+function readRangeSlider(name) {
+    const min = document.getElementById('id_' + name + '_min').value;
+    const max = document.getElementById('id_' + name + '_max').value;
+    return [min, max];
 }
 
 function isEmptyArray(el) {
