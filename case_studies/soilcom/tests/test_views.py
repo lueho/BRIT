@@ -1779,6 +1779,7 @@ class WasteFlyerDetailViewTestCase(ViewWithPermissionsTestCase):
 
 class WasteCollectionMapViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = ('add_collection', 'view_collection', 'change_collection', 'delete_collection')
+    url = reverse('WasteCollection')
 
     @classmethod
     def setUpTestData(cls):
@@ -1788,58 +1789,64 @@ class WasteCollectionMapViewTestCase(ViewWithPermissionsTestCase):
         cls.collection = Collection.objects.create(name='Test Collection', catchment=catchment)
 
     def test_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('WasteCollection'))
+        response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
 
     def test_http_200_ok_for_member(self):
         self.client.force_login(self.member)
-        response = self.client.get(reverse('WasteCollection'))
+        response = self.client.get(self.url)
         self.assertEqual(response.status_code, 200)
 
     def test_uses_correct_template(self):
         self.client.force_login(self.member)
-        response = self.client.get(reverse('WasteCollection'))
+        response = self.client.get(self.url)
         self.assertTemplateUsed(response, 'waste_collection_map.html')
 
     def test_create_collection_option_visible_for_member(self):
         self.client.force_login(self.member)
-        response = self.client.get(reverse('WasteCollection'))
+        response = self.client.get(self.url)
         self.assertContains(response, 'Add new collection')
 
     def test_create_collection_option_not_available_for_outsider(self):
         self.client.force_login(self.outsider)
-        response = self.client.get(reverse('WasteCollection'))
+        response = self.client.get(self.url)
         self.assertNotContains(response, 'Add new collection')
 
     def test_copy_collection_option_visible_for_member(self):
         self.client.force_login(self.member)
-        response = self.client.get(reverse('WasteCollection'))
+        response = self.client.get(self.url)
         self.assertContains(response, 'Copy selected collection')
 
     def test_copy_collection_option_not_available_for_outsider(self):
         self.client.force_login(self.outsider)
-        response = self.client.get(reverse('WasteCollection'))
+        response = self.client.get(self.url)
         self.assertNotContains(response, 'Copy selected collection')
 
     def test_update_collection_option_visible_for_member(self):
         self.client.force_login(self.member)
-        response = self.client.get(reverse('WasteCollection'))
+        response = self.client.get(self.url)
         self.assertContains(response, 'Edit selected collection')
 
     def test_update_collection_option_not_available_for_outsider(self):
         self.client.force_login(self.outsider)
-        response = self.client.get(reverse('WasteCollection'))
+        response = self.client.get(self.url)
         self.assertNotContains(response, 'Edit selected collection')
 
     def test_collection_dashboard_option_visible_for_member(self):
         self.client.force_login(self.member)
-        response = self.client.get(reverse('WasteCollection'))
+        response = self.client.get(self.url)
         self.assertContains(response, 'Waste collection dashboard')
 
     def test_collection_dashboard_option_not_available_for_outsider(self):
         self.client.force_login(self.outsider)
-        response = self.client.get(reverse('WasteCollection'))
+        response = self.client.get(self.url)
         self.assertNotContains(response, 'Waste collection dashboard')
+
+    def test_range_slider_static_files_are_embedded(self):
+        self.client.force_login(self.member)
+        response = self.client.get(self.url)
+        self.assertContains(response, 'range_slider.js')
+        self.assertContains(response, 'range_slider.css')
 
 
 @tag('slow')
