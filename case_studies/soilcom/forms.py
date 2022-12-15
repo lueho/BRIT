@@ -2,18 +2,18 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Column, Field, Layout, Row, HTML, Div
 from dal import autocomplete
 from django.core.exceptions import ValidationError
-from django.forms import (BooleanField, ChoiceField, CheckboxSelectMultiple, HiddenInput, ModelChoiceField,
-                          ModelMultipleChoiceField, MultipleChoiceField, RadioSelect, DecimalField, IntegerField)
+from django.forms import (BooleanField, CheckboxSelectMultiple, HiddenInput, IntegerField, ModelChoiceField,
+                          ModelMultipleChoiceField, RadioSelect)
 from django.utils.translation import gettext as _
 
 from distributions.models import TemporalDistribution, Timestep
 from materials.models import Material, MaterialCategory, Sample
 from users.models import get_default_owner
-from utils.forms import (AutoCompleteModelForm, ForeignkeyField, M2MInlineFormSet,
-                         M2MInlineModelFormSet, ModalModelFormMixin, SimpleForm, SimpleModelForm)
+from utils.forms import (AutoCompleteModelForm, ForeignkeyField, M2MInlineFormSet, ModalModelFormMixin, SimpleForm,
+                         SimpleModelForm)
 from .models import (AggregatedCollectionPropertyValue, Collection, CollectionCatchment, CollectionCountOptions,
                      CollectionFrequency, CollectionPropertyValue, CollectionSeason, CollectionSystem, Collector,
-                     FREQUENCY_TYPES, WasteCategory, WasteComponent, WasteFlyer, WasteStream)
+                     WasteCategory, WasteComponent, WasteFlyer, WasteStream)
 
 
 class CollectorModelForm(AutoCompleteModelForm):
@@ -333,27 +333,6 @@ class CollectionModelForm(AutoCompleteModelForm):
             return super().save(commit=False)
 
 
-COUNTRY_CHOICES = (
-    ('BE', 'BE'),
-    ('DE', 'DE'),
-    ('DK', 'DK'),
-    ('NL', 'NL'),
-    ('UK', 'UK'),
-    ('SE', 'SE'),
-)
-
-SEASONAL_FREQUENCY_CHOICES = (
-    ('', 'All'),
-    (True, 'Seasonal'),
-    (False, 'Not seasonal'),
-)
-OPTIONAL_FREQUENCY_CHOICES = (
-    ('', 'All'),
-    (True, 'Options'),
-    (False, 'No options'),
-)
-
-
 class CollectionFilterFormHelper(FormHelper):
     layout = Layout(
         'catchment',
@@ -361,53 +340,20 @@ class CollectionFilterFormHelper(FormHelper):
         'collection_system',
         'waste_category',
         'allowed_materials',
+        Field('connection_rate', template="fields/range_slider_field.html"),
         Row(Column(Field('seasonal_frequency')), Column(Field('optional_frequency'))),
         'fee_system'
     )
 
 
 class CollectionFilterForm(AutoCompleteModelForm):
-    catchment = ModelChoiceField(
-        queryset=CollectionCatchment.objects.all(),
-        widget=autocomplete.ModelSelect2(url='catchment-autocomplete'),
-        required=False
-    )
-    collector = ModelChoiceField(
-        queryset=Collector.objects.all(),
-        widget=autocomplete.ModelSelect2(url='collector-autocomplete'),
-        required=False
-    )
-    waste_category = ModelMultipleChoiceField(
-        queryset=WasteCategory.objects.all(),
-        widget=CheckboxSelectMultiple,
-        required=False
-    )
-    country = MultipleChoiceField(
-        choices=COUNTRY_CHOICES,
-        required=False
-    )
-    allowed_materials = ModelMultipleChoiceField(
-        queryset=WasteComponent.objects.all(),
-        widget=CheckboxSelectMultiple,
-        required=False
-    )
-    frequency_type = ChoiceField(choices=FREQUENCY_TYPES, required=False)
-    seasonal_frequency = BooleanField(widget=RadioSelect(
-        choices=SEASONAL_FREQUENCY_CHOICES),
-        label='Seasonal frequency')
-    optional_frequency = BooleanField(widget=RadioSelect(
-        choices=OPTIONAL_FREQUENCY_CHOICES),
-        label='Optional frequency')
-
     class Meta:
         model = Collection
-        fields = ('catchment', 'collector', 'collection_system', 'country', 'waste_category', 'allowed_materials',
-                  'frequency_type', 'seasonal_frequency', 'optional_frequency', 'fee_system')
+        fields = []
 
     def __init__(self, *args, **kwargs):
         self.helper = CollectionFilterFormHelper()
         super().__init__(*args, **kwargs)
-
 
 
 class FlyerFilterForm(AutoCompleteModelForm):

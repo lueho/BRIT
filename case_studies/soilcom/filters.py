@@ -2,9 +2,10 @@ from dal import autocomplete
 from django.db.models import Count, Q
 from django.forms import CheckboxSelectMultiple, RadioSelect, DateInput
 from django_filters import (BooleanFilter, CharFilter, ChoiceFilter, DateFilter, FilterSet, ModelChoiceFilter,
-                            ModelMultipleChoiceFilter)
+                            ModelMultipleChoiceFilter, RangeFilter)
 
-from .forms import CollectionFilterForm, FlyerFilterForm, SEASONAL_FREQUENCY_CHOICES, OPTIONAL_FREQUENCY_CHOICES
+from utils.widgets import CustomRangeWidget
+from .forms import CollectionFilterForm, FlyerFilterForm
 from .models import (Collection, CollectionCatchment, CollectionCountOptions, Collector, FREQUENCY_TYPES, WasteCategory,
                      WasteComponent, WasteFlyer, )
 
@@ -27,6 +28,17 @@ COUNTRY_CHOICES = (
     ('SE', 'SE'),
 )
 
+SEASONAL_FREQUENCY_CHOICES = (
+    ('', 'All'),
+    (True, 'Seasonal'),
+    (False, 'Not seasonal'),
+)
+OPTIONAL_FREQUENCY_CHOICES = (
+    ('', 'All'),
+    (True, 'Options'),
+    (False, 'No options'),
+)
+
 
 class CollectionFilter(FilterSet):
     catchment = ModelChoiceFilter(queryset=CollectionCatchment.objects.all(),
@@ -43,7 +55,10 @@ class CollectionFilter(FilterSet):
                                                   field_name='waste_stream__allowed_materials',
                                                   label='Allowed materials',
                                                   widget=CheckboxSelectMultiple)
-
+    connection_rate = RangeFilter(
+        widget=CustomRangeWidget(attrs={'data-range_min': 0, 'data-range_max': 100, 'data-step': 1}),
+        method='get_connection_rate'
+    )
     frequency_type = ChoiceFilter(choices=FREQUENCY_TYPES, field_name='frequency__type', label='Frequency type')
     seasonal_frequency = BooleanFilter(widget=RadioSelect(
         choices=SEASONAL_FREQUENCY_CHOICES),
@@ -54,11 +69,10 @@ class CollectionFilter(FilterSet):
         label='Optional frequency',
         method='get_optional_frequency')
 
-
     class Meta:
         model = Collection
         fields = ('catchment', 'collector', 'collection_system', 'country', 'waste_category', 'allowed_materials',
-                  'frequency_type', 'seasonal_frequency', 'optional_frequency', 'fee_system')
+                  'connection_rate', 'frequency_type', 'seasonal_frequency', 'optional_frequency', 'fee_system')
         form = CollectionFilterForm
 
     @staticmethod
@@ -67,6 +81,10 @@ class CollectionFilter(FilterSet):
         if not qs.exists():
             qs = value.upstream_collections.order_by('name')
         return qs
+
+    @staticmethod
+    def get_connection_rate(qs, _, value):
+        return qs.filter(connection_rate__range=(value.start / 100, value.stop / 100))
 
     @staticmethod
     def get_seasonal_frequency(queryset, name, value):

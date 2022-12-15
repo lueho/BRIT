@@ -75,9 +75,9 @@ class CollectionFilterTestCase(TestCase):
         child_catchment = CollectionCatchment.objects.create(name='Child Catchment', parent=cls.catchment)
         cls.grandchild_catchment = CollectionCatchment.objects.create(parent=child_catchment)
         cls.unrelated_catchment = CollectionCatchment.objects.create(name='Unrelated Test Catchment')
-        cls.collection1 = Collection.objects.create(catchment=cls.catchment, frequency=cls.not_seasonal_frequency)
-        cls.collection2 = Collection.objects.create(catchment=cls.unrelated_catchment, frequency=cls.seasonal_frequency)
-        cls.child_collection = Collection.objects.create(catchment=child_catchment)
+        cls.collection1 = Collection.objects.create(catchment=cls.catchment, frequency=cls.not_seasonal_frequency, connection_rate=0.7)
+        cls.collection2 = Collection.objects.create(catchment=cls.unrelated_catchment, frequency=cls.seasonal_frequency, connection_rate=0.3)
+        cls.child_collection = Collection.objects.create(catchment=child_catchment, connection_rate=0.5)
 
     def test_no_choice_returns_complete_queryset(self):
         qs = CollectionFilter(data={}, queryset=Collection.objects.all()).qs
@@ -95,6 +95,21 @@ class CollectionFilterTestCase(TestCase):
         qs = CollectionFilter(data={'catchment': self.grandchild_catchment.pk}, queryset=Collection.objects.all()).qs
         self.assertIn(self.child_collection, qs)
         self.assertIn(self.collection1, qs)
+
+    def test_connection_rate_range_filter_fields_exists_in_filter_and_form(self):
+        filtr = CollectionFilter(data={'connection_rate_min': 50, 'connection_rate_max': 99}, queryset=Collection.objects.all())
+        self.assertIn('connection_rate', filtr.filters.keys())
+        self.assertIn('connection_rate', filtr.form.fields.keys())
+
+    def test_connection_rate_range_filter_renders_with_converted_percentage_values(self):
+        filtr = CollectionFilter(data={'connection_rate_min': 50, 'connection_rate_max': 99}, queryset=Collection.objects.all())
+        self.assertInHTML('<span class="numeric-slider-range_text" id="id_connection_rate_text"> 50% - 99%</span>', filtr.form.as_p())
+
+    def test_connection_rate_returns_only_collections_in_given_range(self):
+        filtr = CollectionFilter(data={'connection_rate_min': 50, 'connection_rate_max': 100}, queryset=Collection.objects.all())
+        qs = filtr.qs.order_by('id')
+        expected_qs = Collection.objects.filter(connection_rate__range=(0.5, 1)).order_by('id')
+        self.assertQuerysetEqual(expected_qs, qs)
 
     def test_seasonal_frequency_filter_field_exists_in_filter_and_form(self):
         filtr = CollectionFilter(data={'seasonal_frequency': True}, queryset=Collection.objects.all())
