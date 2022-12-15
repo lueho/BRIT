@@ -4,7 +4,7 @@ from django_filters.filters import RangeFilter, MultipleChoiceFilter, NumberFilt
 
 from .forms import TreeFilterForm
 from .models import HamburgRoadsideTrees
-# from .widgets import CustomRangeWidget
+# from .widgets import RangeSlider
 
 
 # class TreeAgeRangeFilter(RangeFilter):
@@ -14,7 +14,7 @@ from .models import HamburgRoadsideTrees
 #         values = [p.pflanzjahr for p in HamburgRoadsideTrees.objects.all()]
 #         min_value = min(values)
 #         max_value = max(values)
-#         self.extra['widget'] = CustomRangeWidget(attrs={'data-range_min': min_value, 'data-range_max': max_value})
+#         self.extra['widget'] = RangeSlider(attrs={'data-range_min': min_value, 'data-range_max': max_value})
 
 
 GATTUNG_CHOICES = (

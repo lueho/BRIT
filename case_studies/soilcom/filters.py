@@ -4,7 +4,7 @@ from django.forms import CheckboxSelectMultiple, RadioSelect, DateInput
 from django_filters import (BooleanFilter, CharFilter, ChoiceFilter, DateFilter, FilterSet, ModelChoiceFilter,
                             ModelMultipleChoiceFilter, RangeFilter)
 
-from utils.widgets import CustomRangeWidget
+from utils.widgets import RangeSlider
 from .forms import CollectionFilterForm, FlyerFilterForm
 from .models import (Collection, CollectionCatchment, CollectionCountOptions, Collector, FREQUENCY_TYPES, WasteCategory,
                      WasteComponent, WasteFlyer, )
@@ -18,15 +18,6 @@ class CollectorFilter(FilterSet):
         model = Collector
         fields = ('name', 'catchment')
 
-
-COUNTRY_CHOICES = (
-    ('BE', 'BE'),
-    ('DE', 'DE'),
-    ('DK', 'DK'),
-    ('NL', 'NL'),
-    ('UK', 'UK'),
-    ('SE', 'SE'),
-)
 
 SEASONAL_FREQUENCY_CHOICES = (
     ('', 'All'),
@@ -46,7 +37,6 @@ class CollectionFilter(FilterSet):
                                   method='catchment_filter')
     collector = ModelChoiceFilter(queryset=Collector.objects.all(),
                                   widget=autocomplete.ModelSelect2(url='collector-autocomplete'))
-    country = ChoiceFilter(choices=COUNTRY_CHOICES, field_name='catchment__region__country', label='Country')
     waste_category = ModelMultipleChoiceFilter(queryset=WasteCategory.objects.all(),
                                                field_name='waste_stream__category',
                                                label='Waste categories',
@@ -56,10 +46,9 @@ class CollectionFilter(FilterSet):
                                                   label='Allowed materials',
                                                   widget=CheckboxSelectMultiple)
     connection_rate = RangeFilter(
-        widget=CustomRangeWidget(attrs={'data-range_min': 0, 'data-range_max': 100, 'data-step': 1}),
+        widget=RangeSlider(attrs={'data-range_min': 0, 'data-range_max': 100, 'data-step': 1}),
         method='get_connection_rate'
     )
-    frequency_type = ChoiceFilter(choices=FREQUENCY_TYPES, field_name='frequency__type', label='Frequency type')
     seasonal_frequency = BooleanFilter(widget=RadioSelect(
         choices=SEASONAL_FREQUENCY_CHOICES),
         label='Seasonal frequency',
@@ -71,8 +60,8 @@ class CollectionFilter(FilterSet):
 
     class Meta:
         model = Collection
-        fields = ('catchment', 'collector', 'collection_system', 'country', 'waste_category', 'allowed_materials',
-                  'connection_rate', 'frequency_type', 'seasonal_frequency', 'optional_frequency', 'fee_system')
+        fields = ('catchment', 'collector', 'collection_system', 'waste_category', 'allowed_materials',
+                  'connection_rate', 'seasonal_frequency', 'optional_frequency', 'fee_system')
         form = CollectionFilterForm
 
     @staticmethod
