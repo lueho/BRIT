@@ -1,6 +1,6 @@
 from dal import autocomplete
 from django.db.models import Count, Q
-from django.forms import CheckboxSelectMultiple, RadioSelect, DateInput
+from django.forms import CheckboxInput, CheckboxSelectMultiple, RadioSelect, DateInput
 from django_filters import (BooleanFilter, CharFilter, ChoiceFilter, DateFilter, FilterSet, ModelChoiceFilter,
                             ModelMultipleChoiceFilter, RangeFilter)
 
@@ -49,6 +49,10 @@ class CollectionFilter(FilterSet):
         widget=RangeSlider(attrs={'data-range_min': 0, 'data-range_max': 100, 'data-step': 1}),
         method='get_connection_rate'
     )
+    connection_rate_include_unknown = BooleanFilter(label='Include unknown connection rate',
+                                                    widget=CheckboxInput,
+                                                    initial=True,
+                                                    method='get_connection_rate_include_unknown')
     seasonal_frequency = BooleanFilter(widget=RadioSelect(
         choices=SEASONAL_FREQUENCY_CHOICES),
         label='Seasonal frequency',
@@ -61,7 +65,8 @@ class CollectionFilter(FilterSet):
     class Meta:
         model = Collection
         fields = ('catchment', 'collector', 'collection_system', 'waste_category', 'allowed_materials',
-                  'connection_rate', 'seasonal_frequency', 'optional_frequency', 'fee_system')
+                  'connection_rate', 'connection_rate_include_unknown', 'seasonal_frequency', 'optional_frequency',
+                  'fee_system')
         form = CollectionFilterForm
 
     @staticmethod
@@ -73,7 +78,16 @@ class CollectionFilter(FilterSet):
 
     @staticmethod
     def get_connection_rate(qs, _, value):
-        return qs.filter(connection_rate__range=(value.start / 100, value.stop / 100))
+        return qs.filter(
+            Q(connection_rate__range=(value.start / 100, value.stop / 100)) | Q(connection_rate__isnull=True)
+        )
+
+    @staticmethod
+    def get_connection_rate_include_unknown(qs, _, value):
+        if not value:
+            return qs.exclude(connection_rate__isnull=True)
+        else:
+            return qs
 
     @staticmethod
     def get_seasonal_frequency(queryset, name, value):

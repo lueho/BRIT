@@ -1,3 +1,4 @@
+from django.db.models import Q
 from django.http.request import QueryDict, MultiValueDict
 from django.test import TestCase, modify_settings
 
@@ -75,69 +76,92 @@ class CollectionFilterTestCase(TestCase):
         child_catchment = CollectionCatchment.objects.create(name='Child Catchment', parent=cls.catchment)
         cls.grandchild_catchment = CollectionCatchment.objects.create(parent=child_catchment)
         cls.unrelated_catchment = CollectionCatchment.objects.create(name='Unrelated Test Catchment')
-        cls.collection1 = Collection.objects.create(catchment=cls.catchment, frequency=cls.not_seasonal_frequency, connection_rate=0.7)
-        cls.collection2 = Collection.objects.create(catchment=cls.unrelated_catchment, frequency=cls.seasonal_frequency, connection_rate=0.3)
-        cls.child_collection = Collection.objects.create(catchment=child_catchment, connection_rate=0.5)
+        cls.collection1 = Collection.objects.create(catchment=cls.catchment, frequency=cls.not_seasonal_frequency,
+                                                    connection_rate=0.7)
+        cls.collection2 = Collection.objects.create(catchment=cls.unrelated_catchment, frequency=cls.seasonal_frequency,
+                                                    connection_rate=0.3)
+        cls.child_collection = Collection.objects.create(catchment=child_catchment)
 
-    def test_no_choice_returns_complete_queryset(self):
-        qs = CollectionFilter(data={}, queryset=Collection.objects.all()).qs
+    def setUp(self):
+        self.data = {field_name: field.initial for field_name, field in CollectionFilter().form.fields.items() if
+                     field.initial}
+
+    def test_only_initial_values_returns_complete_queryset(self):
+        qs = CollectionFilter(self.data, queryset=Collection.objects.all()).qs
         self.assertQuerysetEqual(Collection.objects.order_by('id'), qs.order_by('id'))
 
     def test_catchment_filter(self):
-        qs = CollectionFilter(data={'catchment': self.catchment.pk}, queryset=Collection.objects.all()).qs
+        self.data.update({'catchment': self.catchment.pk})
+        qs = CollectionFilter(self.data, queryset=Collection.objects.all()).qs
         self.assertEqual(2, qs.count())
 
     def test_filter_includes_child_catchments(self):
-        qs = CollectionFilter(data={'catchment': self.catchment.pk}, queryset=Collection.objects.all()).qs
+        self.data.update({'catchment': self.catchment.pk})
+        qs = CollectionFilter(self.data, queryset=Collection.objects.all()).qs
         self.assertIn(self.child_collection, qs)
 
     def test_filter_includes_collections_from_upstream_catchments_if_there_are_none_downstream(self):
-        qs = CollectionFilter(data={'catchment': self.grandchild_catchment.pk}, queryset=Collection.objects.all()).qs
+        self.data.update({'catchment': self.grandchild_catchment.pk})
+        qs = CollectionFilter(self.data, queryset=Collection.objects.all()).qs
         self.assertIn(self.child_collection, qs)
         self.assertIn(self.collection1, qs)
 
     def test_connection_rate_range_filter_fields_exists_in_filter_and_form(self):
-        filtr = CollectionFilter(data={'connection_rate_min': 50, 'connection_rate_max': 99}, queryset=Collection.objects.all())
+        self.data.update({'connection_rate_min': 50, 'connection_rate_max': 99})
+        filtr = CollectionFilter(self.data, queryset=Collection.objects.all())
         self.assertIn('connection_rate', filtr.filters.keys())
         self.assertIn('connection_rate', filtr.form.fields.keys())
 
     def test_connection_rate_range_filter_renders_with_converted_percentage_values(self):
-        filtr = CollectionFilter(data={'connection_rate_min': 50, 'connection_rate_max': 99}, queryset=Collection.objects.all())
-        self.assertInHTML('<span class="numeric-slider-range_text" id="id_connection_rate_text"> 50% - 99%</span>', filtr.form.as_p())
+        self.data.update({'connection_rate_min': 50, 'connection_rate_max': 99})
+        filtr = CollectionFilter(self.data, queryset=Collection.objects.all())
+        self.assertInHTML('<span class="numeric-slider-range_text" id="id_connection_rate_text">50% - 99%</span>',
+                          filtr.form.as_p())
 
     def test_connection_rate_returns_only_collections_in_given_range(self):
-        filtr = CollectionFilter(data={'connection_rate_min': 50, 'connection_rate_max': 100}, queryset=Collection.objects.all())
+        self.data.update({'connection_rate_min': 50, 'connection_rate_max': 100})
+        filtr = CollectionFilter(self.data, queryset=Collection.objects.all())
         qs = filtr.qs.order_by('id')
-        expected_qs = Collection.objects.filter(connection_rate__range=(0.5, 1)).order_by('id')
+        expected_qs = Collection.objects.filter(Q(connection_rate__range=(0.5, 1)) | Q(connection_rate__isnull=True)).order_by('id')
         self.assertQuerysetEqual(expected_qs, qs)
 
+    def test_connection_rate_include_unknown_includes_null_values_if_checked(self):
+        self.data.update({'connection_rate_min': 0, 'connection_rate_max': 100})
+        filtr = CollectionFilter(self.data, queryset=Collection.objects.all())
+        self.assertQuerysetEqual(Collection.objects.all().order_by('id'), filtr.qs.order_by('id'))
+
     def test_seasonal_frequency_filter_field_exists_in_filter_and_form(self):
-        filtr = CollectionFilter(data={'seasonal_frequency': True}, queryset=Collection.objects.all())
+        self.data.update({'seasonal_frequency': True})
+        filtr = CollectionFilter(self.data, queryset=Collection.objects.all())
         self.assertIn('seasonal_frequency', filtr.filters.keys())
         self.assertIn('seasonal_frequency', filtr.form.fields.keys())
 
     def test_seasonal_frequency_filter_returns_collections_with_non_seasonal_frequency_on_false(self):
-        qs = CollectionFilter(data={'seasonal_frequency': False}, queryset=Collection.objects.all()).qs
+        self.data.update({'seasonal_frequency': False})
+        qs = CollectionFilter(self.data, queryset=Collection.objects.all()).qs
         self.assertIn(self.collection1, qs)
         self.assertNotIn(self.collection2, qs)
 
     def test_seasonal_frequency_filter_returns_collections_with_seasonal_frequency_on_true(self):
-        qs = CollectionFilter(data={'seasonal_frequency': True}, queryset=Collection.objects.all()).qs
+        self.data.update({'seasonal_frequency': True})
+        qs = CollectionFilter(self.data, queryset=Collection.objects.all()).qs
         self.assertIn(self.collection2, qs)
         self.assertNotIn(self.collection1, qs)
 
     def test_seasonal_frequency_filter_returns_all_collections_when_unselected(self):
-        qs = CollectionFilter(data={'seasonal_frequency': None}, queryset=Collection.objects.all()).qs
+        self.data.update({'seasonal_frequency': None})
+        qs = CollectionFilter(self.data, queryset=Collection.objects.all()).qs
         self.assertQuerysetEqual(Collection.objects.order_by('id'), qs.order_by('id'))
 
     def test_optional_frequency_filter_field_exists_in_filter_and_form(self):
-        filtr = CollectionFilter(data={'optional_frequency': True}, queryset=Collection.objects.all())
+        self.data.update({'optional_frequency': True})
+        filtr = CollectionFilter(self.data, queryset=Collection.objects.all())
         self.assertIn('optional_frequency', filtr.filters.keys())
         self.assertIn('optional_frequency', filtr.form.fields.keys())
 
     def test_optional_frequency_filter_returns_collections_with_non_seasonal_frequency_on_false(self):
-        from django.db.models import Q
-        qs = CollectionFilter(data={'optional_frequency': False}, queryset=Collection.objects.all()).qs
+        self.data.update({'optional_frequency': False})
+        qs = CollectionFilter(self.data, queryset=Collection.objects.all()).qs
         opts = CollectionCountOptions.objects.filter(Q(option_1__isnull=True) & Q(option_2__isnull=True) &
                                                      Q(option_3__isnull=True))
         self.assertEqual(2, opts.count())
@@ -149,10 +173,12 @@ class CollectionFilterTestCase(TestCase):
         self.assertNotIn(self.collection1, qs)
 
     def test_optional_frequency_filter_returns_collections_with_seasonal_frequency_on_true(self):
-        qs = CollectionFilter(data={'optional_frequency': True}, queryset=Collection.objects.all()).qs
+        self.data.update({'optional_frequency': True})
+        qs = CollectionFilter(self.data, queryset=Collection.objects.all()).qs
         self.assertIn(self.collection1, qs)
         self.assertNotIn(self.collection2, qs)
 
     def test_optional_frequency_filter_returns_all_collections_when_unselected(self):
-        qs = CollectionFilter(data={'optional_frequency': None}, queryset=Collection.objects.all()).qs
+        self.data.update({'optional_frequency': None})
+        qs = CollectionFilter(self.data, queryset=Collection.objects.all()).qs
         self.assertQuerysetEqual(Collection.objects.order_by('id'), qs.order_by('id'))

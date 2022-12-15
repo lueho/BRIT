@@ -341,6 +341,7 @@ class CollectionFilterFormHelper(FormHelper):
         'waste_category',
         'allowed_materials',
         Field('connection_rate', template="fields/range_slider_field.html"),
+        'connection_rate_include_unknown',
         Row(Column(Field('seasonal_frequency')), Column(Field('optional_frequency'))),
         'fee_system'
     )
