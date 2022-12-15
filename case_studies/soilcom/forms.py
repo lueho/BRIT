@@ -303,7 +303,7 @@ class CollectionModelForm(AutoCompleteModelForm):
                 Column(Field('connection_rate_year'))
             ),
             Field('fee_system'),
-            ForeignkeyField('frequency'),
+            Field('frequency'),
             Field('description')
         )
         return helper
