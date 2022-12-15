@@ -1,0 +1,11 @@
+{% load crispy_forms_field %}
+
+<div class="form-group{% if 'form-horizontal' in form_class %} row{% endif %}">
+  <label for="{{ field.id_for_label }}" class="{% if 'form-horizontal' in form_class %}col-form-label {% endif %}{{ label_class }}{% if field.field.required %} requiredField{% endif %}">
+    {{ field.label|safe }}
+    {% if field.field.required %}
+      <span class="asteriskField">*</span>
+    {% endif %}
+  </label>
+  {% crispy_field field  %}
+</div>
