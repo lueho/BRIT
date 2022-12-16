@@ -242,6 +242,9 @@ function parseFilterParameters() {
             case 'RadioSelect':
                 params.append(key, readRadioSelect(key));
                 break;
+            case 'CheckboxInput':
+                params.append(key, readCheckbox(key));
+                break;
             case 'CheckboxSelectMultiple':
                 readCheckboxSelectMultiple(key).forEach((value) => {params.append(key, value);});
                 break;
@@ -267,6 +270,10 @@ function readSelectMultiple(name) {
         }
     }
     return country_codes;
+}
+
+function readCheckbox(name) {
+    return document.getElementsByName(name)[0].checked;
 }
 
 function readCheckboxSelectMultiple(name) {
