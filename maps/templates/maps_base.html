@@ -4,7 +4,6 @@
 {% load crispy_forms_tags %}
 
 {% block style_sheets %}
-    <link rel="stylesheet" href="{% static 'css/custom-slider.css' %}">
     <link rel="stylesheet" href="{% static 'css/maps.css' %}">
 {% endblock style_sheets %}
 
@@ -22,7 +21,7 @@
                     <div class="card-header"><b>
                         {% block map_card_header %}{{ map_title }}{% endblock %}
                     </b></div>
-                    <div class="card-body p-0">
+                    <div class="card-body p-0 vh-75">
                         {% leaflet_map "main" %}
                     </div>
                     <div class="card-footer">
