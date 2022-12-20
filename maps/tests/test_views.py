@@ -1,11 +1,15 @@
+import json
+
 from django.conf import settings
-from django.test import TestCase
+from django.contrib.gis.geos import MultiPolygon, Polygon
+from django.test import RequestFactory, TestCase
 from django.urls import reverse
 from django.utils.http import urlencode
 from rest_framework.test import APITestCase
 
+from maps.views import CatchmentCreateByMergeView
 from utils.tests.testcases import ViewWithPermissionsTestCase
-from ..models import Attribute, RegionAttributeValue, Catchment, LauRegion, NutsRegion, Region, GeoDataset
+from ..models import Attribute, RegionAttributeValue, Catchment, LauRegion, NutsRegion, Region, GeoDataset, GeoPolygon
 
 
 # ----------- Catchment CRUD--------------------------------------------------------------------------------------------
@@ -76,6 +80,186 @@ class CatchmentCreateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.post(reverse('catchment-create'), data, follow=True)
         self.assertRedirects(response, reverse('catchment-detail',
                                                kwargs={'pk': list(response.context.get('messages'))[0].message}))
+
+
+class CatchmentCreateByMergeViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'add_catchment'
+    url = reverse('catchment-create-by-merge')
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        lau_1 = LauRegion.objects.create(
+            name='Test Region 1',
+            borders=GeoPolygon.objects.create(geom=MultiPolygon(Polygon(((0, 0), (0, 2), (2, 2), (2, 0), (0, 0)))))
+        )
+        cls.region_1 = lau_1.region_ptr
+        lau_2 = LauRegion.objects.create(
+            name='Test Region 2',
+            borders=GeoPolygon.objects.create(geom=MultiPolygon(Polygon(((0, 2), (0, 4), (2, 4), (2, 2), (0, 2)))))
+        )
+        cls.region_2 = lau_2.region_ptr
+        lau_3 = LauRegion.objects.create(
+            name='Test Region 3',
+            borders=GeoPolygon.objects.create(geom=MultiPolygon(Polygon(((1, 1), (1, 3), (3, 3), (3, 1), (1, 1)))))
+        )
+        cls.region_3 = lau_3.region_ptr
+
+    def test_get_http_302_redirect_to_login_for_anonymous(self):
+        response = self.client.get(self.url, follow=True)
+        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={self.url}')
+
+    def test_get_http_403_forbidden_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(self.url)
+        self.assertEqual(403, response.status_code)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(self.url)
+        self.assertEqual(200, response.status_code)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(self.url)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
+    def test_post_http_302_redirect_to_login_for_anonymous(self):
+        response = self.client.post(self.url, data={}, follow=True)
+        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={self.url}')
+
+    def test_post_http_403_forbidden_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(self.url)
+        self.assertEqual(403, response.status_code)
+
+    def test_post_success_and_http_302_redirect_to_success_url_for_member(self):
+        self.client.force_login(self.member)
+        data = {
+            'name': 'Updated Test Catchment',
+            'form-INITIAL_FORMS': 2,
+            'form-TOTAL_FORMS': 3,
+            'form-0-region': self.region_1.pk,
+            'form-1-region': self.region_2.pk,
+            'form-2-region': self.region_3.pk,
+        }
+        response = self.client.post(self.url, data, follow=True)
+        self.assertRedirects(response, reverse('catchment-detail',
+                                               kwargs={'pk': list(response.context.get('messages'))[0].message}))
+
+    def test_create_region_borders(self):
+        data = {
+            'name': 'New Catchment Created By Merge',
+            'form-INITIAL_FORMS': 2,
+            'form-TOTAL_FORMS': 3,
+            'form-0-region': self.region_1.pk,
+            'form-1-region': self.region_2.pk,
+            'form-2-region': self.region_3.pk,
+        }
+        request = RequestFactory().post(self.url, data)
+        request.user = self.member
+        view = CatchmentCreateByMergeView()
+        view.setup(request)
+        view.formset = view.get_formset()
+        self.assertTrue(view.formset.is_valid())
+        geom = MultiPolygon(Polygon(((0, 0), (0, 2), (0, 4), (2, 4), (2, 3), (3, 3), (3, 1), (2, 1), (2, 0), (0, 0))))
+        geom.normalize()
+        self.assertTrue(view.create_region_borders().geom.equals_exact(geom))
+
+    def test_get_region_name(self):
+        data = {
+            'name': 'New Catchment Created By Merge',
+            'form-INITIAL_FORMS': 2,
+            'form-TOTAL_FORMS': 2,
+            'form-0-region': self.region_1.pk,
+            'form-1-region': self.region_2.pk,
+        }
+        request = RequestFactory().post(self.url, data)
+        request.user = self.member
+        view = CatchmentCreateByMergeView()
+        view.setup(request)
+        form = view.get_form()
+        self.assertTrue(form.is_valid())
+        view.object = form.save()
+        self.assertEqual('New Catchment Created By Merge', view.get_region_name())
+
+    def test_get_region(self):
+        data = {
+            'name': 'New Catchment Created By Merge',
+            'form-INITIAL_FORMS': 2,
+            'form-TOTAL_FORMS': 3,
+            'form-0-region': self.region_1.pk,
+            'form-1-region': self.region_2.pk,
+            'form-2-region': self.region_3.pk,
+        }
+        request = RequestFactory().post(self.url, data)
+        request.user = self.member
+        view = CatchmentCreateByMergeView()
+        view.setup(request)
+        view.form = view.get_form()
+        self.assertTrue(view.form.is_valid())
+        view.object = view.form.save()
+        view.formset = view.get_formset()
+        self.assertTrue(view.formset.is_valid())
+        geom = MultiPolygon(Polygon(((0, 0), (0, 2), (0, 4), (2, 4), (2, 3), (3, 3), (3, 1), (2, 1), (2, 0), (0, 0))))
+        geom.normalize()
+        expected_region = Region.objects.create(
+            name='New Catchment Created By Merge',
+            borders=GeoPolygon.objects.create(geom=geom)
+        )
+        self.assertEqual(expected_region.name, view.get_region().name)
+        self.assertTrue(view.get_region().borders.geom.equals_exact(geom))
+
+    def test_catchment_with_correct_region_is_created_on_post_with_valid_data(self):
+        self.client.force_login(self.member)
+        data = {
+            'name': 'New Catchment Created By Merge',
+            'form-INITIAL_FORMS': 2,
+            'form-TOTAL_FORMS': 3,
+            'form-0-region': self.region_1.pk,
+            'form-1-region': self.region_2.pk,
+            'form-2-region': self.region_3.pk,
+        }
+        response = self.client.post(self.url, data, follow=True)
+        self.assertRedirects(response, reverse('catchment-detail',
+                                               kwargs={'pk': list(response.context.get('messages'))[0].message}))
+        catchment = Catchment.objects.get(pk=list(response.context.get('messages'))[0].message)
+        geom = MultiPolygon(Polygon(((0, 0), (0, 2), (0, 4), (2, 4), (2, 3), (3, 3), (3, 1), (2, 1), (2, 0), (0, 0))))
+        geom.normalize()
+        expected_region = Region.objects.create(
+            name='New Catchment Created By Merge',
+            borders=GeoPolygon.objects.create(geom=geom)
+        )
+        self.assertEqual(expected_region.name, catchment.region.name)
+        self.assertTrue(catchment.region.borders.geom.equals_exact(geom))
+        self.assertTrue(catchment.type == 'custom')
+
+    def test_at_least_one_entry_in_formset_is_enforced(self):
+        self.client.force_login(self.member)
+        data = {
+            'name': 'New Catchment Created By Merge',
+            'form-INITIAL_FORMS': 2,
+            'form-TOTAL_FORMS': 2,
+            'form-0-region': '',
+            'form-1-region': '',
+        }
+        response = self.client.post(self.url, data)
+        self.assertEqual(200, response.status_code)
+        self.assertIn('You must select at least one region.', response.context['formset'].non_form_errors())
+
+    def test_empty_forms_are_ignored(self):
+        self.client.force_login(self.member)
+        data = {
+            'name': 'New Catchment Created By Merge',
+            'form-INITIAL_FORMS': 2,
+            'form-TOTAL_FORMS': 4,
+            'form-0-region': self.region_1.pk,
+            'form-1-region': self.region_2.pk,
+            'form-2-region': '',
+            'form-3-region': '',
+        }
+        response = self.client.post(self.url, data)
+        self.assertEqual(302, response.status_code)
 
 
 class CatchmentDetailViewTestCase(ViewWithPermissionsTestCase):
@@ -1003,3 +1187,24 @@ class RegionAttributeValueModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         with self.assertRaises(RegionAttributeValue.DoesNotExist):
             RegionAttributeValue.objects.get(pk=self.value.pk)
         self.assertEqual(response.status_code, 302)
+
+
+# ----------- Region Utils ---------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class RegionOfLauAutocompleteViewTestCase(ViewWithPermissionsTestCase):
+    url = reverse('region-of-lau-autocomplete')
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.region_1 = LauRegion.objects.create(name='Test Region 1').region_ptr
+        cls.region_2 = LauRegion.objects.create(name='Test Region 2').region_ptr
+        cls.region_3 = Region.objects.create(name='Test Region Not In Queryset')
+
+    def test_all_lau_regions_with_matching_string_in_queryset(self):
+        response = self.client.get(self.url, data={'q': 'Test'})
+        self.assertEqual(200, response.status_code)
+        ids = [region['id'] for region in json.loads(response.content)['results']]
+        self.assertListEqual([str(lau.id) for lau in LauRegion.objects.all()], ids)
