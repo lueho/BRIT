@@ -1202,12 +1202,26 @@ class RegionOfLauAutocompleteViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.region_1 = LauRegion.objects.create(name='Test Region 1').region_ptr
-        cls.region_2 = LauRegion.objects.create(name='Test Region 2').region_ptr
+        cls.region_1 = LauRegion.objects.create(name='Test Region 1', lau_id='123').region_ptr
+        cls.region_2 = LauRegion.objects.create(name='Test Region 2', lau_id='234').region_ptr
         cls.region_3 = Region.objects.create(name='Test Region Not In Queryset')
 
-    def test_all_lau_regions_with_matching_string_in_queryset(self):
+    def test_all_lau_regions_with_matching_name_string_in_queryset(self):
         response = self.client.get(self.url, data={'q': 'Test'})
         self.assertEqual(200, response.status_code)
         ids = [region['id'] for region in json.loads(response.content)['results']]
         self.assertListEqual([str(lau.id) for lau in LauRegion.objects.all()], ids)
+
+    def test_all_lau_region_with_matching_lau_id_in_queryset(self):
+        response = self.client.get(self.url, data={'q': '12'})
+        self.assertEqual(200, response.status_code)
+        ids = [region['id'] for region in json.loads(response.content)['results']]
+        self.assertListEqual([str(lau.id) for lau in LauRegion.objects.filter(lau_id='123')], ids)
+
+    def test_all_lau_region_with_matching_lau_id_in_queryset_2(self):
+        response = self.client.get(self.url, data={'q': '23'})
+        self.assertEqual(200, response.status_code)
+        ids = [region['id'] for region in json.loads(response.content)['results']]
+        self.assertListEqual([str(lau.id) for lau in LauRegion.objects.all()], ids)
+
+    
