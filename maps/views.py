@@ -164,7 +164,7 @@ class CatchmentDetailView(MapMixin, DetailView):
 
 
 class CatchmentCreateView(OwnedObjectCreateView):
-    template_name = 'simple_form_card.html'
+    template_name = 'maps/catchment_form.html'
     form_class = CatchmentModelForm
     permission_required = 'maps.add_catchment'
 
