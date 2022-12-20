@@ -379,7 +379,7 @@ class RegionOfLauAutocompleteView(autocomplete.Select2QuerySetView):
     def get_queryset(self):
         qs = Region.objects.filter(pk__in=Subquery(LauRegion.objects.all().values('pk'))).order_by('name')
         if self.q:
-            qs = qs.filter(name__icontains=self.q)
+            qs = qs.filter(Q(name__icontains=self.q) | Q(lauregion__lau_id__contains=self.q))
         return qs
 
 
