@@ -5,6 +5,25 @@ from django.test import TestCase
 from ..models import Catchment, LauRegion, NutsRegion, Region
 
 
+class CatchmentPostDeleteTestCase(TestCase):
+
+    def setUp(self):
+        self.region = Region.objects.create(name='Test Region To Delete')
+        self.fix_region = Region.objects.create(name='Test Region To Stay')
+        self.catchment = Catchment.objects.create(name='Test Catchment', type='custom', region=self.region)
+        self.catchment_2 = Catchment.objects.create(name='Test Catchment 2', type='administrative',
+                                                    region=self.fix_region)
+
+    def test_after_deleting_catchment_unused_custom_region_is_also_deleted(self):
+        self.catchment.delete()
+        with self.assertRaises(Region.DoesNotExist):
+            Region.objects.get(name='Test Region To Delete')
+
+    def test_non_custom_regions_are_exempted_from_deletion(self):
+        self.catchment_2.delete()
+        Region.objects.get(name='Test Region To Stay')
+
+
 class CatchmentPedigreeTestCase(TestCase):
 
     @classmethod

@@ -1,5 +1,7 @@
 from django.contrib.gis.db.models import MultiPolygonField, PointField
 from django.db import models
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 from django.urls import reverse
 from tree_queries.models import TreeNode
 
@@ -136,6 +138,12 @@ class Catchment(NamedUserObjectModel, TreeNode):
         return self.name if self.name else self.region.__str__()
 
 
+@receiver(post_delete, sender=Catchment)
+def delete_unused_custom_region(sender, instance, **kwargs):
+    if not instance.region.catchment_set.exists() and instance.type == 'custom':
+        instance.region.delete()
+
+
 class SFBSite(NamedUserObjectModel):
     geom = PointField(null=True)
 
@@ -186,4 +194,3 @@ class RegionAttributeTextValue(NamedUserObjectModel):
     attribute = models.ForeignKey(Attribute, on_delete=models.PROTECT)
     date = models.DateField(blank=True, null=True)
     value = models.CharField(max_length=511)
-

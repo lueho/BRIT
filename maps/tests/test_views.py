@@ -156,7 +156,7 @@ class CatchmentModalDeleteViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.catchment = Catchment.objects.create(name='Test Catchment')
+        cls.catchment = Catchment.objects.create(name='Test Catchment', region=Region.objects.create())
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('catchment-delete-modal', kwargs={'pk': self.catchment.pk})
