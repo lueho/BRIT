@@ -53,15 +53,16 @@ class CatchmentModelForm(AutoCompleteModelForm):
 
 
 class CatchmentCreateByMergeForm(AutoCompleteModelForm):
-    parent_region = ModelChoiceField(
-        queryset=Region.objects.all(),
-        widget=ModelSelect2(url='region-autocomplete'),
-        required=False
+    parent = ModelChoiceField(
+        queryset=Catchment.objects.all(),
+        widget=ModelSelect2(url='catchment-autocomplete'),
+        label='Parent catchment',
+        required=True
     )
 
     class Meta:
         model = Catchment
-        fields = ('name', 'parent_region', 'description')
+        fields = ('name', 'parent', 'description')
 
 
 class RegionMergeFormHelper(FormHelper):
