@@ -1,6 +1,6 @@
 from dal import autocomplete
 from django.contrib.auth.mixins import PermissionRequiredMixin
-from django.db.models import Q
+from django.db.models import Q, Subquery
 from django.http import JsonResponse
 from django.urls import reverse_lazy
 from django.views.generic import DetailView, ListView, TemplateView
@@ -298,6 +298,14 @@ class GeoDatasetDetailView(GeoDataSetFormMixin, GeoDataSetMixin, DetailView):
 class RegionAutocompleteView(autocomplete.Select2QuerySetView):
     def get_queryset(self):
         qs = Region.objects.all().order_by('name')
+        if self.q:
+            qs = qs.filter(name__icontains=self.q)
+        return qs
+
+
+class RegionOfLauAutocompleteView(autocomplete.Select2QuerySetView):
+    def get_queryset(self):
+        qs = Region.objects.filter(pk__in=Subquery(LauRegion.objects.all().values('pk'))).order_by('name')
         if self.q:
             qs = qs.filter(name__icontains=self.q)
         return qs
