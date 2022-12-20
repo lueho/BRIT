@@ -1,12 +1,13 @@
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Field, Layout
+from crispy_forms.layout import Column, Field, Layout, Row
 from dal.autocomplete import ModelSelect2
-from django.forms import ChoiceField, IntegerField, ModelChoiceField, MultipleChoiceField
+from django.db.models import Subquery
+from django.forms import BaseFormSet, ChoiceField, IntegerField, ModelChoiceField, MultipleChoiceField, ValidationError
 from django.forms.widgets import CheckboxSelectMultiple, RadioSelect
 from django.urls import reverse
 
-from utils.forms import AutoCompleteModelForm, SimpleForm, SimpleModelForm, ModalModelFormMixin
-from .models import Attribute, Region, Catchment, NutsRegion, RegionAttributeValue
+from utils.forms import AutoCompleteForm, AutoCompleteModelForm, SimpleForm, SimpleModelForm, ModalModelFormMixin
+from .models import Attribute, Region, Catchment, LauRegion, NutsRegion, RegionAttributeValue
 
 
 class AttributeModelForm(SimpleModelForm):
@@ -34,7 +35,6 @@ class RegionAttributeValueModalModelForm(ModalModelFormMixin, RegionAttributeVal
 
 
 class CatchmentModelForm(AutoCompleteModelForm):
-
     parent_region = ModelChoiceField(
         queryset=Region.objects.all(),
         widget=ModelSelect2(url='region-autocomplete'),
@@ -50,6 +50,50 @@ class CatchmentModelForm(AutoCompleteModelForm):
     class Meta:
         model = Catchment
         fields = ('name', 'type', 'parent_region', 'region', 'description')
+
+
+class CatchmentCreateByMergeForm(AutoCompleteModelForm):
+    parent_region = ModelChoiceField(
+        queryset=Region.objects.all(),
+        widget=ModelSelect2(url='region-autocomplete'),
+        required=False
+    )
+
+    class Meta:
+        model = Catchment
+        fields = ('name', 'parent_region', 'description')
+
+
+class RegionMergeFormHelper(FormHelper):
+    form_tag = False
+    disable_csrf = True
+    layout = (
+        Row(Column(Field('region')), css_class='formset-form')
+    )
+
+
+class RegionMergeForm(AutoCompleteForm):
+    region = ModelChoiceField(
+        queryset=Region.objects.filter(pk__in=Subquery(LauRegion.objects.all().values('pk'))),
+        widget=ModelSelect2(url='region-of-lau-autocomplete'),
+        label='Regions',
+        required=False
+    )
+
+
+class RegionMergeFormSet(BaseFormSet):
+
+    def clean(self):
+        if any(self.errors):
+            return
+        non_empty_forms = 0
+        for form in self.forms:
+            if 'region' not in form.cleaned_data or not form.cleaned_data['region']:
+                continue
+            else:
+                non_empty_forms += 1
+        if non_empty_forms < 1:
+            raise ValidationError('You must select at least one region.')
 
 
 class CatchmentQueryForm(SimpleForm):
