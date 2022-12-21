@@ -14,7 +14,7 @@ from .models import (Collection, CollectionCatchment, CollectionCountOptions, Co
 
 class CollectorFilter(SimpleFilterSet):
     name = CharFilter(lookup_expr='icontains')
-    catchment = CharFilter(lookup_expr='catchment__name__icontains')
+    catchment = CharFilter(lookup_expr='name__icontains', label='Catchment name contains')
 
     class Meta:
         model = Collector
