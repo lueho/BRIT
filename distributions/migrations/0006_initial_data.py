@@ -18,9 +18,9 @@ def create_initial_data(apps, schema_editor):
     order = 90
     for month in ('January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October',
                   'November', 'December'):
-        defaults = {'distribution': distribution, 'order': order}
+        defaults = {'distribution': months, 'order': order}
         timestep, created = Timestep.objects.get_or_create(name=month, owner=owner, defaults=defaults)
-        timestep.distribution = distribution
+        timestep.distribution = months
         timestep.order = order
         timestep.save()
         order += 10
