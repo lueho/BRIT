@@ -1,12 +1,13 @@
+from crispy_forms.helper import FormHelper
 from django.db.models import Q
 from django.http.request import QueryDict, MultiValueDict
 from django.test import TestCase, modify_settings
 
 from distributions.models import Timestep, TemporalDistribution
 from users.models import get_default_owner
-from ..filters import CollectionFilter, WasteFlyerFilter
+from ..filters import CollectionFilter, CollectorFilter, WasteFlyerFilter
 from ..models import (Collection, CollectionCatchment, CollectionCountOptions, CollectionFrequency, CollectionSeason,
-                      WasteFlyer)
+                      Collector, WasteFlyer)
 
 
 @modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
@@ -40,6 +41,10 @@ class WasteFlyerFilterTestCase(TestCase):
         qs = WasteFlyerFilter(newparams, queryset=WasteFlyer.objects.all()).qs
         self.assertEqual(4, WasteFlyer.objects.count())
         self.assertEqual(2, qs.count())
+
+    def test_filter_form_has_no_formtags(self):
+        filtr = WasteFlyerFilter(queryset=WasteFlyer.objects.all())
+        self.assertFalse(filtr.form.helper.form_tag)
 
 
 class CollectionFilterTestCase(TestCase):
@@ -182,3 +187,14 @@ class CollectionFilterTestCase(TestCase):
         self.data.update({'optional_frequency': None})
         qs = CollectionFilter(self.data, queryset=Collection.objects.all()).qs
         self.assertQuerysetEqual(Collection.objects.order_by('id'), qs.order_by('id'))
+
+    def test_filter_form_has_no_formtags(self):
+        filtr = CollectionFilter(queryset=Collection.objects.all())
+        self.assertFalse(filtr.form.helper.form_tag)
+
+
+class CollectorFilterTestCase(TestCase):
+
+    def test_filter_form_has_no_formtags(self):
+        filtr = CollectorFilter(queryset=Collector.objects.all())
+        self.assertFalse(filtr.form.helper.form_tag)

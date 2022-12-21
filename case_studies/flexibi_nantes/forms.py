@@ -93,23 +93,4 @@ class AddGreenhouseGrowthCycleModelForm(SimpleModelForm):
 
 
 class UpdateGreenhouseGrowthCycleValuesForm(GreenhouseGrowthCycleModelForm):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # initial = kwargs.get('initial')
-        # self.fields['material'].initial = initial['material'].id
-        # self.fields['material'].widget = HiddenInput()
-        # self.fields['component'].initial = initial['component'].id
-        # self.fields['component'].widget = HiddenInput()
-
-
-class GreenhouseFilterFormHelper(FormHelper):
-    layout = Layout(
-        Row(
-            Field('heated', wrapper_class='col-md-6'),
-            Field('lighted', wrapper_class='col-md-6'),
-            Field('above_ground', wrapper_class='col-md-6'),
-            Field('high_wire', wrapper_class='col-md-6'),
-            Field('crops', wrapper_class='col-md-12')
-        )
-    )
+    pass

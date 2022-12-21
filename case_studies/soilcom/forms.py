@@ -1,9 +1,8 @@
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Column, Field, Layout, Row, HTML, Div
+from crispy_forms.layout import Column, Div, Field, HTML, Layout, Row
 from dal import autocomplete
 from django.core.exceptions import ValidationError
-from django.forms import (BooleanField, CheckboxSelectMultiple, HiddenInput, IntegerField, ModelChoiceField,
-                          ModelMultipleChoiceField, RadioSelect)
+from django.forms import (CheckboxSelectMultiple, HiddenInput, IntegerField, ModelChoiceField, ModelMultipleChoiceField)
 from django.utils.translation import gettext as _
 
 from distributions.models import TemporalDistribution, Timestep
@@ -331,38 +330,6 @@ class CollectionModelForm(AutoCompleteModelForm):
             return super().save()
         else:
             return super().save(commit=False)
-
-
-class CollectionFilterFormHelper(FormHelper):
-    layout = Layout(
-        'catchment',
-        'collector',
-        'collection_system',
-        'waste_category',
-        'allowed_materials',
-        Field('connection_rate', template="fields/range_slider_field.html"),
-        'connection_rate_include_unknown',
-        Row(Column(Field('seasonal_frequency')), Column(Field('optional_frequency'))),
-        'fee_system'
-    )
-
-
-class CollectionFilterForm(AutoCompleteModelForm):
-    class Meta:
-        model = Collection
-        fields = []
-
-    def __init__(self, *args, **kwargs):
-        self.helper = CollectionFilterFormHelper()
-        super().__init__(*args, **kwargs)
-
-
-class FlyerFilterForm(AutoCompleteModelForm):
-    url_valid = BooleanField(widget=RadioSelect())
-
-    class Meta:
-        model = WasteFlyer
-        fields = ('url_valid',)
 
 
 class CollectionAddWasteSampleForm(AutoCompleteModelForm):
