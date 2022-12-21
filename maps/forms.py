@@ -2,7 +2,8 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Column, Field, Layout, Row
 from dal.autocomplete import ModelSelect2
 from django.db.models import Subquery
-from django.forms import BaseFormSet, ChoiceField, ModelChoiceField, MultipleChoiceField, ValidationError
+from django.forms import (BaseFormSet, ChoiceField, DateInput, DateField, ModelChoiceField, MultipleChoiceField,
+                          ValidationError)
 from django.forms.widgets import CheckboxSelectMultiple, RadioSelect
 from django.urls import reverse
 
@@ -20,10 +21,16 @@ class AttributeModalModelForm(ModalModelFormMixin, AttributeModelForm):
     pass
 
 
-class RegionAttributeValueModelForm(SimpleModelForm):
+class RegionAttributeValueModelForm(AutoCompleteModelForm):
+    region = ModelChoiceField(
+        queryset=Region.objects.all(),
+        widget=ModelSelect2(url='region-autocomplete'),
+    )
+    date = DateField(widget=DateInput(attrs={'type': 'date'}))
+
     class Meta:
         model = RegionAttributeValue
-        fields = ('region', 'attribute', 'value', 'standard_deviation')
+        fields = ('region', 'attribute', 'date', 'value', 'standard_deviation')
 
 
 class RegionAttributeValueModalModelForm(ModalModelFormMixin, RegionAttributeValueModelForm):
