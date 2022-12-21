@@ -8,8 +8,7 @@ from extra_views import InlineFormSetFactory
 
 from bibliography.models import Source, SOURCE_TYPES
 from distributions.models import TemporalDistribution
-from utils.forms import SimpleForm, SimpleModelForm, ModalForm, ModalModelForm, ModalModelFormMixin
-
+from utils.forms import SimpleModelForm, ModalForm, ModalModelForm, ModalModelFormMixin
 from .models import (Composition, Material, MaterialCategory, MaterialComponent, MaterialComponentGroup,
                      MaterialProperty, MaterialPropertyValue, Sample, SampleSeries, WeightShare)
 
@@ -74,23 +73,6 @@ class MaterialPropertyValueModalModelForm(ModalModelFormMixin, MaterialPropertyV
     pass
 
 
-class SampleFilterFormHelper(FormHelper):
-    form_tag = False
-    include_media = False
-    layout = Layout(
-        'material',
-        'timestep'
-    )
-
-
-class SampleFilterForm(SimpleForm):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.helper = SampleFilterFormHelper()
-        self.fields['material'].widget.attrs = {'data-theme': 'bootstrap4'}
-
-
 class SampleSeriesModelForm(SimpleModelForm):
     class Meta:
         model = SampleSeries
@@ -124,6 +106,7 @@ class SampleModelForm(SimpleModelForm):
     class Meta:
         model = Sample
         fields = ('name', 'series', 'timestep', 'taken_at', 'description', 'preview', 'sources')
+
 
 class SampleModalModelForm(ModalModelFormMixin, SampleModelForm):
     pass

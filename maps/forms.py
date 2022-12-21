@@ -2,7 +2,7 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Column, Field, Layout, Row
 from dal.autocomplete import ModelSelect2
 from django.db.models import Subquery
-from django.forms import BaseFormSet, ChoiceField, IntegerField, ModelChoiceField, MultipleChoiceField, ValidationError
+from django.forms import BaseFormSet, ChoiceField, ModelChoiceField, MultipleChoiceField, ValidationError
 from django.forms.widgets import CheckboxSelectMultiple, RadioSelect
 from django.urls import reverse
 
@@ -109,9 +109,6 @@ class CatchmentQueryForm(SimpleForm):
     )
     catchment = ModelChoiceField(queryset=Catchment.objects.all())
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
 
 class NutsRegionQueryForm(SimpleForm):
     level_0 = ModelChoiceField(queryset=NutsRegion.objects.filter(levl_code=0).order_by('nuts_id'))
@@ -149,13 +146,3 @@ class NutsAndLauCatchmentQueryForm(SimpleForm):
             Field('level_4', data_lvl=4)
         )
         return helper
-
-
-class NutsMapFilterForm(SimpleForm):
-    levl_code = IntegerField(label='Level', min_value=0, max_value=3)
-    cntr_code = MultipleChoiceField(label='Country', choices=(('DE', 'DE'), ('FR', 'FR'),))
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['cntr_code'].choices = \
-            NutsRegion.objects.values_list('cntr_code', 'cntr_code').distinct().order_by('cntr_code')

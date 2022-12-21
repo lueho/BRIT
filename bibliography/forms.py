@@ -2,7 +2,6 @@ from dal.autocomplete import ModelSelect2
 from django.forms import DateInput, ModelChoiceField, ModelMultipleChoiceField
 
 from utils.forms import AutoCompleteModelForm, SimpleModelForm, ModalModelFormMixin
-
 from .models import Author, Licence, Source
 
 
@@ -43,12 +42,6 @@ class SourceModelForm(SimpleModelForm):
 
 class SourceModalModelForm(ModalModelFormMixin, SourceModelForm):
     pass
-
-
-class SourceFilterForm(SimpleModelForm):
-    class Meta:
-        model = Source
-        fields = ('abbreviation', 'authors', 'title', 'type', 'year')
 
 
 class SourceSimpleFilterForm(AutoCompleteModelForm):

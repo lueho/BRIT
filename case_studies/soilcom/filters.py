@@ -1,16 +1,18 @@
+from crispy_forms.helper import FormHelper
+from crispy_forms.layout import Column, Field, Layout, Row
 from dal import autocomplete
 from django.db.models import Count, Q
 from django.forms import CheckboxInput, CheckboxSelectMultiple, RadioSelect, DateInput
-from django_filters import (BooleanFilter, CharFilter, ChoiceFilter, DateFilter, FilterSet, ModelChoiceFilter,
-                            ModelMultipleChoiceFilter, RangeFilter)
+from django_filters import (BooleanFilter, CharFilter, DateFilter, ModelChoiceFilter, ModelMultipleChoiceFilter,
+                            RangeFilter)
 
+from utils.filters import AutocompleteFilterSet, SimpleFilterSet
 from utils.widgets import RangeSlider
-from .forms import CollectionFilterForm, FlyerFilterForm
-from .models import (Collection, CollectionCatchment, CollectionCountOptions, Collector, FREQUENCY_TYPES, WasteCategory,
+from .models import (Collection, CollectionCatchment, CollectionCountOptions, Collector, WasteCategory,
                      WasteComponent, WasteFlyer, )
 
 
-class CollectorFilter(FilterSet):
+class CollectorFilter(SimpleFilterSet):
     name = CharFilter(lookup_expr='icontains')
     catchment = CharFilter(lookup_expr='catchment__name__icontains')
 
@@ -31,7 +33,21 @@ OPTIONAL_FREQUENCY_CHOICES = (
 )
 
 
-class CollectionFilter(FilterSet):
+class CollectionFilterFormHelper(FormHelper):
+    layout = Layout(
+        'catchment',
+        'collector',
+        'collection_system',
+        'waste_category',
+        'allowed_materials',
+        Field('connection_rate', template="fields/range_slider_field.html"),
+        'connection_rate_include_unknown',
+        Row(Column(Field('seasonal_frequency')), Column(Field('optional_frequency'))),
+        'fee_system'
+    )
+
+
+class CollectionFilter(AutocompleteFilterSet):
     catchment = ModelChoiceFilter(queryset=CollectionCatchment.objects.all(),
                                   widget=autocomplete.ModelSelect2(url='catchment-autocomplete'),
                                   method='catchment_filter')
@@ -67,10 +83,13 @@ class CollectionFilter(FilterSet):
         fields = ('catchment', 'collector', 'collection_system', 'waste_category', 'allowed_materials',
                   'connection_rate', 'connection_rate_include_unknown', 'seasonal_frequency', 'optional_frequency',
                   'fee_system')
-        form = CollectionFilterForm
+        # catchment_filter must always be applied first, because it grabs the initial queryset and does not filter any
+        # existing queryset.
+        order_by = ['catchment_filter']
+        form_helper = CollectionFilterFormHelper
 
     @staticmethod
-    def catchment_filter(queryset, name, value):
+    def catchment_filter(_, __, value):
         qs = value.downstream_collections.order_by('name')
         if not qs.exists():
             qs = value.upstream_collections.order_by('name')
@@ -90,7 +109,7 @@ class CollectionFilter(FilterSet):
             return qs
 
     @staticmethod
-    def get_seasonal_frequency(queryset, name, value):
+    def get_seasonal_frequency(queryset, _, value):
         if value is None:
             return queryset
         queryset = queryset.annotate(season_count=Count('frequency__seasons'))
@@ -100,7 +119,7 @@ class CollectionFilter(FilterSet):
             return queryset.filter(season_count__lte=1)
 
     @staticmethod
-    def get_optional_frequency(queryset, name, value):
+    def get_optional_frequency(queryset, _, value):
         if value is None:
             return queryset
         if value is True:
@@ -113,7 +132,7 @@ class CollectionFilter(FilterSet):
             return queryset.filter(frequency__in=opts.values_list('frequency'))
 
 
-class WasteFlyerFilter(FilterSet):
+class WasteFlyerFilter(SimpleFilterSet):
     url_valid = BooleanFilter(widget=RadioSelect(choices=((True, 'True'), (False, 'False'))))
     url_checked_before = DateFilter(
         field_name='url_checked',
@@ -131,4 +150,3 @@ class WasteFlyerFilter(FilterSet):
     class Meta:
         model = WasteFlyer
         fields = ('url_valid', 'url_checked_before', 'url_checked_after')
-        form = FlyerFilterForm
