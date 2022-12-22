@@ -2,7 +2,7 @@ import celery
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
-from django.db.models import Count, Q
+from django.db.models import Count, Q, Sum
 from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
 
@@ -250,6 +250,10 @@ class CollectionFrequency(NamedUserObjectModel):
     def seasonal(self):
         qs = CollectionFrequency.objects.annotate(season_count=Count('seasons')).filter(season_count__gt=1)
         return self in qs
+
+    @property
+    def collections_per_year(self):
+        return self.collectioncountoptions_set.aggregate(Sum('standard'))['standard__sum']
 
 
 class CollectionCountOptions(OwnedObjectModel):

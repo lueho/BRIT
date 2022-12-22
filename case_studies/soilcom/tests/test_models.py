@@ -377,8 +377,8 @@ class CollectionFrequencyTestCase(TestCase):
         cls.not_seasonal = CollectionFrequency.objects.create(name='Non-Seasonal Test Frequency')
         CollectionCountOptions.objects.create(frequency=cls.not_seasonal, season=whole_year, standard=35, option_1=70)
         cls.seasonal = CollectionFrequency.objects.create(name='Seasonal Test Frequency')
-        CollectionCountOptions.objects.create(frequency=cls.seasonal, season=first_half_year, standard=17)
-        CollectionCountOptions.objects.create(frequency=cls.seasonal, season=second_half_year, standard=18)
+        CollectionCountOptions.objects.create(frequency=cls.seasonal, season=first_half_year, standard=35)
+        CollectionCountOptions.objects.create(frequency=cls.seasonal, season=second_half_year, standard=35)
 
     def test_seasonal_returns_true_for_seasonal_frequency_object(self):
         self.assertTrue(self.seasonal.seasonal)
@@ -391,3 +391,7 @@ class CollectionFrequencyTestCase(TestCase):
 
     def test_has_options_returns_false_for_frequency_without_optional_collection_count(self):
         self.assertFalse(self.seasonal.has_options)
+
+    def test_collections_per_year_returns_correct_sum_of_standard_values_of_all_seasons(self):
+        self.assertEqual(70, self.seasonal.collections_per_year)
+        self.assertEqual(35, self.not_seasonal.collections_per_year)
