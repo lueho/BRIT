@@ -22,5 +22,16 @@ class RangeSlider(RangeWidget):
         base_id = context['widget']['attrs']['id']
         for swx, subwidget in enumerate(context['widget']['subwidgets']):
             subwidget['attrs']['id'] = base_id + "_" + self.suffixes[swx]
+        context['widget']['value_text'] = "{} - {}".format(cur_min, cur_max)
+        return context
+
+
+class PercentageRangeSlider(RangeSlider):
+    template_name = 'widgets/percentage_range_slider_widget.html'
+
+    def get_context(self, name, value, attrs):
+        context = super().get_context(name, value, attrs)
+        cur_min = context['widget']['attrs']['data-cur_min']
+        cur_max = context['widget']['attrs']['data-cur_max']
         context['widget']['value_text'] = "{}% - {}%".format(cur_min, cur_max)
         return context
