@@ -75,8 +75,8 @@ class CollectionFilterTestCase(TestCase):
         CollectionCountOptions.objects.create(frequency=cls.not_seasonal_frequency, season=whole_year, standard=35,
                                               option_1=70)
         cls.seasonal_frequency = CollectionFrequency.objects.create(name='Seasonal Test Frequency')
-        CollectionCountOptions.objects.create(frequency=cls.seasonal_frequency, season=first_half_year, standard=17)
-        CollectionCountOptions.objects.create(frequency=cls.seasonal_frequency, season=second_half_year, standard=18)
+        CollectionCountOptions.objects.create(frequency=cls.seasonal_frequency, season=first_half_year, standard=35)
+        CollectionCountOptions.objects.create(frequency=cls.seasonal_frequency, season=second_half_year, standard=35)
         cls.catchment = CollectionCatchment.objects.create(name='Test Catchment')
         child_catchment = CollectionCatchment.objects.create(name='Child Catchment', parent=cls.catchment)
         cls.grandchild_catchment = CollectionCatchment.objects.create(parent=child_catchment)
@@ -85,7 +85,9 @@ class CollectionFilterTestCase(TestCase):
                                                     connection_rate=0.7)
         cls.collection2 = Collection.objects.create(catchment=cls.unrelated_catchment, frequency=cls.seasonal_frequency,
                                                     connection_rate=0.3)
-        cls.child_collection = Collection.objects.create(catchment=child_catchment)
+        fixed_once_per_week = CollectionFrequency.objects.create(type='Fixed')
+        CollectionCountOptions.objects.create(frequency=fixed_once_per_week, season=whole_year, standard=52)
+        cls.child_collection = Collection.objects.create(catchment=child_catchment, frequency=fixed_once_per_week)
 
     def setUp(self):
         self.data = {field_name: field.initial for field_name, field in CollectionFilter().form.fields.items() if
@@ -120,7 +122,7 @@ class CollectionFilterTestCase(TestCase):
     def test_connection_rate_range_filter_renders_with_converted_percentage_values(self):
         self.data.update({'connection_rate_min': 50, 'connection_rate_max': 99})
         filtr = CollectionFilter(self.data, queryset=Collection.objects.all())
-        self.assertInHTML('<span class="numeric-slider-range_text" id="id_connection_rate_text">50% - 99%</span>',
+        self.assertInHTML('<span class="numeric-slider-range_text percentage-slider-values" id="id_connection_rate_text">50% - 99%</span>',
                           filtr.form.as_p())
 
     def test_connection_rate_returns_only_collections_in_given_range(self):
@@ -164,11 +166,11 @@ class CollectionFilterTestCase(TestCase):
         self.assertIn('optional_frequency', filtr.filters.keys())
         self.assertIn('optional_frequency', filtr.form.fields.keys())
 
-    def test_optional_frequency_filter_returns_collections_with_non_seasonal_frequency_on_false(self):
+    def test_optional_frequency_filter_returns_collections_without_options_on_false(self):
         self.data.update({'optional_frequency': False})
         qs = CollectionFilter(self.data, queryset=Collection.objects.all()).qs
         opts = CollectionCountOptions.objects.filter(Q(option_1__isnull=True) & Q(option_2__isnull=True) &
-                                                     Q(option_3__isnull=True))
+                                                     Q(option_3__isnull=True) & Q(frequency=self.seasonal_frequency))
         self.assertEqual(2, opts.count())
         for opt in opts:
             self.assertIsNone(opt.option_1)
