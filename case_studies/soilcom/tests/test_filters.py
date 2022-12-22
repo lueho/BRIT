@@ -56,7 +56,7 @@ class CollectionFilterTestCase(TestCase):
         cls.june = Timestep.objects.get(name='June')
         cls.july = Timestep.objects.get(name='July')
         cls.december = Timestep.objects.get(name='December')
-        whole_year = CollectionSeason.objects.create(
+        whole_year = CollectionSeason.objects.get(
             distribution=distribution,
             first_timestep=cls.january,
             last_timestep=cls.december

@@ -332,7 +332,7 @@ class CollectionSeasonTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.distribution = TemporalDistribution.objects.get(name='Months of the year')
-        CollectionSeason.objects.create(
+        CollectionSeason.objects.get(
             distribution=cls.distribution,
             first_timestep=Timestep.objects.get(name='January'),
             last_timestep=Timestep.objects.get(name='December')

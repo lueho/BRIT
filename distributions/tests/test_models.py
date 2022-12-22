@@ -62,7 +62,7 @@ class PeriodTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.period = Period.objects.create(
+        cls.period = Period.objects.get(
             distribution=TemporalDistribution.objects.get(name='Months of the year'),
             first_timestep=Timestep.objects.get(name='January'),
             last_timestep=Timestep.objects.get(name='December')
