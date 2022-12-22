@@ -4,10 +4,23 @@ from django.test import TestCase
 from django.urls import reverse
 
 from distributions.models import Period, TemporalDistribution, Timestep
+from maps.models import GeoDataset, Region
 from materials.models import Material
 from users.models import get_default_owner
 from ..models import (Collection, CollectionCatchment, CollectionCountOptions, CollectionFrequency, CollectionSystem,
                       WasteStream, WasteCategory, WasteFlyer, CollectionSeason)
+
+
+class InitialDataTestCase(TestCase):
+
+    @staticmethod
+    def test_household_biowaste_collection_dataset_is_initialized():
+        GeoDataset.objects.get(
+            owner=get_default_owner(),
+            name='Household Biowaste Collection',
+            model_name='WasteCollection',
+            region=Region.objects.get(name='Europe (NUTS)')
+        )
 
 
 def comparable_model_dict(instance):
@@ -346,7 +359,7 @@ class CollectionFrequencyTestCase(TestCase):
         cls.june = Timestep.objects.get(name='June')
         cls.july = Timestep.objects.get(name='July')
         cls.december = Timestep.objects.get(name='December')
-        whole_year = CollectionSeason.objects.create(
+        whole_year = CollectionSeason.objects.get(
             distribution=distribution,
             first_timestep=cls.january,
             last_timestep=cls.december
