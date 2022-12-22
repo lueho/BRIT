@@ -913,6 +913,7 @@ class RegionAttributeValueCreateViewTestCase(ViewWithPermissionsTestCase):
         data = {
             'name': 'Test Attribute Value',
             'region': self.region.id,
+            'date': '2022-01-01',
             'attribute': self.attribute.id,
             'value': 123.321
         }
@@ -962,6 +963,7 @@ class RegionAttributeValueModalCreateViewTestCase(ViewWithPermissionsTestCase):
         data = {
             'name': 'Test Attribute Value',
             'region': self.region.id,
+            'date': '2022-01-01',
             'attribute': self.attribute.id,
             'value': 123.321
         }
@@ -1076,6 +1078,7 @@ class RegionAttributeValueUpdateViewTestCase(ViewWithPermissionsTestCase):
         data = {
             'name': 'Updated Value',
             'region': self.region.id,
+            'date': '2022-01-01',
             'attribute': self.attribute.id,
             'value': 456.654
         }
@@ -1143,6 +1146,7 @@ class RegionAttributeValueModalUpdateViewTestCase(ViewWithPermissionsTestCase):
         data = {
             'name': 'Updated Value',
             'region': self.region.id,
+            'date': '2022-01-01',
             'attribute': self.attribute.id,
             'value': 456.654
         }
