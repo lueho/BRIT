@@ -1,6 +1,5 @@
 from bootstrap_modal_forms.mixins import CreateUpdateAjaxMixin, PopRequestMixin
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Field
 from dal_select2.widgets import Select2WidgetMixin
 from django.core.exceptions import ImproperlyConfigured
 from django.forms import BaseFormSet, BaseModelFormSet, Form, formset_factory, ModelForm, modelformset_factory
@@ -113,14 +112,6 @@ class DynamicTableInlineFormSetHelper(FormHelper):
         self.template = 'bootstrap4/dynamic_table_inline_formset.html'
         self.form_method = 'post'
         self.form_tag = False
-
-
-class ForeignkeyField(Field):
-    """
-    Similar to a ModelChoiceField. Additional to the model choice by dropdown, this adds a plus symbol next to the field
-    as a shortcut to create a new model though a modal form.
-    """
-    template = 'foreignkey-field.html'
 
 
 class M2MInlineFormSet(BaseFormSet):
