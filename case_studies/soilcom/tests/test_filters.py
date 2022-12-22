@@ -1,4 +1,3 @@
-from crispy_forms.helper import FormHelper
 from django.db.models import Q
 from django.http.request import QueryDict, MultiValueDict
 from django.test import TestCase, modify_settings
@@ -129,7 +128,8 @@ class CollectionFilterTestCase(TestCase):
         self.data.update({'connection_rate_min': 50, 'connection_rate_max': 100})
         filtr = CollectionFilter(self.data, queryset=Collection.objects.all())
         qs = filtr.qs.order_by('id')
-        expected_qs = Collection.objects.filter(Q(connection_rate__range=(0.5, 1)) | Q(connection_rate__isnull=True)).order_by('id')
+        expected_qs = Collection.objects.filter(
+            Q(connection_rate__range=(0.5, 1)) | Q(connection_rate__isnull=True)).order_by('id')
         self.assertQuerysetEqual(expected_qs, qs)
 
     def test_connection_rate_include_unknown_includes_null_values_if_checked(self):
@@ -189,6 +189,22 @@ class CollectionFilterTestCase(TestCase):
         self.data.update({'optional_frequency': None})
         qs = CollectionFilter(self.data, queryset=Collection.objects.all()).qs
         self.assertQuerysetEqual(Collection.objects.order_by('id'), qs.order_by('id'))
+
+    def test_collections_per_year_field_exists_in_filter_form(self):
+        filtr = CollectionFilter(queryset=Collection.objects.all())
+        self.assertIn('collections_per_year', filtr.filters.keys())
+        self.assertIn('collections_per_year', filtr.form.fields.keys())
+
+    def test_get_collections_per_year_returns_only_matching_results(self):
+        filtr = CollectionFilter(queryset=Collection.objects.all())
+        qs = filtr.get_collections_per_year(
+            Collection.objects.all(),
+            'collections_per_year',
+            slice(10, 50, None)
+        )
+        self.assertIn(self.collection1, qs)
+        self.assertNotIn(self.collection2, qs)
+        self.assertNotIn(self.child_collection, qs)
 
     def test_filter_form_has_no_formtags(self):
         filtr = CollectionFilter(queryset=Collection.objects.all())
