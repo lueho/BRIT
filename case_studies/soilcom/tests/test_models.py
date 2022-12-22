@@ -14,6 +14,19 @@ from ..models import (Collection, CollectionCatchment, CollectionCountOptions, C
 class InitialDataTestCase(TestCase):
 
     @staticmethod
+    def test_simple_initial_collection_frequency_exists():
+        season = CollectionSeason.objects.get(
+            distribution=TemporalDistribution.objects.get(name='Months of the year'),
+            first_timestep=Timestep.objects.get(name='January'),
+            last_timestep=Timestep.objects.get(name='December')
+        )
+        CollectionCountOptions.objects.get(
+            frequency__type='Fixed',
+            season=season,
+            standard=52
+        )
+
+    @staticmethod
     def test_household_biowaste_collection_dataset_is_initialized():
         GeoDataset.objects.get(
             owner=get_default_owner(),
