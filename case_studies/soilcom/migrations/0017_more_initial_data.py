@@ -19,7 +19,7 @@ def create_initial_data(apps, schema_editor):
         last_timestep=december
     )
     CollectionFrequency = apps.get_model('soilcom', 'CollectionFrequency')
-    frequency, _ = CollectionFrequency.objects.get_or_create(type='Fixed')
+    frequency, _ = CollectionFrequency.objects.get_or_create(name='Fixed; 52 per year (1 per week)', type='Fixed')
     CollectionCountOptions = apps.get_model('soilcom', 'CollectionCountOptions')
     CollectionCountOptions.objects.get_or_create(
         season=season,
