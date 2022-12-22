@@ -253,6 +253,11 @@ function parseFilterParameters() {
                 params.append(key + '_min', min);
                 params.append(key + '_max', max);
                 break;
+            case 'PercentageRangeSlider':
+                const [min_perc, max_perc] = readRangeSlider(key);
+                params.append(key + '_min', min_perc);
+                params.append(key + '_max', max_perc);
+                break;
             default:
                 params.append(key, document.getElementsByName(key)[0].value);
             }
