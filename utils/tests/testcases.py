@@ -28,3 +28,11 @@ class ViewWithPermissionsTestCase(UserLoginTestCase):
                 cls.member_permissions = [cls.member_permissions]
             for codename in cls.member_permissions:
                 cls.member.user_permissions.add(Permission.objects.get(codename=codename))
+
+
+def comparable_model_dict(instance):
+    """
+    Removes '_state' so that two model instances can be compared by their __dict__ property.
+    """
+    return {k: v for k, v in instance.__dict__.items() if
+            k not in ('_state', 'lastmodified_at', '_prefetched_objects_cache')}

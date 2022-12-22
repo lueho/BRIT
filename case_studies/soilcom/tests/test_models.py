@@ -6,6 +6,7 @@ from django.urls import reverse
 from distributions.models import Period, TemporalDistribution, Timestep
 from maps.models import GeoDataset, Region
 from materials.models import Material
+from utils.tests.testcases import comparable_model_dict
 from users.models import get_default_owner
 from ..models import (Collection, CollectionCatchment, CollectionCountOptions, CollectionFrequency, CollectionSystem,
                       WasteStream, WasteCategory, WasteFlyer, CollectionSeason)
@@ -34,14 +35,6 @@ class InitialDataTestCase(TestCase):
             model_name='WasteCollection',
             region=Region.objects.get(name='Europe (NUTS)')
         )
-
-
-def comparable_model_dict(instance):
-    """
-    Removes '_state' so that two model instances can be compared by their __dict__ property.
-    """
-    return {k: v for k, v in instance.__dict__.items() if
-            k not in ('_state', 'lastmodified_at', '_prefetched_objects_cache')}
 
 
 class CollectionCatchmentTestCase(TestCase):
