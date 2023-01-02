@@ -1,6 +1,8 @@
 from dal import autocomplete
 from django.contrib.auth.mixins import PermissionRequiredMixin
-from django.db.models import Q
+from django.contrib.gis.geos import MultiPolygon
+from django.db.models import Q, Subquery
+from django.forms import formset_factory
 from django.http import JsonResponse
 from django.urls import reverse_lazy
 from django.views.generic import DetailView, ListView, TemplateView
@@ -8,38 +10,34 @@ from django.views.generic.edit import FormMixin
 from rest_framework.exceptions import ParseError, NotFound
 from rest_framework.views import APIView, Response
 
-from brit.views import (
-    BRITFilterView,
-    OwnedObjectListView,
-    OwnedObjectCreateView,
-    OwnedObjectModalCreateView,
-    OwnedObjectDetailView,
-    OwnedObjectModalDetailView,
-    OwnedObjectUpdateView,
-    OwnedObjectModalUpdateView,
-    OwnedObjectModalDeleteView,
-    OwnedObjectModelSelectOptionsView
-)
 from maps.serializers import (
     RegionSerializer, CatchmentSerializer, NutsRegionGeometrySerializer,
     NutsRegionCatchmentOptionSerializer, NutsRegionSummarySerializer, LauRegionOptionSerializer,
     LauRegionSummarySerializer,
     NutsRegionOptionSerializer)
+from utils.forms import DynamicTableInlineFormSetHelper
+from utils.views import (BRITFilterView, OwnedObjectListView, OwnedObjectCreateView, OwnedObjectModalCreateView,
+                         OwnedObjectDetailView, OwnedObjectModalDetailView, OwnedObjectUpdateView,
+                         OwnedObjectModalUpdateView,
+                         OwnedObjectModalDeleteView, OwnedObjectModelSelectOptionsView)
 from .filters import CatchmentFilter
 from .forms import (
     AttributeModelForm,
     AttributeModalModelForm,
     CatchmentModelForm,
+    CatchmentCreateByMergeForm,
     CatchmentQueryForm,
     NutsRegionQueryForm,
     RegionAttributeValueModelForm,
-    RegionAttributeValueModalModelForm
+    RegionAttributeValueModalModelForm,
+    RegionMergeFormSet, RegionMergeForm
 )
 from .models import (
     Attribute,
     RegionAttributeValue,
     Catchment,
     GeoDataset,
+    GeoPolygon,
     Region,
     NutsRegion,
     LauRegion
@@ -155,7 +153,7 @@ class CatchmentBrowseView(FormMixin, TemplateView):
 class CatchmentListView(BRITFilterView):
     model = Catchment
     filterset_class = CatchmentFilter
-    ordering = 'id'
+    ordering = 'name'
 
 
 class CatchmentDetailView(MapMixin, DetailView):
@@ -166,9 +164,74 @@ class CatchmentDetailView(MapMixin, DetailView):
 
 
 class CatchmentCreateView(OwnedObjectCreateView):
-    template_name = 'simple_form_card.html'
+    template_name = 'maps/catchment_form.html'
     form_class = CatchmentModelForm
     permission_required = 'maps.add_catchment'
+
+
+class CatchmentCreateByMergeView(OwnedObjectCreateView):
+    form = None
+    form_class = CatchmentCreateByMergeForm
+    formset = None
+    formset_model = Region
+    formset_class = RegionMergeFormSet
+    formset_form_class = RegionMergeForm
+    formset_helper_class = DynamicTableInlineFormSetHelper
+    formset_factory_kwargs = {'extra': 2}
+    relation_field_name = 'seasons'
+    permission_required = 'maps.add_catchment'
+    template_name = 'form_and_formset.html'
+
+    def get_formset_kwargs(self, **kwargs):
+        if self.request.method in ("POST", "PUT"):
+            kwargs.update({'data': self.request.POST.copy()})
+        return kwargs
+
+    def get_formset(self):
+        FormSet = formset_factory(
+            self.formset_form_class,
+            formset=self.formset_class,
+            **self.formset_factory_kwargs
+        )
+        return FormSet(**self.get_formset_kwargs())
+
+    def get_region_name(self):
+        # The region will get the same custom name as the catchment
+        if self.object:
+            return self.object.name
+
+    def create_region_borders(self):
+        geoms = [form['region'].borders.geom for form in self.formset.cleaned_data if 'region' in form]
+        new_geom = geoms[0]
+        for geom in geoms[1:]:
+            new_geom = new_geom.union(geom)
+        new_geom.normalize()
+        if not type(new_geom) == MultiPolygon:
+            new_geom = MultiPolygon(new_geom)
+        return GeoPolygon.objects.create(geom=new_geom)
+
+    def get_region(self):
+        return Region.objects.create(
+            name=self.get_region_name(),
+            borders=self.create_region_borders()
+        )
+
+    def get_context_data(self, **kwargs):
+        if 'formset' not in kwargs:
+            kwargs['formset'] = self.get_formset()
+        kwargs['formset_helper'] = self.formset_helper_class
+        return super().get_context_data(**kwargs)
+
+    def form_valid(self, form):
+        self.formset = self.get_formset()
+        if not self.formset.is_valid():
+            return self.form_invalid(form)
+        else:
+            response = super().form_valid(form)
+            self.object.region = self.get_region()
+            self.object.type = 'custom'
+            self.object.save()
+            return response
 
 
 class CatchmentUpdateView(OwnedObjectUpdateView):
@@ -300,8 +363,25 @@ class GeoDatasetDetailView(GeoDataSetFormMixin, GeoDataSetMixin, DetailView):
         return self.object.region.id
 
 
-# ----------- Regions --------------------------------------------------------------------------------------------------
+# ----------- Region Utils ---------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
+
+
+class RegionAutocompleteView(autocomplete.Select2QuerySetView):
+    def get_queryset(self):
+        qs = Region.objects.all().order_by('name')
+        if self.q:
+            qs = qs.filter(name__icontains=self.q)
+        return qs
+
+
+class RegionOfLauAutocompleteView(autocomplete.Select2QuerySetView):
+    def get_queryset(self):
+        qs = Region.objects.filter(pk__in=Subquery(LauRegion.objects.all().values('pk'))).order_by('name')
+        if self.q:
+            qs = qs.filter(Q(name__icontains=self.q) | Q(lauregion__lau_id__contains=self.q))
+        return qs
+
 
 class CatchmentGeometryAPI(APIView):
     authentication_classes = []
@@ -326,12 +406,14 @@ class CatchmentGeometryAPI(APIView):
                         'label': 'Description',
                         'value': catchment.description
                     },
-                    'parent_region': {
-                        'label': 'Parent region',
-                        'value': catchment.parent_region.name
-                    }
                 }
             }
+            if catchment.parent_region:
+                data['info']['parent_region'] = {
+                    'label': 'Parent region',
+                    'value': catchment.parent_region.name
+                }
+
             return JsonResponse(data)
 
         return JsonResponse({})

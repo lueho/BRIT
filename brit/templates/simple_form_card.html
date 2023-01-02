@@ -13,11 +13,14 @@
                         <form method="post">
                             {% crispy form %}
                             {% block extra_form_content %}{% endblock %}
+                            {% block submit_button %}
+                                <input type="submit" name="submit" value="Save" class="btn btn-primary"
+                                       id="submit-id-submit">
+                            {% endblock %}
                         </form>
                     </div>
                 </div>
-                <div class="card-footer">
-                </div>
+                <div class="card-footer">{% block card_footer %}{% endblock %}</div>
             </div>
         </div>
     </div>

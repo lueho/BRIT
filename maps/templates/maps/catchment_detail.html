@@ -1,49 +1,57 @@
-{% extends 'base.html' %}
+{% extends 'simple_detail_card.html' %}
 {% load static %}
 {% load leaflet_tags %}
 
-{% block title %}BRIT | Maps | Catchment: {{ object.name }}{% endblock %}
-
-{% block content %}
-
+{% block style_sheets %}
     {% leaflet_js %}
     {% leaflet_css %}
+{% endblock %}
 
-    <div class="row">
-        <div class="col">
-            <div class="card shadow">
-                <div class="card-header"><strong>{{ object.name }}</strong></div>
-                <div class="card-img-top">{% leaflet_map "main" %}</div>
-                <div class="card-body">
-                    <p class="card-text"><strong>Name:</strong><br>{{ object.name }}</p>
-                    <p class="card-text"><strong>Type:</strong><br>{{ object.type }}</p>
-                    {% if object.description %}
-                        <p class="card-text"><strong>Description:</strong><br>{{ object.description }}</p>
-                    {% endif %}
-                </div>
-                <div class="card-footer">
-                    <a href="javascript:history.go(-1)" class="nowrap">
-                        <i class="fas fa-fw fa-arrow-left"></i> back
-                    </a>
-                    <a href="{% url 'catchment-list' %}" class="nowrap ml-3">
-                        <i class="fas fa-fw fa-list"></i> see all
-                    </a>
-                    {% if 'maps.change_catchment' in perms %}
-                        <a href="{% url 'catchment-update' object.pk %}" class="nowrap ml-3">
-                            <i class="fas fa-fw fa-edit"></i> edit
-                        </a>
-                    {% endif %}
-                    {% if 'maps.delete_catchment' in perms %}
-                        <a href="{% url 'catchment-delete-modal' object.pk %}" class="nowrap modal-link ml-3">
-                            <i class="fas fa-fw fa-trash"></i> delete
-                        </a>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-    </div>
+{% block title %}BRIT | Maps | Catchment: {{ object.name }}{% endblock %}
 
-{% endblock content %}
+{% block detail_header %}Catchment: {{ object.name }}{% endblock %}
+
+{% block detail_top_image %}<div class="card-img-top">{% leaflet_map "main" %}</div>{% endblock %}
+
+{% block detail_body %}
+    <p class="card-text"><strong>Name:</strong><br>{{ object.name }}</p>
+    <p class="card-text"><strong>Type:</strong><br>{{ object.type }}</p>
+    {% if object.region %}
+        <p class="card-text">
+            <strong>Region:</strong><br>
+            {{ object.region }}
+        </p>
+    {% endif %}
+    {% if object.parent_region %}
+        <p class="card-text">
+            <strong>Parent region:</strong><br>
+            {{ object.parent_region }}
+        </p>
+    {% endif %}
+    {% if object.description %}
+        <p class="card-text"><strong>Description:</strong><br>{{ object.description }}</p>
+    {% endif %}
+    {% block additional_details %}{% endblock %}
+{% endblock %}
+
+{% block detail_footer %}
+    <a href="javascript:history.go(-1)" class="nowrap mr-2">
+        <i class="fas fa-fw fa-arrow-left"></i> back
+    </a>
+    <a href="{% url 'catchment-list' %}" class="nowrap mr-2">
+        <i class="fas fa-fw fa-list"></i> see all
+    </a>
+    {% if 'maps.change_catchment' in perms %}
+        <a href="{% url 'catchment-update' object.pk %}" class="nowrap mr-2">
+            <i class="fas fa-fw fa-edit"></i> edit
+        </a>
+    {% endif %}
+    {% if 'maps.delete_catchment' in perms %}
+        <a href="{% url 'catchment-delete-modal' object.pk %}" class="nowrap modal-link mr-2">
+            <i class="fas fa-fw fa-trash"></i> delete
+        </a>
+    {% endif %}
+{% endblock %}
 
 {% block javascript %}
     {{ block.super }}

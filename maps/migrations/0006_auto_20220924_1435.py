@@ -4,7 +4,7 @@ import django.db.models.deletion
 from django.conf import settings
 from django.db import migrations, models
 
-import brit.models
+from utils.models import get_default_owner_pk
 
 
 class Migration(migrations.Migration):
@@ -17,43 +17,43 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='attribute',
             name='owner',
-            field=models.ForeignKey(default=brit.models.get_default_owner_pk,
+            field=models.ForeignKey(default=get_default_owner_pk,
                                     on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL),
         ),
         migrations.AlterField(
             model_name='catchment',
             name='owner',
-            field=models.ForeignKey(default=brit.models.get_default_owner_pk,
+            field=models.ForeignKey(default=get_default_owner_pk,
                                     on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL),
         ),
         migrations.AlterField(
             model_name='geodataset',
             name='owner',
-            field=models.ForeignKey(default=brit.models.get_default_owner_pk,
+            field=models.ForeignKey(default=get_default_owner_pk,
                                     on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL),
         ),
         migrations.AlterField(
             model_name='region',
             name='owner',
-            field=models.ForeignKey(default=brit.models.get_default_owner_pk,
+            field=models.ForeignKey(default=get_default_owner_pk,
                                     on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL),
         ),
         migrations.AlterField(
             model_name='regionattributetextvalue',
             name='owner',
-            field=models.ForeignKey(default=brit.models.get_default_owner_pk,
+            field=models.ForeignKey(default=get_default_owner_pk,
                                     on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL),
         ),
         migrations.AlterField(
             model_name='regionattributevalue',
             name='owner',
-            field=models.ForeignKey(default=brit.models.get_default_owner_pk,
+            field=models.ForeignKey(default=get_default_owner_pk,
                                     on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL),
         ),
         migrations.AlterField(
             model_name='sfbsite',
             name='owner',
-            field=models.ForeignKey(default=brit.models.get_default_owner_pk,
+            field=models.ForeignKey(default=get_default_owner_pk,
                                     on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL),
         ),
     ]

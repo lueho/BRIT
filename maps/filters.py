@@ -1,15 +1,12 @@
-from django_filters import (CharFilter,
-                            FilterSet,
-                            )
+from django_filters import CharFilter
 
-from .forms import CatchmentFilterForm
+from utils.filters import AutocompleteFilterSet
 from .models import Catchment
 
 
-class CatchmentFilter(FilterSet):
+class CatchmentFilter(AutocompleteFilterSet):
     name = CharFilter(lookup_expr='icontains')
 
     class Meta:
         model = Catchment
         fields = ('name', 'type',)
-        form = CatchmentFilterForm

@@ -6,7 +6,10 @@
     <div class="row">
         <div class="col">
             <div class="card shadow">
-                <div class="card-header"><strong>{{ model_name }} details</strong></div>
+                <div class="card-header"><strong>{% block detail_header %}{{ model_name }} details{% endblock %}</strong></div>
+
+                {% block detail_top_image %}{% endblock %}
+
                 <div class="card-body">
                     {% block detail_body %}
                         <p class="card-text"><strong>Name:</strong><br>{{ object.name }}</p>

@@ -4,7 +4,7 @@ from celery.result import AsyncResult
 from dal.autocomplete import Select2QuerySetView
 from django.contrib.auth.mixins import PermissionRequiredMixin, LoginRequiredMixin
 from django.db.models import Max
-from django.forms import modelformset_factory, formset_factory
+from django.forms.models import model_to_dict
 from django.http import HttpResponseRedirect, JsonResponse, HttpResponse
 from django.urls import reverse, reverse_lazy
 from django.views import View
@@ -16,25 +16,23 @@ from rest_framework.views import APIView
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
 import case_studies.soilcom.tasks
-from bibliography.views import (SourceCreateView,
-                                SourceModalCreateView,
-                                SourceModalDetailView,
-                                SourceUpdateView,
-                                SourceModalUpdateView,
-                                SourceModalDeleteView,
-                                SourceCheckUrlView)
-from brit import views
-from brit.views import BRITFilterView
+from bibliography.views import (SourceCreateView, SourceModalCreateView, SourceModalDetailView, SourceUpdateView,
+                                SourceModalUpdateView, SourceModalDeleteView, SourceCheckUrlView)
+from distributions.models import TemporalDistribution, Timestep
 from maps.forms import NutsAndLauCatchmentQueryForm
-from maps.models import Catchment, GeoDataset
-from maps.views import GeoDatasetDetailView, GeoDataSetMixin, GeoDataSetFormMixin
+from maps.models import GeoDataset
+from maps.views import CatchmentDetailView, GeoDatasetDetailView, GeoDataSetMixin, GeoDataSetFormMixin
+from utils import views
+from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineModelFormSetMixin, M2MInlineFormSetMixin
+from utils.models import Property
+from utils.views import OwnedObjectCreateView, OwnedObjectUpdateView
 from . import filters
 from . import forms
 from . import models
 from . import serializers
 from .filters import CollectionFilter, CollectorFilter, WasteFlyerFilter
-from .models import Collection
-from .models import Collector, WasteFlyer
+from .models import (Collection, CollectionCatchment, CollectionCountOptions, CollectionFrequency, Collector,
+                     WasteFlyer, CollectionSeason)
 from .serializers import CollectionFlatSerializer
 from .tasks import check_wasteflyer_urls
 
@@ -44,11 +42,20 @@ class CollectionHomeView(PermissionRequiredMixin, TemplateView):
     permission_required = 'soilcom.view_collection'
 
 
+# ----------- CollectionCatchment CRUD ---------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class CollectionCatchmentDetailView(CatchmentDetailView):
+    model = CollectionCatchment
+    permission_required = set()
+
+
 # ----------- Collector CRUD -------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CollectorListView(BRITFilterView):
+class CollectorListView(views.BRITFilterView):
     model = Collector
     filterset_class = CollectorFilter
     ordering = 'name'
@@ -343,7 +350,7 @@ class WasteStreamModalDeleteView(views.OwnedObjectModalDeleteView):
 # ----------- Waste Collection Flyer CRUD ------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class WasteFlyerListView(BRITFilterView):
+class WasteFlyerListView(views.BRITFilterView):
     model = WasteFlyer
     filterset_class = WasteFlyerFilter
     ordering = 'id'
@@ -452,27 +459,44 @@ class WasteFlyerListCheckUrlsProgressView(LoginRequiredMixin, View):
 # ----------------------------------------------------------------------------------------------------------------------
 
 class FrequencyListView(views.OwnedObjectListView):
-    template_name = 'simple_list_card.html'
     model = models.CollectionFrequency
     permission_required = set()
 
 
-class FrequencyCreateView(views.OwnedObjectCreateView):
-    template_name = 'simple_form_card.html'
+class FrequencyCreateView(M2MInlineFormSetMixin, OwnedObjectCreateView):
     form_class = forms.CollectionFrequencyModelForm
-    success_url = reverse_lazy('collectionfrequency-list')
+    formset_model = CollectionSeason
+    formset_class = forms.CollectionSeasonFormSet
+    formset_form_class = forms.CollectionSeasonForm
+    formset_helper_class = forms.CollectionSeasonFormHelper
+    formset_factory_kwargs = {'extra': 0}
+    relation_field_name = 'seasons'
     permission_required = 'soilcom.add_collectionfrequency'
 
+    def get_formset_initial(self):
+        return list(CollectionSeason.objects.filter(
+            distribution__name='Months of the year',
+            first_timestep__name='January',
+            last_timestep__name='December'
+        ).values('distribution', 'first_timestep', 'last_timestep'))
 
-class FrequencyModalCreateView(views.OwnedObjectModalCreateView):
-    template_name = 'modal_form.html'
-    form_class = forms.CollectionFrequencyModalModelForm
-    success_url = reverse_lazy('collectionfrequency-list')
-    permission_required = 'soilcom.add_collectionfrequency'
+    def post(self, request, *args, **kwargs):
+        form = self.get_form()
+        formset = self.get_formset()
+
+        if form.is_valid() and formset.is_valid():
+            form.instance.owner = self.request.user
+            self.object = form.save()
+            formset = self.get_formset()
+            formset.is_valid()
+            formset.save()
+            return HttpResponseRedirect(self.get_success_url())
+        else:
+            context = self.get_context_data(form=form, formset=formset)
+            return self.render_to_response(context)
 
 
 class FrequencyDetailView(views.OwnedObjectDetailView):
-    template_name = 'simple_detail_card.html'
     model = models.CollectionFrequency
     permission_required = set()
 
@@ -483,11 +507,44 @@ class FrequencyModalDetailView(views.OwnedObjectModalDetailView):
     permission_required = set()
 
 
-class FrequencyUpdateView(views.OwnedObjectUpdateView):
-    template_name = 'simple_form_card.html'
-    model = models.CollectionFrequency
+class FrequencyUpdateView(M2MInlineFormSetMixin, OwnedObjectUpdateView):
+    model = CollectionFrequency
     form_class = forms.CollectionFrequencyModelForm
+    formset_model = CollectionSeason
+    formset_class = forms.CollectionSeasonFormSet
+    formset_form_class = forms.CollectionSeasonForm
+    formset_helper_class = forms.CollectionSeasonFormHelper
+    formset_factory_kwargs = {'extra': 0}
+    relation_field_name = 'seasons'
     permission_required = 'soilcom.change_collectionfrequency'
+
+    def get_formset_initial(self):
+        initial = []
+        for season in self.object.seasons.all():
+            options = CollectionCountOptions.objects.get(frequency=self.object, season=season)
+            initial.append({
+                'distribution': season.distribution,
+                'first_timestep': season.first_timestep,
+                'last_timestep': season.last_timestep,
+                'standard': options.standard,
+                'option_1': options.option_1,
+                'option_2': options.option_2,
+                'option_3': options.option_3,
+            })
+        return initial
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        form = self.get_form()
+        formset = self.get_formset()
+
+        if form.is_valid() and formset.is_valid():
+            form.save()
+            formset.save()
+            return HttpResponseRedirect(self.get_success_url())
+        else:
+            context = self.get_context_data(form=form, formset=formset)
+            return self.render_to_response(context)
 
 
 class FrequencyModalUpdateView(views.OwnedObjectModalUpdateView):
@@ -505,82 +562,109 @@ class FrequencyModalDeleteView(views.OwnedObjectModalDeleteView):
     permission_required = 'soilcom.delete_collectionfrequency'
 
 
+# ----------- Frequency Utils ------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class FrequencyAutoCompleteView(Select2QuerySetView):
+    def get_queryset(self):
+        qs = models.CollectionFrequency.objects.order_by('name')
+        if self.q:
+            qs = qs.filter(name__icontains=self.q)
+        return qs
+
+
+# ----------- CollectionPropertyValue CRUD -----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class CollectionPropertyValueCreateView(views.OwnedObjectCreateView):
+    template_name = 'simple_form_card.html'
+    form_class = forms.CollectionPropertyValueModelForm
+    permission_required = 'soilcom.add_collectionpropertyvalue'
+
+
+class CollectionPropertyValueDetailView(views.OwnedObjectDetailView):
+    model = models.CollectionPropertyValue
+    permission_required = set()
+
+
+class CollectionPropertyValueUpdateView(views.OwnedObjectUpdateView):
+    template_name = 'simple_form_card.html'
+    model = models.CollectionPropertyValue
+    form_class = forms.CollectionPropertyValueModelForm
+    permission_required = 'soilcom.change_collectionpropertyvalue'
+
+
+class CollectionPropertyValueModalDeleteView(views.OwnedObjectModalDeleteView):
+    model = models.CollectionPropertyValue
+    success_message = 'Successfully deleted.'
+    permission_required = 'soilcom.delete_collectionpropertyvalue'
+
+    def get_success_url(self):
+        return reverse('collection-detail', kwargs={'pk': self.object.collection.pk})
+
+
+# ----------- AggregatedCollectionPropertyValue CRUD -----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class AggregatedCollectionPropertyValueCreateView(views.OwnedObjectCreateView):
+    template_name = 'simple_form_card.html'
+    form_class = forms.AggregatedCollectionPropertyValueModelForm
+    permission_required = 'soilcom.add_aggregatedcollectionpropertyvalue'
+
+
+class AggregatedCollectionPropertyValueDetailView(views.OwnedObjectDetailView):
+    model = models.AggregatedCollectionPropertyValue
+    permission_required = set()
+
+
+class AggregatedCollectionPropertyValueUpdateView(views.OwnedObjectUpdateView):
+    template_name = 'simple_form_card.html'
+    model = models.AggregatedCollectionPropertyValue
+    form_class = forms.AggregatedCollectionPropertyValueModelForm
+    permission_required = 'soilcom.change_aggregatedcollectionpropertyvalue'
+
+
+class AggregatedCollectionPropertyValueModalDeleteView(views.OwnedObjectModalDeleteView):
+    model = models.AggregatedCollectionPropertyValue
+    success_message = 'Successfully deleted.'
+    permission_required = 'soilcom.delete_aggregatedcollectionpropertyvalue'
+
+    def get_success_url(self):
+        return reverse('collection-list')
+
+
 # ----------- Collection CRUD ------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class CollectionListView(BRITFilterView):
+class CollectionListView(views.BRITFilterView):
     model = Collection
     filterset_class = CollectionFilter
-    ordering = 'id'
+    ordering = 'name'
 
 
-class ModelFormAndModelFormSetMixin:
-    object = None
-    formset_model = None
-    formset_class = None
-    formset_form_class = None
-
-    def get_formset(self, **kwargs):
-        FormSet = modelformset_factory(
-            self.formset_model,
-            form=self.formset_form_class,
-            formset=self.formset_class
-        )
-        return FormSet(**self.get_formset_kwargs())
-
-    def get_formset_kwargs(self, **kwargs):
-        if self.request.method in ("POST", "PUT"):
-            kwargs.update({'data': self.request.POST.copy()})
-        return kwargs
-
-    def get_context_data(self, **kwargs):
-        if 'formset' not in kwargs:
-            kwargs['formset'] = self.get_formset()
-        kwargs['formset_helper'] = forms.FormSetHelper()
-        return super().get_context_data(**kwargs)
-
-
-class ModelFormAndFormSetMixin:
-    object = None
-    formset_class = None
-    formset_form_class = None
-    request = None
-
-    def get_formset(self, **kwargs):
-        FormSet = formset_factory(
-            form=self.formset_form_class,
-            formset=self.formset_class
-        )
-        return FormSet(**self.get_formset_kwargs())
-
-    def get_formset_kwargs(self, **kwargs):
-        if self.request.method in ("POST", "PUT"):
-            kwargs.update({
-                'owner': self.request.user,
-                'data': self.request.POST.copy(),
-                'parent_object': self.object
-            })
-        return kwargs
-
-    def get_context_data(self, **kwargs):
-        if 'formset' not in kwargs:
-            kwargs['formset'] = self.get_formset()
-        kwargs['formset_helper'] = forms.FormSetHelper()
-        return super().get_context_data(**kwargs)
-
-
-class CollectionCreateView(ModelFormAndFormSetMixin, views.OwnedObjectCreateView):
-    template_name = 'collection_form_card.html'
+class CollectionCreateView(M2MInlineFormSetMixin, views.OwnedObjectCreateView):
+    model = Collection
     form_class = forms.CollectionModelForm
+    formset_model = WasteFlyer
     formset_class = forms.BaseWasteFlyerUrlFormSet
-    formset_form_class = forms.UrlForm
+    formset_form_class = forms.WasteFlyerModelForm
+    formset_helper_class = DynamicTableInlineFormSetHelper
+    relation_field_name = 'flyers'
     permission_required = 'soilcom.add_collection'
+
+    def get_formset_kwargs(self, **kwargs):
+        if self.request.method in ("POST", "PUT"):
+            kwargs.update({'owner': self.request.user})
+        return super().get_formset_kwargs(**kwargs)
 
     def get_initial(self):
         initial = super().get_initial()
         if 'region_id' in self.request.GET:
             region_id = self.request.GET.get('region_id')
-            catchment = Catchment.objects.get(id=region_id)
+            catchment = CollectionCatchment.objects.get(id=region_id)
             initial['catchment'] = catchment
         if 'collector' in self.request.GET:
             initial['collector'] = models.Collector.objects.get(id=self.request.GET.get('collector'))
@@ -604,48 +688,24 @@ class CollectionCreateView(ModelFormAndFormSetMixin, views.OwnedObjectCreateView
 
 class CollectionCopyView(CollectionCreateView):
     model = models.Collection
-    original_object = None
-
-    def get_original_object(self):
-        return self.model.objects.get(pk=self.kwargs.get('pk'))
-
-    def get_formset_kwargs(self, **kwargs):
-        kwargs.update({
-            'parent_object': self.original_object,
-        })
-        return super().get_formset_kwargs(**kwargs)
 
     def get_initial(self):
-        initial = {}
-        if self.original_object.catchment:
-            initial['catchment'] = self.original_object.catchment
-        if self.original_object.collector:
-            initial['collector'] = self.original_object.collector
-        if self.original_object.collection_system:
-            initial['collection_system'] = self.original_object.collection_system
-        if self.original_object.waste_stream:
-            if self.original_object.waste_stream.category:
-                initial['waste_category'] = self.original_object.waste_stream.category
-            if self.original_object.waste_stream.allowed_materials.exists():
-                initial['allowed_materials'] = self.original_object.waste_stream.allowed_materials.all()
-        if self.original_object.connection_rate:
-            initial['connection_rate'] = self.original_object.connection_rate
-        if self.original_object.connection_rate_year:
-            initial['connection_rate_year'] = self.original_object.connection_rate_year
-        if self.original_object.fee_system:
-            initial['fee_system'] = self.original_object.fee_system
-        if self.original_object.frequency:
-            initial['frequency'] = self.original_object.frequency
-        if self.original_object.description:
-            initial['description'] = self.original_object.description
+        initial = model_to_dict(self.object)
+        initial.update({
+            'waste_category': self.object.waste_stream.category.id,
+            'allowed_materials': [mat.id for mat in self.object.waste_stream.allowed_materials.all()]
+        })
+        # Prevent the ModelFormMixin from passing the original instance into the ModelForm by removing self.object.
+        # That way, a new instance is created, instead.
+        self.object = None
         return initial
 
     def get(self, request, *args, **kwargs):
-        self.original_object = self.get_original_object()
+        self.object = self.get_object()
         return self.render_to_response(self.get_context_data())
 
     def post(self, request, *args, **kwargs):
-        self.original_object = self.get_original_object()
+        self.object = self.get_object()
         return super().post(request, *args, **kwargs)
 
 
@@ -660,26 +720,25 @@ class CollectionModalDetailView(views.OwnedObjectModalDetailView):
     permission_required = 'soilcom.view_collection'
 
 
-class CollectionUpdateView(ModelFormAndFormSetMixin, views.OwnedObjectUpdateView):
+class CollectionUpdateView(M2MInlineFormSetMixin, views.OwnedObjectUpdateView):
     model = models.Collection
     form_class = forms.CollectionModelForm
+    formset_model = WasteFlyer
     formset_class = forms.BaseWasteFlyerUrlFormSet
-    formset_form_class = forms.UrlForm
+    formset_form_class = forms.WasteFlyerModelForm
+    formset_helper_class = DynamicTableInlineFormSetHelper
+    relation_field_name = 'flyers'
     permission_required = 'soilcom.change_collection'
-    template_name = 'collection_form_card.html'
 
     def get_formset_kwargs(self, **kwargs):
-        kwargs.update({
-            'parent_object': self.object,
-            'owner': self.request.user,
-        })
+        kwargs.update({'owner': self.request.user})
         return super().get_formset_kwargs(**kwargs)
 
     def get_initial(self):
         initial = super().get_initial()
         initial.update({
-            'waste_category': self.object.waste_stream.category,
-            'allowed_materials': self.object.waste_stream.allowed_materials.all(),
+            'waste_category': self.object.waste_stream.category.id,
+            'allowed_materials': [mat.id for mat in self.object.waste_stream.allowed_materials.all()],
         })
         return initial
 
@@ -707,6 +766,44 @@ class CollectionModalDeleteView(views.OwnedObjectModalDeleteView):
 
 # ----------- Collection utils ------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
+
+
+class CollectionAutoCompleteView(Select2QuerySetView):
+    def get_queryset(self):
+        qs = models.Collection.objects.order_by('name')
+        if self.q:
+            qs = qs.filter(name__icontains=self.q)
+        return qs
+
+
+class CollectionAddPropertyValueView(CollectionPropertyValueCreateView):
+
+    def get_initial(self):
+        initial = super().get_initial()
+        prop, _ = Property.objects.get_or_create(
+            name='specific waste generation',
+            defaults={'unit': 'kg/(cap.*a)'}
+        )
+        initial['property'] = prop.pk
+        initial['collection'] = self.kwargs['pk']
+        return initial
+
+    def get_success_url(self):
+        return reverse('collection-detail', kwargs={'pk': self.kwargs['pk']})
+
+
+class CollectionCatchmentAddAggregatedPropertyView(AggregatedCollectionPropertyValueCreateView):
+
+    def get_initial(self):
+        initial = super().get_initial()
+        catchment = CollectionCatchment.objects.get(pk=self.kwargs.get('pk'))
+        initial['collections'] = catchment.downstream_collections
+        prop, _ = Property.objects.get_or_create(
+            name='specific waste generation',
+            defaults={'unit': 'kg/(cap.*a)'}
+        )
+        initial['property'] = prop
+        return initial
 
 
 class SelectNewlyCreatedObjectModelSelectOptionsView(views.OwnedObjectModelSelectOptionsView):
@@ -793,7 +890,7 @@ class CatchmentSelectView(GeoDataSetFormMixin, GeoDataSetMixin, TemplateView):
         region_id = self.get_region_id()
         catchment_id = self.request.GET.get('catchment')
         if catchment_id:
-            catchment = Catchment.objects.get(id=catchment_id)
+            catchment = CollectionCatchment.objects.get(id=catchment_id)
             initial['parent_region'] = catchment.parent_region.id
             initial['catchment'] = catchment.id
         elif region_id:
@@ -893,7 +990,6 @@ class CollectionListFileExportProgressView(LoginRequiredMixin, View):
 
 
 class CollectionSummaryAPI(APIView):
-
     authentication_classes = []
     permission_classes = []
 

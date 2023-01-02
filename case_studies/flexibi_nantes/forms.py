@@ -1,44 +1,33 @@
-from bootstrap_modal_forms.forms import BSModalModelForm
 from crispy_forms.helper import FormHelper, Layout
-from crispy_forms.layout import Div, Field, Row
-from django.forms import (CheckboxSelectMultiple,
-                          ModelMultipleChoiceField,
-                          ChoiceField,
-                          Form,
-                          ModelForm,
-                          MultipleChoiceField,
-                          RadioSelect,
-                          Widget,
-                          NumberInput,
-                          )
+from crispy_forms.layout import Field, Row
+from django.forms import ModelMultipleChoiceField, NumberInput, Widget
 from django.forms.models import BaseInlineFormSet
 from django.utils.safestring import mark_safe
 from extra_views import InlineFormSetFactory
 
 from distributions.models import Timestep
 from materials.models import MaterialComponent
-from .models import Culture, Greenhouse, GreenhouseGrowthCycle, NantesGreenhouses, GrowthTimeStepSet, GrowthShare
+from utils.forms import SimpleModelForm, ModalModelForm, ModalModelFormMixin
+from .models import Culture, Greenhouse, GreenhouseGrowthCycle, GrowthTimeStepSet, GrowthShare
 
 
-class CultureModelForm(BSModalModelForm):
+class CultureModelForm(ModalModelForm):
     class Meta:
         model = Culture
         fields = ('name', 'residue')
 
 
-class GreenhouseModelForm(ModelForm):
+class GreenhouseModelForm(SimpleModelForm):
     class Meta:
         model = Greenhouse
         fields = ('name', 'heated', 'lighted', 'above_ground', 'high_wire')
 
 
-class GreenhouseModalModelForm(BSModalModelForm):
-    class Meta:
-        model = Greenhouse
-        fields = ('name', 'heated', 'lighted', 'above_ground', 'high_wire')
+class GreenhouseModalModelForm(ModalModelFormMixin, GreenhouseModelForm):
+    pass
 
 
-class GreenhouseGrowthCycleModelForm(ModelForm):
+class GreenhouseGrowthCycleModelForm(SimpleModelForm):
     class Meta:
         model = GreenhouseGrowthCycle
         fields = ()
@@ -49,7 +38,7 @@ class GrowthTimestepInline(InlineFormSetFactory):
     fields = ['owner', 'timestep', 'growth_cycle']
 
 
-class GrowthCycleCreateForm(BSModalModelForm):
+class GrowthCycleCreateForm(ModalModelForm):
     timesteps = ModelMultipleChoiceField(queryset=Timestep.objects.filter(distribution__name='Months of the year'))
 
     class Meta:
@@ -97,30 +86,11 @@ class GrowthShareFormSetHelper(FormHelper):
         self.render_required_fields = True
 
 
-class AddGreenhouseGrowthCycleModelForm(ModelForm):
+class AddGreenhouseGrowthCycleModelForm(SimpleModelForm):
     class Meta:
         model = GreenhouseGrowthCycle
         fields = ()
 
 
 class UpdateGreenhouseGrowthCycleValuesForm(GreenhouseGrowthCycleModelForm):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # initial = kwargs.get('initial')
-        # self.fields['material'].initial = initial['material'].id
-        # self.fields['material'].widget = HiddenInput()
-        # self.fields['component'].initial = initial['component'].id
-        # self.fields['component'].widget = HiddenInput()
-
-
-class GreenhouseFilterFormHelper(FormHelper):
-    layout = Layout(
-        Row(
-            Field('heated', wrapper_class='col-md-6'),
-            Field('lighted', wrapper_class='col-md-6'),
-            Field('above_ground', wrapper_class='col-md-6'),
-            Field('high_wire', wrapper_class='col-md-6'),
-            Field('crops', wrapper_class='col-md-12')
-        )
-    )
+    pass

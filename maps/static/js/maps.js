@@ -123,7 +123,6 @@ async function fetchCatchmentGeometry(params) {
 
 async function fetchFeatureGeometries(params) {
     const url = mapConfig.feature_url + '?' + transformSearchParams(params).toString();
-    console.log(url)
     const response = await fetch(url);
     const json = await response.json();
     renderFeatures(json.geoJson);
@@ -243,8 +242,21 @@ function parseFilterParameters() {
             case 'RadioSelect':
                 params.append(key, readRadioSelect(key));
                 break;
+            case 'CheckboxInput':
+                params.append(key, readCheckbox(key));
+                break;
             case 'CheckboxSelectMultiple':
                 readCheckboxSelectMultiple(key).forEach((value) => {params.append(key, value);});
+                break;
+            case 'RangeSlider':
+                const [min, max] = readRangeSlider(key);
+                params.append(key + '_min', min);
+                params.append(key + '_max', max);
+                break;
+            case 'PercentageRangeSlider':
+                const [min_perc, max_perc] = readRangeSlider(key);
+                params.append(key + '_min', min_perc);
+                params.append(key + '_max', max_perc);
                 break;
             default:
                 params.append(key, document.getElementsByName(key)[0].value);
@@ -263,6 +275,10 @@ function readSelectMultiple(name) {
         }
     }
     return country_codes;
+}
+
+function readCheckbox(name) {
+    return document.getElementsByName(name)[0].checked;
 }
 
 function readCheckboxSelectMultiple(name) {
@@ -285,6 +301,12 @@ function readRadioSelect(name) {
         }
     }
     return heating;
+}
+
+function readRangeSlider(name) {
+    const min = document.getElementById('id_' + name + '_min').value;
+    const max = document.getElementById('id_' + name + '_max').value;
+    return [min, max];
 }
 
 function isEmptyArray(el) {

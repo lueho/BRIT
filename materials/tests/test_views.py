@@ -1,6 +1,6 @@
 from django.urls import reverse
 
-from brit.tests.testcases import ViewWithPermissionsTestCase
+from utils.tests.testcases import ViewWithPermissionsTestCase
 from distributions.models import Timestep, TemporalDistribution
 from ..models import (Composition, Material, MaterialCategory, MaterialComponent, MaterialComponentGroup,
                       MaterialProperty, MaterialPropertyValue, Sample, SampleSeries, WeightShare)
@@ -58,6 +58,11 @@ class MaterialCategoryCreateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('materialcategory-create'))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('materialcategory-create'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialcategory-create')
         response = self.client.post(url, {})
@@ -93,6 +98,11 @@ class MaterialCategoryModalCreateViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('materialcategory-create-modal'))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('materialcategory-create-modal'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialcategory-create-modal')
@@ -170,6 +180,11 @@ class MaterialCategoryUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('materialcategory-update', kwargs={'pk': self.category.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('materialcategory-update', kwargs={'pk': self.category.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialcategory-update', kwargs={'pk': self.category.pk})
         response = self.client.post(url, {})
@@ -211,6 +226,11 @@ class MaterialCategoryModalUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('materialcategory-update-modal', kwargs={'pk': self.category.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('materialcategory-update-modal', kwargs={'pk': self.category.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialcategory-update-modal', kwargs={'pk': self.category.pk})
         response = self.client.post(url, {})
@@ -251,6 +271,11 @@ class MaterialCategoryModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('materialcategory-delete-modal', kwargs={'pk': self.category.pk}))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('materialcategory-delete-modal', kwargs={'pk': self.category.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialcategory-delete-modal', kwargs={'pk': self.category.pk})
@@ -314,6 +339,11 @@ class MaterialCreateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('material-create-modal'))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('material-create'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('material-create')
         response = self.client.post(url)
@@ -347,7 +377,7 @@ class MaterialModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
     def test_get_http_200_ok_for_members(self):
         self.client.force_login(self.member)
-        response = self.client.get(reverse('material-create-modal'))
+        response = self.client.get(reverse('material-create'))
         self.assertEqual(response.status_code, 200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
@@ -425,6 +455,11 @@ class MaterialUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('material-update', kwargs={'pk': self.material.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('material-update', kwargs={'pk': self.material.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('material-update', kwargs={'pk': self.material.pk})
         response = self.client.post(url, {})
@@ -466,6 +501,11 @@ class MaterialModalUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('material-update-modal', kwargs={'pk': self.material.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('material-update-modal', kwargs={'pk': self.material.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('material-update-modal', kwargs={'pk': self.material.pk})
         response = self.client.post(url, {})
@@ -506,6 +546,11 @@ class MaterialModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('material-delete-modal', kwargs={'pk': self.material.pk}))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('material-delete-modal', kwargs={'pk': self.material.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('material-delete-modal', kwargs={'pk': self.material.pk})
@@ -564,6 +609,11 @@ class ComponentCreateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('materialcomponent-create'))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('materialcomponent-create'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialcomponent-create')
         response = self.client.post(url)
@@ -604,6 +654,11 @@ class ComponentModalCreateViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('materialcomponent-create-modal'))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('materialcomponent-create-modal'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialcomponent-create-modal')
@@ -680,6 +735,11 @@ class ComponentUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('materialcomponent-update', kwargs={'pk': self.component.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('materialcomponent-update', kwargs={'pk': self.component.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialcomponent-update', kwargs={'pk': self.component.pk})
         response = self.client.post(url, {})
@@ -721,6 +781,11 @@ class ComponentModalUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('materialcomponent-update-modal', kwargs={'pk': self.component.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('materialcomponent-update-modal', kwargs={'pk': self.component.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialcomponent-update-modal', kwargs={'pk': self.component.pk})
         response = self.client.post(url)
@@ -760,6 +825,11 @@ class ComponentModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('materialcomponent-delete-modal', kwargs={'pk': self.component.pk}))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('materialcomponent-delete-modal', kwargs={'pk': self.component.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialcomponent-delete-modal', kwargs={'pk': self.component.pk})
@@ -813,6 +883,11 @@ class ComponentGroupCreateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('materialcomponentgroup-create'))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('materialcomponentgroup-create'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialcomponentgroup-create')
         response = self.client.post(url)
@@ -848,6 +923,11 @@ class ComponentGroupModalCreateViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('materialcomponentgroup-create-modal'))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('materialcomponentgroup-create-modal'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialcomponentgroup-create-modal')
@@ -924,6 +1004,11 @@ class ComponentGroupUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('materialcomponentgroup-update', kwargs={'pk': self.group.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('materialcomponentgroup-update', kwargs={'pk': self.group.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialcomponentgroup-update', kwargs={'pk': self.group.pk})
         response = self.client.post(url)
@@ -965,6 +1050,11 @@ class ComponentGroupModalUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('materialcomponentgroup-update-modal', kwargs={'pk': self.group.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('materialcomponentgroup-update-modal', kwargs={'pk': self.group.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialcomponentgroup-update-modal', kwargs={'pk': self.group.pk})
         response = self.client.post(url)
@@ -1004,6 +1094,11 @@ class ComponentGroupModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('materialcomponentgroup-delete-modal', kwargs={'pk': self.group.pk}))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('materialcomponentgroup-delete-modal', kwargs={'pk': self.group.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialcomponentgroup-delete-modal', kwargs={'pk': self.group.pk})
@@ -1057,6 +1152,11 @@ class MaterialPropertyCreateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('materialproperty-create'))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('materialproperty-create'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialproperty-create')
         response = self.client.post(url)
@@ -1092,6 +1192,11 @@ class MaterialPropertyModalCreateViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('materialproperty-create-modal'))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('materialproperty-create-modal'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialproperty-create-modal')
@@ -1168,6 +1273,11 @@ class MaterialPropertyUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('materialproperty-update', kwargs={'pk': self.property.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('materialproperty-update', kwargs={'pk': self.property.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialproperty-update', kwargs={'pk': self.property.pk})
         response = self.client.post(url)
@@ -1208,6 +1318,11 @@ class MaterialPropertyModalUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('materialproperty-update-modal', kwargs={'pk': self.property.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('materialproperty-update-modal', kwargs={'pk': self.property.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialproperty-update-modal', kwargs={'pk': self.property.pk})
         response = self.client.post(url)
@@ -1247,6 +1362,11 @@ class MaterialPropertyModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('materialproperty-delete-modal', kwargs={'pk': self.property.pk}))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('materialproperty-delete-modal', kwargs={'pk': self.property.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialproperty-delete-modal', kwargs={'pk': self.property.pk})
@@ -1296,6 +1416,11 @@ class MaterialPropertyValueModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('materialpropertyvalue-delete-modal', kwargs={'pk': self.value.pk}))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('materialpropertyvalue-delete-modal', kwargs={'pk': self.value.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialpropertyvalue-delete-modal', kwargs={'pk': self.value.pk})
@@ -1354,6 +1479,11 @@ class SampleSeriesCreateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('sampleseries-create'))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('sampleseries-create'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sampleseries-create')
         response = self.client.post(url)
@@ -1394,6 +1524,11 @@ class SampleSeriesModalCreateViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('sampleseries-create-modal'))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('sampleseries-create-modal'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sampleseries-create-modal')
@@ -1520,6 +1655,11 @@ class SampleSeriesUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('sampleseries-update', kwargs={'pk': self.series.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('sampleseries-update', kwargs={'pk': self.series.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sampleseries-update', kwargs={'pk': self.series.pk})
         response = self.client.post(url)
@@ -1561,6 +1701,11 @@ class SampleSeriesModalUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('sampleseries-update-modal', kwargs={'pk': self.series.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('sampleseries-update-modal', kwargs={'pk': self.series.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sampleseries-update-modal', kwargs={'pk': self.series.pk})
         response = self.client.post(url)
@@ -1601,6 +1746,11 @@ class SampleSeriesModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('sampleseries-delete-modal', kwargs={'pk': self.series.pk}))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('sampleseries-delete-modal', kwargs={'pk': self.series.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sampleseries-delete-modal', kwargs={'pk': self.series.pk})
@@ -1648,6 +1798,11 @@ class SampleSeriesCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('sampleseries-duplicate', kwargs={'pk': self.series.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('sampleseries-duplicate', kwargs={'pk': self.series.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sampleseries-duplicate', kwargs={'pk': self.series.pk})
         response = self.client.post(url)
@@ -1689,6 +1844,11 @@ class SampleSeriesModalCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('sampleseries-duplicate-modal', kwargs={'pk': self.series.pk}))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('sampleseries-duplicate-modal', kwargs={'pk': self.series.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sampleseries-duplicate-modal', kwargs={'pk': self.series.pk})
@@ -1762,6 +1922,11 @@ class SampleCreateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('sample-create'))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('sample-create'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sample-create')
         response = self.client.post(url)
@@ -1807,6 +1972,11 @@ class SampleModalCreateViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('sample-create-modal'))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('sample-create-modal'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sample-create-modal')
@@ -1893,6 +2063,11 @@ class SampleUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('sample-update', kwargs={'pk': self.sample.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('sample-update', kwargs={'pk': self.sample.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sample-update', kwargs={'pk': self.series.pk})
         response = self.client.post(url)
@@ -1939,6 +2114,11 @@ class SampleModalUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('sample-update-modal', kwargs={'pk': self.sample.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('sample-update-modal', kwargs={'pk': self.sample.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sample-update-modal', kwargs={'pk': self.sample.pk})
         response = self.client.post(url)
@@ -1984,6 +2164,11 @@ class SampleModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('sample-delete-modal', kwargs={'pk': self.sample.pk}))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('sample-delete-modal', kwargs={'pk': self.sample.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sample-delete-modal', kwargs={'pk': self.sample.pk})
@@ -2032,6 +2217,11 @@ class SampleAddPropertyViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('sample-add-property', kwargs={'pk': self.sample.pk}))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('sample-add-property', kwargs={'pk': self.sample.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sample-add-property', kwargs={'pk': self.sample.pk})
@@ -2090,6 +2280,11 @@ class SampleModalAddPropertyViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('sample-add-property-modal', kwargs={'pk': self.sample.pk}))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('sample-add-property-modal', kwargs={'pk': self.sample.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sample-add-property-modal', kwargs={'pk': self.sample.pk})
@@ -2151,6 +2346,11 @@ class SampleCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('sample-duplicate', kwargs={'pk': self.sample.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('sample-duplicate', kwargs={'pk': self.sample.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sample-duplicate', kwargs={'pk': self.sample.pk})
         response = self.client.post(url)
@@ -2200,6 +2400,11 @@ class SampleModalCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('sample-duplicate-modal', kwargs={'pk': self.sample.pk}))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('sample-duplicate-modal', kwargs={'pk': self.sample.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sample-duplicate-modal', kwargs={'pk': self.sample.pk})
@@ -2266,6 +2471,11 @@ class CompositionCreateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('composition-create'))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('composition-create'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('composition-create')
         response = self.client.post(url)
@@ -2313,6 +2523,11 @@ class CompositionModalCreateViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('composition-create-modal'))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('composition-create-modal'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('composition-create-modal')
@@ -2419,6 +2634,11 @@ class CompositionUpdateViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn('form', response.context)
         self.assertIn('formset', response.context)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('composition-update', kwargs={'pk': self.composition.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('composition-update', kwargs={'pk': self.composition.pk})
@@ -2559,6 +2779,11 @@ class CompositionModalUpdateViewTestCase(ViewWithPermissionsTestCase):
         self.assertIn('form', response.context)
         self.assertIn('formset', response.context)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('composition-update-modal', kwargs={'pk': self.composition.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('composition-update-modal', kwargs={'pk': self.composition.pk})
         response = self.client.post(url)
@@ -2686,6 +2911,11 @@ class CompositionModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('composition-delete-modal', kwargs={'pk': self.composition.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('composition-delete-modal', kwargs={'pk': self.composition.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('composition-delete-modal', kwargs={'pk': self.composition.pk})
         response = self.client.post(url)
@@ -2750,6 +2980,11 @@ class AddComponentViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('composition-add-component', kwargs={'pk': self.composition.pk}))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('composition-add-component', kwargs={'pk': self.composition.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('composition-add-component', kwargs={'pk': self.composition.pk})
@@ -2884,6 +3119,11 @@ class WeightShareModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('weightshare-delete-modal', kwargs={'pk': self.share.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('weightshare-delete-modal', kwargs={'pk': self.share.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('weightshare-delete-modal', kwargs={'pk': self.share.pk})
         response = self.client.post(url)
@@ -2930,6 +3170,11 @@ class AddCompositionViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('sampleseries-add-composition', kwargs={'pk': self.series.pk}))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('sampleseries-add-composition', kwargs={'pk': self.series.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sampleseries-add-composition', kwargs={'pk': self.series.pk})

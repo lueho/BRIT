@@ -7,7 +7,7 @@ from django.urls import reverse
 from factory.django import mute_signals
 
 from bibliography.models import Source
-from brit.models import NamedUserObjectModel
+from utils.models import NamedUserObjectModel
 from distributions.models import Timestep, TemporalDistribution
 from users.models import get_default_owner
 

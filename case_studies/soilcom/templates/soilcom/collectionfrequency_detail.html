@@ -1,0 +1,31 @@
+{% extends 'simple_detail_card.html' %}
+
+{% block detail_body %}
+    <p class="card-text">
+        <strong>Name:</strong><br>
+        {{ object.name }}
+    </p>
+    <p class="card-text">
+        <strong>Type:</strong><br>
+        {{ object.type }}
+    </p>
+    {% if object.seasons.exists %}
+        {% for option in object.collectioncountoptions_set.all %}
+            <p class="card-text"><strong>{{ option.season }}:</strong><br>
+            {{ option.standard }} collections
+                {% if option.non_standard_options  %}
+                    (standard); Other options:
+                    {% for nso in option.non_standard_options %}
+                        {{ nso }}{% if not forloop.last %},{% endif %}
+                    {% endfor %}
+                {% endif %}
+            </p>
+        {% endfor %}
+    {% endif %}
+    {% if object.description %}
+        <p class="card-text">
+            <strong>Description:</strong><br>
+            {{ object.description }}
+        </p>
+    {% endif %}
+{% endblock detail_body %}

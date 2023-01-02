@@ -1,0 +1,19 @@
+{% extends 'maps/catchment_detail.html' %}
+
+{% block additional_details %}
+    <p class="card-text"><strong>Collections:</strong></p>
+    <ul>
+    {% for collection in object.downstream_collections.all %}
+        <li><a href="{% url 'collection-detail' collection.pk %}">{{ collection.name }}</a></li>
+    {% endfor %}
+    </ul>
+{% endblock %}
+
+{% block detail_footer %}
+    {{ block.super }}
+    {% if perms.soilcom.add_aggregatedcollectionpropertyvalue %}
+        <a href="{% url 'collectioncatchment-add-aggregatedpropertyvalue' object.pk %}">
+            <i class="fas fa-fw fa-plus-circle"></i> add property
+        </a>
+    {% endif %}
+{% endblock %}

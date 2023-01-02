@@ -2,13 +2,16 @@ from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-from brit.models import OwnedObjectModel, CRUDUrlsMixin, NamedUserObjectModel
+from utils.models import NamedUserObjectModel, CRUDUrlsMixin, OwnedObjectModel
 import celery
 
 
-class Author(CRUDUrlsMixin, OwnedObjectModel):
+class Author(OwnedObjectModel):
     first_names = models.CharField(max_length=1023, null=True, blank=True)
     last_names = models.CharField(max_length=1023, null=True, blank=True)
+
+    class Meta:
+        ordering = ['last_names', 'first_names']
 
     def __str__(self):
         name = ''
@@ -45,7 +48,7 @@ SOURCE_TYPES = (
 )
 
 
-class Source(CRUDUrlsMixin, OwnedObjectModel):
+class Source(OwnedObjectModel):
     type = models.CharField(max_length=255, choices=SOURCE_TYPES, default='custom')
     authors = models.ManyToManyField(Author, related_name='sources')
     publisher = models.CharField(max_length=127, blank=True, null=True)

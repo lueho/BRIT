@@ -1,51 +1,31 @@
-from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Field, Layout, Submit
 from dal.autocomplete import ModelSelect2
-from django.forms import DateInput, Form, ModelChoiceField, ModelMultipleChoiceField
-from brit.forms import CustomModelForm, CustomModalModelForm, OwnedObjectModelForm
+from django.forms import DateInput, ModelChoiceField, ModelMultipleChoiceField
 
+from utils.forms import AutoCompleteModelForm, SimpleModelForm, ModalModelFormMixin
 from .models import Author, Licence, Source
 
 
-class AuthorModelForm(OwnedObjectModelForm):
+class AuthorModelForm(SimpleModelForm):
     class Meta:
         model = Author
         fields = ('first_names', 'last_names')
 
 
-class AuthorModalModelForm(CustomModalModelForm):
-    class Meta:
-        model = Author
-        fields = ('first_names', 'last_names')
+class AuthorModalModelForm(ModalModelFormMixin, AuthorModelForm):
+    pass
 
 
-class LicenceModelForm(OwnedObjectModelForm):
+class LicenceModelForm(SimpleModelForm):
     class Meta:
         model = Licence
         fields = ('name', 'reference_url')
 
 
-class LicenceModalModelForm(CustomModalModelForm):
-    class Meta:
-        model = Licence
-        fields = ('name', 'reference_url')
+class LicenceModalModelForm(ModalModelFormMixin, LicenceModelForm):
+    pass
 
 
-class SourceModelForm(OwnedObjectModelForm):
-    authors = ModelMultipleChoiceField(queryset=Author.objects.all(), required=False)
-
-    class Meta:
-        model = Source
-        fields = (
-        'abbreviation', 'authors', 'publisher', 'title', 'type', 'journal', 'issue', 'year', 'licence', 'attributions',
-        'url', 'url_valid', 'url_checked', 'doi', 'last_accessed')
-        widgets = {
-            'url_checked': DateInput(attrs={'type': 'date'}),
-            'last_accessed': DateInput(attrs={'type': 'date'})
-        }
-
-
-class SourceModalModelForm(CustomModalModelForm):
+class SourceModelForm(SimpleModelForm):
     authors = ModelMultipleChoiceField(queryset=Author.objects.all(), required=False)
 
     class Meta:
@@ -60,50 +40,13 @@ class SourceModalModelForm(CustomModalModelForm):
         }
 
 
-class SourceFilterFormHelper(FormHelper):
-    form_tag = False
-    include_media = False
-    layout = Layout(
-        'abbreviation',
-        'authors',
-        'title',
-        'type',
-        'year'
-    )
+class SourceModalModelForm(ModalModelFormMixin, SourceModelForm):
+    pass
 
 
-class SourceFilterForm(Form):
-    class Meta:
-        model = Source
-        fields = ('abbreviation', 'authors', 'title', 'type', 'year')
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.helper = SourceFilterFormHelper()
-        self.fields['abbreviation'].widget.attrs = {'data-theme': 'bootstrap4'}
-        self.fields['authors'].widget.attrs = {'data-theme': 'bootstrap4'}
-        self.fields['title'].widget.attrs = {'data-theme': 'bootstrap4'}
-
-
-class SourceSimpleFilterFormHelper(FormHelper):
-    form_tag = False
-    include_media = False
-    layout = Layout(
-        Field('source'),
-        Submit('submit', 'Add')
-    )
-
-class SourceSimpleFilterForm(CustomModelForm):
+class SourceSimpleFilterForm(AutoCompleteModelForm):
     source = ModelChoiceField(queryset=Source.objects.all(), widget=ModelSelect2(url='source-autocomplete'))
 
     class Meta:
         model = Source
         fields = ('source',)
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields['source'].widget.attrs = {'data-theme': 'bootstrap4'}
-
-    @property
-    def helper(self):
-        return SourceSimpleFilterFormHelper()

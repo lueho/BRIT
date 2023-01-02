@@ -1,4 +1,7 @@
 .leaflet-container {
     height: 100%;
-    padding-bottom: 75%
+}
+
+#main {
+    height: 100%;
 }

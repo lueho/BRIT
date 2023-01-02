@@ -1,8 +1,8 @@
 from dal import autocomplete
+from django_filters import ModelChoiceFilter
 from django_filters import rest_framework as rf_filters
-from django_filters import FilterSet, ModelChoiceFilter
 
-from .forms import SampleFilterForm
+from utils.filters import AutocompleteFilterSet
 from .models import Composition, Material, Sample, SampleSeries
 
 
@@ -21,7 +21,7 @@ class CompositionFilterSet(rf_filters.FilterSet):
         fields = ('group', 'fractions_of',)
 
 
-class SampleFilter(FilterSet):
+class SampleFilter(AutocompleteFilterSet):
     material = ModelChoiceFilter(queryset=Material.objects.filter(type='material'),
                                  field_name='series__material__name',
                                  label='Material',
@@ -30,7 +30,6 @@ class SampleFilter(FilterSet):
     class Meta:
         model = Sample
         fields = ('material', 'timestep')
-        form = SampleFilterForm
 
 
 class SampleFilterSet(rf_filters.FilterSet):

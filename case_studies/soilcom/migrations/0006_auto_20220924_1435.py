@@ -4,7 +4,7 @@ import django.db.models.deletion
 from django.conf import settings
 from django.db import migrations, models
 
-import brit.models
+from utils.models import get_default_owner_pk
 
 
 class Migration(migrations.Migration):
@@ -17,37 +17,37 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='collection',
             name='owner',
-            field=models.ForeignKey(default=brit.models.get_default_owner_pk,
+            field=models.ForeignKey(default=get_default_owner_pk,
                                     on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL),
         ),
         migrations.AlterField(
             model_name='collectionfrequency',
             name='owner',
-            field=models.ForeignKey(default=brit.models.get_default_owner_pk,
+            field=models.ForeignKey(default=get_default_owner_pk,
                                     on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL),
         ),
         migrations.AlterField(
             model_name='collectionsystem',
             name='owner',
-            field=models.ForeignKey(default=brit.models.get_default_owner_pk,
+            field=models.ForeignKey(default=get_default_owner_pk,
                                     on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL),
         ),
         migrations.AlterField(
             model_name='collector',
             name='owner',
-            field=models.ForeignKey(default=brit.models.get_default_owner_pk,
+            field=models.ForeignKey(default=get_default_owner_pk,
                                     on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL),
         ),
         migrations.AlterField(
             model_name='wastecategory',
             name='owner',
-            field=models.ForeignKey(default=brit.models.get_default_owner_pk,
+            field=models.ForeignKey(default=get_default_owner_pk,
                                     on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL),
         ),
         migrations.AlterField(
             model_name='wastestream',
             name='owner',
-            field=models.ForeignKey(default=brit.models.get_default_owner_pk,
+            field=models.ForeignKey(default=get_default_owner_pk,
                                     on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL),
         ),
     ]

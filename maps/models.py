@@ -1,9 +1,12 @@
 from django.contrib.gis.db.models import MultiPolygonField, PointField
 from django.db import models
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 from django.urls import reverse
+from tree_queries.models import TreeNode
 
 from bibliography.models import Source
-from brit.models import NamedUserObjectModel
+from utils.models import NamedUserObjectModel
 
 TYPES = (
     ('administrative', 'administrative'),
@@ -115,7 +118,7 @@ class LauRegion(Region):
         return f'{self.lau_name} ({self.lau_id})'
 
 
-class Catchment(NamedUserObjectModel):
+class Catchment(NamedUserObjectModel, TreeNode):
     parent_region = models.ForeignKey(Region, on_delete=models.CASCADE, related_name='child_catchments', null=True)
     region = models.ForeignKey(Region, on_delete=models.CASCADE, null=True)
     type = models.CharField(max_length=14, choices=TYPES, default='custom')
@@ -133,6 +136,12 @@ class Catchment(NamedUserObjectModel):
 
     def __str__(self):
         return self.name if self.name else self.region.__str__()
+
+
+@receiver(post_delete, sender=Catchment)
+def delete_unused_custom_region(sender, instance, **kwargs):
+    if not instance.region.catchment_set.exists() and instance.type == 'custom':
+        instance.region.delete()
 
 
 class SFBSite(NamedUserObjectModel):
@@ -185,4 +194,3 @@ class RegionAttributeTextValue(NamedUserObjectModel):
     attribute = models.ForeignKey(Attribute, on_delete=models.PROTECT)
     date = models.DateField(blank=True, null=True)
     value = models.CharField(max_length=511)
-

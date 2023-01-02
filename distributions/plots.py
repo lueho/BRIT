@@ -1,6 +1,6 @@
 from collections import UserDict
 
-from brit.exceptions import UnitMismatchError
+from utils.exceptions import UnitMismatchError
 
 
 class Distribution:

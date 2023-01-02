@@ -1,14 +1,24 @@
+import json
+
 from django.conf import settings
-from django.test import TestCase
+from django.contrib.gis.geos import MultiPolygon, Polygon
+from django.test import RequestFactory, TestCase
 from django.urls import reverse
+from django.utils.http import urlencode
 from rest_framework.test import APITestCase
 
-from brit.tests.testcases import ViewWithPermissionsTestCase
-from ..models import Attribute, RegionAttributeValue, Catchment, LauRegion, NutsRegion, Region, GeoDataset
+from maps.views import CatchmentCreateByMergeView
+from utils.tests.testcases import ViewWithPermissionsTestCase
+from ..models import Attribute, RegionAttributeValue, Catchment, LauRegion, NutsRegion, Region, GeoDataset, GeoPolygon
+
+
+# ----------- Catchment CRUD--------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 class CatchmentListViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = ['add_catchment', 'change_catchment']
+    url = reverse('catchment-list')
 
     @classmethod
     def setUpTestData(cls):
@@ -16,20 +26,22 @@ class CatchmentListViewTestCase(ViewWithPermissionsTestCase):
         cls.catchment = Catchment.objects.create(name='Test Catchment')
 
     def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('catchment-list'))
+        response = self.client.get(self.url)
         self.assertEqual(200, response.status_code)
 
     def test_add_and_dashboard_button_not_available_for_outsider(self):
         self.client.force_login(self.outsider)
-        response = self.client.get(reverse('catchment-list'))
+        response = self.client.get(self.url)
         self.assertNotContains(response, reverse('catchment-create'))
         self.assertNotContains(response, reverse('maps-dashboard'))
 
     def test_add_and_dashboard_button_available_for_members(self):
         self.client.force_login(self.member)
-        response = self.client.get(reverse('catchment-list'))
+        response = self.client.get(self.url)
         self.assertContains(response, reverse('catchment-create'))
         self.assertContains(response, reverse('maps-dashboard'))
+
+
 
 
 class CatchmentCreateViewTestCase(ViewWithPermissionsTestCase):
@@ -50,6 +62,11 @@ class CatchmentCreateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('catchment-create'))
         self.assertEqual(200, response.status_code)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('catchment-create'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('catchment-create')
         response = self.client.post(url, data={}, follow=True)
@@ -62,10 +79,201 @@ class CatchmentCreateViewTestCase(ViewWithPermissionsTestCase):
 
     def test_post_success_and_http_302_redirect_to_success_url_for_member(self):
         self.client.force_login(self.member)
-        data = {'name': 'Updated Test Catchment', 'type': 'custom'}
+        data = {'name': 'Updated Test Catchment', 'type': 'custom', 'region': Region.objects.create().pk}
         response = self.client.post(reverse('catchment-create'), data, follow=True)
         self.assertRedirects(response, reverse('catchment-detail',
                                                kwargs={'pk': list(response.context.get('messages'))[0].message}))
+
+
+class CatchmentCreateByMergeViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'add_catchment'
+    url = reverse('catchment-create-by-merge')
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        lau_1 = LauRegion.objects.create(
+            name='Test Region 1',
+            borders=GeoPolygon.objects.create(geom=MultiPolygon(Polygon(((0, 0), (0, 2), (2, 2), (2, 0), (0, 0)))))
+        )
+        cls.region_1 = lau_1.region_ptr
+        lau_2 = LauRegion.objects.create(
+            name='Test Region 2',
+            borders=GeoPolygon.objects.create(geom=MultiPolygon(Polygon(((0, 2), (0, 4), (2, 4), (2, 2), (0, 2)))))
+        )
+        cls.region_2 = lau_2.region_ptr
+        lau_3 = LauRegion.objects.create(
+            name='Test Region 3',
+            borders=GeoPolygon.objects.create(geom=MultiPolygon(Polygon(((1, 1), (1, 3), (3, 3), (3, 1), (1, 1)))))
+        )
+        cls.region_3 = lau_3.region_ptr
+        cls.parent_catchment = Catchment.objects.create(
+            name='Parent Catchment',
+            region=Region.objects.create()
+        )
+
+    def test_get_http_302_redirect_to_login_for_anonymous(self):
+        response = self.client.get(self.url, follow=True)
+        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={self.url}')
+
+    def test_get_http_403_forbidden_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(self.url)
+        self.assertEqual(403, response.status_code)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(self.url)
+        self.assertEqual(200, response.status_code)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(self.url)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
+    def test_post_http_302_redirect_to_login_for_anonymous(self):
+        response = self.client.post(self.url, data={}, follow=True)
+        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={self.url}')
+
+    def test_post_http_403_forbidden_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(self.url)
+        self.assertEqual(403, response.status_code)
+
+    def test_post_success_and_http_302_redirect_to_success_url_for_member(self):
+        self.client.force_login(self.member)
+        data = {
+            'name': 'Updated Test Catchment',
+            'parent': self.parent_catchment.pk,
+            'form-INITIAL_FORMS': 2,
+            'form-TOTAL_FORMS': 3,
+            'form-0-region': self.region_1.pk,
+            'form-1-region': self.region_2.pk,
+            'form-2-region': self.region_3.pk,
+        }
+        response = self.client.post(self.url, data, follow=True)
+        self.assertRedirects(response, reverse('catchment-detail',
+                                               kwargs={'pk': list(response.context.get('messages'))[0].message}))
+
+    def test_create_region_borders(self):
+        data = {
+            'name': 'New Catchment Created By Merge',
+            'parent': self.parent_catchment.pk,
+            'form-INITIAL_FORMS': 2,
+            'form-TOTAL_FORMS': 3,
+            'form-0-region': self.region_1.pk,
+            'form-1-region': self.region_2.pk,
+            'form-2-region': self.region_3.pk,
+        }
+        request = RequestFactory().post(self.url, data)
+        request.user = self.member
+        view = CatchmentCreateByMergeView()
+        view.setup(request)
+        view.formset = view.get_formset()
+        self.assertTrue(view.formset.is_valid())
+        geom = MultiPolygon(Polygon(((0, 0), (0, 2), (0, 4), (2, 4), (2, 3), (3, 3), (3, 1), (2, 1), (2, 0), (0, 0))))
+        geom.normalize()
+        self.assertTrue(view.create_region_borders().geom.equals_exact(geom))
+
+    def test_get_region_name(self):
+        data = {
+            'name': 'New Catchment Created By Merge',
+            'parent': self.parent_catchment.pk,
+            'form-INITIAL_FORMS': 2,
+            'form-TOTAL_FORMS': 2,
+            'form-0-region': self.region_1.pk,
+            'form-1-region': self.region_2.pk,
+        }
+        request = RequestFactory().post(self.url, data)
+        request.user = self.member
+        view = CatchmentCreateByMergeView()
+        view.setup(request)
+        form = view.get_form()
+        self.assertTrue(form.is_valid())
+        view.object = form.save()
+        self.assertEqual('New Catchment Created By Merge', view.get_region_name())
+
+    def test_get_region(self):
+        data = {
+            'name': 'New Catchment Created By Merge',
+            'parent': self.parent_catchment.pk,
+            'form-INITIAL_FORMS': 2,
+            'form-TOTAL_FORMS': 3,
+            'form-0-region': self.region_1.pk,
+            'form-1-region': self.region_2.pk,
+            'form-2-region': self.region_3.pk,
+        }
+        request = RequestFactory().post(self.url, data)
+        request.user = self.member
+        view = CatchmentCreateByMergeView()
+        view.setup(request)
+        view.form = view.get_form()
+        self.assertTrue(view.form.is_valid())
+        view.object = view.form.save()
+        view.formset = view.get_formset()
+        self.assertTrue(view.formset.is_valid())
+        geom = MultiPolygon(Polygon(((0, 0), (0, 2), (0, 4), (2, 4), (2, 3), (3, 3), (3, 1), (2, 1), (2, 0), (0, 0))))
+        geom.normalize()
+        expected_region = Region.objects.create(
+            name='New Catchment Created By Merge',
+            borders=GeoPolygon.objects.create(geom=geom)
+        )
+        self.assertEqual(expected_region.name, view.get_region().name)
+        self.assertTrue(view.get_region().borders.geom.equals_exact(geom))
+
+    def test_catchment_with_correct_region_is_created_on_post_with_valid_data(self):
+        self.client.force_login(self.member)
+        data = {
+            'name': 'New Catchment Created By Merge',
+            'parent': self.parent_catchment.pk,
+            'form-INITIAL_FORMS': 2,
+            'form-TOTAL_FORMS': 3,
+            'form-0-region': self.region_1.pk,
+            'form-1-region': self.region_2.pk,
+            'form-2-region': self.region_3.pk,
+        }
+        response = self.client.post(self.url, data, follow=True)
+        self.assertRedirects(response, reverse('catchment-detail',
+                                               kwargs={'pk': list(response.context.get('messages'))[0].message}))
+        catchment = Catchment.objects.get(pk=list(response.context.get('messages'))[0].message)
+        geom = MultiPolygon(Polygon(((0, 0), (0, 2), (0, 4), (2, 4), (2, 3), (3, 3), (3, 1), (2, 1), (2, 0), (0, 0))))
+        geom.normalize()
+        expected_region = Region.objects.create(
+            name='New Catchment Created By Merge',
+            borders=GeoPolygon.objects.create(geom=geom)
+        )
+        self.assertEqual(expected_region.name, catchment.region.name)
+        self.assertTrue(catchment.region.borders.geom.equals_exact(geom))
+        self.assertTrue(catchment.type == 'custom')
+
+    def test_at_least_one_entry_in_formset_is_enforced(self):
+        self.client.force_login(self.member)
+        data = {
+            'name': 'New Catchment Created By Merge',
+            'parent': self.parent_catchment.pk,
+            'form-INITIAL_FORMS': 2,
+            'form-TOTAL_FORMS': 2,
+            'form-0-region': '',
+            'form-1-region': '',
+        }
+        response = self.client.post(self.url, data)
+        self.assertEqual(200, response.status_code)
+        self.assertIn('You must select at least one region.', response.context['formset'].non_form_errors())
+
+    def test_empty_forms_are_ignored(self):
+        self.client.force_login(self.member)
+        data = {
+            'name': 'New Catchment Created By Merge',
+            'parent': self.parent_catchment.pk,
+            'form-INITIAL_FORMS': 2,
+            'form-TOTAL_FORMS': 4,
+            'form-0-region': self.region_1.pk,
+            'form-1-region': self.region_2.pk,
+            'form-2-region': '',
+            'form-3-region': '',
+        }
+        response = self.client.post(self.url, data)
+        self.assertEqual(302, response.status_code)
 
 
 class CatchmentDetailViewTestCase(ViewWithPermissionsTestCase):
@@ -100,6 +308,7 @@ class CatchmentUpdateViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
+        cls.region = Region.objects.create()
         cls.catchment = Catchment.objects.create(name='Test Catchment')
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
@@ -117,6 +326,11 @@ class CatchmentUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('catchment-update', kwargs={'pk': self.catchment.pk}))
         self.assertEqual(200, response.status_code)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('catchment-update', kwargs={'pk': self.catchment.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('catchment-update', kwargs={'pk': self.catchment.pk})
         response = self.client.post(url, data={}, follow=True)
@@ -129,7 +343,7 @@ class CatchmentUpdateViewTestCase(ViewWithPermissionsTestCase):
 
     def test_post_success_and_http_302_redirect_to_success_url_for_member(self):
         self.client.force_login(self.member)
-        data = {'name': 'Updated Test Catchment', 'type': 'custom'}
+        data = {'name': 'Updated Test Catchment', 'type': 'custom', 'region': self.region.pk}
         response = self.client.post(reverse('catchment-update', kwargs={'pk': self.catchment.pk}), data, follow=True)
         self.assertRedirects(response, reverse('catchment-detail', kwargs={'pk': self.catchment.pk}))
 
@@ -140,7 +354,7 @@ class CatchmentModalDeleteViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.catchment = Catchment.objects.create(name='Test Catchment')
+        cls.catchment = Catchment.objects.create(name='Test Catchment', region=Region.objects.create())
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('catchment-delete-modal', kwargs={'pk': self.catchment.pk})
@@ -156,6 +370,11 @@ class CatchmentModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('catchment-delete-modal', kwargs={'pk': self.catchment.pk}))
         self.assertEqual(200, response.status_code)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('catchment-delete-modal', kwargs={'pk': self.catchment.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('catchment-delete-modal', kwargs={'pk': self.catchment.pk})
@@ -173,6 +392,22 @@ class CatchmentModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         self.assertRedirects(response, reverse('catchment-list'))
         with self.assertRaises(Catchment.DoesNotExist):
             Catchment.objects.get(pk=self.catchment.pk)
+
+
+# ----------- Catchment API---------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class CatchmentGeometryAPITestCase(ViewWithPermissionsTestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.catchment = Catchment.objects.create(name='Test Catchment')
+
+    def test_get_http_200_ok_for_anonymous(self):
+        response = self.client.get(reverse('ajax_catchment_geometries') + '?' + urlencode({'catchment': self.catchment.pk}))
+        self.assertEqual(200, response.status_code)
 
 
 class NutsRegionMapViewTestCase(TestCase):
@@ -376,6 +611,11 @@ class AttributeCreateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('attribute-create'))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('attribute-create'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('attribute-create'), data={})
         self.assertEqual(response.status_code, 302)
@@ -408,6 +648,11 @@ class AttributeModalCreateViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('attribute-create-modal'))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('attribute-create-modal'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('attribute-create-modal'), data={})
@@ -493,6 +738,11 @@ class AttributeUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('attribute-update', kwargs={'pk': self.attribute.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('attribute-update', kwargs={'pk': self.attribute.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('attribute-update', kwargs={'pk': self.attribute.pk}), data={})
         self.assertEqual(response.status_code, 302)
@@ -536,6 +786,11 @@ class AttributeModalUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('attribute-update-modal', kwargs={'pk': self.attribute.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('attribute-update-modal', kwargs={'pk': self.attribute.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('attribute-update-modal', kwargs={'pk': self.attribute.pk}), data={})
         self.assertEqual(response.status_code, 302)
@@ -578,6 +833,11 @@ class AttributeModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('attribute-delete-modal', kwargs={'pk': self.attribute.pk}))
         self.assertEqual(response.status_code, 200)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('attribute-delete-modal', kwargs={'pk': self.attribute.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('attribute-delete-modal', kwargs={'pk': self.attribute.pk}))
@@ -634,6 +894,11 @@ class RegionAttributeValueCreateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('regionattributevalue-create'))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('regionattributevalue-create'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('regionattributevalue-create'), data={})
         self.assertEqual(response.status_code, 302)
@@ -648,6 +913,7 @@ class RegionAttributeValueCreateViewTestCase(ViewWithPermissionsTestCase):
         data = {
             'name': 'Test Attribute Value',
             'region': self.region.id,
+            'date': '2022-01-01',
             'attribute': self.attribute.id,
             'value': 123.321
         }
@@ -678,6 +944,11 @@ class RegionAttributeValueModalCreateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('regionattributevalue-create-modal'))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('regionattributevalue-create-modal'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('regionattributevalue-create-modal'), data={})
         self.assertEqual(response.status_code, 302)
@@ -692,6 +963,7 @@ class RegionAttributeValueModalCreateViewTestCase(ViewWithPermissionsTestCase):
         data = {
             'name': 'Test Attribute Value',
             'region': self.region.id,
+            'date': '2022-01-01',
             'attribute': self.attribute.id,
             'value': 123.321
         }
@@ -781,6 +1053,11 @@ class RegionAttributeValueUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('regionattributevalue-update', kwargs={'pk': self.value.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('regionattributevalue-update', kwargs={'pk': self.value.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('regionattributevalue-update', kwargs={'pk': self.value.pk}), data={})
         self.assertEqual(response.status_code, 302)
@@ -801,6 +1078,7 @@ class RegionAttributeValueUpdateViewTestCase(ViewWithPermissionsTestCase):
         data = {
             'name': 'Updated Value',
             'region': self.region.id,
+            'date': '2022-01-01',
             'attribute': self.attribute.id,
             'value': 456.654
         }
@@ -840,6 +1118,11 @@ class RegionAttributeValueModalUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('regionattributevalue-update-modal', kwargs={'pk': self.value.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('regionattributevalue-update-modal', kwargs={'pk': self.value.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('regionattributevalue-update-modal', kwargs={'pk': self.value.pk}), data={})
         self.assertEqual(response.status_code, 302)
@@ -863,6 +1146,7 @@ class RegionAttributeValueModalUpdateViewTestCase(ViewWithPermissionsTestCase):
         data = {
             'name': 'Updated Value',
             'region': self.region.id,
+            'date': '2022-01-01',
             'attribute': self.attribute.id,
             'value': 456.654
         }
@@ -901,6 +1185,11 @@ class RegionAttributeValueModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('regionattributevalue-delete-modal', kwargs={'pk': self.value.pk}))
         self.assertEqual(response.status_code, 200)
 
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('regionattributevalue-delete-modal', kwargs={'pk': self.value.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('regionattributevalue-delete-modal', kwargs={'pk': self.value.pk}))
         self.assertEqual(response.status_code, 302)
@@ -916,3 +1205,36 @@ class RegionAttributeValueModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         with self.assertRaises(RegionAttributeValue.DoesNotExist):
             RegionAttributeValue.objects.get(pk=self.value.pk)
         self.assertEqual(response.status_code, 302)
+
+
+# ----------- Region Utils ---------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class RegionOfLauAutocompleteViewTestCase(ViewWithPermissionsTestCase):
+    url = reverse('region-of-lau-autocomplete')
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.region_1 = LauRegion.objects.create(name='Test Region 1', lau_id='123').region_ptr
+        cls.region_2 = LauRegion.objects.create(name='Test Region 2', lau_id='234').region_ptr
+        cls.region_3 = Region.objects.create(name='Test Region Not In Queryset')
+
+    def test_all_lau_regions_with_matching_name_string_in_queryset(self):
+        response = self.client.get(self.url, data={'q': 'Test'})
+        self.assertEqual(200, response.status_code)
+        ids = [region['id'] for region in json.loads(response.content)['results']]
+        self.assertListEqual([str(lau.id) for lau in LauRegion.objects.all()], ids)
+
+    def test_all_lau_region_with_matching_lau_id_in_queryset(self):
+        response = self.client.get(self.url, data={'q': '12'})
+        self.assertEqual(200, response.status_code)
+        ids = [region['id'] for region in json.loads(response.content)['results']]
+        self.assertListEqual([str(lau.id) for lau in LauRegion.objects.filter(lau_id='123')], ids)
+
+    def test_all_lau_region_with_matching_lau_id_in_queryset_2(self):
+        response = self.client.get(self.url, data={'q': '23'})
+        self.assertEqual(200, response.status_code)
+        ids = [region['id'] for region in json.loads(response.content)['results']]
+        self.assertListEqual([str(lau.id) for lau in LauRegion.objects.all()], ids)

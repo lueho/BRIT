@@ -33,6 +33,7 @@ INSTALLED_APPS = [
     'cookie_consent',
     'ai_django_core',
     'users.apps.UsersConfig',
+    'utils.apps.UtilsConfig',
     'maps.apps.MapsConfig',
     'brit.apps.BRITConfig',
     'distributions.apps.DistributionsConfig',

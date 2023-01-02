@@ -6,11 +6,10 @@ from users.models import get_default_owner
 from ..filters import SourceFilter
 from ..models import Author, Licence, Source
 
-class SourceFilterTestCase(TestCase):
 
+class SourceFilterTestCase(TestCase):
     author1 = None
     source = None
-
 
     @classmethod
     def setUpTestData(cls):
@@ -35,7 +34,6 @@ class SourceFilterTestCase(TestCase):
             licence=licence,
         )
         source.authors.add(author2)
-
 
     def test_title_icontains(self):
         factory = RequestFactory()
@@ -66,3 +64,7 @@ class SourceFilterTestCase(TestCase):
         qs = SourceFilter(request.GET, Source.objects.all()).qs
         self.assertEqual(1, qs.count())
         self.assertEqual(self.source, qs.first())
+
+    def test_filter_form_has_no_formtags(self):
+        filtr = SourceFilter(queryset=Source.objects.all())
+        self.assertFalse(filtr.form.helper.form_tag)

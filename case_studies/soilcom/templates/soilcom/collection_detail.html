@@ -8,7 +8,10 @@
             <div class="card shadow">
                 <div class="card-header"><strong>Collection Details</strong></div>
                 <div class="card-body">
-                    <p class="card-text"><strong>Catchment:</strong><br>{{ object.catchment.name }}</p>
+                    <p class="card-text">
+                        <strong>Catchment:</strong><br>
+                        <a href="{{ object.catchment.get_absolute_url }}">{{ object.catchment.name }}</a>
+                    </p>
                     <p class="card-text">
                         <strong>Collector:</strong><br>
                         <a href="{{ object.collector.get_absolute_url }}">{{ object.collector.name }}</a>
@@ -48,6 +51,42 @@
                         </p>
                     {% endif %}
 
+                    {% if object.collectionpropertyvalue_set.exists %}
+                        {% regroup object.collectionpropertyvalue_set.all by property as property_list %}
+                        {% for prop in property_list %}
+                            <p class="card-text"><strong>{{ prop.grouper.name|title }}:</strong></p>
+                            <ul>
+                            {% for val in prop.list|dictsortreversed:"year" %}
+                                <li><a href="{{ val.get_absolute_url }}">
+                                {% if val.standard_deviation %}
+                                    {{ val.average }} ± {{ val.standard_deviation }} {{ val.property.unit }} ({{ val.year }})
+                                {% else %}
+                                    {{ val.average }} {{ val.property.unit }} ({{ val.year }})
+                                {% endif %}
+                                </a></li>
+                            {% endfor %}
+                            </ul>
+                        {% endfor %}
+                    {% endif %}
+
+                    {% if object.aggregatedcollectionpropertyvalue_set.exists %}
+                        {% regroup object.aggregatedcollectionpropertyvalue_set.all by property as property_list %}
+                        {% for prop in property_list %}
+                            <p class="card-text"><strong>{{ prop.grouper.name|title }}:</strong></p>
+                            <ul>
+                            {% for val in prop.list|dictsortreversed:"year" %}
+                                <li><a href="{{ val.get_absolute_url }}">
+                                {% if val.standard_deviation %}
+                                    {{ val.average }} ± {{ val.standard_deviation }} {{ val.property.unit }} ({{ val.year }}) (aggregated)
+                                {% else %}
+                                    {{ val.average }} {{ val.property.unit }} ({{ val.year }}) (aggregated)
+                                {% endif %}
+                                </a></li>
+                            {% endfor %}
+                            </ul>
+                        {% endfor %}
+                    {% endif %}
+
                     {% if object.samples.exists %}
                         <p class="card-text"><strong>Samples</strong></p>
                         <ul>
@@ -57,29 +96,40 @@
                         </ul>
                     {% endif %}
 
+                    {% if object.flyers.exists %}
+                        <p class="card-text"><strong>Sources:</strong></p>
+                        <ul>
+                            {% for flyer in object.flyers.all %}
+                                <li><a href="{{ flyer.url }}" target="blank">{{ flyer.url }}</a></li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
 
-                    <p class="card-text"><strong>Sources:</strong></p>
-                    <ul>
-                        {% for flyer in object.flyers.all %}
-                            <li><a href="{{ flyer.url }}" target="blank">{{ flyer.url }}</a></li>
-                        {% endfor %}
-                    </ul>
-
-                    <p class="card-text"><strong>Comments:</strong><br>{{ object.description }}</p>
+                    {% if object.description %}
+                        <p class="card-text"><strong>Comments:</strong><br>{{ object.description }}</p>
+                    {% endif %}
 
                 </div>
                 <div class="card-footer">
                     <a href="javascript:history.go(-1)"><i class="fas fa-fw fa-arrow-left"></i> back</a>
                     <a href="{% url 'collection-list' %}" class="nowrap ml-3">
                         <i class="fas fa-fw fa-list"></i> see all</a>
+                    {% if 'soilcom.change_collection' in perms %}
                     <a href="{% url 'collection-update' object.id %}" class="nowrap ml-3">
                         <i class="fas fa-fw fa-edit"></i> edit</a>
                     <a href="{% url 'collection-wastesamples' object.id %}" class="nowrap ml-3">
                         <i class="fas fa-fw fa-edit"></i> manage samples</a>
+                    <a href="{% url 'collection-add-property' object.id %}" class="nowrap ml-3">
+                        <i class="fas fa-fw fa-plus-circle"></i> add property</a>
+                    {% endif %}
+                    {% if 'soilcom.add_collection' in perms %}
                     <a href="{% url 'collection-copy' object.id %}" class="nowrap ml-3">
                        <i class="fas fa-fw fa-copy"></i> duplicate</a>
+                    {% endif %}
+                    {% if 'soilcom.delete_collection' in perms %}
                     <a href="{% url 'collection-delete-modal' object.id %}" class="nowrap modal-link ml-3">
                         <i class="fas fa-fw fa-trash"></i> delete</a>
+                    {% endif %}
                 </div>
             </div>
         </div>

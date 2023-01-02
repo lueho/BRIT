@@ -13,9 +13,8 @@ from django_filters import rest_framework as rf_filters
 from django_tables2 import table_factory
 from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 from rest_framework.generics import GenericAPIView
-from rest_framework.views import APIView
 
-from brit.views import DualUserListView, UserOwnsObjectMixin, NextOrSuccessUrlMixin
+from utils.views import NextOrSuccessUrlMixin, UserOwnsObjectMixin, DualUserListView
 from maps.models import GeoDataset
 from maps.views import GeoDatasetDetailView
 from materials.models import MaterialComponentGroup
@@ -298,7 +297,6 @@ class UpdateGreenhouseGrowthCycleValuesView(LoginRequiredMixin, UpdateView):
 
 class GreenhousesMapView(GeoDatasetDetailView):
     feature_url = reverse_lazy('data.nantes_greenhouses')
-    # form_class = NantesGreenhousesFilterForm
     filter_class = GreenhouseFilter
     filterset_class = GreenhouseFilter
     load_features = True
