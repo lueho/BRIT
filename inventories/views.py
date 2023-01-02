@@ -1,40 +1,28 @@
 import io
 import json
 
-from bootstrap_modal_forms.generic import BSModalCreateView, BSModalUpdateView, BSModalDeleteView
 from celery.result import AsyncResult
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
-from django.http import JsonResponse, HttpResponse
-from django.shortcuts import render, redirect
-from django.urls import reverse_lazy
+from django.http import HttpResponse, JsonResponse
+from django.shortcuts import redirect, render
+from django.urls import reverse, reverse_lazy
 from django.views.generic import CreateView, DetailView, View
 from django.views.generic.base import TemplateResponseMixin
 from django.views.generic.edit import ModelFormMixin
 from rest_framework.views import APIView
 
-from utils.views import NextOrSuccessUrlMixin, UserOwnsObjectMixin, DualUserListView, OwnedObjectModalUpdateView
 from layer_manager.models import Layer
 from maps.models import Catchment, GeoDataset
 from maps.serializers import BaseResultMapSerializer
 from materials.models import SampleSeries
 from users.models import get_default_owner
-from users.views import ModalLoginRequiredMixin
+from utils.views import (OwnedObjectCreateView, OwnedObjectDetailView, OwnedObjectListView, OwnedObjectModalCreateView,
+                         OwnedObjectModalDeleteView, OwnedObjectModalUpdateView, OwnedObjectUpdateView)
 from .evaluations import ScenarioResult
-from .forms import (
-    ScenarioModalModelForm,
-    ScenarioInventoryConfigurationAddForm,
-    ScenarioInventoryConfigurationUpdateForm,
-    SeasonalDistributionModelForm,
-)
-from .models import (
-    Scenario,
-    ScenarioInventoryConfiguration,
-    InventoryAlgorithm,
-    InventoryAlgorithmParameter,
-    InventoryAlgorithmParameterValue,
-    ScenarioStatus,
-    RunningTask
-)
+from .forms import (ScenarioInventoryConfigurationAddForm, ScenarioInventoryConfigurationUpdateForm,
+                    ScenarioModalModelForm, ScenarioModelForm, SeasonalDistributionModelForm)
+from .models import (InventoryAlgorithm, InventoryAlgorithmParameter, InventoryAlgorithmParameterValue, RunningTask,
+                     Scenario, ScenarioInventoryConfiguration, ScenarioStatus)
 from .tasks import run_inventory
 
 
@@ -44,51 +32,36 @@ class SeasonalDistributionCreateView(LoginRequiredMixin, CreateView):
     success_url = '/inventories/materials/{material_id}'
 
 
-# ----------- Scenarios ------------------------------------------------------------------------------------------------
+# ----------- Scenario CRUD --------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-# ----------- Scenarios CRUD -------------------------------------------------------------------------------------------
 
-class ScenarioListView(DualUserListView):
+class ScenarioListView(OwnedObjectListView):
     model = Scenario
-    template_name = 'scenario_list.html'
+    permission_required = set()
 
 
-# class ScenarioCreateView(LoginRequiredMixin, CreateView):
-#     model = Scenario
-#     form_class = ScenarioModelForm
-#     template_name = 'scenario_create.html'
-#     success_url = reverse_lazy('scenario_list')
-#
-#     def form_valid(self, form):
-#         form.instance.owner = self.request.user
-#         return super().form_valid(form)
+class ScenarioCreateView(OwnedObjectCreateView):
+    form_class = ScenarioModelForm
+    permission_required = 'inventories.add_scenario'
+
+    def get_success_url(self):
+        return reverse('scenario-detail', kwargs={'pk': self.object.pk})
 
 
-class ScenarioCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, BSModalCreateView):
+class ScenarioModalCreateView(OwnedObjectModalCreateView):
     form_class = ScenarioModalModelForm
-    template_name = 'modal_form.html'
-    success_url = reverse_lazy('scenario_list')
+    permission_required = 'inventories.add_scenario'
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({
-            'form_title': 'Create new scenario',
-            'submit_button_text': 'Create'
-        })
-        return context
-
-    def form_valid(self, form):
-        form.instance.owner = self.request.user
-        return super().form_valid(form)
+    def get_success_url(self):
+        return reverse('scenario-detail', kwargs={'pk': self.object.pk})
 
 
-class ScenarioDetailView(UserPassesTestMixin, DetailView):
+class ScenarioDetailView(OwnedObjectDetailView):
     """Summary of the Scenario with complete configuration. Page for final review, which also contains the
     'run' button."""
 
     model = Scenario
-    template_name = 'scenario_detail.html'
     object = None
     config = None
     allow_edit = False
@@ -103,6 +76,7 @@ class ScenarioDetailView(UserPassesTestMixin, DetailView):
         'fillOpacity': 1,
         'stroke': False
     }
+    permission_required = set()
 
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()
@@ -153,39 +127,33 @@ class ScenarioDetailView(UserPassesTestMixin, DetailView):
             return False
 
 
-class ScenarioUpdateView(ModalLoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
+class ScenarioUpdateView(OwnedObjectUpdateView):
     model = Scenario
-    form_class = ScenarioModalModelForm
-    template_name = 'modal_form.html'
+    form_class = ScenarioModelForm
+    permission_required = 'inventories.change_scenario'
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs.update({
-            'region_id': self.object.region.id
-        })
+        kwargs.update({'region_id': self.object.region.id})
         return kwargs
 
 
 class ScenarioModalUpdateView(OwnedObjectModalUpdateView):
-    template_name = 'modal_form.html'
     model = Scenario
     form_class = ScenarioModalModelForm
     permission_required = 'inventories.change_scenario'
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs.update({'region_id': self.object.region.id})
+        return kwargs
 
-class ScenarioDeleteView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalDeleteView):
+
+class ScenarioModalDeleteView(OwnedObjectModalDeleteView):
     model = Scenario
-    template_name = 'modal_delete.html'
     success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('scenario_list')
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({
-            'form_title': 'Delete scenario',
-            'submit_button_text': 'Delete'
-        })
-        return context
+    success_url = reverse_lazy('scenario-list')
+    permission_required = 'inventories.delete_scenario'
 
 
 def get_evaluation_status(request, task_id=None):
@@ -226,7 +194,7 @@ class ScenarioAddInventoryAlgorithmView(LoginRequiredMixin, UserPassesTestMixin,
                 value_id = request.POST.get(parameter_id)
                 values[parameter].append(InventoryAlgorithmParameterValue.objects.get(id=value_id))
         scenario.add_inventory_algorithm(feedstock, algorithm, values)
-        return redirect('scenario_detail', pk=scenario_id)
+        return redirect('scenario-detail', pk=scenario_id)
 
     def get_object(self, **kwargs):
         return Scenario.objects.get(pk=self.kwargs.get('pk'))
@@ -275,7 +243,7 @@ class ScenarioAlgorithmConfigurationUpdateView(LoginRequiredMixin, UserPassesTes
                 value_id = request.POST.get(parameter_id)
                 values[parameter].append(InventoryAlgorithmParameterValue.objects.get(id=value_id))
         scenario.add_inventory_algorithm(feedstock, new_algorithm, values)
-        return redirect('scenario_detail', pk=request.POST.get('scenario'))
+        return redirect('scenario-detail', pk=request.POST.get('scenario'))
 
     def get_object(self, **kwargs):
         return Scenario.objects.get(pk=self.kwargs.get('scenario_pk'))
@@ -311,7 +279,7 @@ class ScenarioRemoveInventoryAlgorithmView(LoginRequiredMixin, UserPassesTestMix
         self.algorithm = InventoryAlgorithm.objects.get(id=self.kwargs.get('algorithm_pk'))
         self.feedstock = SampleSeries.objects.get(id=self.kwargs.get('feedstock_pk'))
         self.scenario.remove_inventory_algorithm(algorithm=self.algorithm, feedstock=self.feedstock)
-        return redirect('scenario_detail', pk=self.scenario.id)
+        return redirect('scenario-detail', pk=self.scenario.id)
 
 
 def download_scenario_summary(request, scenario_pk):
@@ -326,10 +294,10 @@ def download_scenario_summary(request, scenario_pk):
 def load_catchment_options(request):
     region_id = request.GET.get('region_id') or request.GET.get('region')
     if region_id:
-        return render(request, 'catchment_dropdown_list_options.html', {'catchments':Catchment.objects.filter(parent_region_id=region_id)})
+        return render(request, 'catchment_dropdown_list_options.html',
+                      {'catchments': Catchment.objects.filter(parent_region_id=region_id)})
     else:
         return render(request, 'catchment_dropdown_list_options.html', {'catchments': Catchment.objects.none()})
-
 
 
 def load_geodataset_options(request):
@@ -400,7 +368,7 @@ class ResultMapAPI(APIView):
         return JsonResponse(data, safe=False)
 
 
-class ScenarioResultView(DetailView):
+class ScenarioResultView(OwnedObjectDetailView):
     """
     View with summaries of the results of each algorithm and a total summary.
     """
@@ -421,6 +389,7 @@ class ScenarioResultView(DetailView):
         'fillOpacity': 1,
         'stroke': False
     }
+    permission_required = set()
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -463,19 +432,6 @@ class ScenarioResultView(DetailView):
 
     def get_catchment_id(self):
         return self.object.catchment.id
-
-    def test_func(self):
-        self.object = self.get_object()
-        standard_owner = get_default_owner()
-        if self.object.owner == standard_owner:
-            if self.request.user == standard_owner:
-                self.allow_edit = True
-            return True
-        elif self.object.owner == self.request.user:
-            self.allow_edit = True
-            return True
-        else:
-            return False
 
 
 class ScenarioEvaluationProgressView(DetailView):

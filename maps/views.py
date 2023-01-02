@@ -211,7 +211,6 @@ class CatchmentCreateByMergeView(OwnedObjectCreateView):
 
 
 class CatchmentUpdateView(OwnedObjectUpdateView):
-    template_name = 'simple_form_card.html'
     model = Catchment
     form_class = CatchmentModelForm
     permission_required = 'maps.change_catchment'
@@ -647,20 +646,17 @@ class NutsAndLauCatchmentPedigreeAPI(APIView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 class AttributeListView(OwnedObjectListView):
-    template_name = 'simple_list_card.html'
     model = Attribute
     permission_required = set()
 
 
 class AttributeCreateView(OwnedObjectCreateView):
-    template_name = 'simple_form_card.html'
     form_class = AttributeModelForm
     success_url = reverse_lazy('attribute-list')
     permission_required = 'maps.add_attribute'
 
 
 class AttributeModalCreateView(OwnedObjectModalCreateView):
-    template_name = 'modal_form.html'
     form_class = AttributeModalModelForm
     success_url = reverse_lazy('attribute-list')
     permission_required = 'maps.add_attribute'
@@ -679,14 +675,12 @@ class AttributeModalDetailView(OwnedObjectModalDetailView):
 
 
 class AttributeUpdateView(OwnedObjectUpdateView):
-    template_name = 'simple_form_card.html'
     model = Attribute
     form_class = AttributeModelForm
     permission_required = 'maps.change_attribute'
 
 
 class AttributeModalUpdateView(OwnedObjectModalUpdateView):
-    template_name = 'modal_form.html'
     model = Attribute
     form_class = AttributeModalModelForm
     permission_required = 'maps.change_attribute'
@@ -704,20 +698,17 @@ class AttributeModalDeleteView(OwnedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 class RegionAttributeValueListView(OwnedObjectListView):
-    template_name = 'simple_list_card.html'
     model = RegionAttributeValue
     permission_required = set()
 
 
 class RegionAttributeValueCreateView(OwnedObjectCreateView):
-    template_name = 'simple_form_card.html'
     form_class = RegionAttributeValueModelForm
     success_url = reverse_lazy('regionattributevalue-list')
     permission_required = 'maps.add_regionattributevalue'
 
 
 class RegionAttributeValueModalCreateView(OwnedObjectModalCreateView):
-    template_name = 'modal_form.html'
     form_class = RegionAttributeValueModalModelForm
     success_url = reverse_lazy('regionattributevalue-list')
     permission_required = 'maps.add_regionattributevalue'
@@ -736,14 +727,12 @@ class RegionAttributeValueModalDetailView(OwnedObjectModalDetailView):
 
 
 class RegionAttributeValueUpdateView(OwnedObjectUpdateView):
-    template_name = 'simple_form_card.html'
     model = RegionAttributeValue
     form_class = RegionAttributeValueModelForm
     permission_required = 'maps.change_regionattributevalue'
 
 
 class RegionAttributeValueModalUpdateView(OwnedObjectModalUpdateView):
-    template_name = 'modal_form.html'
     model = RegionAttributeValue
     form_class = RegionAttributeValueModalModelForm
     permission_required = 'maps.change_regionattributevalue'

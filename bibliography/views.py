@@ -1,7 +1,7 @@
-from dal.autocomplete import Select2QuerySetView
 import json
 
 from celery.result import AsyncResult
+from dal.autocomplete import Select2QuerySetView
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.db.models import Q
 from django.http import HttpResponse
@@ -10,9 +10,10 @@ from django.views import View
 from django.views.generic import TemplateView
 
 from utils import views
-from . import forms
 from .filters import SourceFilter
-from .models import Author, Licence, Source, SOURCE_TYPES
+from .forms import AuthorModalModelForm, AuthorModelForm, LicenceModalModelForm, LicenceModelForm, SourceModalModelForm, \
+    SourceModelForm
+from .models import Author, Licence, SOURCE_TYPES, Source
 from .serializers import HyperlinkedSourceSerializer
 from .tasks import check_source_url, check_source_urls
 
@@ -31,14 +32,12 @@ class AuthorListView(views.OwnedObjectListView):
 
 
 class AuthorCreateView(views.OwnedObjectCreateView):
-    template_name = 'simple_form_card.html'
-    form_class = forms.AuthorModelForm
+    form_class = AuthorModelForm
     permission_required = 'bibliography.add_author'
 
 
 class AuthorModalCreateView(views.OwnedObjectModalCreateView):
-    template_name = 'modal_form.html'
-    form_class = forms.AuthorModalModelForm
+    form_class = AuthorModalModelForm
     permission_required = 'bibliography.add_author'
 
 
@@ -54,16 +53,14 @@ class AuthorModalDetailView(views.OwnedObjectModalDetailView):
 
 
 class AuthorUpdateView(views.OwnedObjectUpdateView):
-    template_name = 'simple_form_card.html'
     model = Author
-    form_class = forms.AuthorModelForm
+    form_class = AuthorModelForm
     permission_required = 'bibliography.change_author'
 
 
 class AuthorModalUpdateView(views.OwnedObjectModalUpdateView):
-    template_name = 'modal_form.html'
     model = Author
-    form_class = forms.AuthorModalModelForm
+    form_class = AuthorModalModelForm
     permission_required = 'bibliography.change_author'
 
 
@@ -84,14 +81,12 @@ class LicenceListView(views.OwnedObjectListView):
 
 
 class LicenceCreateView(views.OwnedObjectCreateView):
-    template_name = 'simple_form_card.html'
-    form_class = forms.LicenceModelForm
+    form_class = LicenceModelForm
     permission_required = 'bibliography.add_licence'
 
 
 class LicenceModalCreateView(views.OwnedObjectModalCreateView):
-    template_name = 'modal_form.html'
-    form_class = forms.LicenceModalModelForm
+    form_class = LicenceModalModelForm
     permission_required = 'bibliography.add_licence'
 
 
@@ -107,16 +102,14 @@ class LicenceModalDetailView(views.OwnedObjectModalDetailView):
 
 
 class LicenceUpdateView(views.OwnedObjectUpdateView):
-    template_name = 'simple_form_card.html'
     model = Licence
-    form_class = forms.LicenceModelForm
+    form_class = LicenceModelForm
     permission_required = 'bibliography.change_licence'
 
 
 class LicenceModalUpdateView(views.OwnedObjectModalUpdateView):
-    template_name = 'modal_form.html'
     model = Licence
-    form_class = forms.LicenceModalModelForm
+    form_class = LicenceModalModelForm
     permission_required = 'bibliography.change_licence'
 
 
@@ -150,14 +143,12 @@ class SourceListView(views.OwnedObjectListView):
 
 
 class SourceCreateView(views.OwnedObjectCreateView):
-    template_name = 'simple_form_card.html'
-    form_class = forms.SourceModelForm
+    form_class = SourceModelForm
     permission_required = 'bibliography.add_source'
 
 
 class SourceModalCreateView(views.OwnedObjectModalCreateView):
-    template_name = 'modal_form.html'
-    form_class = forms.SourceModalModelForm
+    form_class = SourceModalModelForm
     permission_required = 'bibliography.add_source'
 
 
@@ -190,16 +181,14 @@ class SourceModalDetailView(views.OwnedObjectModalDetailView):
 
 
 class SourceUpdateView(views.OwnedObjectUpdateView):
-    template_name = 'simple_form_card.html'
     model = Source
-    form_class = forms.SourceModelForm
+    form_class = SourceModelForm
     permission_required = 'bibliography.change_source'
 
 
 class SourceModalUpdateView(views.OwnedObjectModalUpdateView):
-    template_name = 'modal_form.html'
     model = Source
-    form_class = forms.SourceModalModelForm
+    form_class = SourceModalModelForm
     permission_required = 'bibliography.change_source'
 
 

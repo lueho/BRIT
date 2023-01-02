@@ -1,4 +1,3 @@
-from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.test import TestCase
 from django.urls import reverse
@@ -6,10 +5,10 @@ from django.urls import reverse
 from distributions.models import Period, TemporalDistribution, Timestep
 from maps.models import GeoDataset, Region
 from materials.models import Material
-from utils.tests.testcases import comparable_model_dict
 from users.models import get_default_owner
-from ..models import (Collection, CollectionCatchment, CollectionCountOptions, CollectionFrequency, CollectionSystem,
-                      WasteStream, WasteCategory, WasteFlyer, CollectionSeason)
+from utils.tests.testcases import comparable_model_dict
+from ..models import (Collection, CollectionCatchment, CollectionCountOptions, CollectionFrequency, CollectionSeason,
+                      CollectionSystem, WasteCategory, WasteFlyer, WasteStream)
 
 
 class InitialDataTestCase(TestCase):
@@ -83,44 +82,17 @@ class CollectionCatchmentTestCase(TestCase):
 class WasteStreamQuerysetTestCase(TestCase):
 
     def setUp(self):
-        self.owner = User.objects.create(username='owner', password='very-secure!')
-        self.material1 = Material.objects.create(
-            owner=self.owner,
-            name='Test material 1'
-        )
-        self.material2 = Material.objects.create(
-            owner=self.owner,
-            name='Test material 2'
-        )
-        self.material3 = Material.objects.create(
-            owner=self.owner,
-            name='Test material 3'
-        )
-        self.category = WasteCategory.objects.create(
-            owner=self.owner,
-            name='Biowaste'
-        )
-        self.waste_stream = WasteStream.objects.create(
-            owner=self.owner,
-            category=self.category
-        )
+        self.material1 = Material.objects.create(name='Test material 1')
+        self.material2 = Material.objects.create(name='Test material 2')
+        self.material3 = Material.objects.create(name='Test material 3')
+        self.category = WasteCategory.objects.create(name='Biowaste')
+        self.waste_stream = WasteStream.objects.create(category=self.category)
         self.waste_stream.allowed_materials.add(self.material1)
         self.waste_stream.allowed_materials.add(self.material2)
-
-    def test_create_waste_stream_routine(self):
-        waste_stream = WasteStream.objects.create(
-            owner=self.owner,
-            category=self.category,
-            name='Test waste stream'
-        )
-        waste_stream.allowed_materials.add(self.material1)
-        waste_stream.allowed_materials.add(self.material2)
-        self.assertEqual(len(waste_stream.allowed_materials.all()), 2)
 
     def test_get_or_create_with_passing_allowed_materials(self):
         allowed_materials = Material.objects.filter(id__in=[self.material1.id, self.material2.id])
         instance, created = WasteStream.objects.get_or_create(
-            owner=self.owner,
             category=self.category,
             allowed_materials=allowed_materials
         )
@@ -131,7 +103,6 @@ class WasteStreamQuerysetTestCase(TestCase):
     def test_get_or_create_with_non_existing_allowed_materials_queryset(self):
         allowed_materials = Material.objects.filter(id__in=[self.material1.id, self.material2.id, self.material3.id])
         instance, created = WasteStream.objects.get_or_create(
-            owner=self.owner,
             category=self.category,
             allowed_materials=allowed_materials
         )
@@ -140,7 +111,6 @@ class WasteStreamQuerysetTestCase(TestCase):
 
     def test_get_or_create_without_passing_allowed_materials(self):
         instance, created = WasteStream.objects.get_or_create(
-            owner=self.waste_stream.owner,
             category=self.waste_stream.category,
             name=self.waste_stream.name
         )
@@ -152,7 +122,6 @@ class WasteStreamQuerysetTestCase(TestCase):
         new_name = 'New waste stream'
 
         instance, created = WasteStream.objects.get_or_create(
-            owner=self.waste_stream.owner,
             category=self.waste_stream.category,
             name=new_name,
         )
@@ -165,7 +134,6 @@ class WasteStreamQuerysetTestCase(TestCase):
         allowed_materials = Material.objects.filter(id__in=[self.material1.id, self.material2.id])
 
         instance, created = WasteStream.objects.get_or_create(
-            owner=self.waste_stream.owner,
             category=self.waste_stream.category,
             name=new_name,
             allowed_materials=allowed_materials
@@ -180,7 +148,6 @@ class WasteStreamQuerysetTestCase(TestCase):
         allowed_materials = Material.objects.filter(id__in=[self.material1.id, self.material2.id])
 
         defaults = {
-            'owner': self.owner,
             'category': self.category,
             'allowed_materials': allowed_materials
         }
@@ -199,7 +166,6 @@ class WasteStreamQuerysetTestCase(TestCase):
 
         instance, created = WasteStream.objects.update_or_create(
             defaults={'name': new_name},
-            owner=self.waste_stream.owner,
             category=self.waste_stream.category,
             name=self.waste_stream.name
         )
@@ -213,7 +179,6 @@ class WasteStreamQuerysetTestCase(TestCase):
 
         instance, created = WasteStream.objects.update_or_create(
             defaults={'name': new_name},
-            owner=self.waste_stream.owner,
             category=self.waste_stream.category,
             allowed_materials=allowed_materials
         )
@@ -228,7 +193,6 @@ class WasteStreamQuerysetTestCase(TestCase):
 
         instance, created = WasteStream.objects.update_or_create(
             defaults={'allowed_materials': allowed_materials},
-            owner=self.waste_stream.owner,
             category=self.waste_stream.category,
             id=self.waste_stream.id
         )
@@ -241,7 +205,6 @@ class WasteStreamQuerysetTestCase(TestCase):
         allowed_materials = Material.objects.filter(id__in=[self.material1.id, self.material2.id, self.material3.id])
 
         instance, created = WasteStream.objects.get_or_create(
-            owner=self.waste_stream.owner,
             category=self.waste_stream.category,
             allowed_materials=allowed_materials
         )
@@ -259,19 +222,13 @@ class WasteFlyerTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = User.objects.create(username='owner', password='very-secure!')
-
-        WasteFlyer.objects.create(
-            owner=owner,
-            abbreviation='WasteFlyer007',
-            url='https://www.super-test-flyer.org'
-        )
+        WasteFlyer.objects.create(abbreviation='WasteFlyer007', url='https://www.super-test-flyer.org')
 
     def setUp(self):
         pass
 
     def test_new_instance_is_saved_with_type_waste_flyer(self):
-        flyer = WasteFlyer.objects.create(owner=User.objects.first(), abbreviation='WasteFlyer002')
+        flyer = WasteFlyer.objects.create(abbreviation='WasteFlyer002')
         self.assertEqual(flyer.type, 'waste_flyer')
 
     def test_str_returns_url(self):
@@ -283,12 +240,11 @@ class CollectionTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        collection_system = CollectionSystem.objects.create(owner=get_default_owner(), name='System')
-        catchment = CollectionCatchment.objects.create(owner=get_default_owner(), name='Catchment')
-        category = WasteCategory.objects.create(owner=get_default_owner(), name='Category')
-        waste_stream = WasteStream.objects.create(owner=get_default_owner(), category=category)
+        collection_system = CollectionSystem.objects.create(name='System')
+        catchment = CollectionCatchment.objects.create(name='Catchment')
+        category = WasteCategory.objects.create(name='Category')
+        waste_stream = WasteStream.objects.create(category=category)
         cls.collection = Collection.objects.create(
-            owner=get_default_owner(),
             catchment=catchment,
             collection_system=collection_system,
             waste_stream=waste_stream
@@ -298,8 +254,7 @@ class CollectionTestCase(TestCase):
         self.assertEqual('Catchment Category System', self.collection.name)
 
     def test_collection_name_is_updated_on_model_update(self):
-        self.collection.collection_system = CollectionSystem.objects.create(owner=get_default_owner(),
-                                                                            name='New System')
+        self.collection.collection_system = CollectionSystem.objects.create(name='New System')
         self.collection.save()
         self.assertEqual('Catchment Category New System', self.collection.name)
 
@@ -312,7 +267,7 @@ class CollectionTestCase(TestCase):
 
     def test_collection_name_is_updated_when_waste_stream_model_is_changed(self):
         waste_stream = WasteStream.objects.get(category__name='Category')
-        category = WasteCategory.objects.create(owner=get_default_owner(), name='New Category')
+        category = WasteCategory.objects.create(name='New Category')
         waste_stream.category = category
         waste_stream.save()
         self.collection.refresh_from_db()

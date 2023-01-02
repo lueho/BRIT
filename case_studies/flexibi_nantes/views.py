@@ -1,36 +1,28 @@
-from bootstrap_modal_forms.generic import BSModalCreateView, BSModalReadView, BSModalUpdateView, \
-    BSModalDeleteView
+from bootstrap_modal_forms.generic import BSModalCreateView, BSModalDeleteView, BSModalReadView, BSModalUpdateView
 from crispy_forms.helper import FormHelper
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Sum
-from django.http import JsonResponse, HttpResponseRedirect
-from django.urls import reverse
-from django.urls import reverse_lazy
-from django.views.generic import DetailView, UpdateView
-from django.views.generic import TemplateView
+from django.http import HttpResponseRedirect, JsonResponse
+from django.urls import reverse, reverse_lazy
+from django.views.generic import DetailView, TemplateView, UpdateView
 from django_filters import rest_framework as rf_filters
 from django_tables2 import table_factory
 from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 from rest_framework.generics import GenericAPIView
 
-from utils.views import NextOrSuccessUrlMixin, UserOwnsObjectMixin, DualUserListView
 from maps.models import GeoDataset
 from maps.views import GeoDatasetDetailView
 from materials.models import MaterialComponentGroup
 from users.models import get_default_owner
+from utils.views import DualUserListView, NextOrSuccessUrlMixin, UserOwnsObjectMixin
 from .filters import GreenhouseFilter
-from .forms import (CultureModelForm,
-                    GreenhouseModalModelForm,
-                    GreenhouseGrowthCycle,
-                    UpdateGreenhouseGrowthCycleValuesForm,
-                    GrowthCycleCreateForm,
-                    GrowthTimestepInline,
-                    GrowthShareFormSetHelper,
-                    InlineGrowthShare, )
-from .models import Culture, Greenhouse, NantesGreenhouses, GrowthTimeStepSet
+from .forms import (CultureModelForm, GreenhouseGrowthCycle, GreenhouseModalModelForm, GrowthCycleCreateForm,
+                    GrowthShareFormSetHelper, GrowthTimestepInline, InlineGrowthShare,
+                    UpdateGreenhouseGrowthCycleValuesForm)
+from .models import Culture, Greenhouse, GrowthTimeStepSet, NantesGreenhouses
 from .serializers import NantesGreenhousesGeometrySerializer
-from .tables import growthcycle_table_factory, StandardGreenhouseTable, UserGreenhouseTable
+from .tables import StandardGreenhouseTable, UserGreenhouseTable, growthcycle_table_factory
 
 
 # ----------- Culture CRUD ---------------------------------------------------------------------------------------------
@@ -328,13 +320,13 @@ class NantesGreenhousesAPIView(GenericAPIView):
             'geoJson': serializer.data,
             'summaries': [
                 {
-                    'greenhouse_count': {'label': 'Number of greenhouses', 'value': f'{len(serializer.data["features"])}'},
+                    'greenhouse_count': {'label': 'Number of greenhouses',
+                                         'value': f'{len(serializer.data["features"])}'},
                     'growth_area': {'label': 'Total growth area', 'value': f'{area} ha'}
-                 },
+                },
             ]
         }
         return JsonResponse(data)
-
 
 # class NantesGreenhousesAPIView(APIView):
 #

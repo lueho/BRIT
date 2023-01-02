@@ -1,7 +1,7 @@
 from django.http import JsonResponse
 from django.urls import reverse_lazy
-from rest_framework.generics import GenericAPIView
 from django_filters import rest_framework as rf_filters
+from rest_framework.generics import GenericAPIView
 
 from maps.models import GeoDataset
 from maps.views import GeoDatasetDetailView

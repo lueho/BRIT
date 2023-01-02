@@ -5,7 +5,7 @@ from django.views.generic import FormView
 
 from .forms import SimuCFModelForm
 from .input_file_template import template_string
-from .serializers import SimuCFSerializer, SimuCF
+from .serializers import SimuCF, SimuCFSerializer
 
 
 class SimuCFFormView(FormView):

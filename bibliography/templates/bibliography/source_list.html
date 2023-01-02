@@ -2,17 +2,17 @@
 {% load static %}
 {% load crispy_forms_tags %}
 
-{% block title %}BRIT | Sources{% endblock %}
+{% block title %}BRIT | Bibliography | Sources{% endblock %}
 
 {% block list_body %}
     <table class="table">
         <thead>
-            <tr>
-                <th>Abbreviation</th>
-                <th>Authors/Publisher</th>
-                <th>Title</th>
-                <th>Type</th>
-            </tr>
+        <tr>
+            <th>Abbreviation</th>
+            <th>Authors/Publisher</th>
+            <th>Title</th>
+            <th>Type</th>
+        </tr>
         </thead>
         {% for object in object_list %}
             <tr>

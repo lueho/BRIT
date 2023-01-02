@@ -1,33 +1,21 @@
-{% extends 'base.html' %}
+{% extends 'simple_list_card.html' %}
 {% load static %}
 
 {% block title %}BRIT | Bibliography | Licences{% endblock %}
 
-{% block content %}
-    <div class="row">
-        <div class="col">
-            <div class="card shadow">
-                <div class="card-header"><strong>Licences</strong></div>
-                <div class="card-body">
-                    <table class="table">
-                        <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Reference url</th>
-                        </tr>
-                        </thead>
-                        {% for object in object_list %}
-                            <tr>
-                                <td><a href="{{ object.get_absolute_url }}">{{ object }}</a></td>
-                                <td><a href="{{ object.reference_url }}" target="_blank">{{ object.reference_url }}</a></td>
-                            </tr>
-                        {% endfor %}
-                    </table>
-                </div>
-                <div class="card-footer">
-                    <a href="{% url 'licence-create' %}">
-                        <i class="fas fa-fw fa-plus"></i> Create new licence
-                    </a>
-                </div>
-            </div>
-{% endblock content %}
+{% block card_body %}
+    <table class="table">
+        <thead>
+        <tr>
+            <th>Name</th>
+            <th>Reference url</th>
+        </tr>
+        </thead>
+        {% for object in object_list %}
+            <tr>
+                <td><a href="{{ object.get_absolute_url }}">{{ object }}</a></td>
+                <td><a href="{{ object.reference_url }}" target="_blank">{{ object.reference_url }}</a></td>
+            </tr>
+        {% endfor %}
+    </table>
+{% endblock card_body %}

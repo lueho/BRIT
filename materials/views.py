@@ -1,47 +1,37 @@
-from bootstrap_modal_forms.generic import BSModalFormView, BSModalReadView, BSModalUpdateView, BSModalDeleteView
+from bootstrap_modal_forms.generic import BSModalDeleteView, BSModalFormView, BSModalReadView, BSModalUpdateView
 from crispy_forms.helper import FormHelper
 from dal import autocomplete
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.contrib.auth.mixins import PermissionRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.urls import reverse, reverse_lazy
-from django.views.generic import ListView, TemplateView, RedirectView
+from django.views.generic import ListView, RedirectView, TemplateView
 from django.views.generic.detail import SingleObjectMixin
 from extra_views import UpdateWithInlinesView
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
-from utils.views import (NextOrSuccessUrlMixin, UserOwnsObjectMixin, BRITFilterView, OwnedObjectListView,
-    OwnedObjectCreateView, OwnedObjectModalCreateView, OwnedObjectDetailView, OwnedObjectModalDetailView,
-    OwnedObjectUpdateView, OwnedObjectModalUpdateView, OwnedObjectModalDeleteView)
 from bibliography.forms import SourceSimpleFilterForm
 from distributions.models import TemporalDistribution
 from distributions.plots import DoughnutChart
-
-from . import forms
+from utils.views import (BRITFilterView, NextOrSuccessUrlMixin, OwnedObjectCreateView, OwnedObjectDetailView,
+                         OwnedObjectListView, OwnedObjectModalCreateView, OwnedObjectModalDeleteView,
+                         OwnedObjectModalDetailView, OwnedObjectModalUpdateView, OwnedObjectUpdateView,
+                         UserOwnsObjectMixin)
 from .filters import CompositionFilterSet, MaterialFilterSet, SampleFilter, SampleFilterSet, SampleSeriesFilterSet
-from .forms import (
-    AddComponentModalForm,
-    AddCompositionModalForm,
-    AddLiteratureSourceForm,
-    AddSeasonalVariationForm,
-    ComponentModelForm,
-    ComponentGroupModelForm,
-    Composition,
-    ComponentShareDistributionFormSetHelper,
-    WeightShareUpdateFormSetHelper,
-    InlineWeightShare, ComponentModalModelForm, ComponentGroupModalModelForm, ModalInlineComponentShare,
-    SampleSeriesAddTemporalDistributionModalModelForm
-)
-from .models import (
-    Material,
-    SampleSeries,
-    Sample,
-    MaterialComponent,
-    MaterialComponentGroup,
-    MaterialCategory, WeightShare, MaterialProperty, MaterialPropertyValue, )
-from .serializers import CompositionDoughnutChartSerializer, SampleModelSerializer, SampleSeriesModelSerializer, \
-    CompositionAPISerializer, SampleAPISerializer, SampleSeriesAPISerializer, MaterialAPISerializer
+from .forms import (AddComponentModalForm, AddCompositionModalForm, AddLiteratureSourceForm, AddSeasonalVariationForm,
+                    ComponentGroupModalModelForm, ComponentGroupModelForm, ComponentModalModelForm, ComponentModelForm,
+                    ComponentShareDistributionFormSetHelper, Composition, CompositionModalModelForm,
+                    CompositionModelForm, InlineWeightShare, MaterialCategoryModalModelForm, MaterialCategoryModelForm,
+                    MaterialModalModelForm, MaterialModelForm, MaterialPropertyModalModelForm,
+                    MaterialPropertyModelForm, MaterialPropertyValueModalModelForm, MaterialPropertyValueModelForm,
+                    ModalInlineComponentShare, SampleModalModelForm, SampleModelForm,
+                    SampleSeriesAddTemporalDistributionModalModelForm, SampleSeriesModalModelForm,
+                    SampleSeriesModelForm, WeightShareUpdateFormSetHelper)
+from .models import (Material, MaterialCategory, MaterialComponent, MaterialComponentGroup, MaterialProperty,
+                     MaterialPropertyValue, Sample, SampleSeries, WeightShare)
+from .serializers import (CompositionAPISerializer, CompositionDoughnutChartSerializer, MaterialAPISerializer,
+                          SampleAPISerializer, SampleModelSerializer, SampleSeriesAPISerializer,
+                          SampleSeriesModelSerializer)
 
 
 class MaterialsDashboardView(PermissionRequiredMixin, TemplateView):
@@ -53,20 +43,17 @@ class MaterialsDashboardView(PermissionRequiredMixin, TemplateView):
 # ---------------------------------------------------------------------------------------------------------------------
 
 class MaterialCategoryListView(OwnedObjectListView):
-    template_name = 'simple_list_card.html'
     model = MaterialCategory
     permission_required = set()
 
 
 class MaterialCategoryCreateView(OwnedObjectCreateView):
-    template_name = 'simple_form_card.html'
-    form_class = forms.MaterialCategoryModelForm
+    form_class = MaterialCategoryModelForm
     permission_required = 'materials.add_materialcategory'
 
 
 class MaterialCategoryModalCreateView(OwnedObjectModalCreateView):
-    template_name = 'modal_form.html'
-    form_class = forms.MaterialCategoryModalModelForm
+    form_class = MaterialCategoryModalModelForm
     permission_required = 'materials.add_materialcategory'
 
 
@@ -83,16 +70,14 @@ class MaterialCategoryModalDetailView(OwnedObjectModalDetailView):
 
 
 class MaterialCategoryUpdateView(OwnedObjectUpdateView):
-    template_name = 'simple_form_card.html'
     model = MaterialCategory
-    form_class = forms.MaterialCategoryModelForm
+    form_class = MaterialCategoryModelForm
     permission_required = 'materials.change_materialcategory'
 
 
 class MaterialCategoryModalUpdateView(OwnedObjectModalUpdateView):
-    template_name = 'modal_form.html'
     model = MaterialCategory
-    form_class = forms.MaterialCategoryModalModelForm
+    form_class = MaterialCategoryModalModelForm
     permission_required = 'materials.change_materialcategory'
 
 
@@ -115,14 +100,12 @@ class MaterialListView(OwnedObjectListView):
 
 
 class MaterialCreateView(OwnedObjectCreateView):
-    template_name = 'simple_form_card.html'
-    form_class = forms.MaterialModelForm
+    form_class = MaterialModelForm
     permission_required = 'materials.add_material'
 
 
 class MaterialModalCreateView(OwnedObjectModalCreateView):
-    template_name = 'modal_form.html'
-    form_class = forms.MaterialModalModelForm
+    form_class = MaterialModalModelForm
     permission_required = 'materials.add_material'
 
 
@@ -139,16 +122,14 @@ class MaterialModalDetailView(OwnedObjectModalDetailView):
 
 
 class MaterialUpdateView(OwnedObjectUpdateView):
-    template_name = 'simple_form_card.html'
     model = Material
-    form_class = forms.MaterialModelForm
+    form_class = MaterialModelForm
     permission_required = 'materials.change_material'
 
 
 class MaterialModalUpdateView(OwnedObjectModalUpdateView):
-    template_name = 'modal_form.html'
     model = Material
-    form_class = forms.MaterialModalModelForm
+    form_class = MaterialModalModelForm
     permission_required = 'materials.change_material'
 
 
@@ -172,24 +153,20 @@ class MaterialAutocompleteView(autocomplete.Select2QuerySetView):
         return qs
 
 
-
 # ----------- Material Components CRUD ---------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 class ComponentListView(OwnedObjectListView):
-    template_name = 'simple_list_card.html'
     model = MaterialComponent
     permission_required = set()
 
 
 class ComponentCreateView(OwnedObjectCreateView):
-    template_name = 'simple_form_card.html'
     form_class = ComponentModelForm
     permission_required = 'materials.add_materialcomponent'
 
 
 class ComponentModalCreateView(OwnedObjectModalCreateView):
-    template_name = 'modal_form.html'
     form_class = ComponentModalModelForm
     permission_required = 'materials.add_materialcomponent'
 
@@ -207,16 +184,14 @@ class ComponentModalDetailView(OwnedObjectModalDetailView):
 
 
 class ComponentUpdateView(OwnedObjectUpdateView):
-    template_name = 'simple_form_card.html'
     model = MaterialComponent
     form_class = ComponentModelForm
     permission_required = 'materials.change_materialcomponent'
 
 
 class ComponentModalUpdateView(OwnedObjectModalUpdateView):
-    template_name = 'modal_form.html'
     model = MaterialComponent
-    form_class = forms.ComponentModalModelForm
+    form_class = ComponentModalModelForm
     permission_required = 'materials.change_materialcomponent'
 
 
@@ -233,13 +208,11 @@ class ComponentModalDeleteView(OwnedObjectModalDeleteView):
 
 
 class ComponentGroupListView(OwnedObjectListView):
-    template_name = 'simple_list_card.html'
     model = MaterialComponentGroup
     permission_required = set()
 
 
 class ComponentGroupCreateView(OwnedObjectCreateView):
-    template_name = 'simple_form_card.html'
     form_class = ComponentGroupModelForm
     permission_required = 'materials.add_materialcomponentgroup'
 
@@ -251,7 +224,6 @@ class ComponentGroupDetailView(OwnedObjectDetailView):
 
 
 class ComponentGroupModalCreateView(OwnedObjectModalCreateView):
-    template_name = 'modal_form.html'
     form_class = ComponentGroupModalModelForm
     permission_required = 'materials.add_materialcomponentgroup'
 
@@ -263,14 +235,12 @@ class ComponentGroupModalDetailView(OwnedObjectModalDetailView):
 
 
 class ComponentGroupUpdateView(OwnedObjectUpdateView):
-    template_name = 'simple_form_card.html'
     model = MaterialComponentGroup
     form_class = ComponentGroupModelForm
     permission_required = 'materials.change_materialcomponentgroup'
 
 
 class ComponentGroupModalUpdateView(OwnedObjectModalUpdateView):
-    template_name = 'modal_form.html'
     model = MaterialComponentGroup
     form_class = ComponentGroupModalModelForm
     permission_required = 'materials.change_materialcomponentgroup'
@@ -288,20 +258,17 @@ class ComponentGroupModalDeleteView(OwnedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 class MaterialPropertyListView(OwnedObjectListView):
-    template_name = 'simple_list_card.html'
     model = MaterialProperty
     permission_required = set()
 
 
 class MaterialPropertyCreateView(OwnedObjectCreateView):
-    template_name = 'simple_form_card.html'
-    form_class = forms.MaterialPropertyModelForm
+    form_class = MaterialPropertyModelForm
     permission_required = 'materials.add_materialproperty'
 
 
 class MaterialPropertyModalCreateView(OwnedObjectModalCreateView):
-    template_name = 'modal_form.html'
-    form_class = forms.MaterialPropertyModalModelForm
+    form_class = MaterialPropertyModalModelForm
     permission_required = 'materials.add_materialproperty'
 
 
@@ -318,16 +285,14 @@ class MaterialPropertyModalDetailView(OwnedObjectModalDetailView):
 
 
 class MaterialPropertyUpdateView(OwnedObjectUpdateView):
-    template_name = 'simple_form_card.html'
     model = MaterialProperty
-    form_class = forms.MaterialPropertyModelForm
+    form_class = MaterialPropertyModelForm
     permission_required = 'materials.change_materialproperty'
 
 
 class MaterialPropertyModalUpdateView(OwnedObjectModalUpdateView):
-    template_name = 'modal_form.html'
     model = MaterialProperty
-    form_class = forms.MaterialPropertyModalModelForm
+    form_class = MaterialPropertyModalModelForm
     permission_required = 'materials.change_materialproperty'
 
 
@@ -355,20 +320,17 @@ class MaterialPropertyValueModalDeleteView(OwnedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 class SampleSeriesListView(OwnedObjectListView):
-    template_name = 'simple_list_card.html'
     model = SampleSeries
     permission_required = set()
 
 
 class SampleSeriesCreateView(OwnedObjectCreateView):
-    template_name = 'simple_form_card.html'
-    form_class = forms.SampleSeriesModelForm
+    form_class = SampleSeriesModelForm
     permission_required = 'materials.add_sampleseries'
 
 
 class SampleSeriesModalCreateView(OwnedObjectModalCreateView):
-    template_name = 'modal_form.html'
-    form_class = forms.SampleSeriesModalModelForm
+    form_class = SampleSeriesModalModelForm
     permission_required = 'materials.add_sampleseries'
 
 
@@ -389,16 +351,14 @@ class SampleSeriesModalDetailView(OwnedObjectModalDetailView):
 
 
 class SampleSeriesUpdateView(OwnedObjectUpdateView):
-    template_name = 'simple_form_card.html'
     model = SampleSeries
-    form_class = forms.SampleSeriesModelForm
+    form_class = SampleSeriesModelForm
     permission_required = 'materials.change_sampleseries'
 
 
 class SampleSeriesModalUpdateView(OwnedObjectModalUpdateView):
-    template_name = 'modal_form.html'
     model = SampleSeries
-    form_class = forms.SampleSeriesModalModelForm
+    form_class = SampleSeriesModalModelForm
     permission_required = 'materials.change_sampleseries'
 
 
@@ -415,9 +375,8 @@ class SampleSeriesModalDeleteView(OwnedObjectModalDeleteView):
 
 
 class SampleSeriesCreateDuplicateView(OwnedObjectUpdateView):
-    template_name = 'simple_form_card.html'
     model = SampleSeries
-    form_class = forms.SampleSeriesModelForm
+    form_class = SampleSeriesModelForm
     permission_required = 'materials.add_sampleseries'
     object = None
 
@@ -427,9 +386,8 @@ class SampleSeriesCreateDuplicateView(OwnedObjectUpdateView):
 
 
 class SampleSeriesModalCreateDuplicateView(OwnedObjectModalUpdateView):
-    template_name = 'modal_form.html'
     model = SampleSeries
-    form_class = forms.SampleSeriesModalModelForm
+    form_class = SampleSeriesModalModelForm
     permission_required = 'materials.add_sampleseries'
     object = None
 
@@ -440,7 +398,6 @@ class SampleSeriesModalCreateDuplicateView(OwnedObjectModalUpdateView):
 
 
 class SampleSeriesModalAddDistributionView(OwnedObjectModalUpdateView):
-    template_name = 'modal_form.html'
     model = SampleSeries
     form_class = SampleSeriesAddTemporalDistributionModalModelForm
     permission_required = 'materials.change_sampleseries'
@@ -449,7 +406,6 @@ class SampleSeriesModalAddDistributionView(OwnedObjectModalUpdateView):
         if not self.request.is_ajax():
             self.object.temporal_distributions.add(form.cleaned_data['distribution'])
         return HttpResponseRedirect(self.get_success_url())
-
 
 
 # ----------- Sample CRUD ----------------------------------------------------------------------------------------------
@@ -470,19 +426,16 @@ class FeaturedSampleListView(OwnedObjectListView):
 
 
 class SampleCreateView(OwnedObjectCreateView):
-    template_name = 'simple_form_card.html'
-    form_class = forms.SampleModelForm
+    form_class = SampleModelForm
     permission_required = 'materials.add_sample'
 
 
 class SampleModalCreateView(OwnedObjectModalCreateView):
-    template_name = 'modal_form.html'
-    form_class = forms.SampleModalModelForm
+    form_class = SampleModalModelForm
     permission_required = 'materials.add_sample'
 
 
 class SampleDetailView(OwnedObjectDetailView):
-    template_name = 'sample_detail.html'
     model = Sample
     permission_required = set()
 
@@ -508,16 +461,14 @@ class SampleModalDetailView(OwnedObjectModalDetailView):
 
 
 class SampleUpdateView(OwnedObjectUpdateView):
-    template_name = 'simple_form_card.html'
     model = Sample
-    form_class = forms.SampleModelForm
+    form_class = SampleModelForm
     permission_required = 'materials.change_sample'
 
 
 class SampleModalUpdateView(OwnedObjectModalUpdateView):
-    template_name = 'modal_form.html'
     model = Sample
-    form_class = forms.SampleModalModelForm
+    form_class = SampleModalModelForm
     permission_required = 'materials.change_sample'
 
 
@@ -542,8 +493,7 @@ class SampleAutoCompleteView(autocomplete.Select2QuerySetView):
 
 
 class SampleAddPropertyView(OwnedObjectCreateView):
-    form_class = forms.MaterialPropertyValueModelForm
-    template_name = 'simple_form_card.html'
+    form_class = MaterialPropertyValueModelForm
     permission_required = 'materials.add_materialpropertyvalue'
 
     def form_valid(self, form):
@@ -558,8 +508,7 @@ class SampleAddPropertyView(OwnedObjectCreateView):
 
 
 class SampleModalAddPropertyView(OwnedObjectModalCreateView):
-    form_class = forms.MaterialPropertyValueModalModelForm
-    template_name = 'modal_form.html'
+    form_class = MaterialPropertyValueModalModelForm
     permission_required = 'materials.add_materialpropertyvalue'
 
     def form_valid(self, form):
@@ -577,7 +526,6 @@ class SampleModalAddPropertyView(OwnedObjectModalCreateView):
 class SampleAddSourceView(OwnedObjectUpdateView):
     model = Sample
     form_class = SourceSimpleFilterForm
-    template_name = 'simple_form_card.html'
     permission_required = 'materials.change_sample'
 
     def form_valid(self, form):
@@ -587,9 +535,8 @@ class SampleAddSourceView(OwnedObjectUpdateView):
 
 
 class SampleCreateDuplicateView(OwnedObjectUpdateView):
-    template_name = 'simple_form_card.html'
     model = Sample
-    form_class = forms.SampleModelForm
+    form_class = SampleModelForm
     permission_required = 'materials.add_sample'
     object = None
 
@@ -599,9 +546,8 @@ class SampleCreateDuplicateView(OwnedObjectUpdateView):
 
 
 class SampleModalCreateDuplicateView(OwnedObjectModalUpdateView):
-    template_name = 'modal_form.html'
     model = Sample
-    form_class = forms.SampleModalModelForm
+    form_class = SampleModalModelForm
     permission_required = 'materials.add_sample'
     object = None
 
@@ -615,25 +561,21 @@ class SampleModalCreateDuplicateView(OwnedObjectModalUpdateView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 class CompositionListView(OwnedObjectListView):
-    template_name = 'simple_list_card.html'
     model = Composition
     permission_required = set()
 
 
 class CompositionCreateView(OwnedObjectCreateView):
-    template_name = 'simple_form_card.html'
-    form_class = forms.CompositionModelForm
+    form_class = CompositionModelForm
     permission_required = 'materials.add_composition'
 
 
 class CompositionModalCreateView(OwnedObjectModalCreateView):
-    template_name = 'modal_form.html'
-    form_class = forms.CompositionModalModelForm
+    form_class = CompositionModalModelForm
     permission_required = 'materials.add_composition'
 
 
 class CompositionDetailView(OwnedObjectDetailView):
-    template_name = 'composition_detail.html'
     model = Composition
     permission_required = set()
 
@@ -648,7 +590,6 @@ class CompositionUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin, Upda
     model = Composition
     inlines = [InlineWeightShare, ]
     fields = set()
-    template_name = 'composition_update.html'
     permission_required = (
         'materials.change_composition',
         'materials.change_weightshare',

@@ -27,9 +27,3 @@
         </tbody>
     </table>
 {% endblock card_body %}
-
-{% block card_footer %}
-    {% if 'materials.add_material' in perms %}
-        <a href="{% url 'material-create' %}"><i class="fas fa-fw fa-plus"></i> new material</a>
-    {% endif %}
-{% endblock card_footer %}

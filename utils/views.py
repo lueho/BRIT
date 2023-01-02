@@ -1,23 +1,15 @@
-from bootstrap_modal_forms.generic import BSModalCreateView, BSModalReadView, BSModalUpdateView, BSModalDeleteView
-from django.contrib.auth.mixins import UserPassesTestMixin, PermissionRequiredMixin
+from bootstrap_modal_forms.generic import BSModalCreateView, BSModalDeleteView, BSModalReadView, BSModalUpdateView
+from django.contrib.auth.mixins import PermissionRequiredMixin, UserPassesTestMixin
 from django.contrib.messages.views import SuccessMessageMixin
-from django.core.exceptions import FieldError
+from django.core.exceptions import FieldError, ImproperlyConfigured
 from django.http import JsonResponse
 from django.template.loader import render_to_string
-from django.views.generic import TemplateView, ListView, CreateView, DetailView, UpdateView
+from django.views.generic import CreateView, DetailView, ListView, TemplateView, UpdateView
 from django_filters.views import FilterView
 from django_tables2 import table_factory
 
-from utils.tables import StandardItemTable, UserItemTable
 from users.models import get_default_owner
-
-
-class Chart:
-    id = None
-    type = None
-    labels = None
-    datasets = None
-    options = None
+from utils.tables import StandardItemTable, UserItemTable
 
 
 class NextOrSuccessUrlMixin:
@@ -85,7 +77,8 @@ class OwnedObjectListView(PermissionRequiredMixin, ListView):
         context.update({
             'header': self.model._meta.verbose_name_plural.capitalize(),
             'create_url': self.model.create_url,
-            'create_url_text': f'New {self.model._meta.verbose_name}'
+            'create_url_text': f'New {self.model._meta.verbose_name}',
+            'create_permission': f'{self.model.__module__.replace(".models", "")}.add_{self.model.__name__.lower()}'
         })
         return context
 
@@ -94,6 +87,11 @@ class OwnedObjectListView(PermissionRequiredMixin, ListView):
             return super().get_queryset().order_by('name')
         except FieldError:
             return super().get_queryset()
+
+    def get_template_names(self):
+        template_names = super().get_template_names()
+        template_names.append('simple_list_card.html')
+        return template_names
 
 
 class CreateOwnedObjectMixin(PermissionRequiredMixin, NextOrSuccessUrlMixin):
@@ -114,8 +112,17 @@ class OwnedObjectCreateView(CreateOwnedObjectMixin, SuccessMessageMixin, CreateV
     def get_success_message(self, cleaned_data):
         return str(self.object.pk)
 
+    def get_template_names(self):
+        try:
+            template_names = super().get_template_names()
+        except ImproperlyConfigured:
+            template_names = []
+        template_names.append('simple_form_card.html')
+        return template_names
+
 
 class OwnedObjectModalCreateView(CreateOwnedObjectMixin, BSModalCreateView):
+    template_name = 'modal_form.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -149,6 +156,7 @@ class OwnedObjectModalDetailView(PermissionRequiredMixin, BSModalReadView):
 
 
 class OwnedObjectUpdateView(PermissionRequiredMixin, SuccessMessageMixin, NextOrSuccessUrlMixin, UpdateView):
+    template_name = 'simple_form_card.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -161,8 +169,17 @@ class OwnedObjectUpdateView(PermissionRequiredMixin, SuccessMessageMixin, NextOr
     def get_success_message(self, cleaned_data):
         return str(self.object.pk)
 
+    def get_template_names(self):
+        try:
+            template_names = super().get_template_names()
+        except ImproperlyConfigured:
+            template_names = []
+        template_names.append('simple_form_card.html')
+        return template_names
+
 
 class OwnedObjectModalUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
+    template_name = 'modal_form.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

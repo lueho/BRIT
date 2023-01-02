@@ -4,15 +4,16 @@ from django.contrib.auth.models import User
 from django.core.validators import RegexValidator
 from django.db import models
 from django.db.models.query import QuerySet
-from django.db.models.signals import pre_save, post_save
+from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.urls import reverse
 
 import case_studies
 from bibliography.models import Source
 from distributions.models import Timestep
-from maps.models import Region, Catchment, GeoDataset, SFBSite
+from maps.models import Catchment, GeoDataset, Region, SFBSite
 from materials.models import Material, SampleSeries
+from utils.models import NamedUserObjectModel
 from .exceptions import BlockedRunningScenario
 
 
@@ -100,7 +101,7 @@ class InventoryAlgorithmParameterValue(models.Model):
 
 
 @receiver(pre_save, sender=InventoryAlgorithmParameterValue)
-def auto_default(sender, instance, **kwargs):
+def auto_default(_, instance, **kwargs):
     """
     Makes sure that defaults are always set correctly, even if the user provides incoherent input.
     """
@@ -156,13 +157,14 @@ class ScenarioStatus(models.Model):
         return f'Status of Scenario {self.scenario}: {self.status}'
 
 
-class Scenario(models.Model):
+class Scenario(NamedUserObjectModel):
     name = models.CharField(max_length=56, default='Custom Scenario')
     owner = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
     description = models.TextField(blank=True, null=True)
     region = models.ForeignKey(Region, on_delete=models.CASCADE, null=True)
     site = models.ForeignKey(SFBSite, on_delete=models.CASCADE, null=True)  # TODO: make many-to-many?
-    catchment = models.ForeignKey(Catchment, on_delete=models.CASCADE, null=True, related_name='catchment')  # TODO: make many-to-many?
+    catchment = models.ForeignKey(Catchment, on_delete=models.CASCADE, null=True,
+                                  related_name='catchment')  # TODO: make many-to-many?
 
     @property
     def status(self):
@@ -458,14 +460,14 @@ class Scenario(models.Model):
 
     @property
     def update_url(self):
-        return reverse('scenario_update', kwargs={'pk': self.id})
+        return reverse('scenario-update', kwargs={'pk': self.id})
 
     @property
     def delete_url(self):
-        return reverse('scenario_delete', kwargs={'pk': self.id})
+        return reverse('scenario-delete-modal', kwargs={'pk': self.id})
 
     def get_absolute_url(self):
-        return reverse('scenario_detail', kwargs={'pk': self.id})
+        return reverse('scenario-detail', kwargs={'pk': self.id})
 
     def __str__(self):
         return self.name
@@ -528,7 +530,7 @@ class ScenarioInventoryConfiguration(models.Model):
     #             .update(inventory_value=self.inventory_value)
 
     def get_absolute_url(self):
-        return reverse('scenario_detail', kwargs={'pk': self.scenario.pk})
+        return reverse('scenario-detail', kwargs={'pk': self.scenario.pk})
 
 
 class RunningTask(models.Model):

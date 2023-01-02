@@ -2,8 +2,8 @@ from dal.autocomplete import ModelSelect2
 from django.forms import HiddenInput, ModelChoiceField
 
 from distributions.models import TemporalDistribution
-from maps.models import Region, Catchment, GeoDataset
-from utils.forms import AutoCompleteModelForm, SimpleModelForm, ModalModelFormMixin
+from maps.models import Catchment, GeoDataset, Region
+from utils.forms import AutoCompleteModelForm, ModalModelFormMixin, SimpleModelForm
 from .models import InventoryAlgorithm, Scenario, ScenarioInventoryConfiguration
 
 
@@ -35,7 +35,6 @@ class ScenarioModelForm(AutoCompleteModelForm):
     class Meta:
         model = Scenario
         fields = ['name', 'description', 'region', 'catchment']
-
 
 class ScenarioModalModelForm(ModalModelFormMixin, ScenarioModelForm):
     pass

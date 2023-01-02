@@ -51,9 +51,11 @@
 
                 <div class="card-footer">
                     {% block card_footer %}
-                        <a href="{{ create_url }}">
-                            <i class="fas fa-fw fa-plus"></i> {{ create_url_text }}
-                        </a>
+                        {% if create_permission in perms %}
+                            <a href="{{ create_url }}">
+                                <i class="fas fa-fw fa-plus"></i> {{ create_url_text }}
+                            </a>
+                        {% endif %}
                     {% endblock card_footer %}
                 </div>
             </div>
