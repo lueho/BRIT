@@ -22,11 +22,10 @@
  * @property mapConfig.adjust_bounds_to_features
  * @property mapConfig.load_region
  * @property mapConfig.load_features
- * @property mapConfig.form_fields
  */
 
 let map;
-window.addEventListener("map:init", function(event) {
+window.addEventListener("map:init", function (event) {
     map = event.detail.map;
 });
 
@@ -61,9 +60,10 @@ function loadMap(mapConfig) {
     if (mapConfig.load_features === true) {
         const params = parseFilterParameters();
         promises.push(fetchFeatureGeometries(params));
-        // filterFeatures();
     }
-    Promise.all(promises).then(() => {orderLayers();});
+    Promise.all(promises).then(() => {
+        orderLayers();
+    });
 
 }
 
@@ -78,7 +78,9 @@ async function updateLayers({region_params, catchment_params, feature_params} = 
     if (feature_params) {
         promises.push(fetchFeatureGeometries(feature_params));
     }
-    Promise.all(promises).then(() => {orderLayers();});
+    Promise.all(promises).then(() => {
+        orderLayers();
+    });
 }
 
 function orderLayers() {
@@ -188,14 +190,13 @@ function renderFeatures(geoJson) {
     markerStyle.renderer = myRenderer;
 
     feature_layer = L.geoJson(geoJson, {
-        pointToLayer: function(feature, latlng) {
+        pointToLayer: function (feature, latlng) {
             return L.circleMarker(latlng, markerStyle);
-        },
-        onEachFeature: function onEachFeature(feature, layer) {
+        }, onEachFeature: function onEachFeature(feature, layer) {
         }
     }).addTo(map);
 
-    feature_layer.on('click', async function(event) {
+    feature_layer.on('click', async function (event) {
         await clickedFeature(event);
     });
 
@@ -209,7 +210,7 @@ function renderFeatures(geoJson) {
 }
 
 try {
-    document.querySelector("#summary-container").addEventListener('click', function(e) {
+    document.querySelector("#summary-container").addEventListener('click', function (e) {
         if (e.target.matches('.collapse-selector')) {
             updateUrls(e.target.dataset.pk);
         }
@@ -231,82 +232,9 @@ async function clickedFeature(event) {
 }
 
 function parseFilterParameters() {
-    const params = new URLSearchParams();
-    if ('form_fields' in mapConfig) {
-        const form_fields = mapConfig.form_fields;
-        Object.keys(form_fields).forEach(key => {
-            switch (form_fields[key]) {
-            case 'SelectMultiple':
-                readSelectMultiple(key).forEach((value) => {params.append(key, value);});
-                break;
-            case 'RadioSelect':
-                params.append(key, readRadioSelect(key));
-                break;
-            case 'CheckboxInput':
-                params.append(key, readCheckbox(key));
-                break;
-            case 'CheckboxSelectMultiple':
-                readCheckboxSelectMultiple(key).forEach((value) => {params.append(key, value);});
-                break;
-            case 'RangeSlider':
-                const [min, max] = readRangeSlider(key);
-                params.append(key + '_min', min);
-                params.append(key + '_max', max);
-                break;
-            case 'PercentageRangeSlider':
-                const [min_perc, max_perc] = readRangeSlider(key);
-                params.append(key + '_min', min_perc);
-                params.append(key + '_max', max_perc);
-                break;
-            default:
-                params.append(key, document.getElementsByName(key)[0].value);
-            }
-        });
-    }
-    return params;
-}
-
-function readSelectMultiple(name) {
-    const country_codes = [];
-    const inputs = document.getElementsByName(name)[0];
-    for (let i = 0; i < inputs.length; i++) {
-        if (inputs[i].selected === true) {
-            country_codes.push(inputs[i].value);
-        }
-    }
-    return country_codes;
-}
-
-function readCheckbox(name) {
-    return document.getElementsByName(name)[0].checked;
-}
-
-function readCheckboxSelectMultiple(name) {
-    const ids = [];
-    const inputs = document.getElementsByName(name);
-    for (let i = 0; i < inputs.length; i++) {
-        if (inputs[i].checked === true) {
-            ids.push(inputs[i].value);
-        }
-    }
-    return ids;
-}
-
-function readRadioSelect(name) {
-    const heatingButtons = document.getElementsByName(name);
-    let heating;
-    for (let i = 0; i < heatingButtons.length; i++) {
-        if (heatingButtons[i].checked === true) {
-            heating = heatingButtons[i].value;
-        }
-    }
-    return heating;
-}
-
-function readRangeSlider(name) {
-    const min = document.getElementById('id_' + name + '_min').value;
-    const max = document.getElementById('id_' + name + '_max').value;
-    return [min, max];
+    const form = document.querySelector('form');
+    const formData = new FormData(form);
+    return new URLSearchParams(formData);
 }
 
 function isEmptyArray(el) {
@@ -351,7 +279,7 @@ function renderSummaryContainer(summary, summary_container) {
             if (Array.isArray(value)) {
                 const ul = document.createElement('ul');
                 summaryValueElement.appendChild(ul);
-                value.forEach(function(item) {
+                value.forEach(function (item) {
                     const li = document.createElement('li');
                     if (isValidHttpUrl(item.toString())) {
                         const a = document.createElement('a');

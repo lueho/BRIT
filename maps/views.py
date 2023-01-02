@@ -7,41 +7,21 @@ from django.http import JsonResponse
 from django.urls import reverse_lazy
 from django.views.generic import DetailView, ListView, TemplateView
 from django.views.generic.edit import FormMixin
-from rest_framework.exceptions import ParseError, NotFound
+from rest_framework.exceptions import NotFound, ParseError
 from rest_framework.views import APIView, Response
 
-from maps.serializers import (
-    RegionSerializer, CatchmentSerializer, NutsRegionGeometrySerializer,
-    NutsRegionCatchmentOptionSerializer, NutsRegionSummarySerializer, LauRegionOptionSerializer,
-    LauRegionSummarySerializer,
-    NutsRegionOptionSerializer)
+from maps.serializers import (CatchmentSerializer, LauRegionOptionSerializer, LauRegionSummarySerializer,
+                              NutsRegionCatchmentOptionSerializer, NutsRegionGeometrySerializer,
+                              NutsRegionOptionSerializer, NutsRegionSummarySerializer, RegionSerializer)
 from utils.forms import DynamicTableInlineFormSetHelper
-from utils.views import (BRITFilterView, OwnedObjectListView, OwnedObjectCreateView, OwnedObjectModalCreateView,
-                         OwnedObjectDetailView, OwnedObjectModalDetailView, OwnedObjectUpdateView,
-                         OwnedObjectModalUpdateView,
-                         OwnedObjectModalDeleteView, OwnedObjectModelSelectOptionsView)
+from utils.views import (BRITFilterView, OwnedObjectCreateView, OwnedObjectDetailView, OwnedObjectListView,
+                         OwnedObjectModalCreateView, OwnedObjectModalDeleteView, OwnedObjectModalDetailView,
+                         OwnedObjectModalUpdateView, OwnedObjectModelSelectOptionsView, OwnedObjectUpdateView)
 from .filters import CatchmentFilter
-from .forms import (
-    AttributeModelForm,
-    AttributeModalModelForm,
-    CatchmentModelForm,
-    CatchmentCreateByMergeForm,
-    CatchmentQueryForm,
-    NutsRegionQueryForm,
-    RegionAttributeValueModelForm,
-    RegionAttributeValueModalModelForm,
-    RegionMergeFormSet, RegionMergeForm
-)
-from .models import (
-    Attribute,
-    RegionAttributeValue,
-    Catchment,
-    GeoDataset,
-    GeoPolygon,
-    Region,
-    NutsRegion,
-    LauRegion
-)
+from .forms import (AttributeModalModelForm, AttributeModelForm, CatchmentCreateByMergeForm, CatchmentModelForm,
+                    CatchmentQueryForm, NutsRegionQueryForm, RegionAttributeValueModalModelForm,
+                    RegionAttributeValueModelForm, RegionMergeForm, RegionMergeFormSet)
+from .models import (Attribute, Catchment, GeoDataset, GeoPolygon, LauRegion, NutsRegion, Region, RegionAttributeValue)
 
 
 class MapMixin:
@@ -131,7 +111,6 @@ class CatchmentBrowseView(FormMixin, TemplateView):
             'form': self.get_form(),
             'nuts_form': NutsRegionQueryForm,
             'map_config': {
-                'form_fields': self.get_form_fields(),
                 'region_url': self.region_url,
                 'feature_url': self.feature_url,
                 'load_features': self.load_features,
@@ -142,9 +121,6 @@ class CatchmentBrowseView(FormMixin, TemplateView):
             }
         })
         return context
-
-    def get_form_fields(self):
-        return {key: type(value.widget).__name__ for key, value in self.form_class.base_fields.items()}
 
     def get_region_id(self):
         return 3
@@ -329,9 +305,6 @@ class GeoDataSetFormMixin(FormMixin):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['map_config'].update({
-            'form_fields': self.get_form_fields(),
-        })
         context.update({
             'form': self.get_form(),
         })
@@ -342,14 +315,6 @@ class GeoDataSetFormMixin(FormMixin):
             return self.form_class(**self.get_form_kwargs())
         if self.filterset_class is not None:
             return self.filterset_class(self.request.GET).form
-
-    def get_filter_fields(self):
-        return {key: type(value.field.widget).__name__ for key, value in self.filterset_class.base_filters.items()}
-
-    def get_form_fields(self):
-        if self.form_class is None and self.filterset_class is not None:
-            return self.get_filter_fields()
-        return {key: type(value.widget).__name__ for key, value in self.form_class.base_fields.items()}
 
 
 class GeoDatasetDetailView(GeoDataSetFormMixin, GeoDataSetMixin, DetailView):
