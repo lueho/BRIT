@@ -3,22 +3,21 @@ from collections import OrderedDict
 
 from django.forms.formsets import BaseFormSet
 from django.http import JsonResponse
-from django.http.request import QueryDict, MultiValueDict
+from django.http.request import MultiValueDict, QueryDict
 from django.test import RequestFactory, tag
 from django.urls import reverse
 from mock import Mock, patch
 
 from distributions.models import TemporalDistribution, Timestep
-from utils.models import Property
-from utils.tests.testcases import ViewWithPermissionsTestCase
 from maps.models import Region
 from materials.models import Material, MaterialCategory, Sample, SampleSeries
+from utils.models import Property
+from utils.tests.testcases import ViewWithPermissionsTestCase
 from .. import views
-from ..forms import CollectionModelForm, BaseWasteFlyerUrlFormSet
-from ..models import (Collection, CollectionCatchment, CollectionCountOptions, Collector, CollectionSystem,
-                      WasteCategory, WasteComponent, WasteFlyer, WasteStream, CollectionFrequency,
-                      CollectionPropertyValue, AggregatedCollectionPropertyValue, CollectionSeason)
-from ..views import FrequencyCreateView
+from ..forms import BaseWasteFlyerUrlFormSet, CollectionModelForm
+from ..models import (AggregatedCollectionPropertyValue, Collection, CollectionCatchment, CollectionCountOptions,
+                      CollectionFrequency, CollectionPropertyValue, CollectionSeason, CollectionSystem, Collector,
+                      WasteCategory, WasteComponent, WasteFlyer, WasteStream)
 
 
 # ----------- Collection Catchment CRUD --------------------------------------------------------------------------------
@@ -1189,6 +1188,11 @@ class CollectionUpdateViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse('collection-update', kwargs={'pk': self.collection.pk}))
         self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
+    def test_uses_custom_template(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('collection-update', kwargs={'pk': self.collection.pk}))
+        self.assertTemplateUsed(response, 'soilcom/collection_form.html')
 
     def test_get_get_formset_kwargs(self):
         kwargs = {'pk': self.collection.pk}
