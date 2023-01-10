@@ -225,7 +225,7 @@ class CollectionFilter(AutocompleteFilterSet):
         return qs
 
 
-class WasteFlyerFilter(SimpleFilterSet):
+class WasteFlyerFilter(AutocompleteFilterSet):
     url_valid = BooleanFilter(widget=RadioSelect(choices=((True, 'True'), (False, 'False'))))
     url_checked_before = DateFilter(
         field_name='url_checked',
@@ -239,7 +239,11 @@ class WasteFlyerFilter(SimpleFilterSet):
         widget=DateInput(attrs={'type': 'date'}),
         label='Url checked after'
     )
+    catchment = ModelChoiceFilter(queryset=CollectionCatchment.objects.all(),
+                                  label='Catchment',
+                                  widget=autocomplete.ModelSelect2(url='catchment-autocomplete'),
+                                  field_name='collections__catchment')
 
     class Meta:
         model = WasteFlyer
-        fields = ('url_valid', 'url_checked_before', 'url_checked_after')
+        fields = ('url_valid', 'url_checked_before', 'url_checked_after', 'catchment')
