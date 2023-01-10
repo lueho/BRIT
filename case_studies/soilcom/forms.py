@@ -125,10 +125,10 @@ class CollectionSeasonForm(SimpleForm):
         queryset=Timestep.objects.filter(distribution=TemporalDistribution.objects.get(name='Months of the year')),
         label='End'
     )
-    standard = IntegerField(required=False)
-    option_1 = IntegerField(required=False)
-    option_2 = IntegerField(required=False)
-    option_3 = IntegerField(required=False)
+    standard = IntegerField(required=False, min_value=0)
+    option_1 = IntegerField(required=False, min_value=0)
+    option_2 = IntegerField(required=False, min_value=0)
+    option_3 = IntegerField(required=False, min_value=0)
 
     class Meta:
         fields = ('distribution', 'first_timestep', 'last_timestep', 'standard', 'option_1', 'option_2', 'option_3')
