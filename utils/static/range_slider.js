@@ -15,13 +15,12 @@ $(function() {
 
         },
         create: function(event, ui) {
+            $("#" + $(this).parent().attr("id") + "_min").val($(this).parent().data("cur_min"));
+            $("#" + $(this).parent().attr("id") + "_max").val($(this).parent().data("cur_max"));
             $(this).slider("option", "step", $(this).parent().data("step"));
             $(this).slider("option", 'min', $(this).parent().data("range_min"));
             $(this).slider("option", 'max', $(this).parent().data("range_max"));
             $(this).slider("option", 'values', [$(this).parent().data("cur_min"), $(this).parent().data("cur_max")]);
         }
     });
-    $("#" + $(".numeric-slider").attr("id") + "_min").val($(".numeric-slider").data("cur_min"));
-    $("#" + $(".numeric-slider").attr("id") + "_max").val($(".numeric-slider").data("cur_max"));
-    // $("#" + $(".numeric-slider").attr("id") + "_text").text(ui.values[0] + ' - ' + ui.values[1]);
 });

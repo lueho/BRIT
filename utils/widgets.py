@@ -11,8 +11,8 @@ class RangeSlider(RangeWidget):
 
     def get_context(self, name, value, attrs):
         context = super().get_context(name, value, attrs)
-        if value is None:
-            value = (None, None)
+        if not isinstance(value, list):
+            value = self.decompress(value)
         cur_min, cur_max = value
         if cur_min is None:
             cur_min = context['widget']['attrs']['data-range_min']
