@@ -757,7 +757,7 @@ class CollectionAddPropertyValueView(CollectionPropertyValueCreateView):
     def get_initial(self):
         initial = super().get_initial()
         prop, _ = Property.objects.get_or_create(
-            name='specific waste generation',
+            name='specific waste collected',
             defaults={'unit': 'kg/(cap.*a)'}
         )
         initial['property'] = prop.pk
@@ -775,7 +775,7 @@ class CollectionCatchmentAddAggregatedPropertyView(AggregatedCollectionPropertyV
         catchment = CollectionCatchment.objects.get(pk=self.kwargs.get('pk'))
         initial['collections'] = catchment.downstream_collections
         prop, _ = Property.objects.get_or_create(
-            name='specific waste generation',
+            name='specific waste collected',
             defaults={'unit': 'kg/(cap.*a)'}
         )
         initial['property'] = prop
