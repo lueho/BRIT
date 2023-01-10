@@ -78,7 +78,7 @@ class OwnedObjectListView(PermissionRequiredMixin, ListView):
             'header': self.model._meta.verbose_name_plural.capitalize(),
             'create_url': self.model.create_url,
             'create_url_text': f'New {self.model._meta.verbose_name}',
-            'create_permission': f'{self.model.__module__.replace(".models", "")}.add_{self.model.__name__.lower()}'
+            'create_permission': f'{self.model.__module__.split(".")[-2]}.add_{self.model.__name__.lower()}'
         })
         return context
 
