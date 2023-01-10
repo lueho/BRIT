@@ -1434,7 +1434,7 @@ class CollectionAddPropertyValueViewTestCase(ViewWithPermissionsTestCase):
         initial = view.get_initial()
         expected = {
             'collection': self.collection.pk,
-            'property': Property.objects.get(name='specific waste generation').pk
+            'property': Property.objects.get(name='specific waste collected').pk
         }
         self.assertDictEqual(expected, initial)
 
@@ -1503,7 +1503,7 @@ class CollectionAddAggregatedPropertyValueViewTestCase(ViewWithPermissionsTestCa
         initial = view.get_initial()
         expected = {
             'collections': self.catchment.downstream_collections,
-            'property': Property.objects.get(name='specific waste generation')
+            'property': Property.objects.get(name='specific waste collected')
         }
         self.assertIn('collections', initial)
         self.assertIn('property', initial)
