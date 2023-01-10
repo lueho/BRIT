@@ -1,12 +1,13 @@
-from django.db.models import Q
+from django.db.models import Q, Avg
 from django.http.request import QueryDict, MultiValueDict
 from django.test import TestCase, modify_settings
 
 from distributions.models import Timestep, TemporalDistribution
 from users.models import get_default_owner
+from utils.models import Property
 from ..filters import CollectionFilter, CollectorFilter, WasteFlyerFilter
-from ..models import (Collection, CollectionCatchment, CollectionCountOptions, CollectionFrequency, CollectionSeason,
-                      Collector, WasteFlyer)
+from ..models import (Collection, CollectionCatchment, CollectionCountOptions, CollectionFrequency,
+                      CollectionPropertyValue, CollectionSeason, Collector, WasteFlyer)
 
 
 @modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
@@ -87,6 +88,10 @@ class CollectionFilterTestCase(TestCase):
         fixed_once_per_week = CollectionFrequency.objects.create(type='Fixed')
         CollectionCountOptions.objects.create(frequency=fixed_once_per_week, season=whole_year, standard=52)
         cls.child_collection = Collection.objects.create(catchment=child_catchment, frequency=fixed_once_per_week)
+        prop = Property.objects.create(name='specific waste collected', unit='kg/(cap.*a)')
+        CollectionPropertyValue.objects.create(property=prop, collection=cls.collection1, year=2022, average=100)
+        CollectionPropertyValue.objects.create(property=prop, collection=cls.collection1, year=2021, average=150)
+        CollectionPropertyValue.objects.create(property=prop, collection=cls.collection2, year=2022, average=200)
 
     def setUp(self):
         self.data = {field_name: field.initial for field_name, field in CollectionFilter().form.fields.items() if
@@ -121,8 +126,9 @@ class CollectionFilterTestCase(TestCase):
     def test_connection_rate_range_filter_renders_with_converted_percentage_values(self):
         self.data.update({'connection_rate_min': 50, 'connection_rate_max': 99})
         filtr = CollectionFilter(self.data, queryset=Collection.objects.all())
-        self.assertInHTML('<span class="numeric-slider-range_text percentage-slider-values" id="id_connection_rate_text">50% - 99%</span>',
-                          filtr.form.as_p())
+        self.assertInHTML(
+            '<span class="numeric-slider-range_text percentage-slider-values" id="id_connection_rate_text">50% - 99%</span>',
+            filtr.form.as_p())
 
     def test_connection_rate_returns_only_collections_in_given_range(self):
         self.data.update({'connection_rate_min': 50, 'connection_rate_max': 100})
@@ -205,6 +211,47 @@ class CollectionFilterTestCase(TestCase):
         self.assertIn(self.collection1, qs)
         self.assertNotIn(self.collection2, qs)
         self.assertNotIn(self.child_collection, qs)
+
+    def test_specific_waste_collected_field_exists_in_filter_form(self):
+        filtr = CollectionFilter(queryset=Collection.objects.all())
+        self.assertIn('spec_waste_collected', filtr.filters.keys())
+        self.assertIn('spec_waste_collected', filtr.form.fields.keys())
+
+    def test_spec_waste_collected_has_get_method(self):
+        filtr = CollectionFilter(queryset=Collection.objects.all())
+        self.assertEqual('get_spec_waste_collected', filtr.filters['spec_waste_collected'].method)
+        self.assertTrue(hasattr(filtr, filtr.filters['spec_waste_collected'].method))
+
+    def test_specific_waste_collected_filter_method_field_exists_in_filter_form(self):
+        filtr = CollectionFilter(queryset=Collection.objects.all())
+        self.assertIn('spec_waste_collected_filter_method', filtr.filters.keys())
+        self.assertIn('spec_waste_collected_filter_method', filtr.form.fields.keys())
+
+    def test_spec_waste_collected_filter_method_has_get_method(self):
+        filtr = CollectionFilter(queryset=Collection.objects.all())
+        self.assertEqual('get_spec_waste_collected_filter_method',
+                         filtr.filters['spec_waste_collected_filter_method'].method)
+        self.assertTrue(hasattr(filtr, filtr.filters['spec_waste_collected_filter_method'].method))
+
+    def test_get_spec_waste_collected_filter_method_sets_filter_method_as_class_attribute(self):
+        filtr = CollectionFilter(data={'spec_waste_collected_filter_method': 'average'},
+                                 queryset=Collection.objects.all())
+        filtr.is_valid()
+        self.assertTrue(filtr.is_valid())
+        qs = filtr.qs
+        self.assertTrue(hasattr(filtr, 'spec_waste_collected_filter_setting'))
+        self.assertEqual(filtr.spec_waste_collected_filter_setting, 'average')
+
+    def test_get_spec_waste_collected_with_average_returns_correctly(self):
+        data = {'spec_waste_collected_filter_method': 'average',
+                'spec_waste_collected_min': 150,
+                'spec_waste_collected_max': 1000}
+        filtr = CollectionFilter(data=data, queryset=Collection.objects.all())
+        filtr.is_valid()
+        self.assertTrue(filtr.is_valid())
+        qs = filtr.qs
+        self.assertIn(self.collection2, qs)
+        self.assertNotIn(self.collection1, qs)
 
     def test_filter_form_has_no_formtags(self):
         filtr = CollectionFilter(queryset=Collection.objects.all())

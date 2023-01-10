@@ -1,16 +1,18 @@
+import math
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Column, Field, Layout, Row
 from dal import autocomplete
-from django.db.models import Count, Max, Q, Sum
-from django.forms import CheckboxInput, CheckboxSelectMultiple, RadioSelect, DateInput
-from django_filters import (BooleanFilter, CharFilter, DateFilter, ModelChoiceFilter, ModelMultipleChoiceFilter,
+from django.db.models import Avg, Count, Max, Q, Sum
+from django.forms import CheckboxInput, CheckboxSelectMultiple, DateInput, RadioSelect
+from django_filters import (BooleanFilter, CharFilter, ChoiceFilter, DateFilter, ModelChoiceFilter,
+                            ModelMultipleChoiceFilter,
                             RangeFilter)
 
 from utils.crispy_fields import RangeSliderField
 from utils.filters import AutocompleteFilterSet, SimpleFilterSet
 from utils.widgets import PercentageRangeSlider, RangeSlider
-from .models import (Collection, CollectionCatchment, CollectionCountOptions, CollectionFrequency, Collector,
-                     WasteCategory, WasteComponent, WasteFlyer, )
+from .models import (Collection, CollectionCatchment, CollectionCountOptions, CollectionFrequency,
+                     CollectionPropertyValue, Collector, WasteCategory, WasteComponent, WasteFlyer, )
 
 
 class CollectorFilter(SimpleFilterSet):
@@ -33,6 +35,12 @@ OPTIONAL_FREQUENCY_CHOICES = (
     (False, 'No options'),
 )
 
+SPEC_WASTE_COLLECTED_FILTER_MODE_CHOICES = (
+    ('average', 'average'),
+    # ('exists', 'exists'),
+    # ('latest', 'latest')
+)
+
 
 class CollectionFilterFormHelper(FormHelper):
     layout = Layout(
@@ -46,16 +54,31 @@ class CollectionFilterFormHelper(FormHelper):
         Row(Column(Field('seasonal_frequency')), Column(Field('optional_frequency'))),
         RangeSliderField('collections_per_year'),
         'collections_per_year_include_unknown',
+        RangeSliderField('spec_waste_collected'),
+        'spec_waste_collected_filter_method',
         'fee_system'
     )
 
 
 class CollectionsPerYearFilter(RangeFilter):
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def set_min_max(self):
         frequencies = CollectionFrequency.objects.annotate(collection_count=Sum('collectioncountoptions__standard'))
-        max_value = frequencies.aggregate(Max('collection_count'))['collection_count__max']
+        if frequencies.exists():
+            max_value = frequencies.aggregate(Max('collection_count'))['collection_count__max']
+        else:
+            max_value = 1000
+        self.extra['widget'] = RangeSlider(attrs={'data-range_min': 0, 'data-range_max': max_value, 'data-step': 1})
+
+
+class SpecWasteCollectedFilter(RangeFilter):
+
+    def set_min_max(self):
+        values = CollectionPropertyValue.objects.filter(property__name='specific waste collected')
+        if values.exists():
+            max_value = math.ceil(values.aggregate(Max('average'))['average__max'])
+        else:
+            max_value = 1000
         self.extra['widget'] = RangeSlider(attrs={'data-range_min': 0, 'data-range_max': max_value, 'data-step': 1})
 
 
@@ -97,16 +120,32 @@ class CollectionFilter(AutocompleteFilterSet):
                                                          widget=CheckboxInput,
                                                          initial=True,
                                                          method='get_collections_per_year_include_unknown')
+    spec_waste_collected = SpecWasteCollectedFilter(
+        label='Specific waste collected [kg/(cap.*a)]',
+        method='get_spec_waste_collected'
+    )
+    spec_waste_collected_filter_method = ChoiceFilter(
+        label='Filter method',
+        empty_label=None,
+        choices=SPEC_WASTE_COLLECTED_FILTER_MODE_CHOICES,
+        method='get_spec_waste_collected_filter_method'
+    )
 
     class Meta:
         model = Collection
         fields = ('catchment', 'collector', 'collection_system', 'waste_category', 'allowed_materials',
                   'connection_rate', 'connection_rate_include_unknown', 'seasonal_frequency', 'optional_frequency',
-                  'collections_per_year', 'collections_per_year_include_unknown', 'fee_system')
+                  'collections_per_year', 'collections_per_year_include_unknown', 'spec_waste_collected_filter_method',
+                  'spec_waste_collected', 'fee_system')
         # catchment_filter must always be applied first, because it grabs the initial queryset and does not filter any
         # existing queryset.
         order_by = ['catchment_filter']
         form_helper = CollectionFilterFormHelper
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.filters['collections_per_year'].set_min_max()
+        self.filters['spec_waste_collected'].set_min_max()
 
     @staticmethod
     def catchment_filter(_, __, value):
@@ -163,6 +202,27 @@ class CollectionFilter(AutocompleteFilterSet):
         frequencies = CollectionFrequency.objects.annotate(collection_count=Sum('collectioncountoptions__standard'))
         frequencies = frequencies.filter(collection_count__gte=value.start, collection_count__lte=value.stop)
         return qs.filter(Q(frequency__in=frequencies) | Q(frequency__isnull=True))
+
+    def get_spec_waste_collected(self, qs, _, value):
+        if self.spec_waste_collected_filter_setting == 'latest':
+            # TODO: implement this filter method
+            return qs
+        elif self.spec_waste_collected_filter_setting == 'exists':
+            # TODO: implement this filter method
+            return qs
+        elif self.spec_waste_collected_filter_setting == 'average':
+            property_filter = Q(
+                collectionpropertyvalue__property__name='specific waste collected',
+                collectionpropertyvalue__average__gt=0.0
+            )
+            qs = qs.annotate(average_amount=Avg('collectionpropertyvalue__average', filter=property_filter))
+            qs = qs.filter(average_amount__gte=value.start, average_amount__lte=value.stop)
+            return qs
+        return qs
+
+    def get_spec_waste_collected_filter_method(self, qs, _, value):
+        self.spec_waste_collected_filter_setting = value
+        return qs
 
 
 class WasteFlyerFilter(SimpleFilterSet):
