@@ -1,4 +1,5 @@
 import math
+
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Column, Field, Layout, Row
 from dal import autocomplete
@@ -56,6 +57,7 @@ class CollectionFilterFormHelper(FormHelper):
         'collections_per_year_include_unknown',
         RangeSliderField('spec_waste_collected'),
         'spec_waste_collected_filter_method',
+        'spec_waste_collected_include_unknown',
         'fee_system'
     )
 
@@ -128,15 +130,20 @@ class CollectionFilter(AutocompleteFilterSet):
         label='Filter method',
         empty_label=None,
         choices=SPEC_WASTE_COLLECTED_FILTER_MODE_CHOICES,
-        method='get_spec_waste_collected_filter_method'
+        method='get_spec_waste_collected_filter_method',
+        initial='average'
     )
+    spec_waste_collected_include_unknown = BooleanFilter(label='Include unknown collected amounts',
+                                                         widget=CheckboxInput,
+                                                         initial=True,
+                                                         method='get_spec_waste_collected_include_unknown')
 
     class Meta:
         model = Collection
         fields = ('catchment', 'collector', 'collection_system', 'waste_category', 'allowed_materials',
                   'connection_rate', 'connection_rate_include_unknown', 'seasonal_frequency', 'optional_frequency',
                   'collections_per_year', 'collections_per_year_include_unknown', 'spec_waste_collected_filter_method',
-                  'spec_waste_collected', 'fee_system')
+                  'spec_waste_collected_include_unknown', 'spec_waste_collected', 'fee_system')
         # catchment_filter must always be applied first, because it grabs the initial queryset and does not filter any
         # existing queryset.
         order_by = ['catchment_filter']
@@ -216,12 +223,20 @@ class CollectionFilter(AutocompleteFilterSet):
                 collectionpropertyvalue__average__gt=0.0
             )
             qs = qs.annotate(average_amount=Avg('collectionpropertyvalue__average', filter=property_filter))
-            qs = qs.filter(average_amount__gte=value.start, average_amount__lte=value.stop)
+            if self.spec_waste_collected_include_unknown:
+                qs = qs.filter(
+                    Q(average_amount__gte=value.start, average_amount__lte=value.stop) | Q(average_amount__isnull=True))
+            else:
+                qs = qs.filter(average_amount__gte=value.start, average_amount__lte=value.stop)
             return qs
         return qs
 
     def get_spec_waste_collected_filter_method(self, qs, _, value):
         self.spec_waste_collected_filter_setting = value
+        return qs
+
+    def get_spec_waste_collected_include_unknown(self, qs, _, value):
+        self.spec_waste_collected_include_unknown = value
         return qs
 
 

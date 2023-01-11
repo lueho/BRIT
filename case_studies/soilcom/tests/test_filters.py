@@ -1,8 +1,8 @@
-from django.db.models import Q, Avg
-from django.http.request import QueryDict, MultiValueDict
+from django.db.models import Q
+from django.http.request import MultiValueDict, QueryDict
 from django.test import TestCase, modify_settings
 
-from distributions.models import Timestep, TemporalDistribution
+from distributions.models import TemporalDistribution, Timestep
 from users.models import get_default_owner
 from utils.models import Property
 from ..filters import CollectionFilter, CollectorFilter, WasteFlyerFilter
@@ -212,6 +212,12 @@ class CollectionFilterTestCase(TestCase):
         self.assertNotIn(self.collection2, qs)
         self.assertNotIn(self.child_collection, qs)
 
+    def test_collections_per_year_range_filter_renders_with_calculated_boundaries(self):
+        filtr = CollectionFilter(self.data, queryset=Collection.objects.all())
+        self.assertInHTML(
+            '<span class="numeric-slider-range_text" id="id_collections_per_year_text">0 - 70</span>',
+            filtr.form.as_p())
+
     def test_specific_waste_collected_field_exists_in_filter_form(self):
         filtr = CollectionFilter(queryset=Collection.objects.all())
         self.assertIn('spec_waste_collected', filtr.filters.keys())
@@ -234,9 +240,8 @@ class CollectionFilterTestCase(TestCase):
         self.assertTrue(hasattr(filtr, filtr.filters['spec_waste_collected_filter_method'].method))
 
     def test_get_spec_waste_collected_filter_method_sets_filter_method_as_class_attribute(self):
-        filtr = CollectionFilter(data={'spec_waste_collected_filter_method': 'average'},
-                                 queryset=Collection.objects.all())
-        filtr.is_valid()
+        self.data.update({'spec_waste_collected_filter_method': 'average'})
+        filtr = CollectionFilter(data=self.data, queryset=Collection.objects.all())
         self.assertTrue(filtr.is_valid())
         qs = filtr.qs
         self.assertTrue(hasattr(filtr, 'spec_waste_collected_filter_setting'))
@@ -252,6 +257,23 @@ class CollectionFilterTestCase(TestCase):
         qs = filtr.qs
         self.assertIn(self.collection2, qs)
         self.assertNotIn(self.collection1, qs)
+
+    def test_spec_waste_collected_include_unknown_includes_null_values_if_checked(self):
+        data = self.data.update(
+            {'spec_waste_collected_filter_method': 'average',
+             'spec_waste_collected_min': 0,
+             'spec_waste_collected_max': 1000})
+        filtr = CollectionFilter(data, queryset=Collection.objects.all())
+        self.assertQuerysetEqual(Collection.objects.all().order_by('id'), filtr.qs.order_by('id'))
+
+    def test_spec_waste_collected_include_unknown_field_exists_in_filter_and_form(self):
+        data = self.data.update(
+            {'spec_waste_collected_filter_method': 'average',
+             'spec_waste_collected_min': 0,
+             'spec_waste_collected_max': 1000})
+        filtr = CollectionFilter(data, queryset=Collection.objects.all())
+        self.assertIn('spec_waste_collected_include_unknown', filtr.filters.keys())
+        self.assertIn('spec_waste_collected_include_unknown', filtr.form.fields.keys())
 
     def test_filter_form_has_no_formtags(self):
         filtr = CollectionFilter(queryset=Collection.objects.all())

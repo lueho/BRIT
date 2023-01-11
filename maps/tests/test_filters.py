@@ -14,7 +14,6 @@ class CatchmentFilterTestCase(TestCase):
         data = {'name': 'Catchment'}
         filtr = CatchmentFilter(data, queryset=Catchment.objects.all())
         form = filtr.form
-        print(form.errors)
         self.assertTrue(form.is_valid())
         self.assertQuerysetEqual(Catchment.objects.all(), filtr.qs)
 
