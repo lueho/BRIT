@@ -1,7 +1,8 @@
 import math
 
+from crispy_forms.bootstrap import Accordion
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Column, Field, Layout, Row
+from crispy_forms.layout import Column, Field, Layout, Row, Submit
 from dal import autocomplete
 from django.db.models import Avg, Count, Max, Q, Sum
 from django.forms import CheckboxInput, CheckboxSelectMultiple, DateInput, RadioSelect
@@ -9,7 +10,7 @@ from django_filters import (BooleanFilter, CharFilter, ChoiceFilter, DateFilter,
                             ModelMultipleChoiceFilter,
                             RangeFilter)
 
-from utils.crispy_fields import RangeSliderField
+from utils.crispy_fields import RangeSliderField, FilterAccordionGroup
 from utils.filters import AutocompleteFilterSet, SimpleFilterSet
 from utils.widgets import PercentageRangeSlider, RangeSlider
 from .models import (Collection, CollectionCatchment, CollectionCountOptions, CollectionFrequency,
@@ -45,20 +46,31 @@ SPEC_WASTE_COLLECTED_FILTER_MODE_CHOICES = (
 
 class CollectionFilterFormHelper(FormHelper):
     layout = Layout(
-        'catchment',
-        'collector',
-        'collection_system',
-        'waste_category',
-        'allowed_materials',
-        RangeSliderField('connection_rate'),
-        'connection_rate_include_unknown',
-        Row(Column(Field('seasonal_frequency')), Column(Field('optional_frequency'))),
-        RangeSliderField('collections_per_year'),
-        'collections_per_year_include_unknown',
-        RangeSliderField('spec_waste_collected'),
-        'spec_waste_collected_filter_method',
-        'spec_waste_collected_include_unknown',
-        'fee_system'
+        Accordion(
+            FilterAccordionGroup(
+                'Filters',
+                'catchment',
+                'collector',
+                'collection_system',
+                'waste_category',
+                Submit('filter', 'Filter')
+            ),
+            FilterAccordionGroup(
+                'Advanced filters',
+                'allowed_materials',
+                RangeSliderField('connection_rate'),
+                'connection_rate_include_unknown',
+                Row(Column(Field('seasonal_frequency'), css_class='col-md'),
+                    Column(Field('optional_frequency'), css_class='col-md')),
+                RangeSliderField('collections_per_year'),
+                'collections_per_year_include_unknown',
+                RangeSliderField('spec_waste_collected'),
+                'spec_waste_collected_filter_method',
+                'spec_waste_collected_include_unknown',
+                'fee_system',
+                Submit('filter', 'Filter')
+            )
+        )
     )
 
 

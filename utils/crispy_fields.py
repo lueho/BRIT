@@ -1,3 +1,4 @@
+from crispy_forms.bootstrap import AccordionGroup
 from crispy_forms.layout import Field
 
 
@@ -14,3 +15,7 @@ class RangeSliderField(Field):
     Field containing a range slider that is suitable for the RangeFilter from the django-filters package.
     """
     template = 'fields/range_slider_field.html'
+
+
+class FilterAccordionGroup(AccordionGroup):
+    template = 'fields/filter-accordion-group.html'

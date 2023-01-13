@@ -38,12 +38,13 @@
             </div>
         </div>
         <div class="col col-sm-3">
+        {% block filter_column %}
             <div class="card shadow">
                 <div class="card-header">
                     {% block filter_header %}<strong>Filter</strong>{% endblock %}
                 </div>
                 <div class="card-body">
-                    {% block fiter_body %}
+                    {% block filter_body %}
                         <form method="get">
                             {% crispy filter.form %}
                             <button id="btn-filter" class="btn btn-primary" type="submit">Filter</button>
@@ -53,6 +54,7 @@
                 {% block filter_footer %}<div class="card-footer"></div>{% endblock %}
             </div>
         {% block extra_options %}{% endblock extra_options %}
+            {% endblock filter_column %}
         </div>
     </div>
 {% endblock %}

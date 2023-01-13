@@ -71,12 +71,11 @@
     {% endif %}
 {% endblock list_footer %}
 
-{% block filter_body %}
+{% block filter_column %}
     <form method="get">
         {% crispy filter.form %}
-        <button id="btn-filter" class="btn btn-primary" type="submit">Filter</button>
     </form>
-{% endblock filter_body %}
+{% endblock filter_column %}
 
 {% block javascript %}
     {{ block.super }}
