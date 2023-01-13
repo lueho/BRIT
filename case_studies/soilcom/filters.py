@@ -257,8 +257,12 @@ class WasteFlyerFilter(AutocompleteFilterSet):
     catchment = ModelChoiceFilter(queryset=CollectionCatchment.objects.all(),
                                   label='Catchment',
                                   widget=autocomplete.ModelSelect2(url='catchment-autocomplete'),
-                                  field_name='collections__catchment')
+                                  method='get_catchment')
 
     class Meta:
         model = WasteFlyer
         fields = ('url_valid', 'url_checked_before', 'url_checked_after', 'catchment')
+
+    @staticmethod
+    def get_catchment(qs, _, value):
+        return qs.filter(collections__in=value.downstream_collections)

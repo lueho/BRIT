@@ -1,50 +1,53 @@
 from django.db.models import Q
-from django.http.request import MultiValueDict, QueryDict
-from django.test import TestCase, modify_settings
+from django.test import TestCase
 
 from distributions.models import TemporalDistribution, Timestep
-from users.models import get_default_owner
 from utils.models import Property
 from ..filters import CollectionFilter, CollectorFilter, WasteFlyerFilter
 from ..models import (Collection, CollectionCatchment, CollectionCountOptions, CollectionFrequency,
                       CollectionPropertyValue, CollectionSeason, Collector, WasteFlyer)
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
 class WasteFlyerFilterTestCase(TestCase):
+    catchment = None
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
         for i in range(1, 5):
             WasteFlyer.objects.create(
-                owner=owner,
                 title=f'Waste flyer {i}',
                 abbreviation=f'WF{i}',
+                url=f'https://www.flyer{i}.com',
                 url_valid=i % 2 == 0
             )
+        cls.catchment = CollectionCatchment.objects.create(name='Parent')
+        child_catchment = CollectionCatchment.objects.create(name='Child', parent=cls.catchment)
+        for flyer in WasteFlyer.objects.filter(abbreviation__in=('WF1', 'WF2')):
+            collection = Collection.objects.create(catchment=child_catchment, )
+            collection.flyers.add(flyer)
+        collection = Collection.objects.create(catchment=cls.catchment)
+        collection.flyers.add(WasteFlyer.objects.get(abbreviation='WF3'))
 
     def setUp(self):
         pass
 
-    def test_init(self):
-        params = {
-            'csrfmiddlewaretoken': ['Hm7MXB2NjRCOIpNbGaRKR87VCHM5KwpR1t4AdZFgaqKfqui1EJwhKKmkxFKDfL3h'],
-            'url_valid': ['False'],
-            'page': ['2']
-        }
-        qdict = QueryDict('', mutable=True)
-        qdict.update(MultiValueDict(params))
-        newparams = qdict.copy()
-        newparams.pop('csrfmiddlewaretoken')
-        newparams.pop('page')
-        qs = WasteFlyerFilter(newparams, queryset=WasteFlyer.objects.all()).qs
-        self.assertEqual(4, WasteFlyer.objects.count())
-        self.assertEqual(2, qs.count())
-
     def test_filter_form_has_no_formtags(self):
-        filtr = WasteFlyerFilter(queryset=WasteFlyer.objects.all())
-        self.assertFalse(filtr.form.helper.form_tag)
+        filter_ = WasteFlyerFilter(queryset=WasteFlyer.objects.all())
+        self.assertFalse(filter_.form.helper.form_tag)
+
+    def test_url_valid(self):
+        data = {'url_valid': 'False'}
+        filter_ = WasteFlyerFilter(data, WasteFlyer.objects.all())
+        self.assertTrue(filter_.is_valid())
+        self.assertEqual(4, WasteFlyer.objects.count())
+        self.assertEqual(2, filter_.qs.count())
+
+    def test_get_catchment_returns_flyers_from_downstream_collections(self):
+        data = {'catchment': self.catchment.id}
+        filter_ = WasteFlyerFilter(data=data, queryset=WasteFlyer.objects.all())
+        self.assertTrue(filter_.is_valid())
+        self.assertQuerysetEqual(filter_.qs.order_by('id'),
+                                 WasteFlyer.objects.filter(abbreviation__in=('WF1', 'WF2', 'WF3')).order_by('id'))
 
 
 class CollectionFilterTestCase(TestCase):
