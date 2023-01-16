@@ -277,4 +277,4 @@ class WasteFlyerFilter(AutocompleteFilterSet):
 
     @staticmethod
     def get_catchment(qs, _, value):
-        return qs.filter(collections__in=value.downstream_collections)
+        return qs.filter(collections__in=value.downstream_collections).distinct()
