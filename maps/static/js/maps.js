@@ -219,11 +219,27 @@ try {
 }
 
 function clickedFilterButton() {
-    const btn = document.getElementById('filter-button');
-    btn.disabled = true;
+    const btns = document.querySelectorAll('.submit-filter');
+    btns.forEach(btn => {
+        btn.value = 'Loading...';
+        btn.disabled = true;
+    });
     const params = parseFilterParameters();
-    fetchFeatureGeometries(params).then(btn.disabled = false);
+    fetchFeatureGeometries(params).then(response => {
+        btns.forEach(btn => {
+            btn.value = 'Filter';
+            btn.disabled = false;
+        });
+    }).catch(error => {
+        btns.forEach(btn => {
+            btn.value = 'Filter';
+            btn.disabled = false;
+        });
+        console.error(error);
+    });
 }
+
+
 
 async function clickedFeature(event) {
     const summaries = await fetchFeatureSummaries(event.layer.feature);

@@ -7,6 +7,7 @@ from django.http import JsonResponse
 from django.urls import reverse_lazy
 from django.views.generic import DetailView, ListView, TemplateView
 from django.views.generic.edit import FormMixin
+from django_filters.views import FilterView
 from rest_framework.exceptions import NotFound, ParseError
 from rest_framework.views import APIView, Response
 
@@ -325,6 +326,13 @@ class GeoDatasetDetailView(GeoDataSetFormMixin, GeoDataSetMixin, DetailView):
 
     def get_region_id(self):
         return self.object.region.id
+
+
+# TODO: This will be a simplified implementation that can replace the previous GeoDatasetDetailView in most (all?) cases.
+class GeoDataSetDetailView(GeoDataSetMixin, FilterView):
+    model = None
+    filterset_class = None
+    template_name = 'filtered_map.html'
 
 
 # ----------- Region Utils ---------------------------------------------------------------------------------------------

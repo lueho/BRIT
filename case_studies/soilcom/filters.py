@@ -10,7 +10,7 @@ from django_filters import (BooleanFilter, CharFilter, ChoiceFilter, DateFilter,
                             ModelMultipleChoiceFilter,
                             RangeFilter)
 
-from utils.crispy_fields import RangeSliderField, FilterAccordionGroup
+from utils.crispy_fields import FilterAccordionGroup, RangeSliderField
 from utils.filters import AutocompleteFilterSet, SimpleFilterSet
 from utils.widgets import PercentageRangeSlider, RangeSlider
 from .models import (Collection, CollectionCatchment, CollectionCountOptions, CollectionFrequency,
@@ -53,7 +53,7 @@ class CollectionFilterFormHelper(FormHelper):
                 'collector',
                 'collection_system',
                 'waste_category',
-                Submit('filter', 'Filter')
+                Submit('filter', 'Filter', css_id='submit-id-basic-filter', css_class='submit-filter')
             ),
             FilterAccordionGroup(
                 'Advanced filters',
@@ -68,7 +68,8 @@ class CollectionFilterFormHelper(FormHelper):
                 'spec_waste_collected_filter_method',
                 'spec_waste_collected_include_unknown',
                 'fee_system',
-                Submit('filter', 'Filter')
+                Field('load_features', type='hidden'),
+                Submit('filter', 'Filter', css_id='submit-id-basic-filter', css_class='submit-filter')
             )
         )
     )
@@ -150,12 +151,18 @@ class CollectionFilter(AutocompleteFilterSet):
                                                          initial=True,
                                                          method='get_spec_waste_collected_include_unknown')
 
+    load_features = BooleanFilter(
+        label='Load features',
+        initial=True,
+        widget=CheckboxInput(), method='get_load_features'
+    )
+
     class Meta:
         model = Collection
         fields = ('catchment', 'collector', 'collection_system', 'waste_category', 'allowed_materials',
                   'connection_rate', 'connection_rate_include_unknown', 'seasonal_frequency', 'optional_frequency',
                   'collections_per_year', 'collections_per_year_include_unknown', 'spec_waste_collected_filter_method',
-                  'spec_waste_collected_include_unknown', 'spec_waste_collected', 'fee_system')
+                  'spec_waste_collected_include_unknown', 'spec_waste_collected', 'fee_system', 'load_features')
         # catchment_filter must always be applied first, because it grabs the initial queryset and does not filter any
         # existing queryset.
         order_by = ['catchment_filter']
@@ -249,6 +256,10 @@ class CollectionFilter(AutocompleteFilterSet):
 
     def get_spec_waste_collected_include_unknown(self, qs, _, value):
         self.spec_waste_collected_include_unknown = value
+        return qs
+
+    @staticmethod
+    def get_load_features(qs, _, __):
         return qs
 
 

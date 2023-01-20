@@ -2,24 +2,40 @@
 {% load static %}
 {% load crispy_forms_tags %}
 
-{% block style_sheets %}
-    {{ block.super }}
-    <link rel="stylesheet" href="{% static 'range_slider.css' %}">
-{% endblock %}
-
 {% block map_card_footer %}
     <a href="javascript:void(0)" onclick="clickedListLink()"><i class="fa fa-fw fa-list"></i> View as list</a>
 {% endblock %}
 
-{% block filter_form %}
+{% block user_actions %}
     <form method="get">
         {% crispy filter.form %}
     </form>
-{% endblock %}
-
-{% block extra_cards %}
-
-
+    <div class="card shadow">
+        <div class="card-header"
+             role="button"
+             data-toggle="collapse"
+             href="#info-card-body"
+             aria-expanded="true"
+             aria-controls="info-card-body">
+            <b>Summary</b>
+        </div>
+        <div class="card-body collapse" id="info-card-body">
+            <div id="summary-container">
+                <p class="card-text">No data selected, yet.</p>
+            </div>
+            {% if object.sources.first %}
+                <p class="card-text mt-3">
+                    <strong>Sources:</strong><br>
+                    {% for source in object.sources.all %}
+                        <a href="{% url 'source-detail-modal' source.id %}"
+                           class="modal-link">
+                            {{ source.abbreviation }}{% if not forloop.last %},{% endif %}
+                        </a>
+                    {% endfor %}
+                </p>
+            {% endif %}
+        </div>
+    </div>
     <div class="card shadow">
 
         <div class="card-header"
@@ -67,7 +83,7 @@
                                class="btn btn-primary w-75"
                                data-href-template="{% url 'catchment-selection' %}"
                                href="javascript:void(0)"
-                                onclick="clickedCreateButton()">
+                               onclick="clickedCreateButton()">
                                 Add new collection
                             </a>
                         </div>
@@ -122,16 +138,13 @@
 
         </div>
     </div>
-
-{% endblock extra_cards %}
+{% endblock user_actions %}
 
 
 {% block javascript %}
     {{ block.super }}
-    {{ filter.form.media }}
-    <link href="{% static 'lib/select2-bootstrap-theme/select2-bootstrap4.min.css' %}" rel="stylesheet">
-    <script type="text/javascript">
 
+    <script type="text/javascript">
         function updateUrls(feature_id) {
             const filter_params = parseFilterParameters();
             filter_params.append('load_features', 'true')
@@ -153,12 +166,12 @@
             const delete_button = document.getElementById('btn-collection-delete');
             const delete_url = delete_button.dataset.hrefTemplate.replace('__pk__', feature_id.toString()) + '?' + params.toString();
             $('#btn-collection-delete').modalForm({
-                    formURL: delete_url,
-                    errorClass: ".is-invalid"
-                });
+                formURL: delete_url,
+                errorClass: ".is-invalid"
+            });
         }
 
-    function clickedCreateButton() {
+        function clickedCreateButton() {
             const filter_params = parseFilterParameters();
             filter_params.append('load_features', 'true');
             const params = new URLSearchParams();
@@ -166,11 +179,11 @@
             window.location.href = "{% url 'catchment-selection' %}" + '?' + params.toString();
         }
 
-    function clickedListLink() {
+        function clickedListLink() {
             window.location.href = "{% url 'collection-list' %}" + '?' + parseFilterParameters().toString();
         }
 
     </script>
-    <script src="{% static 'range_slider.js' %}"></script>
+
 
 {% endblock javascript %}

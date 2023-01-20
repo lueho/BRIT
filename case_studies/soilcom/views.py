@@ -19,8 +19,7 @@ import case_studies.soilcom.tasks
 from bibliography.views import (SourceCheckUrlView, SourceCreateView, SourceModalCreateView, SourceModalDeleteView,
                                 SourceModalDetailView, SourceModalUpdateView, SourceUpdateView)
 from maps.forms import NutsAndLauCatchmentQueryForm
-from maps.models import GeoDataset
-from maps.views import CatchmentDetailView, GeoDataSetFormMixin, GeoDataSetMixin, GeoDatasetDetailView
+from maps.views import CatchmentDetailView, GeoDataSetDetailView, GeoDataSetFormMixin, GeoDataSetMixin
 from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineFormSetMixin
 from utils.models import Property
 from utils.views import (BRITFilterView, OwnedObjectCreateView, OwnedObjectDetailView, OwnedObjectListView,
@@ -877,8 +876,9 @@ class CatchmentSelectView(GeoDataSetFormMixin, GeoDataSetMixin, TemplateView):
         return self.request.GET.get('region')
 
 
-class WasteCollectionMapView(GeoDatasetDetailView):
+class WasteCollectionMapView(GeoDataSetDetailView):
     template_name = 'waste_collection_map.html'
+    map_title = 'Household Waste Collection Europe'
     feature_url = reverse_lazy('collection-geometry-api')
     feature_summary_url = reverse_lazy('collection-summary-api')
     filterset_class = CollectionFilter
@@ -890,27 +890,6 @@ class WasteCollectionMapView(GeoDatasetDetailView):
         'fillOpacity': 1,
         'stroke': False
     }
-
-    def get_initial(self):
-        initial = super().get_initial()
-        initial.update({
-            'collection_system': self.request.GET.getlist('collection_system'),
-            'waste_category': self.request.GET.getlist('waste_category'),
-            'countries': self.request.GET.getlist('countries'),
-            'allowed_materials': self.request.GET.getlist('allowed_materials')
-        })
-        return initial
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        queryset = Collection.objects.all()
-        filterset = self.filterset_class(self.request.GET, queryset=queryset)
-        context['filter'] = filterset
-        return context
-
-    def get_object(self, **kwargs):
-        self.kwargs.update({'pk': GeoDataset.objects.get(model_name='WasteCollection').pk})
-        return super().get_object(**kwargs)
 
 
 # ----------- API ------------------------------------------------------------------------------------------------------
