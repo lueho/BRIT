@@ -318,7 +318,7 @@ class GeoDataSetFormMixin(FormMixin):
 
 class GeoDatasetDetailView(GeoDataSetFormMixin, GeoDataSetMixin, DetailView):
     model = GeoDataset
-    template_name = 'maps_base.html'
+    template_name = 'filtered_map.html'
 
     def get_map_title(self):
         return self.object.name
