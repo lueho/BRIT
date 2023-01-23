@@ -12,10 +12,13 @@ class GeoreferencedWasteCollection(GeoPolygon, models.Collection):
 
 
 class WasteCollectionGeometrySerializer(GeoFeatureModelSerializer):
+    catchment = serializers.StringRelatedField(source='catchment.name')
+    waste_category = serializers.StringRelatedField(source='waste_stream.category.name')
+    collection_system = serializers.StringRelatedField(source='collection_system.name')
     class Meta:
         model = GeoreferencedWasteCollection
         geo_field = 'geom'
-        fields = ['id']
+        fields = ['id', 'catchment', 'waste_category', 'collection_system']
 
 
 class OwnedObjectModelSerializer(serializers.ModelSerializer):

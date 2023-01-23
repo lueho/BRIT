@@ -196,9 +196,7 @@ function renderFeatures(geoJson) {
         }
     }).addTo(map);
 
-    feature_layer.on('click', async function (event) {
-        await clickedFeature(event);
-    });
+    createFeatureLayerBindings(feature_layer);
 
     if (mapConfig.adjust_bounds_to_features === true) {
         try {
@@ -207,6 +205,12 @@ function renderFeatures(geoJson) {
 
         }
     }
+}
+
+function createFeatureLayerBindings(feature_layer) {
+    feature_layer.on('click', async function(event) {
+        await clickedFeature(event);
+    });
 }
 
 try {

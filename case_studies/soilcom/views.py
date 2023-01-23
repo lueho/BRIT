@@ -897,7 +897,7 @@ class WasteCollectionMapView(GeoDataSetDetailView):
 
 
 class CollectionGeometryAPI(GenericAPIView):
-    queryset = Collection.objects.all()
+    queryset = Collection.objects.select_related('catchment', 'waste_stream__category', 'collection_system')
     serializer_class = WasteCollectionGeometrySerializer
     filter_backends = (rf_filters.DjangoFilterBackend,)
     filterset_class = CollectionFilter
@@ -950,10 +950,8 @@ class CollectionSummaryAPI(APIView):
 
     @staticmethod
     def get(request):
-        obj = Collection.objects.get(id=request.query_params.get('pk'))
-        objs = Collection.objects.filter(catchment=obj.catchment)
         serializer = CollectionModelSerializer(
-            objs,
+            Collection.objects.filter(id=request.query_params.get('pk')),
             many=True,
             field_labels_as_keys=True,
             context={'request': request})
