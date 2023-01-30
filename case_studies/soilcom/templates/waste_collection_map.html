@@ -143,9 +143,8 @@
 
 {% block javascript %}
     {{ block.super }}
-
-    <script src="https://cdn.jsdelivr.net/npm/@turf/turf@5/turf.min.js"></script>
-    <script src="{% static 'js/waste_collection_map.js' %}"></script>
+    <script src="{% static 'lib/turf-inside/inside.min.js' %}"></script>
+    <script src="{% static 'js/waste_collection_map.min.js' %}"></script>
 
     <script type="text/javascript">
         function updateUrls(feature_id) {

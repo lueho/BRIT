@@ -1,96 +1,121 @@
 "use strict";
 
 /**
- * For rendering information about map features, the namespace featureInfos is reserved. The below structure follows
- * the for the json object that any related API should return.
+ * Reserved namespace for the configuration data of a map. Each view with a map should provide a dictionary with the
+ * following structure in the context. In the template, the dictionary should parse it and create a variable mapConfig
+ * before running this file.
+ * @namespace mapConfig
+ * @property mapConfig.loadRegion
+ * @property mapConfig.regionUrl
+ * @property mapConfig.regionId
+ * @property mapConfig.regionLayerStyle
+ * @property mapConfig.loadCatchment
+ * @property mapConfig.catchmentId
+ * @property mapConfig.catchmentUrl
+ * @property mapConfig.catchmentLayerStyle
+ * @property mapConfig.loadFeatures
+ * @property mapConfig.featureUrl
+ * @property mapConfig.applyFilterToFeatures
+ * @property mapConfig.featureLayerStyle
+ * @property mapConfig.featureSummaryUrl
+ * @property mapConfig.adjustBoundsToFeatures
+ */
+
+/**
+ * For rendering information about map features, the namespace featureInfos is reserved.
  * @namespace featureInfos
  * @property featureInfos.summaries
  */
 
-/**
- * Reserved namespace for the configuration data of a map. The below structure follows
- * the for the json object that any related API should return.
- * @namespace mapConfig
- * @property mapConfig.feature_summary_url
- * @property mapConfig.feature_url
- * @property mapConfig.region_url
- * @property mapConfig.region_id
- * @property mapConfig.catchment_url
- * @property mapConfig.load_catchment
- * @property mapConfig.catchment_id
- * @property mapConfig.markerStyle
- * @property mapConfig.adjust_bounds_to_features
- * @property mapConfig.load_region
- * @property mapConfig.load_features
- */
-
 let map;
-window.addEventListener("map:init", function (event) {
-    map = event.detail.map;
-});
+let contentLayerGroup;
+let regionLayer;
+let catchmentLayer;
+let featureLayer;
+const paddedRenderer = L.canvas({padding: 0.5});
 
-const myRenderer = L.canvas({padding: 0.5});
-let region_layer;
-let catchment_layer;
-let feature_layer;
 
-const region_layer_style = {
-    "color": "#A1221C",
-    "fillOpacity": 0.0
-};
-
-const catchment_layer_style = {
-    "color": "#04555E"
-};
-
-const feature_layer_style = {
-    "color": "#04555E"
-};
-
-function loadMap(mapConfig) {
-    const promises = [];
-    if (mapConfig.load_region === true) {
-        const params = {pk: mapConfig.region_id};
-        promises.push(fetchRegionGeometry(params));
-    }
-    if (mapConfig.load_catchment === true) {
-        const params = {catchment: mapConfig.catchment_id};
-        promises.push(fetchCatchmentGeometry(params));
-    }
-    if (mapConfig.load_features === true) {
-        const params = parseFilterParameters();
-        promises.push(fetchFeatureGeometries(params));
-    }
-    Promise.all(promises).then(() => {
-        orderLayers();
+function lockFilter() {
+    const submitButtons = document.querySelectorAll('.submit-filter');
+    submitButtons.forEach(btn => {
+        btn.value = 'Loading...';
+        btn.disabled = true;
     });
-
 }
 
-async function updateLayers({region_params, catchment_params, feature_params} = {}) {
-    const promises = [];
-    if (region_params) {
-        promises.push(fetchRegionGeometry(region_params));
-    }
-    if (catchment_params) {
-        promises.push(fetchCatchmentGeometry(catchment_params));
-    }
-    if (feature_params) {
-        promises.push(fetchFeatureGeometries(feature_params));
-    }
-    Promise.all(promises).then(() => {
-        orderLayers();
+function unlockFilter() {
+    const submitButtons = document.querySelectorAll('.submit-filter');
+    submitButtons.forEach(btn => {
+        btn.value = 'Filter';
+        btn.disabled = false;
     });
+}
+
+function showLoadingIndicator() {
+    map.spin(true);
+}
+
+function hideLoadingIndicator() {
+    map.spin(false);
+}
+
+function displayErrorMessage(error) {
+    console.error(`An error occurred while fetching data: ${error}`);
+}
+
+function displayTimeoutError() {
+    console.error("The request has timed out. Please try reducing the size of the dataset by setting more specific filter parameters.");
+}
+
+function prepareMapRefresh() {
+    lockFilter();
+    showLoadingIndicator();
+    contentLayerGroup.clearLayers();
+}
+
+function refreshMap(promises, timeLimit = 120000) {
+    let promiseIsPending = true;
+    Promise.all(promises)
+        .then(() => {
+            promiseIsPending = false;
+            orderLayers();
+        })
+        .catch(error => {
+            promiseIsPending = false;
+            displayErrorMessage(error);
+        })
+        .finally(cleanup);
+    setTimeout(() => {
+        if (promiseIsPending) {
+            promiseIsPending = false;
+            displayTimeoutError();
+            cleanup();
+        }
+    }, timeLimit);
+}
+
+function cleanup() {
+    hideLoadingIndicator();
+    unlockFilter();
 }
 
 function orderLayers() {
     map.invalidateSize();
-    if (catchment_layer) {
-        catchment_layer.bringToBack();
+
+    if (contentLayerGroup.hasLayer(catchmentLayer)) {
+        contentLayerGroup.removeLayer(catchmentLayer);
+        contentLayerGroup.addLayer(catchmentLayer);
     }
-    if (feature_layer) {
-        feature_layer.bringToBack();
+
+    if (regionLayer) {
+        regionLayer.bringToFront();
     }
+}
+
+function parseFilterParameters() {
+    const form = document.querySelector('form');
+    const formData = new FormData(form);
+    return new URLSearchParams(formData);
 }
 
 function transformSearchParams(params) {
@@ -110,21 +135,21 @@ function transformSearchParams(params) {
 }
 
 async function fetchRegionGeometry(params) {
-    const url = mapConfig.region_url + '?' + transformSearchParams(params).toString();
+    const url = mapConfig.regionUrl + '?' + transformSearchParams(params).toString();
     const response = await fetch(url);
     const json = await response.json();
     renderRegion(json.geoJson);
 }
 
 async function fetchCatchmentGeometry(params) {
-    const url = mapConfig.catchment_url + '?' + transformSearchParams(params).toString();
+    const url = mapConfig.catchmentUrl + '?' + transformSearchParams(params).toString();
     const response = await fetch(url);
     const json = await response.json();
     renderCatchment(json.geoJson);
 }
 
 async function fetchFeatureGeometries(params) {
-    const url = mapConfig.feature_url + '?' + transformSearchParams(params).toString();
+    const url = mapConfig.featureUrl + '?' + transformSearchParams(params).toString();
     const response = await fetch(url);
     const json = await response.json();
     renderFeatures(json.geoJson);
@@ -134,15 +159,14 @@ async function fetchFeatureGeometries(params) {
 }
 
 async function fetchFeatureSummaries(feature) {
-
-    let feature_id;
+    let featureId;
     if (typeof (feature) === 'object') {
-        feature_id = feature.properties.id.toString();
+        featureId = feature.properties.id.toString();
     } else {
-        feature_id = feature.toString();
+        featureId = feature.toString();
     }
 
-    const dataurl = mapConfig.feature_summary_url + '?' + 'pk=' + feature_id;
+    const dataurl = mapConfig.featureSummaryUrl + '?' + 'pk=' + featureId;
     const response = await fetch(dataurl);
     return await response.json();
 }
@@ -150,114 +174,75 @@ async function fetchFeatureSummaries(feature) {
 function renderRegion(geoJson) {
 
     // Remove existing layer
-    if (region_layer !== undefined) {
-        map.removeLayer(region_layer);
+    if (regionLayer !== undefined) {
+        map.removeLayer(regionLayer);
     }
 
     // Render geodata on map
-    region_layer = L.geoJson(geoJson, {
-        style: region_layer_style,
-        interactive: false
+    regionLayer = L.geoJson(geoJson, {
+        style: mapConfig.regionLayerStyle, interactive: false,
     });
-    region_layer.addTo(map);
-    map.fitBounds(region_layer.getBounds());
+    regionLayer.addTo(map);
+    map.fitBounds(regionLayer.getBounds());
 }
 
 function renderCatchment(geoJson) {
 
     // Remove existing layer
-    if (catchment_layer !== undefined) {
-        map.removeLayer(catchment_layer);
+    if (catchmentLayer !== undefined) {
+        map.removeLayer(catchmentLayer);
     }
+
+    const catchmentLayerStyle = mapConfig.catchmentLayerStyle;
+    catchmentLayerStyle.renderer = paddedRenderer;
 
     // Render geodata on map
-    catchment_layer = L.geoJson(geoJson, {
-        style: catchment_layer_style,
-        interactive: false
+    catchmentLayer = L.geoJson(geoJson, {
+        style: catchmentLayerStyle, interactive: false,
     });
-    catchment_layer.addTo(map);
-    map.fitBounds(catchment_layer.getBounds());
+
+    catchmentLayer.addTo(contentLayerGroup);
+    map.fitBounds(catchmentLayer.getBounds());
 }
 
-function renderFeatures(geoJson) {
-
-    // Remove existing layer
-    if (feature_layer !== undefined) {
-        map.removeLayer(feature_layer);
-    }
-
-    const markerStyle = mapConfig.markerStyle;
-    markerStyle.renderer = myRenderer;
-
-    feature_layer = L.geoJson(geoJson, {
-        pointToLayer: function (feature, latlng) {
-            return L.circleMarker(latlng, markerStyle);
-        }, onEachFeature: function onEachFeature(feature, layer) {
-        }
-    }).addTo(map);
-
-    createFeatureLayerBindings(feature_layer);
-
-    if (mapConfig.adjust_bounds_to_features === true) {
-        try {
-            map.fitBounds(feature_layer.getBounds());
-        } catch (ex) {
-
-        }
-    }
-}
-
-function createFeatureLayerBindings(feature_layer) {
-    feature_layer.on('click', async function(event) {
+function createFeatureLayerBindings(layer) {
+    layer.on('click', async function(event) {
         await clickedFeature(event);
     });
 }
 
-try {
-    document.querySelector("#summary-container").addEventListener('click', function (e) {
-        if (e.target.matches('.collapse-selector')) {
-            updateUrls(e.target.dataset.pk);
+function renderFeatures(geoJson) {
+    const featureLayerStyle = mapConfig.featureLayerStyle;
+    featureLayerStyle.renderer = paddedRenderer;
+
+    const geometryType = geoJson.features[0].geometry.type;
+    if (geometryType === "Polygon" || geometryType === "MultiPolygon") {
+        featureLayer = L.geoJson(geoJson, {
+            style: featureLayerStyle
+        });
+    } else if (geometryType === "Point") {
+        featureLayer = L.geoJson(geoJson, {
+            pointToLayer: (feature, latlng) => {
+                return L.circleMarker(latlng, featureLayerStyle);
+            }
+        });
+    }
+
+    createFeatureLayerBindings(featureLayer);
+    featureLayer.addTo(contentLayerGroup);
+
+    if (mapConfig.adjustBoundsToFeatures) {
+        try {
+            map.fitBounds(featureLayer.getBounds());
+        } catch (error) {
+            console.error(`An error occurred while adjusting the map bounds to the feature layer: ${error}`);
         }
-    });
-} catch (e) {
+    }
 }
 
-function clickedFilterButton() {
-    const btns = document.querySelectorAll('.submit-filter');
-    btns.forEach(btn => {
-        btn.value = 'Loading...';
-        btn.disabled = true;
-    });
-    const params = parseFilterParameters();
-    fetchFeatureGeometries(params).then(response => {
-        btns.forEach(btn => {
-            btn.value = 'Filter';
-            btn.disabled = false;
-        });
-    }).catch(error => {
-        btns.forEach(btn => {
-            btn.value = 'Filter';
-            btn.disabled = false;
-        });
-        console.error(error);
-    });
-}
-
-
-
-async function clickedFeature(event) {
-    const summaries = await fetchFeatureSummaries(event.layer.feature);
-    renderSummaries(summaries);
-    updateUrls(event.layer.feature.properties.id);
-}
-
-function parseFilterParameters() {
-    const form = document.querySelector('form');
-    const formData = new FormData(form);
-    return new URLSearchParams(formData);
-}
 
 function isEmptyArray(el) {
+
     return Array.isArray(el) && el.length === 0;
 }
 
@@ -299,7 +284,7 @@ function renderSummaryContainer(summary, summary_container) {
             if (Array.isArray(value)) {
                 const ul = document.createElement('ul');
                 summaryValueElement.appendChild(ul);
-                value.forEach(function (item) {
+                value.forEach(function(item) {
                     const li = document.createElement('li');
                     if (isValidHttpUrl(item.toString())) {
                         const a = document.createElement('a');
@@ -388,3 +373,46 @@ function renderSummaries(featureInfos) {
 
     $('#info-card-body').collapse('show');
 }
+
+async function clickedFeature(event) {
+    const summaries = await fetchFeatureSummaries(event.layer.feature);
+    renderSummaries(summaries);
+    updateUrls(event.layer.feature.properties.id);
+}
+
+function clickedFilterButton() {
+    prepareMapRefresh();
+    const params = parseFilterParameters();
+    const promises = [fetchCatchmentGeometry(params), fetchFeatureGeometries(params)];
+    refreshMap(promises);
+}
+
+function loadMap(mapConfig) {
+    prepareMapRefresh();
+
+    let params;
+    if (mapConfig.applyFilterToFeatures) {
+        params = parseFilterParameters();
+    } else {
+        params = new URLSearchParams();
+    }
+
+    const promises = [];
+    if (mapConfig.loadRegion === true) {
+        promises.push(fetchRegionGeometry({pk: mapConfig.regionId}));
+    }
+    if (params.has("catchment") && params.get("catchment") !== "") {
+        promises.push(fetchCatchmentGeometry(params));
+    } else if (mapConfig.loadCatchment === true && 'catchmentId' in mapConfig) {
+        promises.push(fetchCatchmentGeometry({catchment: mapConfig.catchmentId}));
+    }
+    if (mapConfig.loadFeatures === true) {
+        promises.push(fetchFeatureGeometries(params));
+    }
+    refreshMap(promises);
+}
+
+window.addEventListener("map:init", function(event) {
+    map = event.detail.map;
+    contentLayerGroup = L.layerGroup().addTo(map);
+});

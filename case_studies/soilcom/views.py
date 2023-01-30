@@ -851,10 +851,11 @@ class CatchmentSelectView(GeoDataSetFormMixin, GeoDataSetMixin, TemplateView):
     feature_url = reverse_lazy('data.catchment-options')
     feature_summary_url = reverse_lazy('data.catchment_region_summaries')
     load_features = False
+    load_catchment = True
     adjust_bounds_to_features = False
     load_region = False
     map_title = 'Catchments'
-    marker_style = {
+    feature_layer_style = {
         'color': '#4061d2',
         'fillOpacity': 1,
         'stroke': False
@@ -878,18 +879,15 @@ class CatchmentSelectView(GeoDataSetFormMixin, GeoDataSetMixin, TemplateView):
 
 class WasteCollectionMapView(GeoDataSetDetailView):
     template_name = 'waste_collection_map.html'
-    map_title = 'Household Waste Collection Europe'
-    feature_url = reverse_lazy('collection-geometry-api')
-    feature_summary_url = reverse_lazy('collection-summary-api')
     filterset_class = CollectionFilter
-    load_features = False
-    adjust_bounds_to_features = True
+    map_title = 'Household Waste Collection Europe'
     load_region = False
-    marker_style = {
-        'color': '#4061d2',
-        'fillOpacity': 1,
-        'stroke': False
-    }
+    load_catchment = False
+    load_features = False
+    feature_url = reverse_lazy('collection-geometry-api')
+    apply_filter_to_features = True
+    adjust_bounds_to_features = False
+    feature_summary_url = reverse_lazy('collection-summary-api')
 
 
 # ----------- API ------------------------------------------------------------------------------------------------------

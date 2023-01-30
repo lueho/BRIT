@@ -39,7 +39,7 @@
 {% endblock list_body %}
 
 {% block list_footer %}
-    <a class="mr-2 text-nowrap" href="{% url 'WasteCollection' %}?{{ request.GET.urlencode }}&load_features=true">
+    <a class="mr-2 text-nowrap" href="{% url 'WasteCollection' %}?{{ request.GET.urlencode }}&load_catchment=true&load_features=true">
         <i class="fa fa-fw fa-map"></i>
         <span class="text-nowrap">View as map</span>
     </a>

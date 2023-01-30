@@ -406,7 +406,7 @@ class CatchmentGeometryAPITestCase(ViewWithPermissionsTestCase):
         cls.catchment = Catchment.objects.create(name='Test Catchment')
 
     def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('ajax_catchment_geometries') + '?' + urlencode({'catchment': self.catchment.pk}))
+        response = self.client.get(reverse('data.catchment-geometries') + '?' + urlencode({'catchment': self.catchment.pk}))
         self.assertEqual(200, response.status_code)
 
 

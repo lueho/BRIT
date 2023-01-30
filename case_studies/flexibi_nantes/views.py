@@ -292,7 +292,8 @@ class GreenhousesMapView(GeoDatasetDetailView):
     filter_class = GreenhouseFilter
     filterset_class = GreenhouseFilter
     load_features = True
-    marker_style = {
+    apply_filter_to_features = True
+    feature_layer_style = {
         'color': '#4061d2',
         'fillOpacity': 1,
         'radius': 5,
@@ -327,61 +328,3 @@ class NantesGreenhousesAPIView(GenericAPIView):
             ]
         }
         return JsonResponse(data)
-
-# class NantesGreenhousesAPIView(APIView):
-#
-#     @staticmethod
-#     def get(request):
-#         qs = NantesGreenhouses.objects.all()
-#
-#         if request.GET.get('lighting') == '2':
-#             qs = qs.filter(lighted=True)
-#         elif request.GET.get('lighting') == '3':
-#             qs = qs.filter(lighted=False)
-#
-#         if request.GET.get('heating') == '2':
-#             qs = qs.filter(heated=True)
-#         elif request.GET.get('heating') == '3':
-#             qs = qs.filter(heated=False)
-#
-#         if request.GET.get('prod_mode') == '2':
-#             qs = qs.filter(above_ground=False)
-#         elif request.GET.get('prod_mode') == '3':
-#             qs = qs.filter(above_ground=True)
-#
-#         if request.GET.get('cult_man') == '2':
-#             qs = qs.filter(high_wire=False)
-#         elif request.GET.get('cult_man') == '3':
-#             qs = qs.filter(heated=True)
-#
-#         crops_query = request.query_params.getlist('crops[]')
-#
-#         crops = []
-#         if '1' in crops_query:
-#             crops.append('Cucumber')
-#         if '2' in crops_query:
-#             crops.append('Tomato')
-#
-#         qs = qs.filter(culture_1__in=crops)
-#
-#         serializer = NantesGreenhousesGeometrySerializer(qs, many=True)
-#         greenhouse_count = len(serializer.data['features'])
-#         greenhouse_area_qs = qs.aggregate(Sum('surface_ha'))['surface_ha__sum']
-#         greenhouse_area = 0
-#         if greenhouse_area_qs is not None:
-#             greenhouse_area = round(greenhouse_area_qs, 1)
-#         data = {
-#             'geoJson': serializer.data,
-#             'summaries': [{
-#                 'gh_count': {
-#                     'label': 'Number of greenhouses',
-#                     'value': str(greenhouse_count),
-#                 },
-#                 'gh_surface': {
-#                     'label': 'Total growth surface',
-#                     'value': str(greenhouse_area) + ' ha'
-#                 }
-#             }]
-#         }
-#
-#         return JsonResponse(data)

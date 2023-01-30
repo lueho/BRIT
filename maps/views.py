@@ -29,36 +29,112 @@ class MapMixin:
     """
     Provides functionality for the integration of maps with leaflet.
     """
-    region_url = None
-    feature_url = None
+    map_title = None
     load_region = True
-    load_features = True
-    adjust_bounds_to_features = True
-    marker_style = None
     region_id = None
-
-    def get_marker_style(self):
-        if not self.marker_style:
-            self.marker_style = {}
-        return self.marker_style
-
-    def get_region_id(self):
-        return self.region_id
+    region_url = None
+    region_layer_style = None
+    load_catchment = True
+    catchment_url = None
+    catchment_id = None
+    catchment_layer_style = None
+    load_features = True
+    feature_url = None
+    apply_filter_to_features = False
+    feature_layer_style = None
+    adjust_bounds_to_features = True
+    feature_summary_url = None
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update({
+            'map_title': self.get_map_title(),
             'map_config': {
-                'region_url': self.region_url,
-                'feature_url': self.feature_url,
-                'load_features': self.load_features,
-                'adjust_bounds_to_features': self.adjust_bounds_to_features,
-                'region_id': self.get_region_id(),
-                'load_region': self.load_region,
-                'markerStyle': self.get_marker_style()
+                'loadRegion': self.get_load_region(),
+                'regionId': self.get_region_id(),
+                'regionUrl': self.get_region_url(),
+                'regionLayerStyle': self.get_region_layer_style(),
+                'loadCatchment': self.get_load_catchment(),
+                'catchmentId': self.get_catchment_id(),
+                'catchmentUrl': self.get_catchment_url(),
+                'catchmentLayerStyle': self.get_catchment_layer_style(),
+                'loadFeatures': self.get_load_features(),
+                'featureUrl': self.get_apply_filter_to_features(),
+                'applyFilterToFeatures': self.get_use_filter(),
+                'featureLayerStyle': self.get_feature_layer_style(),
+                'adjustBoundsToFeatures': self.get_adjust_bounds_to_features(),
+                'featureSummaryUrl': self.get_feature_summary_url()
             }
         })
         return context
+
+    def get_map_title(self):
+        return self.map_title
+
+    def get_load_region(self):
+        if self.request.GET.get('load_region'):
+            return self.request.GET.get('load_region') == 'true'
+        else:
+            return self.load_region
+
+    def get_region_id(self):
+        return self.region_id
+
+    def get_region_url(self):
+        return self.region_url
+
+    def get_region_layer_style(self):
+        if not self.region_layer_style:
+            self.region_layer_style = {
+                'color': '#A1221C',
+                'fillOpacity': 0.0
+            }
+        return self.region_layer_style
+
+    def get_load_catchment(self):
+        if self.request.GET.get('load_catchment'):
+            return self.request.GET.get('load_catchment') == 'true'
+        else:
+            return self.load_catchment
+
+    def get_catchment_id(self):
+        return self.catchment_id
+
+    def get_catchment_url(self):
+        return self.catchment_url
+
+    def get_catchment_layer_style(self):
+        if not self.catchment_layer_style:
+            self.catchment_layer_style = {
+                'color': '#A1221C',
+                'fillOpacity': 0.0
+            }
+        return self.catchment_layer_style
+
+    def get_load_features(self):
+        if self.request.GET.get('load_features'):
+            return self.request.GET.get('load_features') == 'true'
+        else:
+            return self.load_features
+
+    def get_apply_filter_to_features(self):
+        return self.feature_url
+
+    def get_use_filter(self):
+        return self.apply_filter_to_features
+
+    def get_feature_layer_style(self):
+        if not self.feature_layer_style:
+            self.feature_layer_style = {
+                'color': '#04555E',
+            }
+        return self.feature_layer_style
+
+    def get_adjust_bounds_to_features(self):
+        return self.adjust_bounds_to_features
+
+    def get_feature_summary_url(self):
+        return self.feature_summary_url
 
 
 class MapsDashboardView(PermissionRequiredMixin, TemplateView):
@@ -77,55 +153,6 @@ class MapsListView(ListView):
 # ----------- Catchment CRUD--------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class CatchmentBrowseView(FormMixin, TemplateView):
-    model = Catchment
-    form_class = CatchmentQueryForm
-    template_name = 'catchment_map.html'
-    region_url = reverse_lazy('ajax_region_geometries')
-    feature_url = reverse_lazy('data.catchment-options')
-    filter_class = None
-    load_features = False
-    adjust_bounds_to_features = False
-    load_region = True
-    marker_style = {
-        'color': '#4061d2',
-        'fillOpacity': 1,
-        'stroke': False
-    }
-
-    def get_initial(self):
-        initial = {}
-        region_id = self.request.GET.get('region')
-        catchment_id = self.request.GET.get('catchment')
-        if catchment_id:
-            catchment = Catchment.objects.get(id=catchment_id)
-            initial['parent_region'] = catchment.parent_region.id
-            initial['catchment'] = catchment.id
-        elif region_id:
-            initial['region'] = region_id
-        return initial
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({
-            'map_header': 'Catchments',
-            'form': self.get_form(),
-            'nuts_form': NutsRegionQueryForm,
-            'map_config': {
-                'region_url': self.region_url,
-                'feature_url': self.feature_url,
-                'load_features': self.load_features,
-                'adjust_bounds_to_features': self.adjust_bounds_to_features,
-                'region_id': self.get_region_id(),
-                'load_region': self.load_region,
-                'markerStyle': self.marker_style
-            }
-        })
-        return context
-
-    def get_region_id(self):
-        return 3
-
 
 class CatchmentListView(BRITFilterView):
     model = Catchment
@@ -135,7 +162,7 @@ class CatchmentListView(BRITFilterView):
 
 class CatchmentDetailView(MapMixin, DetailView):
     model = Catchment
-    feature_url = reverse_lazy('ajax_catchment_geometries')
+    feature_url = reverse_lazy('data.catchment-geometries')
     load_region = False
     load_catchment = False
 
@@ -239,64 +266,9 @@ class CatchmentAutocompleteView(autocomplete.Select2QuerySetView):
 # ----------- Geodataset -----------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class GeoDataSetMixin:
-    feature_url = None
-    feature_summary_url = None
-    region_url = reverse_lazy('ajax_region_geometries')
-    load_region = True
-    region_id = None
-    load_catchment = False
-    catchment_id = None
-    load_features = False
-    adjust_bounds_to_features = False
-    marker_style = None
-    map_title = None
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({
-            'map_title': self.get_map_title(),
-            'map_config': {
-                'region_url': self.get_region_url(),
-                'feature_url': self.get_feature_url(),
-                'feature_summary_url': self.get_feature_summary_url(),
-                'load_features': self.get_load_features(),
-                'adjust_bounds_to_features': self.adjust_bounds_to_features,
-                'region_id': self.get_region_id(),
-                'load_region': self.load_region,
-                'catchment_id': self.get_catchment_id(),
-                'load_catchment': self.load_catchment,
-                'markerStyle': self.get_marker_style()
-            }
-        })
-        return context
-
-    def get_map_title(self):
-        return self.map_title
-
-    def get_feature_url(self):
-        return self.feature_url
-
-    def get_feature_summary_url(self):
-        return self.feature_summary_url
-
-    def get_region_url(self):
-        return self.region_url
-
-    def get_region_id(self):
-        return self.region_id
-
-    def get_catchment_id(self):
-        return self.catchment_id
-
-    def get_load_features(self):
-        if self.request.GET.get('load_features'):
-            return self.request.GET.get('load_features') == 'true'
-        else:
-            return self.load_features
-
-    def get_marker_style(self):
-        return self.marker_style
+class GeoDataSetMixin(MapMixin):
+    region_url = reverse_lazy('data.region-geometries')
+    catchment_url = reverse_lazy('data.catchment-geometries')
 
 
 class GeoDataSetFormMixin(FormMixin):
@@ -362,33 +334,13 @@ class CatchmentGeometryAPI(APIView):
     @staticmethod
     def get(request, *args, **kwargs):
         if 'catchment' in request.query_params:
-            catchment_id = request.query_params.get('catchment')
-            catchment = Catchment.objects.get(id=catchment_id)
-            region_id = catchment.region_id
-            regions = Region.objects.filter(id=region_id)
-            serializer = RegionSerializer(regions, many=True)
-            data = {
-                'geoJson': serializer.data,
-                'info': {
-                    'name': {
-                        'label': 'Name',
-                        'value': catchment.name,
-                    },
-                    'description': {
-                        'label': 'Description',
-                        'value': catchment.description
-                    },
-                }
-            }
-            if catchment.parent_region:
-                data['info']['parent_region'] = {
-                    'label': 'Parent region',
-                    'value': catchment.parent_region.name
-                }
-
-            return JsonResponse(data)
-
-        return JsonResponse({})
+            if request.query_params['catchment']:
+                catchment_id = request.query_params.get('catchment')
+                catchment = Catchment.objects.get(id=int(catchment_id))
+                regions = Region.objects.filter(id=catchment.region_id)
+                serializer = RegionSerializer(regions, many=True)
+                return Response({'geoJson': serializer.data})
+        return Response({})
 
 
 class CatchmentOptionGeometryAPI(APIView):
@@ -509,10 +461,8 @@ class NutsRegionMapView(GeoDatasetDetailView):
     load_features = False
     adjust_bounds_to_features = True
     load_region = False
-    marker_style = {
+    feature_layer_style = {
         'color': '#4061d2',
-        'fillOpacity': 1,
-        'stroke': False
     }
 
     def get_object(self, **kwargs):

@@ -115,7 +115,7 @@
                 region_id: document.getElementById("id_region").value
             });
 
-            let url = "{% url 'ajax_region_geometries' %}" + L.Util.getParamString(params);
+            let url = "{% url 'data.region-geometries' %}" + L.Util.getParamString(params);
 
             // Remove existing layer
             if (region_layer !== undefined) {

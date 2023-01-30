@@ -5,6 +5,7 @@
 
 {% endblock extra_cards %}
 
+{% block filter_form_buttons %}{% endblock filter_form_buttons %}
 
 
 {% block javascript %}
@@ -29,6 +30,28 @@
         async function updateFeatureSummary(feature) {
             const summaries = await fetchFeatureSummaries(feature);
             renderSummaries(summaries);
+        }
+
+        async function updateLayers({region_params, catchment_params, feature_params} = {}) {
+            const promises = [];
+            if (region_params) {
+                promises.push(fetchRegionGeometry(region_params));
+            }
+            if (catchment_params) {
+                promises.push(fetchCatchmentGeometry(catchment_params));
+            }
+            if (feature_params) {
+                promises.push(fetchFeatureGeometries(feature_params));
+            }
+            prepareMapRefresh();
+            await refreshMap(promises);
+
+        }
+
+        function cleanup() {
+            hideLoadingIndicator();
+            unlockFilter();
+            document.querySelectorAll("select").forEach(selector => selector.disabled = false);
         }
 
         async function fetchSelectOptions(api_url, params) {

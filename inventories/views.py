@@ -14,6 +14,7 @@ from rest_framework.views import APIView
 from layer_manager.models import Layer
 from maps.models import Catchment, GeoDataset
 from maps.serializers import BaseResultMapSerializer
+from maps.views import MapMixin
 from materials.models import SampleSeries
 from users.models import get_default_owner
 from utils.views import (OwnedObjectCreateView, OwnedObjectDetailView, OwnedObjectListView, OwnedObjectModalCreateView,
@@ -57,26 +58,31 @@ class ScenarioModalCreateView(OwnedObjectModalCreateView):
         return reverse('scenario-detail', kwargs={'pk': self.object.pk})
 
 
-class ScenarioDetailView(OwnedObjectDetailView):
+class ScenarioDetailView(MapMixin, OwnedObjectDetailView):
     """Summary of the Scenario with complete configuration. Page for final review, which also contains the
     'run' button."""
 
     model = Scenario
     object = None
+    permission_required = set()
     config = None
     allow_edit = False
-    region_url = reverse_lazy('ajax_region_geometries')
+
     load_region = True
+    region_url = reverse_lazy('data.region-geometries')
+    region_layer_style = {
+        "color": "#A1221C",
+        "fillOpacity": 0.0
+    }
+
     load_catchment = True
-    catchment_url = reverse_lazy('ajax_catchment_geometries')
+    catchment_url = reverse_lazy('data.catchment-geometries')
+    catchment_layer_style = {
+        'color': '#4061d2',
+    }
+
     load_features = False
     adjust_bounds_to_features = False
-    marker_style = {
-        'color': '#4061d2',
-        'fillOpacity': 1,
-        'stroke': False
-    }
-    permission_required = set()
 
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()
@@ -86,25 +92,11 @@ class ScenarioDetailView(OwnedObjectDetailView):
         context['allow_edit'] = self.allow_edit
         return self.render_to_response(context)
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({
-            'map_config': {
-                'region_url': self.region_url,
-                'catchment_url': self.catchment_url,
-                'load_features': self.load_features,
-                'adjust_bounds_to_features': self.adjust_bounds_to_features,
-                'region_id': self.object.region.id,
-                'load_catchment': self.load_catchment,
-                'catchment_id': self.get_catchment_id(),
-                'load_region': self.load_region,
-                'markerStyle': self.marker_style
-            }
-        })
-        return context
-
     def get_catchment_id(self):
         return self.object.catchment.id
+
+    def get_region_id(self):
+        return self.object.region.id
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
@@ -368,28 +360,33 @@ class ResultMapAPI(APIView):
         return JsonResponse(data, safe=False)
 
 
-class ScenarioResultView(OwnedObjectDetailView):
+class ScenarioResultView(MapMixin, OwnedObjectDetailView):
     """
     View with summaries of the results of each algorithm and a total summary.
     """
 
     template_name = 'scenario_result_detail.html'
     model = Scenario
-    context_object_name = 'scenario'
     object = None
+    permission_required = set()
+    context_object_name = 'scenario'
     allow_edit = False
-    region_url = reverse_lazy('ajax_region_geometries')
+
     load_region = True
-    catchment_url = reverse_lazy('ajax_catchment_geometries')
+    region_url = reverse_lazy('data.region-geometries')
+    region_layer_style = {
+        "color": "#A1221C",
+        "fillOpacity": 0.0
+    }
+
     load_catchment = True
+    catchment_url = reverse_lazy('data.catchment-geometries')
+    catchment_layer_style = {
+        'color': '#4061d2',
+    }
+
     load_features = False
     adjust_bounds_to_features = False
-    marker_style = {
-        'color': '#4061d2',
-        'fillOpacity': 1,
-        'stroke': False
-    }
-    permission_required = set()
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -398,17 +395,6 @@ class ScenarioResultView(OwnedObjectDetailView):
         context['layers'] = [layer.as_dict() for layer in result.layers]
         context['charts'] = result.get_charts()
         context['allow_edit'] = self.allow_edit
-        context['map_config'] = {
-            'region_url': self.region_url,
-            'catchment_url': self.catchment_url,
-            'catchment_id': self.get_catchment_id(),
-            'load_catchment': self.load_catchment,
-            'load_features': self.load_features,
-            'adjust_bounds_to_features': self.adjust_bounds_to_features,
-            'region_id': self.object.region.id,
-            'load_region': self.load_region,
-            'markerStyle': self.marker_style
-        }
         return context
 
     def get(self, request, *args, **kwargs):
@@ -432,6 +418,9 @@ class ScenarioResultView(OwnedObjectDetailView):
 
     def get_catchment_id(self):
         return self.object.catchment.id
+
+    def get_region_id(self):
+        return self.object.region.id
 
 
 class ScenarioEvaluationProgressView(DetailView):

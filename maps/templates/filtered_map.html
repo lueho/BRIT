@@ -5,8 +5,9 @@
 
 {% block style_sheets %}
     {{ block.super }}
-    <link rel="stylesheet" href="{% static 'css/maps.css' %}">
-    <link rel="stylesheet" href="{% static 'range_slider.css' %}">
+
+    <link rel="stylesheet" href="{% static 'css/maps.min.css' %}">
+    <link rel="stylesheet" href="{% static 'range_slider.min.css' %}">
 {% endblock style_sheets %}
 
 {% block title %}Maps | {{ map_title }}{% endblock %}
@@ -94,14 +95,20 @@
 
     </div>
 
+
+
 {% endblock content %}
 
 {% block javascript %}
     {{ block.super }}
+    {# For filters that use forms with autocomplete fields, the inclusion of form media is suppressed #}
+    {# by the form helper. It needs to be included after loading jquery.js and before select2-bootstrap4.css #}
+    {# See AutoCompleteMixin class in utils/forms.#}
     {{ filter.form.media }}
-    <link href="{% static 'lib/select2-bootstrap-theme/select2-bootstrap4.min.css' %}" rel="stylesheet">
-    <script src="{% static 'range_slider.js' %}"></script>
-    <script src="{% static 'js/maps.js' %}"></script>
+    <link rel="stylesheet" href="{% static 'lib/select2-bootstrap-theme/select2-bootstrap4.min.css' %}">
+    <script src="{% static 'range_slider.min.js' %}"></script>
+    <script src="{% static 'js/maps.min.js' %}"></script>
+
     {{ map_config|json_script:"mapConfig" }}
     <script type="text/javascript">
         const mapConfig = JSON.parse(document.getElementById("mapConfig").textContent);
@@ -110,7 +117,9 @@
             document.querySelectorAll('.submit-filter').forEach(btn => {
                 btn.type = 'button';
                 btn.onclick = clickedFilterButton;
-            })
-        }
+            });
+        };
     </script>
 {% endblock %}
+
+

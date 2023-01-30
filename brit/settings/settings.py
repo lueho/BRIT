@@ -160,13 +160,18 @@ LEAFLET_CONFIG = {
     'NO_GLOBALS': False,
     'MIN_ZOOM': 4,
     'MAX_ZOOM': 15,
-    'PLUGINS': {'draw': {'css': 'lib/leaflet-draw/leaflet.draw.css',
-                         'js': 'lib/leaflet-draw/leaflet.draw.js',
-                         'auto-include': True
-                         },
-                'forms': {'auto-include': True},
-
-                }
+    'PLUGINS': {
+        'draw': {
+            'css': 'lib/leaflet-draw/leaflet.draw.min.css',
+            'js': 'lib/leaflet-draw/leaflet.draw.min.js',
+            'auto-include': True
+        },
+        'forms': {'auto-include': True},
+        'spin': {
+            'js': ['lib/spin/spin.min.js', 'lib/leaflet-spin/leaflet.spin.min.js'],
+            'auto-include': True
+        }
+    }
 }
 
 LOGIN_REDIRECT_URL = 'home'

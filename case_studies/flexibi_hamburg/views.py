@@ -14,7 +14,8 @@ class RoadsideTreesMapView(GeoDatasetDetailView):
     feature_url = reverse_lazy('data.hamburg_roadside_trees')
     filterset_class = TreeFilter
     load_features = False
-    marker_style = {
+    apply_filter_to_features = True
+    feature_layer_style = {
         'color': '#63c36c',
         'fillOpacity': 1,
         'radius': 5,

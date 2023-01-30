@@ -1849,8 +1849,8 @@ class WasteCollectionMapViewTestCase(ViewWithPermissionsTestCase):
     def test_range_slider_static_files_are_embedded(self):
         self.client.force_login(self.member)
         response = self.client.get(self.url)
-        self.assertContains(response, 'range_slider.js')
-        self.assertContains(response, 'range_slider.css')
+        self.assertContains(response, 'range_slider.min.js')
+        self.assertContains(response, 'range_slider.min.css')
 
 
 @tag('slow')
