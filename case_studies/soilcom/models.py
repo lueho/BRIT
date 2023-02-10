@@ -75,7 +75,7 @@ def add_material_category(sender, instance, created, **kwargs):
         instance.save()
 
 
-class WasteStreamQueryset(models.query.QuerySet):
+class WasteStreamQuerySet(models.query.QuerySet):
 
     def match_allowed_materials(self, allowed_materials):
         """
@@ -85,12 +85,30 @@ class WasteStreamQueryset(models.query.QuerySet):
         """
 
         return self.alias(
-            allowed_materials_count=models.Count('allowed_materials'),
+            allowed_materials_count=models.Count('allowed_materials', distinct=True),
             allowed_materials_matches=models.Count('allowed_materials',
-                                                   filter=models.Q(allowed_materials__in=allowed_materials))
+                                                   filter=models.Q(allowed_materials__in=allowed_materials),
+                                                   distinct=True)
         ).filter(
             allowed_materials_count=len(allowed_materials),
             allowed_materials_matches=len(allowed_materials)
+        )
+
+    def match_forbidden_materials(self, forbidden_materials):
+        """
+        Returns a queryset of all waste streams that match the given combination of forbidden_materials
+        :param forbidden_materials: Queryset
+        :return: Queryset
+        """
+
+        return self.alias(
+            forbidden_materials_count=models.Count('forbidden_materials', distinct=True),
+            forbidden_materials_matches=models.Count('forbidden_materials',
+                                                     filter=models.Q(forbidden_materials__in=forbidden_materials),
+                                                     distinct=True)
+        ).filter(
+            forbidden_materials_count=len(forbidden_materials),
+            forbidden_materials_matches=len(forbidden_materials)
         )
 
     def get_or_create(self, defaults=None, **kwargs):
@@ -104,22 +122,31 @@ class WasteStreamQueryset(models.query.QuerySet):
         if defaults:
             defaults = defaults.copy()
 
+        qs = self
+
         if 'allowed_materials' in kwargs:
             allowed_materials = kwargs.pop('allowed_materials')
-            qs = self.match_allowed_materials(allowed_materials)
+            qs = qs.match_allowed_materials(allowed_materials)
         else:
             allowed_materials = Material.objects.none()
-            qs = self
+
+        if 'forbidden_materials' in kwargs:
+            forbidden_materials = kwargs.pop('forbidden_materials')
+            qs = qs.match_forbidden_materials(forbidden_materials)
+        else:
+            forbidden_materials = Material.objects.none()
 
         if defaults:
             allowed_materials = defaults.pop('allowed_materials', allowed_materials)
+            forbidden_materials = defaults.pop('forbidden_materials', forbidden_materials)
 
-        instance, created = super(WasteStreamQueryset, qs).get_or_create(defaults=defaults, **kwargs)
+        instance, created = super(WasteStreamQuerySet, qs).get_or_create(defaults=defaults, **kwargs)
 
         if created:
             instance.allowed_materials.add(*allowed_materials)
+            instance.forbidden_materials.add(*forbidden_materials)
             if not instance.name:
-                instance.name = f'{instance.category.name} {len(allowed_materials)}'
+                instance.name = f'{instance.category.name} {len(allowed_materials)} {len(forbidden_materials)}'
                 instance.save()
 
         return instance, created
@@ -140,17 +167,25 @@ class WasteStreamQueryset(models.query.QuerySet):
         if not created:
 
             new_allowed_materials = defaults.pop('allowed_materials', None)
+            new_forbidden_materials = defaults.pop('forbidden_materials', None)
             category = kwargs.get('category', None)
 
-            if new_allowed_materials:
-                qs = self.match_allowed_materials(new_allowed_materials)
-                if category:
-                    qs = qs.filter(category=category)
+            qs = self
+
+            if category:
+                qs = qs.filter(category=category)
+
+            if new_allowed_materials or new_forbidden_materials:
+                if new_allowed_materials:
+                    qs = qs.match_allowed_materials(new_allowed_materials)
+                if new_forbidden_materials:
+                    qs = qs.match_forbidden_materials(new_forbidden_materials)
+
                 if qs.exists():
                     raise ValidationError(
                         """
-                        Waste stream cannot be updated. Equivalent waste stream of equal category and same combination of 
-                        allowed materials already exists.
+                        Waste stream cannot be updated. Equivalent waste stream of equal category and same combination 
+                        of allowed and forbidden materials already exists.
                         """
                     )
 
@@ -160,17 +195,34 @@ class WasteStreamQueryset(models.query.QuerySet):
                 instance.allowed_materials.clear()
                 instance.allowed_materials.add(*new_allowed_materials)
 
+            if new_forbidden_materials:
+                instance.forbidden_materials.clear()
+                instance.forbidden_materials.add(*new_forbidden_materials)
+
             instance.refresh_from_db()
 
         return instance, created
 
 
+class WasteStreamManager(models.Manager):
+
+    def get_queryset(self):
+        return WasteStreamQuerySet(self.model, using=self._db)
+
+    def match_allowed_materials(self, allowed_materials):
+        return self.get_queryset().match_allowed_materials(allowed_materials)
+
+    def match_forbidden_materials(self, forbidden_materials):
+        return self.get_queryset().match_forbidden_materials(forbidden_materials)
+
+
 class WasteStream(NamedUserObjectModel):
     category = models.ForeignKey(WasteCategory, on_delete=models.PROTECT)
-    allowed_materials = models.ManyToManyField(Material)
+    allowed_materials = models.ManyToManyField(Material, related_name='allowed_in_waste_streams')
+    forbidden_materials = models.ManyToManyField(Material, related_name='forbidden_in_waste_streams')
     composition = models.ManyToManyField(SampleSeries)
 
-    objects = WasteStreamQueryset.as_manager()
+    objects = WasteStreamQuerySet.as_manager()
 
     class Meta:
         verbose_name = 'Waste Stream'

@@ -82,34 +82,42 @@ class CollectionCatchmentTestCase(TestCase):
 class WasteStreamQuerysetTestCase(TestCase):
 
     def setUp(self):
-        self.material1 = Material.objects.create(name='Test material 1')
-        self.material2 = Material.objects.create(name='Test material 2')
-        self.material3 = Material.objects.create(name='Test material 3')
+        self.allowed_material_1 = Material.objects.create(name='Allowed Material 1')
+        self.allowed_material_2 = Material.objects.create(name='Allowed Material 2')
+        self.forbidden_material_1 = Material.objects.create(name='Forbidden Material 1')
+        self.forbidden_material_2 = Material.objects.create(name='Forbidden Material 2')
+        self.unrelated_material = Material.objects.create(name='Unrelated Material')
         self.category = WasteCategory.objects.create(name='Biowaste')
-        self.waste_stream = WasteStream.objects.create(category=self.category)
-        self.waste_stream.allowed_materials.add(self.material1)
-        self.waste_stream.allowed_materials.add(self.material2)
+        self.waste_stream = WasteStream.objects.create(name='Waste Stream 1', category=self.category)
+        self.waste_stream.allowed_materials.add(self.allowed_material_1)
+        self.waste_stream.allowed_materials.add(self.allowed_material_2)
+        self.waste_stream.forbidden_materials.add(self.forbidden_material_1)
+        self.waste_stream.forbidden_materials.add(self.forbidden_material_2)
+        self.waste_stream_2 = WasteStream.objects.create(name='Waste Stream 2', category=self.category)
+        self.waste_stream_2.allowed_materials.add(self.allowed_material_1)
+        self.waste_stream_2.forbidden_materials.add(self.forbidden_material_1)
 
-    def test_get_or_create_with_passing_allowed_materials(self):
-        allowed_materials = Material.objects.filter(id__in=[self.material1.id, self.material2.id])
-        instance, created = WasteStream.objects.get_or_create(
-            category=self.category,
-            allowed_materials=allowed_materials
+    def test_match_allowed_materials_returns_all_waste_streams_with_all_given_allowed_materials(self):
+        allowed_materials = Material.objects.filter(
+            id__in=[self.allowed_material_1.id, self.allowed_material_2.id]
         )
-        self.assertFalse(created)
-        self.assertIsInstance(instance, WasteStream)
-        self.assertDictEqual(comparable_model_dict(instance), comparable_model_dict(self.waste_stream))
 
-    def test_get_or_create_with_non_existing_allowed_materials_queryset(self):
-        allowed_materials = Material.objects.filter(id__in=[self.material1.id, self.material2.id, self.material3.id])
-        instance, created = WasteStream.objects.get_or_create(
-            category=self.category,
-            allowed_materials=allowed_materials
+        self.assertQuerysetEqual(
+            WasteStream.objects.filter(id=self.waste_stream.id).order_by('id'),
+            WasteStream.objects.match_allowed_materials(allowed_materials).order_by('id')
         )
-        self.assertTrue(created)
-        self.assertEqual(set(allowed_materials), set(instance.allowed_materials.all()))
 
-    def test_get_or_create_without_passing_allowed_materials(self):
+    def test_match_forbidden_materials_returns_all_waste_streams_with_all_given_forbidden_materials(self):
+        forbidden_materials = Material.objects.filter(
+            id__in=[self.forbidden_material_1.id, self.forbidden_material_2.id]
+        )
+
+        self.assertQuerysetEqual(
+            WasteStream.objects.filter(id=self.waste_stream.id).order_by('id'),
+            WasteStream.objects.match_forbidden_materials(forbidden_materials).order_by('id')
+        )
+
+    def test_get_or_create_finds_existing_waste_stream_by_given_name_and_category(self):
         instance, created = WasteStream.objects.get_or_create(
             category=self.waste_stream.category,
             name=self.waste_stream.name
@@ -118,9 +126,64 @@ class WasteStreamQuerysetTestCase(TestCase):
         self.assertIsInstance(instance, WasteStream),
         self.assertDictEqual(comparable_model_dict(instance), comparable_model_dict(self.waste_stream))
 
-    def test_get_or_create_creates_new_instance_without_allowed_materials(self):
-        new_name = 'New waste stream'
+    def test_get_or_create_finds_existing_waste_stream_with_given_allowed_materials(self):
+        allowed_materials = Material.objects.filter(id__in=[self.allowed_material_1.id, self.allowed_material_2.id])
+        instance, created = WasteStream.objects.get_or_create(
+            name='Waste Stream 1',
+            category=self.category,
+            allowed_materials=allowed_materials
+        )
+        self.assertFalse(created)
+        self.assertIsInstance(instance, WasteStream)
+        self.assertDictEqual(comparable_model_dict(instance), comparable_model_dict(self.waste_stream))
 
+    def test_get_or_create_finds_existing_waste_stream_with_given_forbidden_materials(self):
+        forbidden_materials = Material.objects.filter(id__in=[self.forbidden_material_1.id, self.forbidden_material_2.id])
+        instance, created = WasteStream.objects.get_or_create(
+            name='Waste Stream 1',
+            category=self.category,
+            forbidden_materials=forbidden_materials
+        )
+        self.assertFalse(created)
+        self.assertIsInstance(instance, WasteStream)
+        self.assertDictEqual(comparable_model_dict(instance), comparable_model_dict(self.waste_stream))
+
+    def test_get_or_create_finds_existing_waste_stream_with_given_combination_of_allowed_and_forbidden_materials(self):
+        allowed_materials = Material.objects.filter(id__in=[self.allowed_material_1.id, self.allowed_material_2.id])
+        forbidden_materials = Material.objects.filter(id__in=[self.forbidden_material_1.id, self.forbidden_material_2.id])
+        instance, created = WasteStream.objects.get_or_create(
+            category=self.category,
+            allowed_materials=allowed_materials,
+            forbidden_materials=forbidden_materials
+        )
+        self.assertFalse(created)
+        self.assertIsInstance(instance, WasteStream)
+        self.assertDictEqual(comparable_model_dict(instance), comparable_model_dict(self.waste_stream))
+
+    def test_get_or_create_creates_new_wastestream_if_combination_of_allowed_materials_doesnt_exist(self):
+        allowed_materials = Material.objects.filter(
+            id__in=[self.allowed_material_1.id, self.allowed_material_2.id, self.unrelated_material.id]
+        )
+        instance, created = WasteStream.objects.get_or_create(
+            category=self.category,
+            allowed_materials=allowed_materials
+        )
+        self.assertTrue(created)
+        self.assertEqual(set(allowed_materials), set(instance.allowed_materials.all()))
+
+    def test_get_or_create_creates_new_wastestream_if_combination_of_forbidden_materials_doesnt_exist(self):
+        forbidden_materials = Material.objects.filter(
+            id__in=[self.forbidden_material_1.id, self.forbidden_material_2.id, self.unrelated_material.id]
+        )
+        instance, created = WasteStream.objects.get_or_create(
+            category=self.category,
+            forbidden_materials=forbidden_materials
+        )
+        self.assertTrue(created)
+        self.assertEqual(set(forbidden_materials), set(instance.forbidden_materials.all()))
+
+    def test_get_or_create_creates_new_instance_without_allowed_materials_and_new_name(self):
+        new_name = 'New waste stream'
         instance, created = WasteStream.objects.get_or_create(
             category=self.waste_stream.category,
             name=new_name,
@@ -129,10 +192,11 @@ class WasteStreamQuerysetTestCase(TestCase):
         self.assertIsInstance(instance, WasteStream)
         self.assertEqual(instance.name, new_name)
 
-    def test_get_or_create_creates_new_instance_with_allowed_materials(self):
+    def test_get_or_create_creates_new_instance_with_allowed_materials_and_new_name(self):
         new_name = 'New waste stream'
-        allowed_materials = Material.objects.filter(id__in=[self.material1.id, self.material2.id])
-
+        allowed_materials = Material.objects.filter(
+            id__in=[self.allowed_material_1.id, self.allowed_material_2.id]
+        )
         instance, created = WasteStream.objects.get_or_create(
             category=self.waste_stream.category,
             name=new_name,
@@ -143,9 +207,46 @@ class WasteStreamQuerysetTestCase(TestCase):
         self.assertEqual(instance.name, new_name)
         self.assertEqual(set(allowed_materials), set(instance.allowed_materials.all()))
 
+    def test_get_or_create_creates_new_instance_with_forbidden_materials_and_new_name(self):
+        new_name = 'New waste stream'
+        forbidden_materials = Material.objects.filter(
+            id__in=[self.forbidden_material_1.id, self.forbidden_material_2.id]
+        )
+        instance, created = WasteStream.objects.get_or_create(
+            category=self.waste_stream.category,
+            name=new_name,
+            forbidden_materials=forbidden_materials
+        )
+        self.assertTrue(created)
+        self.assertIsInstance(instance, WasteStream)
+        self.assertEqual(instance.name, new_name)
+        self.assertEqual(set(forbidden_materials), set(instance.forbidden_materials.all()))
+
+    def test_get_or_create_creates_new_instance_with_combined_allowed_and_forbidden_materials_and_new_name(self):
+        new_name = 'New waste stream'
+        allowed_materials = Material.objects.filter(
+            id__in=[self.allowed_material_1.id, self.allowed_material_2.id]
+        )
+        forbidden_materials = Material.objects.filter(
+            id__in=[self.forbidden_material_1.id, self.forbidden_material_2.id]
+        )
+        instance, created = WasteStream.objects.get_or_create(
+            category=self.waste_stream.category,
+            name=new_name,
+            allowed_materials=allowed_materials,
+            forbidden_materials=forbidden_materials
+        )
+        self.assertTrue(created)
+        self.assertIsInstance(instance, WasteStream)
+        self.assertEqual(instance.name, new_name)
+        self.assertEqual(set(allowed_materials), set(instance.allowed_materials.all()))
+        self.assertEqual(set(forbidden_materials), set(instance.forbidden_materials.all()))
+
     def test_get_or_create_with_allowed_materials_in_defaults(self):
         new_name = 'New waste stream'
-        allowed_materials = Material.objects.filter(id__in=[self.material1.id, self.material2.id])
+        allowed_materials = Material.objects.filter(
+            id__in=[self.allowed_material_1.id, self.allowed_material_2.id]
+        )
 
         defaults = {
             'category': self.category,
@@ -161,7 +262,51 @@ class WasteStreamQuerysetTestCase(TestCase):
         self.assertEqual(instance.name, new_name)
         self.assertEqual(set(allowed_materials), set(instance.allowed_materials.all()))
 
-    def test_update_or_create_without_passing_allowed_materials(self):
+    def test_get_or_create_with_forbidden_materials_in_defaults(self):
+        new_name = 'New waste stream'
+        forbidden_materials = Material.objects.filter(
+            id__in=[self.forbidden_material_1.id, self.forbidden_material_2.id]
+        )
+
+        defaults = {
+            'category': self.category,
+            'forbidden_materials': forbidden_materials
+        }
+
+        instance, created = WasteStream.objects.get_or_create(
+            defaults=defaults,
+            name=new_name
+        )
+        self.assertTrue(created)
+        self.assertIsInstance(instance, WasteStream)
+        self.assertEqual(instance.name, new_name)
+        self.assertEqual(set(forbidden_materials), set(instance.forbidden_materials.all()))
+
+    def test_get_or_create_with_combined_allowed_and_forbidden_materials_in_defaults(self):
+        new_name = 'New waste stream'
+        allowed_materials = Material.objects.filter(
+            id__in=[self.allowed_material_1.id, self.allowed_material_2.id]
+        )
+        forbidden_materials = Material.objects.filter(
+            id__in=[self.forbidden_material_1.id, self.forbidden_material_2.id]
+        )
+
+        defaults = {
+            'category': self.category,
+            'allowed_materials': allowed_materials,
+            'forbidden_materials': forbidden_materials
+        }
+
+        instance, created = WasteStream.objects.get_or_create(
+            defaults=defaults,
+            name=new_name
+        )
+        self.assertTrue(created)
+        self.assertIsInstance(instance, WasteStream)
+        self.assertEqual(instance.name, new_name)
+        self.assertEqual(set(forbidden_materials), set(instance.forbidden_materials.all()))
+
+    def test_update_or_create_finds_existing_waste_stream_by_given_name_and_category_and_updates_new_name(self):
         new_name = 'New waste stream'
 
         instance, created = WasteStream.objects.update_or_create(
@@ -173,9 +318,11 @@ class WasteStreamQuerysetTestCase(TestCase):
         self.assertIsInstance(instance, WasteStream)
         self.assertEqual(instance.name, new_name)
 
-    def test_update_or_create_with_passing_allowed_materials(self):
+    def test_update_or_create_finds_existing_waste_stream_with_given_allowed_materials_and_updates_new_name(self):
         new_name = 'New waste stream'
-        allowed_materials = Material.objects.filter(id__in=[self.material1.id, self.material2.id])
+        allowed_materials = Material.objects.filter(
+            id__in=[self.allowed_material_1.id, self.allowed_material_2.id]
+        )
 
         instance, created = WasteStream.objects.update_or_create(
             defaults={'name': new_name},
@@ -188,8 +335,27 @@ class WasteStreamQuerysetTestCase(TestCase):
         self.assertEqual(instance.name, new_name)
         self.assertEqual(set(allowed_materials), set(instance.allowed_materials.all()))
 
-    def test_update_or_create_with_altered_allowed_materials(self):
-        allowed_materials = Material.objects.filter(id__in=[self.material1.id, self.material2.id, self.material3.id])
+    def test_update_or_create_finds_existing_waste_stream_with_given_forbidden_materials_and_updates_new_name(self):
+        new_name = 'New waste stream'
+        forbidden_materials = Material.objects.filter(
+            id__in=[self.forbidden_material_1.id, self.forbidden_material_2.id]
+        )
+
+        instance, created = WasteStream.objects.update_or_create(
+            defaults={'name': new_name},
+            category=self.waste_stream.category,
+            forbidden_materials=forbidden_materials
+        )
+
+        self.assertFalse(created)
+        self.assertIsInstance(instance, WasteStream)
+        self.assertEqual(instance.name, new_name)
+        self.assertEqual(set(forbidden_materials), set(instance.forbidden_materials.all()))
+
+    def test_update_or_create_updates_altered_allowed_materials_with_given_id_and_category(self):
+        allowed_materials = Material.objects.filter(
+            id__in=[self.allowed_material_1.id, self.allowed_material_2.id, self.unrelated_material.id]
+        )
 
         instance, created = WasteStream.objects.update_or_create(
             defaults={'allowed_materials': allowed_materials},
@@ -201,8 +367,25 @@ class WasteStreamQuerysetTestCase(TestCase):
         self.assertDictEqual(comparable_model_dict(instance), comparable_model_dict(self.waste_stream))
         self.assertEqual(set(allowed_materials), set(instance.allowed_materials.all()))
 
+    def test_update_or_create_updates_altered_forbidden_materials_with_given_id_and_category(self):
+        forbidden_materials = Material.objects.filter(
+            id__in=[self.forbidden_material_1.id, self.forbidden_material_2.id, self.unrelated_material.id]
+        )
+
+        instance, created = WasteStream.objects.update_or_create(
+            defaults={'forbidden_materials': forbidden_materials},
+            category=self.waste_stream.category,
+            id=self.waste_stream.id
+        )
+
+        self.assertFalse(created)
+        self.assertDictEqual(comparable_model_dict(instance), comparable_model_dict(self.waste_stream))
+        self.assertEqual(set(forbidden_materials), set(instance.forbidden_materials.all()))
+
     def test_update_or_create_throws_validation_error_when_allowed_materials_not_unique(self):
-        allowed_materials = Material.objects.filter(id__in=[self.material1.id, self.material2.id, self.material3.id])
+        allowed_materials = Material.objects.filter(
+            id__in=[self.allowed_material_1.id, self.allowed_material_2.id, self.unrelated_material.id]
+        )
 
         instance, created = WasteStream.objects.get_or_create(
             category=self.waste_stream.category,
@@ -216,6 +399,33 @@ class WasteStreamQuerysetTestCase(TestCase):
                 defaults={'allowed_materials': allowed_materials},
                 id=self.waste_stream.id
             )
+
+    def test_update_or_create_throws_validation_error_when_forbidden_materials_not_unique(self):
+        forbidden_materials = Material.objects.filter(
+            id__in=[self.forbidden_material_1.id, self.forbidden_material_2.id, self.unrelated_material.id]
+        )
+
+        instance, created = WasteStream.objects.get_or_create(
+            category=self.waste_stream.category,
+            forbidden_materials=forbidden_materials
+        )
+        self.assertEqual(set(forbidden_materials), set(instance.forbidden_materials.all()))
+        self.assertTrue(created)
+
+        with self.assertRaises(ValidationError):
+            WasteStream.objects.update_or_create(
+                defaults={'forbidden_materials': forbidden_materials},
+                id=self.waste_stream.id
+            )
+
+
+class WasteStreamTestCase(TestCase):
+
+    def test_models_uses_manager_from_custom_waste_stream_queryset(self):
+        self.assertEqual(
+            type(WasteStream.objects).__name__,
+            'ManagerFromWasteStreamQuerySet'
+        )
 
 
 class WasteFlyerTestCase(TestCase):
