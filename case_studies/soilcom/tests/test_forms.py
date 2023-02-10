@@ -179,7 +179,7 @@ class CollectionSeasonFormSetTestCase(TestCase):
         self.assertEqual(250, options.option_3)
 
 
-class TestCollectionModelForm(TestCase):
+class CollectionModelFormTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
