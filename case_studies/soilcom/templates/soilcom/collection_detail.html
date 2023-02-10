@@ -30,6 +30,14 @@
                             <li><a href="{{ material.get_absolute_url }}">{{ material }}</a></li>
                         {% endfor %}
                     </ul>
+                    {% if object.waste_stream.forbidden_materials.exists %}
+                    <p class="card-text"><strong>Forbidden Materials:</strong></p>
+                    <ul>
+                        {% for material in object.waste_stream.forbidden_materials.all %}
+                            <li><a href="{{ material.get_absolute_url }}">{{ material }}</a></li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
 
                     {% if object.connection_rate %}
                     <p class="card-text">
