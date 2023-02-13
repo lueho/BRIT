@@ -21,20 +21,19 @@ class CollectionCSVRendererTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         owner = get_default_owner()
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
-        member.user_permissions.add(Permission.objects.get(codename='add_collection'))
-
-        MaterialCategory.objects.create(owner=owner, name='Biowaste component')
-        material1 = WasteComponent.objects.create(owner=owner, name='Test material 1')
-        material2 = WasteComponent.objects.create(owner=owner, name='Test material 2')
+        MaterialCategory.objects.create(name='Biowaste component')
+        cls.allowed_material_1 = WasteComponent.objects.create(name='Allowed Material 1')
+        cls.allowed_material_2 = WasteComponent.objects.create(name='Allowed Material 2')
+        cls.forbidden_material_1 = WasteComponent.objects.create(name='Forbidden Material 1')
+        cls.forbidden_material_2 = WasteComponent.objects.create(name='Forbidden Material 2')
         waste_stream = WasteStream.objects.create(
-            owner=owner,
             name='Test waste stream',
-            category=WasteCategory.objects.create(owner=owner, name='Test category'),
+            category=WasteCategory.objects.create(name='Test category'),
         )
-        waste_stream.allowed_materials.add(material1)
-        waste_stream.allowed_materials.add(material2)
+        waste_stream.allowed_materials.add(cls.allowed_material_1)
+        waste_stream.allowed_materials.add(cls.allowed_material_2)
+        waste_stream.forbidden_materials.add(cls.forbidden_material_1)
+        waste_stream.forbidden_materials.add(cls.forbidden_material_2)
 
         waste_flyer = WasteFlyer.objects.create(
             owner=owner,
@@ -69,9 +68,9 @@ class CollectionCSVRendererTestCase(TestCase):
         self.file.seek(0)
         reader = csv.DictReader(codecs.getreader('utf-8')(self.file), delimiter='\t')
         fieldnames = ['Catchment', 'Country', 'NUTS/LAU Id', 'Collector', 'Collection System', 'Waste Category',
-                      'Allowed Materials', 'Connection Rate', 'Connection Rate Year', 'Fee System', 'Frequency',
-                      'Population', 'Population Density', 'Comments', 'Sources', 'Created by', 'Created at',
-                      'Last modified by', 'Last modified at']
+                      'Allowed Materials', 'Forbidden Materials', 'Connection Rate', 'Connection Rate Year',
+                      'Fee System', 'Frequency', 'Population', 'Population Density', 'Comments', 'Sources',
+                      'Created by', 'Created at', 'Last modified by', 'Last modified at']
         self.assertListEqual(fieldnames, list(reader.fieldnames))
         self.assertEqual(2, sum(1 for _ in reader))
 
@@ -81,7 +80,15 @@ class CollectionCSVRendererTestCase(TestCase):
         self.file.seek(0)
         reader = csv.DictReader(codecs.getreader('utf-8')(self.file), delimiter='\t')
         for row in reader:
-            self.assertEqual('Test material 1, Test material 2', row['Allowed Materials'])
+            self.assertEqual('Allowed Material 1, Allowed Material 2', row['Allowed Materials'])
+
+    def test_forbidden_materials_formatted_as_comma_separated_list_in_one_field(self):
+        renderer = CollectionCSVRenderer()
+        renderer.render(self.file, self.content)
+        self.file.seek(0)
+        reader = csv.DictReader(codecs.getreader('utf-8')(self.file), delimiter='\t')
+        for row in reader:
+            self.assertEqual('Forbidden Material 1, Forbidden Material 2', row['Forbidden Materials'])
 
     def test_regression_flyers_without_urls_dont_raise_type_error(self):
         defected_collection = Collection.objects.first()
@@ -103,16 +110,19 @@ class CollectionXLSXRendererTestCase(TestCase):
         member = User.objects.create(username='member')
         member.user_permissions.add(Permission.objects.get(codename='add_collection'))
 
-        MaterialCategory.objects.create(owner=owner, name='Biowaste component')
-        material1 = WasteComponent.objects.create(owner=owner, name='Test material 1')
-        material2 = WasteComponent.objects.create(owner=owner, name='Test material 2')
+        MaterialCategory.objects.create(name='Biowaste component')
+        cls.allowed_material_1 = WasteComponent.objects.create(name='Allowed Material 1')
+        cls.allowed_material_2 = WasteComponent.objects.create(name='Allowed Material 2')
+        cls.forbidden_material_1 = WasteComponent.objects.create(name='Forbidden Material 1')
+        cls.forbidden_material_2 = WasteComponent.objects.create(name='Forbidden Material 2')
         waste_stream = WasteStream.objects.create(
-            owner=owner,
             name='Test waste stream',
-            category=WasteCategory.objects.create(owner=owner, name='Test category'),
+            category=WasteCategory.objects.create(name='Test category'),
         )
-        waste_stream.allowed_materials.add(material1)
-        waste_stream.allowed_materials.add(material2)
+        waste_stream.allowed_materials.add(cls.allowed_material_1)
+        waste_stream.allowed_materials.add(cls.allowed_material_2)
+        waste_stream.forbidden_materials.add(cls.forbidden_material_1)
+        waste_stream.forbidden_materials.add(cls.forbidden_material_2)
 
         waste_flyer = WasteFlyer.objects.create(
             owner=owner,
@@ -155,6 +165,7 @@ class CollectionXLSXRendererTestCase(TestCase):
             'country': 'Country',
             'waste_category': 'Waste Category',
             'allowed_materials': 'Allowed Materials',
+            'forbidden_materials': 'Forbidden Materials',
             'connection_rate': 'Connection Rate',
             'connection_rate_year': 'Connection Rate Year',
             'fee_system': 'Fee System',

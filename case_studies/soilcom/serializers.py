@@ -15,6 +15,7 @@ class WasteCollectionGeometrySerializer(GeoFeatureModelSerializer):
     catchment = serializers.StringRelatedField(source='catchment.name')
     waste_category = serializers.StringRelatedField(source='waste_stream.category.name')
     collection_system = serializers.StringRelatedField(source='collection_system.name')
+
     class Meta:
         model = GeoreferencedWasteCollection
         geo_field = 'geom'
@@ -64,6 +65,7 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
     collection_system = serializers.StringRelatedField()
     waste_category = serializers.CharField(source='waste_stream.category')
     allowed_materials = serializers.StringRelatedField(many=True, source='waste_stream.allowed_materials')
+    forbidden_materials = serializers.StringRelatedField(many=True, source='waste_stream.forbidden_materials')
     connection_rate = serializers.SerializerMethodField()
     frequency = serializers.StringRelatedField()
     sources = serializers.StringRelatedField(source='flyers', many=True)
@@ -72,7 +74,8 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
     class Meta:
         model = models.Collection
         fields = ('id', 'catchment', 'collector', 'collection_system',
-                  'waste_category', 'allowed_materials', 'connection_rate', 'frequency', 'sources', 'comments')
+                  'waste_category', 'allowed_materials', 'forbidden_materials', 'connection_rate', 'frequency',
+                  'sources', 'comments')
 
     @staticmethod
     def get_connection_rate(obj):
@@ -85,6 +88,9 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
 
 
 class CollectionFlatSerializer(serializers.ModelSerializer):
+    """
+    Creates a flat, human-readable representation of Collections, suitable for file exports.
+    """
     catchment = serializers.StringRelatedField(label='Catchment')
     nuts_or_lau_id = serializers.StringRelatedField(source='catchment.region.nuts_or_lau_id', label='NUTS/LAU Id')
     country = serializers.StringRelatedField(source='catchment.region.country', label='Country')
@@ -92,6 +98,7 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
     collection_system = serializers.StringRelatedField(label='Collection System')
     waste_category = serializers.StringRelatedField(source='waste_stream.category', label='Waste Category')
     allowed_materials = serializers.SerializerMethodField(label='Allowed Materials')
+    forbidden_materials = serializers.SerializerMethodField(label='Forbidden Materials')
     connection_rate = serializers.StringRelatedField(label='Connection Rate')
     connection_rate_year = serializers.StringRelatedField(label='Connection Rate Year')
     fee_system = serializers.CharField(label='Fee system')
@@ -107,13 +114,17 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.Collection
         fields = ('catchment', 'nuts_or_lau_id', 'country', 'collector', 'collection_system', 'waste_category',
-                  'allowed_materials', 'connection_rate', 'connection_rate_year', 'fee_system', 'frequency',
-                  'population', 'population_density', 'comments', 'sources', 'created_by', 'created_at',
+                  'allowed_materials', 'forbidden_materials', 'connection_rate', 'connection_rate_year', 'fee_system',
+                  'frequency', 'population', 'population_density', 'comments', 'sources', 'created_by', 'created_at',
                   'lastmodified_by', 'lastmodified_at')
 
     @staticmethod
     def get_allowed_materials(obj):
         return ', '.join([m.name for m in obj.waste_stream.allowed_materials.all() if m.name])
+
+    @staticmethod
+    def get_forbidden_materials(obj):
+        return ', '.join([m.name for m in obj.waste_stream.forbidden_materials.all() if m.name])
 
     @staticmethod
     def get_population(obj):

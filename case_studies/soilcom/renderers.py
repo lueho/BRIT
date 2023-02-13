@@ -12,6 +12,7 @@ class CollectionXLSXRenderer(BaseXLSXRenderer):
         'country': 'Country',
         'waste_category': 'Waste Category',
         'allowed_materials': 'Allowed Materials',
+        'forbidden_materials': 'Forbidden Materials',
         'connection_rate': 'Connection Rate',
         'connection_rate_year': 'Connection Rate Year',
         'fee_system': 'Fee System',
@@ -37,9 +38,9 @@ class CollectionCSVRenderer(CSVRenderer):
         'delimiter': '\t'
     }
     header = ['catchment', 'country', 'nuts_or_lau_id', 'collector', 'collection_system', 'waste_category',
-              'allowed_materials', 'connection_rate', 'connection_rate_year', 'fee_system', 'frequency', 'population',
-              'population_density', 'comments', 'sources', 'created_by', 'created_at', 'lastmodified_by',
-              'lastmodified_at']
+              'allowed_materials', 'forbidden_materials', 'connection_rate', 'connection_rate_year', 'fee_system',
+              'frequency', 'population', 'population_density', 'comments', 'sources', 'created_by', 'created_at',
+              'lastmodified_by', 'lastmodified_at']
     labels = {
         'catchment': 'Catchment',
         'nuts_or_lau_id': 'NUTS/LAU Id',
@@ -48,6 +49,7 @@ class CollectionCSVRenderer(CSVRenderer):
         'country': 'Country',
         'waste_category': 'Waste Category',
         'allowed_materials': 'Allowed Materials',
+        'forbidden_materials': 'Forbidden Materials',
         'connection_rate': 'Connection Rate',
         'connection_rate_year': 'Connection Rate Year',
         'fee_system': 'Fee System',

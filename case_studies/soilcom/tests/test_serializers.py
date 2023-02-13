@@ -1,4 +1,3 @@
-from django.contrib.auth.models import User
 from django.db import models
 from django.test import TestCase
 from django.test.utils import isolate_apps
@@ -7,6 +6,7 @@ from rest_framework.serializers import ModelSerializer, Serializer, CharField, I
 from maps.models import Attribute, RegionAttributeValue, NutsRegion, LauRegion
 from maps.serializers import FieldLabelMixin
 from materials.models import MaterialCategory
+from users.models import get_default_owner
 
 from ..models import (
     Collection,
@@ -91,19 +91,23 @@ class FieldLabelMixinTestCase(TestCase):
         self.assertDictEqual(serializer.data[0], self.tdata)
 
 
-class CollectionSerializerTestCase(TestCase):
+class CollectionModelSerializerTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
         MaterialCategory.objects.create(name='Biowaste component')
-        material1 = WasteComponent.objects.create(name='Test material 1')
-        material2 = WasteComponent.objects.create(name='Test material 2')
+        cls.allowed_material_1 = WasteComponent.objects.create(name='Allowed Material 1')
+        cls.allowed_material_2 = WasteComponent.objects.create(name='Allowed Material 2')
+        cls.forbidden_material_1 = WasteComponent.objects.create(name='Forbidden Material 1')
+        cls.forbidden_material_2 = WasteComponent.objects.create(name='Forbidden Material 2')
         waste_stream = WasteStream.objects.create(
             name='Test waste stream',
             category=WasteCategory.objects.create(name='Test category'),
         )
-        waste_stream.allowed_materials.add(material1)
-        waste_stream.allowed_materials.add(material2)
+        waste_stream.allowed_materials.add(cls.allowed_material_1)
+        waste_stream.allowed_materials.add(cls.allowed_material_2)
+        waste_stream.forbidden_materials.add(cls.forbidden_material_1)
+        waste_stream.forbidden_materials.add(cls.forbidden_material_2)
 
         waste_flyer_1 = WasteFlyer.objects.create(
             abbreviation='WasteFlyer123',
@@ -127,6 +131,21 @@ class CollectionSerializerTestCase(TestCase):
         )
         cls.collection.flyers.add(waste_flyer_1)
         cls.collection.flyers.add(waste_flyer_2)
+
+    def test_all_keys_are_present_in_result_data(self):
+        serializer = CollectionModelSerializer(self.collection)
+        data = serializer.data
+        self.assertIn('id', data)
+        self.assertIn('catchment', data)
+        self.assertIn('collector', data)
+        self.assertIn('collection_system', data)
+        self.assertIn('waste_category', data)
+        self.assertIn('allowed_materials', data)
+        self.assertIn('forbidden_materials', data)
+        self.assertIn('connection_rate', data)
+        self.assertIn('frequency', data)
+        self.assertIn('sources', data)
+        self.assertIn('comments', data)
 
     def test_multiple_sources_in_representation(self):
         serializer = CollectionModelSerializer(self.collection)
@@ -158,44 +177,45 @@ class CollectionFlatSerializerTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = User.objects.create(username='owner', password='very-secure!')
+        cls.owner = get_default_owner()
 
-        MaterialCategory.objects.create(owner=owner, name='Biowaste component')
-        material1 = WasteComponent.objects.create(owner=owner, name='Test material 1')
-        material2 = WasteComponent.objects.create(owner=owner, name='Test material 2')
+        MaterialCategory.objects.create(name='Biowaste component')
+        cls.allowed_material_1 = WasteComponent.objects.create(name='Allowed Material 1')
+        cls.allowed_material_2 = WasteComponent.objects.create(name='Allowed Material 2')
+        cls.forbidden_material_1 = WasteComponent.objects.create(name='Forbidden Material 1')
+        cls.forbidden_material_2 = WasteComponent.objects.create(name='Forbidden Material 2')
         waste_stream = WasteStream.objects.create(
-            owner=owner,
             name='Test waste stream',
-            category=WasteCategory.objects.create(owner=owner, name='Test Category'),
+            category=WasteCategory.objects.create(name='Test Category'),
         )
-        waste_stream.allowed_materials.add(material1)
-        waste_stream.allowed_materials.add(material2)
+        waste_stream.allowed_materials.add(cls.allowed_material_1)
+        waste_stream.allowed_materials.add(cls.allowed_material_2)
+        waste_stream.forbidden_materials.add(cls.forbidden_material_1)
+        waste_stream.forbidden_materials.add(cls.forbidden_material_2)
 
         waste_flyer_1 = WasteFlyer.objects.create(
-            owner=owner,
             abbreviation='WasteFlyer123',
             url='https://www.test-flyer.org'
         )
         waste_flyer_2 = WasteFlyer.objects.create(
-            owner=owner,
             abbreviation='WasteFlyer456',
             url='https://www.best-flyer.org'
         )
-        frequency = CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
+        frequency = CollectionFrequency.objects.create(name='Test Frequency')
 
-        nutsregion = NutsRegion.objects.create(owner=owner, name='Hamburg', country='DE', nuts_id='DE600')
-        population = Attribute.objects.create(owner=owner, name='Population', unit='')
-        population_density = Attribute.objects.create(owner=owner, name='Population density', unit='1/km')
-        RegionAttributeValue(owner=owner, region=nutsregion, attribute=population, value=123321)
-        RegionAttributeValue(owner=owner, region=nutsregion, attribute=population_density, value=123.5)
-        catchment1 = CollectionCatchment.objects.create(owner=owner, name='Test Catchment', region=nutsregion.region_ptr)
+        nutsregion = NutsRegion.objects.create(name='Hamburg', country='DE', nuts_id='DE600')
+        population = Attribute.objects.create(name='Population', unit='')
+        population_density = Attribute.objects.create(name='Population density', unit='1/km')
+        RegionAttributeValue(region=nutsregion, attribute=population, value=123321)
+        RegionAttributeValue(region=nutsregion, attribute=population_density, value=123.5)
+        catchment1 = CollectionCatchment.objects.create(name='Test Catchment', region=nutsregion.region_ptr)
         cls.collection_nuts = Collection.objects.create(
-            created_by=owner,
-            lastmodified_by=owner,
+            created_by=cls.owner,
+            lastmodified_by=cls.owner,
             name='Test Collection Nuts',
             catchment=catchment1,
-            collector=Collector.objects.create(owner=owner, name='Test Collector'),
-            collection_system=CollectionSystem.objects.create(owner=owner, name='Test System'),
+            collector=Collector.objects.create(name='Test Collector'),
+            collection_system=CollectionSystem.objects.create(name='Test System'),
             waste_stream=waste_stream,
             fee_system='Fixed fee',
             frequency=frequency,
@@ -206,15 +226,15 @@ class CollectionFlatSerializerTestCase(TestCase):
         cls.collection_nuts.flyers.add(waste_flyer_1)
         cls.collection_nuts.flyers.add(waste_flyer_2)
 
-        lauregion = LauRegion.objects.create(owner=owner, name='Shetland Islands', country='UK', lau_id='S30000041')
-        catchment2 = CollectionCatchment.objects.create(owner=owner, name='Test Catchment', region=lauregion.region_ptr)
+        lauregion = LauRegion.objects.create(name='Shetland Islands', country='UK', lau_id='S30000041')
+        catchment2 = CollectionCatchment.objects.create(name='Test Catchment', region=lauregion.region_ptr)
         cls.collection_lau = Collection.objects.create(
-            created_by=owner,
-            lastmodified_by=owner,
+            created_by=cls.owner,
+            lastmodified_by=cls.owner,
             name='Test Collection Lau',
             catchment=catchment2,
-            collector=Collector.objects.create(owner=owner, name='Test Collector'),
-            collection_system=CollectionSystem.objects.create(owner=owner, name='Test System'),
+            collector=Collector.objects.create(name='Test Collector'),
+            collection_system=CollectionSystem.objects.create(name='Test System'),
             waste_stream=waste_stream,
             fee_system='Fixed fee',
             frequency=frequency,
@@ -228,9 +248,9 @@ class CollectionFlatSerializerTestCase(TestCase):
     def test_serializer_data_contains_all_fields(self):
         serializer = CollectionFlatSerializer(self.collection_nuts)
         keys = {'catchment', 'nuts_or_lau_id', 'collector', 'collection_system', 'country', 'waste_category',
-                'allowed_materials', 'connection_rate', 'connection_rate_year', 'fee_system', 'frequency', 'population',
-                'population_density', 'comments', 'sources', 'created_by', 'created_at', 'lastmodified_by',
-                'lastmodified_at'}
+                'allowed_materials', 'forbidden_materials', 'connection_rate', 'connection_rate_year', 'fee_system',
+                'frequency', 'population', 'population_density', 'comments', 'sources', 'created_by',
+                'created_at', 'lastmodified_by', 'lastmodified_at'}
         self.assertSetEqual(keys, set(serializer.data.keys()))
 
     def test_serializer_gets_information_from_foreign_keys_correctly(self):
@@ -239,11 +259,12 @@ class CollectionFlatSerializerTestCase(TestCase):
         self.assertEqual('Test Collector', serializer.data['collector'])
         self.assertEqual('Test System', serializer.data['collection_system'])
         self.assertEqual('Test Category', serializer.data['waste_category'])
-        self.assertEqual('Test material 1, Test material 2', serializer.data['allowed_materials'])
+        self.assertEqual('Allowed Material 1, Allowed Material 2', serializer.data['allowed_materials'])
+        self.assertEqual('Forbidden Material 1, Forbidden Material 2', serializer.data['forbidden_materials'])
         self.assertEqual('Test Frequency', serializer.data['frequency'])
         self.assertEqual('https://www.test-flyer.org, https://www.best-flyer.org', serializer.data['sources'])
-        self.assertEqual('owner', serializer.data['created_by'])
-        self.assertEqual('owner', serializer.data['lastmodified_by'])
+        self.assertEqual(self.owner.username, serializer.data['created_by'])
+        self.assertEqual(self.owner.username, serializer.data['lastmodified_by'])
 
     def test_nuts_id_is_read_correctly(self):
         serializer = CollectionFlatSerializer(self.collection_nuts)
