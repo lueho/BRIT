@@ -1606,6 +1606,7 @@ class CollectionSummaryAPIViewTestCase(ViewWithPermissionsTestCase):
                 ('Collection system', self.collection.collection_system.name),
                 ('Waste category', self.collection.waste_stream.category.name),
                 ('Allowed materials', [m.name for m in self.collection.waste_stream.allowed_materials.all()]),
+                ('Forbidden materials', [m.name for m in self.collection.waste_stream.forbidden_materials.all()]),
                 ('Connection rate', '70.0\u00A0% (2020)'),
                 ('Frequency', self.collection.frequency.name),
                 ('Sources', [flyer.url for flyer in self.collection.flyers.all()]),

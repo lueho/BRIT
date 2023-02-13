@@ -58,6 +58,7 @@ class CollectionFilterFormHelper(FormHelper):
             FilterAccordionGroup(
                 'Advanced filters',
                 'allowed_materials',
+                'forbidden_materials',
                 RangeSliderField('connection_rate'),
                 'connection_rate_include_unknown',
                 Row(Column(Field('seasonal_frequency'), css_class='col-md'),
@@ -111,6 +112,10 @@ class CollectionFilter(AutocompleteFilterSet):
                                                   field_name='waste_stream__allowed_materials',
                                                   label='Allowed materials',
                                                   widget=CheckboxSelectMultiple)
+    forbidden_materials = ModelMultipleChoiceFilter(queryset=WasteComponent.objects.all(),
+                                                    field_name='waste_stream__forbidden_materials',
+                                                    label='Forbidden materials',
+                                                    widget=CheckboxSelectMultiple)
     connection_rate = RangeFilter(
         widget=PercentageRangeSlider(attrs={'data-range_min': 0, 'data-range_max': 100, 'data-step': 1}),
         method='get_connection_rate'
@@ -160,9 +165,10 @@ class CollectionFilter(AutocompleteFilterSet):
     class Meta:
         model = Collection
         fields = ('catchment', 'collector', 'collection_system', 'waste_category', 'allowed_materials',
-                  'connection_rate', 'connection_rate_include_unknown', 'seasonal_frequency', 'optional_frequency',
-                  'collections_per_year', 'collections_per_year_include_unknown', 'spec_waste_collected_filter_method',
-                  'spec_waste_collected_include_unknown', 'spec_waste_collected', 'fee_system', 'load_features')
+                  'forbidden_materials', 'connection_rate', 'connection_rate_include_unknown', 'seasonal_frequency',
+                  'optional_frequency', 'collections_per_year', 'collections_per_year_include_unknown',
+                  'spec_waste_collected_filter_method', 'spec_waste_collected_include_unknown', 'spec_waste_collected',
+                  'fee_system', 'load_features')
         # catchment_filter must always be applied first, because it grabs the initial queryset and does not filter any
         # existing queryset.
         order_by = ['catchment_filter']
