@@ -84,15 +84,18 @@ class WasteStreamQuerySet(models.query.QuerySet):
         :return: Queryset
         """
 
-        return self.alias(
-            allowed_materials_count=models.Count('allowed_materials', distinct=True),
-            allowed_materials_matches=models.Count('allowed_materials',
-                                                   filter=models.Q(allowed_materials__in=allowed_materials),
-                                                   distinct=True)
-        ).filter(
-            allowed_materials_count=len(allowed_materials),
-            allowed_materials_matches=len(allowed_materials)
-        )
+        if allowed_materials:
+            return self.alias(
+                allowed_materials_count=models.Count('allowed_materials', distinct=True),
+                allowed_materials_matches=models.Count('allowed_materials',
+                                                       filter=models.Q(allowed_materials__in=allowed_materials),
+                                                       distinct=True)
+            ).filter(
+                allowed_materials_count=len(allowed_materials),
+                allowed_materials_matches=len(allowed_materials)
+            )
+        else:
+            return self
 
     def match_forbidden_materials(self, forbidden_materials):
         """
@@ -100,16 +103,18 @@ class WasteStreamQuerySet(models.query.QuerySet):
         :param forbidden_materials: Queryset
         :return: Queryset
         """
-
-        return self.alias(
-            forbidden_materials_count=models.Count('forbidden_materials', distinct=True),
-            forbidden_materials_matches=models.Count('forbidden_materials',
-                                                     filter=models.Q(forbidden_materials__in=forbidden_materials),
-                                                     distinct=True)
-        ).filter(
-            forbidden_materials_count=len(forbidden_materials),
-            forbidden_materials_matches=len(forbidden_materials)
-        )
+        if forbidden_materials:
+            return self.alias(
+                forbidden_materials_count=models.Count('forbidden_materials', distinct=True),
+                forbidden_materials_matches=models.Count('forbidden_materials',
+                                                         filter=models.Q(forbidden_materials__in=forbidden_materials),
+                                                         distinct=True)
+            ).filter(
+                forbidden_materials_count=len(forbidden_materials),
+                forbidden_materials_matches=len(forbidden_materials)
+            )
+        else:
+            return self
 
     def get_or_create(self, defaults=None, **kwargs):
         """
@@ -125,13 +130,13 @@ class WasteStreamQuerySet(models.query.QuerySet):
         qs = self
 
         if 'allowed_materials' in kwargs:
-            allowed_materials = kwargs.pop('allowed_materials')
+            allowed_materials = kwargs.pop('allowed_materials', None)
             qs = qs.match_allowed_materials(allowed_materials)
         else:
             allowed_materials = Material.objects.none()
 
         if 'forbidden_materials' in kwargs:
-            forbidden_materials = kwargs.pop('forbidden_materials')
+            forbidden_materials = kwargs.pop('forbidden_materials', None)
             qs = qs.match_forbidden_materials(forbidden_materials)
         else:
             forbidden_materials = Material.objects.none()

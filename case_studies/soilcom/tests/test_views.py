@@ -845,14 +845,18 @@ class CollectionCreateViewTestCase(ViewWithPermissionsTestCase):
         super().setUpTestData()
 
         MaterialCategory.objects.create(name='Biowaste component')
-        material1 = WasteComponent.objects.create(name='Test material 1')
-        material2 = WasteComponent.objects.create(name='Test material 2')
+        cls.allowed_material_1 = WasteComponent.objects.create(name='Allowed material 1')
+        cls.allowed_material_2 = WasteComponent.objects.create(name='Allowed material 2')
+        cls.forbidden_material_1 = WasteComponent.objects.create(name='Forbidden material 1')
+        cls.forbidden_material_2 = WasteComponent.objects.create(name='Forbidden material 2')
         waste_stream = WasteStream.objects.create(
             name='Test waste stream',
             category=WasteCategory.objects.create(name='Test category'),
         )
-        waste_stream.allowed_materials.add(material1)
-        waste_stream.allowed_materials.add(material2)
+        waste_stream.allowed_materials.add(cls.allowed_material_1)
+        waste_stream.allowed_materials.add(cls.allowed_material_2)
+        waste_stream.forbidden_materials.add(cls.forbidden_material_1)
+        waste_stream.forbidden_materials.add(cls.forbidden_material_2)
 
         waste_flyer = WasteFlyer.objects.create(
             abbreviation='WasteFlyer123',
@@ -941,7 +945,8 @@ class CollectionCreateViewTestCase(ViewWithPermissionsTestCase):
                 'collector': Collector.objects.first().id,
                 'collection_system': CollectionSystem.objects.first().id,
                 'waste_category': WasteCategory.objects.first().id,
-                'allowed_materials': [c.id for c in WasteComponent.objects.all()],
+                'allowed_materials': [self.allowed_material_1.id, self.allowed_material_2.id],
+                'forbidden_materials': [self.forbidden_material_1.id, self.forbidden_material_2.id],
                 'connection_rate': 0.7,
                 'connection_rate_year': 2020,
                 'frequency': CollectionFrequency.objects.first().id,
@@ -966,14 +971,18 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
         super().setUpTestData()
 
         MaterialCategory.objects.create(name='Biowaste component')
-        material1 = WasteComponent.objects.create(name='Test material 1')
-        material2 = WasteComponent.objects.create(name='Test material 2')
+        cls.allowed_material_1 = WasteComponent.objects.create(name='Allowed material 1')
+        cls.allowed_material_2 = WasteComponent.objects.create(name='Allowed material 2')
+        cls.forbidden_material_1 = WasteComponent.objects.create(name='Forbidden material 1')
+        cls.forbidden_material_2 = WasteComponent.objects.create(name='Forbidden material 2')
         waste_stream = WasteStream.objects.create(
             name='Test waste stream',
             category=WasteCategory.objects.create(name='Test category'),
         )
-        waste_stream.allowed_materials.add(material1)
-        waste_stream.allowed_materials.add(material2)
+        waste_stream.allowed_materials.add(cls.allowed_material_1)
+        waste_stream.allowed_materials.add(cls.allowed_material_2)
+        waste_stream.forbidden_materials.add(cls.forbidden_material_1)
+        waste_stream.forbidden_materials.add(cls.forbidden_material_2)
 
         cls.flyer = WasteFlyer.objects.create(
             abbreviation='WasteFlyer123',
@@ -1071,7 +1080,8 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
             'collector': Collector.objects.create(name='New Test Collector').id,
             'collection_system': CollectionSystem.objects.first().id,
             'waste_category': WasteCategory.objects.first().id,
-            'allowed_materials': [c.id for c in WasteComponent.objects.all()],
+            'allowed_materials': [self.allowed_material_1.id, self.allowed_material_2.id],
+            'forbidden_materials': [self.forbidden_material_1.id, self.forbidden_material_2.id],
             'connection_rate': 0.7,
             'connection_rate_year': 2020,
             'frequency': CollectionFrequency.objects.first().id,
@@ -1093,6 +1103,7 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
             'collection_system': initial['collection_system'],
             'waste_category': initial['waste_category'],
             'allowed_materials': initial['allowed_materials'],
+            'forbidden_materials': initial['forbidden_materials'],
             'connection_rate': initial['connection_rate'],
             'connection_rate_year': initial['connection_rate_year'],
             'frequency': initial['frequency'],
@@ -1115,6 +1126,7 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
             'collection_system': initial['collection_system'],
             'waste_category': initial['waste_category'],
             'allowed_materials': initial['allowed_materials'],
+            'forbidden_materials': initial['forbidden_materials'],
             'connection_rate': initial['connection_rate'],
             'connection_rate_year': initial['connection_rate_year'],
             'frequency': initial['frequency'],
@@ -1138,14 +1150,18 @@ class CollectionUpdateViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         MaterialCategory.objects.create(name='Biowaste component')
-        material1 = WasteComponent.objects.create(name='Test material 1')
-        material2 = WasteComponent.objects.create(name='Test material 2')
+        cls.allowed_material_1 = WasteComponent.objects.create(name='Allowed material 1')
+        cls.allowed_material_2 = WasteComponent.objects.create(name='Allowed material 2')
+        cls.forbidden_material_1 = WasteComponent.objects.create(name='Forbidden material 1')
+        cls.forbidden_material_2 = WasteComponent.objects.create(name='Forbidden material 2')
         waste_stream = WasteStream.objects.create(
             name='Test waste stream',
             category=WasteCategory.objects.create(name='Test category'),
         )
-        waste_stream.allowed_materials.add(material1)
-        waste_stream.allowed_materials.add(material2)
+        waste_stream.allowed_materials.add(cls.allowed_material_1)
+        waste_stream.allowed_materials.add(cls.allowed_material_2)
+        waste_stream.forbidden_materials.add(cls.forbidden_material_1)
+        waste_stream.forbidden_materials.add(cls.forbidden_material_2)
 
         cls.flyer = WasteFlyer.objects.create(
             abbreviation='WasteFlyer123',
@@ -1306,7 +1322,8 @@ class CollectionUpdateViewTestCase(ViewWithPermissionsTestCase):
                 'collector': Collector.objects.first().id,
                 'collection_system': CollectionSystem.objects.first().id,
                 'waste_category': WasteCategory.objects.first().id,
-                'allowed_materials': [c.id for c in WasteComponent.objects.all()],
+                'allowed_materials': [self.allowed_material_1.id, self.allowed_material_2.id],
+                'forbidden_materials': [self.forbidden_material_1.id, self.forbidden_material_2.id],
                 'connection_rate': 0.7,
                 'connection_rate_year': 2020,
                 'frequency': CollectionFrequency.objects.first().id,
@@ -1333,6 +1350,7 @@ class CollectionUpdateViewTestCase(ViewWithPermissionsTestCase):
             'collection_system': self.collection.collection_system.id,
             'waste_category': self.collection.waste_stream.category.id,
             'allowed_materials': [m.id for m in self.collection.waste_stream.allowed_materials.all()],
+            'forbidden_materials': [m.id for m in self.collection.waste_stream.forbidden_materials.all()],
             'connection_rate': 0.7,
             'connection_rate_year': 2020,
             'frequency': self.collection.frequency.id,
@@ -1354,6 +1372,7 @@ class CollectionUpdateViewTestCase(ViewWithPermissionsTestCase):
             'collection_system': self.collection.collection_system.id,
             'waste_category': self.collection.waste_stream.category.id,
             'allowed_materials': [m.id for m in self.collection.waste_stream.allowed_materials.all()],
+            'forbidden_materials': [m.id for m in self.collection.waste_stream.forbidden_materials.all()],
             'connection_rate': 0.7,
             'connection_rate_year': 2020,
             'frequency': self.collection.frequency.id,
@@ -1372,7 +1391,7 @@ class CollectionUpdateViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(WasteFlyer.objects.count(), 2)
 
 
-# ----------- Collection utils ------------------------------------------------------------------------------------------
+# ----------- Collection utils -----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 

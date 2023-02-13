@@ -668,7 +668,8 @@ class CollectionCopyView(CollectionCreateView):
         initial = model_to_dict(self.object)
         initial.update({
             'waste_category': self.object.waste_stream.category.id,
-            'allowed_materials': [mat.id for mat in self.object.waste_stream.allowed_materials.all()]
+            'allowed_materials': [mat.id for mat in self.object.waste_stream.allowed_materials.all()],
+            'forbidden_materials': [mat.id for mat in self.object.waste_stream.forbidden_materials.all()],
         })
         # Prevent the ModelFormMixin from passing the original instance into the ModelForm by removing self.object.
         # That way, a new instance is created, instead.
@@ -714,6 +715,7 @@ class CollectionUpdateView(M2MInlineFormSetMixin, OwnedObjectUpdateView):
         initial.update({
             'waste_category': self.object.waste_stream.category.id,
             'allowed_materials': [mat.id for mat in self.object.waste_stream.allowed_materials.all()],
+            'forbidden_materials': [mat.id for mat in self.object.waste_stream.forbidden_materials.all()],
         })
         return initial
 
@@ -739,7 +741,7 @@ class CollectionModalDeleteView(OwnedObjectModalDeleteView):
     permission_required = 'soilcom.delete_collection'
 
 
-# ----------- Collection utils ------------------------------------------------------------------------------------------
+# ----------- Collection utils -----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 

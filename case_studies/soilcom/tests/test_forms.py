@@ -188,15 +188,20 @@ class CollectionModelFormTestCase(TestCase):
         cls.collection_system = CollectionSystem.objects.create(name='System')
         cls.waste_category = WasteCategory.objects.create(name='Category')
         cls.material_group = MaterialCategory.objects.create(name='Biowaste component')
-        cls.material1 = WasteComponent.objects.create(name='Material 1')
-        cls.material1.categories.add(cls.material_group)
-        cls.material2 = WasteComponent.objects.create(name='Material 2')
-        cls.material2.categories.add(cls.material_group)
+        cls.allowed_material_1 = WasteComponent.objects.create(name='Allowed Material 1')
+        cls.allowed_material_1.categories.add(cls.material_group)
+        cls.allowed_material_2 = WasteComponent.objects.create(name='Allowed Material 2')
+        cls.allowed_material_2.categories.add(cls.material_group)
+        cls.forbidden_material_1 = WasteComponent.objects.create(name='Forbidden Material 1')
+        cls.forbidden_material_1.categories.add(cls.material_group)
+        cls.forbidden_material_2 = WasteComponent.objects.create(name='Forbidden Material 2')
+        cls.forbidden_material_2.categories.add(cls.material_group)
         cls.frequency = CollectionFrequency.objects.create(name='fix')
         waste_stream = WasteStream.objects.create(
             category=cls.waste_category,
         )
-        waste_stream.allowed_materials.set([cls.material1, cls.material2])
+        waste_stream.allowed_materials.set([cls.allowed_material_1, cls.allowed_material_2])
+        waste_stream.forbidden_materials.set([cls.forbidden_material_1, cls.forbidden_material_2])
         cls.collection = Collection.objects.create(
             catchment=cls.catchment,
             collector=cls.collector,
@@ -225,7 +230,8 @@ class CollectionModelFormTestCase(TestCase):
             'collector': self.collector.id,
             'collection_system': self.collection_system.id,
             'waste_category': self.waste_category.id,
-            'allowed_materials': [self.material1.id, self.material2.id],
+            'allowed_materials': [self.allowed_material_1.id, self.allowed_material_2.id],
+            'forbidden_materials': [self.forbidden_material_1.id, self.forbidden_material_2.id],
             'connection_rate': 70,
             'connection_rate_year': 2020,
             'frequency': self.frequency.id,
@@ -244,7 +250,8 @@ class CollectionModelFormTestCase(TestCase):
             'collector': self.collector.id,
             'collection_system': self.collection_system.id,
             'waste_category': self.waste_category.id,
-            'allowed_materials': [self.material1.id, self.material2.id],
+            'allowed_materials': [self.allowed_material_1.id, self.allowed_material_2.id],
+            'forbidden_materials': [self.forbidden_material_1.id, self.forbidden_material_2.id],
             'frequency': self.frequency.id,
             'flyer_url': 'https://www.great-test-flyers.com',
             'description': 'This is a test case'
@@ -263,7 +270,8 @@ class CollectionModelFormTestCase(TestCase):
             'collector': self.collector.id,
             'collection_system': self.collection_system.id,
             'waste_category': self.waste_category.id,
-            'allowed_materials': [self.material1.id, self.material2.id],
+            'allowed_materials': [self.allowed_material_1.id, self.allowed_material_2.id],
+            'forbidden_materials': [self.forbidden_material_1.id, self.forbidden_material_2.id],
             'connection_rate': 70,
             'connection_rate_year': 2020,
             'frequency': self.frequency.id,

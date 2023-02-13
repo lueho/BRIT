@@ -261,6 +261,11 @@ class CollectionModelForm(AutoCompleteModelForm):
         queryset=WasteComponent.objects.all(),
         widget=CheckboxSelectMultiple
     )
+    forbidden_materials = ModelMultipleChoiceField(
+        queryset=WasteComponent.objects.all(),
+        widget=CheckboxSelectMultiple,
+        required=False
+    )
     frequency = ModelChoiceField(
         queryset=CollectionFrequency.objects.all(),
         widget=autocomplete.ModelSelect2(url='collectionfrequency-autocomplete'),
@@ -270,7 +275,8 @@ class CollectionModelForm(AutoCompleteModelForm):
     class Meta:
         model = Collection
         fields = ('catchment', 'collector', 'collection_system', 'waste_category', 'allowed_materials',
-                  'connection_rate', 'connection_rate_year', 'frequency', 'fee_system', 'description')
+                  'forbidden_materials', 'connection_rate', 'connection_rate_year', 'frequency', 'fee_system',
+                  'description')
         labels = {
             'description': 'Comments',
             'connection_rate': 'Connection rate [%]',
@@ -299,6 +305,7 @@ class CollectionModelForm(AutoCompleteModelForm):
             ForeignkeyField('collection_system'),
             ForeignkeyField('waste_category'),
             Field('allowed_materials'),
+            Field('forbidden_materials'),
             Row(
                 Column(Field('connection_rate')),
                 Column(Field('connection_rate_year'))
@@ -318,13 +325,21 @@ class CollectionModelForm(AutoCompleteModelForm):
         instance.name = f'{data["catchment"]} {data["waste_category"]} {data["collection_system"]}'
 
         # Associate with a new or existing waste stream
+        allowed_materials = WasteComponent.objects.filter(id__in=data['allowed_materials'])
+        if not allowed_materials.exists():
+            allowed_materials = None
+        forbidden_materials = WasteComponent.objects.filter(id__in=data['forbidden_materials'])
+        if not forbidden_materials.exists():
+            forbidden_materials = None
         waste_stream, created = WasteStream.objects.get_or_create(
             defaults={'owner': instance.owner},
             category=data["waste_category"],
-            allowed_materials=WasteComponent.objects.filter(id__in=data['allowed_materials'])
+            allowed_materials=allowed_materials,
+            forbidden_materials=forbidden_materials
         )
         if created:
             waste_stream.allowed_materials.add(*data['allowed_materials'])
+            waste_stream.forbidden_materials.add(*data['forbidden_materials'])
         waste_stream.save()
         instance.waste_stream = waste_stream
 
