@@ -21,7 +21,6 @@ from bibliography.views import (SourceCheckUrlView, SourceCreateView, SourceModa
 from maps.forms import NutsAndLauCatchmentQueryForm
 from maps.views import CatchmentDetailView, GeoDataSetDetailView, GeoDataSetFormMixin, GeoDataSetMixin
 from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineFormSetMixin
-from utils.models import Property
 from utils.views import (BRITFilterView, OwnedObjectCreateView, OwnedObjectDetailView, OwnedObjectListView,
                          OwnedObjectModalCreateView, OwnedObjectModalDeleteView, OwnedObjectModalDetailView,
                          OwnedObjectModalUpdateView, OwnedObjectModelSelectOptionsView, OwnedObjectUpdateView)
@@ -223,7 +222,7 @@ class WasteCategoryModalDeleteView(OwnedObjectModalDeleteView):
     permission_required = 'soilcom.delete_wastecategory'
 
 
-# ----------- Waste Component CRUD -------------------------------------------------------------------------------
+# ----------- Waste Component CRUD -------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 class WasteComponentListView(OwnedObjectListView):
@@ -582,7 +581,7 @@ class CollectionPropertyValueModalDeleteView(OwnedObjectModalDeleteView):
         return reverse('collection-detail', kwargs={'pk': self.object.collection.pk})
 
 
-# ----------- AggregatedCollectionPropertyValue CRUD -----------------------------------------------------------------------------
+# ----------- AggregatedCollectionPropertyValue CRUD -------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 
@@ -757,11 +756,6 @@ class CollectionAddPropertyValueView(CollectionPropertyValueCreateView):
 
     def get_initial(self):
         initial = super().get_initial()
-        prop, _ = Property.objects.get_or_create(
-            name='specific waste collected',
-            defaults={'unit': 'kg/(cap.*a)'}
-        )
-        initial['property'] = prop.pk
         initial['collection'] = self.kwargs['pk']
         return initial
 
@@ -775,11 +769,6 @@ class CollectionCatchmentAddAggregatedPropertyView(AggregatedCollectionPropertyV
         initial = super().get_initial()
         catchment = CollectionCatchment.objects.get(pk=self.kwargs.get('pk'))
         initial['collections'] = catchment.downstream_collections
-        prop, _ = Property.objects.get_or_create(
-            name='specific waste collected',
-            defaults={'unit': 'kg/(cap.*a)'}
-        )
-        initial['property'] = prop
         return initial
 
 

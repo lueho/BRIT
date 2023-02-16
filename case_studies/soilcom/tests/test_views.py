@@ -1445,7 +1445,7 @@ class CollectionAddPropertyValueViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('collection-add-property', kwargs={'pk': self.collection.pk}))
         self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
-    def test_get_initial_has_collection_and_property(self):
+    def test_get_initial_has_collection(self):
         request = RequestFactory().get(reverse('collection-add-property', kwargs={'pk': self.collection.id}))
         view = views.CollectionAddPropertyValueView()
         view.setup(request)
@@ -1453,7 +1453,6 @@ class CollectionAddPropertyValueViewTestCase(ViewWithPermissionsTestCase):
         initial = view.get_initial()
         expected = {
             'collection': self.collection.pk,
-            'property': Property.objects.get(name='specific waste collected').pk
         }
         self.assertDictEqual(expected, initial)
 
@@ -1513,7 +1512,7 @@ class CollectionAddAggregatedPropertyValueViewTestCase(ViewWithPermissionsTestCa
             reverse('collectioncatchment-add-aggregatedpropertyvalue', kwargs={'pk': self.catchment.pk}))
         self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
-    def test_get_initial_has_collections_and_property(self):
+    def test_get_initial_has_collections(self):
         request = RequestFactory().get(
             reverse('collectioncatchment-add-aggregatedpropertyvalue', kwargs={'pk': self.catchment.id}))
         view = views.CollectionCatchmentAddAggregatedPropertyView()
@@ -1522,12 +1521,9 @@ class CollectionAddAggregatedPropertyValueViewTestCase(ViewWithPermissionsTestCa
         initial = view.get_initial()
         expected = {
             'collections': self.catchment.downstream_collections,
-            'property': Property.objects.get(name='specific waste collected')
         }
         self.assertIn('collections', initial)
-        self.assertIn('property', initial)
         self.assertQuerysetEqual(expected['collections'].order_by('id'), initial['collections'].order_by('id'))
-        self.assertEqual(expected['property'], initial['property'])
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(
