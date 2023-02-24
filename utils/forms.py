@@ -5,7 +5,25 @@ from django.core.exceptions import ImproperlyConfigured
 from django.forms import BaseFormSet, BaseModelFormSet, Form, formset_factory, ModelForm, modelformset_factory
 
 
-class NoFormTagMixin:
+class FormHelperMixin:
+    """
+    Makes it possible to provide the 'helper_class' attribute to the form's class Meta. The form will automatically
+    use the provided class is the helper attribute is accessed.
+    """
+
+    helper = None
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if not isinstance(self.helper, FormHelper):
+            if hasattr(self, 'Meta'):
+                if hasattr(self.Meta, 'helper_class'):
+                    self.helper = self.Meta.helper_class()
+                    return self.helper
+            self.helper = FormHelper()
+
+
+class NoFormTagMixin(FormHelperMixin):
     """
     Removes the form tag without blocking the helper property in subclasses of the respective forms. I.e. helpers
     can be added to subclassed forms without the need to super any helper from the base class. Form tags must
@@ -14,10 +32,6 @@ class NoFormTagMixin:
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
-        if not hasattr(self, 'helper'):
-            self.helper = FormHelper()
-
         self.helper.form_tag = False
 
 
@@ -68,9 +82,6 @@ class AutoCompleteMixin:
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-
-        if not hasattr(self, 'helper'):
-            self.helper = FormHelper()
 
         # django-crispy-forms and django-autocomplete-light conflict in the order JQuery needs to be loaded.
         # Suppressing media inclusion here and explicitly adding {{ form.media }} in the template solves this.
@@ -202,7 +213,6 @@ class M2MInlineModelFormSet(BaseModelFormSet):
         self.parent_object = kwargs.pop('parent_object', None)
         self.relation_field_name = kwargs.pop('relation_field_name', None)
         super().__init__(*args, **kwargs)
-
 
 
 class M2MInlineModelFormSetMixin:
