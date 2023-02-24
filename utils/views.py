@@ -9,7 +9,8 @@ from django_filters.views import FilterView
 from django_tables2 import table_factory
 
 from users.models import get_default_owner
-from utils.tables import StandardItemTable, UserItemTable
+from .models import Property
+from .tables import StandardItemTable, UserItemTable
 
 
 class NextOrSuccessUrlMixin:
@@ -213,6 +214,7 @@ class ModelSelectOptionsView(ListView):
     model = None
     template_name = 'html_select_element_options.html'
     object_list = None
+    include_empty_option = True
     selected_object = None
 
     def get_selected_object(self):
@@ -240,7 +242,10 @@ class ModelSelectOptionsView(ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update({'selected': self.get_selected_object_pk()})
+        context.update({
+            'include_empty_option': self.include_empty_option,
+            'selected': self.get_selected_object_pk()
+        })
         return context
 
     def get(self, request, *args, **kwargs):
@@ -256,3 +261,16 @@ class ModelSelectOptionsView(ListView):
 
 class OwnedObjectModelSelectOptionsView(PermissionRequiredMixin, ModelSelectOptionsView):
     pass
+
+
+class PropertyUnitOptionsView(OwnedObjectModelSelectOptionsView):
+    model = Property
+    include_empty_option = False
+    permission_required = set()
+
+    def get_selected_object(self):
+        return self.object_list.first()
+
+    def get_queryset(self):
+        obj = self.model.objects.get(id=self.kwargs.get('pk'))
+        return obj.allowed_units.all()

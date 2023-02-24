@@ -15,6 +15,7 @@ admin.site.enable_nav_sidebar = False
 urlpatterns = [
     path('', RedirectView.as_view(url='/home'), name='entry'),
     path('__debug__/', include(debug_toolbar.urls)),
+    path('utils/', include('utils.urls')),
     path('home/', HomeView.as_view(), name='home'),
     path('admin/', admin.site.urls),
     path('users/', include('users.urls')),
