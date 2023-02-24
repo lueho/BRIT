@@ -1,4 +1,4 @@
-from django.forms import formset_factory, modelformset_factory
+from django.forms import formset_factory
 from django.test import TestCase
 
 from distributions.models import TemporalDistribution, Timestep

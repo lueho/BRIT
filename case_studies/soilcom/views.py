@@ -557,6 +557,7 @@ class FrequencyAutoCompleteView(Select2QuerySetView):
 
 
 class CollectionPropertyValueCreateView(OwnedObjectCreateView):
+    model = CollectionPropertyValue
     form_class = CollectionPropertyValueModelForm
     permission_required = 'soilcom.add_collectionpropertyvalue'
 
@@ -586,6 +587,7 @@ class CollectionPropertyValueModalDeleteView(OwnedObjectModalDeleteView):
 
 
 class AggregatedCollectionPropertyValueCreateView(OwnedObjectCreateView):
+    template_name = 'soilcom/collectionpropertyvalue_form.html'
     form_class = AggregatedCollectionPropertyValueModelForm
     permission_required = 'soilcom.add_aggregatedcollectionpropertyvalue'
 
@@ -596,6 +598,7 @@ class AggregatedCollectionPropertyValueDetailView(OwnedObjectDetailView):
 
 
 class AggregatedCollectionPropertyValueUpdateView(OwnedObjectUpdateView):
+    template_name = 'soilcom/collectionpropertyvalue_form.html'
     model = AggregatedCollectionPropertyValue
     form_class = AggregatedCollectionPropertyValueModelForm
     permission_required = 'soilcom.change_aggregatedcollectionpropertyvalue'

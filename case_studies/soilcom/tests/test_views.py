@@ -11,7 +11,7 @@ from mock import Mock, patch
 from distributions.models import TemporalDistribution, Timestep
 from maps.models import Region
 from materials.models import Material, MaterialCategory, Sample, SampleSeries
-from utils.models import Property
+from utils.models import Property, Unit
 from utils.tests.testcases import ViewWithPermissionsTestCase
 from .. import views
 from ..forms import BaseWasteFlyerUrlFormSet, CollectionModelForm
@@ -193,7 +193,8 @@ class CollectionFrequencyUpdateViewTestCase(ViewWithPermissionsTestCase):
             last_timestep=cls.december
         )
         cls.frequency = CollectionFrequency.objects.create(name='Test Frequency', type='Fixed')
-        cls.options_1 = CollectionCountOptions.objects.create(frequency=cls.frequency, season=season_1, standard=100, option_1=150)
+        cls.options_1 = CollectionCountOptions.objects.create(frequency=cls.frequency, season=season_1, standard=100,
+                                                              option_1=150)
         cls.options_2 = CollectionCountOptions.objects.create(frequency=cls.frequency, season=season_2, standard=150)
 
     def test_get_http_302_redirect_for_anonymous(self):
@@ -417,7 +418,7 @@ class CollectionFrequencyModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 302)
 
 
-# ----------- CollectionPropertyValue CRUD --------------------------------------------------------------------------------
+# ----------- CollectionPropertyValue CRUD -----------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 
@@ -428,7 +429,9 @@ class CollectionPropertyValueCreateViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.collection = Collection.objects.create(name='Test Collection')
-        cls.prop = Property.objects.create(name='Test Property', unit='Test Unit')
+        cls.unit = Unit.objects.create(name='Test Unit')
+        cls.prop = Property.objects.create(name='Test Property')
+        cls.prop.allowed_units.add(cls.unit)
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(reverse('collectionpropertyvalue-create'))
@@ -463,6 +466,7 @@ class CollectionPropertyValueCreateViewTestCase(ViewWithPermissionsTestCase):
         data = {
             'collection': self.collection.pk,
             'property': self.prop.pk,
+            'unit': self.unit.pk,
             'year': 2022,
             'average': 123.5,
             'standard_deviation': 12.6
@@ -478,10 +482,12 @@ class CollectionPropertyValueDetailViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         collection = Collection.objects.create(name='Test Collection')
-        prop = Property.objects.create(name='Test Property', unit='Test Unit')
+        cls.unit = Unit.objects.create(name='Test unit')
+        prop = Property.objects.create(name='Test Property')
         cls.val = CollectionPropertyValue.objects.create(
             collection=collection,
             property=prop,
+            unit=cls.unit,
             average=123.5,
             standard_deviation=12.54
         )
@@ -515,10 +521,13 @@ class CollectionPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.collection = Collection.objects.create(name='Test Collection')
-        cls.prop = Property.objects.create(name='Test Property', unit='Test Unit')
+        cls.unit = Unit.objects.create(name='Test Unit')
+        cls.prop = Property.objects.create(name='Test Property')
+        cls.prop.allowed_units.add(cls.unit)
         cls.val = CollectionPropertyValue.objects.create(
             collection=cls.collection,
             property=cls.prop,
+            unit=cls.unit,
             average=123.5,
             standard_deviation=12.54
         )
@@ -556,6 +565,7 @@ class CollectionPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
         data = {
             'collection': self.collection.pk,
             'property': self.prop.pk,
+            'unit': self.unit.pk,
             'year': 2022,
             'average': 123.5,
             'standard_deviation': 32.2
@@ -615,7 +625,7 @@ class CollectionPropertyValueModalDeleteViewTestCase(ViewWithPermissionsTestCase
         self.assertEqual(response.status_code, 302)
 
 
-# ----------- AggregatedCollectionPropertyValue CRUD --------------------------------------------------------------------------------
+# ----------- AggregatedCollectionPropertyValue CRUD -------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 
@@ -627,7 +637,9 @@ class AggregatedCollectionPropertyValueCreateViewTestCase(ViewWithPermissionsTes
         super().setUpTestData()
         Collection.objects.create(name='Test Collection 1')
         Collection.objects.create(name='Test Collection 2')
-        cls.prop = Property.objects.create(name='Test Property', unit='Test Unit')
+        cls.unit = Unit.objects.create(name='Test Unit')
+        cls.prop = Property.objects.create(name='Test Property')
+        cls.prop.allowed_units.add(cls.unit)
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(reverse('aggregatedcollectionpropertyvalue-create'))
@@ -662,6 +674,7 @@ class AggregatedCollectionPropertyValueCreateViewTestCase(ViewWithPermissionsTes
         data = {
             'collections': [collection.pk for collection in Collection.objects.all()],
             'property': self.prop.pk,
+            'unit': self.unit.pk,
             'year': 2022,
             'average': 123.5,
             'standard_deviation': 12.6
@@ -716,9 +729,12 @@ class AggregatedCollectionPropertyValueUpdateViewTestCase(ViewWithPermissionsTes
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.prop = Property.objects.create(name='Test Property', unit='Test Unit')
+        cls.unit = Unit.objects.create(name='Test Unit')
+        cls.prop = Property.objects.create(name='Test Property')
+        cls.prop.allowed_units.add(cls.unit)
         cls.val = AggregatedCollectionPropertyValue.objects.create(
             property=cls.prop,
+            unit=cls.unit,
             average=123.5,
             standard_deviation=12.54
         )
@@ -758,6 +774,7 @@ class AggregatedCollectionPropertyValueUpdateViewTestCase(ViewWithPermissionsTes
         data = {
             'collections': [self.val.collections.first().pk],
             'property': self.prop.pk,
+            'unit': self.unit.pk,
             'year': 2022,
             'average': 555,
             'standard_deviation': 32.2
@@ -1424,7 +1441,9 @@ class CollectionAddPropertyValueViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.collection = Collection.objects.create(name='Test Collection')
-        cls.prop = Property.objects.create(name='Test Property', unit='Test Unit')
+        cls.unit = Unit.objects.create(name='Test Unit')
+        cls.prop = Property.objects.create(name='Test Property')
+        cls.prop.allowed_units.add(cls.unit)
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(reverse('collection-add-property', kwargs={'pk': self.collection.pk}))
@@ -1470,6 +1489,7 @@ class CollectionAddPropertyValueViewTestCase(ViewWithPermissionsTestCase):
         data = {
             'collection': self.collection.pk,
             'property': self.prop.pk,
+            'unit': self.unit.pk,
             'year': 2022,
             'average': 123.5,
             'standard_deviation': 12.6
@@ -1487,7 +1507,9 @@ class CollectionAddAggregatedPropertyValueViewTestCase(ViewWithPermissionsTestCa
         cls.catchment = CollectionCatchment.objects.create()
         Collection.objects.create(catchment=CollectionCatchment.objects.create(parent=cls.catchment))
         Collection.objects.create(catchment=CollectionCatchment.objects.create(parent=cls.catchment))
-        cls.prop = Property.objects.create(name='Test Property', unit='Test Unit')
+        cls.unit = Unit.objects.create(name='Test Unit')
+        cls.prop = Property.objects.create(name='Test Property')
+        cls.prop.allowed_units.add(cls.unit)
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(
@@ -1541,6 +1563,7 @@ class CollectionAddAggregatedPropertyValueViewTestCase(ViewWithPermissionsTestCa
         data = {
             'collections': [collection.pk for collection in self.catchment.downstream_collections],
             'property': self.prop.pk,
+            'unit': self.unit.pk,
             'year': 2022,
             'average': 123.5,
             'standard_deviation': 12.6

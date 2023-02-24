@@ -217,27 +217,21 @@ class BaseWasteFlyerUrlFormSet(M2MInlineFormSet):
 
 
 class CollectionPropertyValueModelForm(AutoCompleteModelForm):
-    collection = ModelChoiceField(
-        queryset=Collection.objects.all(),
-        widget=autocomplete.ModelSelect2(url='collection-autocomplete'),
-        required=True
-    )
-
     class Meta:
         model = CollectionPropertyValue
-        fields = ('collection', 'property', 'year', 'average', 'standard_deviation')
+        fields = ('collection', 'property', 'unit', 'year', 'average', 'standard_deviation')
+        widgets = {
+            'collection': autocomplete.ModelSelect2(url='collection-autocomplete'),
+        }
 
 
 class AggregatedCollectionPropertyValueModelForm(AutoCompleteModelForm):
-    collections = ModelMultipleChoiceField(
-        queryset=Collection.objects.all(),
-        widget=autocomplete.ModelSelect2Multiple(url='collection-autocomplete'),
-        required=True
-    )
-
     class Meta:
         model = AggregatedCollectionPropertyValue
-        fields = ('collections', 'property', 'year', 'average', 'standard_deviation')
+        fields = ('collections', 'property', 'unit', 'year', 'average', 'standard_deviation')
+        widgets = {
+            'collections': autocomplete.ModelSelect2Multiple(url='collection-autocomplete')
+        }
 
 
 class CollectionModelForm(AutoCompleteModelForm):

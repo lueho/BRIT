@@ -1,0 +1,28 @@
+{% extends 'simple_form_card.html' %}
+
+{% block javascript %}
+    {{ block.super }}
+    <script type="text/javascript">
+        async function fetchUnitOptions(propertyId) {
+            const select_unit = document.querySelector('#id_unit');
+            if (propertyId === '') {
+                select_unit.innerHTML = '<option value="" selected="">---------</option>';
+            } else {
+                const url = "{% url 'property-unit-options' pk=0 %}".replace('0', propertyId);
+            const response = await fetch(url);
+            const json = await response.json();
+            select_unit.innerHTML = json.options;
+            }
+        }
+
+        const changedPropertySelect = async function(e) {
+            fetchUnitOptions(e.target.value);
+        };
+
+        document.querySelector('#id_property').addEventListener("change", changedPropertySelect);
+        document.addEventListener('DOMContentLoaded', () => {
+            const propId = document.getElementById('id_property').value;
+            fetchUnitOptions(propId);
+        })
+    </script>
+{% endblock javascript %}
