@@ -1,0 +1,16 @@
+{% extends 'simple_detail_card.html' %}
+
+{% block detail_body %}
+    <p class="card-text"><strong>Name:</strong><br>{{ object.name }}</p>
+    {% if object.allowed_units.exists %}
+        <p class="card-text"><strong>Allowed units:</strong></p>
+        <ul>
+            {% for unit in object.allowed_units.all %}
+                <li>{{ unit.name }}</li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+    {% if object.description %}
+        <p class="card-text"><strong>Description:</strong><br>{{ object.description }}</p>
+    {% endif %}
+{% endblock %}

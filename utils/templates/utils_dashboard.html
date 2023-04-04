@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+
+{% block title %}BRIT | Utils Dashboard{% endblock %}
+
+{% block content %}
+
+    <div class="row">
+        <div class="col col-12 col-md-6">
+            <div class="card shadow h-100">
+                <div class="card-header"><strong>Utils</strong></div>
+                <div class="card-body">
+                    <p class="card-text">
+                        This is the utils dashboard. Here you can manage database entries that are basic and common to
+                        all other parts of the tool.
+                    </p>
+                </div>
+                <div class="card-footer">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header">
+                    <a href="{% url 'unit-list' %}" class="stretched-link"><strong>Units</strong></a>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Units for any physical, chemical or other properties.
+                    </p>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'unit-list' %}" class="btn btn-primary">View Units</a>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header">
+                    <a href="{% url 'property-list' %}" class="stretched-link"><strong>Properties</strong></a>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Properties are one of the basic building blocks of the tool. They are used to describe items of
+                        any type and help compare items from different modules of the tool.
+                    </p>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'property-list' %}" class="btn btn-primary">View Properties</a>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock content %}

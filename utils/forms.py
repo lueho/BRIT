@@ -4,6 +4,8 @@ from dal_select2.widgets import Select2WidgetMixin
 from django.core.exceptions import ImproperlyConfigured
 from django.forms import BaseFormSet, BaseModelFormSet, Form, formset_factory, ModelForm, modelformset_factory
 
+from .models import Property, Unit
+
 
 class FormHelperMixin:
     """
@@ -265,3 +267,15 @@ class M2MInlineModelFormSetMixin:
             kwargs['formset'] = self.get_formset()
             kwargs['formset_helper'] = self.get_formset_helper_class()()
         return super().get_context_data(**kwargs)
+
+
+class UnitModelForm(SimpleModelForm):
+    class Meta:
+        model = Unit
+        fields = ['name', 'dimensionless', 'reference_quantity', 'description']
+
+
+class PropertyModelForm(SimpleModelForm):
+    class Meta:
+        model = Property
+        fields = ['name', 'allowed_units', 'description']
