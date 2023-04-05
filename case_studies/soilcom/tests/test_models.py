@@ -160,6 +160,25 @@ class WasteStreamQuerysetTestCase(TestCase):
         self.assertIsInstance(instance, WasteStream)
         self.assertDictEqual(comparable_model_dict(instance), comparable_model_dict(self.waste_stream))
 
+    def test_get_or_create_finds_existing_waste_stream_with_empty_queryset_of_allowed_materials(self):
+        allowed_materials = Material.objects.none()
+        forbidden_materials = Material.objects.filter(id__in=[self.forbidden_material_1.id, self.forbidden_material_2.id])
+        created_instance, created = WasteStream.objects.get_or_create(
+            category=self.category,
+            allowed_materials=allowed_materials,
+            forbidden_materials=forbidden_materials
+        )
+        self.assertTrue(created)
+        self.assertFalse(created_instance.allowed_materials.exists())
+        found_instance, created = WasteStream.objects.get_or_create(
+            category=self.category,
+            allowed_materials=allowed_materials,
+            forbidden_materials=forbidden_materials
+        )
+        self.assertFalse(created)
+        self.assertIsInstance(found_instance, WasteStream)
+        self.assertDictEqual(comparable_model_dict(found_instance), comparable_model_dict(created_instance))
+
     def test_get_or_create_creates_new_wastestream_if_combination_of_allowed_materials_doesnt_exist(self):
         allowed_materials = Material.objects.filter(
             id__in=[self.allowed_material_1.id, self.allowed_material_2.id, self.unrelated_material.id]

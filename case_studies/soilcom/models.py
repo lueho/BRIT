@@ -78,13 +78,7 @@ def add_material_category(sender, instance, created, **kwargs):
 class WasteStreamQuerySet(models.query.QuerySet):
 
     def match_allowed_materials(self, allowed_materials):
-        """
-        Returns a queryset of all waste streams that match the given combination of allowed_materials
-        :param allowed_materials: Queryset
-        :return: Queryset
-        """
-
-        if allowed_materials:
+        if allowed_materials is not None and allowed_materials.exists():
             return self.alias(
                 allowed_materials_count=models.Count('allowed_materials', distinct=True),
                 allowed_materials_matches=models.Count('allowed_materials',
@@ -94,16 +88,13 @@ class WasteStreamQuerySet(models.query.QuerySet):
                 allowed_materials_count=len(allowed_materials),
                 allowed_materials_matches=len(allowed_materials)
             )
+        elif allowed_materials is not None:
+            return self.filter(allowed_materials__isnull=True)
         else:
             return self
 
     def match_forbidden_materials(self, forbidden_materials):
-        """
-        Returns a queryset of all waste streams that match the given combination of forbidden_materials
-        :param forbidden_materials: Queryset
-        :return: Queryset
-        """
-        if forbidden_materials:
+        if forbidden_materials and forbidden_materials.exists():
             return self.alias(
                 forbidden_materials_count=models.Count('forbidden_materials', distinct=True),
                 forbidden_materials_matches=models.Count('forbidden_materials',
@@ -113,15 +104,20 @@ class WasteStreamQuerySet(models.query.QuerySet):
                 forbidden_materials_count=len(forbidden_materials),
                 forbidden_materials_matches=len(forbidden_materials)
             )
+        elif forbidden_materials is not None:
+            return self.filter(forbidden_materials__isnull=True)
         else:
             return self
 
     def get_or_create(self, defaults=None, **kwargs):
         """
         Customizes the regular get_or_create to incorporate comparison of many-to-many relationships of
-        allowed_materials. I.e. a queryset of allowed_materials can be passed to this method to get a waste stream
-        with exactly that combination of allowed materials. Each possible combination can only appear once in the
-        database.
+        allowed_materials and forbidden_materials. A queryset of allowed_materials and forbidden_materials can be
+        passed to this method to get a waste stream with exactly that combination of materials.
+        Each possible combination can only appear once in the database.
+        :param defaults: dict
+        :param kwargs: dict
+        :return: tuple (WasteStream instance, bool)
         """
 
         if defaults:
@@ -158,10 +154,13 @@ class WasteStreamQuerySet(models.query.QuerySet):
 
     def update_or_create(self, defaults=None, **kwargs):
         """
-        Updates one object that matches the given kwargs on the fields given in defaults. In comparison to the
-        conventional update_or_create, this method enforces that every combination of allowed materials and category
-        only exists uniquely in the database.
-
+        Customizes the regular update_or_create to incorporate comparison of many-to-many relationships of
+        allowed_materials and forbidden_materials. A queryset of allowed_materials and forbidden_materials can be
+        passed to this method to get a waste stream with exactly that combination of materials.
+        Each possible combination can only appear once in the database.
+        :param defaults: dict
+        :param kwargs: dict
+        :return: tuple (WasteStream instance, bool)
         """
 
         if defaults:
@@ -222,6 +221,8 @@ class WasteStreamManager(models.Manager):
 
 
 class WasteStream(NamedUserObjectModel):
+    """Describes Waste Streams that are collected in Collections. This model is managed automatically by
+    the Collection model. Instances of this model must not be created, edited or deleted manually."""
     category = models.ForeignKey(WasteCategory, on_delete=models.PROTECT)
     allowed_materials = models.ManyToManyField(Material, related_name='allowed_in_waste_streams')
     forbidden_materials = models.ManyToManyField(Material, related_name='forbidden_in_waste_streams')
@@ -376,6 +377,12 @@ class Collection(NamedUserObjectModel):
 @receiver(pre_save, sender=Collection)
 def name_collection(sender, instance, **kwargs):
     instance.name = instance.construct_name()
+
+
+@receiver(post_save, sender=Collection)
+def delete_unused_waste_streams(sender, instance, created, **kwargs):
+    """Deletes all unused waste streams."""
+    WasteStream.objects.filter(collections__isnull=True).delete()
 
 
 @receiver(post_save, sender=WasteStream)

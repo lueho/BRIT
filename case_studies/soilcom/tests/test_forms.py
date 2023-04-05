@@ -221,7 +221,6 @@ class CollectionModelFormTestCase(TestCase):
         self.assertEqual(form.errors['catchment'][0], 'This field is required.')
         self.assertEqual(form.errors['collection_system'][0], 'This field is required.')
         self.assertEqual(form.errors['waste_category'][0], 'This field is required.')
-        self.assertEqual(form.errors['allowed_materials'][0], 'This field is required.')
         self.assertEqual('Year needs to be in YYYY format.', form.errors['connection_rate_year'][0])
 
     def test_waste_stream_get_or_create_on_save(self):

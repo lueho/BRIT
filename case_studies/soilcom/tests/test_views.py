@@ -7,6 +7,7 @@ from django.http.request import MultiValueDict, QueryDict
 from django.test import RequestFactory, tag
 from django.urls import reverse
 from mock import Mock, patch
+from urllib.parse import urlencode
 
 from distributions.models import TemporalDistribution, Timestep
 from maps.models import Region
@@ -855,7 +856,7 @@ class AggregatedCollectionPropertyValueModalDeleteViewTestCase(ViewWithPermissio
 
 
 class CollectionCreateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'add_collection'
+    member_permissions = ['add_collection', 'view_collection']
 
     @classmethod
     def setUpTestData(cls):
@@ -949,7 +950,6 @@ class CollectionCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertTrue(error_msg in response.context['form'].errors['collector'])
         self.assertTrue(error_msg in response.context['form'].errors['collection_system'])
         self.assertTrue(error_msg in response.context['form'].errors['waste_category'])
-        self.assertTrue(error_msg in response.context['form'].errors['allowed_materials'])
         self.assertTrue('Year needs to be in YYYY format.' in response.context['form'].errors['connection_rate_year'])
 
     def test_post_with_valid_form_data(self):
@@ -978,6 +978,37 @@ class CollectionCreateViewTestCase(ViewWithPermissionsTestCase):
         )
         self.assertEqual(response.status_code, 302)
         self.assertEqual(Collection.objects.count(), 2)
+
+    def test_post_with_unspecified_allowed_materials_creates_generic_waste_stream(self):
+        self.assertEqual(Collection.objects.count(), 1)
+        self.client.force_login(self.member)
+        data = {
+                'catchment': CollectionCatchment.objects.first().id,
+                'collector': Collector.objects.first().id,
+                'collection_system': CollectionSystem.objects.first().id,
+                'waste_category': WasteCategory.objects.first().id,
+                'allowed_materials': [],
+                'forbidden_materials': [self.forbidden_material_1.id, self.forbidden_material_2.id],
+                'connection_rate': 0.7,
+                'connection_rate_year': 2020,
+                'frequency': CollectionFrequency.objects.first().id,
+                'description': 'This is a test case that should pass!',
+                'form-INITIAL_FORMS': '0',
+                'form-TOTAL_FORMS': '2',
+                'form-0-url': 'https://www.test-flyer.org',
+                'form-0-id': '',
+                'form-1-url': '',
+                'form-1-id': ''
+            }
+        response = self.client.post(
+            reverse('collection-create'),
+            data=data,
+            follow=True
+        )
+        self.assertEqual(Collection.objects.count(), 2)
+        new_collection = Collection.objects.get(description=data['description'])
+        self.assertRedirects(response, reverse('collection-detail', kwargs={'pk': new_collection.pk}))
+        self.assertFalse(new_collection.waste_stream.allowed_materials.exists())
 
 
 class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
@@ -1327,7 +1358,6 @@ class CollectionUpdateViewTestCase(ViewWithPermissionsTestCase):
         self.assertTrue(error_msg in response.context['form'].errors['collector'])
         self.assertTrue(error_msg in response.context['form'].errors['collection_system'])
         self.assertTrue(error_msg in response.context['form'].errors['waste_category'])
-        self.assertTrue(error_msg in response.context['form'].errors['allowed_materials'])
         self.assertTrue('Year needs to be in YYYY format.' in response.context['form'].errors['connection_rate_year'])
 
     def test_post_with_valid_form_data(self):
@@ -1341,6 +1371,27 @@ class CollectionUpdateViewTestCase(ViewWithPermissionsTestCase):
                 'waste_category': WasteCategory.objects.first().id,
                 'allowed_materials': [self.allowed_material_1.id, self.allowed_material_2.id],
                 'forbidden_materials': [self.forbidden_material_1.id, self.forbidden_material_2.id],
+                'connection_rate': 0.7,
+                'connection_rate_year': 2020,
+                'frequency': CollectionFrequency.objects.first().id,
+                'description': 'This is a test case that should pass!',
+                'form-INITIAL_FORMS': '0',
+                'form-TOTAL_FORMS': '2',
+                'form-0-url': 'https://www.test-flyer.org',
+            }
+        )
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_without_allowed_materials(self):
+        self.client.force_login(self.member)
+        response = self.client.post(
+            reverse('collection-update', kwargs={'pk': self.collection.id}),
+            data={
+                'catchment': CollectionCatchment.objects.first().id,
+                'collector': Collector.objects.first().id,
+                'collection_system': CollectionSystem.objects.first().id,
+                'waste_category': WasteCategory.objects.first().id,
+                'allowed_materials': [self.allowed_material_1.id, self.allowed_material_2.id],
                 'connection_rate': 0.7,
                 'connection_rate_year': 2020,
                 'frequency': CollectionFrequency.objects.first().id,
@@ -1918,3 +1969,31 @@ class WasteFlyerListCheckUrlsView(ViewWithPermissionsTestCase):
         url = reverse('wasteflyer-list-check-urls') + '?' + qdict.urlencode()
         response = self.client.get(url)
         self.assertEqual(200, response.status_code)
+
+
+# ----------- Collection CRUD ------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+class CollectionListViewTestCase(ViewWithPermissionsTestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        for i in range(1, 12):
+            Collection.objects.create(name=f'Test Collection {i}')
+
+    def test_get_http_200_ok_for_anonymous(self):
+        response = self.client.get(reverse('collection-list'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_get_http_200_ok_for_logged_in_users(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('collection-list'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_pagination_works_without_further_query_parameters(self):
+        url = reverse('collection-list')
+        query_params = urlencode({'page': 2})
+        response = self.client.get(f'{url}?{query_params}')
+        self.assertEqual(response.status_code, 200)
+
