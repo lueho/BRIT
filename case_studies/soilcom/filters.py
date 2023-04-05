@@ -11,13 +11,13 @@ from django_filters import (BooleanFilter, CharFilter, ChoiceFilter, DateFilter,
                             RangeFilter)
 
 from utils.crispy_fields import FilterAccordionGroup, RangeSliderField
-from utils.filters import AutocompleteFilterSet, SimpleFilterSet
+from utils.filters import BaseCrispyFilterSet, CrispyAutocompleteFilterSet
 from utils.widgets import PercentageRangeSlider, RangeSlider
 from .models import (Collection, CollectionCatchment, CollectionCountOptions, CollectionFrequency,
                      CollectionPropertyValue, Collector, WasteCategory, WasteComponent, WasteFlyer, )
 
 
-class CollectorFilter(SimpleFilterSet):
+class CollectorFilter(BaseCrispyFilterSet):
     name = CharFilter(lookup_expr='icontains')
     catchment = CharFilter(lookup_expr='name__icontains', label='Catchment name contains')
 
@@ -98,7 +98,7 @@ class SpecWasteCollectedFilter(RangeFilter):
         self.extra['widget'] = RangeSlider(attrs={'data-range_min': 0, 'data-range_max': max_value, 'data-step': 1})
 
 
-class CollectionFilter(AutocompleteFilterSet):
+class CollectionFilter(CrispyAutocompleteFilterSet):
     catchment = ModelChoiceFilter(queryset=CollectionCatchment.objects.all(),
                                   widget=autocomplete.ModelSelect2(url='catchment-autocomplete'),
                                   method='catchment_filter')
@@ -269,7 +269,7 @@ class CollectionFilter(AutocompleteFilterSet):
         return qs
 
 
-class WasteFlyerFilter(AutocompleteFilterSet):
+class WasteFlyerFilter(CrispyAutocompleteFilterSet):
     url_valid = BooleanFilter(widget=RadioSelect(choices=((True, 'True'), (False, 'False'))))
     url_checked_before = DateFilter(
         field_name='url_checked',

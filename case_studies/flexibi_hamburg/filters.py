@@ -1,7 +1,7 @@
 from django.forms import CheckboxSelectMultiple
 from django_filters.filters import MultipleChoiceFilter, NumberFilter
 
-from utils.filters import SimpleFilterSet
+from utils.filters import BaseCrispyFilterSet
 from .models import HamburgRoadsideTrees
 
 GATTUNG_CHOICES = (
@@ -22,7 +22,7 @@ BEZIRK_CHOICES = (
 )
 
 
-class TreeFilter(SimpleFilterSet):
+class TreeFilter(BaseCrispyFilterSet):
     gattung_deutsch = MultipleChoiceFilter(widget=CheckboxSelectMultiple, choices=GATTUNG_CHOICES, label='Tree genus',
                                            method='filter_genus')
     bezirk = MultipleChoiceFilter(widget=CheckboxSelectMultiple, choices=BEZIRK_CHOICES, label='City district')

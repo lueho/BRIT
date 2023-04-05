@@ -3,7 +3,8 @@ from dal_select2.widgets import Select2WidgetMixin
 from django_filters import FilterSet
 
 
-class SimpleFilterSet(FilterSet):
+
+class BaseCrispyFilterSet(FilterSet):
 
     def get_form_helper(self):
         if hasattr(self.Meta, 'form_helper'):
@@ -20,7 +21,7 @@ class SimpleFilterSet(FilterSet):
         return form
 
 
-class AutocompleteFilterSet(SimpleFilterSet):
+class CrispyAutocompleteFilterSet(BaseCrispyFilterSet):
 
     @property
     def form(self):

@@ -1,11 +1,11 @@
 from django.db.models import Q
 from django_filters import CharFilter
 
-from utils.filters import SimpleFilterSet
+from utils.filters import BaseCrispyFilterSet
 from .models import Source
 
 
-class SourceFilter(SimpleFilterSet):
+class SourceFilter(BaseCrispyFilterSet):
     abbreviation = CharFilter(lookup_expr='icontains')
     authors = CharFilter(method='author_icontains', label='Author names contain')
     title = CharFilter(lookup_expr='icontains')

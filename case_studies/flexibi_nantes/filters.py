@@ -3,7 +3,7 @@ from crispy_forms.layout import Layout, Row, Field
 from django.forms import CheckboxSelectMultiple, RadioSelect
 from django_filters.filters import MultipleChoiceFilter, BooleanFilter
 
-from utils.filters import SimpleFilterSet
+from utils.filters import BaseCrispyFilterSet
 from .models import NantesGreenhouses
 
 HEATING_CHOICES = (
@@ -48,7 +48,7 @@ class GreenhouseFilterFormHelper(FormHelper):
     )
 
 
-class GreenhouseFilter(SimpleFilterSet):
+class GreenhouseFilter(BaseCrispyFilterSet):
     crops = MultipleChoiceFilter(field_name='culture_1', widget=CheckboxSelectMultiple(), choices=CROP_CHOICES)
     heated = BooleanFilter(widget=RadioSelect(choices=HEATING_CHOICES), label='Heating')
     lighted = BooleanFilter(widget=RadioSelect(choices=LIGHTING_CHOICES), label='Lighting')
