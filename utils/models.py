@@ -8,96 +8,75 @@ from users.models import get_default_owner
 
 
 class CRUDUrlsMixin(models.Model):
+    """
+    Mixin that implements the convention of url pattern for CRUD operations.
+    """
     class Meta:
         abstract = True
+    # Use a class-level format string to avoid code repetition
+    url_format = "{name_lower}-{action}{suffix}"
 
     @classmethod
-    @property
+    def get_url(cls, action, suffix="", **kwargs):
+        """
+        Construct a URL for the given model and action, with optional suffix and kwargs.
+        """
+        try:
+            url_name = cls.url_format.format(
+                name_lower=cls.__name__.lower(),
+                action=action,
+                suffix=suffix,
+            )
+            return reverse(url_name, kwargs=kwargs)
+        except exceptions.NoReverseMatch:
+            return None
+
+    @classmethod
     def list_url(cls):
-        try:
-            return reverse(f'{cls.__name__.lower()}-list')
-        except exceptions.NoReverseMatch:
-            return None
+        return cls.get_url("list")
 
     @classmethod
-    @property
     def modal_list_url(cls):
-        try:
-            return reverse(f'{cls.__name__.lower()}-list-modal')
-        except exceptions.NoReverseMatch:
-            return None
+        return cls.get_url("list", suffix="-modal")
 
     @classmethod
-    @property
     def options_list_url(cls):
-        try:
-            return reverse(f'{cls.__name__.lower()}-options')
-        except exceptions.NoReverseMatch:
-            return None
+        return cls.get_url("options")
 
     @classmethod
-    @property
     def create_url(cls):
-        try:
-            return reverse(f'{cls.__name__.lower()}-create')
-        except exceptions.NoReverseMatch:
-            return None
+        return cls.get_url("create")
 
     @classmethod
-    @property
     def modal_create_url(cls):
-        try:
-            return reverse(f'{cls.__name__.lower()}-create-modal')
-        except exceptions.NoReverseMatch:
-            return None
+        return cls.get_url("create", suffix="-modal")
 
     @property
     def detail_url(self):
-        try:
-            return reverse(f'{self.__class__.__name__.lower()}-detail', kwargs={'pk': self.pk})
-        except exceptions.NoReverseMatch:
-            return None
+        return self.get_url("detail", pk=self.pk)
 
     @property
     def modal_detail_url(self):
-        try:
-            return reverse(f'{self.__class__.__name__.lower()}-detail-modal', kwargs={'pk': self.pk})
-        except exceptions.NoReverseMatch:
-            return None
+        return self.get_url("detail", suffix="-modal", pk=self.pk)
 
     def get_absolute_url(self):
-        try:
-            return reverse(f'{self.__class__.__name__.lower()}-detail', kwargs={'pk': self.pk})
-        except exceptions.NoReverseMatch:
-            return None
+        return self.detail_url
 
     @property
     def update_url(self):
-        try:
-            return reverse(f'{self.__class__.__name__.lower()}-update', kwargs={'pk': self.pk})
-        except exceptions.NoReverseMatch:
-            return None
+        return self.get_url("update", pk=self.pk)
 
     @property
     def modal_update_url(self):
-        try:
-            return reverse(f'{self.__class__.__name__.lower()}-update-modal', kwargs={'pk': self.pk})
-        except exceptions.NoReverseMatch:
-            return None
+        return self.get_url("update", suffix="-modal", pk=self.pk)
 
     @property
     def delete_url(self):
-        try:
-            return reverse(f'{self.__class__.__name__.lower()}-delete', kwargs={'pk': self.pk})
-        except exceptions.NoReverseMatch:
-            return None
+        return self.get_url("delete", pk=self.pk)
 
     @property
     def modal_delete_url(self):
-        try:
-            return reverse(f'{self.__class__.__name__.lower()}-delete-modal', kwargs={'pk': self.pk})
-        except exceptions.NoReverseMatch:
-            return None
+        return self.get_url("delete", suffix="-modal", pk=self.pk)
 
 
 def get_default_owner_pk():
