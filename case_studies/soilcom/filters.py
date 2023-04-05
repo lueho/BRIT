@@ -6,13 +6,11 @@ from crispy_forms.layout import Column, Field, Layout, Row, Submit
 from dal import autocomplete
 from django.db.models import Avg, Count, Max, Q, Sum
 from django.forms import CheckboxInput, CheckboxSelectMultiple, DateInput, RadioSelect
-from django_filters import (BooleanFilter, CharFilter, ChoiceFilter, DateFilter, ModelChoiceFilter,
-                            ModelMultipleChoiceFilter,
-                            RangeFilter)
+from django_filters import (BooleanFilter, CharFilter, DateFilter, ModelChoiceFilter, ModelMultipleChoiceFilter)
 
 from utils.crispy_fields import FilterAccordionGroup, RangeSliderField
-from utils.filters import BaseCrispyFilterSet, CrispyAutocompleteFilterSet
-from utils.widgets import PercentageRangeSlider, RangeSlider
+from utils.filters import (CrispyAutocompleteFilterSet, BaseCrispyFilterSet, NullableRangeFilter)
+from utils.widgets import NullableRangeSliderWidget
 from .models import (Collection, CollectionCatchment, CollectionCountOptions, CollectionFrequency,
                      CollectionPropertyValue, Collector, WasteCategory, WasteComponent, WasteFlyer, )
 
@@ -37,12 +35,6 @@ OPTIONAL_FREQUENCY_CHOICES = (
     (False, 'No options'),
 )
 
-SPEC_WASTE_COLLECTED_FILTER_MODE_CHOICES = (
-    ('average', 'average'),
-    # ('exists', 'exists'),
-    # ('latest', 'latest')
-)
-
 
 class CollectionFilterFormHelper(FormHelper):
     layout = Layout(
@@ -60,14 +52,10 @@ class CollectionFilterFormHelper(FormHelper):
                 'allowed_materials',
                 'forbidden_materials',
                 RangeSliderField('connection_rate'),
-                'connection_rate_include_unknown',
                 Row(Column(Field('seasonal_frequency'), css_class='col-md'),
                     Column(Field('optional_frequency'), css_class='col-md')),
                 RangeSliderField('collections_per_year'),
-                'collections_per_year_include_unknown',
                 RangeSliderField('spec_waste_collected'),
-                'spec_waste_collected_filter_method',
-                'spec_waste_collected_include_unknown',
                 'fee_system',
                 Field('load_features', type='hidden'),
                 Submit('filter', 'Filter', css_id='submit-id-basic-filter', css_class='submit-filter')
@@ -76,7 +64,7 @@ class CollectionFilterFormHelper(FormHelper):
     )
 
 
-class CollectionsPerYearFilter(RangeFilter):
+class CollectionsPerYearFilter(NullableRangeFilter):
 
     def set_min_max(self):
         frequencies = CollectionFrequency.objects.annotate(collection_count=Sum('collectioncountoptions__standard'))
@@ -84,21 +72,85 @@ class CollectionsPerYearFilter(RangeFilter):
             max_value = frequencies.aggregate(Max('collection_count'))['collection_count__max']
         else:
             max_value = 1000
-        self.extra['widget'] = RangeSlider(attrs={'data-range_min': 0, 'data-range_max': max_value, 'data-step': 1})
+        self.extra['widget'] = NullableRangeSliderWidget(attrs={
+                'data-range_min': 0,
+                'data-range_max': max_value,
+                'data-step': 1,
+                'data-is_null': self.default_include_null,
+                'data-unit': ''
+        })
+
+    def filter(self, qs, range_with_null_flag):
+        if not range_with_null_flag:
+            return qs
+        range_vals, is_null = range_with_null_flag
+        frequencies = CollectionFrequency.objects.annotate(collection_count=Sum('collectioncountoptions__standard'))
+        frequencies = frequencies.filter(collection_count__gte=range_vals.start, collection_count__lte=range_vals.stop)
+        if is_null:
+            return qs.filter(Q(frequency__in=frequencies) | Q(frequency__isnull=True))
+        return qs.filter(frequency__in=frequencies)
 
 
-class SpecWasteCollectedFilter(RangeFilter):
+class NullableCollectionPropertyValueRangeFilter(NullableRangeFilter):
+    """Filter for CollectionPropertyValue model. It is used to filter by average value of property."""
+    property_name = None
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.property_name = kwargs.get('property_name', self.property_name)
 
     def set_min_max(self):
-        values = CollectionPropertyValue.objects.filter(property__name='specific waste collected')
-        if values.exists():
-            max_value = math.ceil(values.aggregate(Max('average'))['average__max'])
+        values = CollectionPropertyValue.objects.filter(property__name=self.property_name)
+        if self.range_min is None:
+            self.range_min = self.default_range_min
+        if self.range_max is None:
+            if values.exists():
+                self.range_max = math.ceil(values.aggregate(Max('average'))['average__max'])
+            else:
+                self.range_max = self.default_range_max
+        if self.range_step is None:
+            self.range_step = self.default_range_step
+        self.extra['widget'] = NullableRangeSliderWidget(
+            attrs={
+                'data-range_min': self.range_min,
+                'data-range_max': self.range_max,
+                'data-step': self.range_step,
+                'data-is_null': self.default_include_null,
+                'data-unit': self.unit}
+        )
+
+    def filter(self, qs, percentage_range_with_null_flag):
+        if not percentage_range_with_null_flag:
+            return qs
+        range_, is_null = percentage_range_with_null_flag
+        property_filter = Q(
+            collectionpropertyvalue__property__name=self.property_name,
+            collectionpropertyvalue__average__gt=0.0
+        )
+        qs = qs.annotate(
+            average_collectionpropertyvalue_average=Avg('collectionpropertyvalue__average', filter=property_filter))
+        if is_null:
+            qs = qs.filter(
+                Q(average_collectionpropertyvalue_average__gte=range_.start,
+                  average_collectionpropertyvalue_average__lte=range_.stop) |
+                Q(average_collectionpropertyvalue_average__isnull=True)
+            )
         else:
-            max_value = 1000
-        self.extra['widget'] = RangeSlider(attrs={'data-range_min': 0, 'data-range_max': max_value, 'data-step': 1})
+            qs = qs.filter(average_collectionpropertyvalue_average__gte=range_.start,
+                           average_collectionpropertyvalue_average__lte=range_.stop)
+        return qs
 
 
-class CollectionFilter(CrispyAutocompleteFilterSet):
+class ConnectionRateFilter(NullableCollectionPropertyValueRangeFilter):
+    property_name = 'Connection rate'
+    unit = '%'
+
+
+class SpecWasteCollectedFilter(NullableCollectionPropertyValueRangeFilter):
+    property_name = 'specific waste collected'
+    default_range_max = 1000
+
+class CollectionFilterSet(CrispyAutocompleteFilterSet):
     catchment = ModelChoiceFilter(queryset=CollectionCatchment.objects.all(),
                                   widget=autocomplete.ModelSelect2(url='catchment-autocomplete'),
                                   method='catchment_filter')
@@ -116,14 +168,7 @@ class CollectionFilter(CrispyAutocompleteFilterSet):
                                                     field_name='waste_stream__forbidden_materials',
                                                     label='Forbidden materials',
                                                     widget=CheckboxSelectMultiple)
-    connection_rate = RangeFilter(
-        widget=PercentageRangeSlider(attrs={'data-range_min': 0, 'data-range_max': 100, 'data-step': 1}),
-        method='get_connection_rate'
-    )
-    connection_rate_include_unknown = BooleanFilter(label='Include unknown connection rate',
-                                                    widget=CheckboxInput,
-                                                    initial=True,
-                                                    method='get_connection_rate_include_unknown')
+    connection_rate = ConnectionRateFilter(label='Connection rate')
     seasonal_frequency = BooleanFilter(widget=RadioSelect(
         choices=SEASONAL_FREQUENCY_CHOICES),
         label='Seasonal frequency',
@@ -133,29 +178,11 @@ class CollectionFilter(CrispyAutocompleteFilterSet):
         label='Optional frequency',
         method='get_optional_frequency')
     collections_per_year = CollectionsPerYearFilter(
-        method='get_collections_per_year',
         label='Collections per year'
     )
-    collections_per_year_include_unknown = BooleanFilter(label='Include unknown collection frequency',
-                                                         widget=CheckboxInput,
-                                                         initial=True,
-                                                         method='get_collections_per_year_include_unknown')
     spec_waste_collected = SpecWasteCollectedFilter(
         label='Specific waste collected [kg/(cap.*a)]',
-        method='get_spec_waste_collected'
     )
-    spec_waste_collected_filter_method = ChoiceFilter(
-        label='Filter method',
-        empty_label=None,
-        choices=SPEC_WASTE_COLLECTED_FILTER_MODE_CHOICES,
-        method='get_spec_waste_collected_filter_method',
-        initial='average'
-    )
-    spec_waste_collected_include_unknown = BooleanFilter(label='Include unknown collected amounts',
-                                                         widget=CheckboxInput,
-                                                         initial=True,
-                                                         method='get_spec_waste_collected_include_unknown')
-
     load_features = BooleanFilter(
         label='Load features',
         initial=True,
@@ -165,10 +192,8 @@ class CollectionFilter(CrispyAutocompleteFilterSet):
     class Meta:
         model = Collection
         fields = ('catchment', 'collector', 'collection_system', 'waste_category', 'allowed_materials',
-                  'forbidden_materials', 'connection_rate', 'connection_rate_include_unknown', 'seasonal_frequency',
-                  'optional_frequency', 'collections_per_year', 'collections_per_year_include_unknown',
-                  'spec_waste_collected_filter_method', 'spec_waste_collected_include_unknown', 'spec_waste_collected',
-                  'fee_system', 'load_features')
+                  'forbidden_materials', 'connection_rate', 'seasonal_frequency', 'optional_frequency',
+                  'collections_per_year', 'spec_waste_collected', 'fee_system', 'load_features')
         # catchment_filter must always be applied first, because it grabs the initial queryset and does not filter any
         # existing queryset.
         order_by = ['catchment_filter']
@@ -176,6 +201,7 @@ class CollectionFilter(CrispyAutocompleteFilterSet):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self.filters['connection_rate'].set_min_max()
         self.filters['collections_per_year'].set_min_max()
         self.filters['spec_waste_collected'].set_min_max()
 
@@ -185,19 +211,6 @@ class CollectionFilter(CrispyAutocompleteFilterSet):
         if not qs.exists():
             qs = value.upstream_collections.order_by('name')
         return qs
-
-    @staticmethod
-    def get_connection_rate(qs, _, value):
-        return qs.filter(
-            Q(connection_rate__range=(value.start / 100, value.stop / 100)) | Q(connection_rate__isnull=True)
-        )
-
-    @staticmethod
-    def get_connection_rate_include_unknown(qs, _, value):
-        if not value:
-            return qs.exclude(connection_rate__isnull=True)
-        else:
-            return qs
 
     @staticmethod
     def get_seasonal_frequency(queryset, _, value):
@@ -221,48 +234,6 @@ class CollectionFilter(CrispyAutocompleteFilterSet):
             opts = CollectionCountOptions.objects.filter(Q(option_1__isnull=True) & Q(option_2__isnull=True) &
                                                          Q(option_3__isnull=True))
             return queryset.filter(frequency__in=opts.values_list('frequency'))
-
-    @staticmethod
-    def get_collections_per_year_include_unknown(qs, _, value):
-        if not value:
-            return qs.exclude(frequency__isnull=True)
-        else:
-            return qs
-
-    @staticmethod
-    def get_collections_per_year(qs, _, value):
-        frequencies = CollectionFrequency.objects.annotate(collection_count=Sum('collectioncountoptions__standard'))
-        frequencies = frequencies.filter(collection_count__gte=value.start, collection_count__lte=value.stop)
-        return qs.filter(Q(frequency__in=frequencies) | Q(frequency__isnull=True))
-
-    def get_spec_waste_collected(self, qs, _, value):
-        if self.spec_waste_collected_filter_setting == 'latest':
-            # TODO: implement this filter method
-            return qs
-        elif self.spec_waste_collected_filter_setting == 'exists':
-            # TODO: implement this filter method
-            return qs
-        elif self.spec_waste_collected_filter_setting == 'average':
-            property_filter = Q(
-                collectionpropertyvalue__property__name='specific waste collected',
-                collectionpropertyvalue__average__gt=0.0
-            )
-            qs = qs.annotate(average_amount=Avg('collectionpropertyvalue__average', filter=property_filter))
-            if self.spec_waste_collected_include_unknown:
-                qs = qs.filter(
-                    Q(average_amount__gte=value.start, average_amount__lte=value.stop) | Q(average_amount__isnull=True))
-            else:
-                qs = qs.filter(average_amount__gte=value.start, average_amount__lte=value.stop)
-            return qs
-        return qs
-
-    def get_spec_waste_collected_filter_method(self, qs, _, value):
-        self.spec_waste_collected_filter_setting = value
-        return qs
-
-    def get_spec_waste_collected_include_unknown(self, qs, _, value):
-        self.spec_waste_collected_include_unknown = value
-        return qs
 
     @staticmethod
     def get_load_features(qs, _, __):

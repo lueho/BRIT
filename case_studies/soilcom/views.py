@@ -24,7 +24,7 @@ from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineFormSetMixin
 from utils.views import (BRITFilterView, OwnedObjectCreateView, OwnedObjectDetailView, OwnedObjectListView,
                          OwnedObjectModalCreateView, OwnedObjectModalDeleteView, OwnedObjectModalDetailView,
                          OwnedObjectModalUpdateView, OwnedObjectModelSelectOptionsView, OwnedObjectUpdateView)
-from .filters import CollectionFilter, CollectorFilter, WasteFlyerFilter
+from .filters import CollectionFilterSet, CollectorFilter, WasteFlyerFilter
 from .forms import (AggregatedCollectionPropertyValueModelForm, BaseWasteFlyerUrlFormSet, CollectionAddWasteSampleForm,
                     CollectionFrequencyModalModelForm, CollectionFrequencyModelForm, CollectionModelForm,
                     CollectionPropertyValueModelForm, CollectionRemoveWasteSampleForm, CollectionSeasonForm,
@@ -618,7 +618,7 @@ class AggregatedCollectionPropertyValueModalDeleteView(OwnedObjectModalDeleteVie
 
 class CollectionListView(BRITFilterView):
     model = Collection
-    filterset_class = CollectionFilter
+    filterset_class = CollectionFilterSet
     ordering = 'name'
 
 
@@ -873,7 +873,7 @@ class CatchmentSelectView(GeoDataSetFormMixin, GeoDataSetMixin, TemplateView):
 
 class WasteCollectionMapView(GeoDataSetDetailView):
     template_name = 'waste_collection_map.html'
-    filterset_class = CollectionFilter
+    filterset_class = CollectionFilterSet
     map_title = 'Household Waste Collection Europe'
     load_region = False
     load_catchment = False
@@ -892,7 +892,7 @@ class CollectionGeometryAPI(GenericAPIView):
     queryset = Collection.objects.select_related('catchment', 'waste_stream__category', 'collection_system')
     serializer_class = WasteCollectionGeometrySerializer
     filter_backends = (rf_filters.DjangoFilterBackend,)
-    filterset_class = CollectionFilter
+    filterset_class = CollectionFilterSet
     authentication_classes = []
     permission_classes = []
 
@@ -907,7 +907,7 @@ class CollectionViewSet(ReadOnlyModelViewSet):
     queryset = Collection.objects.all()
     serializer_class = CollectionFlatSerializer
     filter_backends = (rf_filters.DjangoFilterBackend,)
-    filterset_class = CollectionFilter
+    filterset_class = CollectionFilterSet
 
 
 class CollectionListFileExportView(LoginRequiredMixin, View):
