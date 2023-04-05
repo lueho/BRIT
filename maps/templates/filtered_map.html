@@ -5,9 +5,7 @@
 
 {% block style_sheets %}
     {{ block.super }}
-
     <link rel="stylesheet" href="{% static 'css/maps.min.css' %}">
-    <link rel="stylesheet" href="{% static 'range_slider.min.css' %}">
 {% endblock style_sheets %}
 
 {% block title %}Maps | {{ map_title }}{% endblock %}
@@ -106,7 +104,6 @@
     {# See AutoCompleteMixin class in utils/forms.#}
     {{ filter.form.media }}
     <link rel="stylesheet" href="{% static 'lib/select2-bootstrap-theme/select2-bootstrap4.min.css' %}">
-    <script src="{% static 'range_slider.min.js' %}"></script>
     <script src="{% static 'js/maps.min.js' %}"></script>
 
     {{ map_config|json_script:"mapConfig" }}

@@ -1,0 +1,26 @@
+<div class="form-row">
+    <div class="col">
+        <div class="row d-flex align-items-center">
+            <div class="form-group numeric-slider col-9 mb-0">
+                <div class="numeric-slider-range ui-slider ui-slider-horizontal ui-slider-range mr-2" {% include "django/forms/widgets/attrs.html" %}></div>
+            </div>
+            <div class="form-group d-flex align-items-center mb-0">
+                <div class="custom-control custom-checkbox">
+                    <input class="checkbox-include-unknown custom-control-input" type="checkbox" id="{{ widget.attrs.id }}_unknown">
+                    <label class="custom-control-label" for="{{ widget.attrs.id }}_unknown">Unknown</label>
+                </div>
+            </div>
+        </div>
+        <div class="row mt-0">
+            <div class="col-9 d-flex justify-content-center">
+                <span class="numeric-slider-range-text" id='{{ widget.attrs.id }}_text'>{{ widget.value_text }}</span>
+            </div>
+            <div class="col"></div>
+        </div>
+    </div>
+    {% for widget in widget.subwidgets %}
+        {% include widget.template_name %}
+    {% endfor %}
+</div>
+
+

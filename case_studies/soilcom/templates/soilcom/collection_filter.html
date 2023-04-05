@@ -2,10 +2,6 @@
 {% load static %}
 {% load crispy_forms_tags %}
 
-{% block style_sheets %}
-    <link rel="stylesheet" href="{% static 'range_slider.css' %}">
-{% endblock %}
-
 {% block title %}BRIT | Household waste collections{% endblock %}
 
 {% block list_header %}<strong>Collections</strong>{% endblock %}
@@ -119,6 +115,5 @@
         }
 
     </script>
-    <script src="{% static 'range_slider.js' %}"></script>
 
 {% endblock javascript %}
