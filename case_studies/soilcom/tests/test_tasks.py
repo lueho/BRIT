@@ -52,8 +52,6 @@ class ExportCollectionToFileTestCase(TestCase):
                 collector=Collector.objects.create(owner=owner, name=f'collector{i}'),
                 collection_system=CollectionSystem.objects.create(owner=owner, name='Test system'),
                 waste_stream=waste_stream,
-                connection_rate=0.7,
-                connection_rate_year=2020,
                 frequency=frequency,
                 description='This is a test case.'
             )

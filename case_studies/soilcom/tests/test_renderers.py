@@ -50,8 +50,6 @@ class CollectionCSVRendererTestCase(TestCase):
                 collector=Collector.objects.create(owner=owner, name=f'collector{1}'),
                 collection_system=CollectionSystem.objects.create(owner=owner, name='Test system'),
                 waste_stream=waste_stream,
-                connection_rate=0.7,
-                connection_rate_year=2020,
                 fee_system='Fixed fee',
                 frequency=frequency,
                 description='This is a test case.'
@@ -140,8 +138,6 @@ class CollectionXLSXRendererTestCase(TestCase):
                 collector=Collector.objects.create(owner=owner, name=f'collector{1}'),
                 collection_system=CollectionSystem.objects.create(owner=owner, name='Test system'),
                 waste_stream=waste_stream,
-                connection_rate=0.7,
-                connection_rate_year=2020,
                 frequency=frequency,
                 description='This is a test case.'
             )

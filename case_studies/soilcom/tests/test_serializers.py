@@ -125,8 +125,6 @@ class CollectionModelSerializerTestCase(TestCase):
             collection_system=CollectionSystem.objects.create(name='Test system'),
             waste_stream=waste_stream,
             frequency=frequency,
-            connection_rate=0.7,
-            connection_rate_year=2020,
             description='This is a test case.'
         )
         cls.collection.flyers.add(waste_flyer_1)
@@ -142,7 +140,6 @@ class CollectionModelSerializerTestCase(TestCase):
         self.assertIn('waste_category', data)
         self.assertIn('allowed_materials', data)
         self.assertIn('forbidden_materials', data)
-        self.assertIn('connection_rate', data)
         self.assertIn('frequency', data)
         self.assertIn('sources', data)
         self.assertIn('comments', data)
@@ -154,23 +151,6 @@ class CollectionModelSerializerTestCase(TestCase):
         self.assertEqual(len(flyer_urls), 2)
         for url in flyer_urls:
             self.assertIsInstance(url, str)
-
-    def test_connection_rate_is_converted_and_connected_with_year(self):
-        serializer = CollectionModelSerializer(self.collection)
-        connection_rate = serializer.data['connection_rate']
-        self.assertEqual('70.0\u00A0% (2020)', connection_rate)
-
-    def test_connection_rate_non_returns_without_error(self):
-        self.collection.connection_rate = None
-        self.collection.save()
-        serializer = CollectionModelSerializer(self.collection)
-        self.assertIsNone(serializer.data['connection_rate'])
-
-    def test_connection_rate_returns_without_year_if_year_is_not_given(self):
-        self.collection.connection_rate_year = None
-        self.collection.save()
-        serializer = CollectionModelSerializer(self.collection)
-        self.assertEqual('70.0\u00A0%', serializer.data['connection_rate'])
 
 
 class CollectionFlatSerializerTestCase(TestCase):
@@ -219,8 +199,6 @@ class CollectionFlatSerializerTestCase(TestCase):
             waste_stream=waste_stream,
             fee_system='Fixed fee',
             frequency=frequency,
-            connection_rate=0.7,
-            connection_rate_year=2020,
             description='This is a test case.'
         )
         cls.collection_nuts.flyers.add(waste_flyer_1)
@@ -238,8 +216,6 @@ class CollectionFlatSerializerTestCase(TestCase):
             waste_stream=waste_stream,
             fee_system='Fixed fee',
             frequency=frequency,
-            connection_rate=0.7,
-            connection_rate_year=2020,
             description='This is a test case.'
         )
         cls.collection_lau.flyers.add(waste_flyer_1)
@@ -248,7 +224,7 @@ class CollectionFlatSerializerTestCase(TestCase):
     def test_serializer_data_contains_all_fields(self):
         serializer = CollectionFlatSerializer(self.collection_nuts)
         keys = {'catchment', 'nuts_or_lau_id', 'collector', 'collection_system', 'country', 'waste_category',
-                'allowed_materials', 'forbidden_materials', 'connection_rate', 'connection_rate_year', 'fee_system',
+                'allowed_materials', 'forbidden_materials', 'fee_system',
                 'frequency', 'population', 'population_density', 'comments', 'sources', 'created_by',
                 'created_at', 'lastmodified_by', 'lastmodified_at'}
         self.assertSetEqual(keys, set(serializer.data.keys()))

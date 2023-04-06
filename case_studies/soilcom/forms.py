@@ -270,24 +270,11 @@ class CollectionModelForm(AutoCompleteModelForm):
     class Meta:
         model = Collection
         fields = ('catchment', 'collector', 'collection_system', 'waste_category', 'allowed_materials',
-                  'forbidden_materials', 'connection_rate', 'connection_rate_year', 'frequency', 'fee_system',
+                  'forbidden_materials', 'frequency', 'fee_system',
                   'description')
         labels = {
             'description': 'Comments',
-            'connection_rate': 'Connection rate [%]',
-            'connection_rate_year': 'Year'
         }
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        if 'connection_rate' in self.initial and self.initial['connection_rate'] is not None:
-            self.initial['connection_rate'] *= 100
-
-    def clean_connection_rate(self):
-        connection_rate = self.cleaned_data.get('connection_rate')
-        if connection_rate:
-            connection_rate /= 100
-        return connection_rate
 
     @property
     def helper(self):
@@ -299,10 +286,6 @@ class CollectionModelForm(AutoCompleteModelForm):
             ForeignkeyField('waste_category'),
             Field('allowed_materials'),
             Field('forbidden_materials'),
-            Row(
-                Column(Field('connection_rate')),
-                Column(Field('connection_rate_year'))
-            ),
             Field('fee_system'),
             Field('frequency'),
             Field('description')

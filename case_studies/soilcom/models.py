@@ -346,8 +346,6 @@ class Collection(NamedUserObjectModel):
     collection_system = models.ForeignKey(CollectionSystem, on_delete=models.CASCADE, blank=True, null=True, related_name='collections')
     waste_stream = models.ForeignKey(WasteStream, on_delete=models.SET_NULL, blank=True, null=True, related_name='collections')
     frequency = models.ForeignKey(CollectionFrequency, on_delete=models.SET_NULL, blank=True, null=True, related_name='collections')
-    connection_rate = models.FloatField(blank=True, null=True)
-    connection_rate_year = models.PositiveSmallIntegerField(blank=True, null=True, validators=[YEAR_VALIDATOR])
     fee_system = models.CharField(max_length=32, choices=FEE_SYSTEMS, blank=True, null=True)
     samples = models.ManyToManyField(Sample, related_name='collections')
     flyers = models.ManyToManyField(WasteFlyer, related_name='collections')
@@ -356,10 +354,6 @@ class Collection(NamedUserObjectModel):
     @property
     def geom(self):
         return self.catchment.geom
-
-    @property
-    def connection_rate_string_representation(self):
-        return f'{self.connection_rate * 100}\u00A0%'
 
     def construct_name(self):
         catchment = self.catchment.name if self.catchment else 'Unknown catchment'

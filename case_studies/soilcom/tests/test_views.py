@@ -887,8 +887,6 @@ class CollectionCreateViewTestCase(ViewWithPermissionsTestCase):
             collector=Collector.objects.create(name='Test collector'),
             collection_system=CollectionSystem.objects.create(name='Test system'),
             waste_stream=waste_stream,
-            connection_rate=0.7,
-            connection_rate_year=2020,
             frequency=frequency,
             description='This is a test case.'
         )
@@ -950,7 +948,6 @@ class CollectionCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertTrue(error_msg in response.context['form'].errors['collector'])
         self.assertTrue(error_msg in response.context['form'].errors['collection_system'])
         self.assertTrue(error_msg in response.context['form'].errors['waste_category'])
-        self.assertTrue('Year needs to be in YYYY format.' in response.context['form'].errors['connection_rate_year'])
 
     def test_post_with_valid_form_data(self):
         self.assertEqual(Collection.objects.count(), 1)
@@ -964,8 +961,6 @@ class CollectionCreateViewTestCase(ViewWithPermissionsTestCase):
                 'waste_category': WasteCategory.objects.first().id,
                 'allowed_materials': [self.allowed_material_1.id, self.allowed_material_2.id],
                 'forbidden_materials': [self.forbidden_material_1.id, self.forbidden_material_2.id],
-                'connection_rate': 0.7,
-                'connection_rate_year': 2020,
                 'frequency': CollectionFrequency.objects.first().id,
                 'description': 'This is a test case that should pass!',
                 'form-INITIAL_FORMS': '0',
@@ -989,8 +984,6 @@ class CollectionCreateViewTestCase(ViewWithPermissionsTestCase):
                 'waste_category': WasteCategory.objects.first().id,
                 'allowed_materials': [],
                 'forbidden_materials': [self.forbidden_material_1.id, self.forbidden_material_2.id],
-                'connection_rate': 0.7,
-                'connection_rate_year': 2020,
                 'frequency': CollectionFrequency.objects.first().id,
                 'description': 'This is a test case that should pass!',
                 'form-INITIAL_FORMS': '0',
@@ -1047,8 +1040,6 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
             collector=Collector.objects.create(name='Test collector'),
             collection_system=CollectionSystem.objects.create(name='Test system'),
             waste_stream=waste_stream,
-            connection_rate=0.7,
-            connection_rate_year=2020,
             frequency=frequency,
             description='This is a test case.'
         )
@@ -1130,8 +1121,6 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
             'waste_category': WasteCategory.objects.first().id,
             'allowed_materials': [self.allowed_material_1.id, self.allowed_material_2.id],
             'forbidden_materials': [self.forbidden_material_1.id, self.forbidden_material_2.id],
-            'connection_rate': 0.7,
-            'connection_rate_year': 2020,
             'frequency': CollectionFrequency.objects.first().id,
             'description': 'This is a test case that should pass!',
             'form-INITIAL_FORMS': '0',
@@ -1152,8 +1141,6 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
             'waste_category': initial['waste_category'],
             'allowed_materials': initial['allowed_materials'],
             'forbidden_materials': initial['forbidden_materials'],
-            'connection_rate': initial['connection_rate'],
-            'connection_rate_year': initial['connection_rate_year'],
             'frequency': initial['frequency'],
             'description': initial['description'],
             'form-INITIAL_FORMS': '0',
@@ -1175,8 +1162,6 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
             'waste_category': initial['waste_category'],
             'allowed_materials': initial['allowed_materials'],
             'forbidden_materials': initial['forbidden_materials'],
-            'connection_rate': initial['connection_rate'],
-            'connection_rate_year': initial['connection_rate_year'],
             'frequency': initial['frequency'],
             'description': 'This is the copy.',
             'form-INITIAL_FORMS': '1',
@@ -1226,8 +1211,6 @@ class CollectionUpdateViewTestCase(ViewWithPermissionsTestCase):
             collector=Collector.objects.create(name='Test collector'),
             collection_system=CollectionSystem.objects.create(name='Test system'),
             waste_stream=waste_stream,
-            connection_rate=0.7,
-            connection_rate_year=2020,
             frequency=frequency,
             description='This is a test case.'
         )
@@ -1358,7 +1341,6 @@ class CollectionUpdateViewTestCase(ViewWithPermissionsTestCase):
         self.assertTrue(error_msg in response.context['form'].errors['collector'])
         self.assertTrue(error_msg in response.context['form'].errors['collection_system'])
         self.assertTrue(error_msg in response.context['form'].errors['waste_category'])
-        self.assertTrue('Year needs to be in YYYY format.' in response.context['form'].errors['connection_rate_year'])
 
     def test_post_with_valid_form_data(self):
         self.client.force_login(self.member)
@@ -1371,8 +1353,6 @@ class CollectionUpdateViewTestCase(ViewWithPermissionsTestCase):
                 'waste_category': WasteCategory.objects.first().id,
                 'allowed_materials': [self.allowed_material_1.id, self.allowed_material_2.id],
                 'forbidden_materials': [self.forbidden_material_1.id, self.forbidden_material_2.id],
-                'connection_rate': 0.7,
-                'connection_rate_year': 2020,
                 'frequency': CollectionFrequency.objects.first().id,
                 'description': 'This is a test case that should pass!',
                 'form-INITIAL_FORMS': '0',
@@ -1392,8 +1372,6 @@ class CollectionUpdateViewTestCase(ViewWithPermissionsTestCase):
                 'collection_system': CollectionSystem.objects.first().id,
                 'waste_category': WasteCategory.objects.first().id,
                 'allowed_materials': [self.allowed_material_1.id, self.allowed_material_2.id],
-                'connection_rate': 0.7,
-                'connection_rate_year': 2020,
                 'frequency': CollectionFrequency.objects.first().id,
                 'description': 'This is a test case that should pass!',
                 'form-INITIAL_FORMS': '0',
@@ -1419,8 +1397,6 @@ class CollectionUpdateViewTestCase(ViewWithPermissionsTestCase):
             'waste_category': self.collection.waste_stream.category.id,
             'allowed_materials': [m.id for m in self.collection.waste_stream.allowed_materials.all()],
             'forbidden_materials': [m.id for m in self.collection.waste_stream.forbidden_materials.all()],
-            'connection_rate': 0.7,
-            'connection_rate_year': 2020,
             'frequency': self.collection.frequency.id,
             'description': self.collection.description,
             'form-INITIAL_FORMS': '1',
@@ -1441,8 +1417,6 @@ class CollectionUpdateViewTestCase(ViewWithPermissionsTestCase):
             'waste_category': self.collection.waste_stream.category.id,
             'allowed_materials': [m.id for m in self.collection.waste_stream.allowed_materials.all()],
             'forbidden_materials': [m.id for m in self.collection.waste_stream.forbidden_materials.all()],
-            'connection_rate': 0.7,
-            'connection_rate_year': 2020,
             'frequency': self.collection.frequency.id,
             'description': self.collection.description,
             'form-INITIAL_FORMS': '1',
@@ -1652,8 +1626,6 @@ class CollectionSummaryAPIViewTestCase(ViewWithPermissionsTestCase):
             collector=Collector.objects.create(name='Test collector'),
             collection_system=CollectionSystem.objects.create(name='Test system'),
             waste_stream=waste_stream,
-            connection_rate=0.7,
-            connection_rate_year=2020,
             frequency=frequency,
             description='This is a test case.'
         )
@@ -1677,7 +1649,6 @@ class CollectionSummaryAPIViewTestCase(ViewWithPermissionsTestCase):
                 ('Waste category', self.collection.waste_stream.category.name),
                 ('Allowed materials', [m.name for m in self.collection.waste_stream.allowed_materials.all()]),
                 ('Forbidden materials', [m.name for m in self.collection.waste_stream.forbidden_materials.all()]),
-                ('Connection rate', '70.0\u00A0% (2020)'),
                 ('Frequency', self.collection.frequency.name),
                 ('Sources', [flyer.url for flyer in self.collection.flyers.all()]),
                 ('Comments', self.collection.description)
@@ -1715,8 +1686,6 @@ class CollectionListFileExportViewTestCase(ViewWithPermissionsTestCase):
                 collector=Collector.objects.create(name='Test collector'),
                 collection_system=CollectionSystem.objects.create(name='Test system'),
                 waste_stream=waste_stream,
-                connection_rate=0.7,
-                connection_rate_year=2020,
                 frequency=frequency,
                 description='This is a test case.'
             )

@@ -207,8 +207,6 @@ class CollectionModelFormTestCase(TestCase):
             collector=cls.collector,
             collection_system=cls.collection_system,
             waste_stream=waste_stream,
-            connection_rate=0.7,
-            connection_rate_year=2020,
             frequency=cls.frequency
         )
 
@@ -221,7 +219,6 @@ class CollectionModelFormTestCase(TestCase):
         self.assertEqual(form.errors['catchment'][0], 'This field is required.')
         self.assertEqual(form.errors['collection_system'][0], 'This field is required.')
         self.assertEqual(form.errors['waste_category'][0], 'This field is required.')
-        self.assertEqual('Year needs to be in YYYY format.', form.errors['connection_rate_year'][0])
 
     def test_waste_stream_get_or_create_on_save(self):
         form = CollectionModelForm(data={
@@ -231,8 +228,6 @@ class CollectionModelFormTestCase(TestCase):
             'waste_category': self.waste_category.id,
             'allowed_materials': [self.allowed_material_1.id, self.allowed_material_2.id],
             'forbidden_materials': [self.forbidden_material_1.id, self.forbidden_material_2.id],
-            'connection_rate': 70,
-            'connection_rate_year': 2020,
             'frequency': self.frequency.id,
             'description': 'This is a test case'
         })
@@ -262,32 +257,6 @@ class CollectionModelFormTestCase(TestCase):
         self.assertEqual(instance2.waste_stream.category.id, self.waste_category.id)
         self.assertEqual(instance2.waste_stream.id, instance.waste_stream.id)
         self.assertEqual(len(WasteStream.objects.all()), 1)
-
-    def test_connection_rate_percentage_is_converted_to_fraction(self):
-        form = CollectionModelForm(data={
-            'catchment': self.catchment.id,
-            'collector': self.collector.id,
-            'collection_system': self.collection_system.id,
-            'waste_category': self.waste_category.id,
-            'allowed_materials': [self.allowed_material_1.id, self.allowed_material_2.id],
-            'forbidden_materials': [self.forbidden_material_1.id, self.forbidden_material_2.id],
-            'connection_rate': 70,
-            'connection_rate_year': 2020,
-            'frequency': self.frequency.id,
-            'description': 'This is a test case'
-        })
-        self.assertTrue(form.is_valid())
-        form.instance.owner = self.collection.owner
-        instance = form.save()
-        self.assertEqual(0.7, instance.connection_rate)
-
-    def test_connection_rate_is_converted_to_percentage_for_initial_values(self):
-        form = CollectionModelForm(instance=self.collection)
-        self.assertEqual(form.initial['connection_rate'], self.collection.connection_rate * 100)
-
-    def test_missing_connection_rate_does_not_cause_type_error(self):
-        self.collection.connection_rate = None
-        CollectionModelForm(instance=self.collection)
 
 
 class WasteFlyerUrlFormSetTestCase(TestCase):
