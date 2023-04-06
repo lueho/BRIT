@@ -144,6 +144,7 @@ class PropertyValue(NamedUserObjectModel):
 
     class Meta:
         abstract = True
+        ordering = ['property__name']
 
     def __str__(self):
         name = f'{self.property}: {self.average}'
