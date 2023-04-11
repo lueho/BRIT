@@ -73,11 +73,11 @@ class CollectionsPerYearFilter(NullableRangeFilter):
         else:
             max_value = 1000
         self.extra['widget'] = NullableRangeSliderWidget(attrs={
-                'data-range_min': 0,
-                'data-range_max': max_value,
-                'data-step': 1,
-                'data-is_null': self.default_include_null,
-                'data-unit': ''
+            'data-range_min': 0,
+            'data-range_max': max_value,
+            'data-step': 1,
+            'data-is_null': self.default_include_null,
+            'data-unit': ''
         })
 
     def filter(self, qs, range_with_null_flag):
@@ -149,6 +149,7 @@ class ConnectionRateFilter(NullableCollectionPropertyValueRangeFilter):
 class SpecWasteCollectedFilter(NullableCollectionPropertyValueRangeFilter):
     property_name = 'specific waste collected'
     default_range_max = 1000
+
 
 class CollectionFilterSet(CrispyAutocompleteFilterSet):
     catchment = ModelChoiceFilter(queryset=CollectionCatchment.objects.all(),
