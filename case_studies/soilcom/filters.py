@@ -216,7 +216,8 @@ class CollectionFilterSet(CrispyAutocompleteFilterSet):
     def get_seasonal_frequency(queryset, _, value):
         if value is None:
             return queryset
-        queryset = queryset.annotate(season_count=Count('frequency__seasons'))
+        if 'season_count' not in queryset.query.annotations:
+            queryset = queryset.annotate(season_count=Count('frequency__seasons'))
         if value is True:
             return queryset.filter(season_count__gt=1)
         elif value is False:
