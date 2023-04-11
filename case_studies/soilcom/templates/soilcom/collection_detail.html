@@ -24,27 +24,43 @@
                         <strong>Waste Category:</strong><br>
                         <a href="{{ object.waste_stream.category.get_absolute_url }}">{{ object.waste_stream.category }}</a>
                     </p>
-                    <p class="card-text"><strong>Allowed Materials:</strong></p>
-                    <ul>
-                        {% for material in object.waste_stream.allowed_materials.all %}
-                            <li><a href="{{ material.get_absolute_url }}">{{ material }}</a></li>
-                        {% endfor %}
-                    </ul>
+                    {% if object.waste_stream.allowed_materials.exists %}
+                        <p class="card-text"><strong>Allowed Materials:</strong></p>
+                        <ul>
+                            {% for material in object.waste_stream.allowed_materials.all %}
+                                <li><a href="{{ material.get_absolute_url }}">{{ material }}</a></li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+
                     {% if object.waste_stream.forbidden_materials.exists %}
-                    <p class="card-text"><strong>Forbidden Materials:</strong></p>
-                    <ul>
-                        {% for material in object.waste_stream.forbidden_materials.all %}
-                            <li><a href="{{ material.get_absolute_url }}">{{ material }}</a></li>
-                        {% endfor %}
-                    </ul>
+                        <p class="card-text"><strong>Forbidden Materials:</strong></p>
+                        <ul>
+                            {% for material in object.waste_stream.forbidden_materials.all %}
+                                <li><a href="{{ material.get_absolute_url }}">{{ material }}</a></li>
+                            {% endfor %}
+                        </ul>
                     {% endif %}
 
                     {% if object.frequency %}
-                    <p class="card-text">
-                        <strong>Frequency:</strong><br>
-                        {{ object.frequency }}
-                    </p>
+                        <p class="card-text"><strong>Frequency:</strong><br>
+                            Total number of collections per season:</p>
+                        <ul>
+                            {% for opt in object.frequency.collectioncountoptions_set.all %}
+                                <li>
+                                    {{ opt.season }}: Standard: {{ opt.standard }}
+                                    {% if opt.non_standard_options %}
+                                        (Options:
+                                        {% for non_standard_option in opt.non_standard_options %}
+                                            {{ non_standard_option }}{% if not forloop.last %}, {% endif %}
+                                        {% endfor %})
+                                    {% endif %}
+                                </li>
+                            {% endfor %}
+                        </ul>
+
                     {% endif %}
+
                     {% if object.fee_system %}
                         <p class="card-text">
                             <strong>Fee System:</strong><br>
@@ -57,15 +73,16 @@
                         {% for prop in property_list %}
                             <p class="card-text"><strong>{{ prop.grouper.name|title }}:</strong></p>
                             <ul>
-                            {% for val in prop.list|dictsortreversed:"year" %}
-                                <li><a href="{{ val.get_absolute_url }}">
-                                {% if val.standard_deviation %}
-                                    {{ val.average }} ± {{ val.standard_deviation }} {{ val.unit.name }} ({{ val.year }})
-                                {% else %}
-                                    {{ val.average }} {{ val.unit.name }} ({{ val.year }})
-                                {% endif %}
-                                </a></li>
-                            {% endfor %}
+                                {% for val in prop.list|dictsortreversed:"year" %}
+                                    <li><a href="{{ val.get_absolute_url }}">
+                                        {% if val.standard_deviation %}
+                                            {{ val.average }} ± {{ val.standard_deviation }} {{ val.unit.name }} (
+                                            {{ val.year }})
+                                        {% else %}
+                                            {{ val.average }} {{ val.unit.name }} ({{ val.year }})
+                                        {% endif %}
+                                    </a></li>
+                                {% endfor %}
                             </ul>
                         {% endfor %}
                     {% endif %}
@@ -75,15 +92,16 @@
                         {% for prop in property_list %}
                             <p class="card-text"><strong>{{ prop.grouper.name|title }}:</strong></p>
                             <ul>
-                            {% for val in prop.list|dictsortreversed:"year" %}
-                                <li><a href="{{ val.get_absolute_url }}">
-                                {% if val.standard_deviation %}
-                                    {{ val.average }} ± {{ val.standard_deviation }} {{ val.unit.name }} ({{ val.year }}) (aggregated)
-                                {% else %}
-                                    {{ val.average }} {{ val.unit.name }} ({{ val.year }}) (aggregated)
-                                {% endif %}
-                                </a></li>
-                            {% endfor %}
+                                {% for val in prop.list|dictsortreversed:"year" %}
+                                    <li><a href="{{ val.get_absolute_url }}">
+                                        {% if val.standard_deviation %}
+                                            {{ val.average }} ± {{ val.standard_deviation }} {{ val.unit.name }} (
+                                            {{ val.year }}) (aggregated)
+                                        {% else %}
+                                            {{ val.average }} {{ val.unit.name }} ({{ val.year }}) (aggregated)
+                                        {% endif %}
+                                    </a></li>
+                                {% endfor %}
                             </ul>
                         {% endfor %}
                     {% endif %}
@@ -116,24 +134,24 @@
                     <a href="{% url 'collection-list' %}" class="nowrap ml-3">
                         <i class="fas fa-fw fa-list"></i> see all</a>
                     {% if 'soilcom.change_collection' in perms %}
-                    <a href="{% url 'collection-update' object.id %}" class="nowrap ml-3">
-                        <i class="fas fa-fw fa-edit"></i> edit</a>
-                    <a href="{% url 'collection-wastesamples' object.id %}" class="nowrap ml-3">
-                        <i class="fas fa-fw fa-edit"></i> manage samples</a>
-                    <a href="{% url 'collection-add-property' object.id %}" class="nowrap ml-3">
-                        <i class="fas fa-fw fa-plus-circle"></i> add property</a>
+                        <a href="{% url 'collection-update' object.id %}" class="nowrap ml-3">
+                            <i class="fas fa-fw fa-edit"></i> edit</a>
+                        <a href="{% url 'collection-wastesamples' object.id %}" class="nowrap ml-3">
+                            <i class="fas fa-fw fa-edit"></i> manage samples</a>
+                        <a href="{% url 'collection-add-property' object.id %}" class="nowrap ml-3">
+                            <i class="fas fa-fw fa-plus-circle"></i> add property</a>
                     {% endif %}
                     {% if 'soilcom.add_collection' in perms %}
-                    <a href="{% url 'collection-copy' object.id %}" class="nowrap ml-3">
-                       <i class="fas fa-fw fa-copy"></i> duplicate</a>
+                        <a href="{% url 'collection-copy' object.id %}" class="nowrap ml-3">
+                            <i class="fas fa-fw fa-copy"></i> duplicate</a>
                     {% endif %}
                     {% if 'soilcom.delete_collection' in perms %}
-                    <a href="{% url 'collection-delete-modal' object.id %}" class="nowrap modal-link ml-3">
-                        <i class="fas fa-fw fa-trash"></i> delete</a>
+                        <a href="{% url 'collection-delete-modal' object.id %}" class="nowrap modal-link ml-3">
+                            <i class="fas fa-fw fa-trash"></i> delete</a>
                     {% endif %}
                 </div>
             </div>
         </div>
     </div>
 
-{% endblock %}
+{% endblock content %}
