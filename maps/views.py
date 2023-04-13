@@ -335,13 +335,12 @@ class CatchmentGeometryAPI(APIView):
 
     @staticmethod
     def get(request, *args, **kwargs):
-        if 'catchment' in request.query_params:
-            if request.query_params['catchment']:
-                catchment_id = request.query_params.get('catchment')
-                catchment = Catchment.objects.get(id=int(catchment_id))
-                regions = Region.objects.filter(id=catchment.region_id)
-                serializer = RegionSerializer(regions, many=True)
-                return Response({'geoJson': serializer.data})
+        catchment_id = request.query_params.get('catchment', None)
+        if catchment_id:
+            catchment = get_object_or_404(Catchment, id=int(catchment_id))
+            regions = Region.objects.filter(id=catchment.region_id)
+            serializer = RegionSerializer(regions, many=True)
+            return Response({'geoJson': serializer.data})
         return Response({})
 
 

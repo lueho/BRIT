@@ -114,7 +114,7 @@ function orderLayers() {
 
 function getQueryParameters() {
     // This is a hook to overwrite if this file is run for any page not containing a standard filter form.
-    console.log('getQueryParameters() is not overwritten. Using default implementation.');
+    console.info('getQueryParameters() is not overwritten. Using default implementation.');
     return parseFilterParameters();
 }
 
@@ -429,7 +429,7 @@ function loadMap(mapConfig) {
     }
     if (params.has("catchment") && params.get("catchment") !== "") {
         promises.push(fetchCatchmentGeometry(params));
-    } else if (mapConfig.loadCatchment === true && 'catchmentId' in mapConfig) {
+    } else if (mapConfig.loadCatchment === true && 'catchmentId' in mapConfig && mapConfig.catchmentId !== null) {
         promises.push(fetchCatchmentGeometry({catchment: mapConfig.catchmentId}));
     }
     if (mapConfig.loadFeatures === true) {
