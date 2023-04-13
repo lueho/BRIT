@@ -7,6 +7,7 @@ from django.http import JsonResponse
 from django.urls import reverse_lazy
 from django.views.generic import DetailView, ListView, TemplateView
 from django.views.generic.edit import FormMixin
+from django.shortcuts import get_object_or_404
 from django_filters.views import FilterView
 from rest_framework.exceptions import NotFound, ParseError
 from rest_framework.views import APIView, Response
@@ -162,6 +163,7 @@ class CatchmentListView(BRITFilterView):
 
 class CatchmentDetailView(MapMixin, DetailView):
     model = Catchment
+    catchment_url = reverse_lazy('data.catchment-geometries')
     feature_url = reverse_lazy('data.catchment-geometries')
     load_region = False
     load_catchment = False
