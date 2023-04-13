@@ -58,11 +58,10 @@
     <script src="{% static 'js/maps.js' %}"></script>
     {{ map_config|json_script:"mapConfig" }}
     <script type="text/javascript">
-
-        function parseFilterParameters() {
+        function getQueryParameters() {
             const params = new URLSearchParams();
             params.append('catchment', {{ object.pk }});
-            return params
+            return params;
         }
 
         const mapConfig = JSON.parse(document.getElementById("mapConfig").textContent);

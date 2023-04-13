@@ -112,6 +112,12 @@ function orderLayers() {
     }
 }
 
+function getQueryParameters() {
+    // This is a hook to overwrite if this file is run for any page not containing a standard filter form.
+    console.log('getQueryParameters() is not overwritten. Using default implementation.');
+    return parseFilterParameters();
+}
+
 function parseFilterParameters() {
     const form = document.querySelector('form');
     const formData = new FormData(form);
@@ -143,9 +149,23 @@ async function fetchRegionGeometry(params) {
 
 async function fetchCatchmentGeometry(params) {
     const url = mapConfig.catchmentUrl + '?' + transformSearchParams(params).toString();
-    const response = await fetch(url);
-    const json = await response.json();
-    renderCatchment(json.geoJson);
+    
+    try {
+        const response = await fetch(url);
+        
+        if (!response.ok) {
+            throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
+        }
+
+        const json = await response.json();
+        
+        if ('geoJson' in json && json.geoJson.length > 0) {
+            renderCatchment(json.geoJson);
+        }
+    } catch (error) {
+        console.error('Error fetching catchment geometry:', error);
+        // You can also show an error message to the user, if appropriate.
+    }
 }
 
 async function fetchFeatureGeometries(params) {
@@ -212,6 +232,12 @@ function createFeatureLayerBindings(layer) {
 }
 
 function renderFeatures(geoJson) {
+
+    if (!geoJson || !geoJson.features || geoJson.features.length === 0) {
+        console.warn('The provided GeoJSON object is empty or does not contain any features.');
+        return;
+    }
+
     const featureLayerStyle = mapConfig.featureLayerStyle;
     featureLayerStyle.renderer = paddedRenderer;
 
@@ -394,7 +420,7 @@ function loadMap(mapConfig) {
     if (mapConfig.applyFilterToFeatures) {
         params = parseFilterParameters();
     } else {
-        params = new URLSearchParams();
+        params = getQueryParameters();
     }
 
     const promises = [];
