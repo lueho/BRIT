@@ -34,6 +34,14 @@
                     {% endfor %}
                 </p>
             {% endif %}
+            <div class="text-center">
+                <a id="btn-collection-detail"
+                   class="btn btn-primary w-75 d-none"
+                   data-href-template="/waste_collection/collections/__pk__/"
+                   href="javascript:void(0)">
+                    Full Details
+                </a>
+            </div>
         </div>
     </div>
     <div class="card shadow">
@@ -145,47 +153,4 @@
     {{ block.super }}
     <script src="{% static 'lib/turf-inside/inside.min.js' %}"></script>
     <script src="{% static 'js/waste_collection_map.min.js' %}"></script>
-
-    <script type="text/javascript">
-        function updateUrls(feature_id) {
-            const filter_params = parseFilterParameters();
-            filter_params.append('load_features', 'true')
-            const params = new URLSearchParams();
-            params.append('next', '/waste_collection/collections/map/?' + filter_params.toString());
-
-            const create_button = document.getElementById('btn-collection-create');
-            const create_url = create_button.dataset.hrefTemplate + '?' + params.toString();
-            create_button.setAttribute('href', create_url);
-
-            const update_button = document.getElementById('btn-collection-update');
-            const update_url = update_button.dataset.hrefTemplate.replace('__pk__', feature_id.toString()) + '?' + params.toString();
-            update_button.setAttribute('href', update_url);
-
-            const copy_button = document.getElementById('btn-collection-copy');
-            let copy_url = copy_button.dataset.hrefTemplate.replace('__pk__', feature_id.toString()) + '?' + params.toString();
-            copy_button.setAttribute('href', copy_url);
-
-            const delete_button = document.getElementById('btn-collection-delete');
-            const delete_url = delete_button.dataset.hrefTemplate.replace('__pk__', feature_id.toString()) + '?' + params.toString();
-            $('#btn-collection-delete').modalForm({
-                formURL: delete_url,
-                errorClass: ".is-invalid"
-            });
-        }
-
-        function clickedCreateButton() {
-            const filter_params = parseFilterParameters();
-            filter_params.append('load_features', 'true');
-            const params = new URLSearchParams();
-            params.append('next', window.location.href + '?' + filter_params.toString());
-            window.location.href = "{% url 'catchment-selection' %}" + '?' + params.toString();
-        }
-
-        function clickedListLink() {
-            window.location.href = "{% url 'collection-list' %}" + '?' + parseFilterParameters().toString();
-        }
-
-    </script>
-
-
 {% endblock javascript %}

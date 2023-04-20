@@ -1,5 +1,7 @@
 "use strict";
 
+// Load 'lib/turf-inside/inside.min.js' script before this
+
 function selectFeature(feature) {
     feature.bringToFront();
     feature.setStyle({
@@ -61,4 +63,51 @@ async function getCollectionDetails(fid) {
     } catch (error) {
         console.error(`Error fetching feature summaries for id ${fid}: ${error}`);
     }
+}
+
+function updateUrls(feature_id) {
+    const filter_params = parseFilterParameters();
+    filter_params.append('load_features', 'true')
+    const params = new URLSearchParams();
+    params.append('next', '/waste_collection/collections/map/?' + filter_params.toString());
+
+    const create_button = document.getElementById('btn-collection-create');
+    const create_url = create_button.dataset.hrefTemplate + '?' + params.toString();
+    create_button.setAttribute('href', create_url);
+
+    const detail_button = document.getElementById('btn-collection-detail');
+    const detail_url = detail_button.dataset.hrefTemplate.replace('__pk__', feature_id.toString());
+    detail_button.setAttribute('href', detail_url);
+    detail_button.classList.remove('d-none');
+
+    const update_button = document.getElementById('btn-collection-update');
+    const update_url = update_button.dataset.hrefTemplate.replace('__pk__', feature_id.toString()) + '?' + params.toString();
+    update_button.setAttribute('href', update_url);
+
+    const copy_button = document.getElementById('btn-collection-copy');
+    let copy_url = copy_button.dataset.hrefTemplate.replace('__pk__', feature_id.toString()) + '?' + params.toString();
+    copy_button.setAttribute('href', copy_url);
+
+    const delete_button = document.getElementById('btn-collection-delete');
+    const delete_url = delete_button.dataset.hrefTemplate.replace('__pk__', feature_id.toString()) + '?' + params.toString();
+    $('#btn-collection-delete').modalForm({
+        formURL: delete_url,
+        errorClass: ".is-invalid"
+    });
+}
+
+function clickedCreateButton() {
+    const filter_params = parseFilterParameters();
+    filter_params.append('load_features', 'true');
+    const params = new URLSearchParams();
+    params.append('next', window.location.href + '?' + filter_params.toString());
+    window.location.href = "{% url 'catchment-selection' %}" + '?' + params.toString();
+}
+
+function addDetailViewButton() {
+
+}
+
+function clickedListLink() {
+    window.location.href = "{% url 'collection-list' %}" + '?' + parseFilterParameters().toString();
 }
