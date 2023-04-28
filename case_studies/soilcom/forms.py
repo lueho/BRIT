@@ -279,6 +279,7 @@ class CollectionModelForm(AutoCompleteModelForm):
     @property
     def helper(self):
         helper = FormHelper()
+        helper.form_tag = False
         helper.layout = Layout(
             Field('catchment'),
             ForeignkeyField('collector'),
