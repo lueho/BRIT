@@ -689,7 +689,7 @@ class CollectionCopyView(CollectionCreateView):
 
 class CollectionDetailView(OwnedObjectDetailView):
     model = Collection
-    permission_required = 'soilcom.view_collection'
+    permission_required = set()
 
 
 class CollectionModalDetailView(OwnedObjectModalDetailView):

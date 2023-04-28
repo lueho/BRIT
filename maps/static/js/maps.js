@@ -149,17 +149,17 @@ async function fetchRegionGeometry(params) {
 
 async function fetchCatchmentGeometry(params) {
     const url = mapConfig.catchmentUrl + '?' + transformSearchParams(params).toString();
-    
+
     try {
         const response = await fetch(url);
-        
+
         if (!response.ok) {
             throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
         }
 
         const json = await response.json();
-        
-        if ('geoJson' in json && json.geoJson.length > 0) {
+
+        if ('geoJson' in json) {
             renderCatchment(json.geoJson);
         }
     } catch (error) {
