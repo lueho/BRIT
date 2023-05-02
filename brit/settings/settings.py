@@ -1,4 +1,5 @@
 import os
+import ssl
 from pathlib import Path
 
 from django.core.management.utils import get_random_secret_key
@@ -180,6 +181,9 @@ LOGIN_URL = '/users/login/'
 DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 
 CELERY_BROKER_URL = os.environ.get("REDIS_URL")
+CELERY_BROKER_USE_SSL = {
+    'ssl_cert_reqs': ssl.CERT_NONE
+}
 CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL")
 
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
