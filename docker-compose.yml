@@ -34,7 +34,7 @@ services:
       - web
       - redis
   redis:
-    image: redis:5-alpine
+    image: redis:7-alpine
   db_admin:
     build:
       context: ./docker/db_admin/
