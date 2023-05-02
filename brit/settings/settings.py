@@ -184,6 +184,9 @@ CELERY_BROKER_URL = os.environ.get("REDIS_URL")
 CELERY_BROKER_USE_SSL = {
     'ssl_cert_reqs': ssl.CERT_NONE
 }
+CELERY_REDIS_BACKEND_USE_SSL = {
+    'ssl_cert_reqs': ssl.CERT_NONE
+}
 CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL")
 
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
