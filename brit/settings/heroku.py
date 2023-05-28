@@ -11,7 +11,7 @@ ALLOWED_HOSTS = ALLOWED_HOSTS.append('bri-tool.herokuapp.com')
 
 SECURE_SSL_REDIRECTS = True
 
-DATABASE_URL = os.environ.get('HEROKU_POSTGRESQL_COPPER_URL')
+DATABASE_URL = os.environ.get('DATABASE_URL')
 DATABASES['default'] = dj_database_url.config(default=DATABASE_URL, conn_max_age=500, ssl_require=True)
 DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
 
