@@ -392,8 +392,7 @@ class SampleSeriesModalCreateDuplicateView(OwnedObjectModalUpdateView):
     object = None
 
     def form_valid(self, form):
-        if not self.request.is_ajax():
-            self.object = self.object.duplicate(creator=self.request.user, **form.cleaned_data)
+        self.object = self.object.duplicate(creator=self.request.user, **form.cleaned_data)
         return super().form_valid(form)
 
 
@@ -403,8 +402,7 @@ class SampleSeriesModalAddDistributionView(OwnedObjectModalUpdateView):
     permission_required = 'materials.change_sampleseries'
 
     def form_valid(self, form):
-        if not self.request.is_ajax():
-            self.object.temporal_distributions.add(form.cleaned_data['distribution'])
+        self.object.temporal_distributions.add(form.cleaned_data['distribution'])
         return HttpResponseRedirect(self.get_success_url())
 
 
@@ -512,11 +510,10 @@ class SampleModalAddPropertyView(OwnedObjectModalCreateView):
     permission_required = 'materials.add_materialpropertyvalue'
 
     def form_valid(self, form):
-        if not self.request.is_ajax():
-            form.instance.owner = self.request.user
-            property_value = form.save()
-            sample = Sample.objects.get(pk=self.kwargs.get('pk'))
-            sample.properties.add(property_value)
+        form.instance.owner = self.request.user
+        property_value = form.save()
+        sample = Sample.objects.get(pk=self.kwargs.get('pk'))
+        sample.properties.add(property_value)
         return HttpResponseRedirect(self.get_success_url())
 
     def get_success_url(self):
@@ -529,8 +526,7 @@ class SampleAddSourceView(OwnedObjectUpdateView):
     permission_required = 'materials.change_sample'
 
     def form_valid(self, form):
-        if not self.request.is_ajax():
-            self.object.sources.add(form.cleaned_data['source'])
+        self.object.sources.add(form.cleaned_data['source'])
         return HttpResponseRedirect(self.get_success_url())
 
 
@@ -552,8 +548,7 @@ class SampleModalCreateDuplicateView(OwnedObjectModalUpdateView):
     object = None
 
     def form_valid(self, form):
-        if not self.request.is_ajax():
-            self.object = self.object.duplicate(creator=self.request.user, **form.cleaned_data)
+        self.object = self.object.duplicate(creator=self.request.user, **form.cleaned_data)
         return super().form_valid(form)
 
 
@@ -663,16 +658,13 @@ class AddComponentView(PermissionRequiredMixin, NextOrSuccessUrlMixin, BSModalUp
         return context
 
     def form_valid(self, form):
-        # Due to the way the django-bootstrap modal-forms package is built, the post request and this method are
-        # executed twice.
-        # See: https://github.com/trco/django-bootstrap-modal-forms/issues/14
-        if not self.request.is_ajax():
-            self.get_object().add_component(form.cleaned_data['component'])
+        self.get_object().add_component(form.cleaned_data['component'])
         return HttpResponseRedirect(self.get_success_url())
 
 
 class CompositionOrderUpView(PermissionRequiredMixin, SingleObjectMixin, RedirectView):
     model = Composition
+    object = None
     permission_required = 'materials.change_composition'
 
     def get_redirect_url(self, *args, **kwargs):
@@ -686,6 +678,7 @@ class CompositionOrderUpView(PermissionRequiredMixin, SingleObjectMixin, Redirec
 
 class CompositionOrderDownView(PermissionRequiredMixin, SingleObjectMixin, RedirectView):
     model = Composition
+    object = None
     permission_required = 'materials.change_composition'
 
     def get_redirect_url(self, *args, **kwargs):
@@ -719,6 +712,7 @@ class AddCompositionView(PermissionRequiredMixin, NextOrSuccessUrlMixin, BSModal
     form_class = AddCompositionModalForm
     template_name = 'modal_form.html'
     permission_required = ('materials.add_composition', 'materials.add_weightshare')
+    success_message = 'Composition successfully added.'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -729,12 +723,10 @@ class AddCompositionView(PermissionRequiredMixin, NextOrSuccessUrlMixin, BSModal
         return context
 
     def form_valid(self, form):
-        # Due to the way the django-bootstrap modal-forms package is built, the post request and this method are
-        # executed twice.
-        # See: https://github.com/trco/django-bootstrap-modal-forms/issues/14
-        if not self.request.is_ajax():
-            self.get_object().add_component_group(form.cleaned_data['group'],
-                                                  fractions_of=form.cleaned_data['fractions_of'])
+        self.get_object().add_component_group(
+            form.cleaned_data['group'],
+            fractions_of=form.cleaned_data['fractions_of']
+        )
         return HttpResponseRedirect(self.get_success_url())
 
 
@@ -757,8 +749,7 @@ class AddSourceView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMix
         return context
 
     def form_valid(self, form):
-        if not self.request.is_ajax():
-            self.get_object().sources.add(form.cleaned_data['source'])
+        self.get_object().sources.add(form.cleaned_data['source'])
         return HttpResponseRedirect(self.get_success_url())
 
     def get_success_url(self):
@@ -787,8 +778,7 @@ class AddSeasonalVariationView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSu
         return context
 
     def form_valid(self, form):
-        if not self.request.is_ajax():
-            self.get_object().add_temporal_distribution(form.cleaned_data['temporal_distribution'])
+        self.get_object().add_temporal_distribution(form.cleaned_data['temporal_distribution'])
         return HttpResponseRedirect(self.get_success_url())
 
     def get_success_url(self):

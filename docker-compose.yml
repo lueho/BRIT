@@ -1,4 +1,5 @@
-version: '3.3'
+networks:
+  full:
 
 services:
   db:
@@ -9,6 +10,9 @@ services:
       - brit_db:/var/lib/postgresql/data/
     env_file:
       - brit/settings/.env
+    networks:
+      - full
+
   web:
     build:
       context: .
@@ -20,21 +24,29 @@ services:
       - "8000:8000"
     env_file:
       - brit/settings/.env
-    links:
-      - db
+    networks:
+      - full
+
   celery:
     build:
       context: .
     command: celery --app=brit worker --loglevel=info --logfile=logs/celery.log
-    volumes:
-      - ./:/app
     env_file:
       - brit/settings/.env
     depends_on:
       - web
       - redis
+    networks:
+      - full
+
   redis:
-    image: redis:7-alpine
+    build:
+      context: ./docker/redis/
+    volumes:
+      - ./docker/redis/tests/:/tests
+    networks:
+      - full
+
   db_admin:
     build:
       context: ./docker/db_admin/
@@ -42,18 +54,22 @@ services:
       - brit/settings/.env
     depends_on:
       - db
+    networks:
+      - full
     profiles: [ "db_admin" ]
-#  dashboard:
-#    build: .
-#    command: flower -A brit --port=5555 --broker=redis://redis:6379/0
-#    ports:
-#      - 5555:5555
-#    env_file:
-#      - brit/settings/.env
-#    depends_on:
-#      - web
-#      - redis
-#      - celery
+
+  flower:
+    build: .
+    command: celery --app=brit --broker=redis://redis:6379/0 flower
+    ports:
+      - "5555:5555"
+    env_file:
+      - brit/settings/.env
+    depends_on:
+      - redis
+      - celery
+    networks:
+      - full
 
 volumes:
   brit_db:
