@@ -1,7 +1,7 @@
 from django.urls import reverse
 
+from distributions.models import TemporalDistribution, Timestep
 from utils.tests.testcases import ViewWithPermissionsTestCase
-from distributions.models import Timestep, TemporalDistribution
 from ..models import (Composition, Material, MaterialCategory, MaterialComponent, MaterialComponentGroup,
                       MaterialProperty, MaterialPropertyValue, Sample, SampleSeries, WeightShare)
 
@@ -394,8 +394,8 @@ class MaterialModalCreateViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         data = {'name': 'Test Material'}
         response = self.client.post(reverse('material-create-modal'), data, follow=True)
-        created_pk = list(response.context.get('messages'))[0].message
-        self.assertRedirects(response, reverse('material-detail', kwargs={'pk': created_pk}))
+        pk = response.context['object'].id
+        self.assertRedirects(response, reverse('material-detail', kwargs={'pk': pk}))
 
 
 class MaterialDetailViewTestCase(ViewWithPermissionsTestCase):
@@ -635,11 +635,6 @@ class ComponentCreateViewTestCase(ViewWithPermissionsTestCase):
 class ComponentModalCreateViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = 'add_materialcomponent'
 
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.component = MaterialComponent.objects.create(name='Test Component')
-
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialcomponent-create-modal')
         response = self.client.get(url)
@@ -674,8 +669,8 @@ class ComponentModalCreateViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         data = {'name': 'Test Component'}
         response = self.client.post(reverse('materialcomponent-create-modal'), data, follow=True)
-        created_pk = list(response.context.get('messages'))[0].message
-        self.assertRedirects(response, reverse('materialcomponent-detail', kwargs={'pk': created_pk}))
+        pk = response.context['object'].id
+        self.assertRedirects(response, reverse('materialcomponent-detail', kwargs={'pk': pk}))
 
 
 class ComponentDetailViewTestCase(ViewWithPermissionsTestCase):
@@ -943,8 +938,8 @@ class ComponentGroupModalCreateViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         data = {'name': 'Test Group'}
         response = self.client.post(reverse('materialcomponentgroup-create-modal'), data, follow=True)
-        created_pk = list(response.context.get('messages'))[0].message
-        self.assertRedirects(response, reverse('materialcomponentgroup-detail', kwargs={'pk': created_pk}))
+        pk = response.context['object'].id
+        self.assertRedirects(response, reverse('materialcomponentgroup-detail', kwargs={'pk': pk}))
 
 
 class ComponentGroupDetailViewTestCase(ViewWithPermissionsTestCase):
@@ -1544,8 +1539,8 @@ class SampleSeriesModalCreateViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         data = {'name': 'Test Series', 'material': self.material.pk}
         response = self.client.post(reverse('sampleseries-create-modal'), data, follow=True)
-        created_pk = list(response.context.get('messages'))[0].message
-        self.assertRedirects(response, reverse('sampleseries-detail', kwargs={'pk': created_pk}))
+        pk = response.context['object'].id
+        self.assertRedirects(response, reverse('sampleseries-detail', kwargs={'pk': pk}))
 
 
 class SampleSeriesDetailViewTestCase(ViewWithPermissionsTestCase):
@@ -1866,8 +1861,8 @@ class SampleSeriesModalCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.post(
             reverse('sampleseries-duplicate-modal', kwargs={'pk': self.series.pk}), data, follow=True
         )
-        created_pk = list(response.context.get('messages'))[0].message
-        self.assertRedirects(response, reverse('sampleseries-detail', kwargs={'pk': created_pk}))
+        pk = response.context['object'].id
+        self.assertRedirects(response, reverse('sampleseries-detail', kwargs={'pk': pk}))
 
 
 # ----------- Sample CRUD ----------------------------------------------------------------------------------------------
@@ -1996,8 +1991,8 @@ class SampleModalCreateViewTestCase(ViewWithPermissionsTestCase):
             'timestep': Timestep.objects.default().pk,
         }
         response = self.client.post(reverse('sample-create-modal'), data, follow=True)
-        created_pk = list(response.context.get('messages'))[0].message
-        self.assertRedirects(response, reverse('sample-detail', kwargs={'pk': created_pk}))
+        pk = response.context['object'].id
+        self.assertRedirects(response, reverse('sample-detail', kwargs={'pk': pk}))
 
 
 class SampleDetailViewTestCase(ViewWithPermissionsTestCase):
@@ -2425,8 +2420,8 @@ class SampleModalCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
             'timestep': Timestep.objects.get(name='Test Timestep 2').pk
         }
         response = self.client.post(reverse('sample-duplicate-modal', kwargs={'pk': self.sample.pk}), data, follow=True)
-        created_pk = list(response.context.get('messages'))[0].message
-        self.assertRedirects(response, reverse('sample-detail', kwargs={'pk': created_pk}))
+        pk = response.context['object'].id
+        self.assertRedirects(response, reverse('sample-detail', kwargs={'pk': pk}))
 
 
 # ----------- Composition CRUD -----------------------------------------------------------------------------------------

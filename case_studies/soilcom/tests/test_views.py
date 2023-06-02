@@ -1,13 +1,13 @@
 import json
 from collections import OrderedDict
+from urllib.parse import urlencode
 
 from django.forms.formsets import BaseFormSet
 from django.http import JsonResponse
 from django.http.request import MultiValueDict, QueryDict
-from django.test import RequestFactory, tag
+from django.test import RequestFactory
 from django.urls import reverse
 from mock import Mock, patch
-from urllib.parse import urlencode
 
 from distributions.models import TemporalDistribution, Timestep
 from maps.models import Region
@@ -1912,7 +1912,6 @@ class WasteCollectionMapViewTestCase(ViewWithPermissionsTestCase):
         self.assertContains(response, 'range_slider.min.css')
 
 
-@tag('slow')
 class WasteFlyerListCheckUrlsView(ViewWithPermissionsTestCase):
     member_permissions = 'change_wasteflyer'
 

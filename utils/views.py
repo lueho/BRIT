@@ -1,8 +1,10 @@
 from bootstrap_modal_forms.generic import BSModalCreateView, BSModalDeleteView, BSModalReadView, BSModalUpdateView
+from bootstrap_modal_forms.mixins import is_ajax
+from django.contrib import messages
 from django.contrib.auth.mixins import PermissionRequiredMixin, UserPassesTestMixin
 from django.contrib.messages.views import SuccessMessageMixin
 from django.core.exceptions import FieldError, ImproperlyConfigured
-from django.http import JsonResponse
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.template.loader import render_to_string
 from django.urls import reverse_lazy
 from django.views.generic import CreateView, DetailView, ListView, TemplateView, UpdateView
@@ -126,6 +128,7 @@ class OwnedObjectCreateView(CreateOwnedObjectMixin, SuccessMessageMixin, CreateV
 
 class OwnedObjectModalCreateView(CreateOwnedObjectMixin, BSModalCreateView):
     template_name = 'modal_form.html'
+    success_message = 'Object created successfully.'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -137,6 +140,19 @@ class OwnedObjectModalCreateView(CreateOwnedObjectMixin, BSModalCreateView):
 
     def get_success_message(self, cleaned_data):
         return str(self.object.pk)
+
+    def form_valid(self, form):
+        isAjaxRequest = is_ajax(self.request.META)
+        asyncUpdate = self.request.POST.get('asyncUpdate') == 'True'
+
+        if isAjaxRequest:
+            if asyncUpdate:
+                self.object = form.save()
+            return HttpResponse(status=204)
+
+        self.object = form.save()
+        messages.success(self.request, self.success_message)
+        return HttpResponseRedirect(self.get_success_url())
 
 
 class OwnedObjectDetailView(PermissionRequiredMixin, DetailView):
@@ -182,6 +198,7 @@ class OwnedObjectUpdateView(PermissionRequiredMixin, SuccessMessageMixin, NextOr
 
 class OwnedObjectModalUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
     template_name = 'modal_form.html'
+    success_message = 'Object updated successfully.'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
