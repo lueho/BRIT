@@ -108,6 +108,12 @@ function addDetailViewButton() {
 
 }
 
+function clickedListButton() {
+    const listButton = document.getElementById('btn-collections-as-list');
+    window.location.href = listButton.dataset.hrefTemplate + '?' + parseFilterParameters().toString();
+}
+
 function clickedListLink() {
-    window.location.href = "{% url 'collection-list' %}" + '?' + parseFilterParameters().toString();
+    const listLink = document.getElementById('link-collections-as-list');
+    window.location.href = listLink.dataset.hrefTemplate + '?' + parseFilterParameters().toString();
 }

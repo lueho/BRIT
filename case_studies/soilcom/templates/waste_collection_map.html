@@ -3,7 +3,8 @@
 {% load crispy_forms_tags %}
 
 {% block map_card_footer %}
-    <a href="javascript:void(0)" onclick="clickedListLink()"><i class="fa fa-fw fa-list"></i> View as list</a>
+    <a href="javascript:void(0)" id="link-collections-as-list" data-href-template="/waste_collection/collections/"
+       onclick="clickedListLink()"><i class="fa fa-fw fa-list"></i> View as list</a>
 {% endblock %}
 
 {% block user_actions %}
@@ -60,10 +61,11 @@
             <div class="row">
                 <div class="col">
                     <div class="text-center">
-                        <a id="btn-collection-create"
+                        <a id="btn-collections-as-list"
                            class="btn btn-primary w-75"
                            href="javascript:void(0)"
-                           onclick="clickedListLink()">
+                           data-href-template="/waste_collection/collections/"
+                           onclick="clickedListButton()">
                             View as list
                         </a>
                     </div>
@@ -153,4 +155,5 @@
     {{ block.super }}
     <script src="{% static 'lib/turf-inside/inside.min.js' %}"></script>
     <script src="{% static 'js/waste_collection_map.min.js' %}"></script>
+
 {% endblock javascript %}
