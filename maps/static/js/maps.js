@@ -120,6 +120,10 @@ function getQueryParameters() {
 
 function parseFilterParameters() {
     const form = document.querySelector('form');
+    if (!form) {
+        console.warn('No form found on the page. Returning an empty URLSearchParams object.');
+        return new URLSearchParams();
+    }
     const formData = new FormData(form);
     return new URLSearchParams(formData);
 }
