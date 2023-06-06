@@ -9,7 +9,11 @@ DEBUG = False
 
 ALLOWED_HOSTS = ALLOWED_HOSTS.append('bri-tool.herokuapp.com')
 
-SECURE_SSL_REDIRECTS = True
+SECURE_SSL_REDIRECT = True
+SESSION_COOKIE_SECURE = True
+CSRF_COOKIE_SECURE = True
+SESSION_COOKIE_SAMESITE = 'Lax'
+CSRF_COOKIE_SAMESITE = 'Lax'
 
 DATABASES['default'] = dj_database_url.config(default=os.environ.get('DATABASE_URL'), conn_max_age=500,
                                               ssl_require=True)
