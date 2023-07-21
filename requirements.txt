@@ -1,12 +1,12 @@
-ai-django-core==7.0.1
+ai-django-core==7.0.2
 boto3==1.26.146
 celery==5.2.7
 crispy-bootstrap4==2022.1
 dj-database-url==2.0.0
 Django==4.0.10
 django-autocomplete-light==3.9.7
-django-bootstrap-modal-forms==3.0.2
-django-cookie-consent==0.3.1
+django-bootstrap-modal-forms==3.0.4
+django-cookie-consent==0.4.0
 django-crispy-forms==2.0
 django-debug-toolbar==4.1.0
 django-extra-views==0.14.0
@@ -16,8 +16,8 @@ django-heroku==0.3.1
 django-leaflet==0.29.0
 django-registration-redux==2.12
 django-storages==1.13.2
-django-tables2==2.5.3
-django-tree-queries==0.14.0
+django-tables2==2.6.0
+django-tree-queries==0.15.0
 djangorestframework==3.14.0
 djangorestframework-csv==2.1.1
 djangorestframework-gis==1.0

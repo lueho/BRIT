@@ -129,6 +129,7 @@ class OwnedObjectCreateView(CreateOwnedObjectMixin, SuccessMessageMixin, CreateV
 class OwnedObjectModalCreateView(CreateOwnedObjectMixin, BSModalCreateView):
     template_name = 'modal_form.html'
     success_message = 'Object created successfully.'
+    object = None
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -138,7 +139,7 @@ class OwnedObjectModalCreateView(CreateOwnedObjectMixin, BSModalCreateView):
         })
         return context
 
-    def get_success_message(self, cleaned_data):
+    def get_success_message(self):
         return str(self.object.pk)
 
     def form_valid(self, form):
@@ -151,7 +152,7 @@ class OwnedObjectModalCreateView(CreateOwnedObjectMixin, BSModalCreateView):
             return HttpResponse(status=204)
 
         self.object = form.save()
-        messages.success(self.request, self.success_message)
+        messages.success(self.request, self.get_success_message())
         return HttpResponseRedirect(self.get_success_url())
 
 
@@ -208,7 +209,7 @@ class OwnedObjectModalUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin,
         })
         return context
 
-    def get_success_message(self, cleaned_data):
+    def get_success_message(self):
         return str(self.object.pk)
 
 
