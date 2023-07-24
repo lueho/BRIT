@@ -40,9 +40,15 @@
 {% endblock list_body %}
 
 {% block list_footer %}
-    <a href="{{ create_url }}">
+    <a class="mr-2 text-nowrap" href="{{ create_url }}">
         <i class="fas fa-fw fa-plus"></i> {{ create_url_text }}
     </a>
+    {% if 'bibliography.change_source' in perms %}
+        <a class="mr-2 text-nowrap" href="{% url 'bibliography-dashboard' %}">
+            <i class="fas fa-fw fa-cog"></i>
+            <span>Dashboard</span>
+        </a>
+    {% endif %}
 {% endblock list_footer %}
 
 {% block filter_body %}
