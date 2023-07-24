@@ -6,7 +6,7 @@
 {% block list_header %}<strong>Samples</strong>{% endblock %}
 
 {% block list_body %}
-    <table class="table">
+    <table class="table table-responsive-stack">
         <thead>
         <tr>
             <th>Id</th>
@@ -18,14 +18,14 @@
         <tbody>
         {% for object in object_list %}
             <tr>
-                <td><a href="{{ object.get_absolute_url }}">{{ object.id }}</a></td>
-                <td><a href="{% url 'sampleseries-detail' object.series.pk %}">{{ object.series.name }}</a></td>
-                <td>
+                <td data-label="Id"><a href="{{ object.get_absolute_url }}">{{ object.id }}</a></td>
+                <td data-label="Sample Series"><a href="{% url 'sampleseries-detail' object.series.pk %}">{{ object.series.name }}</a></td>
+                <td data-label="Material">
                     <a href="{% url 'material-detail' object.series.material.pk %}">
                         {{ object.series.material.name }}
                     </a>
                 </td>
-                <td><a href="{% url 'timestep-detail-modal' object.timestep.pk %}" class="modal-link">
+                <td data-label="Timestamp"><a href="{% url 'timestep-detail-modal' object.timestep.pk %}" class="modal-link">
                     {{ object.timestep.name }}
                 </a></td>
             </tr>

@@ -7,7 +7,7 @@
 {% block list_header %}<strong>Collections</strong>{% endblock %}
 
 {% block list_body %}
-    <table class="table">
+    <table class="table table-responsive-stack">
         <thead>
         <tr>
             <th>Id</th>
@@ -20,12 +20,12 @@
         <tbody>
         {% for object in object_list %}
             <tr>
-                <td><a href="{{ object.get_absolute_url }}">{{ object.id }}</a></td>
-                <td><a href="{{ object.catchment.get_absolute_url }}">{{ object.catchment }}</a></td>
-                <td><a href="{{ object.collector.get_absolute_url }}">{{ object.collector }}</a></td>
-                <td><a href="{{ object.waste_stream.category.get_absolute_url }}">{{ object.waste_stream.category }}</a>
+                <td data-label="Id"><a href="{{ object.get_absolute_url }}">{{ object.id }}</a></td>
+                <td data-label="Catchment"><a href="{{ object.catchment.get_absolute_url }}">{{ object.catchment }}</a></td>
+                <td data-label="Collector"><a href="{{ object.collector.get_absolute_url }}">{{ object.collector }}</a></td>
+                <td data-label="Category"><a href="{{ object.waste_stream.category.get_absolute_url }}">{{ object.waste_stream.category }}</a>
                 </td>
-                <td><a href="{{ object.collection_system.get_absolute_url }}">{{ object.collection_system }}</a></td>
+                <td data-label="Collection system"><a href="{{ object.collection_system.get_absolute_url }}">{{ object.collection_system }}</a></td>
             </tr>
         {% endfor %}
         </tbody>

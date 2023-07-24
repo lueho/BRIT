@@ -26,6 +26,37 @@
 }
 
 .url-cell:before {
-  content: '';
-  display: inline-block;
+    content: '';
+    display: inline-block;
 }
+
+@media screen and (max-width: 768px) {
+    .table-responsive-stack tr {
+        display: block;
+        margin-bottom: .625em;
+        border: 1px solid #858796;
+
+    }
+
+    /*.table-responsive-stack tr:nth-child(odd) {*/
+    /*    background-color: #f2f2f2;*/
+    /*}*/
+
+    .table-responsive-stack td {
+        display: block;
+        text-align: left;
+    }
+
+    .table-responsive-stack td::before {
+        content: attr(data-label);
+        display: block;
+        font-weight: bold;
+        text-transform: none;
+    }
+
+    .table-responsive-stack thead {
+        display: none;
+    }
+}
+
+

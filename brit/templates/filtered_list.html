@@ -6,8 +6,9 @@
 {% block title %}BRIT | Sources{% endblock %}
 
 {% block content %}
+    <div class="container-fluid">
     <div class="row">
-        <div class="col">
+        <div class="col-lg-8 order-2 order-lg-1">
             <div class="card shadow">
                 <div class="card-header">
                     {% block list_header %}<b>{{ header }}</b>{% endblock %}
@@ -37,12 +38,14 @@
                 </div>
             </div>
         </div>
-        <div class="col col-sm-3">
+        <div class="col-lg-4 order-1 order-lg-2">
         {% block filter_column %}
             <div class="card shadow">
-                <div class="card-header">
+                <div class="card-header" id="filterFormHeading" data-toggle="collapse" data-target="#filterForm" aria-expanded="true" aria-controls="filterForm">
                     {% block filter_header %}<strong>Filter</strong>{% endblock %}
+                <span class="arrow" aria-hidden="true"></span>
                 </div>
+            <div id="filterForm" class="collapse show" aria-labelledby="filterFormHeading">
                 <div class="card-body">
                     {% block filter_body %}
                         <form method="get">
@@ -51,11 +54,13 @@
                         </form>
                     {% endblock %}
                 </div>
+            </div>
                 {% block filter_footer %}<div class="card-footer"></div>{% endblock %}
             </div>
         {% block extra_options %}{% endblock extra_options %}
             {% endblock filter_column %}
         </div>
+    </div>
     </div>
 {% endblock %}
 

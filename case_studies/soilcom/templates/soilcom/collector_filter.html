@@ -6,7 +6,7 @@
 {% block list_header %}<strong>Collectors</strong>{% endblock %}
 
 {% block list_body %}
-    <table class="table">
+    <table class="table table-responsive-stack">
         <thead>
         <tr>
             <th>Name</th>
@@ -16,8 +16,8 @@
         <tbody>
         {% for object in object_list %}
             <tr>
-                <td><a href="{{ object.get_absolute_url }}">{{ object.name }}</a></td>
-                <td>{{ object.catchment }}</td>
+                <td data-label="Name"><a href="{{ object.get_absolute_url }}">{{ object.name }}</a></td>
+                <td data-label="Catchment">{{ object.catchment }}</td>
             </tr>
         {% endfor %}
         </tbody>

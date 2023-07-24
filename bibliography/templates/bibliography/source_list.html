@@ -5,7 +5,7 @@
 {% block title %}BRIT | Bibliography | Sources{% endblock %}
 
 {% block list_body %}
-    <table class="table">
+    <table class="table table-responsive-stack">
         <thead>
         <tr>
             <th>Abbreviation</th>
@@ -16,8 +16,8 @@
         </thead>
         {% for object in object_list %}
             <tr>
-                <td><a href="{{ object.get_absolute_url }}">{{ object.abbreviation }}</a></td>
-                <td>
+                <td data-label="Abbreviation"><a href="{{ object.get_absolute_url }}">{{ object.abbreviation }}</a></td>
+                <td data-label="Authors/Publisher">
                 {% if object.authors.exists %}
                     {% if object.authors.count > 2 %}
                         {% for author in object.authors.all %}
@@ -32,8 +32,8 @@
                     {{ object.publisher }}
                 {% endif %}
                 </td>
-                <td><a href="{{ object.get_absolute_url }}">{{ object.title }}</a></td>
-                <td>{{ object.type }}</td>
+                <td data-label="Title"><a href="{{ object.get_absolute_url }}">{{ object.title }}</a></td>
+                <td data-label="Type">{{ object.type }}</td>
             </tr>
         {% endfor %}
     </table>
@@ -57,3 +57,5 @@
         <button id="btn-filter" class="btn btn-primary" type="submit">Filter</button>
     </form>
 {% endblock filter_body %}
+
+{% block filter_footer %}{% endblock filter_footer %}
