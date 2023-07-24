@@ -1,4 +1,4 @@
-from ai_django_core.models import CommonInfo
+from ambient_toolbox.models import CommonInfo
 from django.conf import settings
 from django.contrib.auth.models import User, Group
 from django.db import models

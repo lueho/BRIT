@@ -7,7 +7,7 @@ from ..models import NutsRegion, Attribute, RegionAttributeValue, RegionAttribut
 from ..serializers import NutsRegionSummarySerializer
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
+@modify_settings(MIDDLEWARE={'remove': 'ambient_toolbox.middleware.current_user.CurrentUserMiddleware'})
 class NutsRegionSummarySerializerTestCase(TestCase):
 
     @classmethod

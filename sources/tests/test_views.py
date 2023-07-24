@@ -5,7 +5,7 @@ from django.urls import reverse
 
 # CurrentUserMiddleware is used to track object creation and change. It causes errors in the TestCases with
 # logins. Can be disabled here because it is not relevant for these tests.
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
+@modify_settings(MIDDLEWARE={'remove': 'ambient_toolbox.middleware.current_user.CurrentUserMiddleware'})
 class SourcesListViewTestCase(TestCase):
 
     @classmethod

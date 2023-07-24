@@ -31,7 +31,7 @@ INSTALLED_APPS = [
     'rest_framework_gis',
     'leaflet',
     'cookie_consent',
-    'ai_django_core',
+    'ambient_toolbox',
     'users.apps.UsersConfig',
     'utils.apps.UtilsConfig',
     'maps.apps.MapsConfig',
@@ -61,7 +61,7 @@ MIDDLEWARE = [
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
-    'ai_django_core.middleware.current_user.CurrentUserMiddleware',
+    'ambient_toolbox.middleware.current_user.CurrentUserMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
 ]

@@ -1,4 +1,4 @@
-ai-django-core==7.0.2
+ambient-toolbox==8.4.2
 boto3==1.28.9
 celery==5.3.1
 crispy-bootstrap4==2022.1

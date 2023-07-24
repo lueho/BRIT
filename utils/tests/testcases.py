@@ -4,7 +4,7 @@ from django.test import TestCase, modify_settings
 from users.models import User
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ai_django_core.middleware.current_user.CurrentUserMiddleware'})
+@modify_settings(MIDDLEWARE={'remove': 'ambient_toolbox.middleware.current_user.CurrentUserMiddleware'})
 @modify_settings(MIDDLEWARE={'remove': 'debug_toolbar.middleware.DebugToolbarMiddleware'})
 class UserLoginTestCase(TestCase):
     """
