@@ -7,7 +7,10 @@
         <a href="{{ object.website }}" target="blank">{{ object.website }}</a>
     </p>
     {% if object.catchment %}
-        <p class="card-text"><strong>Catchment:</strong><br>{{ object.catchment }}</p>
+        <p class="card-text"><strong>Catchment:</strong><br>
+        <a href="{% url 'collectioncatchment-detail' object.catchment.pk %}">{{ object.catchment }}</a>
+        </p>
+
     {% endif %}
     {% if object.comments %}
         <p class="card-text"><strong>Comments:</strong><br>{{ object.description }}</p>
