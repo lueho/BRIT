@@ -8,7 +8,7 @@ from django.dispatch import receiver
 
 from bibliography.models import Source
 from distributions.models import Period, TemporalDistribution, Timestep
-from maps.models import Catchment
+from maps.models import Catchment, GeoPolygon
 from materials.models import Material, MaterialCategory, Sample, SampleSeries
 from users.models import get_default_owner
 from utils.models import NamedUserObjectModel, OwnedObjectModel, PropertyValue
@@ -17,6 +17,10 @@ from utils.models import NamedUserObjectModel, OwnedObjectModel, PropertyValue
 class CollectionCatchment(Catchment):
     class Meta:
         proxy = True
+
+    @property
+    def inside_collections(self):
+        return Collection.objects.filter(catchment__region__borders__geom__within=self.region.borders.geom)
 
     @property
     def downstream_collections(self):

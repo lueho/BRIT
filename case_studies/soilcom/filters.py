@@ -208,7 +208,10 @@ class CollectionFilterSet(CrispyAutocompleteFilterSet):
 
     @staticmethod
     def catchment_filter(_, __, value):
-        qs = value.downstream_collections.order_by('name')
+        if value.type == 'custom':
+            qs = value.inside_collections.order_by('name')
+        else:
+            qs = value.downstream_collections.order_by('name')
         if not qs.exists():
             qs = value.upstream_collections.order_by('name')
         return qs
