@@ -5,8 +5,8 @@ class HomeView(TemplateView):
     template_name = 'home.html'
 
 
-class ContributorsView(TemplateView):
-    template_name = 'contributors.html'
+class AboutView(TemplateView):
+    template_name = 'about.html'
 
 
 class PrivacyPolicyView(TemplateView):

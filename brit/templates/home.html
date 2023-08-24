@@ -5,93 +5,62 @@
 
 {% block content %}
     <div class="row">
-        <div class="col col-12 col-md-6">
+        <div class="col col-12 col-md-6 mb-4">
             <div class="card shadow h-100">
-                <div class="card-header"><b>Welcome!</b></div>
+                <div class="card-header"><strong>Introduction</strong></div>
                 <div class="card-body">
-                    <p><strong>Welcome to the Bioresource Information Tool!</strong></p>
-                    <p>
+                    <h3 class="card-text"><strong>What is BRIT?</strong></h3>
+                    <p class="card-text">
                         The Bioresource Information Tool (BRIT) provides information about sources, quantities and
-                        properties of residue-based bioresources.
-                        You explore the case studies that have been created in the FLEXIBI project, change parameters
-                        and assumptions to create your own scenarios. This site is the prototype of the system that
-                        is still actively developed. If you find any bugs or have feedback, please let us know and
-                        write a short note to <a
-                            href="mailto:info@bioresource-tools.net">info@bioresource<span>&#8209;</span>tools.net</a>
+                        properties of residue-based bioresources. It is an open source, open data tool that. This free
+                        instance is hosted by the Hamburg University of Technology.
+                        You explore case studies from the
+                        <a href="http://www.flexibi-biorefineries.eu" target="_blank">FLEXIBI</a> and
+                        <a href="https://northsearegion.eu/soilcom/" target="_blank">SOILCOM</a>
+                        project, as well as raw data from these projects and other sources.
+                        This tool is under constant development. We highly appreciate any kind of feedback.
+                    </p>
+                    <p class="card-text">
+                        <a href="mailto:info@bioresource-tools.net" class="btn btn-primary">Contact</a>
                     </p>
                 </div>
             </div>
         </div>
-        <div class="col d-none d-md-block">
+        <div class="col d-md-block mb-4">
             <div class="card shadow h-100">
-                <div class="card-header"><b>Updates</b></div>
+                <div class="card-header"><b>News & Updates</b></div>
                 <div class="card-body">
-                    <p class="card-text"><strong>31.01.2023 - Update 2305</strong></p>
-                    <p class="card-text">
-                    <ul>
-                        <li><strong>German Collections Complete:</strong> The dataset of household waste collections now
-                            holds data for all 899 independent collection catchments in Germany, including reported
-                            collection amounts.
-                        </li>
-                        <li><strong>Maps UI Update:</strong> The user interface for navigating maps has been improved
-                            with several changes including loading indication, search catchment boundaries, selection
-                            through info popups and tooltips.
-                        </li>
-                        <li><strong>Filter UI Update:</strong> Lists can now be filtered more easily. Where applicable,
-                            the search now has autocomplete capabilities. Also, several new filters have been implemented.
-                        </li>
-                    </ul>
-{#                    <p class="card-text"><strong>15.07.2022 - Update 2226</strong></p>#}
-{#                    <p class="card-text">#}
-{#                    <ul>#}
-{#                        <li><strong>New Module:</strong> Models of bioresource generating source from case studies are#}
-{#                            now collected in the new module "Sources" in order to facilitate navigation and overview.#}
-{#                        </li>#}
-{#                        <li><strong>Design update:</strong> Cards for navigation now have a consistent, more#}
-{#                            eye-pleasing and self-explanatory design.#}
-{#                        </li>#}
-{#                        <li><strong>Household Biowaste Collection:</strong> Collection can now be navigated through the#}
-{#                            interactive map as well as a filterable list.#}
-{#                        </li>#}
-{#                    </ul>#}
-{#                    <p class="card-text"><strong>19.04.2022 - Update 2214</strong></p>#}
-{#                    <ul>#}
-{#                        <li><strong>Maps</strong>: NUTS map now includes information about population density and#}
-{#                            remotness factor#}
-{#                        </li>#}
-{#                        <li>#}
-{#                            <strong>Waste Collections:</strong>#}
-{#                            Waste collections can now store information about the collection intervall#}
-{#                        </li>#}
-{#                        <li><strong>Materials:</strong> When editing compositions, now components can now be added on#}
-{#                            the fly#}
-{#                        </li>#}
-{#                    </ul>#}
-                    {#                    <p class="card-text"><strong>01.04.2022 - Update 2210</strong></p>#}
-                    {#                    <p class="card-text">#}
-                    {#                    <ul>#}
-                    {#                        <li><strong>New Module:</strong> Introducing the SOILCOM Household biowaste collection map.</li>#}
-                    {#                        <li>Complete makeover of Materials Module: New model structure is now Sample series >> sample >>#}
-                    {#                            composition >> weight share of component#}
-                    {#                        </li>#}
-                    {#                        <li>Materials: Non mass balance related properties can now be added to samples</li>#}
-                    {#                        <li>Materials: New sample series can now be created as duplicate from existing series for#}
-                    {#                            easier and faster workflow#}
-                    {#                        </li>#}
-                    {#                        <li>Materials: Components of a composition are now sorted by their weight share but the "other"#}
-                    {#                            component is always last in the list#}
-                    {#                        </li>#}
-                    {#                        <li>Bugfix: When updating a collection, sometimes existing flyers where unintentionally deleted.#}
-                    {#                            This problem is fixed.#}
-                    {#                        </li>#}
-                    {#                    </ul>#}
-                    {#                    </p>#}
+                    <h3 class="card-text"><strong>Completion of SOILCOM Project</strong></h3>
+                    <div class="row">
+                        <div class="col-12 col-lg-7 col-xl-6 order-2 order-lg-1">
+                            <p class="card-text">
+                                <a href="https://northsearegion.eu/soilcom/" target="_blank">SOILCOM</a> is an
+                                <a href="https://www.interregnorthsea.eu/" target="_blank">INTERREG North Sea Region</a>
+                                project,
+                                co-funded by the European Union. Through this project, BRIT was extended with the
+                                Household Waste Collection module with waste stream data for the whole NSR. It also
+                                allowed a substantial improvements of the previous prototype.
+                            </p>
+                            <p class="card-text">
+                                <a href="{% url 'WasteCollection' %}?catchment=30845&waste_category=1&waste_category=3&load_catchment=true&load_features=true"
+                                   class="btn btn-primary">SOILCOM Dataset</a>
+                            </p>
+                        </div>
+                        <div class="col-12 col-lg-5 col-xl-6 order-1 order-lg-2">
+                            <a href="https://northsearegion.eu/soilcom/" target="_blank">
+                                <img class="w-100 m-0 p-1"
+                                     src="{% static 'img/interreg_with_soilcom_logo.png' %}"
+                                     alt="Logo of INTERREG North Sea Region SOILCOM Project"
+                                     style="max-width: 250px">
+                            </a>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
     <div class="row">
-        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+        <div class="col col-12 col-md-6 col-lg-3 mb-4">
             <div class="card shadow h-100">
                 <div class="card-header"><a href="{% url 'source-list' %}"><b>Bibliography</b></a></div>
                 <div class="card-img-top">
@@ -110,7 +79,7 @@
                 </div>
             </div>
         </div>
-        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+        <div class="col col-12 col-md-6 col-lg-3 mb-4">
             <div class="card shadow h-100">
                 <div class="card-header"><a href="{% url 'maps_list' %}"><b>Maps</b></a></div>
                 <div class="card-img-top">
@@ -128,7 +97,7 @@
                 </div>
             </div>
         </div>
-        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+        <div class="col col-12 col-md-6 col-lg-3 mb-4">
             <div class="card shadow h-100">
                 <div class="card-header"><a href="{% url 'sample-list-featured' %}"><b>Materials</b></a></div>
                 <div class="card-img">
@@ -146,7 +115,7 @@
                 </div>
             </div>
         </div>
-        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+        <div class="col col-12 col-md-6 col-lg-3 mb-4">
             <div class="card shadow h-100">
                 <div class="card-header"><a href="{% url 'sources-list' %}"><b>Sources</b></a></div>
                 <div class="card-img">
@@ -164,7 +133,7 @@
                 </div>
             </div>
         </div>
-        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+        <div class="col col-12 col-md-6 col-lg-3 mb-4">
             <div class="card shadow h-100">
                 <div class="card-header"><a href="{% url 'scenario-list' %}"><b>Inventories</b></a></div>
                 <div class="card-img">
@@ -179,62 +148,6 @@
                         Inventories are case studies about which bioresources are available in a given region. Explore
                         ready case studies from our research projects or create your own scenarios.
                     </p>
-                </div>
-            </div>
-        </div>
-    </div>
-    <div class="row mt-4">
-        <div class="col d-md-none">
-            <div class="card shadow">
-                <div class="card-header"><b>Updates</b></div>
-                <div class="card-body">
-                    <p class="card-text"><strong>15.07.2022 - Update 2226</strong></p>
-                    <p class="card-text">
-                    <ul>
-                        <li><strong>New Module:</strong> Models of bioresource generating source from case studies are
-                            now collected in the new module "Sources" in order to facilitate navigation and overview.
-                        </li>
-                        <li><strong>Design update:</strong> Cards for navigation now have a consistent, more
-                            eye-pleasing and self-explanatory design.
-                        </li>
-                        <li><strong>Household Biowaste Collection:</strong> Collection can now be navigated through the
-                            interactive map as well as a filterable list.
-                        </li>
-                    </ul>
-                    {#                    <p class="card-text"><strong>19.04.2022 - Update 2214</strong></p>#}
-                    {#                    <p class="card-text">#}
-                    {#                    <ul>#}
-                    {#                        <li><strong>Maps:</strong> NUTS map now includes information about population density and#}
-                    {#                            remoteness factor.#}
-                    {#                        </li>#}
-                    {#                        <li>#}
-                    {#                            <strong>Waste Collection:</strong> Waste collections can now store information about the#}
-                    {#                            collection intervall.#}
-                    {#                        </li>#}
-                    {#                        <li><strong>Materials:</strong> When editing compositions, now components can now be added on#}
-                    {#                            the fly.#}
-                    {#                        </li>#}
-                    {#                    </ul>#}
-                    {#                    </p>#}
-                    {#                    <p class="card-text"><strong>01.04.2022 - Update 2210</strong></p>#}
-                    {#                    <p class="card-text">#}
-                    {#                    <ul>#}
-                    {#                        <li><strong>New Module:</strong> Introducing the SOILCOM Household biowaste collection map.</li>#}
-                    {#                        <li>Complete makeover of Materials Module: New model structure is now Sample series >> sample >>#}
-                    {#                            composition >> weight share of component#}
-                    {#                        </li>#}
-                    {#                        <li>Materials: Non mass balance related properties can now be added to samples</li>#}
-                    {#                        <li>Materials: New sample series can now be created as duplicate from existing series for#}
-                    {#                            easier and faster workflow#}
-                    {#                        </li>#}
-                    {#                        <li>Materials: Components of a composition are now sorted by their weight share but the "other"#}
-                    {#                            component is always last in the list#}
-                    {#                        </li>#}
-                    {#                        <li>Bugfix: When updating a collection, sometimes existing flyers where unintentionally deleted.#}
-                    {#                            This problem is fixed.#}
-                    {#                        </li>#}
-                    {#                    </ul>#}
-                    {#                    </p>#}
                 </div>
             </div>
         </div>
