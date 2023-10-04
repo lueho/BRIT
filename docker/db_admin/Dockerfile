@@ -1,4 +1,4 @@
-FROM postgis/postgis:14-3.3
+FROM postgis/postgis:15-3.4
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends unzip groff less ca-certificates curl\
