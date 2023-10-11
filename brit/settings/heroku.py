@@ -20,6 +20,8 @@ DATABASES['default'] = dj_database_url.config(default=os.environ.get('DATABASE_U
                                               ssl_require=True)
 DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
 
+STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+
 DEBUG_PROPAGATE_EXCEPTIONS = True
 CRISPY_FAIL_SILENTLY = True
 
