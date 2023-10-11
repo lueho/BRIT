@@ -12,7 +12,7 @@
                         {% csrf_token %}
                         {{ form|crispy }}
                         <button class="btn btn-primary" type="submit">Save</button>
-                        <a class="btn btn-secondary" href="{% url 'greenhouse_list' %}">Cancel</a>
+                        <a class="btn btn-secondary" href="{% url 'greenhouse-list' %}">Cancel</a>
                     </form>
                 </div>
             </div>

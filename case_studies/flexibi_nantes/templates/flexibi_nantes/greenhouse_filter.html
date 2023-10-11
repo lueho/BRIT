@@ -1,0 +1,63 @@
+{% extends 'filtered_list.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block title %}BRIT | Greenhouse types{% endblock %}
+
+{% block list_header %}<strong>Greenhouse types</strong>{% endblock %}
+
+{% block list_body %}
+    <table class="table table-responsive-stack">
+        <thead>
+        <tr>
+            <th>Id</th>
+            <th>Name</th>
+            <th>Heated</th>
+            <th>Lighting</th>
+            <th>Above ground</th>
+            <th>High wire</th>
+            <th>Growth cycle list</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for object in object_list %}
+            <tr>
+                <td data-label="Id"><a href="{{ object.get_absolute_url }}">{{ object.id }}</a></td>
+                <td data-label="Name">{{ object.name }}</td>
+                <td data-label="Heated">{{ object.heated }}</td>
+                <td data-label="Lighting">{{ object.lighted }}</td>
+                <td data-label="Above ground">{{ object.above_ground }}</td>
+                <td data-label="High wire">{{ object.high_wire }}</td>
+                <td data-label="Growth cycle list">{{ object.growth_cycle_list }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+        <tfoot>
+        </tfoot>
+    </table>
+{% endblock list_body %}
+
+{% block filter_footer %}{% endblock %}
+
+{% block extra_options %}
+    <div class="card shadow">
+        <div class="card-header"
+             role="button"
+             data-toggle="collapse"
+             href="#learning-card-body"
+             aria-expanded="true"
+             aria-controls="learning-card-body">
+            <b>Learning material</b>
+        </div>
+        <div class="card-body collapse" id="learning-card-body">
+            <p class="card-text">
+                To learn more about the role of residue-based bioresource from agriculture, check out the Lectures for
+                Future series "Residue and by-Product Based Bioresources" of the Hamburg Open Online University.
+                Recommended lecture for this topic:<br>
+                <a href="https://www.hoou.de/projects/lff/pages/residue-and-by-product-based-bioresources"
+                   target="_blank">"Sustainability in Agriculture: Nitrogen as Valuable Resource and Pollutant"
+                </a>
+            </p>
+        </div>
+    </div>
+{% endblock extra_options %}

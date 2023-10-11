@@ -33,7 +33,7 @@
                 <div class="card-footer">
                     <a href="javascript:void(0);"
                        class="modal-link toggle-edit"
-                       data-link="{% url 'greenhouse_update' object.id %}?next={{ request.path }}">
+                       data-link="{% url 'greenhouse-update' object.id %}?next={{ request.path }}">
                         Edit <i class="fas fa-fw fa-edit"></i>
                     </a>
                 </div>
@@ -62,7 +62,7 @@
                             <div class="card-footer">
                                 <a href="javascript:void(0);"
                                    class="modal-link toggle-edit"
-                                   data-link="{% url 'growth_cycle_delete' cycle.id %}?next={{ request.path }}">
+                                   data-link="{% url 'growthcycle-delete' cycle.id %}?next={{ request.path }}">
                                     <i class="fas fa-fw fa-trash"></i> Remove this cycle
                                 </a>
                             </div>
@@ -74,7 +74,7 @@
                             <div class="card-body">
                                 <a href="javascript:void(0);"
                                    class="modal-link"
-                                   data-link="{% url 'growth_cycle_create' object.id %}?next={{ request.path }}">
+                                   data-link="{% url 'growthcycle-create' object.id %}?next={{ request.path }}">
                                     <i class="fas fa-fw fa-plus"></i> Add growth cycle
                                 </a>
                             </div>

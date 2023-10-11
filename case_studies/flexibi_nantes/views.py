@@ -5,24 +5,22 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Sum
 from django.http import HttpResponseRedirect, JsonResponse
 from django.urls import reverse, reverse_lazy
-from django.views.generic import DetailView, TemplateView, UpdateView
+from django.views.generic import DetailView, UpdateView
 from django_filters import rest_framework as rf_filters
-from django_tables2 import table_factory
 from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 from rest_framework.generics import GenericAPIView
 
 from maps.models import GeoDataset
 from maps.views import GeoDatasetDetailView
 from materials.models import MaterialComponentGroup
-from users.models import get_default_owner
-from utils.views import DualUserListView, NextOrSuccessUrlMixin, UserOwnsObjectMixin
-from .filters import GreenhouseFilter
+from utils.views import DualUserListView, NextOrSuccessUrlMixin, UserOwnsObjectMixin, BRITFilterView
+from .filters import GreenhouseFilter, GreenhouseTypeFilter
 from .forms import (CultureModelForm, GreenhouseGrowthCycle, GreenhouseModalModelForm, GrowthCycleCreateForm,
                     GrowthShareFormSetHelper, GrowthTimestepInline, InlineGrowthShare,
                     UpdateGreenhouseGrowthCycleValuesForm)
 from .models import Culture, Greenhouse, GrowthTimeStepSet, NantesGreenhouses
 from .serializers import NantesGreenhousesGeometrySerializer
-from .tables import StandardGreenhouseTable, UserGreenhouseTable, growthcycle_table_factory
+from .tables import growthcycle_table_factory
 
 
 # ----------- Culture CRUD ---------------------------------------------------------------------------------------------
@@ -79,7 +77,7 @@ class CultureDeleteView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUr
     model = Culture
     template_name = 'modal_delete.html'
     success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('culture_list')
+    success_url = reverse_lazy('culture-list')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -92,32 +90,15 @@ class CultureDeleteView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUr
 
 # ----------- Greenhouse CRUD ------------------------------------------------------------------------------------------
 
-class DualUserListView(TemplateView):
-    model = None
-
-    def get_context_data(self, **kwargs):
-        kwargs['item_name_plural'] = self.model._meta.verbose_name_plural
-        kwargs['standard_item_table'] = table_factory(
-            self.model,
-            table=StandardGreenhouseTable
-        )(self.model.objects.filter(owner=get_default_owner()))
-        if not self.request.user.is_anonymous:
-            kwargs['custom_item_table'] = table_factory(
-                self.model,
-                table=UserGreenhouseTable
-            )(self.model.objects.filter(owner=self.request.user))
-        return super().get_context_data(**kwargs)
-
-
-class GreenhouseListView(DualUserListView):
+class GreenhouseListView(BRITFilterView):
     model = Greenhouse
-    template_name = 'dual_user_item_list.html'
+    filterset_class = GreenhouseTypeFilter
 
 
 class GreenhouseCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, BSModalCreateView):
     form_class = GreenhouseModalModelForm
     template_name = '../../brit/templates/modal_form.html'
-    success_url = reverse_lazy('greenhouse_list')
+    success_url = reverse_lazy('greenhouse-list')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -160,7 +141,7 @@ class GreenhouseDeleteView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSucces
     model = Greenhouse
     template_name = 'modal_delete.html'
     success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('greenhouse_list')
+    success_url = reverse_lazy('greenhouse-list')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -220,7 +201,7 @@ class GrowthCycleCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, BSModalCr
 
 class GrowthCycleDetailView(DetailView):
     model = GreenhouseGrowthCycle
-    template_name = 'growth_cycle_detail.html'
+    template_name = 'growthcycle_detail.html'
 
     def get_context_data(self, **kwargs):
         kwargs['table'] = growthcycle_table_factory(self.object)
@@ -231,7 +212,7 @@ class GrowthCycleDeleteView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSucce
     model = GreenhouseGrowthCycle
     template_name = 'modal_delete.html'
     success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('greenhouse_list')
+    success_url = reverse_lazy('greenhouse-list')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -265,6 +246,7 @@ class GrowthTimeStepSetModalUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, 
 
 
 class UpdateGreenhouseGrowthCycleValuesView(LoginRequiredMixin, UpdateView):
+    # TODO: Is this still required?
     model = GreenhouseGrowthCycle
     form_class = UpdateGreenhouseGrowthCycleValuesForm
     template_name = 'greenhouse_growth_cycle_update_values.html'
@@ -278,7 +260,7 @@ class UpdateGreenhouseGrowthCycleValuesView(LoginRequiredMixin, UpdateView):
         return GreenhouseGrowthCycle.objects.get(id=self.kwargs.get('cycle_pk'))
 
     def get_success_url(self):
-        return reverse('greenhouse_detail', kwargs={'pk': self.kwargs.get('pk')})
+        return reverse('greenhouse-detail', kwargs={'pk': self.kwargs.get('pk')})
 
     def get_initial(self):
         return {

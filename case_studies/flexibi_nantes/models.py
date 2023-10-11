@@ -117,19 +117,19 @@ class Greenhouse(models.Model):
         return grouped_growth_cycles
 
     def get_absolute_url(self):
-        return reverse('greenhouse_detail', kwargs={'pk': self.id})
+        return reverse('greenhouse-detail', kwargs={'pk': self.id})
 
     @property
     def detail_url(self):
-        return reverse('greenhouse_detail', kwargs={'pk': self.id})
+        return reverse('greenhouse-detail', kwargs={'pk': self.id})
 
     @property
     def update_url(self):
-        return reverse('greenhouse_update', kwargs={'pk': self.id})
+        return reverse('greenhouse-update', kwargs={'pk': self.id})
 
     @property
     def delete_url(self):
-        return reverse('greenhouse_delete', kwargs={'pk': self.id})
+        return reverse('greenhouse-delete', kwargs={'pk': self.id})
 
     @property
     def filter_kwargs(self):
@@ -165,19 +165,19 @@ class Culture(models.Model):
 
     @staticmethod
     def get_absolute_url():
-        return reverse('culture_list')
+        return reverse('culture-list')
 
     @property
     def detail_url(self):
-        return reverse('culture_list')
+        return reverse('culture-list')
 
     @property
     def update_url(self):
-        return reverse('culture_update', kwargs={'pk': self.id})
+        return reverse('culture-update', kwargs={'pk': self.id})
 
     @property
     def delete_url(self):
-        return reverse('culture_delete', kwargs={'pk': self.id})
+        return reverse('culture-delete', kwargs={'pk': self.id})
 
     def __str__(self):
         return self.name
@@ -219,7 +219,7 @@ class GreenhouseGrowthCycle(models.Model):
         return Timestep.objects.get(id=self.timesteps.aggregate(models.Min('id'))['id__min'])
 
     def get_absolute_url(self):
-        return reverse('greenhouse_detail', kwargs={'pk': self.greenhouse.id})
+        return reverse('greenhouse-detail', kwargs={'pk': self.greenhouse.id})
 
 
 @receiver(post_delete, sender=GreenhouseGrowthCycle)

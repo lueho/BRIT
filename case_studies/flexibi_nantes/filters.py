@@ -4,7 +4,7 @@ from django.forms import CheckboxSelectMultiple, RadioSelect
 from django_filters.filters import MultipleChoiceFilter, BooleanFilter
 
 from utils.filters import BaseCrispyFilterSet
-from .models import NantesGreenhouses
+from .models import Greenhouse, NantesGreenhouses
 
 HEATING_CHOICES = (
     ('', 'All'),
@@ -36,6 +36,29 @@ CROP_CHOICES = (
 )
 
 
+class GreenhouseTypeFilterFormHelper(FormHelper):
+    layout = Layout(
+        Row(
+            Field('heated', wrapper_class='col-md-6'),
+            Field('lighted', wrapper_class='col-md-6'),
+            Field('above_ground', wrapper_class='col-md-6'),
+            Field('high_wire', wrapper_class='col-md-6'),
+        )
+    )
+
+
+class GreenhouseTypeFilter(BaseCrispyFilterSet):
+    heated = BooleanFilter(widget=RadioSelect(choices=HEATING_CHOICES), label='Heating')
+    lighted = BooleanFilter(widget=RadioSelect(choices=LIGHTING_CHOICES), label='Lighting')
+    above_ground = BooleanFilter(widget=RadioSelect(choices=ABOVE_GROUND_CHOICES), label='Production mode')
+    high_wire = BooleanFilter(widget=RadioSelect(choices=HIGH_WIRE_CHOICES), label='Culture management')
+
+    class Meta:
+        model = Greenhouse
+        fields = ('heated', 'lighted', 'above_ground', 'high_wire')
+        form_helper = GreenhouseTypeFilterFormHelper
+
+
 class GreenhouseFilterFormHelper(FormHelper):
     layout = Layout(
         Row(
@@ -46,6 +69,9 @@ class GreenhouseFilterFormHelper(FormHelper):
             Field('crops', wrapper_class='col-md-12')
         )
     )
+
+
+
 
 
 class GreenhouseFilter(BaseCrispyFilterSet):
