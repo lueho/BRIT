@@ -156,7 +156,8 @@ class GeoDataset(NamedUserObjectModel):
     publish = models.BooleanField(default=False)
     region = models.ForeignKey(Region, on_delete=models.CASCADE, null=False)
     model_name = models.CharField(max_length=56, choices=GIS_SOURCE_MODELS, null=True)
-    sources = models.ManyToManyField(Source)
+    sources = models.ManyToManyField(Source, related_name='geodatasets')
+    resources = models.ManyToManyField(Source, related_name='resource_to_geodatasets')
 
     def get_absolute_url(self):
         return reverse(f'{self.model_name}')

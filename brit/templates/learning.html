@@ -1,0 +1,117 @@
+{% extends 'base.html' %}
+{% load static %}
+
+{% block title %}BRIT | Learning Material{% endblock %}
+
+{% block content %}
+    <div class="row">
+        <div class="col col-12 col-md-6 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header"><strong>Learning Material</strong></div>
+                <div class="card-body">
+                    <p class="card-text">On this page, you can find a collection of learning material about
+                        bioresources,
+                        bioresource management and the bioeconomy. The learning material was prepared by the
+                        <a href="https://www.tuhh.de/aww/forschung/biem/" target="_blank">
+                            Management Group (BIEM)
+                        </a>
+                        of the
+                        <a href="https://www.tuhh.de/" target="_blank">
+                            Hamburg University of Technology
+                        </a>
+                        in cooperation with the
+                        <a href="https://www.hoou.de/" target="_blank">
+                            Hamburg Open Online University (HOOU)
+                        </a>.
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <div class="col col-12 col-md-6 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header"><b>The Hamburg Open Online University</b></div>
+                <div class="card-body">
+                    <p class="card-text">
+                        The
+                        <a href="https://www.hoou.de/" target="_blank">
+                            Hamburg Open Online University (HOOU)
+                        </a>
+                        is a joint project of the Hamburg universities and
+                        the Hamburg University of Applied Sciences. The aim of the HOOU is to make the knowledge of
+                        Hamburg's universities available to the general public and to develop new forms of teaching
+                        and learning. The HOOU is funded by the Free and Hanseatic City of Hamburg.
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+        <div class="col col-12 col-md-6 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header"><b>BioCycle</b></div>
+                <div class="card-img-top">
+                    <a class="d-flex align-items-center justify-content-center"
+                       href="https://lernen.hoou-tuhh.de/course/view.php?id=14"
+                        target="_blank">
+                        <img class="w-100 m-0" src="{% static 'img/biocycle.png' %}"
+                             alt="BioCycle Course Overview">
+                    </a>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        <a href="https://lernen.hoou-tuhh.de/course/view.php?id=14"
+                           target="_blank">
+                            The BioCycle
+                        </a>
+                        is an introduction to the concepts of circular economy following the complete cycle of food
+                        waste. This is the perfect start if you want to start using the
+                        <a href="{% url 'sources-list' %}">
+                            Household Waste Collection
+                        </a>
+                        module.
+                    </p>
+                    <ul>
+                        <li><a href="https://lernen.hoou-tuhh.de/course/view.php?id=14"
+                               target="_blank">The BioCycle: From Resource to Waste to Resource</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+        <div class="col col-12 col-md-6 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header"><b>Lectures For Future</b></div>
+                <div class="card-img-top">
+                    <a class="d-flex align-items-center justify-content-center"
+                       href="https://www.hoou.de/projects/lff/pages/lectures-for-future-project-introduction"
+                        target="_blank">
+                        <img class="w-100 m-0" src="{% static 'img/lff_cover.png' %}"
+                             alt="Lectures For Future Cover Image">
+                    </a>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        The
+                        <a href="https://www.hoou.de/projects/lff/pages/lectures-for-future-project-introduction"
+                           target="_blank">
+                            Lectures for Future
+                        </a>
+                        are a series of interactive lectures in English language on the topic of sustainability.
+                        The lectures are made by scientists from Hamburg's universities and are aimed at the general
+                        public.
+                    </p>
+                    <ul>
+                        <li><a href="https://www.hoou.de/projects/lff/pages/residue-and-by-product-based-bioresources"
+                               target="_blank">Residue and by-Product Based Bioresources</a>
+                        </li>
+                        <li><a href="https://www.hoou.de/projects/lff/pages/sustainable-urban-bioresource-management"
+                               target="_blank">Sustainable Urban Bioresource Management</a>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock content %}

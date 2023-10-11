@@ -288,6 +288,7 @@ class UpdateGreenhouseGrowthCycleValuesView(LoginRequiredMixin, UpdateView):
 
 
 class GreenhousesMapView(GeoDatasetDetailView):
+    template_name = 'greenhouse_map.html'
     feature_url = reverse_lazy('data.nantes_greenhouses')
     filter_class = GreenhouseFilter
     filterset_class = GreenhouseFilter

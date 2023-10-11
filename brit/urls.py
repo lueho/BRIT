@@ -5,7 +5,7 @@ from django.contrib import admin
 from django.urls import path, include
 from django.views.generic import RedirectView
 
-from .views import HomeView, AboutView, PrivacyPolicyView
+from .views import HomeView, AboutView, LearningView, PrivacyPolicyView
 
 from rest_framework.authtoken.views import obtain_auth_token
 
@@ -20,6 +20,7 @@ urlpatterns = [
     path('admin/', admin.site.urls),
     path('users/', include('users.urls')),
     path('about/', AboutView.as_view(), name='about'),
+    path('learning/', LearningView.as_view(), name='learning'),
     path('distributions/', include('distributions.urls')),
     path('maps/', include('maps.urls')),
     path('materials/', include('materials.urls')),

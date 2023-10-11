@@ -11,6 +11,7 @@ from .serializers import HamburgRoadsideTreeGeometrySerializer
 
 
 class RoadsideTreesMapView(GeoDatasetDetailView):
+    template_name = 'hamburg_roadside_tree_map.html'
     feature_url = reverse_lazy('data.hamburg_roadside_trees')
     filterset_class = TreeFilter
     load_features = False

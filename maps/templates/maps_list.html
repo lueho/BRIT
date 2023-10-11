@@ -6,8 +6,8 @@
 {% block content %}
 
     <div class="row">
-        <div class="col col-12 col-md-6">
-            <div class="card shadow">
+        <div class="col col-12 col-md-6 mb-4">
+            <div class="card shadow h-100">
                 <div class="card-header"><b>Maps</b></div>
                 <div class="card-body">
                     <p class="card-text">
@@ -20,15 +20,30 @@
                 </div>
             </div>
         </div>
+        <div class="col col-12 col-md-6 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header"><b>Learning Material</b></div>
+                <div class="card-body">
+                    <p class="card-text">
+                        To learn more about the use of geodata in bioresource management, check out the Lectures for
+                        Future series "Sustainable Urban Bioresource Management" of the Hamburg Open Online University.
+                        Recommended lecture for this topic:<br>
+                        <a href="https://www.hoou.de/projects/lff/pages/sustainable-urban-bioresource-management"
+                           target="_blank">"Geoinformation Systems: The Use of Geodata for Bioresource Management and
+                            Biorefinery Planning"
+                        </a>
+                    </p>
+                </div>
+            </div>
+        </div>
     </div>
-    <div class="row">
 
+    <div class="row">
         {% for map in object_list %}
-            <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="col col-12 col-md-6 col-lg-3 mb-4">
                 {% include 'maps_card.html' %}
             </div>
         {% endfor %}
-
     </div>
 
 {% endblock content %}

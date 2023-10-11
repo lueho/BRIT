@@ -9,5 +9,9 @@ class AboutView(TemplateView):
     template_name = 'about.html'
 
 
+class LearningView(TemplateView):
+    template_name = 'learning.html'
+
+
 class PrivacyPolicyView(TemplateView):
     template_name = 'privacy_policy.html'
