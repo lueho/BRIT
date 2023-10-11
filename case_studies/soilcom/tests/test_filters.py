@@ -231,10 +231,12 @@ class CollectionFilterTestCase(TestCase):
         cls.seasonal_frequency = CollectionFrequency.objects.create(name='Seasonal Test Frequency')
         CollectionCountOptions.objects.create(frequency=cls.seasonal_frequency, season=first_half_year, standard=35)
         CollectionCountOptions.objects.create(frequency=cls.seasonal_frequency, season=second_half_year, standard=35)
-        cls.catchment = CollectionCatchment.objects.create(name='Test Catchment')
-        child_catchment = CollectionCatchment.objects.create(name='Child Catchment', parent=cls.catchment)
-        cls.grandchild_catchment = CollectionCatchment.objects.create(parent=child_catchment)
-        cls.unrelated_catchment = CollectionCatchment.objects.create(name='Unrelated Test Catchment')
+        cls.catchment = CollectionCatchment.objects.create(name='Test Catchment', type='administrative')
+        child_catchment = CollectionCatchment.objects.create(name='Child Catchment', parent=cls.catchment,
+                                                             type='administrative')
+        cls.grandchild_catchment = CollectionCatchment.objects.create(parent=child_catchment, type='administrative')
+        cls.unrelated_catchment = CollectionCatchment.objects.create(name='Unrelated Test Catchment',
+                                                                     type='administrative')
         fixed_once_per_week = CollectionFrequency.objects.create(type='Fixed')
         CollectionCountOptions.objects.create(frequency=fixed_once_per_week, season=whole_year, standard=52)
 
