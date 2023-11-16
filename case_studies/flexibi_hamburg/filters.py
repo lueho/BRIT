@@ -22,12 +22,12 @@ BEZIRK_CHOICES = (
 )
 
 
-class TreeFilter(BaseCrispyFilterSet):
+class HamburgRoadsideTreesFilterSet(BaseCrispyFilterSet):
     gattung_deutsch = MultipleChoiceFilter(widget=CheckboxSelectMultiple, choices=GATTUNG_CHOICES, label='Tree genus',
                                            method='filter_genus')
     bezirk = MultipleChoiceFilter(widget=CheckboxSelectMultiple, choices=BEZIRK_CHOICES, label='City district')
     pflanzjahr__gt = NumberFilter(field_name='pflanzjahr', lookup_expr='gt', label='Planted after year')
-    pflanzjahr__lt = NumberFilter(field_name='pflanzjahr', lookup_expr='lt', label='Planted after year')
+    pflanzjahr__lt = NumberFilter(field_name='pflanzjahr', lookup_expr='lt', label='Planted before year')
     stammumfang__gt = NumberFilter(field_name='stammumfang', lookup_expr='gt',
                                    label='Stem circumference [cm] greater than')
     stammumfang__lt = NumberFilter(field_name='stammumfang', lookup_expr='lt',

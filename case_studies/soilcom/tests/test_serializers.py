@@ -190,8 +190,6 @@ class CollectionFlatSerializerTestCase(TestCase):
         RegionAttributeValue(region=nutsregion, attribute=population_density, value=123.5)
         catchment1 = CollectionCatchment.objects.create(name='Test Catchment', region=nutsregion.region_ptr)
         cls.collection_nuts = Collection.objects.create(
-            created_by=cls.owner,
-            lastmodified_by=cls.owner,
             name='Test Collection Nuts',
             catchment=catchment1,
             collector=Collector.objects.create(name='Test Collector'),
@@ -207,8 +205,6 @@ class CollectionFlatSerializerTestCase(TestCase):
         lauregion = LauRegion.objects.create(name='Shetland Islands', country='UK', lau_id='S30000041')
         catchment2 = CollectionCatchment.objects.create(name='Test Catchment', region=lauregion.region_ptr)
         cls.collection_lau = Collection.objects.create(
-            created_by=cls.owner,
-            lastmodified_by=cls.owner,
             name='Test Collection Lau',
             catchment=catchment2,
             collector=Collector.objects.create(name='Test Collector'),
@@ -225,8 +221,8 @@ class CollectionFlatSerializerTestCase(TestCase):
         serializer = CollectionFlatSerializer(self.collection_nuts)
         keys = {'catchment', 'nuts_or_lau_id', 'collector', 'collection_system', 'country', 'waste_category',
                 'allowed_materials', 'forbidden_materials', 'fee_system',
-                'frequency', 'population', 'population_density', 'comments', 'sources', 'created_by',
-                'created_at', 'lastmodified_by', 'lastmodified_at'}
+                'frequency', 'population', 'population_density', 'comments', 'sources',
+                'created_at','lastmodified_at'}
         self.assertSetEqual(keys, set(serializer.data.keys()))
 
     def test_serializer_gets_information_from_foreign_keys_correctly(self):
@@ -239,8 +235,6 @@ class CollectionFlatSerializerTestCase(TestCase):
         self.assertEqual('Forbidden Material 1, Forbidden Material 2', serializer.data['forbidden_materials'])
         self.assertEqual('Test Frequency', serializer.data['frequency'])
         self.assertEqual('https://www.test-flyer.org, https://www.best-flyer.org', serializer.data['sources'])
-        self.assertEqual(self.owner.username, serializer.data['created_by'])
-        self.assertEqual(self.owner.username, serializer.data['lastmodified_by'])
 
     def test_nuts_id_is_read_correctly(self):
         serializer = CollectionFlatSerializer(self.collection_nuts)

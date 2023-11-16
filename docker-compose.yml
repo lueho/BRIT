@@ -30,6 +30,8 @@ services:
   celery:
     build:
       context: .
+    volumes:
+      - ./:/app
     command: celery --app=brit worker --loglevel=info --logfile=logs/celery.log
     env_file:
       - brit/settings/.env

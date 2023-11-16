@@ -57,14 +57,18 @@
         </a>
     {% endif %}
     {% if user.is_authenticated %}
-        <span id="export_csv" class="text-nowrap" style="display: inline-block; width: 10em">
-            <a href="javascript:void(0)" onclick="export_to_file('csv')">
+        <span id="export_csv" class="text-nowrap" style="display: inline-block; width: 10em"
+              data-export-url="{% url 'collection-export' %}"
+              data-export-progress-url="{% url 'collection-export-progress' task_id=0 %}">
+            <a href="javascript:void(0)">
                 <i class="fa fa-fw fa-file-csv"></i>
                 <span>Export to csv</span>
             </a>
         </span>
-        <span id="export_xlsx" class="text-nowrap" style="display: inline-block; width: 10em">
-            <a href="javascript:void(0)" onclick="export_to_file('xlsx')">
+        <span id="export_xlsx" class="text-nowrap" style="display: inline-block; width: 10em"
+              data-export-url="{% url 'collection-export' %}"
+              data-export-progress-url="{% url 'collection-export-progress' task_id=0 %}">
+            <a href="javascript:void(0)">
                 <i class="fa fa-fw fa-file-excel"></i>
                 <span>Export to xlsx</span>
             </a>
@@ -125,45 +129,6 @@
 
 {% block javascript %}
     {{ block.super }}
-
-    <script type="text/javascript">
-
-        async function monitor_task_progress(url, format, count = 0) {
-            const response = await fetch(url);
-            const data = await response.json();
-            const elExportWrapper = document.getElementById('export_' + format);
-            const elExportLink = elExportWrapper.children[0];
-            const elExportLinkText = elExportLink.children[1];
-            if (data["state"] === "PENDING") {
-                elExportLinkText.innerText = "Exporting to " + format + ".".repeat(count++ % 4);
-                elExportLink.classList.add("processing-link");
-                setTimeout(monitor_task_progress, 500, url, format, count);
-            } else if (data["state"] === "SUCCESS") {
-                elExportLinkText.innerText = "Download " + format;
-                elExportLink.removeAttribute("onclick");
-                elExportLink.href = data["details"];
-                elExportLink.classList.remove("processing-link");
-            } else if (data["state"] === "FAILURE") {
-                elExportLinkText.innerText = "Export to " + format;
-                elExportLink.classList.remove("processing-link");
-            }
-        }
-
-        async function start_task(format) {
-            const urlParams = new URLSearchParams(window.location.search);
-            urlParams.append('format', format);
-            const url = "{% url 'collection-export' %}?" + urlParams.toString();
-            const response = await fetch(url);
-            const data = await response.json();
-            return data["task_id"];
-        }
-
-        async function export_to_file(format) {
-            const taskId = await start_task(format);
-            const url = "{% url 'collection-export-progress' task_id=0 %}".replace('0', taskId);
-            monitor_task_progress(url, format);
-        }
-
-    </script>
+    <script src="{% static 'js/data_export.min.js' %}" type="text/javascript"></script>
 
 {% endblock javascript %}

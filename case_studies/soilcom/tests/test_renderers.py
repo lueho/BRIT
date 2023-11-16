@@ -65,10 +65,7 @@ class CollectionCSVRendererTestCase(TestCase):
         renderer.render(self.file, self.content)
         self.file.seek(0)
         reader = csv.DictReader(codecs.getreader('utf-8')(self.file), delimiter='\t')
-        fieldnames = ['Catchment', 'Country', 'NUTS/LAU Id', 'Collector', 'Collection System', 'Waste Category',
-                      'Allowed Materials', 'Forbidden Materials', 'Connection Rate', 'Connection Rate Year',
-                      'Fee System', 'Frequency', 'Population', 'Population Density', 'Comments', 'Sources',
-                      'Created by', 'Created at', 'Last modified by', 'Last modified at']
+        fieldnames = [renderer.labels[key] for key in renderer.header]
         self.assertListEqual(fieldnames, list(reader.fieldnames))
         self.assertEqual(2, sum(1 for _ in reader))
 
@@ -153,27 +150,6 @@ class CollectionXLSXRendererTestCase(TestCase):
         renderer.render(self.file, content)
         wb = load_workbook(self.file)
         ws = wb.active
-        labels = {
-            'catchment': 'Catchment',
-            'nuts_or_lau_id': 'NUTS/LAU Id',
-            'collector': 'Collector',
-            'collection_system': 'Collection System',
-            'country': 'Country',
-            'waste_category': 'Waste Category',
-            'allowed_materials': 'Allowed Materials',
-            'forbidden_materials': 'Forbidden Materials',
-            'connection_rate': 'Connection Rate',
-            'connection_rate_year': 'Connection Rate Year',
-            'fee_system': 'Fee System',
-            'frequency': 'Frequency',
-            'population': 'Population',
-            'population_density': 'Population Density',
-            'comments': 'Comments',
-            'sources': 'Sources',
-            'created_by': 'Created by',
-            'created_at': 'Created at',
-            'lastmodified_by': 'Last modified by',
-            'lastmodified_at': 'Last modified at'
-        }
-        for column, (key, value) in enumerate(content[0].items(), start=1):
-            self.assertEqual(labels[key], ws.cell(row=1, column=column).value)
+        ordered_content = [dict((k, row.get(k)) for k in list(renderer.labels.keys())) for row in content]
+        for column, (key, value) in enumerate(ordered_content[0].items(), start=1):
+            self.assertEqual(renderer.labels[key], ws.cell(row=1, column=column).value)

@@ -3,8 +3,32 @@
 {% load crispy_forms_tags %}
 
 {% block map_card_footer %}
-    <a href="javascript:void(0)" id="link-collections-as-list" data-href-template="/waste_collection/collections/"
-       onclick="clickedListLink()"><i class="fa fa-fw fa-list"></i> View as list</a>
+    <a class="mr-2 text-nowrap"
+       href="javascript:void(0)"
+       id="link-collections-as-list"
+       data-href-template="/waste_collection/collections/"
+       onclick="clickedListLink()">
+        <i class="fa fa-fw fa-list"></i>
+        View as list
+    </a>
+    {% if user.is_authenticated %}
+        <span id="export_csv" class="text-nowrap" style="display: inline-block; width: 10em"
+              data-export-url="{% url 'collection-export' %}"
+              data-export-progress-url="{% url 'collection-export-progress' task_id=0 %}">
+            <a href="javascript:void(0)">
+                <i class="fa fa-fw fa-file-csv"></i>
+                <span>Export to csv</span>
+            </a>
+        </span>
+        <span id="export_xlsx" class="text-nowrap" style="display: inline-block; width: 10em"
+              data-export-url="{% url 'collection-export' %}"
+              data-export-progress-url="{% url 'collection-export-progress' task_id=0 %}">
+            <a href="javascript:void(0)">
+                <i class="fa fa-fw fa-file-excel"></i>
+                <span>Export to xlsx</span>
+            </a>
+        </span>
+    {% endif %}
 {% endblock %}
 
 {% block user_actions %}
@@ -200,5 +224,6 @@
     {{ block.super }}
     <script src="{% static 'lib/turf-inside/inside.min.js' %}"></script>
     <script src="{% static 'js/waste_collection_map.min.js' %}"></script>
+    <script src="{% static 'js/data_export.min.js' %}"></script>
 
 {% endblock javascript %}

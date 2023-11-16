@@ -1,6 +1,7 @@
 "use strict";
 
 // Load 'lib/turf-inside/inside.min.js' script before this
+// Load 'js/maps.js' script before this
 
 function selectFeature(feature) {
     feature.bringToFront();
@@ -67,7 +68,7 @@ async function getCollectionDetails(fid) {
 
 function updateUrls(feature_id) {
     const filter_params = parseFilterParameters();
-    filter_params.append('load_features', 'true')
+    filter_params.append('load_features', 'true');
     const params = new URLSearchParams();
     params.append('next', '/waste_collection/collections/map/?' + filter_params.toString());
 
@@ -85,7 +86,7 @@ function updateUrls(feature_id) {
     update_button.setAttribute('href', update_url);
 
     const copy_button = document.getElementById('btn-collection-copy');
-    let copy_url = copy_button.dataset.hrefTemplate.replace('__pk__', feature_id.toString()) + '?' + params.toString();
+    const copy_url = copy_button.dataset.hrefTemplate.replace('__pk__', feature_id.toString()) + '?' + params.toString();
     copy_button.setAttribute('href', copy_url);
 
     const delete_button = document.getElementById('btn-collection-delete');

@@ -39,5 +39,5 @@ class BaseXLSXRendererTestCase(SimpleTestCase):
         self.renderer.render(self.file, self.content)
         wb = load_workbook(self.file)
         ws = wb.active
-        self.assertEqual('Column 1', ws.cell(row=1, column=1).value)
-        self.assertEqual('Column 2', ws.cell(row=1, column=2).value)
+        self.assertEqual('Column 2', ws.cell(row=1, column=1).value)
+        self.assertEqual('Column 1', ws.cell(row=1, column=2).value)

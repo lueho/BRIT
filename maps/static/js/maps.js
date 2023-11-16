@@ -43,12 +43,20 @@ function lockFilter() {
     });
 }
 
+function lockCustomElements() {
+    // This is a hook to overwrite if there are any other elements to lock that are specific to the page.
+}
+
 function unlockFilter() {
     const submitButtons = document.querySelectorAll('.submit-filter');
     submitButtons.forEach(btn => {
         btn.value = 'Filter';
         btn.disabled = false;
     });
+}
+
+function unlockCustomElements() {
+    // This is a hook to overwrite if there are any other elements to lock that are specific to the page.
 }
 
 function showLoadingIndicator() {
@@ -68,6 +76,7 @@ function displayTimeoutError() {
 }
 
 function prepareMapRefresh() {
+    lockCustomElements();
     lockFilter();
     showLoadingIndicator();
     contentLayerGroup.clearLayers();
@@ -94,9 +103,18 @@ function refreshMap(promises, timeLimit = 120000) {
     }, timeLimit);
 }
 
+function updateUrlSearchParams() {
+    const params = parseFilterParameters();
+    const url = new URL(window.location);
+    url.search = params.toString();
+    window.history.replaceState({}, '', url.toString());
+}
+
 function cleanup() {
+    updateUrlSearchParams();
     hideLoadingIndicator();
     unlockFilter();
+    unlockCustomElements();
 }
 
 function orderLayers() {

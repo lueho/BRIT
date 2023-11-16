@@ -1,9 +1,11 @@
+from collections import OrderedDict
 from rest_framework import serializers
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from maps.models import GeoPolygon
 from maps.serializers import FieldLabelModelSerializer
 from materials.models import Material
+from utils.models import Property
 from . import models
 
 
@@ -89,24 +91,19 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
     waste_category = serializers.StringRelatedField(source='waste_stream.category', label='Waste Category')
     allowed_materials = serializers.SerializerMethodField(label='Allowed Materials')
     forbidden_materials = serializers.SerializerMethodField(label='Forbidden Materials')
-    connection_rate = serializers.StringRelatedField(label='Connection Rate')
-    connection_rate_year = serializers.StringRelatedField(label='Connection Rate Year')
     fee_system = serializers.CharField(label='Fee system')
     frequency = serializers.StringRelatedField(label='Frequency')
     population = serializers.SerializerMethodField()
     population_density = serializers.SerializerMethodField()
     comments = serializers.SerializerMethodField(source='description', label='Comments')
     sources = serializers.SerializerMethodField(label='Sources')
-    created_by = serializers.StringRelatedField(source='created_by.username', label='Created by')
     created_at = serializers.DateTimeField(label='Created at')
-    lastmodified_by = serializers.StringRelatedField(source='lastmodified_by.username', label='Last modified by')
 
     class Meta:
         model = models.Collection
         fields = ('catchment', 'nuts_or_lau_id', 'country', 'collector', 'collection_system', 'waste_category',
-                  'allowed_materials', 'forbidden_materials', 'connection_rate', 'connection_rate_year', 'fee_system',
-                  'frequency', 'population', 'population_density', 'comments', 'sources', 'created_by', 'created_at',
-                  'lastmodified_by', 'lastmodified_at')
+                  'allowed_materials', 'forbidden_materials', 'fee_system', 'frequency', 'population',
+                  'population_density', 'comments', 'sources', 'created_at', 'lastmodified_at')
 
     @staticmethod
     def get_allowed_materials(obj):
@@ -151,3 +148,39 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
             return comments
         else:
             return ''
+
+    def to_representation(self, instance):
+        # Call the superclass's to_representation method to get the default ordering
+        representation = super().to_representation(instance)
+
+        # Create an ordered dictionary to hold the ordered fields
+        ordered_representation = OrderedDict()
+
+        # Add all the fields from the superclass's representation to the ordered dictionary
+        for field in self.Meta.fields:  # Assuming self.Meta.fields contains the desired order
+            ordered_representation[field] = representation.get(field, None)
+
+        additional_properties = ['specific waste collected', 'Connection rate']
+        for property_name in additional_properties:
+
+            # Add your custom fields at the desired position
+            specific_property = Property.objects.filter(name=property_name).first()
+            if specific_property:
+                collection_values = models.CollectionPropertyValue.objects.filter(
+                    collection=instance, property=specific_property)
+                for value in collection_values:
+                    column_name = f'{property_name.lower().replace(" ", "_")}_{value.year}'
+                    ordered_representation[column_name] = value.average
+
+                # If no CollectionPropertyValue, then fetch the AggregatedCollectionPropertyValue
+                if not collection_values.exists():
+                    aggregated_values = models.AggregatedCollectionPropertyValue.objects.filter(
+                        collections=instance, property=specific_property)
+                    for value in aggregated_values:
+                        column_name = f'{property_name.lower().replace(" ", "_")}_{value.year}'
+                        ordered_representation[column_name] = value.average
+                        # Mark this as an aggregated value
+                        ordered_representation['aggregated'] = True
+
+        # Return the ordered representation
+        return ordered_representation

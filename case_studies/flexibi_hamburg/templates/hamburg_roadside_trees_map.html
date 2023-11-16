@@ -1,0 +1,56 @@
+{% extends 'filtered_map.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block map_card_footer %}
+    {% if user.is_authenticated %}
+        <span id="export_csv" class="text-nowrap" style="display: inline-block; width: 10em"
+              data-export-url="{% url 'hamburgroadsidetrees-export' %}"
+              data-export-progress-url="{% url 'hamburgroadsidetrees-export-progress' task_id=0 %}">
+            <a href="javascript:void(0)">
+                <i class="fa fa-fw fa-file-csv"></i>
+                <span>Export to csv</span>
+            </a>
+        </span>
+        <span id="export_xlsx" class="text-nowrap" style="display: inline-block; width: 10em"
+              data-export-url="{% url 'hamburgroadsidetrees-export' %}"
+              data-export-progress-url="{% url 'hamburgroadsidetrees-export-progress' task_id=0 %}">
+            <a href="javascript:void(0)">
+                <i class="fa fa-fw fa-file-excel"></i>
+                <span>Export to xlsx</span>
+            </a>
+        </span>
+    {% endif %}
+{% endblock %}
+
+{% block extra_cards %}
+
+    <div class="card shadow">
+        <div class="card-header"
+             role="button"
+             data-toggle="collapse"
+             href="#learning-card-body"
+             aria-expanded="true"
+             aria-controls="learning-card-body">
+            <b>Learning material</b>
+        </div>
+        <div class="card-body collapse" id="learning-card-body">
+            <p class="card-text">
+                To learn more about residue wood pathways in bioresource management, check out the Lectures for
+                Future series "Residue and by-Product Based Bioresources" of the Hamburg Open Online University.
+                Recommended lecture for this topic:<br>
+                <a href="https://www.hoou.de/projects/lff/pages/residue-and-by-product-based-bioresources"
+                   target="_blank">"Wood Pathways: From Sustainable Forests to Sustainable Products"
+                </a>
+            </p>
+        </div>
+    </div>
+
+{% endblock %}
+
+{% block javascript %}
+    {{ block.super }}
+    <script src="{% static 'lib/turf-inside/inside.min.js' %}"></script>
+    <script src="{% static 'js/data_export.min.js' %}"></script>
+
+{% endblock javascript %}
