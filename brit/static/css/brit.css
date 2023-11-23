@@ -30,6 +30,14 @@
     display: inline-block;
 }
 
+.svg-icon-header svg {
+    /*width: 1em; !* Adjust size to match font-size *!*/
+    height: 1em; /* Adjust size to match font-size */
+    fill: currentColor; /* Use the current font color */
+    vertical-align: middle; /* Align inline with the text */
+}
+
+
 @media screen and (max-width: 768px) {
     .table-responsive-stack tr {
         display: block;

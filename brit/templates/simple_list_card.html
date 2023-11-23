@@ -6,7 +6,11 @@
     <div class="row">
         <div class="col">
             <div class="card shadow mb-3">
-                <div class="card-header"><b>{{ header }}</b></div>
+                <div class="card-header">
+                    {% block card_header %}
+                        <strong>{{ header }}</strong>
+                    {% endblock card_header %}
+                </div>
                 <div class="card-body overflow-auto">
                     {% block card_body %}
                         <table class="table">
