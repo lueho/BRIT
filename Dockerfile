@@ -1,4 +1,4 @@
-FROM python:3.9-slim
+FROM python:3.12-slim
 
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
@@ -20,5 +20,3 @@ USER standard_user:standard_user
 COPY --chown=standard_user:standard_user . .
 
 RUN chmod +x *.sh
-
-RUN python manage.py collectstatic --no-input  --settings=brit.settings.heroku
