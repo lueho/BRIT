@@ -39,27 +39,42 @@ async function export_to_file(format) {
 
 function lockCustomElements() {
     // This function overrides a hook from maps.js which is called in filtered_map.html
-    const elExportCSVWrapper = document.getElementById('export_csv');
-    const elExportCSVLink = elExportCSVWrapper.children[0];
-    elExportCSVLink.classList.add("processing-link");
-    const elExportXLSXWrapper = document.getElementById('export_xlsx');
-    const elExportXLSXLink = elExportXLSXWrapper.children[0];
-    elExportXLSXLink.classList.add("processing-link");
+    function addProcessingClass(elementId) {
+        const wrapper = document.getElementById(elementId);
+        if (wrapper && wrapper.children.length > 0) {
+            wrapper.children[0].classList.add("processing-link");
+        } else {
+            console.warn(`Element with ID '${elementId}' or its first child was not found.`);
+        }
+    }
+
+    // Apply the class to the first child of both elements
+    addProcessingClass('export_csv');
+    addProcessingClass('export_xlsx');
 }
 
 function unlockCustomElements() {
     // This function overrides a hook from maps.js which is called in filtered_map.html
-    const elExportCSVWrapper = document.getElementById('export_csv');
-    const elExportCSVLink = elExportCSVWrapper.children[0];
-    const elExportCSVLinkText = elExportCSVLink.children[1];
-    elExportCSVLinkText.innerText = "Export to csv";
-    elExportCSVLink.classList.remove("processing-link");
-    const elExportXLSXWrapper = document.getElementById('export_xlsx');
-    const elExportXLSXLink = elExportXLSXWrapper.children[0];
-    const elExportXLSXLinkText = elExportXLSXLink.children[1];
-    elExportXLSXLinkText.innerText = "Export to xlsx";
-    elExportXLSXLink.classList.remove("processing-link");
+    function removeProcessingClass(elementId, text) {
+        const wrapper = document.getElementById(elementId);
+        if (wrapper && wrapper.children.length > 0) {
+            const link = wrapper.children[0];
+            if (link.children.length > 1) {
+                link.children[1].innerText = text;
+                link.classList.remove("processing-link");
+            } else {
+                console.warn(`Second child of link in '${elementId}' was not found.`);
+            }
+        } else {
+            console.warn(`Element with ID '${elementId}' or its first child was not found.`);
+        }
+    }
+
+    // Reset the text and class for both elements
+    removeProcessingClass('export_csv', 'Export to csv');
+    removeProcessingClass('export_xlsx', 'Export to xlsx');
 }
+
 
 // add eventHandler for the export links
 document.getElementById('export_xlsx').addEventListener('click', () => export_to_file('xlsx'), false);
