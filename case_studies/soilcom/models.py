@@ -1,3 +1,5 @@
+from datetime import date
+
 import celery
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
@@ -346,14 +348,19 @@ FEE_SYSTEMS = (
 
 class Collection(NamedUserObjectModel):
     collector = models.ForeignKey(Collector, on_delete=models.CASCADE, blank=True, null=True)
-    catchment = models.ForeignKey(CollectionCatchment, on_delete=models.PROTECT, blank=True, null=True, related_name='collections')
-    collection_system = models.ForeignKey(CollectionSystem, on_delete=models.CASCADE, blank=True, null=True, related_name='collections')
-    waste_stream = models.ForeignKey(WasteStream, on_delete=models.SET_NULL, blank=True, null=True, related_name='collections')
-    frequency = models.ForeignKey(CollectionFrequency, on_delete=models.SET_NULL, blank=True, null=True, related_name='collections')
+    catchment = models.ForeignKey(CollectionCatchment, on_delete=models.PROTECT, blank=True, null=True,
+                                  related_name='collections')
+    collection_system = models.ForeignKey(CollectionSystem, on_delete=models.CASCADE, blank=True, null=True,
+                                          related_name='collections')
+    waste_stream = models.ForeignKey(WasteStream, on_delete=models.SET_NULL, blank=True, null=True,
+                                     related_name='collections')
+    frequency = models.ForeignKey(CollectionFrequency, on_delete=models.SET_NULL, blank=True, null=True,
+                                  related_name='collections')
     fee_system = models.CharField(max_length=32, choices=FEE_SYSTEMS, blank=True, null=True)
     samples = models.ManyToManyField(Sample, related_name='collections')
     flyers = models.ManyToManyField(WasteFlyer, related_name='collections')
     sources = models.ManyToManyField(Source)
+    date = models.DateField(blank=False, null=False, default=date.today)
 
     @property
     def geom(self):
