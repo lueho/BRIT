@@ -24,6 +24,10 @@
                         <strong>Waste Category:</strong><br>
                         <a href="{{ object.waste_stream.category.get_absolute_url }}">{{ object.waste_stream.category }}</a>
                     </p>
+                    <p class="card-text">
+                        <strong>Year:</strong><br>
+                        {{ object.date|date:"Y" }}
+                    </p>
                     {% if object.waste_stream.allowed_materials.exists %}
                         <p class="card-text"><strong>Allowed Materials:</strong></p>
                         <ul>
@@ -127,6 +131,11 @@
                     {% if object.description %}
                         <p class="card-text"><strong>Comments:</strong><br>{{ object.description }}</p>
                     {% endif %}
+
+                    <p class="card-text">
+                        <strong>Last update:</strong><br>
+                        {{ object.lastmodified_at|date:"d.m.Y" }}
+                    </p>
 
                 </div>
                 <div class="card-footer">
