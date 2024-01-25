@@ -142,7 +142,8 @@ class WasteStreamQuerysetTestCase(TestCase):
         self.assertDictEqual(comparable_model_dict(instance), comparable_model_dict(self.waste_stream))
 
     def test_get_or_create_finds_existing_waste_stream_with_given_forbidden_materials(self):
-        forbidden_materials = Material.objects.filter(id__in=[self.forbidden_material_1.id, self.forbidden_material_2.id])
+        forbidden_materials = Material.objects.filter(
+            id__in=[self.forbidden_material_1.id, self.forbidden_material_2.id])
         instance, created = WasteStream.objects.get_or_create(
             name='Waste Stream 1',
             category=self.category,
@@ -154,7 +155,8 @@ class WasteStreamQuerysetTestCase(TestCase):
 
     def test_get_or_create_finds_existing_waste_stream_with_given_combination_of_allowed_and_forbidden_materials(self):
         allowed_materials = Material.objects.filter(id__in=[self.allowed_material_1.id, self.allowed_material_2.id])
-        forbidden_materials = Material.objects.filter(id__in=[self.forbidden_material_1.id, self.forbidden_material_2.id])
+        forbidden_materials = Material.objects.filter(
+            id__in=[self.forbidden_material_1.id, self.forbidden_material_2.id])
         instance, created = WasteStream.objects.get_or_create(
             category=self.category,
             allowed_materials=allowed_materials,
@@ -166,7 +168,8 @@ class WasteStreamQuerysetTestCase(TestCase):
 
     def test_get_or_create_finds_existing_waste_stream_with_empty_queryset_of_allowed_materials(self):
         allowed_materials = Material.objects.none()
-        forbidden_materials = Material.objects.filter(id__in=[self.forbidden_material_1.id, self.forbidden_material_2.id])
+        forbidden_materials = Material.objects.filter(
+            id__in=[self.forbidden_material_1.id, self.forbidden_material_2.id])
         created_instance, created = WasteStream.objects.get_or_create(
             category=self.category,
             allowed_materials=allowed_materials,
@@ -483,23 +486,24 @@ class CollectionTestCase(TestCase):
         cls.collection = Collection.objects.create(
             catchment=catchment,
             collection_system=collection_system,
-            waste_stream=waste_stream
+            waste_stream=waste_stream,
+            valid_from=date(2024, 1, 1)
         )
 
     def test_collection_is_named_automatically_on_creation(self):
-        self.assertEqual('Catchment Category System', self.collection.name)
+        self.assertEqual('Catchment Category System 2024', self.collection.name)
 
     def test_collection_name_is_updated_on_model_update(self):
         self.collection.collection_system = CollectionSystem.objects.create(name='New System')
         self.collection.save()
-        self.assertEqual('Catchment Category New System', self.collection.name)
+        self.assertEqual('Catchment Category New System 2024', self.collection.name)
 
     def test_collection_name_is_updated_when_collection_system_model_is_changed(self):
         system = CollectionSystem.objects.get(name='System')
         system.name = 'Updated System'
         system.save()
         self.collection.refresh_from_db()
-        self.assertEqual('Catchment Category Updated System', self.collection.name)
+        self.assertEqual('Catchment Category Updated System 2024', self.collection.name)
 
     def test_collection_name_is_updated_when_waste_stream_model_is_changed(self):
         waste_stream = WasteStream.objects.get(category__name='Category')
@@ -507,21 +511,91 @@ class CollectionTestCase(TestCase):
         waste_stream.category = category
         waste_stream.save()
         self.collection.refresh_from_db()
-        self.assertEqual('Catchment New Category System', self.collection.name)
+        self.assertEqual('Catchment New Category System 2024', self.collection.name)
 
     def test_collection_name_is_updated_when_waste_category_model_is_changed(self):
         category = WasteCategory.objects.get(name='Category')
         category.name = 'Updated Category'
         category.save()
         self.collection.refresh_from_db()
-        self.assertEqual('Catchment Updated Category System', self.collection.name)
+        self.assertEqual('Catchment Updated Category System 2024', self.collection.name)
 
     def test_collection_name_is_updated_when_catchment_model_is_changed(self):
         catchment = CollectionCatchment.objects.get(name='Catchment')
         catchment.name = 'Updated Catchment'
         catchment.save()
         self.collection.refresh_from_db()
-        self.assertEqual('Updated Catchment Category System', self.collection.name)
+        self.assertEqual('Updated Catchment Category System 2024', self.collection.name)
+
+    def test_collection_name_is_updated_when_year_is_changed(self):
+        self.collection.valid_from = date(2025, 1, 1)
+        self.collection.save()
+        self.assertEqual('Catchment Category System 2025', self.collection.name)
+
+    def test_currently_valid_returns_collection_with_past_valid_from_date(self):
+        self.collection.valid_from = date.today() - timedelta(days=1)
+        self.collection.valid_until = None
+        self.collection.save()
+        self.assertQuerysetEqual(Collection.objects.currently_valid(), [self.collection])
+
+    def test_currently_valid_does_not_return_collection_with_future_valid_from_date(self):
+        self.collection.valid_from = date.today() + timedelta(days=1)
+        self.collection.valid_until = None
+        self.collection.save()
+        self.assertQuerysetEqual(Collection.objects.currently_valid(), [])
+
+    def test_currently_valid_returns_collection_with_valid_from_date_today(self):
+        self.collection.valid_from = date.today()
+        self.collection.valid_until = None
+        self.collection.save()
+        self.assertQuerysetEqual(Collection.objects.currently_valid(), [self.collection])
+
+    def test_currently_valid_returns_collection_with_future_valid_until_date(self):
+        self.collection.valid_from = date.today() - timedelta(days=1)
+        self.collection.valid_until = date.today() + timedelta(days=1)
+        self.collection.save()
+        self.assertQuerysetEqual(Collection.objects.currently_valid(), [self.collection])
+
+    def test_currently_valid_does_not_return_collection_with_past_valid_until_date(self):
+        self.collection.valid_from = date.today() - timedelta(days=2)
+        self.collection.valid_until = date.today() - timedelta(days=1)
+        self.collection.save()
+        self.assertQuerysetEqual(Collection.objects.currently_valid(), [])
+
+    def test_valid_on_returns_collection_with_past_valid_from_date(self):
+        day = date(2023, 6, 30)
+        self.collection.valid_from = day - timedelta(days=1)
+        self.collection.valid_until = None
+        self.collection.save()
+        self.assertQuerysetEqual(Collection.objects.valid_on(day), [self.collection])
+
+    def test_valid_on_does_not_return_collection_with_future_valid_from_date(self):
+        day = date(2023, 6, 30)
+        self.collection.valid_from = day + timedelta(days=1)
+        self.collection.valid_until = None
+        self.collection.save()
+        self.assertQuerysetEqual(Collection.objects.valid_on(day), [])
+
+    def test_valid_on_returns_collection_with_given_valid_from_date(self):
+        day = date(2023, 6, 30)
+        self.collection.valid_from = day
+        self.collection.valid_until = None
+        self.collection.save()
+        self.assertQuerysetEqual(Collection.objects.valid_on(day), [self.collection])
+
+    def test_valid_on_returns_collection_with_future_valid_until_date(self):
+        day = date(2023, 6, 30)
+        self.collection.valid_from = day - timedelta(days=1)
+        self.collection.valid_until = day + timedelta(days=1)
+        self.collection.save()
+        self.assertQuerysetEqual(Collection.objects.valid_on(day), [self.collection])
+
+    def test_valid_on_does_not_return_collection_with_past_valid_until_date(self):
+        day = date(2023, 6, 30)
+        self.collection.valid_from = day - timedelta(days=2)
+        self.collection.valid_until = day - timedelta(days=1)
+        self.collection.save()
+        self.assertQuerysetEqual(Collection.objects.valid_on(day), [])
 
 
 class CollectionSeasonTestCase(TestCase):

@@ -1,5 +1,6 @@
 import json
 from collections import OrderedDict
+from datetime import date
 from urllib.parse import urlencode
 
 from django.db.models import signals
@@ -964,6 +965,7 @@ class CollectionCreateViewTestCase(ViewWithPermissionsTestCase):
                 'allowed_materials': [self.allowed_material_1.id, self.allowed_material_2.id],
                 'forbidden_materials': [self.forbidden_material_1.id, self.forbidden_material_2.id],
                 'frequency': CollectionFrequency.objects.first().id,
+                'valid_from': date(2020, 1, 1),
                 'description': 'This is a test case that should pass!',
                 'form-INITIAL_FORMS': '0',
                 'form-TOTAL_FORMS': '2',
@@ -980,21 +982,22 @@ class CollectionCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(Collection.objects.count(), 1)
         self.client.force_login(self.member)
         data = {
-            'catchment': CollectionCatchment.objects.first().id,
-            'collector': Collector.objects.first().id,
-            'collection_system': CollectionSystem.objects.first().id,
-            'waste_category': WasteCategory.objects.first().id,
-            'allowed_materials': [],
-            'forbidden_materials': [self.forbidden_material_1.id, self.forbidden_material_2.id],
-            'frequency': CollectionFrequency.objects.first().id,
-            'description': 'This is a test case that should pass!',
-            'form-INITIAL_FORMS': '0',
-            'form-TOTAL_FORMS': '2',
-            'form-0-url': 'https://www.test-flyer.org',
-            'form-0-id': '',
-            'form-1-url': '',
-            'form-1-id': ''
-        }
+                'catchment': CollectionCatchment.objects.first().id,
+                'collector': Collector.objects.first().id,
+                'collection_system': CollectionSystem.objects.first().id,
+                'waste_category': WasteCategory.objects.first().id,
+                'allowed_materials': [],
+                'forbidden_materials': [self.forbidden_material_1.id, self.forbidden_material_2.id],
+                'frequency': CollectionFrequency.objects.first().id,
+                'valid_from': date(2020, 1, 1),
+                'description': 'This is a test case that should pass!',
+                'form-INITIAL_FORMS': '0',
+                'form-TOTAL_FORMS': '2',
+                'form-0-url': 'https://www.test-flyer.org',
+                'form-0-id': '',
+                'form-1-url': '',
+                'form-1-id': ''
+            }
         response = self.client.post(
             reverse('collection-create'),
             data=data,
@@ -1124,6 +1127,7 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
             'allowed_materials': [self.allowed_material_1.id, self.allowed_material_2.id],
             'forbidden_materials': [self.forbidden_material_1.id, self.forbidden_material_2.id],
             'frequency': CollectionFrequency.objects.first().id,
+            'valid_from': date(2022, 1, 1),
             'description': 'This is a test case that should pass!',
             'form-INITIAL_FORMS': '0',
             'form-TOTAL_FORMS': '0',
@@ -1144,6 +1148,7 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
             'allowed_materials': initial['allowed_materials'],
             'forbidden_materials': initial['forbidden_materials'],
             'frequency': initial['frequency'],
+            'valid_from': initial['valid_from'],
             'description': initial['description'],
             'form-INITIAL_FORMS': '0',
             'form-TOTAL_FORMS': '0',
@@ -1165,6 +1170,8 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
             'allowed_materials': initial['allowed_materials'],
             'forbidden_materials': initial['forbidden_materials'],
             'frequency': initial['frequency'],
+            'valid_from': initial['valid_from'],
+            'valid_until': '',
             'description': 'This is the copy.',
             'form-INITIAL_FORMS': '1',
             'form-TOTAL_FORMS': '1',
@@ -1356,6 +1363,7 @@ class CollectionUpdateViewTestCase(ViewWithPermissionsTestCase):
                 'allowed_materials': [self.allowed_material_1.id, self.allowed_material_2.id],
                 'forbidden_materials': [self.forbidden_material_1.id, self.forbidden_material_2.id],
                 'frequency': CollectionFrequency.objects.first().id,
+                'valid_from': date(2020, 1, 1),
                 'description': 'This is a test case that should pass!',
                 'form-INITIAL_FORMS': '0',
                 'form-TOTAL_FORMS': '2',
@@ -1375,6 +1383,7 @@ class CollectionUpdateViewTestCase(ViewWithPermissionsTestCase):
                 'waste_category': WasteCategory.objects.first().id,
                 'allowed_materials': [self.allowed_material_1.id, self.allowed_material_2.id],
                 'frequency': CollectionFrequency.objects.first().id,
+                'valid_from': date(2020, 1, 1),
                 'description': 'This is a test case that should pass!',
                 'form-INITIAL_FORMS': '0',
                 'form-TOTAL_FORMS': '2',
@@ -1400,6 +1409,7 @@ class CollectionUpdateViewTestCase(ViewWithPermissionsTestCase):
             'allowed_materials': [m.id for m in self.collection.waste_stream.allowed_materials.all()],
             'forbidden_materials': [m.id for m in self.collection.waste_stream.forbidden_materials.all()],
             'frequency': self.collection.frequency.id,
+            'valid_from': date(2020, 1, 1),
             'description': self.collection.description,
             'form-INITIAL_FORMS': '1',
             'form-TOTAL_FORMS': '2',
@@ -1421,6 +1431,7 @@ class CollectionUpdateViewTestCase(ViewWithPermissionsTestCase):
             'allowed_materials': [m.id for m in self.collection.waste_stream.allowed_materials.all()],
             'forbidden_materials': [m.id for m in self.collection.waste_stream.forbidden_materials.all()],
             'frequency': self.collection.frequency.id,
+            'valid_from': self.collection.valid_from,
             'description': self.collection.description,
             'form-INITIAL_FORMS': '1',
             'form-TOTAL_FORMS': '2',
@@ -1653,6 +1664,8 @@ class CollectionSummaryAPIViewTestCase(ViewWithPermissionsTestCase):
                 ('Allowed materials', [m.name for m in self.collection.waste_stream.allowed_materials.all()]),
                 ('Forbidden materials', [m.name for m in self.collection.waste_stream.forbidden_materials.all()]),
                 ('Frequency', self.collection.frequency.name),
+                ('Valid from', self.collection.valid_from.strftime('%Y-%m-%d')),
+                ('Valid until', None),
                 ('Sources', [flyer.url for flyer in self.collection.flyers.all()]),
                 ('Comments', self.collection.description)
             ]),

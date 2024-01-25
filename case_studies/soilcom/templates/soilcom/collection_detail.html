@@ -26,7 +26,7 @@
                     </p>
                     <p class="card-text">
                         <strong>Year:</strong><br>
-                        {{ object.date|date:"Y" }}
+                        {{ object.valid_from|date:"Y" }}
                     </p>
                     {% if object.waste_stream.allowed_materials.exists %}
                         <p class="card-text"><strong>Allowed Materials:</strong></p>

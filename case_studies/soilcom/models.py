@@ -7,6 +7,7 @@ from django.db import models
 from django.db.models import Count, Q, Sum
 from django.db.models.signals import pre_save, post_save
 from django.dispatch import receiver
+from django.utils import timezone
 
 from bibliography.models import Source
 from distributions.models import Period, TemporalDistribution, Timestep
@@ -346,6 +347,15 @@ FEE_SYSTEMS = (
 )
 
 
+class CollectionManager(models.Manager):
+
+    def valid_on(self, date):
+        return self.filter(Q(valid_from__lte=date), Q(valid_until__gt=date) | Q(valid_until=None))
+
+    def currently_valid(self):
+        return self.valid_on(timezone.now().date())
+
+
 class Collection(NamedUserObjectModel):
     collector = models.ForeignKey(Collector, on_delete=models.CASCADE, blank=True, null=True)
     catchment = models.ForeignKey(CollectionCatchment, on_delete=models.PROTECT, blank=True, null=True,
@@ -360,7 +370,10 @@ class Collection(NamedUserObjectModel):
     samples = models.ManyToManyField(Sample, related_name='collections')
     flyers = models.ManyToManyField(WasteFlyer, related_name='collections')
     sources = models.ManyToManyField(Source)
-    date = models.DateField(blank=False, null=False, default=date.today)
+    valid_from = models.DateField(default=date.today)
+    valid_until = models.DateField(blank=True, null=True)
+
+    objects = CollectionManager()
 
     @property
     def geom(self):
@@ -373,7 +386,7 @@ class Collection(NamedUserObjectModel):
         if self.waste_stream:
             if self.waste_stream.category:
                 category = self.waste_stream.category.name
-        return f'{catchment} {category} {system}'
+        return f'{catchment} {category} {system} {self.valid_from.year}'
 
     def __str__(self):
         return self.name

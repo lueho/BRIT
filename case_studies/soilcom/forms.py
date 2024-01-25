@@ -2,7 +2,8 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Column, Div, Field, HTML, Layout, Row
 from dal import autocomplete
 from django.core.exceptions import ValidationError
-from django.forms import (CheckboxSelectMultiple, HiddenInput, IntegerField, ModelChoiceField, ModelMultipleChoiceField)
+from django.forms import (CheckboxSelectMultiple, DateInput, HiddenInput, IntegerField, ModelChoiceField,
+                          ModelMultipleChoiceField)
 from django.utils.translation import gettext as _
 
 from distributions.models import TemporalDistribution, Timestep
@@ -270,10 +271,13 @@ class CollectionModelForm(AutoCompleteModelForm):
     class Meta:
         model = Collection
         fields = ('catchment', 'collector', 'collection_system', 'waste_category', 'allowed_materials',
-                  'forbidden_materials', 'frequency', 'fee_system',
-                  'description')
+                  'forbidden_materials', 'frequency', 'fee_system', 'valid_from', 'valid_until', 'description')
         labels = {
             'description': 'Comments',
+        }
+        widgets = {
+            'valid_from': DateInput(attrs={'type': 'date'}),
+            'valid_until': DateInput(attrs={'type': 'date'}),
         }
 
     @property
@@ -289,6 +293,8 @@ class CollectionModelForm(AutoCompleteModelForm):
             Field('forbidden_materials'),
             Field('fee_system'),
             Field('frequency'),
+            Field('valid_from'),
+            Field('valid_until'),
             Field('description')
         )
         return helper

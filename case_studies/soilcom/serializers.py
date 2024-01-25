@@ -74,9 +74,8 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
 
     class Meta:
         model = models.Collection
-        fields = ('id', 'catchment', 'collector', 'collection_system',
-                  'waste_category', 'allowed_materials', 'forbidden_materials', 'frequency',
-                  'sources', 'comments')
+        fields = ('id', 'catchment', 'collector', 'collection_system', 'waste_category', 'allowed_materials',
+                  'forbidden_materials', 'frequency', 'valid_from', 'valid_until', 'sources', 'comments')
 
 
 class CollectionFlatSerializer(serializers.ModelSerializer):
@@ -103,7 +102,8 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
         model = models.Collection
         fields = ('catchment', 'nuts_or_lau_id', 'country', 'collector', 'collection_system', 'waste_category',
                   'allowed_materials', 'forbidden_materials', 'fee_system', 'frequency', 'population',
-                  'population_density', 'comments', 'sources', 'created_at', 'lastmodified_at')
+                  'population_density', 'comments', 'sources', 'valid_from', 'valid_until', 'created_at',
+                  'lastmodified_at')
 
     @staticmethod
     def get_allowed_materials(obj):

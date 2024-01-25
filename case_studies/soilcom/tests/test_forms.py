@@ -211,7 +211,9 @@ class CollectionModelFormTestCase(TestCase):
             collector=cls.collector,
             collection_system=cls.collection_system,
             waste_stream=waste_stream,
-            frequency=cls.frequency
+            frequency=cls.frequency,
+            valid_from=date(2023, 1, 1),
+            valid_until=date(2023, 12, 31),
         )
 
     def test_form_errors(self):
@@ -223,6 +225,7 @@ class CollectionModelFormTestCase(TestCase):
         self.assertEqual(form.errors['catchment'][0], 'This field is required.')
         self.assertEqual(form.errors['collection_system'][0], 'This field is required.')
         self.assertEqual(form.errors['waste_category'][0], 'This field is required.')
+        self.assertEqual(form.errors['valid_from'][0], 'This field is required.')
 
     def test_waste_stream_get_or_create_on_save(self):
         form = CollectionModelForm(data={
@@ -233,13 +236,14 @@ class CollectionModelFormTestCase(TestCase):
             'allowed_materials': [self.allowed_material_1.id, self.allowed_material_2.id],
             'forbidden_materials': [self.forbidden_material_1.id, self.forbidden_material_2.id],
             'frequency': self.frequency.id,
+            'valid_from': date(2023, 1, 1),
             'description': 'This is a test case'
         })
         self.assertTrue(form.is_valid())
         form.instance.owner = self.collection.owner
         instance = form.save()
         self.assertIsInstance(instance, Collection)
-        self.assertEqual(instance.name, f'{self.catchment} {self.waste_category} {self.collection_system}')
+        self.assertEqual(instance.name, f'{self.catchment} {self.waste_category} {self.collection_system} {self.collection.valid_from.year}')
         self.assertIsInstance(instance.waste_stream, WasteStream)
         self.assertEqual(instance.waste_stream.category.id, self.waste_category.id)
 
@@ -251,6 +255,7 @@ class CollectionModelFormTestCase(TestCase):
             'allowed_materials': [self.allowed_material_1.id, self.allowed_material_2.id],
             'forbidden_materials': [self.forbidden_material_1.id, self.forbidden_material_2.id],
             'frequency': self.frequency.id,
+            'valid_from': date(2023, 1, 1),
             'flyer_url': 'https://www.great-test-flyers.com',
             'description': 'This is a test case'
         })

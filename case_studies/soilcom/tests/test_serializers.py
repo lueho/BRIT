@@ -129,6 +129,7 @@ class CollectionModelSerializerTestCase(TestCase):
             collection_system=CollectionSystem.objects.create(name='Test system'),
             waste_stream=waste_stream,
             frequency=frequency,
+            valid_from=date(2020, 1, 1),
             description='This is a test case.'
         )
         cls.collection.flyers.add(waste_flyer_1)
@@ -145,6 +146,8 @@ class CollectionModelSerializerTestCase(TestCase):
         self.assertIn('allowed_materials', data)
         self.assertIn('forbidden_materials', data)
         self.assertIn('frequency', data)
+        self.assertIn('valid_from', data)
+        self.assertIn('valid_until', data)
         self.assertIn('sources', data)
         self.assertIn('comments', data)
 
@@ -202,6 +205,7 @@ class CollectionFlatSerializerTestCase(TestCase):
             waste_stream=waste_stream,
             fee_system='Fixed fee',
             frequency=frequency,
+            valid_from=date(2020, 1, 1),
             description='This is a test case.'
         )
         cls.collection_nuts.flyers.add(waste_flyer_1)
@@ -227,7 +231,7 @@ class CollectionFlatSerializerTestCase(TestCase):
         keys = {'catchment', 'nuts_or_lau_id', 'collector', 'collection_system', 'country', 'waste_category',
                 'allowed_materials', 'forbidden_materials', 'fee_system',
                 'frequency', 'population', 'population_density', 'comments', 'sources',
-                'created_at','lastmodified_at'}
+                'valid_from', 'valid_until', 'created_at','lastmodified_at'}
         self.assertSetEqual(keys, set(serializer.data.keys()))
 
     def test_serializer_gets_information_from_foreign_keys_correctly(self):

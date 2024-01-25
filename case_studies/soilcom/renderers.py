@@ -29,6 +29,8 @@ class CollectionXLSXRenderer(BaseXLSXRenderer):
         'specific_waste_collected_2021': 'Specific waste collected in 2021 [kg/(cap*year)]',
         'comments': 'Comments',
         'sources': 'Sources',
+        'valid_from': 'Valid from',
+        'valid_until': 'Valid until',
         'created_at': 'Created at',
         'lastmodified_at': 'Last modified at'
     }
@@ -50,7 +52,7 @@ class CollectionCSVRenderer(CSVRenderer):
               'specific_waste_collected_2015', 'specific_waste_collected_2016', 'specific_waste_collected_2017',
               'specific_waste_collected_2018', 'specific_waste_collected_2019', 'specific_waste_collected_2020',
               'specific_waste_collected_2021',
-              'comments', 'sources', 'created_at', 'lastmodified_at']
+              'comments', 'sources', 'valid_from', 'valid_until', 'created_at', 'lastmodified_at']
 
     labels = {
         'catchment': 'Catchment',
@@ -77,6 +79,8 @@ class CollectionCSVRenderer(CSVRenderer):
         'specific_waste_collected_2021': 'Specific waste collected in 2021 [kg/(cap*year)]',
         'comments': 'Comments',
         'sources': 'Sources',
+        'valid_from': 'Valid from',
+        'valid_until': 'Valid until',
         'created_at': 'Created at',
         'lastmodified_at': 'Last modified at'
     }

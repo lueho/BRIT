@@ -2,6 +2,7 @@ from factory.django import mute_signals
 
 from django.db.models import signals, Q
 from django.test import TestCase
+from django.utils import timezone
 
 from distributions.models import TemporalDistribution, Timestep
 from utils.models import Property
@@ -243,10 +244,23 @@ class CollectionFilterTestCase(TestCase):
         fixed_once_per_week = CollectionFrequency.objects.create(type='Fixed')
         CollectionCountOptions.objects.create(frequency=fixed_once_per_week, season=whole_year, standard=52)
 
-        # Create collections
-        cls.collection1 = Collection.objects.create(catchment=cls.catchment, frequency=cls.not_seasonal_frequency)
-        cls.collection2 = Collection.objects.create(catchment=cls.unrelated_catchment, frequency=cls.seasonal_frequency)
-        cls.child_collection = Collection.objects.create(catchment=child_catchment, frequency=fixed_once_per_week)
+        cls.collection1 = Collection.objects.create(
+            catchment=cls.catchment,
+            frequency=cls.not_seasonal_frequency,
+            valid_from=timezone.now().date(),
+            valid_until=timezone.now().date() + timezone.timedelta(days=30)
+        )
+        cls.collection2 = Collection.objects.create(
+            catchment=cls.unrelated_catchment,
+            frequency=cls.seasonal_frequency,
+            valid_from=timezone.now().date() - timezone.timedelta(days=30),
+        )
+        cls.child_collection = Collection.objects.create(
+            catchment=child_catchment,
+            frequency=fixed_once_per_week,
+            valid_from=timezone.now().date() - timezone.timedelta(days=60),
+            valid_until=timezone.now().date() - timezone.timedelta(days=30)
+        )
 
         # Add connection_rate properties
         prop_connection_rate = Property.objects.create(name='Connection rate')
@@ -267,6 +281,7 @@ class CollectionFilterTestCase(TestCase):
     def setUp(self):
         self.data = {field_name: field.initial for field_name, field in CollectionFilterSet().form.fields.items() if
                      field.initial}
+        self.data['valid_on'] = None
 
     def test_only_initial_values_returns_complete_queryset(self):
         qs = CollectionFilterSet(self.data, queryset=Collection.objects.all()).qs
@@ -409,6 +424,15 @@ class CollectionFilterTestCase(TestCase):
     def test_filter_form_has_no_formtags(self):
         filtr = CollectionFilterSet(queryset=Collection.objects.all())
         self.assertFalse(filtr.form.helper.form_tag)
+
+    def test_valid_on_filter(self):
+        self.data['valid_on'] = timezone.now().date()
+        filtr = CollectionFilterSet(self.data, queryset=Collection.objects.all())
+        qs = filtr.qs
+
+        self.assertIn(self.collection1, qs)
+        self.assertIn(self.collection2, qs)
+        self.assertNotIn(self.child_collection, qs)
 
 
 class CollectorFilterTestCase(TestCase):

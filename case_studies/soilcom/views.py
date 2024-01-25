@@ -2,6 +2,8 @@ import json
 
 from celery.result import AsyncResult
 from dal.autocomplete import Select2QuerySetView
+from datetime import date
+
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.db.models import Max
 from django.forms.models import model_to_dict
@@ -645,6 +647,7 @@ class CollectionCreateView(M2MInlineFormSetMixin, OwnedObjectCreateView):
             initial['catchment'] = catchment
         if 'collector' in self.request.GET:
             initial['collector'] = Collector.objects.get(id=self.request.GET.get('collector'))
+        initial['valid_from'] = date.today()
         return initial
 
     def post(self, request, *args, **kwargs):

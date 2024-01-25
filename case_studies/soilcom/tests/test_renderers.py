@@ -55,6 +55,7 @@ class CollectionCSVRendererTestCase(TestCase):
                 waste_stream=waste_stream,
                 fee_system='Fixed fee',
                 frequency=frequency,
+                valid_from=date(2020, 1, 1),
                 description='This is a test case.'
             )
             collection.flyers.add(waste_flyer)
