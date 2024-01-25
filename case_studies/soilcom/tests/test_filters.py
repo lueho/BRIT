@@ -1,4 +1,6 @@
-from django.db.models import Q
+from factory.django import mute_signals
+
+from django.db.models import signals, Q
 from django.test import TestCase
 
 from distributions.models import TemporalDistribution, Timestep
@@ -14,13 +16,14 @@ class WasteFlyerFilterTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        for i in range(1, 5):
-            WasteFlyer.objects.create(
-                title=f'Waste flyer {i}',
-                abbreviation=f'WF{i}',
-                url=f'https://www.flyer{i}.com',
-                url_valid=i % 2 == 0
-            )
+        with mute_signals(signals.post_save):
+            for i in range(1, 5):
+                WasteFlyer.objects.create(
+                    title=f'Waste flyer {i}',
+                    abbreviation=f'WF{i}',
+                    url=f'https://www.flyer{i}.com',
+                    url_valid=i % 2 == 0
+                )
         cls.catchment = CollectionCatchment.objects.create(name='Parent')
         child_catchment = CollectionCatchment.objects.create(name='Child', parent=cls.catchment)
         for flyer in WasteFlyer.objects.filter(abbreviation__in=('WF1', 'WF2')):

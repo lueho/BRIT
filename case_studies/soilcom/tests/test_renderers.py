@@ -1,9 +1,12 @@
 import codecs
 import csv
+from datetime import date
+from factory.django import mute_signals
 from io import BytesIO
 from openpyxl import load_workbook
 
 from django.contrib.auth.models import User, Permission
+from django.db.models import signals
 from django.test import TestCase
 
 from maps.models import NutsRegion
@@ -34,12 +37,12 @@ class CollectionCSVRendererTestCase(TestCase):
         waste_stream.allowed_materials.add(cls.allowed_material_2)
         waste_stream.forbidden_materials.add(cls.forbidden_material_1)
         waste_stream.forbidden_materials.add(cls.forbidden_material_2)
-
-        waste_flyer = WasteFlyer.objects.create(
-            owner=owner,
-            abbreviation='WasteFlyer123',
-            url='https://www.test-flyer.org'
-        )
+        with mute_signals(signals.post_save):
+            waste_flyer = WasteFlyer.objects.create(
+                owner=owner,
+                abbreviation='WasteFlyer123',
+                url='https://www.test-flyer.org'
+            )
         frequency = CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
         nuts = NutsRegion.objects.create(owner=owner, name='Test NUTS', nuts_id='DE123', cntr_code='DE')
         catchment = CollectionCatchment.objects.create(owner=owner, name='Test catchment', region=nuts.region_ptr)
@@ -87,7 +90,8 @@ class CollectionCSVRendererTestCase(TestCase):
 
     def test_regression_flyers_without_urls_dont_raise_type_error(self):
         defected_collection = Collection.objects.first()
-        rogue_flyer = WasteFlyer.objects.create(title='Rogue flyer without url', abbreviation='RF')
+        with mute_signals(signals.post_save):
+            rogue_flyer = WasteFlyer.objects.create(title='Rogue flyer without url', abbreviation='RF')
         defected_collection.flyers.add(rogue_flyer)
         renderer = CollectionCSVRenderer()
         renderer.render(self.file, self.content)
@@ -118,12 +122,12 @@ class CollectionXLSXRendererTestCase(TestCase):
         waste_stream.allowed_materials.add(cls.allowed_material_2)
         waste_stream.forbidden_materials.add(cls.forbidden_material_1)
         waste_stream.forbidden_materials.add(cls.forbidden_material_2)
-
-        waste_flyer = WasteFlyer.objects.create(
-            owner=owner,
-            abbreviation='WasteFlyer123',
-            url='https://www.test-flyer.org'
-        )
+        with mute_signals(signals.post_save):
+            waste_flyer = WasteFlyer.objects.create(
+                owner=owner,
+                abbreviation='WasteFlyer123',
+                url='https://www.test-flyer.org'
+            )
         frequency = CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
         nuts = NutsRegion.objects.create(owner=owner, name='Test NUTS', nuts_id='DE123', cntr_code='DE')
         catchment = CollectionCatchment.objects.create(owner=owner, name='Test catchment', region=nuts.region_ptr)

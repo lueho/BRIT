@@ -1,4 +1,8 @@
+from datetime import date, timedelta
+from factory.django import mute_signals
+
 from django.core.exceptions import ValidationError
+from django.db.models import signals
 from django.test import TestCase
 from django.urls import reverse
 
@@ -451,17 +455,20 @@ class WasteFlyerTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        WasteFlyer.objects.create(abbreviation='WasteFlyer007', url='https://www.super-test-flyer.org')
+        with mute_signals(signals.post_save):
+            WasteFlyer.objects.create(abbreviation='WasteFlyer007', url='https://www.super-test-flyer.org')
 
     def setUp(self):
         pass
 
     def test_new_instance_is_saved_with_type_waste_flyer(self):
-        flyer = WasteFlyer.objects.create(abbreviation='WasteFlyer002')
+        with mute_signals(signals.post_save):
+            flyer = WasteFlyer.objects.create(abbreviation='WasteFlyer002')
         self.assertEqual(flyer.type, 'waste_flyer')
 
     def test_str_returns_url(self):
-        flyer = WasteFlyer.objects.get(abbreviation='WasteFlyer007')
+        with mute_signals(signals.post_save):
+            flyer = WasteFlyer.objects.get(abbreviation='WasteFlyer007')
         self.assertEqual(flyer.__str__(), 'https://www.super-test-flyer.org')
 
 

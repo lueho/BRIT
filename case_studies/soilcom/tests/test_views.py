@@ -2,11 +2,13 @@ import json
 from collections import OrderedDict
 from urllib.parse import urlencode
 
+from django.db.models import signals
 from django.forms.formsets import BaseFormSet
 from django.http import JsonResponse
 from django.http.request import MultiValueDict, QueryDict
 from django.test import RequestFactory
 from django.urls import reverse
+from factory.django import mute_signals
 from mock import Mock, patch
 
 from distributions.models import TemporalDistribution, Timestep
@@ -875,11 +877,11 @@ class CollectionCreateViewTestCase(ViewWithPermissionsTestCase):
         waste_stream.allowed_materials.add(cls.allowed_material_2)
         waste_stream.forbidden_materials.add(cls.forbidden_material_1)
         waste_stream.forbidden_materials.add(cls.forbidden_material_2)
-
-        waste_flyer = WasteFlyer.objects.create(
-            abbreviation='WasteFlyer123',
-            url='https://www.test-flyer.org'
-        )
+        with mute_signals(signals.post_save):
+            waste_flyer = WasteFlyer.objects.create(
+                abbreviation='WasteFlyer123',
+                url='https://www.test-flyer.org'
+            )
         frequency = CollectionFrequency.objects.create(name='Test Frequency')
         cls.collection = Collection.objects.create(
             name='collection1',
@@ -978,21 +980,21 @@ class CollectionCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(Collection.objects.count(), 1)
         self.client.force_login(self.member)
         data = {
-                'catchment': CollectionCatchment.objects.first().id,
-                'collector': Collector.objects.first().id,
-                'collection_system': CollectionSystem.objects.first().id,
-                'waste_category': WasteCategory.objects.first().id,
-                'allowed_materials': [],
-                'forbidden_materials': [self.forbidden_material_1.id, self.forbidden_material_2.id],
-                'frequency': CollectionFrequency.objects.first().id,
-                'description': 'This is a test case that should pass!',
-                'form-INITIAL_FORMS': '0',
-                'form-TOTAL_FORMS': '2',
-                'form-0-url': 'https://www.test-flyer.org',
-                'form-0-id': '',
-                'form-1-url': '',
-                'form-1-id': ''
-            }
+            'catchment': CollectionCatchment.objects.first().id,
+            'collector': Collector.objects.first().id,
+            'collection_system': CollectionSystem.objects.first().id,
+            'waste_category': WasteCategory.objects.first().id,
+            'allowed_materials': [],
+            'forbidden_materials': [self.forbidden_material_1.id, self.forbidden_material_2.id],
+            'frequency': CollectionFrequency.objects.first().id,
+            'description': 'This is a test case that should pass!',
+            'form-INITIAL_FORMS': '0',
+            'form-TOTAL_FORMS': '2',
+            'form-0-url': 'https://www.test-flyer.org',
+            'form-0-id': '',
+            'form-1-url': '',
+            'form-1-id': ''
+        }
         response = self.client.post(
             reverse('collection-create'),
             data=data,
@@ -1024,15 +1026,15 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
         waste_stream.allowed_materials.add(cls.allowed_material_2)
         waste_stream.forbidden_materials.add(cls.forbidden_material_1)
         waste_stream.forbidden_materials.add(cls.forbidden_material_2)
-
-        cls.flyer = WasteFlyer.objects.create(
-            abbreviation='WasteFlyer123',
-            url='https://www.test-flyer.org'
-        )
-        cls.flyer2 = WasteFlyer.objects.create(
-            abbreviation='WasteFlyer234',
-            url='https://www.fest-flyer.org'
-        )
+        with mute_signals(signals.post_save):
+            cls.flyer = WasteFlyer.objects.create(
+                abbreviation='WasteFlyer123',
+                url='https://www.test-flyer.org'
+            )
+            cls.flyer2 = WasteFlyer.objects.create(
+                abbreviation='WasteFlyer234',
+                url='https://www.fest-flyer.org'
+            )
         frequency = CollectionFrequency.objects.create(name='Test Frequency')
         cls.collection = Collection.objects.create(
             name='collection1',
@@ -1195,15 +1197,15 @@ class CollectionUpdateViewTestCase(ViewWithPermissionsTestCase):
         waste_stream.allowed_materials.add(cls.allowed_material_2)
         waste_stream.forbidden_materials.add(cls.forbidden_material_1)
         waste_stream.forbidden_materials.add(cls.forbidden_material_2)
-
-        cls.flyer = WasteFlyer.objects.create(
-            abbreviation='WasteFlyer123',
-            url='https://www.test-flyer.org'
-        )
-        cls.flyer2 = WasteFlyer.objects.create(
-            abbreviation='WasteFlyer234',
-            url='https://www.rest-flyer.org'
-        )
+        with mute_signals(signals.post_save):
+            cls.flyer = WasteFlyer.objects.create(
+                abbreviation='WasteFlyer123',
+                url='https://www.test-flyer.org'
+            )
+            cls.flyer2 = WasteFlyer.objects.create(
+                abbreviation='WasteFlyer234',
+                url='https://www.rest-flyer.org'
+            )
         frequency = CollectionFrequency.objects.create(name='Test Frequency')
         cls.collection = Collection.objects.create(
             name='collection1',
@@ -1404,7 +1406,8 @@ class CollectionUpdateViewTestCase(ViewWithPermissionsTestCase):
             'form-0-url': 'https://www.best-flyer.org',
             'form-1-url': 'https://www.fest-flyer.org',
         }
-        self.client.post(reverse('collection-update', kwargs={'pk': self.collection.pk}), data=data)
+        with mute_signals(signals.post_save):
+            self.client.post(reverse('collection-update', kwargs={'pk': self.collection.pk}), data=data)
         flyer = WasteFlyer.objects.get(url='https://www.fest-flyer.org')
         self.assertIsInstance(flyer, WasteFlyer)
 
@@ -1614,11 +1617,11 @@ class CollectionSummaryAPIViewTestCase(ViewWithPermissionsTestCase):
         )
         waste_stream.allowed_materials.add(material1)
         waste_stream.allowed_materials.add(material2)
-
-        waste_flyer = WasteFlyer.objects.create(
-            abbreviation='WasteFlyer123',
-            url='https://www.test-flyer.org'
-        )
+        with mute_signals(signals.post_save):
+            waste_flyer = WasteFlyer.objects.create(
+                abbreviation='WasteFlyer123',
+                url='https://www.test-flyer.org'
+            )
         frequency = CollectionFrequency.objects.create(name='Test Frequency')
         cls.collection = Collection.objects.create(
             name='collection1',
@@ -1673,11 +1676,11 @@ class CollectionListFileExportViewTestCase(ViewWithPermissionsTestCase):
         )
         waste_stream.allowed_materials.add(material1)
         waste_stream.allowed_materials.add(material2)
-
-        waste_flyer = WasteFlyer.objects.create(
-            abbreviation='WasteFlyer123',
-            url='https://www.test-flyer.org'
-        )
+        with mute_signals(signals.post_save):
+            waste_flyer = WasteFlyer.objects.create(
+                abbreviation='WasteFlyer123',
+                url='https://www.test-flyer.org'
+            )
         frequency = CollectionFrequency.objects.create(name='Test Frequency')
         for i in range(1, 3):
             collection = Collection.objects.create(
@@ -1783,18 +1786,19 @@ class WasteFlyerListViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        WasteFlyer.objects.create(
-            abbreviation='Flyer1',
-            url='https://www.test-flyer.org'
-        )
-        WasteFlyer.objects.create(
-            abbreviation='Flyer2',
-            url='https://www.best-flyer.org'
-        )
-        WasteFlyer.objects.create(
-            abbreviation='Flyer3',
-            url='https://www.rest-flyer.org'
-        )
+        with mute_signals(signals.post_save):
+            WasteFlyer.objects.create(
+                abbreviation='Flyer1',
+                url='https://www.test-flyer.org'
+            )
+            WasteFlyer.objects.create(
+                abbreviation='Flyer2',
+                url='https://www.best-flyer.org'
+            )
+            WasteFlyer.objects.create(
+                abbreviation='Flyer3',
+                url='https://www.rest-flyer.org'
+            )
 
     def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse('wasteflyer-list'))
@@ -1818,7 +1822,8 @@ class WasteFlyerDetailViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.flyer = WasteFlyer.objects.create(abbreviation='TEST')
+        with mute_signals(signals.post_save):
+            cls.flyer = WasteFlyer.objects.create(abbreviation='TEST')
 
     def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse('wasteflyer-detail', kwargs={'pk': self.flyer.pk}))
@@ -1912,21 +1917,24 @@ class WasteCollectionMapViewTestCase(ViewWithPermissionsTestCase):
         self.assertContains(response, 'range_slider.min.css')
 
 
-class WasteFlyerListCheckUrlsView(ViewWithPermissionsTestCase):
+class WasteFlyerListCheckUrlsViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = 'change_wasteflyer'
 
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        for i in range(1, 5):
-            WasteFlyer.objects.create(
-                title=f'Waste flyer {i}',
-                abbreviation=f'WF{i}',
-                url_valid=i % 2 == 0
-            )
+        with mute_signals(signals.post_save):
+            for i in range(1, 5):
+                WasteFlyer.objects.create(
+                    title=f'Waste flyer {i}',
+                    abbreviation=f'WF{i}',
+                    url_valid=i % 2 == 0
+                )
 
-    def test_get_http_200_ok_for_members(self):
+    @patch('case_studies.soilcom.tasks.check_wasteflyer_urls.delay')
+    def test_get_http_200_ok_for_members(self, mock_task):
         self.client.force_login(self.member)
+        mock_task.return_value.get.return_value = [['mocked_callback_id']]
         params = {
             'csrfmiddlewaretoken': ['Hm7MXB2NjRCOIpNbGaRKR87VCHM5KwpR1t4AdZFgaqKfqui1EJwhKKmkxFKDfL3h'],
             'url_valid': ['False'],
@@ -1936,6 +1944,7 @@ class WasteFlyerListCheckUrlsView(ViewWithPermissionsTestCase):
         qdict.update(MultiValueDict(params))
         url = reverse('wasteflyer-list-check-urls') + '?' + qdict.urlencode()
         response = self.client.get(url)
+        mock_task.assert_called_once()
         self.assertEqual(200, response.status_code)
 
 

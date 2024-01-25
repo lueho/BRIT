@@ -1,5 +1,8 @@
 from celery import chord
+from factory.django import mute_signals
+
 from django.contrib.auth.models import User, Permission
+from django.db.models import signals
 from django.http.request import QueryDict, MultiValueDict
 from django.test import TestCase
 from mock import patch, Mock
@@ -35,12 +38,12 @@ class ExportCollectionToFileTestCase(TestCase):
         )
         waste_stream.allowed_materials.add(material1)
         waste_stream.allowed_materials.add(material2)
-
-        waste_flyer = WasteFlyer.objects.create(
-            owner=owner,
-            abbreviation='WasteFlyer123',
-            url='https://www.test-flyer.org'
-        )
+        with mute_signals(signals.post_save):
+            waste_flyer = WasteFlyer.objects.create(
+                owner=owner,
+                abbreviation='WasteFlyer123',
+                url='https://www.test-flyer.org'
+            )
         frequency = CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
         region = Region.objects.create(owner=owner, name='Test Region')
         catchment = CollectionCatchment.objects.create(owner=owner, name='Test catchment', region=region)
@@ -87,13 +90,14 @@ class CheckWasteFlyerUrlsTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         owner = get_default_owner()
-        for i in range(1, 5):
-            WasteFlyer.objects.create(
-                owner=owner,
-                title=f'Waste flyer {i}',
-                abbreviation=f'WF{i}',
-                url_valid=i % 2 == 0
-            )
+        with mute_signals(signals.post_save):
+            for i in range(1, 5):
+                WasteFlyer.objects.create(
+                    owner=owner,
+                    title=f'Waste flyer {i}',
+                    abbreviation=f'WF{i}',
+                    url_valid=i % 2 == 0
+                )
 
     def setUp(self):
         self.flyer = WasteFlyer.objects.first

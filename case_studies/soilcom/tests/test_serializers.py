@@ -1,3 +1,6 @@
+from datetime import date
+from factory.django import mute_signals
+
 from django.db import models
 from django.test import TestCase
 from django.test.utils import isolate_apps
@@ -109,14 +112,15 @@ class CollectionModelSerializerTestCase(TestCase):
         waste_stream.forbidden_materials.add(cls.forbidden_material_1)
         waste_stream.forbidden_materials.add(cls.forbidden_material_2)
 
-        waste_flyer_1 = WasteFlyer.objects.create(
-            abbreviation='WasteFlyer123',
-            url='https://www.test-flyer.org'
-        )
-        waste_flyer_2 = WasteFlyer.objects.create(
-            abbreviation='WasteFlyer456',
-            url='https://www.best-flyer.org'
-        )
+        with mute_signals(models.signals.post_save):
+            waste_flyer_1 = WasteFlyer.objects.create(
+                abbreviation='WasteFlyer123',
+                url='https://www.test-flyer.org'
+            )
+            waste_flyer_2 = WasteFlyer.objects.create(
+                abbreviation='WasteFlyer456',
+                url='https://www.best-flyer.org'
+            )
         frequency = CollectionFrequency.objects.create(name='Test Frequency')
         cls.collection = Collection.objects.create(
             name='Test Collection',
@@ -173,14 +177,15 @@ class CollectionFlatSerializerTestCase(TestCase):
         waste_stream.forbidden_materials.add(cls.forbidden_material_1)
         waste_stream.forbidden_materials.add(cls.forbidden_material_2)
 
-        waste_flyer_1 = WasteFlyer.objects.create(
-            abbreviation='WasteFlyer123',
-            url='https://www.test-flyer.org'
-        )
-        waste_flyer_2 = WasteFlyer.objects.create(
-            abbreviation='WasteFlyer456',
-            url='https://www.best-flyer.org'
-        )
+        with mute_signals(models.signals.post_save):
+            waste_flyer_1 = WasteFlyer.objects.create(
+                abbreviation='WasteFlyer123',
+                url='https://www.test-flyer.org'
+            )
+            waste_flyer_2 = WasteFlyer.objects.create(
+                abbreviation='WasteFlyer456',
+                url='https://www.best-flyer.org'
+            )
         frequency = CollectionFrequency.objects.create(name='Test Frequency')
 
         nutsregion = NutsRegion.objects.create(name='Hamburg', country='DE', nuts_id='DE600')

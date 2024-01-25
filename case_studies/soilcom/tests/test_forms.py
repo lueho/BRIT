@@ -1,3 +1,7 @@
+from datetime import date
+from factory.django import mute_signals
+
+from django.db.models import signals
 from django.forms import formset_factory
 from django.test import TestCase
 
@@ -263,9 +267,10 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        flyer_1 = WasteFlyer.objects.create(url='https://www.test-flyers.org')
-        flyer_2 = WasteFlyer.objects.create(url='https://www.best-flyers.org')
-        flyer_3 = WasteFlyer.objects.create(url='https://www.rest-flyers.org')
+        with mute_signals(signals.post_save):
+            flyer_1 = WasteFlyer.objects.create(url='https://www.test-flyers.org')
+            flyer_2 = WasteFlyer.objects.create(url='https://www.best-flyers.org')
+            flyer_3 = WasteFlyer.objects.create(url='https://www.rest-flyers.org')
         CollectionCatchment.objects.create(name='Catchment')
         collector = Collector.objects.create(name='Collector')
         collection_system = CollectionSystem.objects.create(name='System')
