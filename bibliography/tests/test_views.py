@@ -1,9 +1,6 @@
-from django.contrib.auth.models import Group, User
 from django.urls import reverse
 
-from utils.tests.testcases import UserLoginTestCase
-from users.models import get_default_owner
-
+from utils.tests.testcases import ViewWithPermissionsTestCase
 from ..models import Author, Licence, Source
 
 
@@ -11,13 +8,7 @@ from ..models import Author, Licence, Source
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class AuthorListViewTestCase(UserLoginTestCase):
-
-    outsider = None
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.outsider = User.objects.create(username='outsider')
+class AuthorListViewTestCase(ViewWithPermissionsTestCase):
 
     def test_get_http_200_redirect_for_anonymous(self):
         response = self.client.get(reverse('author-list'))
@@ -29,17 +20,8 @@ class AuthorListViewTestCase(UserLoginTestCase):
         self.assertEqual(response.status_code, 200)
 
 
-class AuthorCreateViewTestCase(UserLoginTestCase):
-
-    outsider = None
-    member = None
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.outsider = User.objects.create(username='outsider')
-        cls.member = User.objects.create(username='member')
-        editors = Group.objects.get(name='editors')
-        cls.member.groups.add(editors)
+class AuthorCreateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['add_author']
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         response = self.client.get(reverse('author-create'))
@@ -94,17 +76,8 @@ class AuthorCreateViewTestCase(UserLoginTestCase):
         )
 
 
-class AuthorModalCreateViewTestCase(UserLoginTestCase):
-
-    outsider = None
-    member = None
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.outsider = User.objects.create(username='outsider')
-        cls.member = User.objects.create(username='member')
-        editors = Group.objects.get(name='editors')
-        cls.member.groups.add(editors)
+class AuthorModalCreateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['add_author']
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(reverse('author-create-modal'))
@@ -149,16 +122,13 @@ class AuthorModalCreateViewTestCase(UserLoginTestCase):
         )
 
 
-class AuthorDetailViewTestCase(UserLoginTestCase):
-
-    outsider = None
-    author = None
+class AuthorDetailViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['view_author']
 
     @classmethod
     def setUpTestData(cls):
-        cls.outsider = User.objects.create(username='outsider')
+        super().setUpTestData()
         cls.author = Author.objects.create(
-            owner=get_default_owner(),
             first_names='Test',
             last_names='Author',
         )
@@ -173,16 +143,13 @@ class AuthorDetailViewTestCase(UserLoginTestCase):
         self.assertEqual(response.status_code, 200)
 
 
-class AuthorModalDetailViewTestCase(UserLoginTestCase):
-
-    outsider = None
-    author = None
+class AuthorModalDetailViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['view_author']
 
     @classmethod
     def setUpTestData(cls):
-        cls.outsider = User.objects.create(username='outsider')
+        super().setUpTestData()
         cls.author = Author.objects.create(
-            owner=get_default_owner(),
             first_names='Test',
             last_names='Author',
         )
@@ -197,20 +164,13 @@ class AuthorModalDetailViewTestCase(UserLoginTestCase):
         self.assertEqual(response.status_code, 200)
 
 
-class AuthorUpdateViewTestCase(UserLoginTestCase):
-
-    outsider = None
-    member = None
-    author = None
+class AuthorUpdateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['change_author']
 
     @classmethod
     def setUpTestData(cls):
-        cls.outsider = User.objects.create(username='outsider')
-        cls.member = User.objects.create(username='member')
-        editors = Group.objects.get(name='editors')
-        cls.member.groups.add(editors)
+        super().setUpTestData()
         cls.author = Author.objects.create(
-            owner=get_default_owner(),
             first_names='Test',
             last_names='Author',
         )
@@ -265,20 +225,13 @@ class AuthorUpdateViewTestCase(UserLoginTestCase):
         )
 
 
-class AuthorModalUpdateViewTestCase(UserLoginTestCase):
-
-    outsider = None
-    member = None
-    author = None
+class AuthorModalUpdateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['change_author']
 
     @classmethod
     def setUpTestData(cls):
-        cls.outsider = User.objects.create(username='outsider')
-        cls.member = User.objects.create(username='member')
-        editors = Group.objects.get(name='editors')
-        cls.member.groups.add(editors)
+        super().setUpTestData()
         cls.author = Author.objects.create(
-            owner=get_default_owner(),
             first_names='Test',
             last_names='Author',
         )
@@ -323,20 +276,13 @@ class AuthorModalUpdateViewTestCase(UserLoginTestCase):
         )
 
 
-class AuthorModalDeleteViewTestCase(UserLoginTestCase):
-
-    outsider = None
-    member = None
-    author = None
+class AuthorModalDeleteViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['delete_author']
 
     @classmethod
     def setUpTestData(cls):
-        cls.outsider = User.objects.create(username='outsider')
-        cls.member = User.objects.create(username='member')
-        editors = Group.objects.get(name='editors')
-        cls.member.groups.add(editors)
+        super().setUpTestData()
         cls.author = Author.objects.create(
-            owner=get_default_owner(),
             first_names='Test',
             last_names='Author',
         )
@@ -386,13 +332,8 @@ class AuthorModalDeleteViewTestCase(UserLoginTestCase):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class LicenceListViewTestCase(UserLoginTestCase):
-
-    outsider = None
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.outsider = User.objects.create(username='outsider')
+class LicenceListViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['view_licence']
 
     def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse('licence-list'))
@@ -404,16 +345,8 @@ class LicenceListViewTestCase(UserLoginTestCase):
         self.assertEqual(response.status_code, 200)
 
 
-class LicenceCreateViewTestCase(UserLoginTestCase):
-    outsider = None
-    member = None
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.outsider = User.objects.create(username='outsider')
-        cls.member = User.objects.create(username='member')
-        editors = Group.objects.get(name='editors')
-        cls.member.groups.add(editors)
+class LicenceCreateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['add_licence']
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(reverse('licence-create'))
@@ -465,17 +398,8 @@ class LicenceCreateViewTestCase(UserLoginTestCase):
         )
 
 
-class LicenceModalCreateViewTestCase(UserLoginTestCase):
-
-    outsider = None
-    member = None
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.outsider = User.objects.create(username='outsider')
-        cls.member = User.objects.create(username='member')
-        editors = Group.objects.get(name='editors')
-        cls.member.groups.add(editors)
+class LicenceModalCreateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['add_licence']
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(reverse('licence-create-modal'))
@@ -517,16 +441,13 @@ class LicenceModalCreateViewTestCase(UserLoginTestCase):
         )
 
 
-class LicenceDetailViewTestCase(UserLoginTestCase):
-
-    outsider = None
-    licence = None
+class LicenceDetailViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['view_licence']
 
     @classmethod
     def setUpTestData(cls):
-        cls.outsider = User.objects.create(username='outsider')
+        super().setUpTestData()
         cls.licence = Licence.objects.create(
-            owner=get_default_owner(),
             name='Test Licence',
             reference_url='https://www.reference-url.org',
         )
@@ -541,16 +462,13 @@ class LicenceDetailViewTestCase(UserLoginTestCase):
         self.assertEqual(response.status_code, 200)
 
 
-class LicenceModalDetailViewTestCase(UserLoginTestCase):
-
-    outsider = None
-    licence = None
+class LicenceModalDetailViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['view_licence']
 
     @classmethod
     def setUpTestData(cls):
-        cls.outsider = User.objects.create(username='outsider')
+        super().setUpTestData()
         cls.licence = Licence.objects.create(
-            owner=get_default_owner(),
             name='Test Licence',
             reference_url='https://www.reference-url.org',
         )
@@ -565,20 +483,13 @@ class LicenceModalDetailViewTestCase(UserLoginTestCase):
         self.assertEqual(response.status_code, 200)
 
 
-class LicenceUpdateViewTestCase(UserLoginTestCase):
-
-    outsider = None
-    member = None
-    licence = None
+class LicenceUpdateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['change_licence']
 
     @classmethod
     def setUpTestData(cls):
-        cls.outsider = User.objects.create(username='outsider')
-        cls.member = User.objects.create(username='member')
-        editors = Group.objects.get(name='editors')
-        cls.member.groups.add(editors)
+        super().setUpTestData()
         cls.licence = Licence.objects.create(
-            owner=get_default_owner(),
             name='Test Licence',
             reference_url='https://www.reference-url.org',
         )
@@ -633,20 +544,13 @@ class LicenceUpdateViewTestCase(UserLoginTestCase):
         )
 
 
-class LicenceModalUpdateViewTestCase(UserLoginTestCase):
-
-    outsider = None
-    member = None
-    licence = None
+class LicenceModalUpdateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['change_licence']
 
     @classmethod
     def setUpTestData(cls):
-        cls.outsider = User.objects.create(username='outsider')
-        cls.member = User.objects.create(username='member')
-        editors = Group.objects.get(name='editors')
-        cls.member.groups.add(editors)
+        super().setUpTestData()
         cls.licence = Licence.objects.create(
-            owner=get_default_owner(),
             name='Test Licence',
             reference_url='https://www.reference-url.org',
         )
@@ -682,7 +586,8 @@ class LicenceModalUpdateViewTestCase(UserLoginTestCase):
     def test_post_success_and_http_302_redirect_for_members(self):
         self.client.force_login(self.member)
         data = {'name': 'Updated Test Licence'}
-        response = self.client.post(reverse('licence-update-modal', kwargs={'pk': self.licence.pk}), data=data, follow=True)
+        response = self.client.post(reverse('licence-update-modal', kwargs={'pk': self.licence.pk}), data=data,
+                                    follow=True)
         self.assertRedirects(
             response,
             f"{reverse('licence-detail', kwargs={'pk': self.licence.pk})}",
@@ -691,20 +596,13 @@ class LicenceModalUpdateViewTestCase(UserLoginTestCase):
         )
 
 
-class LicenceModalDeleteViewTestCase(UserLoginTestCase):
-
-    outsider = None
-    member = None
-    licence = None
+class LicenceModalDeleteViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['delete_licence']
 
     @classmethod
     def setUpTestData(cls):
-        cls.outsider = User.objects.create(username='outsider')
-        cls.member = User.objects.create(username='member')
-        editors = Group.objects.get(name='editors')
-        cls.member.groups.add(editors)
+        super().setUpTestData()
         cls.licence = Licence.objects.create(
-            owner=get_default_owner(),
             name='Test Licence',
             reference_url='https://www.reference-url.org',
         )
@@ -754,13 +652,8 @@ class LicenceModalDeleteViewTestCase(UserLoginTestCase):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class SourceListViewTestCase(UserLoginTestCase):
-
-    outsider = None
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.outsider = User.objects.create(username='outsider')
+class SourceListViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['view_source']
 
     def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse('source-list'))
@@ -772,17 +665,8 @@ class SourceListViewTestCase(UserLoginTestCase):
         self.assertEqual(response.status_code, 200)
 
 
-class SourceCreateViewTestCase(UserLoginTestCase):
-
-    outsider = None
-    member = None
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.outsider = User.objects.create(username='outsider')
-        cls.member = User.objects.create(username='member')
-        editors = Group.objects.get(name='editors')
-        cls.member.groups.add(editors)
+class SourceCreateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['add_source']
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(reverse('source-create'), follow=True)
@@ -834,17 +718,8 @@ class SourceCreateViewTestCase(UserLoginTestCase):
         )
 
 
-class SourceModalCreateViewTestCase(UserLoginTestCase):
-
-    outsider = None
-    member = None
-
-    @classmethod
-    def setUpTestData(cls):
-        cls.outsider = User.objects.create(username='outsider')
-        cls.member = User.objects.create(username='member')
-        editors = Group.objects.get(name='editors')
-        cls.member.groups.add(editors)
+class SourceModalCreateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['add_source']
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(reverse('source-create-modal'))
@@ -886,16 +761,13 @@ class SourceModalCreateViewTestCase(UserLoginTestCase):
         )
 
 
-class SourceDetailViewTestCase(UserLoginTestCase):
-
-    outsider = None
-    source = None
+class SourceDetailViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['view_source']
 
     @classmethod
     def setUpTestData(cls):
-        cls.outsider = User.objects.create(username='outsider')
+        super().setUpTestData()
         cls.source = Source.objects.create(
-            owner=get_default_owner(),
             abbreviation='TS1',
             type='article',
             title='Test Source'
@@ -911,16 +783,13 @@ class SourceDetailViewTestCase(UserLoginTestCase):
         self.assertEqual(response.status_code, 200)
 
 
-class SourceModalDetailViewTestCase(UserLoginTestCase):
-
-    outsider = None
-    source = None
+class SourceModalDetailViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['view_source']
 
     @classmethod
     def setUpTestData(cls):
-        cls.outsider = User.objects.create(username='outsider')
+        super().setUpTestData()
         cls.source = Source.objects.create(
-            owner=get_default_owner(),
             abbreviation='TS1',
             type='article',
             title='Test Source'
@@ -936,20 +805,13 @@ class SourceModalDetailViewTestCase(UserLoginTestCase):
         self.assertEqual(response.status_code, 200)
 
 
-class SourceUpdateViewTestCase(UserLoginTestCase):
-
-    member = None
-    outsider = None
-    source = None
+class SourceUpdateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['change_source']
 
     @classmethod
     def setUpTestData(cls):
-        cls.outsider = User.objects.create(username='outsider')
-        cls.member = User.objects.create(username='member')
-        editors = Group.objects.get(name='editors')
-        cls.member.groups.add(editors)
+        super().setUpTestData()
         cls.source = Source.objects.create(
-            owner=get_default_owner(),
             abbreviation='TS1',
             type='article',
             title='Test Source'
@@ -1012,20 +874,13 @@ class SourceUpdateViewTestCase(UserLoginTestCase):
         )
 
 
-class SourceModalUpdateViewTestCase(UserLoginTestCase):
-
-    member = None
-    outsider = None
-    source = None
+class SourceModalUpdateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['change_source']
 
     @classmethod
     def setUpTestData(cls):
-        cls.outsider = User.objects.create(username='outsider')
-        cls.member = User.objects.create(username='member')
-        editors = Group.objects.get(name='editors')
-        cls.member.groups.add(editors)
+        super().setUpTestData()
         cls.source = Source.objects.create(
-            owner=get_default_owner(),
             abbreviation='TS1',
             type='article',
             title='Test Source'
@@ -1075,20 +930,13 @@ class SourceModalUpdateViewTestCase(UserLoginTestCase):
         )
 
 
-class SourceModalDeleteViewTestCase(UserLoginTestCase):
-
-    outsider = None
-    member = None
-    source = None
+class SourceModalDeleteViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['delete_source']
 
     @classmethod
     def setUpTestData(cls):
-        cls.outsider = User.objects.create(username='outsider')
-        cls.member = User.objects.create(username='member')
-        editors = Group.objects.get(name='editors')
-        cls.member.groups.add(editors)
+        super().setUpTestData()
         cls.source = Source.objects.create(
-            owner=get_default_owner(),
             abbreviation='TS1',
             type='article',
             title='Test Source'
@@ -1135,20 +983,13 @@ class SourceModalDeleteViewTestCase(UserLoginTestCase):
         )
 
 
-class CheckSourceUrlViewTestCase(UserLoginTestCase):
-
-    outsider = None
-    member = None
-    source = None
+class SourceCheckUrlViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['change_source']
 
     @classmethod
     def setUpTestData(cls):
-        cls.outsider = User.objects.create(username='outsider')
-        cls.member = User.objects.create(username='member')
-        editors = Group.objects.get(name='editors')
-        cls.member.groups.add(editors)
+        super().setUpTestData()
         cls.source = Source.objects.create(
-            owner=get_default_owner(),
             title='Test Source from the Web',
             abbreviation='WORKING',
             url='https://httpbin.org/status/200'
@@ -1175,32 +1016,23 @@ class CheckSourceUrlViewTestCase(UserLoginTestCase):
         self.assertEqual(200, response.status_code)
 
 
-class SourceListCheckUrlsViewTestCase(UserLoginTestCase):
-
-    outsider = None
-    member = None
+class SourceListCheckUrlsViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['change_source']
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        cls.outsider = User.objects.create(username='outsider')
-        cls.member = User.objects.create(username='member')
-        editors = Group.objects.get(name='editors')
-        cls.member.groups.add(editors)
+        super().setUpTestData()
         Source.objects.create(
-            owner=owner,
             title='Test Source from the Web',
             abbreviation='WORKING',
             url='https://httpbin.org/status/200'
         )
         Source.objects.create(
-            owner=owner,
             title='Test Source from the Web',
             abbreviation='NOTWORKING',
             url='https://httpbin.org/status/404'
         )
         Source.objects.create(
-            owner=owner,
             title='Test Source from the Web',
             abbreviation='NOTWORKING',
             url='https://httpbin.org/status/404'

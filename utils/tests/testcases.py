@@ -1,5 +1,6 @@
 from django.contrib.auth.models import Permission
 from django.test import TestCase, modify_settings
+from rest_framework.test import APIClient
 
 from users.models import User
 
@@ -15,6 +16,10 @@ class UserLoginTestCase(TestCase):
 
 
 class ViewWithPermissionsTestCase(UserLoginTestCase):
+    """This TestCase is used for testing views with permissions. There are three levels of access:
+    - outsider: no permissions
+    - outsider: authenticated but without any special permissions
+    - member: has permissions which are specified in the member_permissions class variable"""
     outsider = None
     member = None
     member_permissions = None
@@ -28,6 +33,18 @@ class ViewWithPermissionsTestCase(UserLoginTestCase):
                 cls.member_permissions = [cls.member_permissions]
             for codename in cls.member_permissions:
                 cls.member.user_permissions.add(Permission.objects.get(codename=codename))
+
+
+class ViewSetWithPermissionsTestCase(ViewWithPermissionsTestCase):
+    """
+    This TestCase is used for testing ViewSets. It has the same functionality as ViewWithPermissionsTestCase,
+    but it uses the APIClient class provided by django rest framework instead of the standard django test client.
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.client = APIClient()
 
 
 def comparable_model_dict(instance):

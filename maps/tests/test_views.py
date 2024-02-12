@@ -8,7 +8,7 @@ from django.utils.http import urlencode
 from rest_framework.test import APITestCase
 
 from maps.views import CatchmentCreateByMergeView
-from utils.tests.testcases import ViewWithPermissionsTestCase
+from utils.tests.testcases import ViewWithPermissionsTestCase, ViewSetWithPermissionsTestCase
 from ..models import Attribute, RegionAttributeValue, Catchment, LauRegion, NutsRegion, Region, GeoDataset, GeoPolygon
 
 
@@ -410,10 +410,11 @@ class CatchmentGeometryAPITestCase(ViewWithPermissionsTestCase):
         self.assertEqual(200, response.status_code)
 
 
-class NutsRegionMapViewTestCase(TestCase):
+class NutsRegionMapViewTestCase(ViewWithPermissionsTestCase):
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         region = Region.objects.create(name='Test Region')
         GeoDataset.objects.create(
             name='Test Dataset',
@@ -426,104 +427,99 @@ class NutsRegionMapViewTestCase(TestCase):
         self.assertEqual(response.status_code, 200)
 
 
-class NutsRegionPedigreeAPITestCase(APITestCase):
+class NutsAndLauCatchmentPedigreeAPITestCase(ViewSetWithPermissionsTestCase):
     member_permissions = 'add_collection'
 
     @classmethod
     def setUpTestData(cls):
-        uk = NutsRegion.objects.create(
-            nuts_id='UK',
+        super().setUpTestData()
+        level_0_region = NutsRegion.objects.create(
+            nuts_id='XX',
             levl_code=0,
-            name_latn='United Kingdom'
+            name_latn='Level 0 Region'
         )
-        Catchment.objects.create(
-            region=uk.region_ptr
+        cls.level_0_catchment = Catchment.objects.create(
+            region=level_0_region.region_ptr
         )
-        ukh = NutsRegion.objects.create(
-            nuts_id='UKH',
+        level_1_region = NutsRegion.objects.create(
+            nuts_id='XX0',
             levl_code=1,
-            name_latn='East of England',
-            parent=uk
+            name_latn='Level 1 Region',
+            parent=level_0_region
         )
-        Catchment.objects.create(
-            region=ukh.region_ptr,
-            parent_region=uk.region_ptr
+        cls.level_1_catchment = Catchment.objects.create(
+            region=level_1_region.region_ptr,
+            parent_region=level_0_region.region_ptr
         )
-        ukh1 = NutsRegion.objects.create(
-            nuts_id='UKH1',
+        level_2_region_1 = NutsRegion.objects.create(
+            nuts_id='XX00',
             levl_code=2,
-            name_latn='East Anglia',
-            parent=ukh
+            name_latn='Level 2 Region 1',
+            parent=level_1_region
         )
-        Catchment.objects.create(
-            region=ukh1.region_ptr,
-            parent_region=ukh.region_ptr
+        cls.level_2_catchment_1 = Catchment.objects.create(
+            region=level_2_region_1.region_ptr,
+            parent_region=level_1_region.region_ptr
         )
-        ukh2 = NutsRegion.objects.create(
-            nuts_id='UKH2',
+        level_2_region_2 = NutsRegion.objects.create(
+            nuts_id='XX01',
             levl_code=2,
-            name_latn='Bedfordshire and Hertfordshire',
-            parent=ukh
+            name_latn='Level 2 Region 2',
+            parent=level_1_region
         )
-        Catchment.objects.create(
-            region=ukh2.region_ptr,
-            parent_region=ukh.region_ptr
+        cls.level_2_catchment_1 = Catchment.objects.create(
+            region=level_2_region_2.region_ptr,
+            parent_region=level_1_region.region_ptr
         )
-        ukh11 = NutsRegion.objects.create(
-            nuts_id='UKH11',
+        level_3_region_1 = NutsRegion.objects.create(
+            nuts_id='XX000',
             levl_code=3,
-            name_latn='Peterborough',
-            parent=ukh1
+            name_latn='Level 3 Region 1',
+            parent=level_2_region_1
         )
-        Catchment.objects.create(
-            region=ukh11.region_ptr,
-            parent_region=ukh1.region_ptr
+        cls.level_3_catchment_1 = Catchment.objects.create(
+            region=level_3_region_1.region_ptr,
+            parent_region=level_2_region_1.region_ptr
         )
-        ukh14 = NutsRegion.objects.create(
-            nuts_id='UKH14',
+        level_3_region_2 = NutsRegion.objects.create(
+            nuts_id='XX011',
             levl_code=3,
-            name_latn='Suffolk',
-            parent=ukh1
+            name_latn='Level 3 Region 2',
+            parent=level_2_region_2
         )
-        Catchment.objects.create(
-            region=ukh14.region_ptr,
-            parent_region=ukh1.region_ptr
+        cls.level_3_catchment_2 = Catchment.objects.create(
+            region=level_3_region_2.region_ptr,
+            parent_region=level_2_region_2.region_ptr
         )
-        babergh = LauRegion.objects.create(
-            lau_id='E07000200',
-            lau_name='Babergh',
-            nuts_parent=ukh14
+        level_4_region_1 = LauRegion.objects.create(
+            lau_id='X00000000',
+            lau_name='Level 4 Region 1',
+            nuts_parent=level_3_region_1
         )
-        Catchment.objects.create(
-            region=babergh.region_ptr,
-            parent_region=ukh14.region_ptr
+        cls.level_4_catchment_1 = Catchment.objects.create(
+            region=level_4_region_1.region_ptr,
+            parent_region=level_3_region_1.region_ptr
         )
-        ipswich = LauRegion.objects.create(
-            lau_id='E07000202',
-            lau_name='Ipswich',
-            nuts_parent=ukh14
+        level_4_region_2 = LauRegion.objects.create(
+            lau_id='X00000001',
+            lau_name='Level 4 Region 2',
+            nuts_parent=level_3_region_2
         )
-        Catchment.objects.create(
-            region=ipswich.region_ptr,
-            parent_region=ukh14.region_ptr
+        cls.level_4_catchment_2 = Catchment.objects.create(
+            region=level_4_region_2.region_ptr,
+            parent_region=level_3_region_2.region_ptr
         )
-
-    def setUp(self):
-        self.uk = Catchment.objects.get(region__nutsregion__nuts_id='UK')
-        self.ukh = Catchment.objects.get(region__nutsregion__nuts_id='UKH')
-        self.ukh1 = Catchment.objects.get(region__nutsregion__nuts_id='UKH1')
-        self.ukh2 = Catchment.objects.get(region__nutsregion__nuts_id='UKH2')
-        self.ukh11 = Catchment.objects.get(region__nutsregion__nuts_id='UKH11')
-        self.ukh14 = Catchment.objects.get(region__nutsregion__nuts_id='UKH14')
-        self.babergh = Catchment.objects.get(region__lauregion__lau_id='E07000200')
-        self.ipswich = Catchment.objects.get(region__lauregion__lau_id='E07000202')
 
     def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('data.nuts_lau_catchment_options'),
-                                   {'id': self.uk.id, 'direction': 'children'})
+        catchment = Catchment.objects.get(region__nutsregion__nuts_id='XX')
+        response = self.client.get(
+            reverse('data.nuts_lau_catchment_options'),
+            {'id': catchment.id, 'direction': 'children'}
+        )
         self.assertEqual(response.status_code, 200)
 
     def test_get_http_400_bad_request_on_missing_query_parameter_id(self):
+        self.client.force_login(self.outsider)
         response = self.client.get(reverse('data.nuts_lau_catchment_options'), {'direction': 'children'})
         self.assertEqual(response.status_code, 400)
         self.assertEqual(
@@ -531,7 +527,8 @@ class NutsRegionPedigreeAPITestCase(APITestCase):
             'Query parameter "id" missing. Must provide valid catchment id.')
 
     def test_get_http_400_bad_request_on_missing_query_parameter_direction(self):
-        response = self.client.get(reverse('data.nuts_lau_catchment_options'), {'id': self.uk.id})
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('data.nuts_lau_catchment_options'), {'id': self.level_0_catchment.id})
         self.assertEqual(response.status_code, 400)
         self.assertEqual(
             response.data['detail'],
@@ -539,7 +536,11 @@ class NutsRegionPedigreeAPITestCase(APITestCase):
         )
 
     def test_get_http_400_bad_request_on_wrong_query_parameter_direction(self):
-        response = self.client.get(reverse('data.nuts_lau_catchment_options'), {'id': self.uk.id, 'direction': 'south'})
+        self.client.force_login(self.outsider)
+        response = self.client.get(
+            reverse('data.nuts_lau_catchment_options'),
+            {'id': self.level_0_catchment.id, 'direction': 'south'}
+        )
         self.assertEqual(response.status_code, 400)
         self.assertEqual(
             response.data['detail'],
@@ -547,20 +548,25 @@ class NutsRegionPedigreeAPITestCase(APITestCase):
         )
 
     def test_get_http_404_bad_request_on_non_existing_region_id(self):
+        self.client.force_login(self.outsider)
         response = self.client.get(reverse('data.nuts_lau_catchment_options'), {'id': 0, 'direction': 'parents'})
         self.assertEqual(response.status_code, 404)
         self.assertEqual(response.data['detail'], 'A NUTS region with the provided id does not exist.')
 
     def test_get_response_contains_level_4_in_children_if_input_is_level_3(self):
-        response = self.client.get(reverse('data.nuts_lau_catchment_options'),
-                                   {'id': self.ukh14.id, 'direction': 'children'})
+        self.client.force_login(self.outsider)
+        response = self.client.get(
+            reverse('data.nuts_lau_catchment_options'),
+            {'id': self.level_3_catchment_1.id, 'direction': 'children'}
+        )
         self.assertIn('id_level_4', response.data)
 
 
-class NutsRegionSummaryAPIViewTestCase(TestCase):
+class NutsRegionSummaryAPIViewTestCase(ViewSetWithPermissionsTestCase):
 
     @classmethod
     def setUpTestData(cls):
+        super().setUpTestData()
         NutsRegion.objects.create(
             nuts_id='TE57',
             name_latn='Test NUTS'

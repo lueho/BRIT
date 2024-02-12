@@ -1,24 +1,18 @@
-from django.contrib.auth.models import User
 from django.contrib.gis.geos import Point
-from django.test import TestCase, modify_settings
 from django.urls import reverse
-from rest_framework.test import APITestCase
 
+from utils.tests.testcases import ViewSetWithPermissionsTestCase
 from ..models import HamburgRoadsideTrees
 
 
-@modify_settings(MIDDLEWARE={'remove': 'ambient_toolbox.middleware.current_user.CurrentUserMiddleware'})
-class HamburgRoadSideTreeAPITestCase(APITestCase):
+class HamburgRoadSideTreeAPITestCase(ViewSetWithPermissionsTestCase):
 
     @classmethod
     def setUpTestData(cls):
-        User.objects.create(username='outsider')
+        super().setUpTestData()
         HamburgRoadsideTrees.objects.create(
             geom=Point(0, 0, srid=4326)
         )
-
-    def setUp(self):
-        self.outsider = User.objects.get(username='outsider')
 
     def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse('data.hamburg_roadside_trees'))
