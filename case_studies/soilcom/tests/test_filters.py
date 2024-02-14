@@ -253,14 +253,20 @@ class CollectionFilterTestCase(TestCase):
         cls.collection2 = Collection.objects.create(
             catchment=cls.unrelated_catchment,
             frequency=cls.seasonal_frequency,
-            valid_from=timezone.now().date() - timezone.timedelta(days=30),
+            valid_from=timezone.now().date(),
         )
         cls.child_collection = Collection.objects.create(
             catchment=child_catchment,
             frequency=fixed_once_per_week,
-            valid_from=timezone.now().date() - timezone.timedelta(days=60),
-            valid_until=timezone.now().date() - timezone.timedelta(days=30)
+            valid_from=timezone.now().date()
         )
+        cls.predecessor_collection = Collection.objects.create(
+            catchment=cls.catchment,
+            valid_from=timezone.now().date() - timezone.timedelta(days=90),
+            valid_until=timezone.now().date() - timezone.timedelta(days=1),
+            description='Predecessor collection'
+        )
+        cls.collection1.add_predecessor(cls.predecessor_collection)
 
         # Add connection_rate properties
         prop_connection_rate = Property.objects.create(name='Connection rate')
@@ -290,7 +296,7 @@ class CollectionFilterTestCase(TestCase):
     def test_catchment_filter(self):
         self.data.update({'catchment': self.catchment.pk})
         qs = CollectionFilterSet(self.data, queryset=Collection.objects.all()).qs
-        self.assertEqual(2, qs.count())
+        self.assertEqual(3, qs.count())
 
     def test_filter_includes_child_catchments(self):
         self.data.update({'catchment': self.catchment.pk})
@@ -427,12 +433,21 @@ class CollectionFilterTestCase(TestCase):
 
     def test_valid_on_filter(self):
         self.data['valid_on'] = timezone.now().date()
-        filtr = CollectionFilterSet(self.data, queryset=Collection.objects.all())
-        qs = filtr.qs
+        qs = CollectionFilterSet(self.data, queryset=Collection.objects.all()).qs
 
         self.assertIn(self.collection1, qs)
         self.assertIn(self.collection2, qs)
+        self.assertIn(self.child_collection, qs)
+        self.assertNotIn(self.predecessor_collection, qs)
+
+    def test_valid_on_finds_collections_from_past_dates(self):
+        self.data['valid_on'] = timezone.now().date() - timezone.timedelta(days=1)
+        qs = CollectionFilterSet(self.data, queryset=Collection.objects.all()).qs
+
+        self.assertNotIn(self.collection1, qs)
+        self.assertNotIn(self.collection2, qs)
         self.assertNotIn(self.child_collection, qs)
+        self.assertIn(self.predecessor_collection, qs)
 
 
 class CollectorFilterTestCase(TestCase):

@@ -3,6 +3,7 @@ from factory.django import mute_signals
 
 from django.core.exceptions import ValidationError
 from django.db.models import signals
+from django.db.utils import IntegrityError
 from django.test import TestCase
 from django.urls import reverse
 
@@ -483,11 +484,20 @@ class CollectionTestCase(TestCase):
         catchment = CollectionCatchment.objects.create(name='Catchment')
         category = WasteCategory.objects.create(name='Category')
         waste_stream = WasteStream.objects.create(category=category)
+        cls.predecessor_collection = Collection.objects.create(
+            catchment=catchment,
+            collection_system=collection_system,
+            waste_stream=waste_stream,
+            valid_from=date(2023, 1, 1),
+            valid_until=date(2023, 12, 31),
+            description='Predecessor Collection'
+        )
         cls.collection = Collection.objects.create(
             catchment=catchment,
             collection_system=collection_system,
             waste_stream=waste_stream,
-            valid_from=date(2024, 1, 1)
+            valid_from=date(2024, 1, 1),
+            description='Current Collection'
         )
 
     def test_collection_is_named_automatically_on_creation(self):
@@ -563,39 +573,54 @@ class CollectionTestCase(TestCase):
         self.assertQuerysetEqual(Collection.objects.currently_valid(), [])
 
     def test_valid_on_returns_collection_with_past_valid_from_date(self):
-        day = date(2023, 6, 30)
-        self.collection.valid_from = day - timedelta(days=1)
-        self.collection.valid_until = None
-        self.collection.save()
+        day = date(2024, 6, 30)
         self.assertQuerysetEqual(Collection.objects.valid_on(day), [self.collection])
 
     def test_valid_on_does_not_return_collection_with_future_valid_from_date(self):
-        day = date(2023, 6, 30)
-        self.collection.valid_from = day + timedelta(days=1)
-        self.collection.valid_until = None
-        self.collection.save()
+        day = date(2022, 6, 30)
         self.assertQuerysetEqual(Collection.objects.valid_on(day), [])
 
     def test_valid_on_returns_collection_with_given_valid_from_date(self):
-        day = date(2023, 6, 30)
-        self.collection.valid_from = day
-        self.collection.valid_until = None
-        self.collection.save()
+        day = date(2024, 1, 1)
         self.assertQuerysetEqual(Collection.objects.valid_on(day), [self.collection])
 
     def test_valid_on_returns_collection_with_future_valid_until_date(self):
-        day = date(2023, 6, 30)
-        self.collection.valid_from = day - timedelta(days=1)
+        day = date(2024, 6, 30)
         self.collection.valid_until = day + timedelta(days=1)
         self.collection.save()
         self.assertQuerysetEqual(Collection.objects.valid_on(day), [self.collection])
 
     def test_valid_on_does_not_return_collection_with_past_valid_until_date(self):
-        day = date(2023, 6, 30)
-        self.collection.valid_from = day - timedelta(days=2)
+        day = date(2024, 6, 30)
         self.collection.valid_until = day - timedelta(days=1)
         self.collection.save()
         self.assertQuerysetEqual(Collection.objects.valid_on(day), [])
+
+    def test_predecessor_returns_predecessor_collection(self):
+        self.collection.predecessors.add(self.predecessor_collection)
+        self.assertEqual(self.predecessor_collection, self.collection.predecessors.first())
+
+    def test_successor_returns_successor_collection(self):
+        self.collection.predecessors.add(self.predecessor_collection)
+        self.assertEqual(self.collection, self.predecessor_collection.successors.first())
+
+    def test_on_creation_of_newer_version_predecessor_automatically_gets_valid_until_date(self):
+        self.collection.predecessors.add(self.predecessor_collection)
+        successor = Collection.objects.create(
+            catchment=self.collection.catchment,
+            collection_system=self.collection.collection_system,
+            waste_stream=self.collection.waste_stream,
+            valid_from=date(2025, 1, 1),
+            description='Successor Collection'
+        )
+        successor.add_predecessor(self.collection)
+        self.assertEqual(date(2024, 12, 31), self.collection.valid_until)
+
+    def test_valid_until_cannot_be_before_valid_from(self):
+        self.collection.valid_until = date(2023, 12, 31)
+        with self.assertRaises(ValidationError):
+            self.collection.full_clean()
+            self.collection.save()
 
 
 class CollectionSeasonTestCase(TestCase):

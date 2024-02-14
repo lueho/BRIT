@@ -1,6 +1,7 @@
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Column, Div, Field, HTML, Layout, Row
 from dal import autocomplete
+from datetime import timedelta
 from django.core.exceptions import ValidationError
 from django.forms import (CheckboxSelectMultiple, DateInput, HiddenInput, IntegerField, ModelChoiceField,
                           ModelMultipleChoiceField)
@@ -327,6 +328,12 @@ class CollectionModelForm(AutoCompleteModelForm):
         instance.waste_stream = waste_stream
 
         if commit:
+            instance.save()
+            for predecessor in instance.predecessors.all():
+                valid_until = instance.valid_from - timedelta(days=1)
+                predecessor.valid_until = valid_until
+                predecessor.full_clean()
+                predecessor.save()
             return super().save()
         else:
             return super().save(commit=False)
@@ -351,3 +358,49 @@ class CollectionRemoveWasteSampleForm(SimpleModelForm):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['sample'].queryset = Sample.objects.filter(collections=self.instance)
+
+
+class CollectionAddPredecessorForm(AutoCompleteModelForm):
+    """
+    This form is used to add a predecessor to a Collection instance. A predecessor is a Collection instance that
+    was replaced by the current Collection instance.
+
+    Fields:
+    predecessor: A ModelChoiceField that represents the predecessor to be added.
+                 The queryset for this field is all Collection instances.
+                 The widget used is ModelSelect2 with 'collection-autocomplete' as the url,
+                 which provides autocomplete functionality.
+    """
+
+    predecessor = ModelChoiceField(
+        queryset=Collection.objects.all(),
+        widget=autocomplete.ModelSelect2(url='collection-autocomplete')
+    )
+
+    class Meta:
+        model = Collection
+        fields = ('predecessor',)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['predecessor'].queryset = Collection.objects.exclude(id=self.instance.id)
+
+
+class CollectionRemovePredecessorForm(SimpleModelForm):
+    """
+    This form is used to remove a predecessor from a Collection instance. A predecessor is a Collection instance that
+    was replaced by the current Collection instance.
+
+    Fields:
+    predecessor: A ModelChoiceField that represents the predecessor collection to be removed.
+    """
+
+    predecessor = ModelChoiceField(queryset=Collection.objects.all())
+
+    class Meta:
+        model = Collection
+        fields = ('predecessor',)
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['predecessor'].queryset = Collection.objects.filter(successors=self.instance)

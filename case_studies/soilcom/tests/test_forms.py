@@ -6,9 +6,10 @@ from django.forms import formset_factory
 from django.test import TestCase
 
 from distributions.models import TemporalDistribution, Timestep
-from materials.models import MaterialCategory
-from ..forms import (CollectionModelForm, CollectionSeasonForm, CollectionSeasonFormSet, BaseWasteFlyerUrlFormSet,
-                     WasteFlyerModelForm)
+from materials.models import Material, MaterialCategory, Sample, SampleSeries
+from ..forms import (CollectionAddPredecessorForm, CollectionModelForm, CollectionSeasonForm, CollectionSeasonFormSet,
+                     BaseWasteFlyerUrlFormSet, WasteFlyerModelForm, CollectionAddWasteSampleForm,
+                     CollectionRemovePredecessorForm, CollectionRemoveWasteSampleForm)
 from ..models import (Collection, CollectionCatchment, CollectionCountOptions, Collector, CollectionFrequency,
                       CollectionSeason, CollectionSystem, WasteCategory, WasteComponent, WasteFlyer, WasteStream)
 
@@ -206,6 +207,22 @@ class CollectionModelFormTestCase(TestCase):
         )
         waste_stream.allowed_materials.set([cls.allowed_material_1, cls.allowed_material_2])
         waste_stream.forbidden_materials.set([cls.forbidden_material_1, cls.forbidden_material_2])
+        cls.predecessor_collection_1 = Collection.objects.create(
+            catchment=cls.catchment,
+            collector=cls.collector,
+            collection_system=cls.collection_system,
+            waste_stream=waste_stream,
+            frequency=cls.frequency,
+            valid_from=date(2021, 1, 1),
+        )
+        cls.predecessor_collection_2 = Collection.objects.create(
+            catchment=cls.catchment,
+            collector=cls.collector,
+            collection_system=cls.collection_system,
+            waste_stream=waste_stream,
+            frequency=cls.frequency,
+            valid_from=date(2022, 1, 1),
+        )
         cls.collection = Collection.objects.create(
             catchment=cls.catchment,
             collector=cls.collector,
@@ -215,6 +232,7 @@ class CollectionModelFormTestCase(TestCase):
             valid_from=date(2023, 1, 1),
             valid_until=date(2023, 12, 31),
         )
+        cls.collection.predecessors.set([cls.predecessor_collection_1, cls.predecessor_collection_2])
 
     def test_form_errors(self):
         data = {
@@ -243,7 +261,8 @@ class CollectionModelFormTestCase(TestCase):
         form.instance.owner = self.collection.owner
         instance = form.save()
         self.assertIsInstance(instance, Collection)
-        self.assertEqual(instance.name, f'{self.catchment} {self.waste_category} {self.collection_system} {self.collection.valid_from.year}')
+        self.assertEqual(instance.name,
+                         f'{self.catchment} {self.waste_category} {self.collection_system} {self.collection.valid_from.year}')
         self.assertIsInstance(instance.waste_stream, WasteStream)
         self.assertEqual(instance.waste_stream.category.id, self.waste_category.id)
 
@@ -266,6 +285,26 @@ class CollectionModelFormTestCase(TestCase):
         self.assertEqual(instance2.waste_stream.category.id, self.waste_category.id)
         self.assertEqual(instance2.waste_stream.id, instance.waste_stream.id)
         self.assertEqual(len(WasteStream.objects.all()), 1)
+
+    def test_on_change_of_valid_from_date_predecessors_valid_until_date_is_updated(self):
+        form = CollectionModelForm(instance=self.collection, data={
+            'catchment': self.catchment.id,
+            'collector': self.collector.id,
+            'collection_system': self.collection_system.id,
+            'waste_category': self.waste_category.id,
+            'allowed_materials': [self.allowed_material_1.id, self.allowed_material_2.id],
+            'forbidden_materials': [self.forbidden_material_1.id, self.forbidden_material_2.id],
+            'frequency': self.frequency.id,
+            'valid_from': date(2023, 1, 1),
+            'valid_until': date(2023, 12, 31),
+            'description': 'This is a test case'
+        })
+        self.assertTrue(form.is_valid())
+        form.save()
+        self.predecessor_collection_1.refresh_from_db()
+        self.predecessor_collection_2.refresh_from_db()
+        self.assertEqual(self.predecessor_collection_1.valid_until, date(2022, 12, 31))
+        self.assertEqual(self.predecessor_collection_2.valid_until, date(2022, 12, 31))
 
 
 class WasteFlyerUrlFormSetTestCase(TestCase):
@@ -413,3 +452,190 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
         WasteFlyer.objects.get(url=url)
         # one should be deleted and one created ==> +-0
         self.assertEqual(original_flyer_count, WasteFlyer.objects.count())
+
+
+class CollectionAddWasteSampleFormTestCase(TestCase):
+    def setUp(self):
+        self.sample = Sample.objects.create(
+            name="Test Sample",
+            series=SampleSeries.objects.create(name="Test Series",
+                                               material=Material.objects.create(name="Test Material")),
+        )
+
+    def test_form_is_valid_with_existing_sample(self):
+        form = CollectionAddWasteSampleForm(data={'sample': self.sample.id})
+        self.assertTrue(form.is_valid())
+
+    def test_form_is_invalid_with_non_existing_sample(self):
+        form = CollectionAddWasteSampleForm(data={'sample': 9999})
+        self.assertFalse(form.is_valid())
+
+    def test_form_is_invalid_with_no_sample(self):
+        form = CollectionAddWasteSampleForm(data={})
+        self.assertFalse(form.is_valid())
+
+
+class CollectionRemoveWasteSampleFormTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        CollectionCatchment.objects.create(name='Catchment')
+        collector = Collector.objects.create(name='Collector')
+        collection_system = CollectionSystem.objects.create(name='System')
+        waste_stream = WasteStream.objects.create(category=WasteCategory.objects.create(name='Category'))
+        cls.collection = Collection.objects.create(
+            name='collection1',
+            collector=collector,
+            collection_system=collection_system,
+            waste_stream=waste_stream,
+        )
+        cls.sample = Sample.objects.create(
+            name="Test Sample",
+            series=SampleSeries.objects.create(name="Test Series",
+                                               material=Material.objects.create(name="Test Material")),
+        )
+
+    def test_collection_remove_waste_sample_form_valid(self):
+        self.collection.samples.add(self.sample)
+        form = CollectionRemoveWasteSampleForm(data={'sample': self.sample.id}, instance=self.collection)
+        self.assertTrue(form.is_valid())
+
+    def test_collection_remove_waste_sample_form_invalid_with_existing_but_unassociated_sample(self):
+        form = CollectionRemoveWasteSampleForm(data={'sample': self.sample.id}, instance=self.collection)
+        self.assertFalse(form.is_valid())
+
+    def test_collection_remove_waste_sample_form_invalid(self):
+        form = CollectionRemoveWasteSampleForm(data={'sample': None}, instance=self.collection)
+        self.assertFalse(form.is_valid())
+
+    def test_collection_remove_waste_sample_form_no_sample_in_collection(self):
+        other_sample = Sample.objects.create(
+            name="Other Sample",
+            series=SampleSeries.objects.create(name="Other Series",
+                                               material=Material.objects.create(name="Other Material")),
+        )
+        form = CollectionRemoveWasteSampleForm(data={'sample': other_sample.id}, instance=self.collection)
+        self.assertFalse(form.is_valid())
+
+    def test_collection_remove_waste_sample_form_sample_queryset(self):
+        self.collection.samples.add(self.sample)
+        form = CollectionRemoveWasteSampleForm(instance=self.collection)
+        self.assertTrue(form.fields['sample'].queryset.exists())
+        self.assertEqual(form.fields['sample'].queryset.first(), self.sample)
+
+
+class CollectionAddPredecessorFormTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        catchment1 = CollectionCatchment.objects.create(name="Catchment 1")
+        catchment2 = CollectionCatchment.objects.create(name="Catchment 2")
+        collector = Collector.objects.create(name='Collector')
+        collection_system = CollectionSystem.objects.create(name='System')
+        waste_stream = WasteStream.objects.create(category=WasteCategory.objects.create(name='Category'))
+        cls.collection = Collection.objects.create(
+            name='Current Collection',
+            catchment=catchment1,
+            collector=collector,
+            collection_system=collection_system,
+            waste_stream=waste_stream,
+        )
+        cls.other_collection = Collection.objects.create(
+            name='Predecessor Collection',
+            catchment=catchment1,
+            collector=collector,
+            collection_system=collection_system,
+            waste_stream=waste_stream,
+        )
+        cls.predecessor_collection = Collection.objects.create(
+            name='Predecessor Collection',
+            catchment=catchment2,
+            collector=collector,
+            collection_system=collection_system,
+            waste_stream=waste_stream,
+        )
+
+    def test_queryset_excludes_current_collection(self):
+        form = CollectionAddPredecessorForm(instance=self.collection)
+        self.assertFalse(form.fields['predecessor'].queryset.filter(id=self.collection.id).exists())
+
+    def test_form_is_valid_with_existing_predecessor(self):
+        form = CollectionAddPredecessorForm(data={'predecessor': self.predecessor_collection.id})
+        form.is_valid()
+        print(form.errors)
+        self.assertTrue(form.is_valid())
+
+    def test_form_is_invalid_with_non_existing_predecessor(self):
+        form = CollectionAddPredecessorForm(data={'predecessor': 9999})
+        self.assertFalse(form.is_valid())
+
+    def test_form_is_invalid_with_no_predecessor(self):
+        form = CollectionAddPredecessorForm(data={})
+        self.assertFalse(form.is_valid())
+
+    def collections_with_same_catchment_are_prioritized(self):
+        form = CollectionAddPredecessorForm(instance=self.collection)
+        queryset = form.fields['predecessor'].queryset
+        self.assertEqual(queryset.first(), self.other_collection)
+
+    def current_collection_is_excluded_from_queryset(self):
+        form = CollectionAddPredecessorForm(instance=self.collection)
+        queryset = form.fields['predecessor'].queryset
+        self.assertNotIn(self.collection, queryset)
+
+    def collections_with_different_catchment_are_included_in_queryset(self):
+        form = CollectionAddPredecessorForm(instance=self.collection)
+        queryset = form.fields['predecessor'].queryset
+        self.assertIn(self.predecessor_collection, queryset)
+
+
+class CollectionRemovePredecessorFormTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        CollectionCatchment.objects.create(name='Catchment')
+        collector = Collector.objects.create(name='Collector')
+        collection_system = CollectionSystem.objects.create(name='System')
+        waste_stream = WasteStream.objects.create(category=WasteCategory.objects.create(name='Category'))
+        cls.collection = Collection.objects.create(
+            collector=collector,
+            collection_system=collection_system,
+            waste_stream=waste_stream,
+            description='Current Collection',
+        )
+        cls.predecessor_collection = Collection.objects.create(
+            collector=collector,
+            collection_system=collection_system,
+            waste_stream=waste_stream,
+            description='Predecessor Collection 1',
+        )
+        cls.other_collection = Collection.objects.create(
+            collector=collector,
+            collection_system=collection_system,
+            waste_stream=waste_stream,
+            description='Other Collection',
+        )
+
+    def test_collection_remove_predecessor_form_valid(self):
+        self.collection.add_predecessor(self.predecessor_collection)
+        form = CollectionRemovePredecessorForm(data={'predecessor': self.predecessor_collection.id},
+                                               instance=self.collection)
+        self.assertTrue(form.is_valid())
+
+    def test_collection_remove_predecessor_form_invalid_with_existing_but_unassociated_collection(self):
+        form = CollectionRemovePredecessorForm(data={'predecessor': self.other_collection.id}, instance=self.collection)
+        self.assertFalse(form.is_valid())
+
+    def test_collection_remove_predecessor_form_invalid(self):
+        form = CollectionRemovePredecessorForm(data={'predecessor': None}, instance=self.collection)
+        self.assertFalse(form.is_valid())
+
+    def test_collection_remove_predecessor_form_no_predecessor_in_collection(self):
+        form = CollectionRemovePredecessorForm(data={'predecessor': self.other_collection.id}, instance=self.collection)
+        self.assertFalse(form.is_valid())
+
+    def test_collection_remove_predecessor_form_predecessor_queryset(self):
+        self.collection.add_predecessor(self.predecessor_collection)
+        form = CollectionRemovePredecessorForm(instance=self.collection)
+        self.assertTrue(form.fields['predecessor'].queryset.exists())
+        self.assertEqual(form.fields['predecessor'].queryset.first(), self.predecessor_collection)

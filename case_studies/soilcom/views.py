@@ -32,7 +32,8 @@ from .forms import (AggregatedCollectionPropertyValueModelForm, BaseWasteFlyerUr
                     CollectionSeasonFormHelper, CollectionSeasonFormSet, CollectionSystemModalModelForm,
                     CollectionSystemModelForm, CollectorModalModelForm, CollectorModelForm, WasteCategoryModalModelForm,
                     WasteCategoryModelForm, WasteComponentModalModelForm, WasteComponentModelForm,
-                    WasteFlyerModalModelForm, WasteFlyerModelForm, WasteStreamModalModelForm, WasteStreamModelForm)
+                    WasteFlyerModalModelForm, WasteFlyerModelForm, WasteStreamModalModelForm, WasteStreamModelForm,
+                    CollectionAddPredecessorForm, CollectionRemovePredecessorForm)
 from .models import (AggregatedCollectionPropertyValue, Collection, CollectionCatchment, CollectionCountOptions,
                      CollectionFrequency,
                      CollectionPropertyValue, CollectionSeason,
@@ -617,10 +618,20 @@ class AggregatedCollectionPropertyValueModalDeleteView(OwnedObjectModalDeleteVie
 # ----------- Collection CRUD ------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class CollectionListView(BRITFilterView):
+class CollectionCurrentListView(BRITFilterView):
     model = Collection
     filterset_class = CollectionFilterSet
     ordering = 'name'
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        # Check if it's a GET request and no query parameters are present
+        # This implies that the user has just opened the page and no filtering has been applied yet.
+        if self.request.method == 'GET' and not self.request.GET:
+            queryset = queryset.currently_valid()
+
+        return queryset
 
 
 class CollectionCreateView(M2MInlineFormSetMixin, OwnedObjectCreateView):
@@ -687,6 +698,41 @@ class CollectionCopyView(CollectionCreateView):
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         return super().post(request, *args, **kwargs)
+
+
+class CollectionCreateNewVersionView(CollectionCopyView):
+    predecessor = None
+
+    def get_initial(self):
+        initial = model_to_dict(self.object)
+        initial.update({
+            'waste_category': self.object.waste_stream.category.id,
+            'allowed_materials': [mat.id for mat in self.object.waste_stream.allowed_materials.all()],
+            'forbidden_materials': [mat.id for mat in self.object.waste_stream.forbidden_materials.all()],
+        })
+        # Prevent the ModelFormMixin from passing the original instance into the ModelForm by removing self.object.
+        # That way, a new instance is created, instead.
+        self.predecessor = self.object
+        self.object = None
+        return initial
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        form = self.get_form()
+        formset = self.get_formset()
+
+        if form.is_valid() and formset.is_valid():
+            form.instance.owner = self.request.user
+            self.predecessor = self.get_object()
+            self.object = form.save()
+            self.object.add_predecessor(self.predecessor)
+            formset = self.get_formset()
+            formset.is_valid()
+            formset.save()
+            return HttpResponseRedirect(self.get_success_url())
+        else:
+            context = self.get_context_data(form=form, formset=formset)
+            return self.render_to_response(context)
 
 
 class CollectionDetailView(OwnedObjectDetailView):
@@ -833,6 +879,37 @@ class CollectionWasteSamplesView(OwnedObjectUpdateView):
             self.object.samples.add(form.cleaned_data['sample'])
         if self.request.POST['submit'] == 'Remove':
             self.object.samples.remove(form.cleaned_data['sample'])
+        return HttpResponseRedirect(self.get_success_url())
+
+
+class CollectionPredecessorsView(OwnedObjectUpdateView):
+    template_name = 'collection_predecessors.html'
+    model = Collection
+    form_class = CollectionAddPredecessorForm
+    permission_required = 'soilcom.change_collection'
+
+    def get_success_url(self):
+        return reverse('collection-predecessors', kwargs={'pk': self.object.pk})
+
+    def get_form(self, form_class=None):
+        if self.request.method in ('POST', 'PUT'):
+            if self.request.POST['submit'] == 'Add':
+                return CollectionAddPredecessorForm(**self.get_form_kwargs())
+            if self.request.POST['submit'] == 'Remove':
+                return CollectionRemovePredecessorForm(**self.get_form_kwargs())
+        else:
+            return super().get_form(self.get_form_class())
+
+    def get_context_data(self, **kwargs):
+        kwargs['form_add'] = CollectionAddPredecessorForm(**self.get_form_kwargs())
+        kwargs['form_remove'] = CollectionRemovePredecessorForm(**self.get_form_kwargs())
+        return super().get_context_data(**kwargs)
+
+    def form_valid(self, form):
+        if self.request.POST['submit'] == 'Add':
+            self.object.predecessors.add(form.cleaned_data['predecessor'])
+        if self.request.POST['submit'] == 'Remove':
+            self.object.predecessors.remove(form.cleaned_data['predecessor'])
         return HttpResponseRedirect(self.get_success_url())
 
 

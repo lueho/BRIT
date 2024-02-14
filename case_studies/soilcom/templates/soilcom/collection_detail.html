@@ -9,6 +9,10 @@
                 <div class="card-header"><strong>Collection Details</strong></div>
                 <div class="card-body">
                     <p class="card-text">
+                        <strong>Name:</strong><br>
+                        {{ object.name }}
+                    </p>
+                    <p class="card-text">
                         <strong>Catchment:</strong><br>
                         <a href="{{ object.catchment.get_absolute_url }}">{{ object.catchment.name }}</a>
                     </p>
@@ -136,6 +140,26 @@
                         <strong>Last update:</strong><br>
                         {{ object.lastmodified_at|date:"d.m.Y" }}
                     </p>
+                    {% if object.predecessors.exists %}
+                        <strong>Predecessors:</strong><br>
+                        <ul>
+                            {% for collection in object.predecessors.all %}
+                                <li>
+                                    <a href="{{ object.predecessors.first.get_absolute_url }}">{{ object.predecessors.first }}</a>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
+                    {% if object.successors.exists %}
+                        <strong>Successors:</strong><br>
+                        <ul>
+                            {% for collection in object.successors.all %}
+                                <li>
+                                    <a href="{{ object.successors.first.get_absolute_url }}">{{ object.successors.first }}</a>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    {% endif %}
 
                 </div>
                 <div class="card-footer">
@@ -153,6 +177,10 @@
                     {% if 'soilcom.add_collection' in perms %}
                         <a href="{% url 'collection-copy' object.id %}" class="nowrap ml-3">
                             <i class="fas fa-fw fa-copy"></i> duplicate</a>
+                    {% endif %}
+                    {% if 'soilcom.change_collection' in perms %}
+                        <a href="{% url 'collection-new-version'  object.id %}" class="nowrap ml-3">
+                            <i class="fas fa-fw fa-code-branch"></i> new version</a>
                     {% endif %}
                     {% if 'soilcom.delete_collection' in perms %}
                         <a href="{% url 'collection-delete-modal' object.id %}" class="nowrap modal-link ml-3">

@@ -1,0 +1,59 @@
+{% extends 'base.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+
+{% block content %}
+
+    <div class="row">
+        <div class="col">
+            <div class="card shadow">
+                <div class="card-header"><strong>Manage predecessors</strong></div>
+                <div class="card-body">
+                    <p class="card-text">
+                        <strong>Collection:</strong><br>
+                        <a href="{{ object.get_absolute_url }}">{{ object.name }}</a>
+                    </p>
+                    <p class="card-text">
+                        <strong>Predecessors</strong><br>
+                        {% if object.predecessors.exists %}
+                            <ul>
+                                {% for predecessor in object.predecessors.all %}
+                                    <li><a href="{{ predecessor.get_absolute_url }}">{{ predecessor.name }}</a></li>
+                                {% endfor %}
+                            </ul>
+                        {% else %}
+                            No connected collections
+                        {% endif %}
+                    </p>
+                    <p class="card-text"><strong>Add predecessor</strong><br>
+                    <div id="form-container">
+                        <form method="post">
+                            {% crispy form_add %}
+                            <input type="submit" name="submit" value="Add" class="btn btn-primary"
+                                       id="submit-id-submit">
+                        </form>
+                    </div>
+                    </p>
+                    <p class="card-text"><strong>Remove predecessor</strong></p>
+                    <div id="form-container-2">
+                        <form method="post">
+                            {% crispy form_remove %}
+                            <input type="submit" name="submit" value="Remove" class="btn btn-primary"
+                                       id="submit-id-submit">
+                        </form>
+                    </div>
+                </div>
+                <div class="card-footer">
+                    <a href="{{ object.get_absolute_url }}"><i class="fas fa-fw fa-arrow-left"></i> back to collection</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+{% endblock %}
+
+{% block javascript %}
+    {{ block.super }}
+    {{ form.media }}
+    <link href="{% static 'lib/select2-bootstrap-theme/select2-bootstrap4.min.css' %}" rel="stylesheet">
+{% endblock %}

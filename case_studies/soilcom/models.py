@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 
 import celery
 from django.core.exceptions import ValidationError
@@ -347,10 +347,10 @@ FEE_SYSTEMS = (
 )
 
 
-class CollectionManager(models.Manager):
+class CollectionQuerySet(models.query.QuerySet):
 
     def valid_on(self, date):
-        return self.filter(Q(valid_from__lte=date), Q(valid_until__gt=date) | Q(valid_until=None))
+        return self.filter(Q(valid_from__lte=date), Q(valid_until__gte=date) | Q(valid_until=None))
 
     def currently_valid(self):
         return self.valid_on(timezone.now().date())
@@ -370,14 +370,31 @@ class Collection(NamedUserObjectModel):
     samples = models.ManyToManyField(Sample, related_name='collections')
     flyers = models.ManyToManyField(WasteFlyer, related_name='collections')
     sources = models.ManyToManyField(Source)
+
     valid_from = models.DateField(default=date.today)
     valid_until = models.DateField(blank=True, null=True)
+    predecessors = models.ManyToManyField('self', blank=True, symmetrical=False, related_name='successors')
 
-    objects = CollectionManager()
+    objects = CollectionQuerySet.as_manager()
 
     @property
     def geom(self):
         return self.catchment.geom
+
+    def clean(self):
+        if self.valid_from and self.valid_until:
+            if self.valid_from >= self.valid_until:
+                raise ValidationError({
+                    'valid_from': 'Valid from date must be before the valid until date.',
+                    'valid_until': 'Valid until date must be after the valid from date.'
+                })
+        super().clean()
+
+    def add_predecessor(self, predecessor):
+        if not self.predecessors.filter(id=predecessor.id).exists():
+            self.predecessors.add(predecessor)
+            predecessor.valid_until = self.valid_from - timedelta(days=1)
+            predecessor.save()
 
     def construct_name(self):
         catchment = self.catchment.name if self.catchment else 'Unknown catchment'
