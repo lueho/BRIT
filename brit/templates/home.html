@@ -63,29 +63,6 @@
         <div class="col col-12 col-md-6 col-lg-3 mb-4">
             <div class="card shadow h-100">
                 <div class="card-header">
-                    <a href="{% url 'source-list' %}">
-                        <strong><i class="fas fa-fw fa-book"></i> Bibliography</strong>
-                    </a>
-                </div>
-                <div class="card-img-top">
-                    <a class="d-flex align-items-center justify-content-center stretched-link"
-                       href="{% url 'source-list' %}">
-                        <img class="w-100 m-0" src="{% static 'img/bibliography_cover_card.png' %}"
-                             alt="Bibliography Module Cover Image">
-                    </a>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        This is a library of sources that contain valuable information about bioresources. The
-                        sources can be explored and managed here. Any source from the library can be referred to
-                        in the respective models in the other modules.
-                    </p>
-                </div>
-            </div>
-        </div>
-        <div class="col col-12 col-md-6 col-lg-3 mb-4">
-            <div class="card shadow h-100">
-                <div class="card-header">
                     <a href="{% url 'maps_list' %}">
                         <strong><i class="fas fa-fw fa-globe-europe"></i> Maps</strong>
                     </a>
@@ -167,6 +144,29 @@
                     <p class="card-text">
                         Inventories are case studies about which bioresources are available in a given region. Explore
                         ready case studies from our research projects or create your own scenarios.
+                    </p>
+                </div>
+            </div>
+        </div>
+        <div class="col col-12 col-md-6 col-lg-3 mb-4">
+            <div class="card shadow h-100">
+                <div class="card-header">
+                    <a href="{% url 'source-list' %}">
+                        <strong><i class="fas fa-fw fa-book"></i> Bibliography</strong>
+                    </a>
+                </div>
+                <div class="card-img-top">
+                    <a class="d-flex align-items-center justify-content-center stretched-link"
+                       href="{% url 'source-list' %}">
+                        <img class="w-100 m-0" src="{% static 'img/bibliography_cover_card.png' %}"
+                             alt="Bibliography Module Cover Image">
+                    </a>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        This is a library of sources that contain valuable information about bioresources. The
+                        sources can be explored and managed here. Any source from the library can be referred to
+                        in the respective models in the other modules.
                     </p>
                 </div>
             </div>
