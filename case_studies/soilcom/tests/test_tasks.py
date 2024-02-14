@@ -18,7 +18,7 @@ from ..tasks import (export_collections_to_file, check_wasteflyer_urls, check_wa
                      check_wasteflyer_urls_callback)
 
 
-@patch('utils.storages.write_file_for_download')
+@patch('utils.file_export.storages.write_file_for_download')
 class ExportCollectionToFileTestCase(TestCase):
 
     @classmethod

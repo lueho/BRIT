@@ -70,7 +70,7 @@
             const elCheckUrlLink = elCheckLinkWrapper.children[0];
             const elCheckUrlLinkText = elCheckUrlLink.children[1];
             elCheckUrlLinkText.innerText = "checking";
-            elCheckUrlLink.classList.add("processing-link");
+            elCheckUrlLink.classList.add("disabled");
         }
 
         async function check_url(pk) {

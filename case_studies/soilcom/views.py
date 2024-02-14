@@ -1,9 +1,8 @@
 import json
+from datetime import date
 
 from celery.result import AsyncResult
 from dal.autocomplete import Select2QuerySetView
-from datetime import date
-
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.db.models import Max
 from django.forms.models import model_to_dict

@@ -1,5 +1,7 @@
 "use strict";
 
+// load filter_utils.js before this if filters are used within the map functionality
+
 /**
  * Reserved namespace for the configuration data of a map. Each view with a map should provide a dictionary with the
  * following structure in the context. In the template, the dictionary should parse it and create a variable mapConfig
@@ -34,30 +36,6 @@ let catchmentLayer;
 let featureLayer;
 const paddedRenderer = L.canvas({padding: 0.5});
 
-
-function lockFilter() {
-    const submitButtons = document.querySelectorAll('.submit-filter');
-    submitButtons.forEach(btn => {
-        btn.value = 'Loading...';
-        btn.disabled = true;
-    });
-}
-
-function lockCustomElements() {
-    // This is a hook to overwrite if there are any other elements to lock that are specific to the page.
-}
-
-function unlockFilter() {
-    const submitButtons = document.querySelectorAll('.submit-filter');
-    submitButtons.forEach(btn => {
-        btn.value = 'Filter';
-        btn.disabled = false;
-    });
-}
-
-function unlockCustomElements() {
-    // This is a hook to overwrite if there are any other elements to lock that are specific to the page.
-}
 
 function showLoadingIndicator() {
     map.spin(true);
@@ -136,15 +114,6 @@ function getQueryParameters() {
     return parseFilterParameters();
 }
 
-function parseFilterParameters() {
-    const form = document.querySelector('form');
-    if (!form) {
-        console.warn('No form found on the page. Returning an empty URLSearchParams object.');
-        return new URLSearchParams();
-    }
-    const formData = new FormData(form);
-    return new URLSearchParams(formData);
-}
 
 function transformSearchParams(params) {
     if (params instanceof URLSearchParams) {

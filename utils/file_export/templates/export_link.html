@@ -1,0 +1,13 @@
+{% load static %}
+
+<link rel="stylesheet" href="{% static 'css/file_export.min.css' %}">
+
+<span id="{{ id }}" class="text-nowrap" style="display: inline-block; width: 10em"
+      data-export-url="{{ export_url }}"
+      data-export-status="READY"
+      data-export-progress-url="{{ progress_url }}">
+    <a title="Export to {{ file_format }}">
+        <i class="{{ icon_class }}"></i>
+        <span>{{ text }}</span>
+    </a>
+</span>

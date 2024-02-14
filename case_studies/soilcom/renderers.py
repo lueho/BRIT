@@ -1,6 +1,6 @@
 from rest_framework_csv.renderers import CSVRenderer
 
-from utils.renderers import BaseXLSXRenderer
+from utils.file_export.renderers import BaseXLSXRenderer
 
 
 class CollectionXLSXRenderer(BaseXLSXRenderer):

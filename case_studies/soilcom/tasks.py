@@ -5,7 +5,7 @@ from django.utils import timezone
 
 from bibliography.utils import check_url
 from brit.celery import app
-import utils.storages
+import utils.file_export.storages
 
 from .filters import CollectionFilterSet
 from .filters import WasteFlyerFilter
@@ -25,9 +25,9 @@ def export_collections_to_file(self, file_format, query_params):
 
     file_name = f'collections_{self.request.id}.{file_format}'
     if file_format == 'xlsx':
-        return utils.storages.write_file_for_download(file_name, data, CollectionXLSXRenderer)
+        return utils.file_export.storages.write_file_for_download(file_name, data, CollectionXLSXRenderer)
     else:
-        return utils.storages.write_file_for_download(file_name, data, CollectionCSVRenderer)
+        return utils.file_export.storages.write_file_for_download(file_name, data, CollectionCSVRenderer)
 
 
 @app.task(name='check_wasteflyer_url', trail=True)

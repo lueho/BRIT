@@ -1,7 +1,7 @@
 from django.http.request import QueryDict, MultiValueDict
 
 from brit.celery import app
-import utils.storages
+import utils.file_export.storages
 
 from .filters import HamburgRoadsideTreesFilterSet
 from .models import HamburgRoadsideTrees
@@ -19,6 +19,6 @@ def export_hamburg_roadside_trees_to_file(self, file_format, query_params):
 
     file_name = f'collections_{self.request.id}.{file_format}'
     if file_format == 'xlsx':
-        return utils.storages.write_file_for_download(file_name, data, HamburgRoadsideTreesXLSXRenderer)
+        return utils.file_export.storages.write_file_for_download(file_name, data, HamburgRoadsideTreesXLSXRenderer)
     else:
-        return utils.storages.write_file_for_download(file_name, data, HamburgRoadsideTreesCSVRenderer)
+        return utils.file_export.storages.write_file_for_download(file_name, data, HamburgRoadsideTreesCSVRenderer)

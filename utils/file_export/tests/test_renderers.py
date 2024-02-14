@@ -4,7 +4,7 @@ from collections import OrderedDict
 from io import BytesIO
 from openpyxl import load_workbook
 
-from utils.renderers import BaseXLSXRenderer
+from utils.file_export.renderers import BaseXLSXRenderer
 
 
 class BaseXLSXRendererTestCase(SimpleTestCase):

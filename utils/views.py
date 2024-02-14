@@ -1,3 +1,5 @@
+from urllib.parse import urlencode
+
 from bootstrap_modal_forms.generic import BSModalCreateView, BSModalDeleteView, BSModalReadView, BSModalUpdateView
 from bootstrap_modal_forms.mixins import is_ajax
 from django.contrib import messages
@@ -71,7 +73,35 @@ class ModalMessageView(TemplateView):
 
 
 class BRITFilterView(FilterView):
+    """
+    A view that extends FilterView to add the query string of the default filter values to the URL of the resulting page.
+    """
+    initial_values = {}
+    filterset_class = None
     paginate_by = 10
+
+    def get_default_filters(self):
+        """
+        Extracts the default filter values from the FilterSet class.
+        """
+        initial_values = {}
+        for name, filter_ in self.filterset_class.base_filters.items():
+            if filter_.extra.get('initial'):
+                initial_values[name] = filter_.extra['initial']
+        return initial_values
+
+    def get(self, request, *args, **kwargs):
+        response = super().get(request, *args, **kwargs)
+
+        # If the request method is GET and the request's parameters are empty,
+        # redirect to the same page but with the default filters as parameters.
+        if request.method == 'GET' and not request.GET:
+            self.initial_values = self.get_default_filters()
+            if self.initial_values:
+                params = urlencode(self.initial_values)
+                return HttpResponseRedirect(f"{request.path}?{params}")
+
+        return response
 
 
 class OwnedObjectListView(PermissionRequiredMixin, ListView):

@@ -1,6 +1,7 @@
 {% extends 'filtered_map.html' %}
 {% load static %}
 {% load crispy_forms_tags %}
+{% load file_export_tags %}
 
 {% block map_card_footer %}
     <a class="mr-2 text-nowrap"
@@ -12,22 +13,8 @@
         View as list
     </a>
     {% if user.is_authenticated %}
-        <span id="export_csv" class="text-nowrap" style="display: inline-block; width: 10em"
-              data-export-url="{% url 'collection-export' %}"
-              data-export-progress-url="{% url 'collection-export-progress' task_id=0 %}">
-            <a href="javascript:void(0)">
-                <i class="fa fa-fw fa-file-csv"></i>
-                <span>Export to csv</span>
-            </a>
-        </span>
-        <span id="export_xlsx" class="text-nowrap" style="display: inline-block; width: 10em"
-              data-export-url="{% url 'collection-export' %}"
-              data-export-progress-url="{% url 'collection-export-progress' task_id=0 %}">
-            <a href="javascript:void(0)">
-                <i class="fa fa-fw fa-file-excel"></i>
-                <span>Export to xlsx</span>
-            </a>
-        </span>
+        {% export_link "csv" 'collection-export' 'collection-export-progress' %}
+        {% export_link "xlsx" 'collection-export' 'collection-export-progress' %}
     {% endif %}
 {% endblock %}
 
@@ -224,6 +211,6 @@
     {{ block.super }}
     <script src="{% static 'lib/turf-inside/inside.min.js' %}"></script>
     <script src="{% static 'js/waste_collection_map.min.js' %}"></script>
-    <script src="{% static 'js/data_export.min.js' %}"></script>
+    <script src="{% static 'js/file_export.min.js' %}"></script>
 
 {% endblock javascript %}
