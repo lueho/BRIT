@@ -321,6 +321,7 @@ class MaterialListViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('material-list'))
         self.assertNotContains(response, reverse('material-create'))
 
+
 class MaterialCreateViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = 'add_material'
 
@@ -1996,6 +1997,11 @@ class SampleModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 
 class SampleDetailViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['view_material', 'add_material', 'change_material', 'delete_material',
+                          'view_sample', 'add_sample', 'change_sample', 'delete_sample',
+                          'view_composition', 'add_composition', 'change_composition', 'delete_composition',
+                          'view_materialpropertyvalue', 'add_materialpropertyvalue', 'change_materialpropertyvalue',
+                          'delete_materialpropertyvalue']
 
     @classmethod
     def setUpTestData(cls):
@@ -2003,6 +2009,9 @@ class SampleDetailViewTestCase(ViewWithPermissionsTestCase):
         material = Material.objects.create(name='Test Material')
         series = SampleSeries.objects.create(name='Test Series', material=material)
         cls.sample = Sample.objects.create(name='Test Sample', series=series)
+        prop = MaterialProperty.objects.create(name='Test Property', unit='Test Unit')
+        cls.prop_val = MaterialPropertyValue.objects.create(property=prop, average=123.3, standard_deviation=0.13)
+        cls.sample.properties.add(cls.prop_val)
 
     def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse('sample-detail', kwargs={'pk': self.sample.pk}))
@@ -2012,6 +2021,44 @@ class SampleDetailViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.outsider)
         response = self.client.get(reverse('sample-detail', kwargs={'pk': self.sample.pk}))
         self.assertEqual(response.status_code, 200)
+
+    def test_template_contains_edit_toggle_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('sample-detail', kwargs={'pk': self.sample.pk}))
+        self.assertContains(response, 'data-toggle="collapse"')
+
+    def test_template_does_not_contain_edit_toggle_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('sample-detail', kwargs={'pk': self.sample.pk}))
+        self.assertNotContains(response, 'data-toggle="collapse"')
+
+    def test_template_contains_dashboard_edit_and_delete_button_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('sample-detail', kwargs={'pk': self.sample.pk}))
+        self.assertContains(response, reverse('sample-update-modal', kwargs={'pk': self.sample.pk}))
+        self.assertContains(response, reverse('sample-add-source', kwargs={'pk': self.sample.pk}))
+        self.assertContains(response, reverse('sample-duplicate-modal', kwargs={'pk': self.sample.pk}))
+        self.assertContains(response, reverse('material-dashboard'))
+        self.assertContains(response, reverse('sample-update', kwargs={'pk': self.sample.pk}))
+        self.assertContains(response, reverse('sample-delete-modal', kwargs={'pk': self.sample.pk}))
+        self.assertContains(response, reverse('sample-add-property-modal', kwargs={'pk': self.sample.pk}))
+        self.assertContains(response, reverse('materialpropertyvalue-delete-modal', kwargs={'pk': self.prop_val.pk}))
+        self.assertContains(response, reverse('sampleseries-add-composition', kwargs={'pk': self.sample.series.pk}))
+        self.assertContains(response, 'edit-group-')
+
+    def test_template_does_not_contain_dashboard_edit_and_delete_button_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('sample-detail', kwargs={'pk': self.sample.pk}))
+        self.assertNotContains(response, reverse('sample-update-modal', kwargs={'pk': self.sample.pk}))
+        self.assertNotContains(response, reverse('sample-add-source', kwargs={'pk': self.sample.pk}))
+        self.assertNotContains(response, reverse('sample-duplicate-modal', kwargs={'pk': self.sample.pk}))
+        self.assertNotContains(response, f'href="{reverse("material-dashboard")}"')
+        self.assertNotContains(response, reverse('sample-update', kwargs={'pk': self.sample.pk}))
+        self.assertNotContains(response, reverse('sample-delete-modal', kwargs={'pk': self.sample.pk}))
+        self.assertNotContains(response, reverse('sample-add-property-modal', kwargs={'pk': self.sample.pk}))
+        self.assertNotContains(response, reverse('materialpropertyvalue-delete-modal', kwargs={'pk': self.prop_val.pk}))
+        self.assertNotContains(response, reverse('sampleseries-add-composition', kwargs={'pk': self.sample.pk}))
+        self.assertNotContains(response, 'edit-group-')
 
 
 class SampleModalDetailViewTestCase(ViewWithPermissionsTestCase):
