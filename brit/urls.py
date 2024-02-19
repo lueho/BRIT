@@ -4,10 +4,9 @@ from django.conf.urls.static import static
 from django.contrib import admin
 from django.urls import path, include
 from django.views.generic import RedirectView
+from rest_framework.authtoken.views import obtain_auth_token
 
 from .views import HomeView, AboutView, LearningView, PrivacyPolicyView
-
-from rest_framework.authtoken.views import obtain_auth_token
 
 admin.autodiscover()
 admin.site.enable_nav_sidebar = False
@@ -27,6 +26,7 @@ urlpatterns = [
     path('sources/', include('sources.urls')),
     path('inventories/', include('inventories.urls')),
     path('interfaces/simucf/', include('interfaces.simucf.urls')),
+    path('case_studies/hamburg/', include('case_studies.flexibi_hamburg.urls')),
     path('case_studies/nantes/', include('case_studies.flexibi_nantes.urls')),
     path('waste_collection/', include('case_studies.soilcom.urls')),
     path('bibliography/', include('bibliography.urls')),

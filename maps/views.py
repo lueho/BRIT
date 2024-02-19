@@ -4,10 +4,10 @@ from django.contrib.gis.geos import MultiPolygon
 from django.db.models import Q, Subquery
 from django.forms import formset_factory
 from django.http import JsonResponse
-from django.urls import reverse_lazy
+from django.shortcuts import get_object_or_404
+from django.urls import reverse_lazy, reverse
 from django.views.generic import DetailView, ListView, TemplateView
 from django.views.generic.edit import FormMixin
-from django.shortcuts import get_object_or_404
 from django_filters.views import FilterView
 from rest_framework.exceptions import NotFound, ParseError
 from rest_framework.views import APIView, Response
@@ -21,7 +21,7 @@ from utils.views import (BRITFilterView, OwnedObjectCreateView, OwnedObjectDetai
                          OwnedObjectModalUpdateView, OwnedObjectModelSelectOptionsView, OwnedObjectUpdateView)
 from .filters import CatchmentFilter
 from .forms import (AttributeModalModelForm, AttributeModelForm, CatchmentCreateByMergeForm, CatchmentModelForm,
-                    CatchmentQueryForm, NutsRegionQueryForm, RegionAttributeValueModalModelForm,
+                    NutsRegionQueryForm, RegionAttributeValueModalModelForm,
                     RegionAttributeValueModelForm, RegionMergeForm, RegionMergeFormSet)
 from .models import (Attribute, Catchment, GeoDataset, GeoPolygon, LauRegion, NutsRegion, Region, RegionAttributeValue)
 
@@ -45,6 +45,8 @@ class MapMixin:
     feature_layer_style = None
     adjust_bounds_to_features = True
     feature_summary_url = None
+    api_basename = None
+    feature_details_url = None
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -64,7 +66,8 @@ class MapMixin:
                 'applyFilterToFeatures': self.get_use_filter(),
                 'featureLayerStyle': self.get_feature_layer_style(),
                 'adjustBoundsToFeatures': self.get_adjust_bounds_to_features(),
-                'featureSummaryUrl': self.get_feature_summary_url()
+                'featureSummaryUrl': self.get_feature_summary_url(),
+                'featureDetailsUrl': self.get_feature_details_url(),
             }
         })
         return context
@@ -136,6 +139,14 @@ class MapMixin:
 
     def get_feature_summary_url(self):
         return self.feature_summary_url
+
+    def get_api_basename(self):
+        return self.api_basename
+
+    def get_feature_details_url(self):
+        if not self.feature_details_url and self.api_basename:
+            self.feature_details_url = reverse(f'{self.api_basename}-detail', kwargs={'pk': 0})[:-2]
+        return self.feature_details_url
 
 
 class MapsDashboardView(PermissionRequiredMixin, TemplateView):

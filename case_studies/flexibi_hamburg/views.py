@@ -7,18 +7,20 @@ from django.urls import reverse_lazy
 from django.views import View
 from django_filters import rest_framework as rf_filters
 from rest_framework.generics import GenericAPIView
+from rest_framework.viewsets import ReadOnlyModelViewSet
 
 import case_studies.flexibi_hamburg.tasks
 from maps.models import GeoDataset
 from maps.views import GeoDatasetDetailView
 from .filters import HamburgRoadsideTreesFilterSet
 from .models import HamburgRoadsideTrees
-from .serializers import HamburgRoadsideTreeGeometrySerializer
+from .serializers import HamburgRoadsideTreeGeometrySerializer, HamburgRoadsideTreeSimpleModelSerializer
 
 
 class RoadsideTreesMapView(GeoDatasetDetailView):
     template_name = 'hamburg_roadside_trees_map.html'
     feature_url = reverse_lazy('data.hamburg_roadside_trees')
+    api_basename = 'api-hamburgroadsidetree'
     filterset_class = HamburgRoadsideTreesFilterSet
     load_features = False
     apply_filter_to_features = True
@@ -32,6 +34,13 @@ class RoadsideTreesMapView(GeoDatasetDetailView):
     def get_object(self, **kwargs):
         self.kwargs.update({'pk': GeoDataset.objects.get(model_name='HamburgRoadsideTrees').pk})
         return super().get_object(**kwargs)
+
+
+class HamburgRoadsideTreeViewSet(ReadOnlyModelViewSet):
+    queryset = HamburgRoadsideTrees.objects.all()
+    serializer_class = HamburgRoadsideTreeSimpleModelSerializer
+    filter_backends = (rf_filters.DjangoFilterBackend,)
+    filterset_class = HamburgRoadsideTreesFilterSet
 
 
 class HamburgRoadsideTreeAPIView(GenericAPIView):
