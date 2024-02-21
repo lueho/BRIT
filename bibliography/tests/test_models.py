@@ -27,3 +27,11 @@ class AuthorModelTests(TestCase):
     def test_suffix_handling(self):
         author = Author(first_names="John", middle_names="Fitzgerald", last_names="Kennedy", suffix="II")
         self.assertEqual("Kennedy, J. F., II", author.abbreviated_full_name)
+
+    def test_full_name_with_none_values(self):
+        author = Author(first_names=None, middle_names=None, last_names="Doe")
+        self.assertEqual("Doe", author.abbreviated_full_name)
+
+    def test_bibtex_name_with_none_values(self):
+        author = Author(first_names=None, last_names="Doe")
+        self.assertEqual("Doe", author.bibtex_name)
