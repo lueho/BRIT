@@ -8,6 +8,7 @@ from django.views import View
 from django_filters import rest_framework as rf_filters
 from rest_framework.generics import GenericAPIView
 from rest_framework.viewsets import ReadOnlyModelViewSet
+from rest_framework.permissions import IsAuthenticated, AllowAny
 
 import case_studies.flexibi_hamburg.tasks
 from maps.models import GeoDataset
@@ -41,6 +42,13 @@ class HamburgRoadsideTreeViewSet(ReadOnlyModelViewSet):
     serializer_class = HamburgRoadsideTreeSimpleModelSerializer
     filter_backends = (rf_filters.DjangoFilterBackend,)
     filterset_class = HamburgRoadsideTreesFilterSet
+
+    def get_permissions(self):
+        if self.action == 'retrieve':
+            permission_classes = [AllowAny]
+        else:
+            permission_classes = [IsAuthenticated]
+        return [permission() for permission in permission_classes]
 
 
 class HamburgRoadsideTreeAPIView(GenericAPIView):
