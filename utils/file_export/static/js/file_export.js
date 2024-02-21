@@ -89,24 +89,32 @@ function resetExportLink(format) {
 
 function lockCustomElements() {
     // This function overrides a hook from filter_utils.js
-    const elementsCSV = getLinkElements('csv');
-    elementsCSV.link.classList.add("disabled");
+    try {
+        const elementsCSV = getLinkElements('csv');
+        elementsCSV.link.classList.add("disabled");
 
-    const elementsXLSX = getLinkElements('xlsx');
-    elementsXLSX.link.classList.add("disabled");
+        const elementsXLSX = getLinkElements('xlsx');
+        elementsXLSX.link.classList.add("disabled");
+    } catch (error) {
+        console.warn(`Failed to lock export links: ${error.message}`);
+    }
+
 }
 
 function unlockCustomElements() {
     // This function overrides a hook from filter_utils.js
+    try {
+        resetExportLink('csv');
+        resetExportLink('xlsx');
 
-    resetExportLink('csv');
-    resetExportLink('xlsx');
+        const elementsCSV = getLinkElements('csv');
+        elementsCSV.link.classList.remove("disabled");
 
-    const elementsCSV = getLinkElements('csv');
-    elementsCSV.link.classList.remove("disabled");
-
-    const elementsXLSX = getLinkElements('xlsx');
-    elementsXLSX.link.classList.remove("disabled");
+        const elementsXLSX = getLinkElements('xlsx');
+        elementsXLSX.link.classList.remove("disabled");
+    } catch (error) {
+        console.warn(`Failed to unlock export links: ${error.message}`);
+    }
 }
 
 document.addEventListener('DOMContentLoaded', function() {
