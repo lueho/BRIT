@@ -54,8 +54,16 @@ function displayTimeoutError() {
 }
 
 function prepareMapRefresh() {
-    lockCustomElements();
-    lockFilter();
+    try {
+        lockCustomElements();
+    } catch (error) {
+        console.warn('Custom elements were not locked', error);
+    }
+    try {
+        lockFilter();
+    } catch (error) {
+        console.warn('Filter was not locked', error);
+    }
     showLoadingIndicator();
     contentLayerGroup.clearLayers();
 }
@@ -89,10 +97,22 @@ function updateUrlSearchParams() {
 }
 
 function cleanup() {
-    updateUrlSearchParams();
+    try {
+        updateUrlSearchParams();
+    } catch (error) {
+        console.warn('URL search parameters were not updated:', error);
+    }
     hideLoadingIndicator();
-    unlockFilter();
-    unlockCustomElements();
+    try {
+        unlockFilter();
+    } catch (error) {
+        console.warn('Filter was not unlocked', error);
+    }
+    try {
+        unlockCustomElements();
+    } catch (error) {
+        console.warn('Custom elements were not unlocked', error);
+    }
 }
 
 function orderLayers() {
@@ -408,17 +428,21 @@ function loadMap(mapConfig) {
     prepareMapRefresh();
 
     let params;
-    if (mapConfig.applyFilterToFeatures) {
-        params = parseFilterParameters();
-    } else {
-        params = getQueryParameters();
+    try {
+        if (mapConfig.applyFilterToFeatures) {
+            params = parseFilterParameters();
+        } else {
+            params = getQueryParameters();
+        }
+    } catch (error) {
+        console.warn('Filter parameters could not be parsed:', error);
     }
 
     const promises = [];
     if (mapConfig.loadRegion === true) {
         promises.push(fetchRegionGeometry({pk: mapConfig.regionId}));
     }
-    if (params.has("catchment") && params.get("catchment") !== "") {
+    if (params && params.has("catchment") && params.get("catchment") !== "") {
         promises.push(fetchCatchmentGeometry(params));
     } else if (mapConfig.loadCatchment === true && 'catchmentId' in mapConfig && mapConfig.catchmentId !== null) {
         promises.push(fetchCatchmentGeometry({catchment: mapConfig.catchmentId}));
