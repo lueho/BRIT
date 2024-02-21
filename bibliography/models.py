@@ -8,27 +8,44 @@ import celery
 
 class Author(OwnedObjectModel):
     first_names = models.CharField(max_length=1023, null=True, blank=True)
+    middle_names = models.CharField(max_length=1023, null=True, blank=True)  # New field
     last_names = models.CharField(max_length=1023, null=True, blank=True)
+    suffix = models.CharField(max_length=100, null=True, blank=True)  # New field
+    preferred_citation = models.CharField(max_length=2046, null=True, blank=True)  # New field
 
     class Meta:
         ordering = ['last_names', 'first_names']
 
     def __str__(self):
-        name = ''
+        parts = [part for part in [self.last_names, self.first_names] if part]
+        return ', '.join(parts)
+
+    @property
+    def bibtex_name(self):
+        """Formats the author's name according to BibTeX conventions."""
+        name_parts = []
         if self.last_names:
-            name += self.last_names
+            name_parts.append(self.last_names)
+        initials_parts = []
         if self.first_names:
-            name += f', {self.first_names}'
-        return name
+            initials_parts += [name.strip()[0].upper() + '.' for name in self.first_names.split(' ')]
+        if self.middle_names:
+            initials_parts += [name.strip()[0].upper() + '.' for name in self.middle_names.split(' ')]
+        if initials_parts:
+            name_parts.append(' '.join(initials_parts))
+        if self.suffix:
+            name_parts.append(self.suffix)
+        return ', '.join(name_parts)
 
     @property
     def abbreviated_full_name(self):
-        name = ''
-        if self.last_names:
-            name += self.last_names
-        if self.first_names:
-            first_names = '. '.join([name.strip().replace('.', '')[0].upper() for name in self.first_names.split(' ')])
-            name += f', {first_names}.'
+        """Improved abbreviation handling, respecting middle names and suffix."""
+        name = self.last_names if self.last_names else ''
+        initials = [name.strip()[0].upper() for name in (self.first_names + ' ' + self.middle_names).split(' ') if name]
+        if initials:
+            name += f', {". ".join(initials)}.'
+        if self.suffix:
+            name += f', {self.suffix}'
         return name
 
 
