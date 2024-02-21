@@ -355,6 +355,9 @@ class CollectionQuerySet(models.query.QuerySet):
     def currently_valid(self):
         return self.valid_on(timezone.now().date())
 
+    def archived(self):
+        return self.filter(valid_until__lt=timezone.now().date())
+
 
 class Collection(NamedUserObjectModel):
     collector = models.ForeignKey(Collector, on_delete=models.CASCADE, blank=True, null=True)

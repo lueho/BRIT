@@ -1,11 +1,10 @@
 from datetime import date, timedelta
-from factory.django import mute_signals
 
 from django.core.exceptions import ValidationError
 from django.db.models import signals
-from django.db.utils import IntegrityError
 from django.test import TestCase
 from django.urls import reverse
+from factory.django import mute_signals
 
 from distributions.models import Period, TemporalDistribution, Timestep
 from maps.models import GeoDataset, Region
@@ -571,6 +570,23 @@ class CollectionTestCase(TestCase):
         self.collection.valid_until = date.today() - timedelta(days=1)
         self.collection.save()
         self.assertQuerysetEqual(Collection.objects.currently_valid(), [])
+
+    def test_archived_returns_collection_with_past_valid_until_date(self):
+        self.collection.valid_from = date.today()
+        self.collection.save()
+        self.assertQuerysetEqual(Collection.objects.archived(), [self.predecessor_collection])
+
+    def test_archived_does_not_return_collection_with_future_valid_until_date(self):
+        self.collection.valid_from = date.today() + timedelta(days=2)
+        self.collection.save()
+        self.predecessor_collection.valid_until = date.today() + timedelta(days=1)
+        self.predecessor_collection.save()
+        self.assertQuerysetEqual(Collection.objects.archived(), [])
+
+    def test_archived_returns_collection_with_valid_until_date_today(self):
+        self.collection.valid_from = date.today() + timedelta(days=1)
+        self.collection.save()
+        self.assertQuerysetEqual(Collection.objects.archived(), [self.predecessor_collection])
 
     def test_valid_on_returns_collection_with_past_valid_from_date(self):
         day = date(2024, 6, 30)

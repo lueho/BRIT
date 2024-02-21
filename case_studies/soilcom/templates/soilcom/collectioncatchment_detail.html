@@ -1,9 +1,15 @@
 {% extends 'maps/catchment_detail.html' %}
 
 {% block additional_details %}
-    <p class="card-text"><strong>Collections:</strong></p>
+    <p class="card-text"><strong>Current collections:</strong></p>
     <ul>
-    {% for collection in object.downstream_collections.all %}
+    {% for collection in object.downstream_collections.currently_valid %}
+        <li><a href="{% url 'collection-detail' collection.pk %}">{{ collection.name }}</a></li>
+    {% endfor %}
+    </ul>
+    <p class="card-text"><strong>Archived collections:</strong></p>
+    <ul>
+    {% for collection in object.downstream_collections.archived %}
         <li><a href="{% url 'collection-detail' collection.pk %}">{{ collection.name }}</a></li>
     {% endfor %}
     </ul>
