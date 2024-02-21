@@ -5,7 +5,6 @@ async function clickedFeature(e) {
     const url = `${mapConfig.featureDetailsUrl}${featureId}/`;
     const response = await fetch(url);
     const json = await response.json();
-    console.log(json);
     const html = `
     <p>
         <strong>Tree type:</strong><br/>
