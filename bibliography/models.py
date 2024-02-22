@@ -1,9 +1,9 @@
-import celery
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from utils.models import NamedUserObjectModel, CRUDUrlsMixin, OwnedObjectModel
+import celery
 
 
 class Author(OwnedObjectModel):
@@ -41,8 +41,7 @@ class Author(OwnedObjectModel):
     def abbreviated_full_name(self):
         """Improved abbreviation handling, respecting middle names and suffix."""
         name = self.last_names if self.last_names else ''
-        initials = [name.strip()[0].upper() for name in
-                    f"{self.first_names if self.first_names else ''}{' ' + self.middle_names if self.middle_names else ''}".split(' ') if name]
+        initials = [name.strip()[0].upper() for name in (self.first_names + ' ' + self.middle_names).split(' ') if name]
         if initials:
             name += f', {". ".join(initials)}.'
         if self.suffix:
@@ -89,6 +88,8 @@ class Source(OwnedObjectModel):
 
     def __str__(self):
         return self.abbreviation
+
+
 
 
 @receiver(post_save, sender=Source)
