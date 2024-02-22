@@ -1,8 +1,17 @@
 from collections import OrderedDict
-from rest_framework.serializers import ModelSerializer, HyperlinkedIdentityField, HyperlinkedModelSerializer, \
-    HyperlinkedRelatedField, SerializerMethodField
+
+from rest_framework.serializers import (ModelSerializer, HyperlinkedModelSerializer,
+                                        SerializerMethodField)
 
 from .models import Author, Licence, Source
+
+
+class AuthorModelSerializer(ModelSerializer):
+    class Meta:
+        model = Author
+        fields = ['id', 'first_names', 'middle_names', 'last_names', 'suffix', 'preferred_citation', 'bibtex_name',
+                  'abbreviated_full_name']
+        read_only_fields = ['bibtex_name', 'abbreviated_full_name']
 
 
 class HyperlinkedLicenceSerializer(HyperlinkedModelSerializer):

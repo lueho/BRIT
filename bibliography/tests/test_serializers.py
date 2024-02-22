@@ -6,8 +6,60 @@ from django.urls import reverse
 
 from users.models import get_default_owner
 from ..models import Author, Licence, Source
-from ..serializers import (HyperlinkedAuthorSerializer, HyperlinkedSourceSerializer, HyperlinkedLicenceSerializer,
-                           SourceAbbreviationSerializer)
+from ..serializers import (AuthorModelSerializer, HyperlinkedAuthorSerializer, HyperlinkedSourceSerializer,
+                           HyperlinkedLicenceSerializer, SourceAbbreviationSerializer)
+
+
+class AuthorModelSerializerTestCase(TestCase):
+    def setUp(self):
+        self.author_attributes = {
+            'first_names': 'John',
+            'middle_names': 'F.',
+            'last_names': 'Kennedy',
+            'suffix': 'Jr.',
+            'preferred_citation': 'J.F.K. Jr.'
+        }
+
+        self.serializer_data = {
+            'first_names': 'Jane',
+            'middle_names': 'A.',
+            'last_names': 'Doe',
+            'suffix': '',
+            'preferred_citation': 'J.A.D.'
+        }
+
+        self.author = Author.objects.create(**self.author_attributes)
+        self.serializer = AuthorModelSerializer(instance=self.author)
+
+    def test_contains_expected_fields(self):
+        data = self.serializer.data
+        self.assertEqual(set(data.keys()),
+                         {'id', 'first_names', 'middle_names', 'last_names', 'suffix', 'preferred_citation',
+                          'bibtex_name', 'abbreviated_full_name'})
+
+    def test_field_content(self):
+        data = self.serializer.data
+        self.assertEqual(data['first_names'], self.author_attributes['first_names'])
+        self.assertEqual(data['middle_names'], self.author_attributes['middle_names'])
+        self.assertEqual(data['last_names'], self.author_attributes['last_names'])
+        self.assertEqual(data['suffix'], self.author_attributes['suffix'])
+        self.assertEqual(data['preferred_citation'], self.author_attributes['preferred_citation'])
+
+    def test_bibtex_name_field(self):
+        expected_bibtex_name = f"Kennedy, J. F., Jr."
+        self.assertEqual(self.serializer.data['bibtex_name'], expected_bibtex_name)
+
+    def test_abbreviated_full_name_field(self):
+        expected_abbreviated_name = f"Kennedy, J. F., Jr."
+        self.assertEqual(self.serializer.data['abbreviated_full_name'], expected_abbreviated_name)
+
+    def test_deserialization(self):
+        serializer = AuthorModelSerializer(data=self.serializer_data)
+        self.assertTrue(serializer.is_valid())
+        author = serializer.save()
+        for field in self.serializer_data:
+            if self.serializer_data[field]:
+                self.assertEqual(self.serializer_data[field], getattr(author, field))
 
 
 class HyperlinkedLicenceSerializerTestCase(TestCase):
@@ -96,10 +148,10 @@ class HyperlinkedSourceSerializerTestCase(TestCase):
             'title': self.source.title,
             'type': self.source.type,
             'licence': OrderedDict([
-                    ('name', 'Test Licence'),
-                    ('url',
-                     factory.get(reverse('licence-detail', kwargs={'pk': self.source.licence.pk})).build_absolute_uri())
-                ]),
+                ('name', 'Test Licence'),
+                ('url',
+                 factory.get(reverse('licence-detail', kwargs={'pk': self.source.licence.pk})).build_absolute_uri())
+            ]),
             'publisher': self.source.publisher,
             'journal': self.source.journal,
             'issue': self.source.issue,
