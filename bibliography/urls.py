@@ -1,6 +1,8 @@
-from django.urls import path
+from django.urls import path, include
 
 from . import views
+from .router import router
+
 urlpatterns = [
     path('', views.BibliographyDashboardView.as_view(), name='bibliography-dashboard'),
     path('authors/', views.AuthorListView.as_view(), name='author-list'),
@@ -31,5 +33,5 @@ urlpatterns = [
     path('sources/check_url_in_task/<str:task_id>/progress/', views.SourceCheckUrlProgressView.as_view(), name='source-check-url-progress'),
     path('sources/list/check_urls/', views.SourceListCheckUrlsView.as_view(), name='source-list-check-urls'),
     path('sources/autocomplete/', views.SourceAutocompleteView.as_view(), name='source-autocomplete'),
+    path('api/', include(router.urls)),
 ]
-
