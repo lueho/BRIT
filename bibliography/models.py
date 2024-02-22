@@ -1,9 +1,9 @@
+import celery
 from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
 from utils.models import NamedUserObjectModel, CRUDUrlsMixin, OwnedObjectModel
-import celery
 
 
 class Author(OwnedObjectModel):
@@ -55,6 +55,13 @@ class Licence(NamedUserObjectModel):
     def __str__(self):
         return self.name
 
+    def bibtex_entry(self):
+        """Formats the license information for inclusion in a BibTeX entry."""
+        bibtex_note = f"License: {self.name}"
+        if self.reference_url:
+            bibtex_note += f", URL: {self.reference_url}"
+        return bibtex_note
+
 
 SOURCE_TYPES = (
     ('article', 'article'),
@@ -88,8 +95,6 @@ class Source(OwnedObjectModel):
 
     def __str__(self):
         return self.abbreviation
-
-
 
 
 @receiver(post_save, sender=Source)
