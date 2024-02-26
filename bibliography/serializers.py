@@ -14,6 +14,13 @@ class AuthorModelSerializer(ModelSerializer):
         read_only_fields = ['bibtex_name', 'abbreviated_full_name']
 
 
+class LicenceModelSerializer(ModelSerializer):
+    class Meta:
+        model = Licence
+        fields = ['id', 'name', 'reference_url', 'description', 'bibtex_entry']
+        read_only_fields = ['bibtex_entry']
+
+
 class HyperlinkedLicenceSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Licence
