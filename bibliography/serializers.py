@@ -21,6 +21,44 @@ class LicenceModelSerializer(ModelSerializer):
         read_only_fields = ['bibtex_entry']
 
 
+class SourceModelSerializer(ModelSerializer):
+    authors = AuthorModelSerializer(many=True)
+    licence = LicenceModelSerializer()
+
+    class Meta:
+        model = Source
+        fields = ['id', 'abbreviation', 'authors', 'title', 'type', 'licence', 'publisher', 'journal', 'issue', 'year',
+                  'abstract', 'attributions', 'url', 'url_valid', 'url_checked', 'doi', 'last_accessed']
+        read_only_fields = ['url_valid', 'url_checked', 'doi', 'last_accessed']
+
+    def create(self, validated_data):
+        authors_data = validated_data.pop('authors')
+        licence_data = validated_data.pop('licence')
+        licence = Licence.objects.create(**licence_data)
+        source = Source.objects.create(licence=licence, **validated_data)
+        for author_data in authors_data:
+            author, _ = Author.objects.get_or_create(**author_data)
+            source.authors.add(author)
+        return source
+
+    def update(self, instance, validated_data):
+        authors_data = validated_data.pop('authors')
+        licence_data = validated_data.pop('licence')
+
+        Licence.objects.filter(id=instance.licence.id).update(**licence_data)
+
+        for attr, value in validated_data.items():
+            setattr(instance, attr, value)
+        instance.save()
+
+        instance.authors.clear()
+        for author_data in authors_data:
+            author, _ = Author.objects.get_or_create(**author_data)
+            instance.authors.add(author)
+
+        return instance
+
+
 class HyperlinkedLicenceSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Licence

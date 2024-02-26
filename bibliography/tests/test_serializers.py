@@ -7,7 +7,58 @@ from django.urls import reverse
 from users.models import get_default_owner
 from ..models import Author, Licence, Source
 from ..serializers import (AuthorModelSerializer, HyperlinkedAuthorSerializer, HyperlinkedSourceSerializer,
-                           HyperlinkedLicenceSerializer, SourceAbbreviationSerializer)
+                           HyperlinkedLicenceSerializer, SourceAbbreviationSerializer, SourceModelSerializer)
+
+
+class SourceSerializerTest(TestCase):
+    def setUp(self):
+        self.licence_data = {'name': 'Test Licence', 'reference_url': 'http://example.com/licence',
+                             'description': 'A test licence'}
+        self.author_data = [{'first_names': 'John', 'last_names': 'Doe'}, {'first_names': 'Jane', 'last_names': 'Doe'}]
+        self.source_data = {
+            'abbreviation': 'TST',
+            'authors': self.author_data,
+            'title': 'Test Source',
+            'type': 'article',
+            'licence': self.licence_data,
+            'publisher': 'Test Publisher',
+            'journal': 'Test Journal',
+            'issue': '1',
+            'year': '2020',
+            'abstract': 'This is a test abstract.',
+            'url': 'http://example.com/source',
+        }
+
+    def test_serializer_with_valid_data(self):
+        serializer = SourceModelSerializer(data=self.source_data)
+        self.assertTrue(serializer.is_valid())
+        source = serializer.save()
+
+        self.assertEqual(Source.objects.count(), 1)
+        self.assertEqual(source.authors.count(), 2)
+        self.assertEqual(source.licence.name, 'Test Licence')
+
+    def test_serializer_with_invalid_data(self):
+        invalid_data = self.source_data.copy()
+        del invalid_data['title']
+        serializer = SourceModelSerializer(data=invalid_data)
+
+        self.assertFalse(serializer.is_valid())
+        self.assertIn('title', serializer.errors)
+
+    def test_update_source_with_serializer(self):
+        licence = Licence.objects.create(**self.licence_data)
+        source = Source.objects.create(licence=licence, **{key: self.source_data[key] for key in self.source_data if
+                                                           key != 'authors' and key != 'licence'})
+
+        update_data = self.source_data.copy()
+        update_data['title'] = 'Updated Test Source'
+        serializer = SourceModelSerializer(source, data=update_data)
+
+        self.assertTrue(serializer.is_valid())
+        updated_source = serializer.save()
+
+        self.assertEqual(updated_source.title, 'Updated Test Source')
 
 
 class AuthorModelSerializerTestCase(TestCase):
