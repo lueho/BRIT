@@ -51,4 +51,4 @@ class LicenceModelTest(TestCase):
 
     def test_bibtex_entry(self):
         expected_bibtex_note = f"License: {self.licence_name}, URL: {self.licence_url}"
-        self.assertEqual(self.licence.bibtex_entry(), expected_bibtex_note)
+        self.assertEqual(self.licence.bibtex_entry, expected_bibtex_note)

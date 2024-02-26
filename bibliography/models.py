@@ -58,7 +58,7 @@ class Licence(NamedUserObjectModel):
     @property
     def bibtex_entry(self):
         """Formats the license information for inclusion in a BibTeX entry."""
-        bibtex_note = f"Licence: {self.name}"
+        bibtex_note = f"License: {self.name}"
         if self.reference_url:
             bibtex_note += f", URL: {self.reference_url}"
         return bibtex_note
