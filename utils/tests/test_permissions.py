@@ -89,3 +89,33 @@ class HasModelPermissionTestCase(TestCase):
         self.view.permission_required = ['app.view_model']
         with self.assertRaises(ImproperlyConfigured):
             self.permission.has_permission(request, self.view)
+
+    def test_options_method_is_always_allowed(self):
+        request = self.factory.options('/any-url')
+        request.user = self.user
+
+        request.user.is_authenticated = False
+        self.assertTrue(self.permission.has_permission(request, self.view))
+
+        request.user.is_authenticated = True
+        request.user.has_perm = MagicMock(return_value=True)
+        self.assertTrue(self.permission.has_permission(request, self.view))
+
+        request.user.is_authenticated = True
+        request.user.has_perm = MagicMock(return_value=False)
+        self.assertTrue(self.permission.has_permission(request, self.view))
+
+    def test_head_method_is_always_allowed(self):
+        request = self.factory.head('/any-url')
+        request.user = self.user
+
+        request.user.is_authenticated = False
+        self.assertTrue(self.permission.has_permission(request, self.view))
+
+        request.user.is_authenticated = True
+        request.user.has_perm = MagicMock(return_value=True)
+        self.assertTrue(self.permission.has_permission(request, self.view))
+
+        request.user.is_authenticated = True
+        request.user.has_perm = MagicMock(return_value=False)
+        self.assertTrue(self.permission.has_permission(request, self.view))

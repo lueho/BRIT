@@ -11,6 +11,13 @@ class HasModelPermission(permissions.BasePermission):
     """
 
     def has_permission(self, request, view):
+
+        # The OPTIONS method is not associated with any action and should always be allowed
+        if request.method in ('OPTIONS', 'HEAD'):
+            return True
+
+        # The DRF ViewSet handles the authentication separately from the permission check. In order to send the correct
+        # response, the permission check should be skipped for non-authenticated users.
         if not request.user.is_authenticated:
             return True
 
