@@ -1,7 +1,8 @@
 from utils.viewsets import AutoPermModelViewSet
 
-from .models import Author, Licence
-from .serializers import AuthorModelSerializer, LicenceModelSerializer
+from .filters import SourceModelFilterSet
+from .models import Author, Licence, Source
+from .serializers import AuthorModelSerializer, LicenceModelSerializer, SourceModelSerializer
 
 
 class AuthorViewSet(AutoPermModelViewSet):
@@ -16,6 +17,16 @@ class AuthorViewSet(AutoPermModelViewSet):
 class LicenceViewSet(AutoPermModelViewSet):
     queryset = Licence.objects.all()
     serializer_class = LicenceModelSerializer
+    custom_permission_required = {
+        'list': None,
+        'retrieve': None,
+    }
+
+
+class SourceViewSet(AutoPermModelViewSet):
+    queryset = Source.objects.all()
+    serializer_class = SourceModelSerializer
+    filterset_class = SourceModelFilterSet
     custom_permission_required = {
         'list': None,
         'retrieve': None,
