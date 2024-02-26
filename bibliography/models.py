@@ -41,7 +41,7 @@ class Author(OwnedObjectModel):
     def abbreviated_full_name(self):
         """Improved abbreviation handling, respecting middle names and suffix."""
         name = self.last_names if self.last_names else ''
-        initials = [name.strip()[0].upper() for name in (self.first_names + ' ' + self.middle_names).split(' ') if name]
+        initials = [name.strip()[0].upper() for name in f"{self.first_names + ' ' if self.first_names else ''}{self.middle_names + ' ' if self.middle_names else ''}".split(' ') if name]
         if initials:
             name += f', {". ".join(initials)}.'
         if self.suffix:
@@ -55,9 +55,10 @@ class Licence(NamedUserObjectModel):
     def __str__(self):
         return self.name
 
+    @property
     def bibtex_entry(self):
         """Formats the license information for inclusion in a BibTeX entry."""
-        bibtex_note = f"License: {self.name}"
+        bibtex_note = f"Licence: {self.name}"
         if self.reference_url:
             bibtex_note += f", URL: {self.reference_url}"
         return bibtex_note
