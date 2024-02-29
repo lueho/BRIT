@@ -22,8 +22,9 @@ from utils.views import (BRITFilterView, OwnedObjectCreateView, OwnedObjectDetai
 from .filters import CatchmentFilter
 from .forms import (AttributeModalModelForm, AttributeModelForm, CatchmentCreateByMergeForm, CatchmentModelForm,
                     NutsRegionQueryForm, RegionAttributeValueModalModelForm,
-                    RegionAttributeValueModelForm, RegionMergeForm, RegionMergeFormSet)
-from .models import (Attribute, Catchment, GeoDataset, GeoPolygon, LauRegion, NutsRegion, Region, RegionAttributeValue)
+                    RegionAttributeValueModelForm, RegionMergeForm, RegionMergeFormSet, LocationModelForm)
+from .models import (Attribute, Catchment, GeoDataset, GeoPolygon, LauRegion, Location, NutsRegion, Region,
+                     RegionAttributeValue)
 
 
 class MapMixin:
@@ -160,6 +161,42 @@ class MapsListView(ListView):
     def get_queryset(self):
         user_groups = self.request.user.groups.all()
         return GeoDataset.objects.filter(Q(visible_to_groups__in=user_groups) | Q(publish=True)).distinct()
+
+
+# ----------- Location CRUD---------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class LocationListView(OwnedObjectListView):
+    model = Location
+    permission_required = set()
+
+
+class LocationCreateView(OwnedObjectCreateView):
+    model = Location
+    form_class = LocationModelForm
+    permission_required = 'maps.add_location'
+
+
+class LocationDetailView(MapMixin, OwnedObjectDetailView):
+    model = Location
+    feature_url = reverse_lazy('api-location-geojson')
+    load_region = False
+    load_catchment = False
+    permission_required = set()
+
+
+class LocationUpdateView(OwnedObjectUpdateView):
+    model = Location
+    form_class = LocationModelForm
+    permission_required = 'maps.change_location'
+
+
+class LocationModalDeleteView(OwnedObjectModalDeleteView):
+    model = Location
+    success_url = reverse_lazy('location-list')
+    success_message = 'deletion successful'
+    permission_required = 'maps.delete_location'
 
 
 # ----------- Catchment CRUD--------------------------------------------------------------------------------------------

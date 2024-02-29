@@ -1,4 +1,5 @@
 from django.urls import include, path
+from .router import router
 
 from .views import (
     AttributeListView,
@@ -38,7 +39,9 @@ from .views import (
     NutsRegionSummaryAPIView,
     NutsRegionPedigreeAPI,
     LauRegionOptionsAPI,
-    NutsAndLauCatchmentPedigreeAPI
+    NutsAndLauCatchmentPedigreeAPI,
+    LocationListView,
+    LocationCreateView, LocationDetailView, LocationUpdateView, LocationModalDeleteView
 )
 
 urlpatterns = [
@@ -91,4 +94,10 @@ urlpatterns = [
     # TODO: Can case study urls be detected and added automatically?
     path('nantes/', include('case_studies.flexibi_nantes.urls')),
     path('hamburg/', include('case_studies.flexibi_hamburg.urls')),
+    path('locations/', LocationListView.as_view(), name='location-list'),
+    path('locations/create/', LocationCreateView.as_view(), name='location-create'),
+    path('locations/<int:pk>/', LocationDetailView.as_view(), name='location-detail'),
+    path('locations/<int:pk>/update/', LocationUpdateView.as_view(), name='location-update'),
+    path('locations/<int:pk>/delete/', LocationModalDeleteView.as_view(), name='location-delete-modal'),
+    path('api/', include(router.urls)),
 ]

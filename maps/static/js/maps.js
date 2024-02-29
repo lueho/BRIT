@@ -179,20 +179,38 @@ async function fetchCatchmentGeometry(params) {
     }
 }
 
-async function fetchFeatureGeometries(params) {
-    const url = mapConfig.featureUrl + '?' + transformSearchParams(params).toString();
-    const response = await fetch(url);
-    const json = await response.json();
-    renderFeatures(json.geoJson);
-    if ('summaries' in json) {
-        renderSummaries(json);
+function convertToFeatureCollection(data) {
+    // This function is necessary for compatibility with early versions of the API.
+    // Once all endpoints for geometry data return a FeatureCollection, this function can be removed.
+
+    if ('geoJson' in data) {
+        data = { ...data.geoJson, summaries: data.summaries || null };
     }
+
+    if (data.type !== 'FeatureCollection') {
+        data = { type: 'FeatureCollection', features: data.features, summaries: data.summaries };
+    }
+
+    return data;
+}
+async function fetchFeatureGeometries(params) {
+    const url = new URL(window.location.origin + mapConfig.featureUrl);
+    url.search = transformSearchParams(params).toString();
+    const response = await fetch(url);
+    const geoJson = await response.json();
+    renderFeatures(convertToFeatureCollection(geoJson));
+    if ('summaries' in geoJson) {renderSummaries(geoJson);}
 }
 
 async function fetchFeatureSummaries(feature) {
     let featureId;
     if (typeof (feature) === 'object') {
-        featureId = feature.properties.id.toString();
+        try {
+            featureId = feature.properties.id.toString();
+        } catch (error) {
+            console.warn('The provided feature does not contain an id property:', error);
+            return;
+        }
     } else {
         featureId = feature.toString();
     }
@@ -413,8 +431,10 @@ function renderSummaries(featureInfos) {
 
 async function clickedFeature(event) {
     const summaries = await fetchFeatureSummaries(event.layer.feature);
-    renderSummaries(summaries);
-    updateUrls(event.layer.feature.properties.id);
+    if (summaries) {
+        renderSummaries(summaries);
+        updateUrls(event.layer.feature.properties.id);
+    }
 }
 
 function clickedFilterButton() {

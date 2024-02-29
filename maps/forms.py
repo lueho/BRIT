@@ -1,14 +1,22 @@
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Column, Field, Layout, Row
 from dal.autocomplete import ModelSelect2
+from leaflet.forms.widgets import LeafletWidget
 from django.db.models import Subquery
 from django.forms import (BaseFormSet, ChoiceField, DateInput, DateField, ModelChoiceField, MultipleChoiceField,
-                          ValidationError)
+                          ValidationError, ModelForm)
 from django.forms.widgets import CheckboxSelectMultiple, RadioSelect
 from django.urls import reverse
 
 from utils.forms import AutoCompleteForm, AutoCompleteModelForm, SimpleForm, SimpleModelForm, ModalModelFormMixin
-from .models import Attribute, Region, Catchment, LauRegion, NutsRegion, RegionAttributeValue
+from .models import Attribute, Region, Catchment, LauRegion, NutsRegion, RegionAttributeValue, Location
+
+
+class LocationModelForm(SimpleModelForm):
+    class Meta:
+        model = Location
+        fields = ('name', 'geom', 'address')
+        widgets = {'geom': LeafletWidget()}
 
 
 class AttributeModelForm(SimpleModelForm):
