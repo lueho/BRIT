@@ -1,0 +1,35 @@
+{% extends 'geo_detail_card.html' %}
+
+{% block title %}BRIT | Maps | Location: {{ object.name }}{% endblock %}
+
+{% block detail_header %}Location: {{ object.name }}{% endblock %}
+
+{% block detail_body %}
+    <p class="card-text"><strong>Name:</strong><br>{{ object.name }}</p>
+    {% if object.address %}
+        <p class="card-text"><strong>Address:</strong><br>{{ object.address }}</p>
+    {% endif %}
+    {% if object.description %}
+        <p class="card-text"><strong>Description:</strong><br>{{ object.description }}</p>
+    {% endif %}
+    {% block additional_details %}{% endblock %}
+{% endblock %}
+
+{% block detail_footer %}
+    <a href="javascript:history.go(-1)" class="nowrap mr-2">
+        <i class="fas fa-fw fa-arrow-left"></i> back
+    </a>
+    <a href="{% url 'location-list' %}" class="nowrap mr-2">
+        <i class="fas fa-fw fa-list"></i> see all
+    </a>
+    {% if 'maps.change_location' in perms %}
+        <a href="{% url 'location-update' object.pk %}" class="nowrap mr-2">
+            <i class="fas fa-fw fa-edit"></i> edit
+        </a>
+    {% endif %}
+    {% if 'maps.delete_location' in perms %}
+        <a href="{% url 'location-delete-modal' object.pk %}" class="nowrap modal-link mr-2">
+            <i class="fas fa-fw fa-trash"></i> delete
+        </a>
+    {% endif %}
+{% endblock %}

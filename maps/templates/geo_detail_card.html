@@ -1,0 +1,27 @@
+{% extends 'simple_detail_card.html' %}
+{% load static %}
+{% load leaflet_tags %}
+
+{% block style_sheets %}
+    {{ block.super }}
+    {% leaflet_js %}
+    {% leaflet_css %}
+{% endblock %}
+
+{% block detail_top_image %}<div class="card-img-top">{% leaflet_map "main" %}</div>{% endblock %}
+
+{% block javascript %}
+    {{ block.super }}
+    <script src="{% static 'js/maps.js' %}"></script>
+    {{ map_config|json_script:"mapConfig" }}
+    <script type="text/javascript">
+        function getQueryParameters() {
+            const params = new URLSearchParams();
+            params.append('id', {{ object.id }});
+            return params;
+        }
+
+        const mapConfig = JSON.parse(document.getElementById("mapConfig").textContent);
+        window.onload = () => loadMap(mapConfig);
+    </script>
+{% endblock javascript %}

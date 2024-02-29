@@ -2,14 +2,14 @@ import json
 from unittest.mock import patch
 
 from django.conf import settings
-from django.contrib.gis.geos import MultiPolygon, Polygon
+from django.contrib.gis.geos import MultiPolygon, Point, Polygon
 from django.test import TestCase, RequestFactory
 from django.urls import reverse
 from django.utils.http import urlencode
 
 from maps.views import CatchmentCreateByMergeView
 from utils.tests.testcases import ViewWithPermissionsTestCase, ViewSetWithPermissionsTestCase
-from ..models import Attribute, RegionAttributeValue, Catchment, LauRegion, NutsRegion, Region, GeoDataset, GeoPolygon
+from ..models import Attribute, RegionAttributeValue, Catchment, LauRegion, NutsRegion, Region, GeoDataset, GeoPolygon, Location
 from ..views import MapMixin
 
 
@@ -124,6 +124,225 @@ class MapMixinTestCase(TestCase):
         self.assertEqual(map_config['adjustBoundsToFeatures'], True)
         self.assertEqual(map_config['featureSummaryUrl'], None)
         self.assertEqual(map_config['featureDetailsUrl'], '/mocked/url/')
+
+
+# ----------- Location CRUD---------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class LocationListViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['add_location', 'change_location']
+    url = reverse('location-list')
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.location = Region.objects.create(name='Test Location')
+
+    def test_get_http_200_ok_for_anonymous(self):
+        response = self.client.get(self.url)
+        self.assertEqual(200, response.status_code)
+
+    def test_get_http_200_ok_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(self.url)
+        self.assertEqual(200, response.status_code)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(self.url)
+        self.assertEqual(200, response.status_code)
+
+    def test_add_button_not_available_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(self.url)
+        self.assertNotContains(response, reverse('location-create'))
+
+    def test_add_button_available_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(self.url)
+        self.assertContains(response, reverse('location-create'))
+
+
+class LocationCreateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'add_location'
+
+    def test_get_http_302_redirect_to_login_for_anonymous(self):
+        url = reverse('location-create')
+        response = self.client.get(url, follow=True)
+        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
+
+    def test_get_http_403_forbidden_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('location-create'))
+        self.assertEqual(403, response.status_code)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('location-create'))
+        self.assertEqual(200, response.status_code)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('location-create'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
+    def test_post_http_302_redirect_to_login_for_anonymous(self):
+        url = reverse('location-create')
+        response = self.client.post(url, data={}, follow=True)
+        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
+
+    def test_post_http_403_forbidden_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(reverse('location-create'))
+        self.assertEqual(403, response.status_code)
+
+    def test_post_success_and_http_302_redirect_to_success_url_for_member(self):
+        self.client.force_login(self.member)
+        data = {
+            'name': 'Newly created location',
+            'address': '123 Test St.',
+            'geom': 'POINT (30 10)'
+        }
+        response = self.client.post(reverse('location-create'), data, follow=True)
+        pk = Location.objects.get(name='Newly created location').pk
+        self.assertRedirects(response, reverse('location-detail', kwargs={'pk': pk}))
+
+
+class LocationDetailViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['change_location', 'delete_location']
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        location_data = {
+            'name': 'Test Location',
+            'address': 'Test Address',
+            'geom': Point(0, 0)
+        }
+        cls.location = Location.objects.create(**location_data)
+
+    def test_get_http_200_pk_for_anonymous(self):
+        self.assertIsNotNone(self.location.pk)
+        response = self.client.get(reverse('location-detail', kwargs={'pk': self.location.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'maps/location_detail.html')
+
+    def test_edit_and_delete_button_not_available_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('location-detail', kwargs={'pk': self.location.pk}))
+        self.assertNotContains(response, reverse('location-update', kwargs={'pk': self.location.pk}))
+        self.assertNotContains(response, reverse('location-delete-modal', kwargs={'pk': self.location.pk}))
+
+    def test_edit_button_available_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('location-detail', kwargs={'pk': self.location.pk}))
+        self.assertContains(response, reverse('location-update', kwargs={'pk': self.location.pk}))
+        self.assertContains(response, reverse('location-delete-modal', kwargs={'pk': self.location.pk}))
+
+
+class LocationUpdateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'change_location'
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        location_data = {
+            'name': 'Test Location',
+            'address': 'Test Address',
+            'geom': Point(0, 0)
+        }
+        cls.location = Location.objects.create(**location_data)
+
+    def test_get_http_302_redirect_to_login_for_anonymous(self):
+        url = reverse('location-update', kwargs={'pk': self.location.pk})
+        response = self.client.get(url, follow=True)
+        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
+
+    def test_get_http_403_forbidden_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('location-update', kwargs={'pk': self.location.pk}))
+        self.assertEqual(403, response.status_code)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('location-update', kwargs={'pk': self.location.pk}))
+        self.assertEqual(200, response.status_code)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('location-update', kwargs={'pk': self.location.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
+    def test_post_http_302_redirect_to_login_for_anonymous(self):
+        url = reverse('location-update', kwargs={'pk': self.location.pk})
+        response = self.client.post(url, data={}, follow=True)
+        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
+
+    def test_post_http_403_forbidden_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(reverse('location-update', kwargs={'pk': self.location.pk}), data={})
+        self.assertEqual(403, response.status_code)
+
+    def test_post_success_and_http_302_redirect_to_success_url_for_member(self):
+        self.client.force_login(self.member)
+        data = {
+            'name': 'Updated Test Location',
+            'geom': 'POINT (30 10)'
+        }
+        response = self.client.post(reverse('location-update', kwargs={'pk': self.location.pk}), data, follow=True)
+        self.assertRedirects(response, reverse('location-detail', kwargs={'pk': self.location.pk}))
+
+
+class LocationModalDeleteViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'delete_location'
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        location_data = {
+            'name': 'Test Location',
+            'address': 'Test Address',
+            'geom': Point(0, 0)
+        }
+        cls.location = Location.objects.create(**location_data)
+
+    def test_get_http_302_redirect_to_login_for_anonymous(self):
+        url = reverse('location-delete-modal', kwargs={'pk': self.location.pk})
+        response = self.client.get(url)
+        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
+
+    def test_get_http_403_forbidden_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('location-delete-modal', kwargs={'pk': self.location.pk}))
+        self.assertEqual(403, response.status_code)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('location-delete-modal', kwargs={'pk': self.location.pk}))
+        self.assertEqual(200, response.status_code)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('location-delete-modal', kwargs={'pk': self.location.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
+    def test_post_http_302_redirect_to_login_for_anonymous(self):
+        url = reverse('location-delete-modal', kwargs={'pk': self.location.pk})
+        response = self.client.post(url, data={})
+        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
+
+    def test_post_http_403_forbidden_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(reverse('location-delete-modal', kwargs={'pk': self.location.pk}), data={})
+        self.assertEqual(403, response.status_code)
+
+    def test_post_success_and_http_302_redirect_to_success_url_for_member(self):
+        self.client.force_login(self.member)
+        response = self.client.post(reverse('location-delete-modal', kwargs={'pk': self.location.pk}), {})
+        self.assertRedirects(response, reverse('location-list'))
+        with self.assertRaises(Region.DoesNotExist):
+            Region.objects.get(pk=self.location.pk)
 
 
 # ----------- Catchment CRUD--------------------------------------------------------------------------------------------
