@@ -15,7 +15,7 @@ from mock import Mock, patch
 from distributions.models import TemporalDistribution, Timestep
 from maps.models import Region
 from materials.models import Material, MaterialCategory, Sample, SampleSeries
-from utils.models import Property, Unit
+from utils.properties.models import Property, Unit
 from utils.tests.testcases import ViewWithPermissionsTestCase
 from .. import views
 from ..forms import BaseWasteFlyerUrlFormSet, CollectionModelForm
@@ -872,12 +872,14 @@ class CollectionCurrentListViewTestCase(ViewWithPermissionsTestCase):
 
     def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse('collection-list'))
-        self.assertRedirects(response, f'{reverse("collection-list")}?load_features=True&valid_on={date.today()}', fetch_redirect_response=True)
+        self.assertRedirects(response, f'{reverse("collection-list")}?load_features=True&valid_on={date.today()}',
+                             fetch_redirect_response=True)
 
     def test_get_http_200_ok_for_logged_in_users(self):
         self.client.force_login(self.outsider)
         response = self.client.get(reverse('collection-list'))
-        self.assertRedirects(response, f'{reverse("collection-list")}?load_features=True&valid_on={date.today()}', fetch_redirect_response=True)
+        self.assertRedirects(response, f'{reverse("collection-list")}?load_features=True&valid_on={date.today()}',
+                             fetch_redirect_response=True)
 
     def test_pagination_works_without_further_query_parameters(self):
         url = reverse('collection-list')
@@ -1099,7 +1101,8 @@ class CollectionDetailViewTestCase(ViewWithPermissionsTestCase):
         )
         cls.collection.add_predecessor(cls.predecessor_collection_1)
         cls.collection.add_predecessor(cls.predecessor_collection_2)
-        cls.collection.flyers.add(WasteFlyer.objects.create(abbreviation='Test Flyer', url='https://www.test-flyer.org'))
+        cls.collection.flyers.add(
+            WasteFlyer.objects.create(abbreviation='Test Flyer', url='https://www.test-flyer.org'))
 
     def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse('collection-detail', kwargs={'pk': self.collection.pk}))

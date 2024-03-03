@@ -1,13 +1,12 @@
-from factory.django import mute_signals
-
-from django.db.models import signals, Q
+from django.db.models import Q, signals
 from django.test import TestCase
 from django.utils import timezone
+from factory.django import mute_signals
 
 from distributions.models import TemporalDistribution, Timestep
-from utils.models import Property
-from ..filters import (CollectionFilterSet, CollectionsPerYearFilter, ConnectionRateFilter,
-                       CollectorFilter, WasteFlyerFilter, SpecWasteCollectedFilter)
+from utils.properties.models import Property
+from ..filters import (CollectionFilterSet, CollectionsPerYearFilter, CollectorFilter, ConnectionRateFilter,
+                       SpecWasteCollectedFilter, WasteFlyerFilter)
 from ..models import (Collection, CollectionCatchment, CollectionCountOptions, CollectionFrequency,
                       CollectionPropertyValue, CollectionSeason, Collector, WasteFlyer)
 

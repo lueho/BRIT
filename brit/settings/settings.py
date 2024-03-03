@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'case_studies.soilcom.apps.SoilcomConfig',
     'interfaces.simucf.apps.SimucfConfig',
     'utils.file_export.apps.FileExportConfig',
+    'utils.properties.apps.PropertiesConfig',
     'django.forms',
     'django_filters',
     'crispy_forms',

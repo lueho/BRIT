@@ -2,9 +2,7 @@ from bootstrap_modal_forms.mixins import CreateUpdateAjaxMixin, PopRequestMixin
 from crispy_forms.helper import FormHelper
 from dal_select2.widgets import Select2WidgetMixin
 from django.core.exceptions import ImproperlyConfigured
-from django.forms import BaseFormSet, BaseModelFormSet, Form, formset_factory, ModelForm, modelformset_factory
-
-from .models import Property, Unit
+from django.forms import BaseFormSet, BaseModelFormSet, Form, ModelForm, formset_factory, modelformset_factory
 
 
 class FormHelperMixin:
@@ -184,7 +182,8 @@ class M2MInlineFormSetMixin:
     def get_formset_initial(self):
         if self.object:
             related_objects = getattr(self.object, self.relation_field_name).all()
-            return [{name: getattr(obj, name) for name, _ in self.formset_form_class.base_fields.items()} for obj in related_objects]
+            return [{name: getattr(obj, name) for name, _ in self.formset_form_class.base_fields.items()} for obj in
+                    related_objects]
         else:
             return []
 
@@ -267,15 +266,3 @@ class M2MInlineModelFormSetMixin:
             kwargs['formset'] = self.get_formset()
             kwargs['formset_helper'] = self.get_formset_helper_class()()
         return super().get_context_data(**kwargs)
-
-
-class UnitModelForm(SimpleModelForm):
-    class Meta:
-        model = Unit
-        fields = ['name', 'dimensionless', 'reference_quantity', 'description']
-
-
-class PropertyModelForm(SimpleModelForm):
-    class Meta:
-        model = Property
-        fields = ['name', 'allowed_units', 'description']

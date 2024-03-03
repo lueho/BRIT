@@ -8,14 +8,11 @@ from django.contrib.messages.views import SuccessMessageMixin
 from django.core.exceptions import FieldError, ImproperlyConfigured
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.template.loader import render_to_string
-from django.urls import reverse_lazy
 from django.views.generic import CreateView, DetailView, ListView, TemplateView, UpdateView
 from django_filters.views import FilterView
 from django_tables2 import table_factory
 
 from users.models import get_default_owner
-from .forms import PropertyModelForm, UnitModelForm
-from .models import Property, Unit
 from .tables import StandardItemTable, UserItemTable
 
 
@@ -315,76 +312,4 @@ class OwnedObjectModelSelectOptionsView(PermissionRequiredMixin, ModelSelectOpti
 
 class UtilsDashboardView(PermissionRequiredMixin, TemplateView):
     template_name = 'utils_dashboard.html'
-    permission_required = ('utils.view_property',)
-
-
-class UnitListView(OwnedObjectListView):
-    model = Unit
-    permission_required = set()
-
-
-class UnitCreateView(OwnedObjectCreateView):
-    model = Unit
-    form_class = UnitModelForm
-    permission_required = ('utils.add_unit',)
-
-
-class UnitDetailView(OwnedObjectDetailView):
-    template_name = 'simple_detail_card.html'
-    model = Unit
-    permission_required = set()
-
-
-class UnitUpdateView(OwnedObjectUpdateView):
-    model = Unit
-    form_class = UnitModelForm
-    permission_required = ('utils.change_unit',)
-
-
-class UnitModalDeleteView(OwnedObjectModalDeleteView):
-    model = Unit
-    permission_required = ('utils.delete_unit',)
-    success_message = 'Unit deleted successfully.'
-    success_url = reverse_lazy('unit-list')
-
-
-class PropertyListView(OwnedObjectListView):
-    model = Property
-    permission_required = set()
-
-
-class PropertyCreateView(OwnedObjectCreateView):
-    model = Property
-    form_class = PropertyModelForm
-    permission_required = ('utils.add_property',)
-
-
-class PropertyDetailView(OwnedObjectDetailView):
-    model = Property
-    permission_required = set()
-
-
-class PropertyUpdateView(OwnedObjectUpdateView):
-    model = Property
-    form_class = PropertyModelForm
-    permission_required = ('utils.change_property',)
-
-
-class PropertyModalDeleteView(OwnedObjectModalDeleteView):
-    model = Property
-    permission_required = ('utils.delete_property',)
-    success_message = 'Property deleted successfully.'
-    success_url = reverse_lazy('property-list')
-
-
-class PropertyUnitOptionsView(OwnedObjectModelSelectOptionsView):
-    model = Property
-    include_empty_option = False
-    permission_required = set()
-
-    def get_selected_object(self):
-        return self.object_list.first()
-
-    def get_queryset(self):
-        obj = self.model.objects.get(id=self.kwargs.get('pk'))
-        return obj.allowed_units.all()
+    permission_required = ('properties.view_property',)

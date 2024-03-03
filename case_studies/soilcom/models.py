@@ -5,7 +5,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
 from django.db import models
 from django.db.models import Count, Q, Sum
-from django.db.models.signals import pre_save, post_save
+from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.utils import timezone
 
@@ -14,7 +14,8 @@ from distributions.models import Period, TemporalDistribution, Timestep
 from maps.models import Catchment, GeoPolygon
 from materials.models import Material, MaterialCategory, Sample, SampleSeries
 from users.models import get_default_owner
-from utils.models import NamedUserObjectModel, OwnedObjectModel, PropertyValue
+from utils.models import NamedUserObjectModel, OwnedObjectModel
+from utils.properties.models import PropertyValue
 
 
 class CollectionCatchment(Catchment):
