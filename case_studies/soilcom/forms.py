@@ -1,7 +1,8 @@
+from datetime import timedelta
+
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Column, Div, Field, HTML, Layout, Row
 from dal import autocomplete
-from datetime import timedelta
 from django.core.exceptions import ValidationError
 from django.forms import (CheckboxSelectMultiple, DateInput, HiddenInput, IntegerField, ModelChoiceField,
                           ModelMultipleChoiceField)
@@ -114,17 +115,19 @@ class CollectionSeasonFormHelper(FormHelper):
 
 class CollectionSeasonForm(SimpleForm):
     distribution = ModelChoiceField(
-        queryset=TemporalDistribution.objects.filter(name='Months of the year'),
-        initial=TemporalDistribution.objects.get(name='Months of the year'),
+        # queryset=TemporalDistribution.objects.filter(name='Months of the year'),
+        queryset=TemporalDistribution.objects.none(),
+        # initial=TemporalDistribution.objects.get(name='Months of the year'),
+        initial=None,
         empty_label=None,
         widget=HiddenInput()
     )
     first_timestep = ModelChoiceField(
-        queryset=Timestep.objects.filter(distribution=TemporalDistribution.objects.get(name='Months of the year')),
+        queryset=Timestep.objects.none(),
         label='Start'
     )
     last_timestep = ModelChoiceField(
-        queryset=Timestep.objects.filter(distribution=TemporalDistribution.objects.get(name='Months of the year')),
+        queryset=Timestep.objects.none(),
         label='End'
     )
     standard = IntegerField(required=False, min_value=0)
@@ -135,15 +138,23 @@ class CollectionSeasonForm(SimpleForm):
     class Meta:
         fields = ('distribution', 'first_timestep', 'last_timestep', 'standard', 'option_1', 'option_2', 'option_3')
 
-    # @property
-    # def helper(self):
-    #     helper = FormHelper()
-    #     helper.layout = Layout(
-    #         Row(Column(Field('first_timestep')), Column(Field('last_timestep'))),
-    #         Row(Column(Field('cpw_standard')))
-    #     )
-    #     helper.nam = 'Hello'
-    #     return helper
+    def __init__(self, *args, **kwargs):
+        super(CollectionSeasonForm, self).__init__(*args, **kwargs)
+        # Now, set the queryset and initial value when the form instance is created
+        self.fields['distribution'].queryset = TemporalDistribution.objects.filter(name='Months of the year')
+        try:
+            self.fields['distribution'].initial = TemporalDistribution.objects.get(name='Months of the year')
+        except TemporalDistribution.DoesNotExist:
+            # Handle the case where the 'Months of the year' distribution does not exist
+            pass
+        distribution_qs = TemporalDistribution.objects.filter(name='Months of the year')
+        if distribution_qs.exists():
+            distribution = distribution_qs.first()
+            self.fields['first_timestep'].queryset = Timestep.objects.filter(distribution=distribution)
+            self.fields['last_timestep'].queryset = Timestep.objects.filter(distribution=distribution)
+        else:
+            self.fields['first_timestep'].queryset = Timestep.objects.none()
+            self.fields['last_timestep'].queryset = Timestep.objects.none()
 
     def save(self):
         self.instance, _ = CollectionSeason.objects.get_or_create(
