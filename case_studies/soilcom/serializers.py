@@ -91,7 +91,7 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
     waste_category = serializers.StringRelatedField(source='waste_stream.category', label='Waste Category')
     allowed_materials = serializers.SerializerMethodField(label='Allowed Materials')
     forbidden_materials = serializers.SerializerMethodField(label='Forbidden Materials')
-    fee_system = serializers.CharField(label='Fee system')
+    fee_system = serializers.StringRelatedField(source='fee_system.name', label='Fee system')
     frequency = serializers.StringRelatedField(label='Frequency')
     population = serializers.SerializerMethodField()
     population_density = serializers.SerializerMethodField()

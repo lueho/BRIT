@@ -11,17 +11,8 @@ from maps.serializers import FieldLabelMixin
 from materials.models import MaterialCategory
 from users.models import get_default_owner
 
-from ..models import (
-    Collection,
-    CollectionCatchment,
-    CollectionFrequency,
-    CollectionSystem,
-    Collector,
-    WasteCategory,
-    WasteComponent,
-    WasteFlyer,
-    WasteStream
-)
+from ..models import (Collection, CollectionCatchment, CollectionFrequency, CollectionSystem, Collector, FeeSystem,
+                      WasteCategory, WasteComponent, WasteFlyer, WasteStream)
 from ..serializers import CollectionModelSerializer, CollectionFlatSerializer
 
 
@@ -203,7 +194,7 @@ class CollectionFlatSerializerTestCase(TestCase):
             collector=Collector.objects.create(name='Test Collector'),
             collection_system=CollectionSystem.objects.create(name='Test System'),
             waste_stream=waste_stream,
-            fee_system='Fixed fee',
+            fee_system=FeeSystem.objects.create(name='Test fee system'),
             frequency=frequency,
             valid_from=date(2020, 1, 1),
             description='This is a test case.'
@@ -219,7 +210,7 @@ class CollectionFlatSerializerTestCase(TestCase):
             collector=Collector.objects.create(name='Test Collector'),
             collection_system=CollectionSystem.objects.create(name='Test System'),
             waste_stream=waste_stream,
-            fee_system='Fixed fee',
+            fee_system=FeeSystem.objects.create(name='Fixed fee', ),
             frequency=frequency,
             description='This is a test case.'
         )
@@ -231,7 +222,7 @@ class CollectionFlatSerializerTestCase(TestCase):
         keys = {'catchment', 'nuts_or_lau_id', 'collector', 'collection_system', 'country', 'waste_category',
                 'allowed_materials', 'forbidden_materials', 'fee_system',
                 'frequency', 'population', 'population_density', 'comments', 'sources',
-                'valid_from', 'valid_until', 'created_at','lastmodified_at'}
+                'valid_from', 'valid_until', 'created_at', 'lastmodified_at'}
         self.assertSetEqual(keys, set(serializer.data.keys()))
 
     def test_serializer_gets_information_from_foreign_keys_correctly(self):

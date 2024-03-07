@@ -16,7 +16,7 @@ from utils.forms import (AutoCompleteModelForm, M2MInlineFormSet, ModalModelForm
                          SimpleModelForm)
 from .models import (AggregatedCollectionPropertyValue, Collection, CollectionCatchment, CollectionCountOptions,
                      CollectionFrequency, CollectionPropertyValue, CollectionSeason, CollectionSystem, Collector,
-                     WasteCategory, WasteComponent, WasteFlyer, WasteStream)
+                     FeeSystem, WasteCategory, WasteComponent, WasteFlyer, WasteStream)
 
 
 class CollectorModelForm(AutoCompleteModelForm):
@@ -277,6 +277,10 @@ class CollectionModelForm(AutoCompleteModelForm):
     frequency = ModelChoiceField(
         queryset=CollectionFrequency.objects.all(),
         widget=autocomplete.ModelSelect2(url='collectionfrequency-autocomplete'),
+        required=False
+    )
+    fee_system = ModelChoiceField(
+        queryset=FeeSystem.objects.all(),
         required=False
     )
 

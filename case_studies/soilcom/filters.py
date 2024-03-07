@@ -13,7 +13,7 @@ from utils.crispy_fields import FilterAccordionGroup, RangeSliderField
 from utils.filters import (CrispyAutocompleteFilterSet, BaseCrispyFilterSet, NullableRangeFilter)
 from utils.widgets import NullableRangeSliderWidget
 from .models import (Collection, CollectionCatchment, CollectionCountOptions, CollectionFrequency,
-                     CollectionPropertyValue, Collector, WasteCategory, WasteComponent, WasteFlyer, )
+                     CollectionPropertyValue, Collector, FeeSystem, WasteCategory, WasteComponent, WasteFlyer, )
 
 
 class CollectorFilter(BaseCrispyFilterSet):
@@ -185,6 +185,9 @@ class CollectionFilterSet(CrispyAutocompleteFilterSet):
     )
     spec_waste_collected = SpecWasteCollectedFilter(
         label='Specific waste collected [kg/(cap.*a)]',
+    )
+    fee_system = ModelChoiceFilter(
+        queryset=FeeSystem.objects.all(),
     )
     valid_on = DateFilter(method='filter_valid_on', widget=DateInput(attrs={'type': 'date'}),
                           initial=timezone.now().date(), label='Valid on')

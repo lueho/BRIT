@@ -13,8 +13,8 @@ from maps.models import NutsRegion
 from materials.models import MaterialCategory
 from users.models import get_default_owner
 
-from ..models import (Collection, CollectionCatchment, Collector, CollectionSystem, WasteCategory, WasteComponent,
-                      WasteFlyer, WasteStream, CollectionFrequency)
+from ..models import (Collection, CollectionCatchment, Collector, CollectionSystem, FeeSystem, WasteCategory,
+                      WasteComponent, WasteFlyer, WasteStream, CollectionFrequency)
 from ..renderers import CollectionCSVRenderer, CollectionXLSXRenderer
 from ..serializers import CollectionFlatSerializer
 
@@ -53,7 +53,7 @@ class CollectionCSVRendererTestCase(TestCase):
                 collector=Collector.objects.create(owner=owner, name=f'collector{1}'),
                 collection_system=CollectionSystem.objects.create(owner=owner, name='Test system'),
                 waste_stream=waste_stream,
-                fee_system='Fixed fee',
+                fee_system=FeeSystem.objects.create(name='Fixed fee'),
                 frequency=frequency,
                 valid_from=date(2020, 1, 1),
                 description='This is a test case.'

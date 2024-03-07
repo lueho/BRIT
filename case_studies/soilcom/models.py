@@ -341,11 +341,9 @@ class CollectionCountOptions(OwnedObjectModel):
 
 YEAR_VALIDATOR = RegexValidator(r'^([0-9]{4})$', message='Year needs to be in YYYY format.', code='invalid year')
 
-FEE_SYSTEMS = (
-    ('No fee', 'No fee'),
-    ('Fixed fee', 'Fixed fee',),
-    ('Pay as you throw (PAYT)', 'Pay as you throw (PAYT)',)
-)
+
+class FeeSystem(NamedUserObjectModel):
+    pass
 
 
 class CollectionQuerySet(models.query.QuerySet):
@@ -370,7 +368,7 @@ class Collection(NamedUserObjectModel):
                                      related_name='collections')
     frequency = models.ForeignKey(CollectionFrequency, on_delete=models.SET_NULL, blank=True, null=True,
                                   related_name='collections')
-    fee_system = models.CharField(max_length=32, choices=FEE_SYSTEMS, blank=True, null=True)
+    fee_system = models.ForeignKey(FeeSystem, on_delete=models.PROTECT, blank=True, null=True)
     samples = models.ManyToManyField(Sample, related_name='collections')
     flyers = models.ManyToManyField(WasteFlyer, related_name='collections')
     sources = models.ManyToManyField(Source)
