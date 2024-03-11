@@ -3,7 +3,7 @@ from django.contrib.gis.geos import Point
 from django.db.models import QuerySet
 from django.test import TestCase
 
-from maps.models import Location
+from maps.models import Location, GeoPolygon
 from ..models import Catchment, LauRegion, NutsRegion, Region
 
 
@@ -38,6 +38,17 @@ class TestLocationModel(TestCase):
         self.location.address = None
         self.location.save()
         self.assertEqual(str(self.location), "Test Location")
+
+
+class RegionTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.borders = GeoPolygon.objects.create(geom='MULTIPOLYGON (((30 20, 45 40, 10 40, 30 20)))')
+        cls.region = Region.objects.create(name='Test Region', country='DE', borders=cls.borders)
+
+    def test_region_geom(self):
+        self.assertEqual(self.borders.geom, self.region.geom)
 
 
 class CatchmentPostDeleteTestCase(TestCase):

@@ -184,22 +184,25 @@ function convertToFeatureCollection(data) {
     // Once all endpoints for geometry data return a FeatureCollection, this function can be removed.
 
     if ('geoJson' in data) {
-        data = { ...data.geoJson, summaries: data.summaries || null };
+        data = {...data.geoJson, summaries: data.summaries || null};
     }
 
     if (data.type !== 'FeatureCollection') {
-        data = { type: 'FeatureCollection', features: data.features, summaries: data.summaries };
+        data = {type: 'FeatureCollection', features: data.features, summaries: data.summaries};
     }
 
     return data;
 }
+
 async function fetchFeatureGeometries(params) {
     const url = new URL(window.location.origin + mapConfig.featureUrl);
     url.search = transformSearchParams(params).toString();
     const response = await fetch(url);
     const geoJson = await response.json();
     renderFeatures(convertToFeatureCollection(geoJson));
-    if ('summaries' in geoJson) {renderSummaries(geoJson);}
+    if ('summaries' in geoJson) {
+        renderSummaries(geoJson);
+    }
 }
 
 async function fetchFeatureSummaries(feature) {
@@ -214,8 +217,7 @@ async function fetchFeatureSummaries(feature) {
     } else {
         featureId = feature.toString();
     }
-
-    const dataurl = mapConfig.featureSummaryUrl + '?' + 'pk=' + featureId;
+    const dataurl = mapConfig.featureSummaryUrl + '?' + 'id=' + featureId;
     const response = await fetch(dataurl);
     return await response.json();
 }
@@ -368,65 +370,70 @@ function renderSummaryContainer(summary, summary_container) {
 }
 
 function renderSummaries(featureInfos) {
-
     // Empty summary container from previous content
     const outer_summary_container = document.getElementById('summary-container');
     outer_summary_container.textContent = '';
 
-    if (featureInfos.summaries.length > 1) {
+    if ('summaries' in featureInfos) {
+        if (featureInfos.summaries.length > 1) {
 
-        // render multiple summaries
-        const message = document.createElement('P');
-        message.innerText = 'Found ' + featureInfos.summaries.length + ' items:';
-        outer_summary_container.appendChild(message);
+            // render multiple summaries
+            const message = document.createElement('P');
+            message.innerText = 'Found ' + featureInfos.summaries.length + ' items:';
+            outer_summary_container.appendChild(message);
 
-        const accordion = document.createElement('div');
-        accordion.id = 'summaries_accordion';
-        accordion.className = 'accordion';
-        outer_summary_container.appendChild(accordion);
+            const accordion = document.createElement('div');
+            accordion.id = 'summaries_accordion';
+            accordion.className = 'accordion';
+            outer_summary_container.appendChild(accordion);
 
-        featureInfos.summaries.forEach((summary, i) => {
+            featureInfos.summaries.forEach((summary, i) => {
 
-            const card = document.createElement('div');
-            card.className = 'card';
-            accordion.appendChild(card);
+                const card = document.createElement('div');
+                card.className = 'card';
+                accordion.appendChild(card);
 
-            const header = document.createElement('div');
-            header.className = 'card-header collapse-selector';
-            header.setAttribute('role', 'button');
-            header.setAttribute('data-toggle', 'collapse');
-            header.setAttribute('href', '#collapse' + i.toString());
-            header.setAttribute('aria-expanded', 'true');
-            header.setAttribute('aria-controls', 'collapse' + i.toString());
-            if (summary.id) {
-                header.setAttribute('data-pk', summary.id);
-            }
-            const numbering = i + 1;
-            header.innerHTML = '<b>#' + numbering.toString() + '</b>';
-            card.appendChild(header);
+                const header = document.createElement('div');
+                header.className = 'card-header collapse-selector';
+                header.setAttribute('role', 'button');
+                header.setAttribute('data-toggle', 'collapse');
+                header.setAttribute('href', '#collapse' + i.toString());
+                header.setAttribute('aria-expanded', 'true');
+                header.setAttribute('aria-controls', 'collapse' + i.toString());
+                if (summary.id) {
+                    header.setAttribute('data-pk', summary.id);
+                }
+                const numbering = i + 1;
+                header.innerHTML = '<b>#' + numbering.toString() + '</b>';
+                card.appendChild(header);
 
-            const collapse_container = document.createElement('div');
-            collapse_container.id = 'collapse' + i.toString();
-            collapse_container.className = 'summary collapse';
-            collapse_container.setAttribute('aria-labelledby', 'collapse' + i.toString());
-            collapse_container.setAttribute('data-parent', '#summaries_accordion');
-            card.appendChild(collapse_container);
+                const collapse_container = document.createElement('div');
+                collapse_container.id = 'collapse' + i.toString();
+                collapse_container.className = 'summary collapse';
+                collapse_container.setAttribute('aria-labelledby', 'collapse' + i.toString());
+                collapse_container.setAttribute('data-parent', '#summaries_accordion');
+                card.appendChild(collapse_container);
 
-            const body = document.createElement('div');
-            body.className = 'card-body';
+                const body = document.createElement('div');
+                body.className = 'card-body';
 
-            collapse_container.appendChild(body);
-            renderSummaryContainer(summary, body);
-        });
+                collapse_container.appendChild(body);
+                renderSummaryContainer(summary, body);
+            });
 
 
-    } else if (featureInfos.summaries.length === 1) {
-        // render one single summary
-        const summary = featureInfos.summaries[0];
-        renderSummaryContainer(summary, outer_summary_container);
+        } else if (featureInfos.summaries.length === 1) {
+            // render one single summary
+            const summary = featureInfos.summaries[0];
+            renderSummaryContainer(summary, outer_summary_container);
+        }
+
+        $('#info-card-body').collapse('show');
     }
+}
 
-    $('#info-card-body').collapse('show');
+function updateUrls(feature_id) {
+    // This is a hook to overwrite if this file is run for any page not containing a standard filter form.
 }
 
 async function clickedFeature(event) {

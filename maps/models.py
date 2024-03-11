@@ -70,10 +70,6 @@ class Region(NamedUserObjectModel):
         except Region.lauregion.RelatedObjectDoesNotExist:
             return None
 
-    @staticmethod
-    def get_absolute_url(**kwargs):
-        return reverse('catchment-list')
-
     def __str__(self):
         try:
             return self.nutsregion.__str__()

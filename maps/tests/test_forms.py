@@ -1,8 +1,66 @@
+from django.contrib.gis.geos import MultiPolygon, Polygon
 from django.forms import formset_factory
 from django.test import TestCase
 
-from ..forms import RegionMergeForm, RegionMergeFormSet
+from ..forms import RegionMergeForm, RegionMergeFormSet, RegionModelForm
 from ..models import LauRegion, Region
+
+
+class RegionModelFormTestCase(TestCase):
+
+    def test_valid_form_submission(self):
+        poly = MultiPolygon(Polygon(((0, 0), (1, 1), (1, 0), (0, 0))))
+
+        form_data = {
+            'name': 'Test Region',
+            'country': 'TE',
+            'description': 'Test Description',
+            'geom': poly,
+        }
+
+        form = RegionModelForm(data=form_data)
+
+        self.assertTrue(form.is_valid())
+
+        region = form.save()
+        self.assertIsNotNone(region.pk)
+        self.assertIsNotNone(region.borders.pk)
+        self.assertEqual(region.borders.geom, poly)
+
+    def test_invalid_form_submission(self):
+        form_data = {
+            'name': 'Test Region',
+            # 'country' is required but missing
+            'description': 'Test Description',
+            'geom': 'invalid_geometry',
+        }
+
+        form = RegionModelForm(data=form_data)
+        self.assertFalse(form.is_valid())
+        self.assertIn('country', form.errors)
+        self.assertIn('geom', form.errors)
+
+    def test_save_method_with_commit_false(self):
+        poly = MultiPolygon(Polygon(((0, 0), (1, 1), (1, 0), (0, 0))))
+
+        form_data = {
+            'name': 'Test Region Without Commit',
+            'country': 'Test Country',
+            'description': 'Test Description',
+            'geom': poly,
+        }
+
+        form = RegionModelForm(data=form_data)
+        self.assertTrue(form.is_valid())
+
+        region = form.save(commit=False)
+
+        self.assertIsNone(region.pk)
+
+        region.save()
+        self.assertIsNotNone(region.pk)
+        self.assertIsNotNone(region.borders.pk)
+        self.assertEqual(region.borders.geom, poly)
 
 
 class TestRegionMergeFormset(TestCase):

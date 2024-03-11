@@ -68,15 +68,24 @@ class LocationGeoFeatureModelSerializer(GeoFeatureModelSerializer):
 # ----------- Regions --------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 class GeoreferencedRegion(GeoPolygon, Region):
     pass
 
 
-class RegionSerializer(GeoFeatureModelSerializer):
+class RegionModelSerializer(ModelSerializer):
+    class Meta:
+        model = Region
+        fields = ('id', 'name', 'country', 'description')
+
+
+class RegionGeoFeatureModelSerializer(GeoFeatureModelSerializer):
+    id = IntegerField(source='pk')
+
     class Meta:
         model = GeoreferencedRegion
         geo_field = 'geom'
-        fields = ['name', 'country']
+        fields = ['id', 'name', 'country', 'description']
 
 
 class BaseResultMapSerializer(GeoFeatureModelSerializer):

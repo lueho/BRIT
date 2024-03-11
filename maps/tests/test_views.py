@@ -9,7 +9,8 @@ from django.utils.http import urlencode
 
 from maps.views import CatchmentCreateByMergeView
 from utils.tests.testcases import ViewWithPermissionsTestCase, ViewSetWithPermissionsTestCase
-from ..models import Attribute, RegionAttributeValue, Catchment, LauRegion, NutsRegion, Region, GeoDataset, GeoPolygon, Location
+from ..models import (Attribute, RegionAttributeValue, Catchment, LauRegion, NutsRegion, Region, GeoDataset, GeoPolygon,
+    Location)
 from ..views import MapMixin
 
 
@@ -343,6 +344,240 @@ class LocationModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         self.assertRedirects(response, reverse('location-list'))
         with self.assertRaises(Region.DoesNotExist):
             Region.objects.get(pk=self.location.pk)
+
+
+# ----------- Location CRUD---------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class RegionListViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['add_region', 'change_region']
+    url = reverse('region-list')
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.region = Region.objects.create(name='Test Region')
+
+    def test_get_http_200_ok_for_anonymous(self):
+        response = self.client.get(self.url)
+        self.assertEqual(200, response.status_code)
+
+    def test_get_http_200_ok_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(self.url)
+        self.assertEqual(200, response.status_code)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(self.url)
+        self.assertEqual(200, response.status_code)
+
+    def test_add_button_not_available_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(self.url)
+        self.assertNotContains(response, reverse('region-create'))
+
+    def test_add_button_available_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(self.url)
+        self.assertContains(response, reverse('region-create'))
+
+
+class RegionMapViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['add_region', 'change_region']
+    url = reverse('region-map')
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.region = Region.objects.create(name='Test Region')
+
+    def test_get_http_302_redirect_to_login_for_anonymous(self):
+        response = self.client.get(self.url)
+        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={self.url}')
+
+    def test_get_http_200_ok_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(self.url)
+        self.assertEqual(200, response.status_code)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(self.url)
+        self.assertEqual(200, response.status_code)
+
+    def test_add_button_available_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(self.url)
+        self.assertContains(response, reverse('region-create'))
+
+
+class RegionCreateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'add_region'
+
+    def test_get_http_302_redirect_to_login_for_anonymous(self):
+        url = reverse('region-create')
+        response = self.client.get(url, follow=True)
+        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
+
+    def test_get_http_403_forbidden_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('region-create'))
+        self.assertEqual(403, response.status_code)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('region-create'))
+        self.assertEqual(200, response.status_code)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('region-create'))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
+    def test_post_http_302_redirect_to_login_for_anonymous(self):
+        url = reverse('region-create')
+        response = self.client.post(url, data={}, follow=True)
+        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
+
+    def test_post_http_403_forbidden_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(reverse('region-create'))
+        self.assertEqual(403, response.status_code)
+
+    def test_post_success_and_http_302_redirect_to_success_url_for_member(self):
+        self.client.force_login(self.member)
+        data = {
+            'name': 'Newly created region',
+            'country': 'DE',
+            'geom': 'MULTIPOLYGON (((30 10, 40 40, 20 40, 10 20, 30 10)))'
+        }
+        response = self.client.post(reverse('region-create'), data, follow=True)
+        pk = Region.objects.get(name='Newly created region').pk
+        self.assertRedirects(response, reverse('region-detail', kwargs={'pk': pk}))
+
+
+class RegionDetailViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['change_region', 'delete_region']
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.region = Region.objects.create(name='Test Region')
+
+    def test_get_http_200_pk_for_anonymous(self):
+        self.assertIsNotNone(self.region.pk)
+        response = self.client.get(reverse('region-detail', kwargs={'pk': self.region.pk}))
+        self.assertEqual(response.status_code, 200)
+        self.assertTemplateUsed(response, 'maps/region_detail.html')
+
+    def test_edit_and_delete_button_not_available_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('region-detail', kwargs={'pk': self.region.pk}))
+        self.assertNotContains(response, reverse('region-update', kwargs={'pk': self.region.pk}))
+        self.assertNotContains(response, reverse('region-delete-modal', kwargs={'pk': self.region.pk}))
+
+    def test_edit_button_available_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('region-detail', kwargs={'pk': self.region.pk}))
+        self.assertContains(response, reverse('region-update', kwargs={'pk': self.region.pk}))
+        self.assertContains(response, reverse('region-delete-modal', kwargs={'pk': self.region.pk}))
+
+
+class RegionUpdateViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'change_region'
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.region = Region.objects.create(name='Test Region')
+
+    def test_get_http_302_redirect_to_login_for_anonymous(self):
+        url = reverse('region-update', kwargs={'pk': self.region.pk})
+        response = self.client.get(url, follow=True)
+        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
+
+    def test_get_http_403_forbidden_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('region-update', kwargs={'pk': self.region.pk}))
+        self.assertEqual(403, response.status_code)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('region-update', kwargs={'pk': self.region.pk}))
+        self.assertEqual(200, response.status_code)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('region-update', kwargs={'pk': self.region.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
+    def test_post_http_302_redirect_to_login_for_anonymous(self):
+        url = reverse('region-update', kwargs={'pk': self.region.pk})
+        response = self.client.post(url, data={}, follow=True)
+        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
+
+    def test_post_http_403_forbidden_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(reverse('region-update', kwargs={'pk': self.region.pk}), data={})
+        self.assertEqual(403, response.status_code)
+
+    def test_post_success_and_http_302_redirect_to_success_url_for_member(self):
+        self.client.force_login(self.member)
+        data = {
+            'name': 'Updated Test Region',
+            'country': 'DE',
+            'geom': 'MULTIPOLYGON (((30 10, 40 40, 20 40, 10 20, 30 10)))'
+        }
+        response = self.client.post(reverse('region-update', kwargs={'pk': self.region.pk}), data, follow=True)
+        self.assertRedirects(response, reverse('region-detail', kwargs={'pk': self.region.pk}))
+
+
+class RegionModalDeleteViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'delete_region'
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.region = Region.objects.create(name='Test Region')
+
+    def test_get_http_302_redirect_to_login_for_anonymous(self):
+        url = reverse('region-delete-modal', kwargs={'pk': self.region.pk})
+        response = self.client.get(url)
+        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
+
+    def test_get_http_403_forbidden_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('region-delete-modal', kwargs={'pk': self.region.pk}))
+        self.assertEqual(403, response.status_code)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('region-delete-modal', kwargs={'pk': self.region.pk}))
+        self.assertEqual(200, response.status_code)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('region-delete-modal', kwargs={'pk': self.region.pk}))
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
+    def test_post_http_302_redirect_to_login_for_anonymous(self):
+        url = reverse('region-delete-modal', kwargs={'pk': self.region.pk})
+        response = self.client.post(url, data={})
+        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
+
+    def test_post_http_403_forbidden_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.post(reverse('region-delete-modal', kwargs={'pk': self.region.pk}), data={})
+        self.assertEqual(403, response.status_code)
+
+    def test_post_success_and_http_302_redirect_to_success_url_for_member(self):
+        self.client.force_login(self.member)
+        response = self.client.post(reverse('region-delete-modal', kwargs={'pk': self.region.pk}), {})
+        self.assertRedirects(response, reverse('region-list'))
+        with self.assertRaises(Region.DoesNotExist):
+            Region.objects.get(pk=self.region.pk)
 
 
 # ----------- Catchment CRUD--------------------------------------------------------------------------------------------

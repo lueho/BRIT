@@ -1,15 +1,17 @@
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Column, Field, Layout, Row
 from dal.autocomplete import ModelSelect2
-from leaflet.forms.widgets import LeafletWidget
+# from django.contrib.gis.db.models import MultiPolygonField
+from django.contrib.gis.forms import MultiPolygonField
 from django.db.models import Subquery
 from django.forms import (BaseFormSet, ChoiceField, DateInput, DateField, ModelChoiceField, MultipleChoiceField,
-                          ValidationError, ModelForm)
+                          ValidationError)
 from django.forms.widgets import CheckboxSelectMultiple, RadioSelect
 from django.urls import reverse
+from leaflet.forms.widgets import LeafletWidget
 
 from utils.forms import AutoCompleteForm, AutoCompleteModelForm, SimpleForm, SimpleModelForm, ModalModelFormMixin
-from .models import Attribute, Region, Catchment, LauRegion, NutsRegion, RegionAttributeValue, Location
+from .models import Attribute, Region, Catchment, GeoPolygon, LauRegion, NutsRegion, RegionAttributeValue, Location
 
 
 class LocationModelForm(SimpleModelForm):
@@ -17,6 +19,22 @@ class LocationModelForm(SimpleModelForm):
         model = Location
         fields = ('name', 'geom', 'address')
         widgets = {'geom': LeafletWidget()}
+
+
+class RegionModelForm(AutoCompleteModelForm):
+    geom = MultiPolygonField(widget=LeafletWidget())
+
+    class Meta:
+        model = Region
+        fields = ('name', 'geom', 'country', 'description')
+
+    def save(self, commit=True):
+        geom = self.cleaned_data.pop('geom')
+        instance = super().save(commit=False)
+        instance.borders = GeoPolygon.objects.create(geom=geom)
+        if commit:
+            instance.save()
+        return instance
 
 
 class AttributeModelForm(SimpleModelForm):

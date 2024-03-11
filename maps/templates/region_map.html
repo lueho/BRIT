@@ -1,0 +1,46 @@
+{% extends 'filtered_map.html' %}
+{% load crispy_forms_tags %}
+
+{% block map_card_footer %}
+    <a class="mr-3 text-nowrap"
+       href="javascript:void(0)"
+       id="link-regions-as-list"
+       data-href-template="/maps/regions/"
+       onclick="clickedListLink()">
+        <i class="fa fa-fw fa-list"></i>
+        View as list
+    </a>
+    {% if 'maps.add_region' in perms %}
+        <a class="mr-3 text-nowrap"
+           href="{% url 'region-create' %}">
+            <i class="fa fa-fw fa-plus"></i>
+            Create region
+        </a>
+    {% endif %}
+{% endblock %}
+
+{% block filter_form %}
+    <form method="GET">
+        {% crispy filter.form %}
+    </form>
+{% endblock filter_form %}
+
+{% block javascript %}
+    {{ block.super }}
+    <script type="text/javascript">
+        function clickedListLink() {
+            const listLink = document.getElementById('link-regions-as-list');
+            window.location.href = listLink.dataset.hrefTemplate + '?' + parseFilterParameters().toString();
+        }
+
+        function createFeatureLayerBindings(collectionLayer) {
+            collectionLayer.bindTooltip(function(layer) {
+                return layer.feature.properties.name.toString();
+            });
+
+            collectionLayer.bindPopup(function(layer) {
+                return layer.feature.properties.name.toString();
+            });
+        }
+    </script>
+{% endblock javascript %}
