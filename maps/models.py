@@ -24,6 +24,17 @@ GIS_SOURCE_MODELS = (
 )
 
 
+class Location(NamedUserObjectModel):
+    geom = PointField(null=True)
+    address = models.CharField(max_length=255, null=True, blank=True)
+
+    class Meta:
+        verbose_name = 'Location'
+
+    def __str__(self):
+        return f"{self.name}{' at ' + self.address if self.address else ''}"
+
+
 class GeoPolygon(models.Model):
     fid = models.BigAutoField(primary_key=True)
     geom = MultiPolygonField(blank=True, null=True)
@@ -58,10 +69,6 @@ class Region(NamedUserObjectModel):
             return self.lauregion.lau_id
         except Region.lauregion.RelatedObjectDoesNotExist:
             return None
-
-    @staticmethod
-    def get_absolute_url(**kwargs):
-        return reverse('catchment-list')
 
     def __str__(self):
         try:

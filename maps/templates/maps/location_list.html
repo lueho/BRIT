@@ -1,0 +1,23 @@
+{% extends 'simple_list_card.html' %}
+{% load static %}
+
+{% block title %}BRIT | Maps | Locations{% endblock %}
+
+{% block card_body %}
+    <table class="table">
+        <thead>
+        <tr>
+            <th>Name</th>
+            <th>Address</th>
+            <th>Description</th>
+        </tr>
+        </thead>
+        {% for object in object_list %}
+            <tr>
+                <td><a href="{{ object.get_absolute_url }}">{{ object.name }}</a></td>
+                <td>{{ object.address }}</td>
+                <td>{{ object.description }}</td>
+            </tr>
+        {% endfor %}
+    </table>
+{% endblock card_body %}

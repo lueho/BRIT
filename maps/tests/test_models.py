@@ -1,8 +1,54 @@
 from django.contrib.auth.models import User
+from django.contrib.gis.geos import Point
 from django.db.models import QuerySet
 from django.test import TestCase
 
+from maps.models import Location, GeoPolygon
 from ..models import Catchment, LauRegion, NutsRegion, Region
+
+
+class TestLocationModel(TestCase):
+
+    def setUp(self):
+        self.location = Location.objects.create(
+            name="Test Location",
+            geom=Point(5, 23),
+            address="123 Test St."
+        )
+
+    def tearDown(self):
+        self.location.delete()
+
+    def test_location_created(self):
+        self.assertIsInstance(self.location, Location)
+
+    def test_location_name(self):
+        self.assertEqual(self.location.name, "Test Location")
+
+    def test_location_geom(self):
+        self.assertEqual((self.location.geom.x, self.location.geom.y), (5, 23))
+
+    def test_location_address(self):
+        self.assertEqual(self.location.address, "123 Test St.")
+
+    def test_location_str(self):
+        self.assertEqual(str(self.location), "Test Location at 123 Test St.")
+
+    def test_location_without_address_str(self):
+        self.location.address = None
+        self.location.save()
+        self.assertEqual(str(self.location), "Test Location")
+
+
+class RegionTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.borders = GeoPolygon.objects.create(geom='MULTIPOLYGON (((30 20, 45 40, 10 40, 30 20)))')
+        cls.region = Region.objects.create(name='Test Region', country='DE', borders=cls.borders)
+
+    def test_region_geom(self):
+        self.assertEqual(self.borders.geom, self.region.geom)
 
 
 class CatchmentPostDeleteTestCase(TestCase):
@@ -32,11 +78,13 @@ class CatchmentPedigreeTestCase(TestCase):
         cls.catchment = Catchment.objects.create(name='Test Catchment', region=region)
         cls.child_catchment_1 = Catchment.objects.create(name='Child 1', parent=cls.catchment)
         cls.child_catchment_2 = Catchment.objects.create(name='Child 2', parent=cls.catchment)
-        cls.grandchild_catchment_1_1 = Catchment.objects.create(name='Grandchild 1 1', parent=cls.child_catchment_1 )
-        cls.grandchild_catchment_1_2 = Catchment.objects.create(name='Grandchild 1 2', parent=cls.child_catchment_1 )
-        cls.grandchild_catchment_2_1 = Catchment.objects.create(name='Grandchild 2 1', parent=cls.child_catchment_2 )
-        cls.great_grandchild_catchment_1_1_1 = Catchment.objects.create(name='Great Grandchild 1 1 1', parent=cls.grandchild_catchment_1_1 )
-        cls.great_grandchild_catchment_2_1_1 = Catchment.objects.create(name='Great Grandchild 2 1 1', parent=cls.grandchild_catchment_2_1 )
+        cls.grandchild_catchment_1_1 = Catchment.objects.create(name='Grandchild 1 1', parent=cls.child_catchment_1)
+        cls.grandchild_catchment_1_2 = Catchment.objects.create(name='Grandchild 1 2', parent=cls.child_catchment_1)
+        cls.grandchild_catchment_2_1 = Catchment.objects.create(name='Grandchild 2 1', parent=cls.child_catchment_2)
+        cls.great_grandchild_catchment_1_1_1 = Catchment.objects.create(name='Great Grandchild 1 1 1',
+                                                                        parent=cls.grandchild_catchment_1_1)
+        cls.great_grandchild_catchment_2_1_1 = Catchment.objects.create(name='Great Grandchild 2 1 1',
+                                                                        parent=cls.grandchild_catchment_2_1)
         cls.unrelated_catchment = Catchment.objects.create(name='Unrelated Catchment', region=region)
 
     def test_downstream_pedigree_returns_catchment_queryset(self):

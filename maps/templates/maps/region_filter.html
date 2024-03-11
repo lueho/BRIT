@@ -1,0 +1,57 @@
+{% extends 'filtered_list.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}BRIT | Maps | Regions{% endblock %}
+
+{% block list_header %}<strong>Regions</strong>{% endblock %}
+
+{% block list_body %}
+    <table class="table table-responsive-stack">
+        <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for object in object_list %}
+            <tr>
+                <td data-label="Name"><a href="{{ object.get_absolute_url }}">{{ object.name }}</a></td>
+                <td data-label="Country">{{ object.type }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+        <tfoot>
+        </tfoot>
+    </table>
+{% endblock list_body %}
+
+{% block list_footer %}
+    {% if user.is_authenticated %}
+        <a class="nowrap" href="{% url 'region-map' %}?{{ request.GET.urlencode }}&load_features=true">
+            <i class="fa fa-fw fa-map"></i> View as map
+        </a>
+    {% endif %}
+    {% if 'maps.add_region' in perms %}
+        <a href="{% url 'region-create' %}?next={{ request.get_full_path|urlencode }}" class="nowrap">
+            <i class="fa fa-fw fa-plus"></i>
+            <span>Add new region</span>
+        </a>
+    {% endif %}
+    {% if 'maps.change_region' in perms %}
+        <a href="{% url 'maps-dashboard' %}" class="ml-3 nowrap">
+            <i class="fas fa-fw fa-cog"></i> Dashboard
+        </a>
+    {% endif %}
+{% endblock list_footer %}
+
+{% block filter_body %}
+    <form method="get">
+        {% crispy filter.form %}
+        <button id="btn-filter" class="btn btn-primary" type="submit">Filter</button>
+    </form>
+{% endblock filter_body %}
+
+{% block javascript %}
+    {{ block.super }}
+{% endblock javascript %}

@@ -1,4 +1,5 @@
 from django.urls import include, path
+from .router import router
 
 from .views import (
     AttributeListView,
@@ -19,6 +20,7 @@ from .views import (
     RegionAttributeValueModalUpdateView,
     RegionAttributeValueModalDeleteView,
     RegionOfLauAutocompleteView,
+    RegionListView, RegionMapView, RegionCreateView, RegionDetailView, RegionUpdateView, RegionModalDeleteView,
     CatchmentAutocompleteView,
     CatchmentListView,
     CatchmentCreateView,
@@ -38,7 +40,9 @@ from .views import (
     NutsRegionSummaryAPIView,
     NutsRegionPedigreeAPI,
     LauRegionOptionsAPI,
-    NutsAndLauCatchmentPedigreeAPI
+    NutsAndLauCatchmentPedigreeAPI,
+    LocationListView,
+    LocationCreateView, LocationDetailView, LocationUpdateView, LocationModalDeleteView
 )
 
 urlpatterns = [
@@ -75,8 +79,14 @@ urlpatterns = [
     path('catchments/data/', RegionGeometryAPI.as_view(), name='data.catchments'),
     path('catchments/autocomplete/', CatchmentAutocompleteView.as_view(), name='catchment-autocomplete'),
     path('catchment_options/data/', CatchmentOptionGeometryAPI.as_view(), name='data.catchment-options'),
+    path('regions/', RegionListView.as_view(), name='region-list'),
+    path('regions/create/', RegionCreateView.as_view(), name='region-create'),
+    path('regions/<int:pk>/', RegionDetailView.as_view(), name='region-detail'),
+    path('regions/<int:pk>/update/', RegionUpdateView.as_view(), name='region-update'),
+    path('regions/<int:pk>/delete/modal/', RegionModalDeleteView.as_view(), name='region-delete-modal'),
     path('regions/autocomplete/', RegionAutocompleteView.as_view(), name='region-autocomplete'),
     path('regions/autocomplete/lau/', RegionOfLauAutocompleteView.as_view(), name='region-of-lau-autocomplete'),
+    path('regions/map/', RegionMapView.as_view(), name='region-map'),
     path('nutsregions/map/', NutsRegionMapView.as_view(), name='NutsRegion'),
     path('nutsregions/data/', NutsRegionAPIView.as_view(), name='data.nutsregion'),
     path('nutsregions/summary/', NutsRegionSummaryAPIView.as_view(), name='data.nutsregion-summary'),
@@ -91,4 +101,10 @@ urlpatterns = [
     # TODO: Can case study urls be detected and added automatically?
     path('nantes/', include('case_studies.flexibi_nantes.urls')),
     path('hamburg/', include('case_studies.flexibi_hamburg.urls')),
+    path('locations/', LocationListView.as_view(), name='location-list'),
+    path('locations/create/', LocationCreateView.as_view(), name='location-create'),
+    path('locations/<int:pk>/', LocationDetailView.as_view(), name='location-detail'),
+    path('locations/<int:pk>/update/', LocationUpdateView.as_view(), name='location-update'),
+    path('locations/<int:pk>/delete/', LocationModalDeleteView.as_view(), name='location-delete-modal'),
+    path('api/', include(router.urls)),
 ]

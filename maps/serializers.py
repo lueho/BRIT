@@ -5,7 +5,7 @@ from rest_framework.relations import PKOnlyObject
 from rest_framework.serializers import CharField, ModelSerializer, SerializerMethodField, IntegerField, Serializer
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
-from .models import Catchment, Region, LauRegion, NutsRegion, GeoPolygon, RegionAttributeTextValue
+from .models import (Catchment, Region, LauRegion, NutsRegion, GeoPolygon, RegionAttributeTextValue, Location)
 
 
 class FieldLabelMixin(Serializer):
@@ -52,18 +52,40 @@ class PolygonSerializer(GeoFeatureModelSerializer):
         fields = '__all__'
 
 
+class LocationModelSerializer(ModelSerializer):
+    class Meta:
+        model = Location
+        fields = ('id', 'name', 'address', 'description')
+
+
+class LocationGeoFeatureModelSerializer(GeoFeatureModelSerializer):
+    class Meta:
+        model = Location
+        geo_field = 'geom'
+        fields = ('id', 'name', 'geom', 'address', 'description')
+
+
 # ----------- Regions --------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
+
 
 class GeoreferencedRegion(GeoPolygon, Region):
     pass
 
 
-class RegionSerializer(GeoFeatureModelSerializer):
+class RegionModelSerializer(ModelSerializer):
+    class Meta:
+        model = Region
+        fields = ('id', 'name', 'country', 'description')
+
+
+class RegionGeoFeatureModelSerializer(GeoFeatureModelSerializer):
+    id = IntegerField(source='pk')
+
     class Meta:
         model = GeoreferencedRegion
         geo_field = 'geom'
-        fields = ['name', 'country']
+        fields = ['id', 'name', 'country', 'description']
 
 
 class BaseResultMapSerializer(GeoFeatureModelSerializer):

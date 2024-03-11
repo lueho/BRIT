@@ -1,5 +1,5 @@
 from dal import autocomplete
-from django.contrib.auth.mixins import PermissionRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.gis.geos import MultiPolygon
 from django.db.models import Q, Subquery
 from django.forms import formset_factory
@@ -14,16 +14,17 @@ from rest_framework.views import APIView, Response
 
 from maps.serializers import (CatchmentSerializer, LauRegionOptionSerializer, LauRegionSummarySerializer,
                               NutsRegionCatchmentOptionSerializer, NutsRegionGeometrySerializer,
-                              NutsRegionOptionSerializer, NutsRegionSummarySerializer, RegionSerializer)
+                              NutsRegionOptionSerializer, NutsRegionSummarySerializer, RegionGeoFeatureModelSerializer)
 from utils.forms import DynamicTableInlineFormSetHelper
 from utils.views import (BRITFilterView, OwnedObjectCreateView, OwnedObjectDetailView, OwnedObjectListView,
                          OwnedObjectModalCreateView, OwnedObjectModalDeleteView, OwnedObjectModalDetailView,
                          OwnedObjectModalUpdateView, OwnedObjectModelSelectOptionsView, OwnedObjectUpdateView)
-from .filters import CatchmentFilter
+from .filters import CatchmentFilter, RegionFilterSet
 from .forms import (AttributeModalModelForm, AttributeModelForm, CatchmentCreateByMergeForm, CatchmentModelForm,
-                    NutsRegionQueryForm, RegionAttributeValueModalModelForm,
-                    RegionAttributeValueModelForm, RegionMergeForm, RegionMergeFormSet)
-from .models import (Attribute, Catchment, GeoDataset, GeoPolygon, LauRegion, NutsRegion, Region, RegionAttributeValue)
+                    NutsRegionQueryForm, RegionModelForm, RegionAttributeValueModalModelForm,
+                    RegionAttributeValueModelForm, RegionMergeForm, RegionMergeFormSet, LocationModelForm)
+from .models import (Attribute, Catchment, GeoDataset, GeoPolygon, LauRegion, Location, NutsRegion, Region,
+                     RegionAttributeValue)
 
 
 class MapMixin:
@@ -162,6 +163,139 @@ class MapsListView(ListView):
         return GeoDataset.objects.filter(Q(visible_to_groups__in=user_groups) | Q(publish=True)).distinct()
 
 
+# ----------- Geodataset -----------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+class GeoDataSetMixin(MapMixin):
+    region_url = reverse_lazy('data.region-geometries')
+    catchment_url = reverse_lazy('data.catchment-geometries')
+
+
+class GeoDataSetFormMixin(FormMixin):
+    filterset_class = None
+    form_class = None
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'form': self.get_form(),
+        })
+        return context
+
+    def get_form(self, form_class=None):
+        if self.form_class is not None:
+            return self.form_class(**self.get_form_kwargs())
+        if self.filterset_class is not None:
+            return self.filterset_class(self.request.GET).form
+
+
+class GeoDatasetDetailView(GeoDataSetFormMixin, GeoDataSetMixin, DetailView):
+    model = GeoDataset
+    template_name = 'filtered_map.html'
+
+    def get_map_title(self):
+        return self.object.name
+
+    def get_region_id(self):
+        return self.object.region.id
+
+
+# TODO: This will be a simplified implementation that can replace the previous GeoDatasetDetailView in most (all?) cases.
+class GeoDataSetDetailView(GeoDataSetMixin, FilterView):
+    model = None
+    filterset_class = None
+    template_name = 'filtered_map.html'
+
+
+# ----------- Location CRUD---------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class LocationListView(OwnedObjectListView):
+    model = Location
+    permission_required = set()
+
+
+class LocationCreateView(OwnedObjectCreateView):
+    model = Location
+    form_class = LocationModelForm
+    permission_required = 'maps.add_location'
+
+
+class LocationDetailView(MapMixin, OwnedObjectDetailView):
+    model = Location
+    feature_url = reverse_lazy('api-location-geojson')
+    load_region = False
+    load_catchment = False
+    permission_required = set()
+
+
+class LocationUpdateView(OwnedObjectUpdateView):
+    model = Location
+    form_class = LocationModelForm
+    permission_required = 'maps.change_location'
+
+
+class LocationModalDeleteView(OwnedObjectModalDeleteView):
+    model = Location
+    success_url = reverse_lazy('location-list')
+    success_message = 'deletion successful'
+    permission_required = 'maps.delete_location'
+
+
+# ----------- Region CRUD-----------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class RegionListView(BRITFilterView):
+    model = Region
+    filterset_class = RegionFilterSet
+    ordering = 'name'
+
+
+class RegionMapView(LoginRequiredMixin, GeoDataSetDetailView):
+    template_name = 'region_map.html'
+    filterset_class = RegionFilterSet
+    map_title = 'Regions'
+    feature_url = reverse_lazy('api-region-geojson')
+    feature_summary_url = reverse_lazy('api-region-list')
+    apply_filter_to_features = True
+    load_region = False
+    load_catchment = False
+    load_features = False
+
+
+class RegionDetailView(MapMixin, DetailView):
+    model = Region
+    feature_url = reverse_lazy('api-region-geojson')
+    load_region = False
+    load_catchment = False
+    permission_required = set()
+
+
+class RegionCreateView(OwnedObjectCreateView):
+    model = Region
+    form_class = RegionModelForm
+    permission_required = 'maps.add_region'
+
+    def get(self, request, *args, **kwargs):
+        print(request.GET)
+        return super().get(request, *args, **kwargs)
+
+
+class RegionUpdateView(OwnedObjectUpdateView):
+    model = Region
+    form_class = RegionModelForm
+    permission_required = 'maps.change_region'
+
+
+class RegionModalDeleteView(OwnedObjectModalDeleteView):
+    model = Region
+    success_url = reverse_lazy('region-list')
+    success_message = 'deletion successful'
+    permission_required = 'maps.delete_region'
+
+
 # ----------- Catchment CRUD--------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -276,50 +410,6 @@ class CatchmentAutocompleteView(autocomplete.Select2QuerySetView):
         return qs
 
 
-# ----------- Geodataset -----------------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------------------------
-
-class GeoDataSetMixin(MapMixin):
-    region_url = reverse_lazy('data.region-geometries')
-    catchment_url = reverse_lazy('data.catchment-geometries')
-
-
-class GeoDataSetFormMixin(FormMixin):
-    filterset_class = None
-    form_class = None
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({
-            'form': self.get_form(),
-        })
-        return context
-
-    def get_form(self, form_class=None):
-        if self.form_class is not None:
-            return self.form_class(**self.get_form_kwargs())
-        if self.filterset_class is not None:
-            return self.filterset_class(self.request.GET).form
-
-
-class GeoDatasetDetailView(GeoDataSetFormMixin, GeoDataSetMixin, DetailView):
-    model = GeoDataset
-    template_name = 'filtered_map.html'
-
-    def get_map_title(self):
-        return self.object.name
-
-    def get_region_id(self):
-        return self.object.region.id
-
-
-# TODO: This will be a simplified implementation that can replace the previous GeoDatasetDetailView in most (all?) cases.
-class GeoDataSetDetailView(GeoDataSetMixin, FilterView):
-    model = None
-    filterset_class = None
-    template_name = 'filtered_map.html'
-
-
 # ----------- Region Utils ---------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -350,7 +440,7 @@ class CatchmentGeometryAPI(APIView):
         if catchment_id:
             catchment = get_object_or_404(Catchment, id=int(catchment_id))
             regions = Region.objects.filter(id=catchment.region_id)
-            serializer = RegionSerializer(regions, many=True)
+            serializer = RegionGeoFeatureModelSerializer(regions, many=True)
             return Response({'geoJson': serializer.data})
         return Response({})
 
@@ -385,7 +475,7 @@ class RegionGeometryAPI(APIView):
         if 'pk' in request.query_params:
             region_id = request.query_params.get('pk')
             regions = Region.objects.filter(id=region_id)
-            serializer = RegionSerializer(regions, many=True)
+            serializer = RegionGeoFeatureModelSerializer(regions, many=True)
             return JsonResponse({'geoJson': serializer.data})
 
         return JsonResponse({})
@@ -423,7 +513,7 @@ class CatchmentRegionGeometryAPI(APIView):
         if 'pk' in request.query_params:
             catchment = Catchment.objects.get(pk=request.query_params.get('pk'))
             regions = Region.objects.filter(catchment=catchment)
-            serializer = RegionSerializer(regions, many=True)
+            serializer = RegionGeoFeatureModelSerializer(regions, many=True)
             return JsonResponse({'geoJson': serializer.data})
 
         return JsonResponse({})
