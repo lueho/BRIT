@@ -29,7 +29,6 @@ class RegionViewSet(AutoPermModelViewSet):
     queryset = Region.objects.all()
     serializer_class = RegionModelSerializer
     filterset_class = RegionFilterSet
-    # filterset_fields = ('id', 'name', 'country')
     custom_permission_required = {
         'list': None,
         'retrieve': None,

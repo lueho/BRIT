@@ -17,4 +17,4 @@ class RegionFilterSet(CrispyAutocompleteFilterSet):
 
     class Meta:
         model = Region
-        fields = ('name', 'name_icontains', 'country',)
+        fields = ('id', 'name', 'name_icontains', 'country',)
