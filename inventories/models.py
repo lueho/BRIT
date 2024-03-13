@@ -11,7 +11,7 @@ from django.urls import reverse
 import case_studies
 from bibliography.models import Source
 from distributions.models import Timestep
-from maps.models import Catchment, GeoDataset, Region, SFBSite
+from maps.models import Catchment, GeoDataset, Region
 from materials.models import Material, SampleSeries
 from utils.models import NamedUserObjectModel
 from .exceptions import BlockedRunningScenario
@@ -162,7 +162,6 @@ class Scenario(NamedUserObjectModel):
     owner = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
     description = models.TextField(blank=True, null=True)
     region = models.ForeignKey(Region, on_delete=models.CASCADE, null=True)
-    site = models.ForeignKey(SFBSite, on_delete=models.CASCADE, null=True)  # TODO: make many-to-many?
     catchment = models.ForeignKey(Catchment, on_delete=models.CASCADE, null=True,
                                   related_name='catchment')  # TODO: make many-to-many?
 

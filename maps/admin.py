@@ -2,7 +2,8 @@ from django.contrib import admin
 from django.contrib.admin import ModelAdmin
 from django.contrib.gis.admin import OSMGeoAdmin
 from django.forms import ModelForm, ValidationError
-from .models import Region, Catchment, Location, SFBSite, GeoDataset
+
+from .models import Region, Catchment, Location, GeoDataset
 
 
 class CatchmentForm(ModelForm):
@@ -65,5 +66,4 @@ class GeoDatasetAdmin(ModelAdmin):
     list_display = ('name', 'region', 'description')
 
 
-admin.site.register(SFBSite)
 admin.site.register(Location)

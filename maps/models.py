@@ -151,10 +151,6 @@ def delete_unused_custom_region(sender, instance, **kwargs):
         instance.region.delete()
 
 
-class SFBSite(NamedUserObjectModel):
-    geom = PointField(null=True)
-
-
 class GeoDataset(NamedUserObjectModel):
     """
     Holds meta information about datasets from the core module or scenario extensions.
