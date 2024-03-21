@@ -23,7 +23,7 @@ class BRITFilterViewTestCase(TestCase):
         self.view.filterset_class = MockFilterSet
 
     def test_initial_filter_values_extraction(self):
-        expected_initial_values = {'name': 'Initial property'}
+        expected_initial_values = {'name': 'Initial name'}
         self.assertEqual(self.view.get_default_filters(), expected_initial_values)
 
     def test_get_with_empty_query_parameters(self):
