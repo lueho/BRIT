@@ -43,6 +43,7 @@ class GeoPolygon(models.Model):
 class Region(NamedUserObjectModel):
     country = models.CharField(max_length=56, null=False)
     borders = models.ForeignKey(GeoPolygon, on_delete=models.PROTECT, null=True)
+    composed_of = models.ManyToManyField('self', symmetrical=False, related_name='composing_regions', blank=True)
 
     @property
     def geom(self):
