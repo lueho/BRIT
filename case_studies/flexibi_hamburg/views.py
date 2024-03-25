@@ -1,35 +1,46 @@
 import json
 
 from celery.result import AsyncResult
+from dal import autocomplete
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import HttpResponse, JsonResponse
 from django.urls import reverse_lazy
 from django.views import View
 from django_filters import rest_framework as rf_filters
 from rest_framework.generics import GenericAPIView
-from rest_framework.viewsets import ReadOnlyModelViewSet
 from rest_framework.permissions import IsAuthenticated, AllowAny
+from rest_framework.viewsets import ReadOnlyModelViewSet
 
 import case_studies.flexibi_hamburg.tasks
-from maps.models import GeoDataset
-from maps.views import GeoDatasetDetailView
+from maps.models import Catchment, GeoDataset
+from maps.views import GeoDataSetDetailView
 from .filters import HamburgRoadsideTreesFilterSet
 from .models import HamburgRoadsideTrees
 from .serializers import HamburgRoadsideTreeGeometrySerializer, HamburgRoadsideTreeSimpleModelSerializer
 
 
-class RoadsideTreesMapView(GeoDatasetDetailView):
+class RoadsideTreesMapView(GeoDataSetDetailView):
     template_name = 'hamburg_roadside_trees_map.html'
-    feature_url = reverse_lazy('data.hamburg_roadside_trees')
-    api_basename = 'api-hamburgroadsidetree'
     filterset_class = HamburgRoadsideTreesFilterSet
+    map_title = 'Hamburg Roadside Trees'
+    load_region = True
+    #TODO: This must be generalized to automatically retrieve the id from the dataset entry
+    region_id = 3
+    load_catchment = True
     load_features = False
+    feature_url = reverse_lazy('data.hamburg_roadside_trees')
     apply_filter_to_features = True
+    api_basename = 'api-hamburgroadsidetree'
     feature_layer_style = {
         'color': '#63c36c',
         'fillOpacity': 1,
         'radius': 5,
         'stroke': False
+    }
+    catchment_layer_style = {
+        'color': '#04555E',
+        'fillOpacity': 0.1,
+        'weight': 1
     }
 
     def get_object(self, **kwargs):
