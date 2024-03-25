@@ -98,3 +98,12 @@ class HamburgRoadsideTreesListFileExportProgressView(LoginRequiredMixin, View):
             'details': result.info,
         }
         return HttpResponse(json.dumps(response_data), content_type='application/json')
+
+
+class HamburgRoadsideTreeCatchmentAutocompleteView(autocomplete.Select2QuerySetView):
+    def get_queryset(self):
+        dataset_region = GeoDataset.objects.get(model_name='HamburgRoadsideTrees').region
+        qs = Catchment.objects.filter(region__borders__geom__within=dataset_region.geom).order_by('name')
+        if self.q:
+            qs = qs.filter(name__icontains=self.q)
+        return qs
