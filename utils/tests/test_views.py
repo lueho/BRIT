@@ -8,7 +8,7 @@ from ..views import BRITFilterView
 
 
 class MockFilterSet(FilterSet):
-    name = CharFilter(field_name='name', lookup_expr='icontains', initial='Initial property')
+    name = CharFilter(field_name='name', lookup_expr='icontains', initial='Initial name')
 
     class Meta:
         model = Property
@@ -34,16 +34,16 @@ class BRITFilterViewTestCase(TestCase):
 
         self.assertEqual(response.status_code, 302)
         redirect_url = response.url
-        self.assertEqual('/?name=Initial+property', redirect_url)
+        self.assertEqual('/?name=Initial+name', redirect_url)
 
     def test_get_with_query_parameters(self):
-        request = self.factory.get('/?name=Other+property')
+        request = self.factory.get('/?name=Other+name')
         self.view.request = request
         self.view.kwargs = {}
         response = self.view.get(request)
 
         self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.context_data['filter'].data, {'name': ['Other property']})
+        self.assertEqual(response.context_data['filter'].data, {'name': ['Other name']})
 
 
 class UtilsDashboardViewTestCase(ViewWithPermissionsTestCase):
