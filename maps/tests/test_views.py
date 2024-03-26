@@ -584,7 +584,7 @@ class RegionModalDeleteViewTestCase(ViewWithPermissionsTestCase):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CatchmentListViewTestCase(ViewWithPermissionsTestCase):
+class PublishedCatchmentListViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = ['add_catchment', 'change_catchment']
     url = reverse('catchment-list')
 
@@ -597,10 +597,51 @@ class CatchmentListViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(self.url)
         self.assertEqual(200, response.status_code)
 
-    def test_add_and_dashboard_button_not_available_for_outsider(self):
+    def test_add_and_dashboard_button_available_for_outsider(self):
         self.client.force_login(self.outsider)
         response = self.client.get(self.url)
-        self.assertNotContains(response, reverse('catchment-create'))
+        self.assertContains(response, reverse('catchment-create'))
+        self.assertNotContains(response, reverse('maps-dashboard'))
+
+    def test_add_and_dashboard_button_available_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(self.url)
+        self.assertContains(response, reverse('catchment-create'))
+        self.assertContains(response, reverse('maps-dashboard'))
+
+    def test_my_catchments_button_available_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(self.url)
+        self.assertContains(response, reverse('catchment-list-owned'))
+
+
+class UserOwnedCatchmentListViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ['add_catchment', 'change_catchment']
+    url = reverse('catchment-list-owned')
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.catchment = Catchment.objects.create(name='Test Catchment', owner=cls.member)
+
+    def test_get_http_302_redirect_to_login_for_anonymous(self):
+        response = self.client.get(self.url)
+        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={self.url}')
+
+    def test_get_http_200_ok_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(self.url)
+        self.assertEqual(200, response.status_code)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(self.url)
+        self.assertEqual(200, response.status_code)
+
+    def test_add_and_dashboard_button_available_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(self.url)
+        self.assertContains(response, reverse('catchment-create'))
         self.assertNotContains(response, reverse('maps-dashboard'))
 
     def test_add_and_dashboard_button_available_for_members(self):

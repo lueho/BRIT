@@ -1,10 +1,14 @@
-from django.test import (RequestFactory, TestCase)
+from urllib.parse import urlencode
+
+from django.http import HttpResponseRedirect
+from django.test import TestCase, RequestFactory
 from django.urls import reverse
 from django_filters import CharFilter, FilterSet
+from django_filters.views import FilterView
 
 from utils.properties.models import Property
 from .testcases import ViewWithPermissionsTestCase
-from ..views import BRITFilterView
+from ..views import FilterDefaultsMixin, BRITFilterView
 
 
 class MockFilterSet(FilterSet):
@@ -13,6 +17,28 @@ class MockFilterSet(FilterSet):
     class Meta:
         model = Property
         fields = ['name']
+
+
+class MockFilterView(FilterDefaultsMixin, FilterView):
+    filterset_class = MockFilterSet
+
+
+class FilterDefaultsMixinTest(TestCase):
+
+    def setUp(self):
+        self.factory = RequestFactory()
+
+    def test_get_default_filters(self):
+        view = MockFilterView()
+        default_filters = view.get_default_filters()
+        self.assertEqual(default_filters, {'name': 'Initial name'})
+
+    def test_redirect_with_default_filters(self):
+        request = self.factory.get('/')
+        response = MockFilterView.as_view()(request)
+        self.assertIsInstance(response, HttpResponseRedirect)
+        expected_query = urlencode({'name': 'Initial name'})
+        self.assertTrue(expected_query in response.url)
 
 
 class BRITFilterViewTestCase(TestCase):

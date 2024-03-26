@@ -3,7 +3,7 @@ from urllib.parse import urlencode
 from bootstrap_modal_forms.generic import BSModalCreateView, BSModalDeleteView, BSModalReadView, BSModalUpdateView
 from bootstrap_modal_forms.mixins import is_ajax
 from django.contrib import messages
-from django.contrib.auth.mixins import PermissionRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin, UserPassesTestMixin
 from django.contrib.messages.views import SuccessMessageMixin
 from django.core.exceptions import FieldError, ImproperlyConfigured
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
@@ -69,18 +69,15 @@ class ModalMessageView(TemplateView):
         return context
 
 
-class BRITFilterView(FilterView):
+class FilterDefaultsMixin:
     """
-    A view that extends FilterView to add the query string of the default filter values to the URL of the resulting page.
+    A mixin that extends FilterView to add the query string of the default filter values to the URL of the resulting page.
+    This is useful when you want to have default filters applied when the page is first loaded.
     """
     initial_values = {}
     filterset_class = None
-    paginate_by = 10
 
     def get_default_filters(self):
-        """
-        Extracts the default filter values from the FilterSet class.
-        """
         initial_values = {}
         for name, filter_ in self.filterset_class.base_filters.items():
             if filter_.extra.get('initial'):
@@ -88,10 +85,21 @@ class BRITFilterView(FilterView):
         return initial_values
 
     def get(self, request, *args, **kwargs):
+        """
+        Overrides the get method of the FilterView.
+        If the request method is GET and the request's parameters are empty,
+        it redirects to the same page but with the default filters as parameters.
+
+        Args:
+            request: The request that triggered this view.
+            *args: Variable length argument list.
+            **kwargs: Arbitrary keyword arguments.
+
+        Returns:
+            HttpResponse: The HttpResponse object.
+        """
         response = super().get(request, *args, **kwargs)
 
-        # If the request method is GET and the request's parameters are empty,
-        # redirect to the same page but with the default filters as parameters.
         if request.method == 'GET' and not request.GET:
             self.initial_values = self.get_default_filters()
             if self.initial_values:
@@ -99,6 +107,34 @@ class BRITFilterView(FilterView):
                 return HttpResponseRedirect(f"{request.path}?{params}")
 
         return response
+
+
+class BRITFilterView(FilterDefaultsMixin, FilterView):
+    paginate_by = 10
+    ordering = 'id'
+
+
+class PublishedObjectFilterView(FilterDefaultsMixin, FilterView):
+    """
+    A view to display a list of published objects with default filters applied.
+    """
+    paginate_by = 10
+    ordering = 'id'
+
+    def get_queryset(self):
+        return super().get_queryset().filter(publication_status='published')
+
+
+class UserOwnedObjectFilterView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
+    """
+    A view to display a list of objects owned by the currently logged-in user with default filters applied.
+    """
+    template_name_suffix = '_filter_owned'
+    paginate_by = 10
+    ordering = 'id'
+
+    def get_queryset(self):
+        return super().get_queryset().filter(owner=self.request.user)
 
 
 class OwnedObjectListView(PermissionRequiredMixin, ListView):

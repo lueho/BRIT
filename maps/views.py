@@ -18,7 +18,8 @@ from maps.serializers import (CatchmentSerializer, LauRegionOptionSerializer, La
 from utils.forms import DynamicTableInlineFormSetHelper
 from utils.views import (BRITFilterView, OwnedObjectCreateView, OwnedObjectDetailView, OwnedObjectListView,
                          OwnedObjectModalCreateView, OwnedObjectModalDeleteView, OwnedObjectModalDetailView,
-                         OwnedObjectModalUpdateView, OwnedObjectModelSelectOptionsView, OwnedObjectUpdateView)
+                         OwnedObjectModalUpdateView, OwnedObjectModelSelectOptionsView, PublishedObjectFilterView,
+                         OwnedObjectUpdateView, UserOwnedObjectFilterView)
 from .filters import CatchmentFilter, RegionFilterSet
 from .forms import (AttributeModalModelForm, AttributeModelForm, CatchmentCreateByMergeForm, CatchmentModelForm,
                     NutsRegionQueryForm, RegionModelForm, RegionAttributeValueModalModelForm,
@@ -300,7 +301,13 @@ class RegionModalDeleteView(OwnedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CatchmentListView(BRITFilterView):
+class PublishedCatchmentListView(PublishedObjectFilterView):
+    model = Catchment
+    filterset_class = CatchmentFilter
+    ordering = 'name'
+
+
+class UserOwnedCatchmentListView(UserOwnedObjectFilterView):
     model = Catchment
     filterset_class = CatchmentFilter
     ordering = 'name'
