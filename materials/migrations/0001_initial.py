@@ -4,7 +4,6 @@ from django.conf import settings
 from django.db import migrations, models
 import django.db.models.deletion
 import django.utils.timezone
-import materials.models
 
 
 class Migration(migrations.Migration):
@@ -232,6 +231,6 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='composition',
             name='fractions_of',
-            field=models.ForeignKey(default=materials.models.get_default_component_pk, on_delete=django.db.models.deletion.PROTECT, to='materials.materialcomponent'),
+            field=models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='materials.materialcomponent'),
         ),
     ]
