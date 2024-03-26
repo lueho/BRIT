@@ -84,9 +84,17 @@ def get_default_owner_pk():
     return get_default_owner().pk
 
 
+STATUS_CHOICES = (
+        ('private', 'Private'),
+        ('review', 'Under Review'),
+        ('published', 'Published'),
+    )
+
+
 class OwnedObjectModel(CRUDUrlsMixin, CommonInfo):
     owner = models.ForeignKey(User, on_delete=models.PROTECT, default=get_default_owner_pk)
     visible_to_groups = models.ManyToManyField(Group)
+    publication_status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='private')
 
     class Meta:
         abstract = True
