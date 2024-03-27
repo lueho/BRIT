@@ -13,7 +13,7 @@ from rest_framework.generics import GenericAPIView
 from maps.models import GeoDataset
 from maps.views import GeoDatasetDetailView
 from materials.models import MaterialComponentGroup
-from utils.views import DualUserListView, NextOrSuccessUrlMixin, UserOwnsObjectMixin, BRITFilterView
+from utils.views import (BRITFilterView, NextOrSuccessUrlMixin, OwnedObjectListView, UserOwnsObjectMixin)
 from .filters import GreenhouseFilter, GreenhouseTypeFilter
 from .forms import (CultureModelForm, GreenhouseGrowthCycle, GreenhouseModalModelForm, GrowthCycleCreateForm,
                     GrowthShareFormSetHelper, GrowthTimestepInline, InlineGrowthShare,
@@ -25,9 +25,9 @@ from .tables import growthcycle_table_factory
 
 # ----------- Culture CRUD ---------------------------------------------------------------------------------------------
 
-class CultureListView(DualUserListView):
+class CultureListView(OwnedObjectListView):
     model = Culture
-    template_name = 'dual_user_item_list.html'
+    permission_required = set()
 
 
 class CultureCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, BSModalCreateView):
