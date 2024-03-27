@@ -4,13 +4,13 @@ from unittest.mock import patch
 from django.conf import settings
 from django.contrib.gis.geos import MultiPolygon, Point, Polygon
 from django.test import TestCase, RequestFactory
-from django.urls import reverse
+from django.urls import reverse, reverse_lazy
 from django.utils.http import urlencode
 
-from maps.views import CatchmentCreateByMergeView
+from maps.views import CatchmentCreateMergeLauView
 from utils.tests.testcases import ViewWithPermissionsTestCase, ViewSetWithPermissionsTestCase
 from ..models import (Attribute, RegionAttributeValue, Catchment, LauRegion, NutsRegion, Region, GeoDataset, GeoPolygon,
-    Location)
+                      Location)
 from ..views import MapMixin
 
 
@@ -653,48 +653,126 @@ class UserOwnedCatchmentListViewTestCase(ViewWithPermissionsTestCase):
 
 class CatchmentCreateViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = 'add_catchment'
+    url = reverse_lazy('catchment-create')
 
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('catchment-create')
-        response = self.client.get(url, follow=True)
-        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
+    def test_get_http_200_ok_for_anonymous(self):
+        response = self.client.get(self.url)
+        self.assertEqual(200, response.status_code)
 
-    def test_get_http_403_forbidden_for_outsider(self):
+    def test_get_http_200_ok_for_outsider(self):
         self.client.force_login(self.outsider)
-        response = self.client.get(reverse('catchment-create'))
-        self.assertEqual(403, response.status_code)
+        response = self.client.get(self.url)
+        self.assertEqual(200, response.status_code)
 
     def test_get_http_200_ok_for_members(self):
         self.client.force_login(self.member)
-        response = self.client.get(reverse('catchment-create'))
+        response = self.client.get(self.url)
+        self.assertEqual(200, response.status_code)
+
+
+class CatchmentCreateSelectRegionViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'add_catchment'
+    url = reverse_lazy('catchment-create-select-region')
+
+    def test_get_http_302_redirect_to_login_for_anonymous(self):
+        response = self.client.get(self.url, follow=True)
+        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={self.url}')
+
+    def test_get_http_200_ok_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(self.url)
+        self.assertEqual(200, response.status_code)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(self.url)
         self.assertEqual(200, response.status_code)
 
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
-        response = self.client.get(reverse('catchment-create'))
+        response = self.client.get(self.url)
         self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('catchment-create')
-        response = self.client.post(url, data={}, follow=True)
-        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
+        response = self.client.post(self.url, data={}, follow=True)
+        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={self.url}')
 
-    def test_post_http_403_forbidden_for_outsider(self):
+    def test_post_success_and_http_302_redirect_to_success_url_for_outsider(self):
         self.client.force_login(self.outsider)
-        response = self.client.post(reverse('catchment-create'))
-        self.assertEqual(403, response.status_code)
+        data = {'name': 'Newly created catchment', 'type': 'custom', 'region': Region.objects.create().pk}
+        response = self.client.post(self.url, data, follow=True)
+        self.assertRedirects(response, reverse('catchment-detail',
+                                               kwargs={'pk': list(response.context.get('messages'))[0].message}))
 
     def test_post_success_and_http_302_redirect_to_success_url_for_member(self):
         self.client.force_login(self.member)
-        data = {'name': 'Updated Test Catchment', 'type': 'custom', 'region': Region.objects.create().pk}
-        response = self.client.post(reverse('catchment-create'), data, follow=True)
+        data = {'name': 'Newly created Catchment', 'type': 'custom', 'region': Region.objects.create().pk}
+        response = self.client.post(self.url, data, follow=True)
         self.assertRedirects(response, reverse('catchment-detail',
                                                kwargs={'pk': list(response.context.get('messages'))[0].message}))
 
 
-class CatchmentCreateByMergeViewTestCase(ViewWithPermissionsTestCase):
+class CatchmentCreateDrawCustomViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = 'add_catchment'
-    url = reverse('catchment-create-by-merge')
+    url = reverse_lazy('catchment-create-draw-custom')
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.parent_region = Region.objects.create(
+            name='Test Parent Region',
+            borders=GeoPolygon.objects.create(geom=MultiPolygon(Polygon(((0, 0), (0, 2), (2, 2), (2, 0), (0, 0)))))
+        )
+
+    def test_get_http_302_redirect_to_login_for_anonymous(self):
+        response = self.client.get(self.url, follow=True)
+        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={self.url}')
+
+    def test_get_http_200_ok_for_outsider(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(self.url)
+        self.assertEqual(200, response.status_code)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(self.url)
+        self.assertEqual(200, response.status_code)
+
+    def test_form_contains_exactly_one_submit_button(self):
+        self.client.force_login(self.member)
+        response = self.client.get(self.url)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+
+    def test_post_http_302_redirect_to_login_for_anonymous(self):
+        response = self.client.post(self.url, data={}, follow=True)
+        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={self.url}')
+
+    def test_post_success_and_http_302_redirect_to_success_url_for_outsider(self):
+        self.client.force_login(self.outsider)
+        data = {
+            'name': 'Newly created catchment',
+            'geom': 'MULTIPOLYGON (((30 10, 40 40, 20 40, 10 20, 30 10)))',
+            'parent_region': self.parent_region.id
+        }
+        response = self.client.post(self.url, data, follow=True)
+        self.assertRedirects(response, reverse('catchment-detail',
+                                               kwargs={'pk': Catchment.objects.get(name='Newly created catchment').pk}))
+
+    def test_post_success_and_http_302_redirect_to_success_url_for_member(self):
+        self.client.force_login(self.member)
+        data = {
+            'name': 'Newly created catchment',
+            'geom': 'MULTIPOLYGON (((30 10, 40 40, 20 40, 10 20, 30 10)))',
+            'parent_region': self.parent_region.id
+        }
+        response = self.client.post(self.url, data, follow=True)
+        self.assertRedirects(response, reverse('catchment-detail',
+                                               kwargs={'pk': Catchment.objects.get(name='Newly created catchment').pk}))
+
+
+class CatchmentCreateMergeLauViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = 'add_catchment'
+    url = reverse('catchment-create-merge-lau')
 
     @classmethod
     def setUpTestData(cls):
@@ -723,10 +801,10 @@ class CatchmentCreateByMergeViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(self.url, follow=True)
         self.assertRedirects(response, f'{settings.LOGIN_URL}?next={self.url}')
 
-    def test_get_http_403_forbidden_for_outsider(self):
+    def test_get_http_200_ok_for_outsider(self):
         self.client.force_login(self.outsider)
         response = self.client.get(self.url)
-        self.assertEqual(403, response.status_code)
+        self.assertEqual(200, response.status_code)
 
     def test_get_http_200_ok_for_members(self):
         self.client.force_login(self.member)
@@ -742,10 +820,20 @@ class CatchmentCreateByMergeViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.post(self.url, data={}, follow=True)
         self.assertRedirects(response, f'{settings.LOGIN_URL}?next={self.url}')
 
-    def test_post_http_403_forbidden_for_outsider(self):
+    def test_post_success_and_http_302_redirect_to_success_url_for_outsider(self):
         self.client.force_login(self.outsider)
-        response = self.client.post(self.url)
-        self.assertEqual(403, response.status_code)
+        data = {
+            'name': 'Updated Test Catchment',
+            'parent': self.parent_catchment.pk,
+            'form-INITIAL_FORMS': 2,
+            'form-TOTAL_FORMS': 3,
+            'form-0-region': self.region_1.pk,
+            'form-1-region': self.region_2.pk,
+            'form-2-region': self.region_3.pk,
+        }
+        response = self.client.post(self.url, data, follow=True)
+        self.assertRedirects(response, reverse('catchment-detail',
+                                               kwargs={'pk': list(response.context.get('messages'))[0].message}))
 
     def test_post_success_and_http_302_redirect_to_success_url_for_member(self):
         self.client.force_login(self.member)
@@ -774,7 +862,7 @@ class CatchmentCreateByMergeViewTestCase(ViewWithPermissionsTestCase):
         }
         request = RequestFactory().post(self.url, data)
         request.user = self.member
-        view = CatchmentCreateByMergeView()
+        view = CatchmentCreateMergeLauView()
         view.setup(request)
         view.formset = view.get_formset()
         self.assertTrue(view.formset.is_valid())
@@ -793,7 +881,7 @@ class CatchmentCreateByMergeViewTestCase(ViewWithPermissionsTestCase):
         }
         request = RequestFactory().post(self.url, data)
         request.user = self.member
-        view = CatchmentCreateByMergeView()
+        view = CatchmentCreateMergeLauView()
         view.setup(request)
         form = view.get_form()
         self.assertTrue(form.is_valid())
@@ -812,7 +900,7 @@ class CatchmentCreateByMergeViewTestCase(ViewWithPermissionsTestCase):
         }
         request = RequestFactory().post(self.url, data)
         request.user = self.member
-        view = CatchmentCreateByMergeView()
+        view = CatchmentCreateMergeLauView()
         view.setup(request)
         view.form = view.get_form()
         self.assertTrue(view.form.is_valid())

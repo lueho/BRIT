@@ -68,24 +68,45 @@ class RegionAttributeValueModalModelForm(ModalModelFormMixin, RegionAttributeVal
 
 
 class CatchmentModelForm(AutoCompleteModelForm):
+    region = ModelChoiceField(
+        queryset=Region.objects.all(),
+        widget=ModelSelect2(url='region-autocomplete'),
+        required=True
+    )
     parent_region = ModelChoiceField(
         queryset=Region.objects.all(),
         widget=ModelSelect2(url='region-autocomplete'),
         required=False
     )
 
-    region = ModelChoiceField(
+    class Meta:
+        model = Catchment
+        fields = ('name', 'region', 'parent_region', 'description')
+
+
+class CatchmentCreateDrawCustomForm(AutoCompleteModelForm):
+    geom = MultiPolygonField(widget=LeafletWidget())
+    parent_region = ModelChoiceField(
         queryset=Region.objects.all(),
         widget=ModelSelect2(url='region-autocomplete'),
-        required=True
+        required=False
     )
 
     class Meta:
         model = Catchment
-        fields = ('name', 'type', 'parent_region', 'region', 'description')
+        fields = ('name', 'geom', 'parent_region', 'description')
+
+    def save(self, commit=True):
+        geom = self.cleaned_data.pop('geom')
+        instance = super().save(commit=False)
+        borders = GeoPolygon.objects.create(geom=geom)
+        instance.region = Region.objects.create(name=instance.name, borders=borders)
+        if commit:
+            instance.save()
+        return instance
 
 
-class CatchmentCreateByMergeForm(AutoCompleteModelForm):
+class CatchmentCreateMergeLauForm(AutoCompleteModelForm):
     parent = ModelChoiceField(
         queryset=Catchment.objects.all(),
         widget=ModelSelect2(url='catchment-autocomplete'),

@@ -25,7 +25,9 @@ from .views import (
     PublishedCatchmentListView,
     UserOwnedCatchmentListView,
     CatchmentCreateView,
-    CatchmentCreateByMergeView,
+    CatchmentCreateSelectRegionView,
+    CatchmentCreateMergeLauView,
+    CatchmentCreateDrawCustomView,
     CatchmentDetailView,
     CatchmentGeometryAPI,
     CatchmentOptionGeometryAPI,
@@ -45,7 +47,6 @@ from .views import (
     LocationListView,
     LocationCreateView, LocationDetailView, LocationUpdateView, LocationModalDeleteView
 )
-
 urlpatterns = [
     path('list/', MapsListView.as_view(), name='maps_list'),
     path('dashboard/', MapsDashboardView.as_view(), name='maps-dashboard'),
@@ -73,8 +74,10 @@ urlpatterns = [
     path('catchments/', PublishedCatchmentListView.as_view(), name='catchment-list'),
     path('catchments/user/', UserOwnedCatchmentListView.as_view(), name='catchment-list-owned'),
     path('catchments/create/', CatchmentCreateView.as_view(), name='catchment-create'),
-    path('catchments/create/modal/', CatchmentCreateView.as_view(), name='catchment-create-modal'),
-    path('catchments/create/by-merge/', CatchmentCreateByMergeView.as_view(), name='catchment-create-by-merge'),
+    path('catchments/create/select_region/', CatchmentCreateSelectRegionView.as_view(), name='catchment-create-select-region'),
+    path('catchments/create/draw_custom/', CatchmentCreateDrawCustomView.as_view(), name='catchment-create-draw-custom'),
+    path('catchments/create/merge_lau/', CatchmentCreateMergeLauView.as_view(), name='catchment-create-merge-lau'),
+    path('catchments/create/modal/', CatchmentCreateSelectRegionView.as_view(), name='catchment-create-modal'),
     path('catchments/<int:pk>/', CatchmentDetailView.as_view(), name='catchment-detail'),
     path('catchments/<int:pk>/update/', CatchmentUpdateView.as_view(), name='catchment-update'),
     path('catchments/<int:pk>/delete/modal/', CatchmentModalDeleteView.as_view(), name='catchment-delete-modal'),
@@ -110,3 +113,4 @@ urlpatterns = [
     path('locations/<int:pk>/delete/', LocationModalDeleteView.as_view(), name='location-delete-modal'),
     path('api/', include(router.urls)),
 ]
+

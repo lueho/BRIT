@@ -21,7 +21,8 @@ from utils.views import (BRITFilterView, OwnedObjectCreateView, OwnedObjectDetai
                          OwnedObjectModalUpdateView, OwnedObjectModelSelectOptionsView, PublishedObjectFilterView,
                          OwnedObjectUpdateView, UserOwnedObjectFilterView)
 from .filters import CatchmentFilter, RegionFilterSet
-from .forms import (AttributeModalModelForm, AttributeModelForm, CatchmentCreateByMergeForm, CatchmentModelForm,
+from .forms import (AttributeModalModelForm, AttributeModelForm, CatchmentCreateDrawCustomForm,
+                    CatchmentCreateMergeLauForm, CatchmentModelForm,
                     NutsRegionQueryForm, RegionModelForm, RegionAttributeValueModalModelForm,
                     RegionAttributeValueModelForm, RegionMergeForm, RegionMergeFormSet, LocationModelForm)
 from .models import (Attribute, Catchment, GeoDataset, GeoPolygon, LauRegion, Location, NutsRegion, Region,
@@ -153,7 +154,7 @@ class MapMixin:
 
 class MapsDashboardView(PermissionRequiredMixin, TemplateView):
     template_name = 'maps_dashboard.html'
-    permission_required = 'maps.change_geodataset'
+    permission_required = set()
 
 
 class MapsListView(ListView):
@@ -321,15 +322,26 @@ class CatchmentDetailView(MapMixin, DetailView):
     load_catchment = False
 
 
-class CatchmentCreateView(OwnedObjectCreateView):
+class CatchmentCreateView(TemplateView):
+    template_name = 'catchment_create_method_select.html'
+
+
+class CatchmentCreateSelectRegionView(LoginRequiredMixin, OwnedObjectCreateView):
     template_name = 'maps/catchment_form.html'
     form_class = CatchmentModelForm
-    permission_required = 'maps.add_catchment'
+    permission_required = set()
 
 
-class CatchmentCreateByMergeView(OwnedObjectCreateView):
+class CatchmentCreateDrawCustomView(LoginRequiredMixin, OwnedObjectCreateView):
+    template_name = 'catchment_draw_form.html'
+    form_class = CatchmentCreateDrawCustomForm
+    permission_required = set()
+
+
+class CatchmentCreateMergeLauView(LoginRequiredMixin, OwnedObjectCreateView):
+    template_name = 'catchment_merge_formset.html'
     form = None
-    form_class = CatchmentCreateByMergeForm
+    form_class = CatchmentCreateMergeLauForm
     formset = None
     formset_model = Region
     formset_class = RegionMergeFormSet
@@ -337,8 +349,7 @@ class CatchmentCreateByMergeView(OwnedObjectCreateView):
     formset_helper_class = DynamicTableInlineFormSetHelper
     formset_factory_kwargs = {'extra': 2}
     relation_field_name = 'seasons'
-    permission_required = 'maps.add_catchment'
-    template_name = 'form_and_formset.html'
+    permission_required = set()
 
     def get_formset_kwargs(self, **kwargs):
         if self.request.method in ("POST", "PUT"):
