@@ -9,6 +9,7 @@ from distributions.models import TemporalDistribution, Timestep
 from materials.models import Material, SampleSeries, MaterialComponent, MaterialComponentGroup, \
     Composition
 from users.models import get_default_owner
+from utils.models import NamedUserObjectModel
 from .tables import growthcycle_table_factory
 
 
@@ -158,29 +159,8 @@ class Greenhouse(models.Model):
         return f'Greenhouse: {h}, {l}, {g}, {s}'
 
 
-class Culture(models.Model):
-    owner = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
-    name = models.CharField(max_length=255, blank=True, null=True)
+class Culture(NamedUserObjectModel):
     residue = models.ForeignKey(SampleSeries, on_delete=models.PROTECT, null=True)
-
-    @staticmethod
-    def get_absolute_url():
-        return reverse('culture-list')
-
-    @property
-    def detail_url(self):
-        return reverse('culture-list')
-
-    @property
-    def update_url(self):
-        return reverse('culture-update', kwargs={'pk': self.id})
-
-    @property
-    def delete_url(self):
-        return reverse('culture-delete', kwargs={'pk': self.id})
-
-    def __str__(self):
-        return self.name
 
 
 class GreenhouseGrowthCycle(models.Model):
