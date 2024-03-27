@@ -10,10 +10,6 @@ from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.template.loader import render_to_string
 from django.views.generic import CreateView, DetailView, ListView, TemplateView, UpdateView
 from django_filters.views import FilterView
-from django_tables2 import table_factory
-
-from users.models import get_default_owner
-from .tables import StandardItemTable, UserItemTable
 
 
 class NextOrSuccessUrlMixin:
@@ -36,23 +32,6 @@ class UserOwnsObjectMixin(UserPassesTestMixin):
 
     def test_func(self):
         return self.get_object().owner == self.request.user
-
-
-class DualUserListView(TemplateView):
-    model = None
-
-    def get_context_data(self, **kwargs):
-        kwargs['item_name_plural'] = self.model._meta.verbose_name_plural
-        kwargs['standard_item_table'] = table_factory(
-            self.model,
-            table=StandardItemTable
-        )(self.model.objects.filter(owner=get_default_owner()))
-        if not self.request.user.is_anonymous:
-            kwargs['custom_item_table'] = table_factory(
-                self.model,
-                table=UserItemTable
-            )(self.model.objects.filter(owner=self.request.user))
-        return super().get_context_data(**kwargs)
 
 
 class ModalMessageView(TemplateView):
