@@ -3,6 +3,7 @@ import json
 from celery.result import AsyncResult
 from dal import autocomplete
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
 from django.urls import reverse_lazy
 from django.views import View
@@ -113,8 +114,12 @@ class HamburgRoadsideTreesListFileExportProgressView(LoginRequiredMixin, View):
 
 class HamburgRoadsideTreeCatchmentAutocompleteView(autocomplete.Select2QuerySetView):
     def get_queryset(self):
+        if self.request.user.is_authenticated:
+            qs = Catchment.objects.filter(Q(owner=self.request.user) | Q(publication_status='published'))
+        else:
+            qs = Catchment.objects.filter(publication_status='published')
         dataset_region = GeoDataset.objects.get(model_name='HamburgRoadsideTrees').region
-        qs = Catchment.objects.filter(region__borders__geom__within=dataset_region.geom).order_by('name')
+        qs = qs.filter(region__borders__geom__within=dataset_region.geom).order_by('name')
         if self.q:
             qs = qs.filter(name__icontains=self.q)
         return qs

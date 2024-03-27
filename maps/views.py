@@ -422,7 +422,11 @@ class CatchmentModalDeleteView(OwnedObjectModalDeleteView):
 
 class CatchmentAutocompleteView(autocomplete.Select2QuerySetView):
     def get_queryset(self):
-        qs = Catchment.objects.all().order_by('name')
+        if self.request.user.is_authenticated:
+            qs = Catchment.objects.filter(Q(owner=self.request.user) | Q(publication_status='published'))
+        else:
+            qs = Catchment.objects.filter(publication_status='published')
+        qs = qs.order_by('name')
         if self.q:
             qs = qs.filter(name__icontains=self.q)
         return qs
