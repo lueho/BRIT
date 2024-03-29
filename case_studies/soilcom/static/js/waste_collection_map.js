@@ -45,11 +45,11 @@ function collectionClickHandler(e, featureGroup) {
 }
 
 function createFeatureLayerBindings(collectionLayer) {
-    collectionLayer.bindTooltip(function(layer) {
+    collectionLayer.bindTooltip(function (layer) {
         return layer.feature.properties.catchment.toString();
     });
 
-    collectionLayer.bindPopup(function(layer) {
+    collectionLayer.bindPopup(function (layer) {
         return layer.feature.properties.catchment.toString();
     });
 
@@ -72,29 +72,48 @@ function updateUrls(feature_id) {
     const params = new URLSearchParams();
     params.append('next', '/waste_collection/collections/map/?' + filter_params.toString());
 
-    const create_button = document.getElementById('btn-collection-create');
-    const create_url = create_button.dataset.hrefTemplate + '?' + params.toString();
-    create_button.setAttribute('href', create_url);
+    try {
+        const create_button = document.getElementById('btn-collection-create');
+        const create_url = create_button.dataset.hrefTemplate + '?' + params.toString();
+        create_button.setAttribute('href', create_url);
+    } catch (error) {
+        console.warn(`Create button not updated: ${error}`);
+    }
 
-    const detail_button = document.getElementById('btn-collection-detail');
-    const detail_url = detail_button.dataset.hrefTemplate.replace('__pk__', feature_id.toString());
-    detail_button.setAttribute('href', detail_url);
-    detail_button.classList.remove('d-none');
+    try {
+        const detail_button = document.getElementById('btn-collection-detail');
+        const detail_url = detail_button.dataset.hrefTemplate.replace('__pk__', feature_id.toString());
+        detail_button.setAttribute('href', detail_url);
+        detail_button.classList.remove('d-none');
+    } catch (error) {
+        console.warn(`Detail button not updated: ${error}`);
+    }
 
-    const update_button = document.getElementById('btn-collection-update');
-    const update_url = update_button.dataset.hrefTemplate.replace('__pk__', feature_id.toString()) + '?' + params.toString();
-    update_button.setAttribute('href', update_url);
+    try {
+        const update_button = document.getElementById('btn-collection-update');
+        const update_url = update_button.dataset.hrefTemplate.replace('__pk__', feature_id.toString()) + '?' + params.toString();
+        update_button.setAttribute('href', update_url);
+    } catch (error) {
+        console.warn(`Update button not updated: ${error}`);
+    }
 
-    const copy_button = document.getElementById('btn-collection-copy');
-    const copy_url = copy_button.dataset.hrefTemplate.replace('__pk__', feature_id.toString()) + '?' + params.toString();
-    copy_button.setAttribute('href', copy_url);
+    try {
+        const copy_button = document.getElementById('btn-collection-copy');
+        const copy_url = copy_button.dataset.hrefTemplate.replace('__pk__', feature_id.toString()) + '?' + params.toString();
+        copy_button.setAttribute('href', copy_url);
+    } catch (error) {
+        console.warn(`Copy button not updated: ${error}`);
+    }
 
-    const delete_button = document.getElementById('btn-collection-delete');
-    const delete_url = delete_button.dataset.hrefTemplate.replace('__pk__', feature_id.toString()) + '?' + params.toString();
-    $('#btn-collection-delete').modalForm({
-        formURL: delete_url,
-        errorClass: ".is-invalid"
-    });
+    try {
+        const delete_button = document.getElementById('btn-collection-delete');
+        const delete_url = delete_button.dataset.hrefTemplate.replace('__pk__', feature_id.toString()) + '?' + params.toString();
+        $('#btn-collection-delete').modalForm({
+            formURL: delete_url, errorClass: ".is-invalid"
+        });
+    } catch (error) {
+        console.warn(`Delete button not updated: ${error}`);
+    }
 }
 
 function clickedCreateButton() {

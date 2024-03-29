@@ -1862,10 +1862,10 @@ class CollectionSummaryAPIViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('collection-summary-api'), {'pk': self.collection.pk})
         self.assertEqual(response.status_code, 200)
 
-    def test_get_returns_correct_summary_on_existing_collection_pk(self):
+    def test_get_returns_correct_summary_on_existing_collection_id(self):
         self.maxDiff = None
         self.client.force_login(self.member)
-        response = self.client.get(reverse('collection-summary-api'), {'pk': self.collection.pk})
+        response = self.client.get(reverse('collection-summary-api'), {'id': self.collection.id})
         expected = {'summaries': [
             OrderedDict([
                 ('id', self.collection.id),

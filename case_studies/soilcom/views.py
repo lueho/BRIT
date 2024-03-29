@@ -26,14 +26,14 @@ from utils.views import (BRITFilterView, OwnedObjectCreateView, OwnedObjectDetai
                          OwnedObjectModalCreateView, OwnedObjectModalDeleteView, OwnedObjectModalDetailView,
                          OwnedObjectModalUpdateView, OwnedObjectModelSelectOptionsView, OwnedObjectUpdateView)
 from .filters import CollectionFilterSet, CollectorFilter, WasteFlyerFilter
-from .forms import (AggregatedCollectionPropertyValueModelForm, BaseWasteFlyerUrlFormSet, CollectionAddWasteSampleForm,
-                    CollectionFrequencyModalModelForm, CollectionFrequencyModelForm, CollectionModelForm,
-                    CollectionPropertyValueModelForm, CollectionRemoveWasteSampleForm, CollectionSeasonForm,
-                    CollectionSeasonFormHelper, CollectionSeasonFormSet, CollectionSystemModalModelForm,
-                    CollectionSystemModelForm, CollectorModalModelForm, CollectorModelForm, WasteCategoryModalModelForm,
-                    WasteCategoryModelForm, WasteComponentModalModelForm, WasteComponentModelForm,
-                    WasteFlyerModalModelForm, WasteFlyerModelForm, WasteStreamModalModelForm, WasteStreamModelForm,
-                    CollectionAddPredecessorForm, CollectionRemovePredecessorForm)
+from .forms import (AggregatedCollectionPropertyValueModelForm, BaseWasteFlyerUrlFormSet, CollectionAddPredecessorForm,
+                    CollectionAddWasteSampleForm, CollectionFrequencyModalModelForm, CollectionFrequencyModelForm,
+                    CollectionModelForm, CollectionPropertyValueModelForm, CollectionRemovePredecessorForm,
+                    CollectionRemoveWasteSampleForm, CollectionSeasonForm, CollectionSeasonFormHelper,
+                    CollectionSeasonFormSet, CollectionSystemModalModelForm, CollectionSystemModelForm,
+                    CollectorModalModelForm, CollectorModelForm, WasteCategoryModalModelForm, WasteCategoryModelForm,
+                    WasteComponentModalModelForm, WasteComponentModelForm, WasteFlyerModalModelForm,
+                    WasteFlyerModelForm, WasteStreamModalModelForm, WasteStreamModelForm)
 from .models import (AggregatedCollectionPropertyValue, Collection, CollectionCatchment, CollectionCountOptions,
                      CollectionFrequency,
                      CollectionPropertyValue, CollectionSeason,
@@ -1022,7 +1022,7 @@ class CollectionSummaryAPI(APIView):
     @staticmethod
     def get(request):
         serializer = CollectionModelSerializer(
-            Collection.objects.filter(id=request.query_params.get('pk')),
+            Collection.objects.filter(id=request.query_params.get('id')),
             many=True,
             field_labels_as_keys=True,
             context={'request': request})
