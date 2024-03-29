@@ -8,7 +8,6 @@ from django.urls import reverse, reverse_lazy
 from django.views.generic import ListView, RedirectView, TemplateView
 from django.views.generic.detail import SingleObjectMixin
 from extra_views import UpdateWithInlinesView
-from rest_framework.viewsets import ReadOnlyModelViewSet
 
 from bibliography.forms import SourceSimpleFilterForm
 from distributions.models import TemporalDistribution
@@ -17,7 +16,7 @@ from utils.views import (BRITFilterView, NextOrSuccessUrlMixin, OwnedObjectCreat
                          OwnedObjectListView, OwnedObjectModalCreateView, OwnedObjectModalDeleteView,
                          OwnedObjectModalDetailView, OwnedObjectModalUpdateView, OwnedObjectUpdateView,
                          UserOwnsObjectMixin)
-from .filters import CompositionFilterSet, MaterialFilterSet, SampleFilter, SampleFilterSet, SampleSeriesFilterSet
+from .filters import SampleFilter
 from .forms import (AddComponentModalForm, AddCompositionModalForm, AddLiteratureSourceForm, AddSeasonalVariationForm,
                     ComponentGroupModalModelForm, ComponentGroupModelForm, ComponentModalModelForm, ComponentModelForm,
                     ComponentShareDistributionFormSetHelper, Composition, CompositionModalModelForm,
@@ -29,9 +28,7 @@ from .forms import (AddComponentModalForm, AddCompositionModalForm, AddLiteratur
                     SampleSeriesModelForm, WeightShareUpdateFormSetHelper)
 from .models import (Material, MaterialCategory, MaterialComponent, MaterialComponentGroup, MaterialProperty,
                      MaterialPropertyValue, Sample, SampleSeries, WeightShare)
-from .serializers import (CompositionAPISerializer, CompositionDoughnutChartSerializer, MaterialAPISerializer,
-                          SampleAPISerializer, SampleModelSerializer, SampleSeriesAPISerializer,
-                          SampleSeriesModelSerializer)
+from .serializers import (CompositionDoughnutChartSerializer, SampleModelSerializer, SampleSeriesModelSerializer)
 
 
 class MaterialsDashboardView(PermissionRequiredMixin, TemplateView):
@@ -841,31 +838,3 @@ class FeaturedMaterialListView(ListView):
     def get_queryset(self):
         user_groups = self.request.user.groups.all()
         return SampleSeries.objects.filter(Q(visible_to_groups__in=user_groups) | Q(publish=True))
-
-
-# ----------- API ------------------------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-class MaterialViewSet(ReadOnlyModelViewSet):
-    queryset = Material.objects.all()
-    serializer_class = MaterialAPISerializer
-    filterset_class = MaterialFilterSet
-
-
-class CompositionViewSet(ReadOnlyModelViewSet):
-    queryset = Composition.objects.all()
-    serializer_class = CompositionAPISerializer
-    filterset_class = CompositionFilterSet
-
-
-class SampleViewSet(ReadOnlyModelViewSet):
-    queryset = Sample.objects.all()
-    serializer_class = SampleAPISerializer
-    filterset_class = SampleFilterSet
-
-
-class SampleSeriesViewSet(ReadOnlyModelViewSet):
-    queryset = SampleSeries.objects.all()
-    serializer_class = SampleSeriesAPISerializer
-    filterset_class = SampleSeriesFilterSet
