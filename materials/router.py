@@ -1,5 +1,6 @@
-from materials.views import CompositionViewSet, MaterialViewSet, SampleViewSet, SampleSeriesViewSet
 from rest_framework import routers
+
+from materials.viewsets import CompositionViewSet, MaterialViewSet, SampleSeriesViewSet, SampleViewSet
 
 router = routers.DefaultRouter()
 router.register('material', MaterialViewSet, basename='api-material')
