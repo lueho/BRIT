@@ -1,5 +1,4 @@
 {% extends 'base.html' %}
-{% load render_table from django_tables2 %}
 
 {% block content %}
 
@@ -56,8 +55,8 @@
                                 <h6 class="m-0 font-weight-bold text-primary">
                                     {{ cycle.cycle_number }}: {{ content.culture.name }}</h6>
                             </div>
-                            <div class="card-body">
-                                {% render_table content.table %}
+                            <div class="card-body"> 
+                                {% include 'growthcycle_table.html' with table_data=content.table %}
                             </div>
                             <div class="card-footer">
                                 <a href="javascript:void(0);"

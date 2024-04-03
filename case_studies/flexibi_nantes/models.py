@@ -10,7 +10,6 @@ from materials.models import Material, SampleSeries, MaterialComponent, Material
     Composition
 from users.models import get_default_owner
 from utils.models import NamedUserObjectModel
-from .tables import growthcycle_table_factory
 
 
 class NantesGreenhouses(models.Model):
@@ -92,7 +91,7 @@ class Greenhouse(models.Model):
     def configuration(self):
         return {gc: {'culture': gc.culture,
                      'timesteps': [t for t in gc.timesteps],
-                     'table': growthcycle_table_factory(gc)} for gc in
+                     'table': gc.table_data} for gc in
                 self.greenhousegrowthcycle_set.all().order_by('cycle_number')}
 
     def cultures(self):
@@ -197,6 +196,30 @@ class GreenhouseGrowthCycle(models.Model):
     @property
     def min_timestep(self):
         return Timestep.objects.get(id=self.timesteps.aggregate(models.Min('id'))['id__min'])
+
+    @property
+    def table_data(self):
+        table_data = []
+        components = self.group_settings.components()
+        for component in components:
+            table_row = {'Component': component.name}
+            shares = GrowthShare.objects.filter(
+                component=component,
+                timestepset__growth_cycle=self,
+                timestepset__timestep__in=self.timesteps.all()
+            ).order_by('timestepset__timestep__id')
+            for share in shares:
+                table_row[share.timestep.name] = f'{share.average}'
+            table_data.append(table_row)
+
+        # If no components, create a row with None values
+        if not table_data:
+            table_row = {'component': None}
+            for timestep in self.timesteps.all():
+                table_row[timestep.name] = None
+            table_data.append(table_row)
+
+        return table_data
 
     def get_absolute_url(self):
         return reverse('greenhouse-detail', kwargs={'pk': self.greenhouse.id})

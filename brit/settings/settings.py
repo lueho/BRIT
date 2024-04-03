@@ -25,7 +25,6 @@ INSTALLED_APPS = [
     'fontawesomefree',
     'django.contrib.gis',
     'extra_views',
-    'django_tables2',
     'rest_framework',
     'rest_framework.authtoken',
     'rest_framework_gis',
@@ -191,7 +190,6 @@ CELERY_REDIS_BACKEND_USE_SSL = {
 CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL")
 
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
-DJANGO_TABLES2_TEMPLATE = "django_tables2/bootstrap4.html"
 
 EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = os.environ.get('EMAIL_HOST')

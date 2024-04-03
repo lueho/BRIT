@@ -20,7 +20,6 @@ from .forms import (CultureModelForm, GreenhouseGrowthCycle, GreenhouseModalMode
                     UpdateGreenhouseGrowthCycleValuesForm)
 from .models import Culture, Greenhouse, GrowthTimeStepSet, NantesGreenhouses
 from .serializers import NantesGreenhousesGeometrySerializer
-from .tables import growthcycle_table_factory
 
 
 # ----------- Culture CRUD ---------------------------------------------------------------------------------------------
@@ -204,7 +203,8 @@ class GrowthCycleDetailView(DetailView):
     template_name = 'growthcycle_detail.html'
 
     def get_context_data(self, **kwargs):
-        kwargs['table'] = growthcycle_table_factory(self.object)
+        kwargs['table_data'] = self.object.table_data
+        kwargs['growth_cycle'] = self.object
         return super().get_context_data(**kwargs)
 
 

@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+
+{% block content %}
+    <div class="row">
+        <div class="col">
+            <div class="card shadow">
+                <div class="card-header"><h2>{{ growth_cycle.name }}</h2></div>
+                <div class="card-body">
+                </div>{% include 'growthcycle_table.html' %}<div class="card-footer"></div>
+            </div>
+        </div>
+    </div>
+{% endblock content %}
