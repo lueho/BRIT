@@ -19,12 +19,6 @@
     {% endif %}
 {% endblock %}
 
-{% block filter_form %}
-    <form method="GET">
-        {% crispy filter.form %}
-    </form>
-{% endblock filter_form %}
-
 {% block javascript %}
     {{ block.super }}
     <script type="text/javascript">
