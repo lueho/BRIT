@@ -17,7 +17,7 @@ def export_hamburg_roadside_trees_to_file(self, file_format, query_params):
     qs = HamburgRoadsideTreesFilterSet(qdict, HamburgRoadsideTrees.objects.all()).qs
     data = HamburgRoadsideTreeFlatSerializer(qs, many=True).data
 
-    file_name = f'collections_{self.request.id}.{file_format}'
+    file_name = f'hamburg_roadside_trees_{self.request.id}.{file_format}'
     if file_format == 'xlsx':
         return utils.file_export.storages.write_file_for_download(file_name, data, HamburgRoadsideTreesXLSXRenderer)
     else:
