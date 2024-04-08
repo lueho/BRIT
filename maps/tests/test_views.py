@@ -1278,7 +1278,6 @@ class NutsRegionSummaryAPIViewTestCase(ViewSetWithPermissionsTestCase):
     def test_returns_correct_data(self):
         response = self.client.get(reverse('data.nutsregion-summary'), {'id': self.region.pk})
         self.assertIn('summaries', response.data)
-        print(response.data)
         self.assertEqual(response.data['summaries'][0]['Name'], self.region.name_latn)
 
 

@@ -562,7 +562,6 @@ class CollectionAddPredecessorFormTestCase(TestCase):
     def test_form_is_valid_with_existing_predecessor(self):
         form = CollectionAddPredecessorForm(data={'predecessor': self.predecessor_collection.id})
         form.is_valid()
-        print(form.errors)
         self.assertTrue(form.is_valid())
 
     def test_form_is_invalid_with_non_existing_predecessor(self):

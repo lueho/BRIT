@@ -278,10 +278,6 @@ class RegionCreateView(OwnedObjectCreateView):
     form_class = RegionModelForm
     permission_required = 'maps.add_region'
 
-    def get(self, request, *args, **kwargs):
-        print(request.GET)
-        return super().get(request, *args, **kwargs)
-
 
 class RegionUpdateView(OwnedObjectUpdateView):
     model = Region
