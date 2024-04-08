@@ -1,6 +1,4 @@
-from rest_framework_csv.renderers import CSVRenderer
-
-from utils.file_export.renderers import BaseXLSXRenderer
+from utils.file_export.renderers import BaseCSVRenderer, BaseXLSXRenderer
 
 
 class CollectionXLSXRenderer(BaseXLSXRenderer):
@@ -41,7 +39,7 @@ class CollectionXLSXRenderer(BaseXLSXRenderer):
     }
 
 
-class CollectionCSVRenderer(CSVRenderer):
+class CollectionCSVRenderer(BaseCSVRenderer):
     writer_opts = {
         'delimiter': '\t'
     }
@@ -84,7 +82,3 @@ class CollectionCSVRenderer(CSVRenderer):
         'created_at': 'Created at',
         'lastmodified_at': 'Last modified at'
     }
-
-    def render(self, file, data, *args, **kwargs):
-        content = super().render(data, **kwargs)
-        file.write(content)

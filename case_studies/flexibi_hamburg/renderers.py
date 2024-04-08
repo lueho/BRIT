@@ -1,6 +1,4 @@
-from rest_framework_csv.renderers import CSVRenderer
-
-from utils.file_export.renderers import BaseXLSXRenderer
+from utils.file_export.renderers import BaseCSVRenderer, BaseXLSXRenderer
 
 
 class HamburgRoadsideTreesXLSXRenderer(BaseXLSXRenderer):
@@ -25,7 +23,7 @@ class HamburgRoadsideTreesXLSXRenderer(BaseXLSXRenderer):
     }
 
 
-class HamburgRoadsideTreesCSVRenderer(CSVRenderer):
+class HamburgRoadsideTreesCSVRenderer(BaseCSVRenderer):
     writer_opts = {
         'delimiter': '\t'
     }
@@ -46,7 +44,3 @@ class HamburgRoadsideTreesCSVRenderer(CSVRenderer):
         'stadtteil': 'District',
         'bezirk': 'Borough'
     }
-
-    def render(self, file, data, *args, **kwargs):
-        content = super().render(data, **kwargs)
-        file.write(content)

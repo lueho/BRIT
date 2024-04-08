@@ -1,6 +1,4 @@
-from rest_framework_csv.renderers import CSVRenderer
-
-from utils.file_export.renderers import BaseXLSXRenderer
+from utils.file_export.renderers import BaseCSVRenderer, BaseXLSXRenderer
 
 
 class NantesGreenhousesXLSXRenderer(BaseXLSXRenderer):
@@ -22,7 +20,7 @@ class NantesGreenhousesXLSXRenderer(BaseXLSXRenderer):
     }
 
 
-class NantesGreenhousesCSVRenderer(CSVRenderer):
+class NantesGreenhousesCSVRenderer(BaseCSVRenderer):
     writer_opts = {
         'delimiter': '\t'
     }
@@ -40,7 +38,3 @@ class NantesGreenhousesCSVRenderer(CSVRenderer):
         'above_ground': 'Above ground',
         'surface_ha': 'Surface (ha)'
     }
-
-    def render(self, file, data, *args, **kwargs):
-        content = super().render(data, **kwargs)
-        file.write(content)

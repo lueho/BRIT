@@ -1,4 +1,5 @@
 import xlsxwriter
+from rest_framework_csv.renderers import CSVRenderer
 
 
 class BaseXLSXRenderer:
@@ -36,3 +37,14 @@ class BaseXLSXRenderer:
                 row_idx += 1
 
         workbook.close()
+
+
+class BaseCSVRenderer(CSVRenderer):
+    """
+    This class ist adapted to exhibit the same behaviour as the used BaseXLSXRenderer. The render method is overwritten
+    to write the content to a file instead of returning it.
+    """
+
+    def render(self, file, data, *args, **kwargs):
+        content = super().render(data, **kwargs)
+        file.write(content)
