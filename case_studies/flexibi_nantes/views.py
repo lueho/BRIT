@@ -1,16 +1,24 @@
+import json
+
 from bootstrap_modal_forms.generic import BSModalCreateView, BSModalDeleteView, BSModalReadView, BSModalUpdateView
+from celery.result import AsyncResult
 from crispy_forms.helper import FormHelper
 from dal import autocomplete
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Q, Sum
-from django.http import HttpResponseRedirect, JsonResponse
-from django.urls import reverse, reverse_lazy
+from django.db.models import Q
+from django.db.models import Sum
+from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponseRedirect
+from django.urls import reverse
+from django.urls import reverse_lazy
+from django.views import View
 from django.views.generic import DetailView, UpdateView
 from django_filters import rest_framework as rf_filters
 from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 from rest_framework.generics import GenericAPIView
 
+import case_studies.flexibi_nantes.tasks
 from maps.models import Catchment, GeoDataset
 from maps.views import GeoDataSetDetailView
 from materials.models import MaterialComponentGroup
@@ -329,3 +337,29 @@ class NantesGreenhousesAPIView(GenericAPIView):
             ]
         }
         return JsonResponse(data)
+
+
+class NantesGreenhousesListFileExportView(LoginRequiredMixin, View):
+
+    @staticmethod
+    def get(request, *args, **kwargs):
+        params = dict(request.GET)
+        file_format = params.pop('format', 'csv')[0]
+        params.pop('page', None)
+        task = case_studies.flexibi_nantes.tasks.export_nantes_greenhouses_to_file.delay(file_format, params)
+        response_data = {
+            'task_id': task.task_id
+        }
+        return HttpResponse(json.dumps(response_data), content_type='application/json')
+
+
+class NantesGreenhousesListFileExportProgressView(LoginRequiredMixin, View):
+
+    @staticmethod
+    def get(request, task_id):
+        result = AsyncResult(task_id)
+        response_data = {
+            'state': result.state,
+            'details': result.info,
+        }
+        return HttpResponse(json.dumps(response_data), content_type='application/json')

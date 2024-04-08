@@ -1,5 +1,14 @@
 {% extends 'filtered_map.html' %}
+{% load static %}
 {% load crispy_forms_tags %}
+{% load file_export_tags %}
+
+{% block map_card_footer %}
+    {% if user.is_authenticated %}
+        {% export_link "csv" 'nantesgreenhouses-export' 'nantesgreenhouses-export-progress' %}
+        {% export_link "xlsx" 'nantesgreenhouses-export' 'nantesgreenhouses-export-progress' %}
+    {% endif %}
+{% endblock %}
 
 {% block filter_form %}
     <form method="GET">
@@ -31,3 +40,9 @@
     </div>
 
 {% endblock %}
+
+{% block javascript %}
+    {{ block.super }}
+    <script src="{% static 'lib/turf-inside/inside.min.js' %}"></script>
+    <script src="{% static 'js/file_export.min.js' %}"></script>
+{% endblock javascript %}
