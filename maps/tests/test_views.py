@@ -1272,12 +1272,13 @@ class NutsRegionSummaryAPIViewTestCase(ViewSetWithPermissionsTestCase):
         self.region = NutsRegion.objects.get(nuts_id='TE57')
 
     def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('data.nutsregion-summary'), {'pk': self.region.pk})
+        response = self.client.get(reverse('data.nutsregion-summary'), {'id': self.region.pk})
         self.assertEqual(response.status_code, 200)
 
     def test_returns_correct_data(self):
-        response = self.client.get(reverse('data.nutsregion-summary'), {'pk': self.region.pk})
+        response = self.client.get(reverse('data.nutsregion-summary'), {'id': self.region.pk})
         self.assertIn('summaries', response.data)
+        print(response.data)
         self.assertEqual(response.data['summaries'][0]['Name'], self.region.name_latn)
 
 

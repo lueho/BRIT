@@ -1,8 +1,9 @@
 from bootstrap_modal_forms.generic import BSModalCreateView, BSModalDeleteView, BSModalReadView, BSModalUpdateView
 from crispy_forms.helper import FormHelper
+from dal import autocomplete
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Sum
+from django.db.models import Q, Sum
 from django.http import HttpResponseRedirect, JsonResponse
 from django.urls import reverse, reverse_lazy
 from django.views.generic import DetailView, UpdateView
@@ -10,11 +11,11 @@ from django_filters import rest_framework as rf_filters
 from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 from rest_framework.generics import GenericAPIView
 
-from maps.models import GeoDataset
-from maps.views import GeoDatasetDetailView
+from maps.models import Catchment, GeoDataset
+from maps.views import GeoDataSetDetailView
 from materials.models import MaterialComponentGroup
 from utils.views import (BRITFilterView, NextOrSuccessUrlMixin, OwnedObjectListView, UserOwnsObjectMixin)
-from .filters import GreenhouseFilter, GreenhouseTypeFilter
+from .filters import GreenhouseTypeFilter, NantesGreenhousesFilterSet
 from .forms import (CultureModelForm, GreenhouseGrowthCycle, GreenhouseModalModelForm, GrowthCycleCreateForm,
                     GrowthShareFormSetHelper, GrowthTimestepInline, InlineGrowthShare,
                     UpdateGreenhouseGrowthCycleValuesForm)
@@ -269,12 +270,28 @@ class UpdateGreenhouseGrowthCycleValuesView(LoginRequiredMixin, UpdateView):
         }
 
 
-class GreenhousesMapView(GeoDatasetDetailView):
+class NantesGreenhousesCatchmentAutocompleteView(autocomplete.Select2QuerySetView):
+    def get_queryset(self):
+        if self.request.user.is_authenticated:
+            qs = Catchment.objects.filter(Q(owner=self.request.user) | Q(publication_status='published'))
+        else:
+            qs = Catchment.objects.filter(publication_status='published')
+        dataset_region = GeoDataset.objects.get(model_name='NantesGreenhouses').region
+        qs = qs.filter(region__borders__geom__within=dataset_region.geom).order_by('name')
+        if self.q:
+            qs = qs.filter(name__icontains=self.q)
+        return qs
+
+
+class GreenhousesMapView(GeoDataSetDetailView):
+    model_name = 'NantesGreenhouses'
     template_name = 'greenhouse_map.html'
-    feature_url = reverse_lazy('data.nantes_greenhouses')
-    filter_class = GreenhouseFilter
-    filterset_class = GreenhouseFilter
+    filterset_class = NantesGreenhousesFilterSet
+    map_title = 'Nantes Greenhouses'
+    load_region = True
+    load_catchment = True
     load_features = True
+    feature_url = reverse_lazy('data.nantes_greenhouses')
     apply_filter_to_features = True
     feature_layer_style = {
         'color': '#4061d2',
@@ -282,17 +299,18 @@ class GreenhousesMapView(GeoDatasetDetailView):
         'radius': 5,
         'stroke': False
     }
-
-    def get_object(self, **kwargs):
-        self.kwargs.update({'pk': GeoDataset.objects.get(model_name='NantesGreenhouses').pk})
-        return super().get_object(**kwargs)
+    catchment_layer_style = {
+        'color': '#04555E',
+        'fillOpacity': 0.1,
+        'weight': 1
+    }
 
 
 class NantesGreenhousesAPIView(GenericAPIView):
     queryset = NantesGreenhouses.objects.all()
     serializer_class = NantesGreenhousesGeometrySerializer
     filter_backends = (rf_filters.DjangoFilterBackend,)
-    filterset_class = GreenhouseFilter
+    filterset_class = NantesGreenhousesFilterSet
     permission_classes = set()
 
     def get(self, request, *args, **kwargs):

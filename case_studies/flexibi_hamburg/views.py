@@ -21,12 +21,11 @@ from .serializers import HamburgRoadsideTreeGeometrySerializer, HamburgRoadsideT
 
 
 class RoadsideTreesMapView(GeoDataSetDetailView):
+    model_name = 'HamburgRoadsideTrees'
     template_name = 'hamburg_roadside_trees_map.html'
     filterset_class = HamburgRoadsideTreesFilterSet
     map_title = 'Hamburg Roadside Trees'
     load_region = True
-    #TODO: This must be generalized to automatically retrieve the id from the dataset entry
-    region_id = 3
     load_catchment = True
     load_features = False
     feature_url = reverse_lazy('data.hamburg_roadside_trees')
@@ -43,10 +42,6 @@ class RoadsideTreesMapView(GeoDataSetDetailView):
         'fillOpacity': 0.1,
         'weight': 1
     }
-
-    def get_object(self, **kwargs):
-        self.kwargs.update({'pk': GeoDataset.objects.get(model_name='HamburgRoadsideTrees').pk})
-        return super().get_object(**kwargs)
 
 
 class HamburgRoadsideTreeViewSet(ReadOnlyModelViewSet):

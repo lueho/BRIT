@@ -1,6 +1,7 @@
 from dal import autocomplete
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.gis.geos import MultiPolygon
+from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Q, Subquery
 from django.forms import formset_factory
 from django.http import JsonResponse
@@ -20,10 +21,10 @@ from utils.views import (BRITFilterView, OwnedObjectCreateView, OwnedObjectDetai
                          OwnedObjectModalCreateView, OwnedObjectModalDeleteView, OwnedObjectModalDetailView,
                          OwnedObjectModalUpdateView, OwnedObjectModelSelectOptionsView, PublishedObjectFilterView,
                          OwnedObjectUpdateView, UserOwnedObjectFilterView)
-from .filters import CatchmentFilter, RegionFilterSet
+from .filters import CatchmentFilter, RegionFilterSet, NutsRegionFilterSet
 from .forms import (AttributeModalModelForm, AttributeModelForm, CatchmentCreateDrawCustomForm,
                     CatchmentCreateMergeLauForm, CatchmentModelForm,
-                    NutsRegionQueryForm, RegionModelForm, RegionAttributeValueModalModelForm,
+                    RegionModelForm, RegionAttributeValueModalModelForm,
                     RegionAttributeValueModelForm, RegionMergeForm, RegionMergeFormSet, LocationModelForm)
 from .models import (Attribute, Catchment, GeoDataset, GeoPolygon, LauRegion, Location, NutsRegion, Region,
                      RegionAttributeValue)
@@ -191,22 +192,19 @@ class GeoDataSetFormMixin(FormMixin):
             return self.filterset_class(self.request.GET).form
 
 
-class GeoDatasetDetailView(GeoDataSetFormMixin, GeoDataSetMixin, DetailView):
-    model = GeoDataset
-    template_name = 'filtered_map.html'
-
-    def get_map_title(self):
-        return self.object.name
-
-    def get_region_id(self):
-        return self.object.region.id
-
-
-# TODO: This will be a simplified implementation that can replace the previous GeoDatasetDetailView in most (all?) cases.
 class GeoDataSetDetailView(GeoDataSetMixin, FilterView):
-    model = None
+    model_name = None
     filterset_class = None
     template_name = 'filtered_map.html'
+
+    def get_object(self):
+        try:
+            return GeoDataset.objects.get(model_name=self.model_name)
+        except GeoDataset.DoesNotExist:
+            raise ImproperlyConfigured(f'No GeoDataset with model_name "{self.model_name}" found.')
+
+    def get_region_id(self):
+        return self.get_object().region.id
 
 
 # ----------- Location CRUD---------------------------------------------------------------------------------------------
@@ -255,7 +253,7 @@ class RegionListView(BRITFilterView):
     ordering = 'name'
 
 
-class RegionMapView(LoginRequiredMixin, GeoDataSetDetailView):
+class RegionMapView(LoginRequiredMixin, GeoDataSetMixin, FilterView):
     template_name = 'region_map.html'
     filterset_class = RegionFilterSet
     map_title = 'Regions'
@@ -444,6 +442,33 @@ class RegionAutocompleteView(autocomplete.Select2QuerySetView):
         return qs
 
 
+class NutsRegionAutocompleteView(autocomplete.Select2QuerySetView):
+    def get_queryset(self):
+
+        qs = NutsRegion.objects.all()
+
+        levl_code = self.forwarded.get('levl_code', None)
+        if levl_code is not None:
+            qs = qs.filter(levl_code=levl_code)
+
+        parent = self.forwarded.get('parent', None)
+        if parent:
+            qs = qs.filter(parent_id=parent)
+
+        grandparent = self.forwarded.get('grandparent', None)
+        if grandparent:
+            qs = qs.filter(parent__parent_id=grandparent)
+
+        great_grandparent = self.forwarded.get('great_grandparent', None)
+        if great_grandparent:
+            qs = qs.filter(parent__parent__parent_id=great_grandparent)
+
+        if self.q:
+            qs = qs.filter(name__icontains=self.q)
+
+        return qs.order_by('name')
+
+
 class RegionOfLauAutocompleteView(autocomplete.Select2QuerySetView):
     def get_queryset(self):
         qs = Region.objects.filter(pk__in=Subquery(LauRegion.objects.all().values('pk'))).order_by('name')
@@ -512,7 +537,7 @@ class NutsRegionSummaryAPIView(APIView):
 
     @staticmethod
     def get(request):
-        obj = NutsRegion.objects.filter(id=request.query_params.get('pk'))
+        obj = NutsRegion.objects.filter(id=request.query_params.get('id'))
         serializer = NutsRegionSummarySerializer(
             obj,
             many=True,
@@ -576,22 +601,21 @@ class CatchmentRegionSummaryAPIView(APIView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class NutsRegionMapView(GeoDatasetDetailView):
+class NutsRegionMapView(GeoDataSetDetailView):
+    model_name = 'NutsRegion'
     template_name = 'nuts_region_map.html'
+    filterset_class = NutsRegionFilterSet
+    map_title = 'NUTS Regions'
+    load_region = False
+    load_catchment = False
+    load_features = False
     feature_url = reverse_lazy('data.nutsregion')
     feature_summary_url = reverse_lazy('data.nutsregion-summary')
     region_url = reverse_lazy('data.nutsregion')
-    form_class = NutsRegionQueryForm
-    load_features = False
     adjust_bounds_to_features = True
-    load_region = False
     feature_layer_style = {
         'color': '#4061d2',
     }
-
-    def get_object(self, **kwargs):
-        self.kwargs.update({'pk': GeoDataset.objects.get(model_name='NutsRegion').pk})
-        return super().get_object(**kwargs)
 
 
 class NutsRegionAPIView(APIView):

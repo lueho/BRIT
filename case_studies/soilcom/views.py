@@ -951,6 +951,7 @@ class CatchmentSelectView(GeoDataSetFormMixin, GeoDataSetMixin, TemplateView):
 
 
 class WasteCollectionMapView(GeoDataSetDetailView):
+    model_name = 'WasteCollection'
     template_name = 'waste_collection_map.html'
     filterset_class = CollectionFilterSet
     map_title = 'Household Waste Collection Europe'

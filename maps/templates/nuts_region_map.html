@@ -1,125 +1,18 @@
 {% extends 'filtered_map.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
 
 
-{% block extra_cards %}
-
-{% endblock extra_cards %}
+{% block filter_form %}
+    <form method="GET">
+        {% crispy filter.form %}
+    </form>
+{% endblock filter_form %}
 
 {% block filter_form_buttons %}{% endblock filter_form_buttons %}
 
 
 {% block javascript %}
     {{ block.super }}
-
-    <script type="text/javascript">
-
-        // This is a hook for templates that derive from this
-        async function updateUrls() {
-        }
-
-        async function selectFeature(feature) {
-            let sel = document.getElementById('id_level_' + feature['properties']['level']);
-            sel.value = feature.properties.id;
-            if (sel.hasAttribute('data-optionsapi')) {
-                await fetchSelectOptions(sel.dataset['optionsapi'], {id: sel.value});
-            }
-            await updateLayers({region_params: {pk: sel.value}, feature_params: {parent_id: sel.value}});
-            await updateUrls(sel.value);
-        }
-
-        async function updateFeatureSummary(feature) {
-            const summaries = await fetchFeatureSummaries(feature);
-            renderSummaries(summaries);
-        }
-
-        async function updateLayers({region_params, catchment_params, feature_params} = {}) {
-            const promises = [];
-            if (region_params) {
-                promises.push(fetchRegionGeometry(region_params));
-            }
-            if (catchment_params) {
-                promises.push(fetchCatchmentGeometry(catchment_params));
-            }
-            if (feature_params) {
-                promises.push(fetchFeatureGeometries(feature_params));
-            }
-            prepareMapRefresh();
-            await refreshMap(promises);
-
-        }
-
-        function cleanup() {
-            hideLoadingIndicator();
-            unlockFilter();
-            document.querySelectorAll("select").forEach(selector => selector.disabled = false);
-        }
-
-        async function fetchSelectOptions(api_url, params) {
-            // fetch options for children of selection
-            params['direction'] = 'children';
-            let dataurl = api_url + '?' + $.param(params).toString();
-            let response = await fetch(dataurl);
-            let children = await response.json();
-            Object.keys(children).forEach(key => {
-                let sel = document.getElementById(key);
-                while (sel.firstChild) {
-                    sel.removeChild(sel.lastChild);
-                }
-                let opt = document.createElement('Option');
-                opt.value = "";
-                opt.innerText = "---------";
-                sel.appendChild(opt);
-                children[key].forEach(function(item) {
-                    opt = document.createElement('Option');
-                    opt.value = item.id;
-                    opt.innerText = item.name;
-                    sel.appendChild(opt);
-                });
-            });
-
-            // mark the parents of the selected item as also selected
-            params['direction'] = 'parents';
-            dataurl = api_url + '?' + $.param(params);
-            response = await fetch(dataurl);
-            let parents = await response.json();
-            Object.keys(parents).forEach(key => {
-                let sel = document.getElementById(key);
-                sel.value = parents[key]['id'];
-            });
-        }
-
-        async function clickedFeature(event) {
-            await selectFeature(event.layer.feature);
-            await updateFeatureSummary(event.layer.feature);
-        }
-
-
-        const changedSelect = async function(e) {
-            // fetch options for children of selection
-            document.querySelectorAll("select").forEach(selector => selector.disabled = true);
-
-            let target = e.target;
-            if (!target.value) {
-                const selectors = $('.select');
-                target = selectors.eq(selectors.index(target) - 1)[0];
-            }
-            if (target.value) {
-                const params = {id: target.value};
-                if (target.hasAttribute('data-optionsapi')) {
-                    await fetchSelectOptions(target.dataset['optionsapi'], params);
-                }
-                await updateLayers({region_params: {pk: target.value}, feature_params: {parent_id: target.value}});
-                await updateFeatureSummary(target.value);
-                await updateUrls(target.value);
-            }
-
-            document.querySelectorAll("select").forEach(selector => selector.disabled = false);
-        };
-
-        document.querySelectorAll("select").forEach(function(selector) {
-            selector.addEventListener("change", changedSelect, false);
-        });
-
-    </script>
-
+     <script src="{% static 'js/nuts_region_map.min.js' %}"></script>
 {% endblock javascript %}

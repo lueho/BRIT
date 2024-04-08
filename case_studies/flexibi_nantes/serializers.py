@@ -1,6 +1,6 @@
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
-from case_studies.flexibi_nantes.models import NantesGreenhouses
+from .models import NantesGreenhouses
 
 
 class NantesGreenhousesGeometrySerializer(GeoFeatureModelSerializer):
