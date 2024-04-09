@@ -1,0 +1,41 @@
+{% extends 'filtered_list.html' %}
+
+{% block title %}BRIT | Inventories{% endblock %}
+
+{% block list_header %}<strong><i class="fas fa-fw fa-chart-bar"></i>Inventories</strong>{% endblock %}
+
+{% block list_body %}
+    <table class="table table-responsive-stack">
+        <thead>
+        <tr>
+            <th>Name</th>
+            <th>Catchment</th>
+            <th>Description</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for object in object_list %}
+            <tr>
+                <td data-label="Name"><a href="{{ object.get_absolute_url }}">{{ object.name }}</a></td>
+                <td data-label="Catchment"><a href="{{ object.catchment.get_absolute_url }}">{{ object.catchment }}</a></td>
+                <td data-label="Description">{{ object.description }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+        <tfoot></tfoot>
+    </table>
+{% endblock %}
+
+{% block list_footer %}
+    {% if user.is_authenticated %}
+        <a class="mr-2 text-nowrap" href="{% url 'scenario-list-owned' %}">
+            <i class="fas fa-fw fa-list"></i> My scenarios
+        </a>
+    {% endif %}
+    {% if user.is_authenticated %}
+        <a href="{% url 'scenario-create' %}?next={{ request.get_full_path|urlencode }}" class="nowrap">
+            <i class="fa fa-fw fa-plus"></i>
+            <span>Add new scenario</span>
+        </a>
+    {% endif %}
+{% endblock list_footer %}

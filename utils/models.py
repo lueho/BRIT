@@ -85,16 +85,43 @@ def get_default_owner_pk():
 
 
 STATUS_CHOICES = (
-        ('private', 'Private'),
-        ('review', 'Under Review'),
-        ('published', 'Published'),
-    )
+    ('private', 'Private'),
+    ('review', 'Under Review'),
+    ('published', 'Published'),
+)
+
+
+class OwnedObjectQuerySet(models.QuerySet):
+    def published(self):
+        return self.filter(publication_status='published')
+
+    def owned_by_user(self, user):
+        return self.filter(owner=user)
+
+    def accessible_by_user(self, user):
+        return self.filter(models.Q(owner=user) | models.Q(publication_status='published'))
+
+
+class OwnedObjectManager(models.Manager):
+    def get_queryset(self):
+        return OwnedObjectQuerySet(self.model, using=self._db)
+
+    def published(self):
+        return self.get_queryset().published()
+
+    def owned_by_user(self, user):
+        return self.get_queryset().owned_by_user(user)
+
+    def accessible_by_user(self, user):
+        return self.get_queryset().accessible_by_user(user)
 
 
 class OwnedObjectModel(CRUDUrlsMixin, CommonInfo):
     owner = models.ForeignKey(User, on_delete=models.PROTECT, default=get_default_owner_pk)
     visible_to_groups = models.ManyToManyField(Group)
     publication_status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='private')
+
+    objects = OwnedObjectManager()
 
     class Meta:
         abstract = True

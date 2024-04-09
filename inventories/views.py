@@ -2,6 +2,7 @@ import io
 import json
 
 from celery.result import AsyncResult
+from dal_select2.views import Select2ListView
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
@@ -17,9 +18,11 @@ from maps.serializers import BaseResultMapSerializer
 from maps.views import MapMixin
 from materials.models import SampleSeries
 from users.models import get_default_owner
-from utils.views import (OwnedObjectCreateView, OwnedObjectDetailView, OwnedObjectListView, OwnedObjectModalCreateView,
-                         OwnedObjectModalDeleteView, OwnedObjectModalUpdateView, OwnedObjectUpdateView)
+from utils.views import (OwnedObjectCreateView, OwnedObjectDetailView, OwnedObjectModalCreateView,
+                         OwnedObjectModalDeleteView, OwnedObjectModalUpdateView, OwnedObjectUpdateView,
+                         PublishedObjectFilterView, UserOwnedObjectFilterView)
 from .evaluations import ScenarioResult
+from .filters import ScenarioFilterSet
 from .forms import (ScenarioInventoryConfigurationAddForm, ScenarioInventoryConfigurationUpdateForm,
                     ScenarioModalModelForm, ScenarioModelForm, SeasonalDistributionModelForm)
 from .models import (InventoryAlgorithm, InventoryAlgorithmParameter, InventoryAlgorithmParameterValue, RunningTask,
@@ -37,9 +40,29 @@ class SeasonalDistributionCreateView(LoginRequiredMixin, CreateView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class ScenarioListView(OwnedObjectListView):
+class ScenarioNameAutocompleteView(Select2ListView):
+
+    def get_list(self):
+        if self.request.user.is_authenticated:
+            qs = Scenario.objects.accessible_by_user(self.request.user)
+        else:
+            qs = Scenario.objects.published()
+
+        if self.q:
+            qs = qs.filter(name__icontains=self.q)
+
+        return qs.values_list('name', flat=True)
+
+
+class PublishedScenarioFilterView(PublishedObjectFilterView):
     model = Scenario
+    filterset_class = ScenarioFilterSet
     permission_required = set()
+
+
+class UserOwnedScenarioFilterView(UserOwnedObjectFilterView):
+    model = Scenario
+    filterset_class = ScenarioFilterSet
 
 
 class ScenarioCreateView(OwnedObjectCreateView):

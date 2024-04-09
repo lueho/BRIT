@@ -1,0 +1,15 @@
+{% extends 'inventories/scenario_filter.html' %}
+
+{% block list_header %}<strong><i class="fas fa-fw fa-chart-bar"></i>My Inventories</strong>{% endblock %}
+
+{% block list_footer %}
+    <a class="mr-2 text-nowrap" href="{% url 'scenario-list' %}">
+        <i class="fas fa-fw fa-list"></i> Public inventories
+    </a>
+    {% if user.is_authenticated %}
+        <a href="{% url 'scenario-create' %}?next={{ request.get_full_path|urlencode }}" class="nowrap">
+            <i class="fa fa-fw fa-plus"></i>
+            <span>Add new inventory</span>
+        </a>
+    {% endif %}
+{% endblock list_footer %}
