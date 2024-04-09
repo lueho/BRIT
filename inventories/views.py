@@ -65,12 +65,9 @@ class UserOwnedScenarioFilterView(UserOwnedObjectFilterView):
     filterset_class = ScenarioFilterSet
 
 
-class ScenarioCreateView(OwnedObjectCreateView):
+class ScenarioCreateView(LoginRequiredMixin, OwnedObjectCreateView):
     form_class = ScenarioModelForm
-    permission_required = 'inventories.add_scenario'
-
-    def get_success_url(self):
-        return reverse('scenario-detail', kwargs={'pk': self.object.pk})
+    permission_required = set()
 
 
 class ScenarioModalCreateView(OwnedObjectModalCreateView):
