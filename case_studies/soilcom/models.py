@@ -14,7 +14,7 @@ from distributions.models import Period, TemporalDistribution, Timestep
 from maps.models import Catchment, GeoPolygon
 from materials.models import Material, MaterialCategory, Sample, SampleSeries
 from users.models import get_default_owner
-from utils.models import NamedUserObjectModel, OwnedObjectModel
+from utils.models import NamedUserObjectModel, OwnedObjectModel, OwnedObjectManager
 from utils.properties.models import PropertyValue
 
 
@@ -61,7 +61,7 @@ class WasteCategory(NamedUserObjectModel):
         verbose_name_plural = 'Waste categories'
 
 
-class WasteComponentManager(models.Manager):
+class WasteComponentManager(OwnedObjectManager):
 
     def get_queryset(self):
         categories = MaterialCategory.objects.filter(name__in=('Biowaste component',))
@@ -216,7 +216,7 @@ class WasteStreamQuerySet(models.query.QuerySet):
         return instance, created
 
 
-class WasteStreamManager(models.Manager):
+class WasteStreamManager(OwnedObjectManager):
 
     def get_queryset(self):
         return WasteStreamQuerySet(self.model, using=self._db)
@@ -242,7 +242,7 @@ class WasteStream(NamedUserObjectModel):
         verbose_name = 'Waste Stream'
 
 
-class WasteFlyerManager(models.Manager):
+class WasteFlyerManager(OwnedObjectManager):
 
     def get_queryset(self):
         return super().get_queryset().filter(type='waste_flyer')
@@ -273,7 +273,7 @@ def check_url_valid(sender, instance, created, **kwargs):
         celery.current_app.send_task('check_wasteflyer_url', (instance.pk,))
 
 
-class CollectionSeasonManager(models.Manager):
+class CollectionSeasonManager(OwnedObjectManager):
 
     def get_queryset(self):
         distribution = TemporalDistribution.objects.get(owner=get_default_owner(), name='Months of the year')

@@ -20,7 +20,7 @@ from utils.forms import DynamicTableInlineFormSetHelper
 from utils.views import (BRITFilterView, OwnedObjectCreateView, OwnedObjectDetailView, OwnedObjectListView,
                          OwnedObjectModalCreateView, OwnedObjectModalDeleteView, OwnedObjectModalDetailView,
                          OwnedObjectModalUpdateView, OwnedObjectModelSelectOptionsView, PublishedObjectFilterView,
-                         OwnedObjectUpdateView, UserOwnedObjectFilterView)
+                         OwnedObjectUpdateView, RestrictedOwnedObjectDetailView, UserOwnedObjectFilterView)
 from .filters import CatchmentFilter, RegionFilterSet, NutsRegionFilterSet
 from .forms import (AttributeModalModelForm, AttributeModelForm, CatchmentCreateDrawCustomForm,
                     CatchmentCreateMergeLauForm, CatchmentModelForm,
@@ -308,12 +308,13 @@ class UserOwnedCatchmentListView(UserOwnedObjectFilterView):
     ordering = 'name'
 
 
-class CatchmentDetailView(MapMixin, DetailView):
+class CatchmentDetailView(MapMixin, RestrictedOwnedObjectDetailView):
     model = Catchment
     catchment_url = reverse_lazy('data.catchment-geometries')
     feature_url = reverse_lazy('data.catchment-geometries')
     load_region = False
     load_catchment = False
+    permission_required = set()
 
 
 class CatchmentCreateView(TemplateView):

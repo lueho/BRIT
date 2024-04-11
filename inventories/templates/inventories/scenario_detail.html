@@ -24,10 +24,9 @@
                                 <b>Catchment</b>: {{ object.catchment }}
                             </p>
                             <div class="collapse multi-collapse">
-                                <a href="{% url 'scenario-update-modal' object.id %}" class="modal-link mr-3"><i
+                                <a href="{% url 'scenario-update' object.id %}" class="mr-3"><i
                                         class="fas fa-fw fa-edit"></i> edit</a>
-                                <a href="{% url 'scenario-update-modal' object.id %}?next={{ request.path }}"
-                                   class="modal-link">
+                                <a href="{% url 'scenario-update' object.id %}?next={{ request.path }}">
                                     Edit <i class="fas fa-fw fa-edit"></i>
                                 </a>
                             </div>

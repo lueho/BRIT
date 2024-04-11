@@ -2,9 +2,8 @@ from django.urls import path
 
 from .views import (ResultMapAPI, ScenarioAddInventoryAlgorithmView, ScenarioAlgorithmConfigurationUpdateView,
                     ScenarioCreateView, ScenarioDetailView, ScenarioEvaluationProgressView,
-                    ScenarioModalCreateView, ScenarioModalDeleteView, ScenarioModalUpdateView,
-                    ScenarioRemoveInventoryAlgorithmView, ScenarioResultDetailMapView, ScenarioResultView,
-                    ScenarioUpdateView, SeasonalDistributionCreateView, UserOwnedScenarioFilterView,
+                    ScenarioModalDeleteView, ScenarioRemoveInventoryAlgorithmView, ScenarioResultDetailMapView,
+                    ScenarioResultView, ScenarioUpdateView, SeasonalDistributionCreateView, UserOwnedScenarioFilterView,
                     download_scenario_result_summary, download_scenario_summary, get_evaluation_status,
                     load_algorithm_options, load_catchment_options, load_geodataset_options, load_parameter_options,
                     PublishedScenarioFilterView, ScenarioNameAutocompleteView)
@@ -18,10 +17,8 @@ urlpatterns = [
     path('scenarios/user/', UserOwnedScenarioFilterView.as_view(), name='scenario-list-owned'),
     path('scenarios/autocomplete/name/', ScenarioNameAutocompleteView.as_view(), name='scenario-name-autocomplete'),
     path('scenarios/create/', ScenarioCreateView.as_view(), name='scenario-create'),
-    path('scenarios/create/modal/', ScenarioModalCreateView.as_view(), name='scenario-create-modal'),
     path('scenarios/<int:pk>/', ScenarioDetailView.as_view(), name='scenario-detail'),
     path('scenarios/<int:pk>/update/', ScenarioUpdateView.as_view(), name='scenario-update'),
-    path('scenarios/<int:pk>/update/modal/', ScenarioModalUpdateView.as_view(), name='scenario-update-modal'),
     path('scenarios/<int:pk>/delete/', ScenarioModalDeleteView.as_view(), name='scenario-delete-modal'),
     path('scenarios/<int:pk>/result/', ScenarioResultView.as_view(), name='scenario-result'),
     path('scenarios/<int:pk>/add_inventory_algorithm/', ScenarioAddInventoryAlgorithmView.as_view(),

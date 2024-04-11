@@ -34,7 +34,9 @@ class CollectionCatchmentDetailViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         region = Region.objects.create(name='Test Region')
-        cls.catchment = CollectionCatchment.objects.create(name='Test Catchment', region=region)
+        cls.catchment = CollectionCatchment.objects.create(
+            name='Test Catchment', region=region, publication_status='published'
+        )
 
     def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse('collectioncatchment-detail', kwargs={'pk': self.catchment.pk}))

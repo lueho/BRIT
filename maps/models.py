@@ -4,9 +4,10 @@ from django.db.models.signals import post_delete
 from django.dispatch import receiver
 from django.urls import reverse
 from tree_queries.models import TreeNode
+from tree_queries.query import TreeQuerySet
 
 from bibliography.models import Source
-from utils.models import NamedUserObjectModel
+from utils.models import NamedUserObjectModel, OwnedObjectQuerySet
 
 TYPES = (
     ('administrative', 'administrative'),
@@ -126,10 +127,27 @@ class LauRegion(Region):
         return f'{self.lau_name} ({self.lau_id})'
 
 
+class CatchmentQueryset(OwnedObjectQuerySet, TreeQuerySet):
+    pass
+
+
+class CatchmentManager(models.Manager):
+    def get_queryset(self):
+        return CatchmentQueryset(self.model, using=self._db)
+
+    def descendants(self, *args, **kwargs):
+        return self.get_queryset().descendants(*args, **kwargs)
+
+    def ancestors(self, *args, **kwargs):
+        return self.get_queryset().ancestors(*args, **kwargs)
+
+
 class Catchment(NamedUserObjectModel, TreeNode):
     parent_region = models.ForeignKey(Region, on_delete=models.CASCADE, related_name='child_catchments', null=True)
     region = models.ForeignKey(Region, on_delete=models.CASCADE, null=True)
     type = models.CharField(max_length=14, choices=TYPES, default='custom')
+
+    objects = CatchmentManager()
 
     @property
     def geom(self):

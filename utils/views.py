@@ -5,7 +5,7 @@ from bootstrap_modal_forms.mixins import is_ajax
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin, UserPassesTestMixin
 from django.contrib.messages.views import SuccessMessageMixin
-from django.core.exceptions import FieldError, ImproperlyConfigured
+from django.core.exceptions import FieldError, ImproperlyConfigured, PermissionDenied
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.template.loader import render_to_string
 from django.views.generic import CreateView, DetailView, ListView, TemplateView, UpdateView
@@ -206,6 +206,26 @@ class OwnedObjectDetailView(PermissionRequiredMixin, DetailView):
             'model_name': self.object._meta.verbose_name.capitalize(),
         })
         return context
+
+
+class RestrictedOwnedObjectDetailView(OwnedObjectDetailView):
+
+    def get_queryset(self):
+        """
+        Override the get_queryset to filter based on owner or publication status.
+        If the user does not have access to the requested object, raise PermissionDenied.
+        """
+        qs = super().get_queryset()
+
+        if self.request.user.is_authenticated:
+            qs_filtered = qs.accessible_by_user(self.request.user)
+        else:
+            qs_filtered = qs.published()
+
+        if not qs_filtered.exists():
+            raise PermissionDenied("You do not have permission to view this object.")
+
+        return qs_filtered
 
 
 class OwnedObjectModalDetailView(PermissionRequiredMixin, BSModalReadView):

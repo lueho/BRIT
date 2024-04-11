@@ -977,7 +977,7 @@ class CatchmentDetailViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.catchment = Catchment.objects.create(name='Test Catchment')
+        cls.catchment = Catchment.objects.create(name='Test Catchment', publication_status='published')
 
     def test_get_http_200_pk_for_anonymous(self):
         response = self.client.get(reverse('catchment-detail', kwargs={'pk': self.catchment.pk}))
@@ -1004,7 +1004,7 @@ class CatchmentUpdateViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.region = Region.objects.create()
-        cls.catchment = Catchment.objects.create(name='Test Catchment')
+        cls.catchment = Catchment.objects.create(name='Test Catchment', publication_status='published')
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('catchment-update', kwargs={'pk': self.catchment.pk})

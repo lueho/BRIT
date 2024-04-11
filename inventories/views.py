@@ -6,7 +6,7 @@ from dal_select2.views import Select2ListView
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
-from django.urls import reverse, reverse_lazy
+from django.urls import reverse_lazy
 from django.views.generic import CreateView, DetailView, View
 from django.views.generic.base import TemplateResponseMixin
 from django.views.generic.edit import ModelFormMixin
@@ -17,14 +17,13 @@ from maps.models import Catchment, GeoDataset
 from maps.serializers import BaseResultMapSerializer
 from maps.views import MapMixin
 from materials.models import SampleSeries
-from users.models import get_default_owner
-from utils.views import (OwnedObjectCreateView, OwnedObjectDetailView, OwnedObjectModalCreateView,
-                         OwnedObjectModalDeleteView, OwnedObjectModalUpdateView, OwnedObjectUpdateView,
-                         PublishedObjectFilterView, UserOwnedObjectFilterView)
+from utils.views import (OwnedObjectCreateView, OwnedObjectDetailView, OwnedObjectModalDeleteView,
+                         OwnedObjectUpdateView, PublishedObjectFilterView, RestrictedOwnedObjectDetailView,
+                         UserOwnedObjectFilterView)
 from .evaluations import ScenarioResult
 from .filters import ScenarioFilterSet
 from .forms import (ScenarioInventoryConfigurationAddForm, ScenarioInventoryConfigurationUpdateForm,
-                    ScenarioModalModelForm, ScenarioModelForm, SeasonalDistributionModelForm)
+                    ScenarioModelForm, SeasonalDistributionModelForm)
 from .models import (InventoryAlgorithm, InventoryAlgorithmParameter, InventoryAlgorithmParameterValue, RunningTask,
                      Scenario, ScenarioInventoryConfiguration, ScenarioStatus)
 from .tasks import run_inventory
@@ -70,15 +69,7 @@ class ScenarioCreateView(LoginRequiredMixin, OwnedObjectCreateView):
     permission_required = set()
 
 
-class ScenarioModalCreateView(OwnedObjectModalCreateView):
-    form_class = ScenarioModalModelForm
-    permission_required = 'inventories.add_scenario'
-
-    def get_success_url(self):
-        return reverse('scenario-detail', kwargs={'pk': self.object.pk})
-
-
-class ScenarioDetailView(MapMixin, OwnedObjectDetailView):
+class ScenarioDetailView(MapMixin, RestrictedOwnedObjectDetailView):
     """Summary of the Scenario with complete configuration. Page for final review, which also contains the
     'run' button."""
 
@@ -125,34 +116,10 @@ class ScenarioDetailView(MapMixin, OwnedObjectDetailView):
         run_inventory(scenario.id)
         return redirect('scenario-result', scenario.id)
 
-    def test_func(self):
-        self.object = self.get_object()
-        standard_owner = get_default_owner()
-        if self.object.owner == standard_owner:
-            if self.request.user == standard_owner:
-                self.allow_edit = True
-            return True
-        elif self.object.owner == self.request.user:
-            self.allow_edit = True
-            return True
-        else:
-            return False
-
 
 class ScenarioUpdateView(OwnedObjectUpdateView):
     model = Scenario
     form_class = ScenarioModelForm
-    permission_required = 'inventories.change_scenario'
-
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs.update({'region_id': self.object.region.id})
-        return kwargs
-
-
-class ScenarioModalUpdateView(OwnedObjectModalUpdateView):
-    model = Scenario
-    form_class = ScenarioModalModelForm
     permission_required = 'inventories.change_scenario'
 
     def get_form_kwargs(self):
