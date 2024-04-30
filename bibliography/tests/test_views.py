@@ -1,4 +1,8 @@
+from unittest.mock import patch
+
+from django.db.models.signals import post_save
 from django.urls import reverse
+from factory.django import mute_signals
 
 from utils.tests.testcases import ViewWithPermissionsTestCase
 from ..models import Author, Licence, Source
@@ -709,7 +713,8 @@ class SourceCreateViewTestCase(ViewWithPermissionsTestCase):
     def test_post_success_and_http_302_redirect_for_members_with_minimal_data(self):
         self.client.force_login(self.member)
         data = {'abbreviation': 'TS1', 'type': 'article', 'title': 'Test Source'}
-        response = self.client.post(reverse('source-create'), data=data, follow=True)
+        with mute_signals(post_save):
+            response = self.client.post(reverse('source-create'), data=data, follow=True)
         self.assertRedirects(
             response,
             f"{reverse('source-detail', kwargs={'pk': Source.objects.first().pk})}",
@@ -752,7 +757,8 @@ class SourceModalCreateViewTestCase(ViewWithPermissionsTestCase):
     def test_post_success_and_http_302_redirect_members_with_minimal_data(self):
         self.client.force_login(self.member)
         data = {'abbreviation': 'TS1', 'type': 'article', 'title': 'Test Source'}
-        response = self.client.post(reverse('source-create-modal'), data=data)
+        with mute_signals(post_save):
+            response = self.client.post(reverse('source-create-modal'), data=data)
         self.assertRedirects(
             response,
             f"{reverse('source-detail', kwargs={'pk': Source.objects.first().pk})}",
@@ -767,11 +773,12 @@ class SourceDetailViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.source = Source.objects.create(
-            abbreviation='TS1',
-            type='article',
-            title='Test Source'
-        )
+        with mute_signals(post_save):
+            cls.source = Source.objects.create(
+                abbreviation='TS1',
+                type='article',
+                title='Test Source'
+            )
 
     def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse('source-detail', kwargs={'pk': self.source.pk}))
@@ -789,11 +796,12 @@ class SourceModalDetailViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.source = Source.objects.create(
-            abbreviation='TS1',
-            type='article',
-            title='Test Source'
-        )
+        with mute_signals(post_save):
+            cls.source = Source.objects.create(
+                abbreviation='TS1',
+                type='article',
+                title='Test Source'
+            )
 
     def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse('source-detail-modal', kwargs={'pk': self.source.pk}))
@@ -811,11 +819,12 @@ class SourceUpdateViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.source = Source.objects.create(
-            abbreviation='TS1',
-            type='article',
-            title='Test Source'
-        )
+        with mute_signals(post_save):
+            cls.source = Source.objects.create(
+                abbreviation='TS1',
+                type='article',
+                title='Test Source'
+            )
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(reverse('source-update', kwargs={'pk': self.source.pk}), follow=True)
@@ -865,7 +874,8 @@ class SourceUpdateViewTestCase(ViewWithPermissionsTestCase):
             'type': self.source.type,
             'title': 'Updated Test Source'
         }
-        response = self.client.post(reverse('source-update', kwargs={'pk': self.source.pk}), data=data)
+        with mute_signals(post_save):
+            response = self.client.post(reverse('source-update', kwargs={'pk': self.source.pk}), data=data)
         self.assertRedirects(
             response,
             f"{reverse('source-detail', kwargs={'pk': self.source.pk})}",
@@ -880,11 +890,12 @@ class SourceModalUpdateViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.source = Source.objects.create(
-            abbreviation='TS1',
-            type='article',
-            title='Test Source'
-        )
+        with mute_signals(post_save):
+            cls.source = Source.objects.create(
+                abbreviation='TS1',
+                type='article',
+                title='Test Source'
+            )
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(reverse('source-update-modal', kwargs={'pk': self.source.pk}))
@@ -921,7 +932,8 @@ class SourceModalUpdateViewTestCase(ViewWithPermissionsTestCase):
             'type': self.source.type,
             'title': 'Updated Test Source'
         }
-        response = self.client.post(reverse('source-update-modal', kwargs={'pk': self.source.pk}), data=data)
+        with mute_signals(post_save):
+            response = self.client.post(reverse('source-update-modal', kwargs={'pk': self.source.pk}), data=data)
         self.assertRedirects(
             response,
             f"{reverse('source-detail', kwargs={'pk': self.source.pk})}",
@@ -936,11 +948,12 @@ class SourceModalDeleteViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.source = Source.objects.create(
-            abbreviation='TS1',
-            type='article',
-            title='Test Source'
-        )
+        with mute_signals(post_save):
+            cls.source = Source.objects.create(
+                abbreviation='TS1',
+                type='article',
+                title='Test Source'
+            )
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(reverse('source-delete-modal', kwargs={'pk': self.source.pk}))
@@ -983,19 +996,22 @@ class SourceModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         )
 
 
+@patch('bibliography.views.check_source_url.delay')
 class SourceCheckUrlViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = ['change_source']
 
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.source = Source.objects.create(
-            title='Test Source from the Web',
-            abbreviation='WORKING',
-            url='https://httpbin.org/status/200'
-        )
+        with mute_signals(post_save):
+            cls.source = Source.objects.create(
+                title='Test Source from the Web',
+                abbreviation='WORKING',
+                url='https://httpbin.org/status/200'
+            )
 
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
+    def test_get_http_302_redirect_to_login_for_anonymous(self, mock_check_task):
+        mock_check_task.return_value = type('task', (object,), {'task_id': 'fake_task_id'})
         request_url = reverse('source-check-url', kwargs={'pk': self.source.pk})
         response = self.client.get(request_url, follow=True)
         self.assertRedirects(
@@ -1005,52 +1021,61 @@ class SourceCheckUrlViewTestCase(ViewWithPermissionsTestCase):
             target_status_code=200
         )
 
-    def test_get_http_403_forbidden_for_outsiders(self):
+    def test_get_http_403_forbidden_for_outsiders(self, mock_check_task):
+        mock_check_task.return_value = type('task', (object,), {'task_id': 'fake_task_id'})
         self.client.force_login(self.outsider)
         response = self.client.get(reverse('source-check-url', kwargs={'pk': self.source.pk}))
         self.assertEqual(response.status_code, 403)
 
-    def test_get_http_200_ok_for_members(self):
+    def test_get_http_200_ok_for_members(self, mock_check_task):
+        mock_check_task.return_value = type('task', (object,), {'task_id': 'fake_task_id'})
         self.client.force_login(self.member)
         response = self.client.get(reverse('source-check-url', kwargs={'pk': self.source.pk}))
         self.assertEqual(200, response.status_code)
+        self.assertTrue(mock_check_task.called_with(self.source.pk))
 
 
+@patch('bibliography.views.check_source_urls.delay')
 class SourceListCheckUrlsViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = ['change_source']
 
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        Source.objects.create(
-            title='Test Source from the Web',
-            abbreviation='WORKING',
-            url='https://httpbin.org/status/200'
-        )
-        Source.objects.create(
-            title='Test Source from the Web',
-            abbreviation='NOTWORKING',
-            url='https://httpbin.org/status/404'
-        )
-        Source.objects.create(
-            title='Test Source from the Web',
-            abbreviation='NOTWORKING',
-            url='https://httpbin.org/status/404'
-        )
+        with mute_signals(post_save):
+            Source.objects.create(
+                title='Test Source from the Web',
+                abbreviation='WORKING',
+                url='https://httpbin.org/status/200'
+            )
+            Source.objects.create(
+                title='Test Source from the Web',
+                abbreviation='NOTWORKING',
+                url='https://httpbin.org/status/404'
+            )
+            Source.objects.create(
+                title='Test Source from the Web',
+                abbreviation='NOTWORKING',
+                url='https://httpbin.org/status/404'
+            )
 
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
+    def test_get_http_302_redirect_to_login_for_anonymous(self, mock_check_task):
+        mock_check_task.return_value = type('task', (object,), {'task_id': 'fake_task_id'})
         request_url = f"{reverse('source-list-check-urls')}?url_valid=False"
         response = self.client.get(request_url, follow=True)
         self.assertRedirects(response, f"{reverse('auth_login')}?next={request_url}", status_code=302)
 
-    def test_get_http_403_forbidden_for_outsiders(self):
+    def test_get_http_403_forbidden_for_outsiders(self, mock_check_task):
+        mock_check_task.return_value = type('task', (object,), {'task_id': 'fake_task_id'})
         self.client.force_login(self.outsider)
         request_url = f"{reverse('source-list-check-urls')}?url_valid=False"
         response = self.client.get(request_url)
         self.assertEqual(response.status_code, 403)
 
-    def test_get_http_200_ok_for_members(self):
+    def test_get_http_200_ok_for_members(self, mock_check_task):
+        mock_check_task.return_value = type('task', (object,), {'task_id': 'fake_task_id'})
         self.client.force_login(self.member)
         request_url = f"{reverse('source-list-check-urls')}?url_valid=False&page=1"
         response = self.client.get(request_url)
         self.assertEqual(200, response.status_code)
+        self.assertTrue(mock_check_task.called_with(url_valid=False))

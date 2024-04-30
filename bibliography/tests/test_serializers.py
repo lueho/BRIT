@@ -1,8 +1,10 @@
 from collections import OrderedDict
 from datetime import date
 
+from django.db.models.signals import post_save
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
+from factory.django import mute_signals
 
 from users.models import get_default_owner
 from ..models import Author, Licence, Source
@@ -32,7 +34,8 @@ class SourceSerializerTest(TestCase):
     def test_serializer_with_valid_data(self):
         serializer = SourceModelSerializer(data=self.source_data)
         self.assertTrue(serializer.is_valid())
-        source = serializer.save()
+        with mute_signals(post_save):
+            source = serializer.save()
 
         self.assertEqual(Source.objects.count(), 1)
         self.assertEqual(source.authors.count(), 2)
@@ -48,15 +51,17 @@ class SourceSerializerTest(TestCase):
 
     def test_update_source_with_serializer(self):
         licence = Licence.objects.create(**self.licence_data)
-        source = Source.objects.create(licence=licence, **{key: self.source_data[key] for key in self.source_data if
-                                                           key != 'authors' and key != 'licence'})
+        with mute_signals(post_save):
+            source = Source.objects.create(licence=licence, **{key: self.source_data[key] for key in self.source_data if
+                                                               key != 'authors' and key != 'licence'})
 
         update_data = self.source_data.copy()
         update_data['title'] = 'Updated Test Source'
         serializer = SourceModelSerializer(source, data=update_data)
 
         self.assertTrue(serializer.is_valid())
-        updated_source = serializer.save()
+        with mute_signals(post_save):
+            updated_source = serializer.save()
 
         self.assertEqual(updated_source.title, 'Updated Test Source')
 
@@ -158,24 +163,25 @@ class HyperlinkedSourceSerializerTestCase(TestCase):
         cls.author1 = Author.objects.create(owner=owner, first_names='One', last_names='Test Author')
         cls.author2 = Author.objects.create(owner=owner, first_names='Two', last_names='Test Author')
         licence = Licence.objects.create(owner=owner, name='Test Licence', reference_url='https://www.licence.com')
-        source = Source.objects.create(
-            owner=owner,
-            type='custom',
-            title='Test Source',
-            abbreviation='TS1',
-            licence=licence,
-            publisher='Test Publisher',
-            journal='Test Journal',
-            issue='Test Issue',
-            year=2022,
-            abstract='Test Abstract',
-            attributions='Test Attributions',
-            url='https://www.test_url.org',
-            url_valid=True,
-            url_checked=date.today(),
-            doi='10.1000/282',
-            last_accessed=date.today()
-        )
+        with mute_signals(post_save):
+            source = Source.objects.create(
+                owner=owner,
+                type='custom',
+                title='Test Source',
+                abbreviation='TS1',
+                licence=licence,
+                publisher='Test Publisher',
+                journal='Test Journal',
+                issue='Test Issue',
+                year=2022,
+                abstract='Test Abstract',
+                attributions='Test Attributions',
+                url='https://www.test_url.org',
+                url_valid=True,
+                url_checked=date.today(),
+                doi='10.1000/282',
+                last_accessed=date.today()
+            )
         source.authors.set([cls.author1, cls.author2])
         cls.source = source
 
@@ -223,7 +229,8 @@ class SourceAbbreviationSerializerTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         owner = get_default_owner()
-        Source.objects.create(owner=owner, title='Test Source', abbreviation='(TS, 1955)')
+        with mute_signals(post_save):
+            Source.objects.create(owner=owner, title='Test Source', abbreviation='(TS, 1955)')
 
     def setUp(self):
         self.source = Source.objects.get(title='Test Source')

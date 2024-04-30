@@ -1,8 +1,9 @@
+from django.db.models.signals import post_save
 from django.test import TestCase, RequestFactory
 from django.urls import reverse
+from factory.django import mute_signals
 
 from users.models import get_default_owner
-
 from ..filters import SourceFilter
 from ..models import Author, Licence, Source
 
@@ -17,22 +18,24 @@ class SourceFilterTestCase(TestCase):
         cls.author1 = Author.objects.create(owner=owner, first_names='One', last_names='Test Author')
         author2 = Author.objects.create(owner=owner, first_names='Two', last_names='Test Author')
         licence = Licence.objects.create(owner=owner, name='Test Licence', reference_url='https://www.test-licence.org')
-        cls.source = Source.objects.create(
-            owner=owner,
-            type='custom',
-            title='Test Custom Source',
-            abbreviation='TS1',
-            licence=licence,
-        )
+        with mute_signals(post_save):
+            cls.source = Source.objects.create(
+                owner=owner,
+                type='custom',
+                title='Test Custom Source',
+                abbreviation='TS1',
+                licence=licence,
+            )
         cls.source.authors.add(cls.author1)
         cls.source.authors.add(author2)
-        source = Source.objects.create(
-            owner=owner,
-            type='book',
-            title='Test Book',
-            abbreviation='TS2',
-            licence=licence,
-        )
+        with mute_signals(post_save):
+            source = Source.objects.create(
+                owner=owner,
+                type='book',
+                title='Test Book',
+                abbreviation='TS2',
+                licence=licence,
+            )
         source.authors.add(author2)
 
     def test_title_icontains(self):

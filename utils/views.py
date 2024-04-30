@@ -6,10 +6,12 @@ from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin, UserPassesTestMixin
 from django.contrib.messages.views import SuccessMessageMixin
 from django.core.exceptions import FieldError, ImproperlyConfigured, PermissionDenied
+from django.db.models.signals import post_save
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.template.loader import render_to_string
 from django.views.generic import CreateView, DetailView, ListView, TemplateView, UpdateView
 from django_filters.views import FilterView
+from factory.django import mute_signals
 
 
 class NextOrSuccessUrlMixin:
@@ -192,8 +194,8 @@ class OwnedObjectModalCreateView(CreateOwnedObjectMixin, BSModalCreateView):
             if asyncUpdate:
                 self.object = form.save()
             return HttpResponse(status=204)
-
-        self.object = form.save()
+        with mute_signals(post_save):
+            self.object = form.save()
         messages.success(self.request, self.get_success_message())
         return HttpResponseRedirect(self.get_success_url())
 

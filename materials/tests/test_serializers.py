@@ -1,5 +1,7 @@
+from django.db.models.signals import post_save
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
+from factory.django import mute_signals
 
 from bibliography.models import Source
 from distributions.models import Timestep
@@ -74,7 +76,8 @@ class SampleSerializerTestCase(TestCase):
         series = SampleSeries.objects.create(owner=owner, name='Test Series', material=material)
         sample = Sample.objects.create(owner=owner, name='Test Sample', series=series,
                                        timestep=Timestep.objects.default())
-        source = Source.objects.create(owner=owner, title='Test Source')
+        with mute_signals(post_save):
+            source = Source.objects.create(owner=owner, title='Test Source')
         sample.sources.add(source)
 
     def setUp(self):

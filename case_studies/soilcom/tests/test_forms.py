@@ -1,9 +1,10 @@
 from datetime import date
-from factory.django import mute_signals
 
 from django.db.models import signals
+from django.db.models.signals import post_save
 from django.forms import formset_factory
 from django.test import TestCase
+from factory.django import mute_signals
 
 from distributions.models import TemporalDistribution, Timestep
 from materials.models import Material, MaterialCategory, Sample, SampleSeries
@@ -393,7 +394,8 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
         formset = WasteFlyerModelFormSet(parent_object=self.collection, owner=self.collection.owner, data=data,
                                          relation_field_name='flyers')
         self.assertTrue(formset.is_valid())
-        formset.save()
+        with mute_signals(post_save):
+            formset.save()
         WasteFlyer.objects.get(url='https://www.fest-flyers.org')
         self.assertEqual(len(initial_urls) + 1, self.collection.flyers.count())
 
@@ -447,7 +449,8 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
         formset = WasteFlyerModelFormSet(data=data, parent_object=self.collection, relation_field_name='flyers')
         self.assertTrue(formset.is_valid())
         original_flyer_count = WasteFlyer.objects.count()
-        formset.save()
+        with mute_signals(signals.post_save):
+            formset.save()
         # get raises an error if the query returns more than one instance
         WasteFlyer.objects.get(url=url)
         # one should be deleted and one created ==> +-0

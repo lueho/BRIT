@@ -1,15 +1,15 @@
-from celery import chord
-from factory.django import mute_signals
+from collections import namedtuple
 
+from celery import chord
 from django.contrib.auth.models import User, Permission
 from django.db.models import signals
-from django.http.request import QueryDict, MultiValueDict
+from django.http.request import MultiValueDict, QueryDict
 from django.test import TestCase
+from factory.django import mute_signals
 from mock import patch, Mock
 
 from maps.models import Region
 from users.models import get_default_owner
-
 from ..models import (Collection, CollectionCatchment, CollectionSystem, CollectionFrequency, Collector,
                       MaterialCategory, WasteCategory, WasteComponent, WasteFlyer, WasteStream)
 from ..renderers import CollectionXLSXRenderer
@@ -85,6 +85,8 @@ class ExportCollectionToFileTestCase(TestCase):
         self.assertEqual('SUCCESS', task.status)
 
 
+@patch('case_studies.soilcom.tests.test_tasks.check_wasteflyer_urls.apply')
+@patch('case_studies.soilcom.tests.test_tasks.chord')
 class CheckWasteFlyerUrlsTestCase(TestCase):
 
     @classmethod
@@ -102,7 +104,9 @@ class CheckWasteFlyerUrlsTestCase(TestCase):
     def setUp(self):
         self.flyer = WasteFlyer.objects.first
 
-    def test_initial(self):
+    def test_initial(self, mock_chord, mock_apply):
+        MockAsyncResult = namedtuple('MockAsyncResult', ['status', 'get'])
+        mock_apply.return_value = MockAsyncResult(status='SUCCESS', get=lambda: None)
         self.assertEqual(4, WasteFlyer.objects.count())
         params = {
             'csrfmiddlewaretoken': ['Hm7MXB2NjRCOIpNbGaRKR87VCHM5KwpR1t4AdZFgaqKfqui1EJwhKKmkxFKDfL3h'],
@@ -121,7 +125,10 @@ class CheckWasteFlyerUrlsTestCase(TestCase):
             result.get()
         self.assertEqual('SUCCESS', result.status)
 
-    def test_something(self):
+    def test_chord(self, mock_chord, mock_apply):
+        mock_chord.return_value = lambda x: type('task', (object,), {'task_id': 'fake_task_id'})
+        mock_apply.side_effect = [type('task', (object,), {'status': 'SUCCESS'}) for _ in WasteFlyer.objects.all()]
         callback = check_wasteflyer_urls_callback.s()
         header = [check_wasteflyer_url.s(flyer.pk) for flyer in WasteFlyer.objects.all()]
         result = chord(header)(callback)
+        self.assertEqual(result.task_id, 'fake_task_id')

@@ -4,6 +4,7 @@ from datetime import date, timedelta
 from urllib.parse import urlencode
 
 from django.db.models import signals
+from django.db.models.signals import post_save
 from django.forms.formsets import BaseFormSet
 from django.http import JsonResponse
 from django.http.request import MultiValueDict, QueryDict
@@ -1103,8 +1104,9 @@ class CollectionDetailViewTestCase(ViewWithPermissionsTestCase):
         )
         cls.collection.add_predecessor(cls.predecessor_collection_1)
         cls.collection.add_predecessor(cls.predecessor_collection_2)
-        cls.collection.flyers.add(
-            WasteFlyer.objects.create(abbreviation='Test Flyer', url='https://www.test-flyer.org'))
+        with mute_signals(post_save):
+            cls.collection.flyers.add(
+                WasteFlyer.objects.create(abbreviation='Test Flyer', url='https://www.test-flyer.org'))
 
     def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse('collection-detail', kwargs={'pk': self.collection.pk}))
@@ -1654,7 +1656,8 @@ class CollectionUpdateViewTestCase(ViewWithPermissionsTestCase):
             'form-1-url': 'https://www.fest-flyer.org',
             'form-1-id': '',
         }
-        response = self.client.post(reverse('collection-update', kwargs={'pk': self.collection.id}), data=data)
+        with mute_signals(post_save):
+            response = self.client.post(reverse('collection-update', kwargs={'pk': self.collection.id}), data=data)
         self.assertEqual(response.status_code, 302)
         self.assertIn(WasteFlyer.objects.get(url='https://www.fest-flyer.org'), self.collection.flyers.all())
         self.assertIn(WasteFlyer.objects.get(url='https://www.test-flyer.org'), self.collection.flyers.all())

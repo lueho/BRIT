@@ -1,12 +1,12 @@
 from celery import chord
-
+from django.db.models.signals import post_save
 from django.http.request import QueryDict, MultiValueDict
 from django.utils import timezone
+from factory.django import mute_signals
 
+import utils.file_export.storages
 from bibliography.utils import check_url
 from brit.celery import app
-import utils.file_export.storages
-
 from .filters import CollectionFilterSet
 from .filters import WasteFlyerFilter
 from .models import Collection
@@ -35,7 +35,8 @@ def check_wasteflyer_url(pk):
     flyer = WasteFlyer.objects.get(pk=pk)
     flyer.url_valid = check_url(flyer.url)
     flyer.url_checked = timezone.now()
-    flyer.save()
+    with mute_signals(post_save):
+        flyer.save()
     return True
 
 
