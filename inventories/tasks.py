@@ -3,7 +3,7 @@ import importlib
 from celery import chord
 
 from brit.celery import app
-from inventories.models import InventoryAlgorithm, Scenario, ScenarioStatus, RunningTask
+from inventories.models import Algorithm, Scenario, ScenarioStatus, RunningTask
 from layer_manager.models import Layer
 from materials.models import SampleSeries
 
@@ -29,7 +29,7 @@ def run_inventory(scenario_id):
     for task in task_chord.tasks:
         source_module = task.args[0].split('.')[1]
         function_name = task.args[0].split(':')[1]
-        algorithm = InventoryAlgorithm.objects.get(source_module=source_module, function_name=function_name)
+        algorithm = Algorithm.objects.get(source_module=source_module, function_name=function_name)
         RunningTask.objects.create(scenario=scenario, uuid=task.id, algorithm=algorithm)
 
     return result
@@ -41,7 +41,7 @@ def run_inventory_algorithm(self, module_function, **kwargs):
     function_name = module_function.split(':')[1]
     module = importlib.import_module(source_module)
     results = getattr(module.InventoryAlgorithms, function_name)(**kwargs)
-    algorithm = InventoryAlgorithm.objects.get(source_module=source_module.split('.')[1], function_name=function_name)
+    algorithm = Algorithm.objects.get(source_module=source_module.split('.')[1], function_name=function_name)
     kwargs = {
         'name': algorithm.function_name,
         'scenario': Scenario.objects.get(id=kwargs.get('scenario_id')),

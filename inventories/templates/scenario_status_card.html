@@ -1,0 +1,36 @@
+<div class="card shadow mt-4">
+    <div class="card-header">Status</div>
+    <div class="card-body">
+        {# status = CHANGED #}
+        {% if object.status == 1 %}
+            <p class="card-text">Start the evaluation of this inventory scenario.</p>
+            <div class="text-center">
+                <form method="post">
+                    {% csrf_token %}
+                    <button type="submit" name="run" class="btn btn-primary">
+                        Run
+                    </button>
+                </form>
+            </div>
+            {# status = RUNNING #}
+        {% elif object.status == 2 %}
+            <p class="card-text">The scenario evaluation is currently running.</p>
+            <div class="text-center">
+                <a class="btn btn-primary w-75"
+                   href="{% url 'scenario-result' object.id %}">
+                    Show progress
+                </a>
+            </div>
+            {# status = FINISHED #}
+        {% elif object.status == 3 %}
+            <p class="card-text">Show the summary results of the inventories:</p>
+            <div class="text-center">
+                <a class="btn btn-primary w-75"
+                   href="{% url 'scenario-result' object.id %}">
+                    Show results
+                </a>
+            </div>
+        {% endif %}
+    </div>
+    <div class="card-footer"></div>
+</div>

@@ -1,3 +1,4 @@
+"use strict";
 // Set new default font family and font color to mimic Bootstrap's default styling
 Chart.defaults.global.defaultFontFamily =
     'Nunito', '-apple-system,system-ui,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif';
@@ -7,13 +8,13 @@ function number_format(number, decimals, dec_point, thousands_sep) {
     // *     example: number_format(1234.56, 2, ',', ' ');
     // *     return: '1 234,56'
     number = (number + '').replace(',', '').replace(' ', '');
-    let n = !isFinite(+number) ? 0 : +number;
-    let prec = !isFinite(+decimals) ? 0 : Math.abs(decimals);
-    let sep = (typeof thousands_sep === 'undefined') ? ',' : thousands_sep;
-    let dec = (typeof dec_point === 'undefined') ? '.' : dec_point;
+    const n = !isFinite(+number) ? 0 : +number;
+    const prec = !isFinite(+decimals) ? 0 : Math.abs(decimals);
+    const sep = (typeof thousands_sep === 'undefined') ? ',' : thousands_sep;
+    const dec = (typeof dec_point === 'undefined') ? '.' : dec_point;
     let s;
-    let toFixedFix = function (n, prec) {
-        let k = Math.pow(10, prec);
+    const toFixedFix = function(n, prec) {
+        const k = Math.pow(10, prec);
         return '' + Math.round(n * k) / k;
     };
     // Fix for IE parseFloat(0.55).toFixed(0) = 0;
@@ -29,13 +30,11 @@ function number_format(number, decimals, dec_point, thousands_sep) {
 }
 
 function chartDefinition(type, labels, values, unit, show_legend) {
-
-
     switch (type) {
-        case 'barchart':
-            return barChartDefinition(labels, values, unit, show_legend);
-        case 'stacked_barchart':
-            return barChartDefinition(labels, values, unit, show_legend);
+    case 'barchart':
+        return barChartDefinition(labels, values, unit, show_legend);
+    case 'stacked_barchart':
+        return barChartDefinition(labels, values, unit, show_legend);
     }
 
 }
@@ -49,11 +48,11 @@ function barChartDefinition(xlabels, data, unit, show_legend) {
         "#f49a33",
         "#826937",
         "#fcc767"
-    ]
+    ];
 
     for (let i = 0; i < data.length; i++) {
-        data[i]['backgroundColor'] = bg_colors[i]
-        data[i]['backgroundColor'] = bg_colors[i]
+        data[i].backgroundColor = bg_colors[i];
+        data[i].backgroundColor = bg_colors[i];
         // data[i]['hoverBackgroundColor'] = TODO
         // data[i]['borderColor'] = TODO
     }
@@ -77,16 +76,16 @@ function barChartDefinition(xlabels, data, unit, show_legend) {
                 display: false
             },
             legendCallback: chart => {
-                let html = '<ul style="list-style-type: none;">'
+                let html = '<ul style="list-style-type: none;">';
                 chart.data.datasets.forEach((ds, i) => {
                     const bgColor = ds.backgroundColor[i];
                     // const border = ds.borderWidth + 'px solid ' + ds.borderColor[i];
                     html += '<li>' +
                         '<div style="display: inline-block; margin-right: 10px; width: 25px; height: 0.8rem; background-color: ' + ds.backgroundColor + '"></div>' +
                         '<span style="display: inline-block; font-size: small;">' + ds.label + '</span>' +
-                        '</li>'
-                })
-                return html += '</ul>'
+                        '</li>';
+                });
+                return html += '</ul>';
             },
             maintainAspectRatio: false,
             scales: {
@@ -135,12 +134,12 @@ function barChartDefinition(xlabels, data, unit, show_legend) {
                 displayColors: false,
                 caretPadding: 10,
                 callbacks: {
-                    label: function (tooltipItem, chart) {
+                    label: function(tooltipItem, chart) {
                         const datasetLabel = chart.datasets[tooltipItem.datasetIndex].label || '';
                         return datasetLabel + ': ' + number_format(tooltipItem.yLabel) + ' ' + unit;
                     }
                 }
             },
         }
-    }
+    };
 }

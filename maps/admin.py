@@ -48,7 +48,7 @@ class RegionAdmin(OSMGeoAdmin):
     #                    alg.geodataset.name,
     #                    reverse('admin:inventories_material_change', args=(alg.feedstock.id,)),
     #                    alg.feedstock.name)
-    #                   for alg in InventoryAlgorithm.objects.filter(geodataset__region=obj)]
+    #                   for alg in Algorithm.objects.filter(geodataset__region=obj)]
     #     algorithm_list = format_html_join(
     #         '\n', "<li><a href='{}'>{}</a>: <a href='{}'>{}</a></li>",
     #         (alg for alg in algorithms)

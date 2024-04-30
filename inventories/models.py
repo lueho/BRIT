@@ -6,33 +6,29 @@ from django.db import models
 from django.db.models.query import QuerySet
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
-from django.urls import reverse
 
 import case_studies
 from bibliography.models import Source
 from distributions.models import Timestep
 from maps.models import Catchment, GeoDataset, Region
 from materials.models import Material, SampleSeries
-from utils.models import NamedUserObjectModel
+from utils.models import NamedUserObjectModel, OwnedObjectModel
 from .exceptions import BlockedRunningScenario
 
 
-class InventoryAlgorithm(models.Model):
+class Algorithm(NamedUserObjectModel):
     """
     Links functions that are defined in the InventoryMixin to the corresponding geodatasets and feedstocks in the
     database. This model is for configuration by admins and must not be available to users. Customization by users can
-    be done in InventoryAlgorithmParameter and InventoryAlgorithmParameterValue.
+    be done in Parameter and ParameterValue.
     """
-    name = models.CharField(max_length=56)
     source_module = models.CharField(max_length=255, null=True)
     function_name = models.CharField(max_length=56, null=True)
-    description = models.TextField(blank=True, null=True)
-    geodataset = models.ForeignKey(GeoDataset, on_delete=models.CASCADE)  # TODO: Make many2many?
+    geodataset = models.ForeignKey(GeoDataset, on_delete=models.CASCADE,
+                                   related_name='algorithms')  # TODO: Make many2many?
     feedstocks = models.ManyToManyField(Material)
     default = models.BooleanField('Default for this combination of geodataset and feedstock', default=False)
     source = models.ForeignKey(Source, on_delete=models.PROTECT, null=True)
-
-    # TODO: How are default values controlled?
 
     @staticmethod
     def available_modules():
@@ -48,10 +44,10 @@ class InventoryAlgorithm(models.Model):
         Returns a queryset of all default values of parameters of this algorithm.
         """
         values = {}
-        for parameter in self.inventoryalgorithmparameter_set.all():
+        for parameter in self.parameters.all():
             if parameter not in values.keys():
                 values[parameter] = []
-            for value in InventoryAlgorithmParameterValue.objects.filter(parameter=parameter, default=True):
+            for value in ParameterValue.objects.filter(parameter=parameter, default=True):
                 values[parameter].append(value)
         return values
 
@@ -59,38 +55,46 @@ class InventoryAlgorithm(models.Model):
         return self.name
 
 
-class InventoryAlgorithmParameter(models.Model):
+class Parameter(NamedUserObjectModel):
+    """
+    The Parameter model represents a parameter that is associated with an algorithm.
+    """
+
     descriptive_name = models.CharField(max_length=56)
     short_name = models.CharField(max_length=28,
                                   validators=[RegexValidator(regex=r'^\w{1,28}$',
                                                              message='Invalid parameter short_name. Do not use space'
                                                                      'or special characters.',
                                                              code='invalid_parameter_name')])
-    description = models.TextField(blank=True, null=True)
-    inventory_algorithm = models.ManyToManyField(InventoryAlgorithm)  # TODO: convert to foreign key
+    algorithm = models.ForeignKey(Algorithm, on_delete=models.CASCADE, related_name='parameters')
     unit = models.CharField(max_length=20, blank=True, null=True)
     is_required = models.BooleanField(default=False)
-
-    def default_value(self):
-        return InventoryAlgorithmParameterValue.objects.get(parameter=self, default=True)
+    data_type = models.CharField(max_length=50)
+    default_value = models.ForeignKey('ParameterValue', on_delete=models.PROTECT, related_name='default_for', null=True)
 
     def __str__(self):
         return self.short_name
 
 
-class InventoryAlgorithmParameterValue(models.Model):
+class ParameterValue(NamedUserObjectModel):
+    """
+    The ParameterValue model represents the value of a parameter that is associated with an algorithm.
+    """
+
     class ValueType(models.IntegerChoices):
+        """
+        The ValueType model represents the type of the value of a parameter.
+        It can be either NUMERIC (1) or SELECTION (2).
+        """
         NUMERIC = 1
         SELECTION = 2
 
-    name = models.CharField(max_length=56)
+    # TODO: This should now be data_type in Parameter
     type = models.IntegerField(choices=ValueType.choices, default=ValueType.NUMERIC)
-    description = models.TextField(blank=True, null=True)
-    parameter = models.ForeignKey(InventoryAlgorithmParameter, on_delete=models.CASCADE, null=True)
+    parameter = models.ForeignKey(Parameter, on_delete=models.CASCADE, null=True, related_name='values')
     value = models.FloatField()
     standard_deviation = models.FloatField(blank=True, null=True)
-    source = models.CharField(max_length=200, blank=True, null=True)  # TODO: connect to bibliography
-    default = models.BooleanField(default=False)
+    source = models.ForeignKey(Source, on_delete=models.CASCADE, null=True)
 
     def __str__(self):
         if self.type == 1:
@@ -98,29 +102,6 @@ class InventoryAlgorithmParameterValue(models.Model):
         elif self.type == 2:
             return f'{self.name}'
         return self.name
-
-
-@receiver(pre_save, sender=InventoryAlgorithmParameterValue)
-def auto_default(_, instance, **kwargs):
-    """
-    Makes sure that defaults are always set correctly, even if the user provides incoherent input.
-    """
-    # If there is no default, yet, make the new instance default
-    if not instance.default:
-        if not instance.parameter.inventoryalgorithmparametervalue_set.exclude(id=instance.id).filter(default=True):
-            instance.default = True
-
-
-@receiver(post_save, sender=InventoryAlgorithmParameterValue)
-def manage_scenario_status(sender, instance, created, **kwargs):
-    """
-    Makes sure that defaults are always set correctly, even if the user provides incoherent input.
-    """
-    # If the new instance is set to default and there are other old defaults, override them.
-    if instance.default:
-        for val in instance.parameter.inventoryalgorithmparametervalue_set.exclude(id=instance.id).filter(default=True):
-            val.default = False
-            val.save()
 
 
 class ScenarioConfigurationError(Exception):
@@ -138,12 +119,6 @@ class FeedstockNotImplemented(Exception):
         algorithm for it in this region"""
 
 
-SCENARIO_STATUS = (
-    ('administrative', 'administrative'),
-    ('custom', 'custom'),
-)
-
-
 class ScenarioStatus(models.Model):
     class Status(models.IntegerChoices):
         CHANGED = 1
@@ -158,12 +133,9 @@ class ScenarioStatus(models.Model):
 
 
 class Scenario(NamedUserObjectModel):
-    name = models.CharField(max_length=56, default='Custom Scenario')
-    owner = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
     description = models.TextField(blank=True, null=True)
     region = models.ForeignKey(Region, on_delete=models.CASCADE, null=True)
-    catchment = models.ForeignKey(Catchment, on_delete=models.CASCADE, null=True,
-                                  related_name='catchment')  # TODO: make many-to-many?
+    catchment = models.ForeignKey(Catchment, on_delete=models.CASCADE, null=True, related_name='catchment')
 
     @property
     def status(self):
@@ -179,18 +151,11 @@ class Scenario(NamedUserObjectModel):
             self.scenariostatus.status = status
             self.scenariostatus.save()
 
-    def available_feedstocks(self):
-        """
-        Returns all materials that can be included in this scenario.
-        """
-        materials = Material.objects.filter(id__in=self.available_inventory_algorithms().values('feedstocks'))
-        return SampleSeries.objects.filter(material__in=materials)
-
     def feedstocks(self):
         """
         Returns all materials (SampleSeries) that have been included in this scenario.
         """
-        return SampleSeries.objects.filter(id__in=self.scenarioinventoryconfiguration_set.all().values('feedstock'))
+        return SampleSeries.objects.filter(id__in=self.scenarioconfiguration_set.all().values('feedstock'))
 
     def available_geodatasets(self, feedstock: Material = None, feedstocks: QuerySet = None):
         """
@@ -204,25 +169,8 @@ class Scenario(NamedUserObjectModel):
             feedstocks = Material.objects.filter(id=feedstock.id)
 
         return GeoDataset.objects.filter(
-            id__in=InventoryAlgorithm.objects.filter(
+            id__in=Algorithm.objects.filter(
                 feedstocks__in=feedstocks, geodataset__region=self.region).values('geodataset'))
-
-    def evaluated_geodatasets(self, feedstock: Material = None, feedstocks: QuerySet = None):
-        if feedstocks is None and feedstock is None:
-            feedstocks = Material.objects.filter(type='material')
-        elif feedstocks is None and feedstock is not None:
-            feedstocks = Material.objects.filter(id=feedstock.id)
-        return GeoDataset.objects.filter(
-            id__in=ScenarioInventoryConfiguration.objects.filter(
-                scenario=self, feedstock__material__in=feedstocks).values('geodataset'))
-
-    def remaining_geodataset_options(self, feedstock: Material = None, feedstocks: QuerySet = None):
-        if feedstocks is None and feedstock is None:
-            feedstocks = Material.objects.filter(type='material')
-        elif feedstocks is None and feedstock is not None:
-            feedstocks = Material.objects.filter(id=feedstock.id)
-        return self.available_geodatasets(
-            feedstocks=feedstocks).difference(self.evaluated_geodatasets(feedstocks=feedstocks))
 
     def available_inventory_algorithms(self,
                                        feedstock: Material = None,
@@ -242,149 +190,15 @@ class Scenario(NamedUserObjectModel):
 
         geodatasets = geodatasets.filter(region=self.region)
 
-        return InventoryAlgorithm.objects.filter(feedstocks__in=feedstocks, geodataset__in=geodatasets)
-
-    def evaluated_inventory_algorithms(self):
-        return InventoryAlgorithm.objects.filter(
-            id__in=ScenarioInventoryConfiguration.objects.filter(scenario=self).values('inventory_algorithm'))
-
-    def remaining_inventory_algorithm_options(self, feedstock, geodataset):
-
-        if ScenarioInventoryConfiguration.objects.filter(scenario=self, feedstock=feedstock, geodataset=geodataset):
-            return InventoryAlgorithm.objects.none()
-        else:
-            return InventoryAlgorithm.objects.filter(feedstock=feedstock.material, geodataset=geodataset)
+        return Algorithm.objects.filter(feedstocks__in=feedstocks, geodataset__in=geodatasets)
 
     def default_inventory_algorithms(self):
-        return InventoryAlgorithm.objects.filter(geodataset__region=self.region,
-                                                 default=True)
-
-    def inventory_algorithm_config(self, algorithm):
-        return {
-            'scenario': self,
-            'feedstocks': Material.objects.filter(id__in=[c['feedstock_id'] for c in
-                                                          self.scenarioinventoryconfiguration_set.filter(
-                                                              inventory_algorithm=algorithm).values()]),
-            'geodataset': algorithm.geodataset,
-            'inventory_algorithm': algorithm,
-            'parameters': [{conf.inventory_parameter.id: conf.inventory_value.id} for conf in
-                           ScenarioInventoryConfiguration.objects.filter(scenario=self, inventory_algorithm=algorithm)]
-        }
-
-    def add_inventory_algorithm(self, feedstock: Material, algorithm: InventoryAlgorithm, custom_parameter_values=None):
-        """
-        Adds an inventory algorithm to and the given parameter values to the scenario configuration. If no
-        parameter values are given, the algorithm will be added with default values.
-        """
-
-        # self.remove_inventory_algorithm(algorithm, feedstock)
-
-        if feedstock not in self.available_feedstocks():
-            raise FeedstockNotImplemented(feedstock)
-
-        if custom_parameter_values:
-            # for value in custom_parameter_values:
-            #     if not value.parameter.inventory_algorithm == algorithm:
-            #         raise WrongParameterForInventoryAlgorithm(value)
-            values = custom_parameter_values
-        else:
-            values = algorithm.default_values()
-
-        if not values:
-            config = {
-                'scenario': self,
-                'feedstock': feedstock,
-                'geodataset': algorithm.geodataset,
-                'inventory_algorithm': algorithm,
-            }
-            ScenarioInventoryConfiguration.objects.create(**config)
-            return
-
-        for parameter, value_list in values.items():
-            for value in value_list:
-                config = {
-                    'scenario': self,
-                    'feedstock': feedstock,
-                    'geodataset': algorithm.geodataset,
-                    'inventory_algorithm': algorithm,
-                    'inventory_parameter': parameter,
-                    'inventory_value': value
-                }
-                ScenarioInventoryConfiguration.objects.create(**config)
-
-    def remove_inventory_algorithm(self, algorithm: InventoryAlgorithm, feedstock: SampleSeries):
-        """
-        Remove all entries from the configuration that are associated with the given algorithm.
-        """
-        for config_entry in ScenarioInventoryConfiguration.objects.filter(scenario=self,
-                                                                          inventory_algorithm=algorithm,
-                                                                          feedstock=feedstock):
-            config_entry.delete()
-
-    # def delete(self, **kwargs):
-    #     self.delete_configuration()  # TODO: Does this happen automatically through cascading?
-    #     super().delete()
+        return Algorithm.objects.filter(geodataset__region=self.region,
+                                        default=True)
 
     def delete_result_layers(self):
         for layer in self.layer_set.all():
             layer.delete()
-
-    def delete_configuration(self):
-        """
-        Removes all entries from the configuration that are associated with this scenario. Handle with care!
-        An improperly configured scenario will lead to unexpected behaviour.
-        """
-        for config_entry in ScenarioInventoryConfiguration.objects.filter(scenario=self):
-            config_entry.delete()
-
-    def reset_configuration(self):
-        self.delete_configuration()
-        self.create_default_configuration()
-
-    def is_valid_configuration(self):
-        # At least one entry for a scenario
-        if not ScenarioInventoryConfiguration.objects.filter(scenario=self):
-            raise ScenarioConfigurationError('The scenario is not configured.')
-
-        # Get all inventory algorithms that are used in this scenario
-        algorithms = [c.inventory_algorithm for c in
-                      ScenarioInventoryConfiguration.objects.filter(scenario=self).distinct('inventory_algorithm')]
-
-        # Are all required parameters included in the configuration?
-        required = \
-            InventoryAlgorithmParameter.objects.filter(inventory_algorithm__in=algorithms, is_required=True) \
-                .values_list('id')
-        configured = \
-            ScenarioInventoryConfiguration.objects.filter(inventory_algorithm__in=algorithms) \
-                .values_list('inventory_parameter')
-        if not set(required).issubset(configured):
-            raise ScenarioConfigurationError('Not all required parameters are defined.')
-
-        # Is each parameter only defined once per scenario?
-        if not len(set(configured)) == len(configured):
-            raise ScenarioConfigurationError('There are double defined parameters in the configuration')
-
-    def create_default_configuration(self):
-        """
-        Gathers all defaults that are necessary to evaluate a defined base scenario and saves them as entries in
-        ScenarioInventoryConfiguration. The scenario can now be evaluated with defaults or be customized in a second
-        step.
-        :return:
-        """
-        for parameter in InventoryAlgorithmParameter.objects.filter(
-                inventory_algorithm__in=self.default_inventory_algorithms()
-        ):
-            config_entry = ScenarioInventoryConfiguration()
-            config_entry.scenario = self
-            config_entry.feedstock = parameter.inventory_algorithm.feedstock
-            config_entry.inventory_algorithm = parameter.inventory_algorithm
-            config_entry.geodataset = parameter.inventory_algorithm.geodataset
-            config_entry.inventory_parameter = parameter
-            config_entry.inventory_value = parameter.default_value()
-            config_entry.save()
-
-    def configuration(self):
-        return ScenarioInventoryConfiguration.objects.filter(scenario=self)
 
     def configuration_as_dict(self):
         """
@@ -394,36 +208,34 @@ class Scenario(NamedUserObjectModel):
         """
 
         inventory_config = {}
-        for entry in ScenarioInventoryConfiguration.objects.filter(scenario=self):
-            feedstock = entry.feedstock.id
-            function = 'case_studies.' + \
-                       entry.inventory_algorithm.source_module + \
-                       '.algorithms:' + \
-                       entry.inventory_algorithm.function_name
-            parameter = entry.inventory_parameter.short_name if entry.inventory_parameter else None
-            if entry.inventory_value:
-                value = entry.inventory_value.value
-                standard_deviation = entry.inventory_value.standard_deviation
-
-            if feedstock not in inventory_config.keys():
-                inventory_config[feedstock] = {}
-            if function not in inventory_config[feedstock].keys():
-                inventory_config[feedstock][function] = {}
-                inventory_config[feedstock][function]['catchment_id'] = self.catchment.id
-                inventory_config[feedstock][function]['scenario_id'] = self.id
-                inventory_config[feedstock][function]['feedstock_id'] = feedstock
-            if parameter and parameter not in inventory_config[feedstock][function]:
-                inventory_config[feedstock][function][parameter] = {'value': value,
-                                                                    'standard_deviation': standard_deviation}
-
+        for entry in ScenarioConfiguration.objects.filter(scenario=self):
+            for parameter_value in entry.parameter_settings.all():
+                feedstock = entry.feedstock.id
+                function = f'case_studies.{entry.algorithm.source_module}.algorithms:{entry.algorithm.function_name}'
+                parameter = parameter_value.parameter.short_name if parameter_value.parameter.short_name else None
+                value = None
+                standard_deviation = None
+                if parameter_value:
+                    value = parameter_value.value
+                    standard_deviation = parameter_value.standard_deviation
+                if feedstock not in inventory_config.keys():
+                    inventory_config[feedstock] = {}
+                if function not in inventory_config[feedstock].keys():
+                    inventory_config[feedstock][function] = {}
+                    inventory_config[feedstock][function]['catchment_id'] = self.catchment.id
+                    inventory_config[feedstock][function]['scenario_id'] = self.id
+                    inventory_config[feedstock][function]['feedstock_id'] = feedstock
+                if parameter and parameter not in inventory_config[feedstock][function]:
+                    inventory_config[feedstock][function][parameter] = {'value': value,
+                                                                        'standard_deviation': standard_deviation}
         return inventory_config
 
     def configuration_for_template(self):
 
         config = {}
-        for entry in ScenarioInventoryConfiguration.objects.filter(scenario=self):
+        for entry in ScenarioConfiguration.objects.filter(scenario=self):
             feedstock = entry.feedstock
-            algorithm = entry.inventory_algorithm
+            algorithm = entry.algorithm
             parameter = entry.inventory_parameter
             value = entry.inventory_value
 
@@ -453,29 +265,11 @@ class Scenario(NamedUserObjectModel):
         }
         return summary
 
-    @property
-    def detail_url(self):
-        return self.get_absolute_url()
 
-    @property
-    def update_url(self):
-        return reverse('scenario-update', kwargs={'pk': self.id})
-
-    @property
-    def delete_url(self):
-        return reverse('scenario-delete-modal', kwargs={'pk': self.id})
-
-    def get_absolute_url(self):
-        return reverse('scenario-detail', kwargs={'pk': self.id})
-
-    def __str__(self):
-        return self.name
-
-
-class InventoryAmountShare(models.Model):
-    owner = models.ForeignKey(User, default=1, on_delete=models.CASCADE)
+class InventoryAmountShare(OwnedObjectModel):
     scenario = models.ForeignKey(Scenario, null=True, on_delete=models.CASCADE)
-    feedstock = models.ForeignKey(SampleSeries, null=True, on_delete=models.CASCADE)
+    feedstock = models.ForeignKey(SampleSeries, null=True,
+                                  on_delete=models.CASCADE)  # TODO: Check if Material can be used, instead
     timestep = models.ForeignKey(Timestep, null=True, on_delete=models.CASCADE)
     average = models.FloatField(default=0.0)
     standard_deviation = models.FloatField(default=0.0)
@@ -502,37 +296,42 @@ def manage_scenario_status(sender, instance, created, **kwargs):
         instance.scenariostatus.save()
 
 
-class ScenarioInventoryConfiguration(models.Model):
+class ScenarioConfiguration(OwnedObjectModel):
     scenario = models.ForeignKey(Scenario, on_delete=models.CASCADE)
     feedstock = models.ForeignKey(SampleSeries, on_delete=models.CASCADE, null=True)
     geodataset = models.ForeignKey(GeoDataset, on_delete=models.CASCADE)
-    inventory_algorithm = models.ForeignKey(InventoryAlgorithm, on_delete=models.CASCADE)
-    inventory_parameter = models.ForeignKey(InventoryAlgorithmParameter, on_delete=models.CASCADE, null=True)
-    inventory_value = models.ForeignKey(InventoryAlgorithmParameterValue, on_delete=models.CASCADE, null=True)
+    algorithm = models.ForeignKey(Algorithm, on_delete=models.CASCADE)
+    inventory_parameter = models.ForeignKey(Parameter, on_delete=models.CASCADE, null=True)  # TODO: remove
+    inventory_value = models.ForeignKey(ParameterValue, on_delete=models.CASCADE, null=True)  # TODO: remove
+    parameter_settings = models.ManyToManyField(ParameterValue, through='ScenarioParameterSetting',
+                                                related_name='parameter_settings')
 
     def save(self, *args, **kwargs):
         # TODO: The status must also be changed, when any of the referenced foreign key objects change
         self.scenario.set_status(ScenarioStatus.Status.CHANGED)
         super().save(*args, **kwargs)
 
-    # def save(self, *args, **kwargs):
-    #     # Only save if there is no previous entry for a parameter in a scenario. Otherwise drop old entry first.
-    #     if not ScenarioInventoryConfiguration.objects.filter(scenario=self.scenario,
-    #                                                          inventory_algorithm=self.inventory_algorithm,
-    #                                                          inventory_parameter=self.inventory_parameter):
-    #         super(ScenarioInventoryConfiguration, self).save(*args, **kwargs)
-    #     else:
-    #         ScenarioInventoryConfiguration.objects \
-    #             .filter(scenario=self.scenario,
-    #                     inventory_algorithm=self.inventory_algorithm,
-    #                     inventory_parameter=self.inventory_parameter) \
-    #             .update(inventory_value=self.inventory_value)
-
     def get_absolute_url(self):
-        return reverse('scenario-detail', kwargs={'pk': self.scenario.pk})
+        return self.scenario.get_absolute_url()
+
+
+@receiver(post_save, sender=ScenarioConfiguration)
+def set_default_parameters(sender, instance, created, **kwargs):
+    if created:
+        for parameter in instance.algorithm.parameters.all():
+            ScenarioParameterSetting.objects.create(
+                scenario_configuration=instance,
+                parameter_value=parameter.default_value
+            )
+
+
+class ScenarioParameterSetting(OwnedObjectModel):
+    scenario_configuration = models.ForeignKey(ScenarioConfiguration, on_delete=models.CASCADE)
+    parameter_value = models.ForeignKey(ParameterValue, on_delete=models.CASCADE)
+    custom_value = models.CharField(max_length=255, blank=True, null=True)
 
 
 class RunningTask(models.Model):
     scenario = models.ForeignKey(Scenario, on_delete=models.CASCADE)
-    algorithm = models.ForeignKey(InventoryAlgorithm, on_delete=models.CASCADE, null=True)
+    algorithm = models.ForeignKey(Algorithm, on_delete=models.CASCADE, null=True)
     uuid = models.UUIDField(primary_key=False)

@@ -27,6 +27,7 @@ urlpatterns = [
     path('sample_series/<int:pk>/add_distribution/modal/', views.SampleSeriesModalAddDistributionView.as_view(), name='sampleseries-add-distribution-modal'),
     path('sample_series/<int:pk>/duplicate/', views.SampleSeriesCreateDuplicateView.as_view(), name='sampleseries-duplicate'),
     path('sample_series/<int:pk>/duplicate/modal/', views.SampleSeriesModalCreateDuplicateView.as_view(), name='sampleseries-duplicate-modal'),
+    path('sample_series/autocomplete/', views.SampleSeriesAutoCompleteView.as_view(), name='sampleseries-autocomplete'),
     path('samples/', views.SampleListView.as_view(), name='sample-list'),
     path('samples/autocomplete/', views.SampleAutoCompleteView.as_view(), name='sample-autocomplete'),
     path('samples/featured', views.FeaturedSampleListView.as_view(), name='sample-list-featured'),

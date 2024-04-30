@@ -19,7 +19,7 @@ class InventoryAlgorithmsBase(object):
         """
         catchment = Catchment.objects.get(id=kwargs.get('catchment_id'))
         model = kwargs.get('source_model')
-        clipped = model.objects.filter(geom__intersects=catchment.geom)
+        clipped = model.objects.filter(geom__intersects=catchment.region.borders.geom)
         count = clipped.count()
         point_yield = kwargs.get('point_yield')
         total_production = point_yield['value'] * count

@@ -10,6 +10,7 @@ from .views import (
     AttributeUpdateView,
     AttributeModalUpdateView,
     AttributeModalDeleteView,
+    GeoDataSetNameAutocompleteView,
     RegionAutocompleteView,
     RegionAttributeValueListView,
     RegionAttributeValueCreateView,
@@ -114,5 +115,6 @@ urlpatterns = [
     path('locations/<int:pk>/update/', LocationUpdateView.as_view(), name='location-update'),
     path('locations/<int:pk>/delete/', LocationModalDeleteView.as_view(), name='location-delete-modal'),
     path('api/', include(router.urls)),
+    path('geodatasets/autocomplete/name/', GeoDataSetNameAutocompleteView.as_view(), name='geodataset-name-autocomplete'),
 ]
 

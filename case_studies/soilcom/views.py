@@ -797,10 +797,10 @@ class CollectionModalDeleteView(OwnedObjectModalDeleteView):
 
 class CollectionAutoCompleteView(Select2QuerySetView):
     def get_queryset(self):
-        qs = Collection.objects.order_by('name')
+        qs = Collection.objects
         if self.q:
             qs = qs.filter(name__icontains=self.q)
-        return qs
+        return qs.order_by('name')
 
 
 class CollectionAddPropertyValueView(CollectionPropertyValueCreateView):

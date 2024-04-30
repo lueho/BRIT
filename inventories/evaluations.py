@@ -1,8 +1,7 @@
-from utils.exceptions import UnitMismatchError
 from distributions.models import TemporalDistribution
 from distributions.plots import BarChart, DataSet
 from layer_manager.models import LayerAggregatedDistribution
-from materials.models import MaterialComponentGroup
+from utils.exceptions import UnitMismatchError
 
 
 class ScenarioResult:
@@ -26,13 +25,13 @@ class ScenarioResult:
             return []
 
     def material_component_groups(self):
-        group_settings = []
-        material_settings = self.scenario.feedstocks()
-        for material_setting in material_settings:
-            for group_setting in material_setting.materialcomponentgroupsettings_set.all():
-                if not group_setting.group == MaterialComponentGroup.objects.default():
-                    group_settings.append(group_setting)
-        return list(set(group_settings))
+        groups = []
+        sample_series = self.scenario.feedstocks()
+        for series in sample_series.all():
+            for sample in series.samples.all():
+                for composition in sample.compositions.all():
+                    groups.append(composition.group)
+        return list(set(groups))
 
     def distributions(self):
         return TemporalDistribution.objects.filter(id__in=[ad['distribution'] for ad in
@@ -63,68 +62,19 @@ class ScenarioResult:
         production = DataSet(label='Total production per feedstock', data=data, unit=unit)
         return production
 
-    def get_charts(self):
-        charts = {}
-
-        # Total annual production per feedstock
-        production = self.total_production_per_feedstock()
-        chart = BarChart(
-            id='productionPerFeedstockBarChart',
-            title='Total annual production per feedstock',
-            unit=production.unit
-        )
-        chart.add_dataset(production)
-        charts.update({
-            'productionPerFeedstockBarChart': chart.as_old_dict()
-        })
-
-        # Composition of total production by component group
-        try:
-            group_settings = self.material_component_groups()
-            for group_setting in group_settings:
-                xlabels, data = self.material_values_for_plot(group_setting)
-                chart_id = group_setting.group.name.replace(' ', '') + 'BarChart'
-                charts.update({
-                    chart_id: BarChart(
-                        id=chart_id,
-                        title='Production per component: ' + group_setting.group.name,
-                        data=data
-                    ).as_old_dict()
-                })
-        except:
-            pass
-
-        # Seasonal production by component
-        chart = BarChart(
-            id='seasonalFeedstockBarChart',
-            title='Seasonal distribution of feedstocks',
-            unit='Mg/a',
-            show_legend=True
-        )
-        for ds in self.seasonal_production_per_component():
-            chart.add_dataset(ds)
-        charts.update({
-            'seasonalFeedstockBarChart': chart.as_old_dict()
-        })
-
-        return charts
-
-    # TODO: Delete when ready
-    # def total_production_per_material_component(self):
-    #     # This should not depend on the material definition but should be fetched directly from layer. Calculation
-    #     # should happen directly in the model algorithm.
-    #     total_production_per_feedstock = self.total_production_per_feedstock()
-    #     components = {}
-    #     for feedstock in self.feedstocks:
-    #         for group, content in feedstock.composition().items():
-    #             if group not in components:
-    #                 components[group] = {}
-    #             for share in content['averages']:
-    #                 if share.component.name not in components[group]:
-    #                     components[group][share.component.name] = 0
-    #                 components[group][share.component.name] += share.average * total_production_per_feedstock[
-    #                     feedstock]
-    #     return components
+    def total_production_per_component(self):
+        data = {}
+        total_production_per_feedstock = self.total_production_per_feedstock().__dict__
+        for sample_series in self.scenario.feedstocks():
+            data[sample_series.name] = {}
+            total_production = total_production_per_feedstock['data'][sample_series.name]
+            for sample in sample_series.samples.all():
+                for composition in sample.compositions.all():
+                    data[sample_series.name][composition.group.name] = {}
+                    for share in composition.shares.all():
+                        data[sample_series.name][composition.group.name][
+                            share.component.name] = share.average * total_production
+        return data
 
     def seasonal_production_per_component(self):
         datasets = []
@@ -134,6 +84,60 @@ class ScenarioResult:
                 d['label'] = f'{layer.feedstock.name}: {d["label"]}'
                 datasets.append(DataSet(**d))
         return datasets
+
+    def get_charts(self):
+        charts = {}
+
+        # Total annual production per feedstock
+        try:
+            chart_id = 'productionPerFeedstockBarChart'
+            production = self.total_production_per_feedstock()
+            chart = BarChart(
+                id=chart_id,
+                title='Total annual production per feedstock',
+                unit=production.unit
+            )
+            chart.add_dataset(production)
+            charts.update({chart_id: chart.as_old_dict()})
+        except:
+            pass
+
+        # Seasonal production by component
+        try:
+            chart_id = 'seasonalFeedstockBarChart'
+            chart = BarChart(
+                id=chart_id,
+                title='Seasonal distribution of feedstocks',
+                unit='Mg/a',
+                show_legend=True
+            )
+            for ds in self.seasonal_production_per_component():
+                chart.add_dataset(ds)
+            charts.update({chart_id: chart.as_old_dict()})
+        except:
+            pass
+
+        # Composition of total production by component group
+        try:
+            sample_series = self.scenario.feedstocks()
+            for series in sample_series.all():
+                for sample in series.samples.all():
+                    for composition in sample.compositions.all():
+                        chart_id = f"{series.name.replace(' ', '')}{composition.group.name.replace(' ', '')}BarChart"
+                        chart = BarChart(
+                            id=chart_id,
+                            title='Production per component: ' + composition.group.name,
+                            unit='Mg/a',
+                            show_legend=True
+                        )
+                        data = self.total_production_per_component()[series.name][composition.group.name]
+                        if sum(data.values()) > 0:
+                            chart.add_dataset(DataSet(label=f'{series.name}: Total', data=data, unit='Mg/a'))
+                            charts.update({chart_id: chart.as_old_dict()})
+        except:
+            pass
+
+        return charts
 
     def layer_summaries(self):
         layer_summaries = {}

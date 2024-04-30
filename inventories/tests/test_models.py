@@ -2,7 +2,7 @@ from django.test import TestCase
 
 from maps.models import Region
 from users.models import get_default_owner
-from ..models import GeoDataset, InventoryAlgorithm, Material, Scenario
+from ..models import GeoDataset, Algorithm, Material, Scenario
 
 
 class ScenarioTestCase(TestCase):
@@ -16,7 +16,7 @@ class ScenarioTestCase(TestCase):
         Scenario.objects.create(owner=owner, name='Test Scenario', region=region)
 
         geodataset = GeoDataset.objects.create(owner=owner, name='Test Dataset', region=region)
-        algorithm = InventoryAlgorithm.objects.create(
+        algorithm = Algorithm.objects.create(
             name='Test Algorithm',
             geodataset=geodataset
         )
@@ -43,13 +43,13 @@ class ScenarioTestCase(TestCase):
     def test_available_inventory_algorithms_with_single_feedstock(self):
         feedstock = Material.objects.get(name='Feedstock 1')
         algorithms = self.scenario.available_inventory_algorithms(feedstock=feedstock)
-        self.assertQuerysetEqual(algorithms, InventoryAlgorithm.objects.filter(name='Test Algorithm'))
+        self.assertQuerysetEqual(algorithms, Algorithm.objects.filter(name='Test Algorithm'))
 
     def test_available_inventory_algorithms_with_feedstock_queryset(self):
         feedstocks = Material.objects.all()
         algorithms = self.scenario.available_inventory_algorithms(feedstocks=feedstocks)
-        self.assertQuerysetEqual(algorithms, InventoryAlgorithm.objects.filter(name='Test Algorithm'))
+        self.assertQuerysetEqual(algorithms, Algorithm.objects.filter(name='Test Algorithm'))
 
     def test_available_inventory_algorithms_with_missing_input(self):
         algorithms = self.scenario.available_inventory_algorithms()
-        self.assertQuerysetEqual(algorithms, InventoryAlgorithm.objects.filter(name='Test Algorithm'))
+        self.assertQuerysetEqual(algorithms, Algorithm.objects.filter(name='Test Algorithm'))

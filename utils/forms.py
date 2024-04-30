@@ -61,6 +61,12 @@ class SimpleModelForm(NoFormTagMixin, ModelForm):
     """
 
 
+class SimpleModelFormSet(NoFormTagMixin, BaseModelFormSet):
+    """
+    The regular django ModelFormSet just without form tags by default.
+    """
+
+
 class ModalForm(ModalFormMixin, Form):
     """
     Form that can be used within bootstrap modals. Makes use of the django-boostrap-modal-forms package.
