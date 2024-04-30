@@ -1,0 +1,26 @@
+{% extends "simple_form_card.html" %}
+{% load crispy_forms_tags %}
+
+{% block card_header %}<strong>Set algorithm parameters</strong>{% endblock %}
+
+{% block form %}
+    {% crispy form formset_helper %}
+{% endblock %}
+
+{% block extra_form_content %}
+    {% for formset in inlines %}
+        {% crispy formset formset_helper %}
+    {% endfor %}
+{% endblock %}
+
+{% block javascript %}
+    {{ block.super }}
+    <script type="text/javascript">
+        document.getElementById('algorithm_select').addEventListener('change', function() {
+            fetch(`/get-formset-html/?algorithm_id=${this.value}`).then(response => response.text()).then(html => {
+                console.log(html);
+                document.getElementById('formset_container').innerHTML = html;
+            }).catch(error => console.error('Error loading formset:', error));
+        });
+    </script>/
+{% endblock %}

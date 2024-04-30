@@ -114,7 +114,7 @@ class HamburgRoadsideTreeCatchmentAutocompleteView(autocomplete.Select2QuerySetV
         else:
             qs = Catchment.objects.filter(publication_status='published')
         dataset_region = GeoDataset.objects.get(model_name='HamburgRoadsideTrees').region
-        qs = qs.filter(region__borders__geom__within=dataset_region.geom).order_by('name')
+        qs = qs.filter(region__borders__geom__within=dataset_region.geom)
         if self.q:
             qs = qs.filter(name__icontains=self.q)
-        return qs
+        return qs.order_by('name')

@@ -4,7 +4,7 @@ from django.db import models, connection
 from django.urls import reverse
 
 from distributions.models import TemporalDistribution, Timestep
-from inventories.models import Scenario, InventoryAlgorithm
+from inventories.models import Scenario, Algorithm
 from materials.models import SampleSeries, MaterialComponent
 from .exceptions import InvalidGeometryType, NoFeaturesProvided, TableAlreadyExists
 
@@ -115,7 +115,7 @@ class Layer(models.Model):
     table_name = models.CharField(max_length=200)
     scenario = models.ForeignKey(Scenario, on_delete=models.CASCADE)
     feedstock = models.ForeignKey(SampleSeries, on_delete=models.CASCADE)
-    algorithm = models.ForeignKey(InventoryAlgorithm, on_delete=models.CASCADE)
+    algorithm = models.ForeignKey(Algorithm, on_delete=models.CASCADE)
     layer_fields = models.ManyToManyField(LayerField)
 
     objects = LayerManager()
@@ -164,7 +164,7 @@ class Layer(models.Model):
             'table_name': self.table_name,
             'scenario': self.scenario,
             'feedstock': self.feedstock,
-            'inventory_algorithm': self.algorithm,
+            'algorithm': self.algorithm,
             'layer_fields': [field for field in self.layer_fields.all()],
             'aggregated_results': [
                 {'name': aggregate.name,

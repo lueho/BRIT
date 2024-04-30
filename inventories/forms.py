@@ -1,10 +1,14 @@
+from crispy_forms.helper import FormHelper
+from dal import forward
 from dal.autocomplete import ModelSelect2
-from django.forms import HiddenInput, ModelChoiceField
+from django.forms import ModelChoiceField
+from extra_views import InlineFormSetFactory
 
 from distributions.models import TemporalDistribution
 from maps.models import Catchment, GeoDataset, Region
+from materials.models import SampleSeries
 from utils.forms import AutoCompleteModelForm, ModalModelFormMixin, SimpleModelForm
-from .models import InventoryAlgorithm, Scenario, ScenarioInventoryConfiguration
+from .models import Algorithm, Scenario, ScenarioConfiguration, ParameterValue, ScenarioParameterSetting
 
 
 class SeasonalDistributionModelForm(SimpleModelForm):
@@ -36,50 +40,78 @@ class ScenarioModelForm(AutoCompleteModelForm):
         model = Scenario
         fields = ['name', 'description', 'region', 'catchment']
 
+
 class ScenarioModalModelForm(ModalModelFormMixin, ScenarioModelForm):
     pass
 
 
-class ScenarioInventoryConfigurationForm(SimpleModelForm):
+# ----------- Scenario configuration -----------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class ScenarioConfigurationModelForm(AutoCompleteModelForm):
+    scenario = ModelChoiceField(
+        queryset=Scenario.objects.all(),
+        widget=ModelSelect2(url='scenario-name-autocomplete'),  # TODO: This should not be editable
+    )
+    feedstock = ModelChoiceField(
+        queryset=SampleSeries.objects.all(),
+        widget=ModelSelect2(url='sampleseries-autocomplete'),
+        # TODO: Limit choices with respect to geodataset and algorithm
+    )
+    geodataset = ModelChoiceField(
+        queryset=GeoDataset.objects.all(),
+        widget=ModelSelect2(url='geodataset-name-autocomplete', forward=['algorithm', ]),
+        # TODO: Limit choices with respect to feedstock
+    )
+    algorithm = ModelChoiceField(
+        queryset=Algorithm.objects.all(),
+        widget=ModelSelect2(url='algorithm-name-autocomplete', forward=['geodataset', ]),
+        # TODO: Limit choices with respect to feedstock
+    )
+
     class Meta:
-        model = ScenarioInventoryConfiguration
-        fields = ('scenario', 'feedstock', 'geodataset', 'inventory_algorithm', 'inventory_parameter',
-                  'inventory_value')
+        model = ScenarioConfiguration
+        fields = ('scenario', 'feedstock', 'geodataset', 'algorithm')
 
 
-class ScenarioInventoryConfigurationAddForm(ScenarioInventoryConfigurationForm):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        del self.fields['inventory_parameter']
-        del self.fields['inventory_value']
-        initial = kwargs.get('initial')
-        self.fields['scenario'].queryset = Scenario.objects.all()
-        self.fields['scenario'].initial = initial.get('scenario')
-        self.fields['scenario'].widget = HiddenInput()
-        self.fields['feedstock'].queryset = initial.get('feedstocks')
-        self.fields['geodataset'].queryset = GeoDataset.objects.none()
-        self.fields['inventory_algorithm'].queryset = InventoryAlgorithm.objects.none()
+# ----------- Scenario Parameter Settings ------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
 
 
-class ScenarioInventoryConfigurationUpdateForm(ScenarioInventoryConfigurationForm):
+class NoFormTagFormSetHelper(FormHelper):  # TODO: Where to put this for reuse?
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        del self.fields['inventory_parameter']
-        del self.fields['inventory_value']
-        initial = kwargs.get('initial')
-        scenario = initial.get('scenario')
-        feedstock = initial.get('feedstock')
-        geodataset = initial.get('geodataset')
-        algorithm = initial.get('inventory_algorithm')
-        self.fields['scenario'].queryset = Scenario.objects.all()
-        self.fields['scenario'].initial = scenario
-        self.fields['scenario'].widget = HiddenInput()
-        self.fields['feedstock'].queryset = scenario.available_feedstocks()
-        self.fields['feedstock'].initial = feedstock
-        self.fields['geodataset'].queryset = scenario.available_geodatasets(feedstock=feedstock)
-        self.fields['geodataset'].initial = geodataset
-        self.fields['inventory_algorithm'].queryset = scenario.available_inventory_algorithms(feedstock=feedstock,
-                                                                                              geodataset=geodataset)
-        self.fields['inventory_algorithm'].initial = algorithm
+        self.form_tag = False
+
+
+class ScenarioParameterSettingForm(AutoCompleteModelForm):
+    parameter_value = ModelChoiceField(
+        queryset=ParameterValue.objects.all(),
+        widget=ModelSelect2(url='parametervalue-name-autocomplete'),
+    )
+
+    class Meta:
+        model = ScenarioParameterSetting
+        fields = ['parameter_value']
+
+    def __init__(self, *args, **kwargs):
+        super(ScenarioParameterSettingForm, self).__init__(*args, **kwargs)
+        if self.instance and self.instance.parameter_value:
+            self.fields['parameter_value'].label = self.instance.parameter_value.parameter.descriptive_name
+            self.fields['parameter_value'].queryset = ParameterValue.objects.filter(parameter=self.instance.parameter_value.parameter)
+            self.fields['parameter_value'].widget.forward=(forward.Const(self.instance.parameter_value.parameter.id, 'parameter'), )
+
+
+class ScenarioParameterSettingInline(InlineFormSetFactory):
+    model = ScenarioParameterSetting
+    form_class = ScenarioParameterSettingForm
+    fields = ['parameter_value']
+    factory_kwargs = {'extra': 0, 'max_num': 10, 'can_delete': False}
+
+    def get_initial(self):
+        return [
+            {'parameter_value': ParameterValue.objects.get(parameter=parameter, value=parameter.default_value.value)}
+            for parameter in
+            self.object.algorithm.parameters.all()]

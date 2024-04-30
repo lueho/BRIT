@@ -1,64 +1,48 @@
 {% extends 'base.html' %}
-{% load leaflet_tags %}
 {% load static %}
 
 {% block title %}Inventories | {{ object.name }}{% endblock %}
 
 {% block content %}
-    {% leaflet_js %}
-    {% leaflet_css %}
 
     <div class="row">
         <div class="col col-12 col-lg-3 mb-4">
-            <div class="accordion">
-                <div class="card shadow">
-                    <div class="card-header"><b>{{ object.name }}</b></div>
-                    <div class="card-body p-0">
-                        {% leaflet_map "main" %}
-                        <div class="card-text p-2">
-                            <p>{{ object.description }}</p>
-                            <p id="region" data-region-id="{{ object.region.id }}"><b>Region</b>: {{ object.region }}
-                            </p>
-                            <p id="catchment" data-catchment-id="{{ object.catchment.id }}">
-                                <b>Catchment</b>: {{ object.catchment }}</p>
+            {% include 'scenario_summary_map_card.html' %}
+            <div class="card shadow mt-4">
+                <div class="card-header">Status</div>
+                <div class="card-body">
+                    {# status = CHANGED #}
+                    {% if object.status == 1 %}
+                        <p class="card-text">Start the evaluation of this inventory scenario.</p>
+                        <div class="text-center">
+                            <form method="post">
+                                {% csrf_token %}
+                                <button type="submit" name="run" class="btn btn-primary">
+                                    Run
+                                </button>
+                            </form>
                         </div>
-                    </div>
-                    <div class="card-header"
-                         role="button"
-                         data-toggle="collapse"
-                         href="#sources-body-{{ group_settings.id }}"
-                         aria-expanded="true"
-                         aria-controls="sources-body-{{ group_settings.id }}">
-                        <b>Options</b>
-                    </div>
-                    <div class="card-body collapse" id="sources-body-{{ group_settings.id }}">
-                        <table class="table">
-                            <tr>
-                                <td class="col-2">
-                                    <p>Download the summary as .json for further processing</p>
-                                    <div class="text-center">
-                                        <a class="btn btn-primary w-75"
-                                           href="{% url 'download_result_summary' object.id %}">
-                                            Download
-                                        </a>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td class="col-3">
-                                    <p>Show the configuration of the inventories:</p>
-                                    <div class="text-center">
-                                        <a class="btn btn-primary w-75"
-                                           href="{% url 'scenario-detail' object.id %}">
-                                            Show config
-                                        </a>
-                                    </div>
-                                </td>
-                            </tr>
-                        </table>
-                    </div>
-                    <div class="card-footer"></div>
+                    {# status = RUNNING #}
+                    {% elif object.status == 2 %}
+                        <p class="card-text">The scenario evaluation is currently running.</p>
+                        <div class="text-center">
+                            <a class="btn btn-primary w-75"
+                               href="{% url 'scenario-result' object.id %}">
+                                Show progress
+                            </a>
+                        </div>
+                    {# status = FINISHED #}
+                    {% elif object.status == 3 %}
+                        <p class="card-text">Show the summary results of the inventories:</p>
+                        <div class="text-center">
+                            <a class="btn btn-primary w-75"
+                               href="{% url 'scenario-detail' object.id %}">
+                                Show configuration
+                            </a>
+                        </div>
+                    {% endif %}
                 </div>
+                <div class="card-footer"></div>
             </div>
         </div>
         <div class="col col-12 col-lg-9">
@@ -102,7 +86,7 @@
                                             {% for aggregate in layer.aggregated_results %}
                                                 <span>{{ aggregate.name }}: {{ aggregate.value }} {{ aggregate.unit }} - </span>
                                             {% endfor %}
-                                            <a href="{% url 'scenario_result_map' layer.scenario.pk layer.inventory_algorithm.pk layer.feedstock.pk %}">
+                                            <a href="{% url 'scenario_result_map' layer.scenario.pk layer.algorithm.pk layer.feedstock.pk %}">
                                                 <i class="fas fa-fw fa-map"></i> show map
                                             </a>
                                         </div>
@@ -122,18 +106,15 @@
 {% endblock content %}
 
 {% block javascript %}
-
     {{ block.super }}
     {{ plot_data|json_script:"plot_data" }}
     {{ charts|json_script:"charts" }}
-    {{ map_config|json_script:"mapConfig" }}
 
     <script src="{% static 'js/feedstock_summary_bar_chart.js' %}"></script>
-    <script src="{% static 'js/maps.js' %}"></script>
     <script>
         let charts = JSON.parse(document.getElementById("charts").textContent);
         for (const [id, chart] of Object.entries(charts)) {
-            let ctx = document.getElementById(id)
+            let ctx = document.getElementById(id);
             const args = chartDefinition(
                 chart["type"],
                 chart["labels"],
@@ -142,11 +123,7 @@
                 chart["show_legend"],
             );
             let ch = new Chart(ctx, args);
-            document.getElementById('legend-' + ch.canvas.id).innerHTML = ch.generateLegend()
+            document.getElementById('legend-' + ch.canvas.id).innerHTML = ch.generateLegend();
         }
-
-        const mapConfig = JSON.parse(document.getElementById("mapConfig").textContent);
-        window.onload = () => loadMap(mapConfig);
     </script>
-
 {% endblock javascript %}

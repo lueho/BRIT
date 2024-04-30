@@ -1,4 +1,5 @@
 from dal import autocomplete
+from dal_select2.views import Select2ListView, Select2QuerySetView
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.gis.geos import MultiPolygon
 from django.core.exceptions import ImproperlyConfigured
@@ -204,6 +205,23 @@ class GeoDataSetDetailView(GeoDataSetMixin, FilterView):
     def get_region_id(self):
         return self.get_object().region.id
 
+
+class GeoDataSetNameAutocompleteView(Select2QuerySetView):
+
+    def get_queryset(self):
+        if self.request.user.is_authenticated:
+            qs = GeoDataset.objects.accessible_by_user(self.request.user)
+        else:
+            qs = GeoDataset.objects.published()
+
+        algorithm_id = self.forwarded.get('algorithm', None)
+        if algorithm_id:
+            qs = qs.filter(algorithms__id=algorithm_id)
+
+        if self.q:
+            qs = qs.filter(name__icontains=self.q)
+
+        return qs.order_by('name')
 
 # ----------- Location CRUD---------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
@@ -419,10 +437,9 @@ class CatchmentAutocompleteView(autocomplete.Select2QuerySetView):
             qs = Catchment.objects.filter(Q(owner=self.request.user) | Q(publication_status='published'))
         else:
             qs = Catchment.objects.filter(publication_status='published')
-        qs = qs.order_by('name')
         if self.q:
             qs = qs.filter(name__icontains=self.q)
-        return qs
+        return qs.order_by('name')
 
 
 # ----------- Region Utils ---------------------------------------------------------------------------------------------
@@ -431,10 +448,10 @@ class CatchmentAutocompleteView(autocomplete.Select2QuerySetView):
 
 class RegionAutocompleteView(autocomplete.Select2QuerySetView):
     def get_queryset(self):
-        qs = Region.objects.all().order_by('name')
+        qs = Region.objects.all()
         if self.q:
             qs = qs.filter(name__icontains=self.q)
-        return qs
+        return qs.order_by('name')
 
 
 class NutsRegionAutocompleteView(autocomplete.Select2QuerySetView):
@@ -466,10 +483,10 @@ class NutsRegionAutocompleteView(autocomplete.Select2QuerySetView):
 
 class RegionOfLauAutocompleteView(autocomplete.Select2QuerySetView):
     def get_queryset(self):
-        qs = Region.objects.filter(pk__in=Subquery(LauRegion.objects.all().values('pk'))).order_by('name')
+        qs = Region.objects.filter(pk__in=Subquery(LauRegion.objects.all().values('pk')))
         if self.q:
             qs = qs.filter(Q(name__icontains=self.q) | Q(lauregion__lau_id__contains=self.q))
-        return qs
+        return qs.order_by('name')
 
 
 class CatchmentGeometryAPI(APIView):

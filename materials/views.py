@@ -147,10 +147,10 @@ class MaterialModalDeleteView(OwnedObjectModalDeleteView):
 
 class MaterialAutocompleteView(autocomplete.Select2QuerySetView):
     def get_queryset(self):
-        qs = Material.objects.filter(type='material').order_by('id')
+        qs = Material.objects.filter(type='material')
         if self.q:
             qs = qs.filter(name__icontains=self.q)
-        return qs
+        return qs.order_by('id')
 
 
 # ----------- Material Components CRUD ---------------------------------------------------------------------------------
@@ -372,6 +372,14 @@ class SampleSeriesModalDeleteView(OwnedObjectModalDeleteView):
 
 # ----------- Sample Series Utilities ----------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
+
+
+class SampleSeriesAutoCompleteView(autocomplete.Select2QuerySetView):
+    def get_queryset(self):
+        qs = SampleSeries.objects.all()
+        if self.q:
+            qs = qs.filter(name__icontains=self.q)
+        return qs.order_by('name')
 
 
 class SampleSeriesCreateDuplicateView(OwnedObjectUpdateView):

@@ -7,7 +7,7 @@ from django.test import TestCase
 
 from case_studies.flexibi_hamburg.models import HamburgGreenAreas
 from distributions.models import Timestep, TemporalDistribution
-from inventories.models import Scenario, InventoryAlgorithm
+from inventories.models import Scenario, Algorithm
 from layer_manager.models import DistributionSet, DistributionShare, LayerAggregatedDistribution, Layer, LayerField
 from maps.models import Catchment, Region, GeoDataset
 from materials.models import Material, MaterialComponent, SampleSeries
@@ -46,13 +46,13 @@ class LayerTestCase(TestCase):
             name='Test Feedstock'
         )
 
-        InventoryAlgorithm.objects.create(
+        Algorithm.objects.create(
             name='Average Point Yield',
             function_name='avg_point_yield',
             geodataset=geodataset,
         )
 
-        InventoryAlgorithm.objects.create(
+        Algorithm.objects.create(
             name='Average Area Yield',
             function_name='avg_area_yield',
             geodataset=geodataset,
@@ -75,7 +75,7 @@ class LayerTestCase(TestCase):
         self.testkwargs = {
             'name': 'test name',
             'scenario': self.scenario,
-            'algorithm': InventoryAlgorithm.objects.get(function_name='avg_point_yield'),
+            'algorithm': Algorithm.objects.get(function_name='avg_point_yield'),
             'geom_type': 'Point',
             'table_name': 'test_table_name',
             'feedstock': self.feedstock_sample_series
@@ -118,7 +118,7 @@ class LayerTestCase(TestCase):
             results['avg_area_yield']['features'].append({'geom': area.geom, 'yield': 12.5})
 
         # Test creation of completely new layer
-        algorithm = InventoryAlgorithm.objects.get(function_name='avg_area_yield')
+        algorithm = Algorithm.objects.get(function_name='avg_area_yield')
         layer, feature_collection = Layer.objects.create_or_replace(name='new layer',
                                                                     scenario=self.scenario,
                                                                     feedstock=self.feedstock_sample_series,
@@ -172,7 +172,7 @@ class LayerTestCase(TestCase):
         for area in areas:
             results['avg_area_yield']['features'].append({'geom': area.geom, 'avg_yield': 12.5})
 
-        algorithm = InventoryAlgorithm.objects.get(function_name='avg_area_yield')
+        algorithm = Algorithm.objects.get(function_name='avg_area_yield')
         Layer.objects.create_or_replace(name='second layer',
                                         scenario=self.scenario,
                                         feedstock=self.feedstock_sample_series,
@@ -224,7 +224,7 @@ class LayerTestCase(TestCase):
             'geom_type': 'point',
             'feedstock': self.feedstock_sample_series,
             'scenario': self.scenario,
-            'algorithm': InventoryAlgorithm.objects.get(name='Average Point Yield'),
+            'algorithm': Algorithm.objects.get(name='Average Point Yield'),
         }
         layer = Layer.objects.create(**kwargs)
 
