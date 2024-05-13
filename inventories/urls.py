@@ -1,6 +1,6 @@
 from django.urls import path
 
-from .views import (AlgorithmNameAutocompleteView, ResultMapAPI, ScenarioCreateView, ScenarioDetailView,
+from .views import (AlgorithmNameAutocompleteView, ResultMapAPI, ScenarioCreateView, ScenarioConfigurationDetailView,
                     ScenarioEvaluationProgressView,
                     ScenarioModalDeleteView, ScenarioResultDetailMapView,
                     ScenarioResultView, ScenarioUpdateView, SeasonalDistributionCreateView, UserOwnedScenarioFilterView,
@@ -17,7 +17,7 @@ urlpatterns = [
     path('scenarios/user/', UserOwnedScenarioFilterView.as_view(), name='scenario-list-owned'),
     path('scenarios/autocomplete/name/', ScenarioNameAutocompleteView.as_view(), name='scenario-name-autocomplete'),
     path('scenarios/create/', ScenarioCreateView.as_view(), name='scenario-create'),
-    path('scenarios/<int:pk>/', ScenarioDetailView.as_view(), name='scenario-detail'),
+    path('scenarios/<int:pk>/', ScenarioConfigurationDetailView.as_view(), name='scenario-detail'),
     path('scenarios/<int:pk>/update/', ScenarioUpdateView.as_view(), name='scenario-update'),
     path('scenarios/<int:pk>/delete/', ScenarioModalDeleteView.as_view(), name='scenario-delete-modal'),
     path('scenarios/<int:pk>/result/', ScenarioResultView.as_view(), name='scenario-result'),

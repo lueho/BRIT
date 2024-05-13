@@ -124,6 +124,7 @@ class ScenarioStatus(models.Model):
         CHANGED = 1
         RUNNING = 2
         FINISHED = 3
+        FAILED = 4
 
     scenario = models.OneToOneField('Scenario', on_delete=models.CASCADE, null=True)
     status = models.IntegerField(choices=Status.choices, default=Status.CHANGED)
@@ -149,6 +150,16 @@ class Scenario(NamedUserObjectModel):
     def set_status(self, status):
         if isinstance(status, ScenarioStatus.Status):
             self.scenariostatus.status = status
+            self.scenariostatus.save()
+        elif isinstance(status, int):
+            if status == 1:
+                self.scenariostatus.status = ScenarioStatus.Status.CHANGED
+            elif status == 2:
+                self.scenariostatus.status = ScenarioStatus.Status.RUNNING
+            elif status == 3:
+                self.scenariostatus.status = ScenarioStatus.Status.FINISHED
+            elif status == 4:
+                self.scenariostatus.status = ScenarioStatus.Status.FAILED
             self.scenariostatus.save()
 
     def feedstocks(self):

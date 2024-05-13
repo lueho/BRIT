@@ -205,3 +205,5 @@ ADMINS = [(os.environ.get('ADMIN_NAME'), os.environ.get('ADMIN_EMAIL'))]
 GOOGLE_ANALYTICS_KEY = os.environ.get("GOOGLE_ANALYTICS_KEY")
 
 COOKIE_CONSENT_NAME = "cookie_consent"
+
+MONITOR_TASKS_COUNTDOWN = 5

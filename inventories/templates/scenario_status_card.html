@@ -12,7 +12,7 @@
                     </button>
                 </form>
             </div>
-            {# status = RUNNING #}
+        {# status = RUNNING #}
         {% elif object.status == 2 %}
             <p class="card-text">The scenario evaluation is currently running.</p>
             <div class="text-center">
@@ -21,7 +21,7 @@
                     Show progress
                 </a>
             </div>
-            {# status = FINISHED #}
+        {# status = SUCCESS #}
         {% elif object.status == 3 %}
             <p class="card-text">Show the summary results of the inventories:</p>
             <div class="text-center">
@@ -30,6 +30,9 @@
                     Show results
                 </a>
             </div>
+        {# status = FINISHED #}
+        {% elif object.status == 4 %}
+            <p class="card-text">Scenario evaluation failed. Please check your settings.</p>
         {% endif %}
     </div>
     <div class="card-footer"></div>

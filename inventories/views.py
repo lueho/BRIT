@@ -23,7 +23,7 @@ from .filters import ScenarioFilterSet
 from .forms import (ScenarioModelForm, SeasonalDistributionModelForm, ScenarioConfigurationModelForm,
                     ScenarioParameterSettingInline, NoFormTagFormSetHelper)
 from .models import (Algorithm, ParameterValue, RunningTask,
-                     Scenario, ScenarioConfiguration, ScenarioStatus)
+                     Scenario, ScenarioConfiguration)
 from .tasks import run_inventory
 
 
@@ -89,50 +89,7 @@ class ScenarioCreateView(LoginRequiredMixin, OwnedObjectCreateView):
     permission_required = set()
 
 
-class ScenarioDetailView(MapMixin, RestrictedOwnedObjectDetailView):
-    """Summary of the Scenario with complete configuration. Page for final review, which also contains the
-    'run' button."""
-
-    model = Scenario
-    object = None
-    permission_required = set()
-    config = None
-
-    load_region = True
-    region_url = reverse_lazy('data.region-geometries')
-    region_layer_style = {
-        "color": "#A1221C",
-        "fillOpacity": 0.0
-    }
-
-    load_catchment = True
-    catchment_url = reverse_lazy('data.catchment-geometries')
-    catchment_layer_style = {
-        'color': '#4061d2',
-    }
-
-    load_features = False
-    adjust_bounds_to_features = False
-
-    def get(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        self.config = self.object.configuration_for_template()
-        context = self.get_context_data(object=self.object)
-        context['config'] = self.config
-        return self.render_to_response(context)
-
-    def get_catchment_id(self):
-        return self.object.catchment.id
-
-    def get_region_id(self):
-        return self.object.region.id
-
-    def post(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        scenario = self.object
-        scenario.set_status(ScenarioStatus.Status.RUNNING)
-        run_inventory(scenario.id)
-        return redirect('scenario-result', scenario.id)
+# There is not ScenarioDetailView. Use ScenarioConfigurationDetailView instead.
 
 
 class ScenarioUpdateView(OwnedObjectUpdateView):
@@ -201,6 +158,54 @@ class ScenarioConfigurationCreateView(OwnedObjectCreateView):
 
     def get_initial(self):
         return {'scenario': Scenario.objects.get(id=self.kwargs.get('scenario_pk'))}
+
+
+class ScenarioConfigurationDetailView(MapMixin, RestrictedOwnedObjectDetailView):
+    """Summary of the Scenario with complete configuration. Page for final review, which also contains the
+    'run' button."""
+
+    model = Scenario
+    object = None
+    permission_required = set()
+    config = None
+
+    load_region = True
+    region_url = reverse_lazy('data.region-geometries')
+    region_layer_style = {
+        "color": "#A1221C",
+        "fillOpacity": 0.0
+    }
+
+    load_catchment = True
+    catchment_url = reverse_lazy('data.catchment-geometries')
+    catchment_layer_style = {
+        'color': '#4061d2',
+    }
+
+    load_features = False
+    adjust_bounds_to_features = False
+
+    def get(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        # If the scenario has failed, delete all registered tasks
+        if self.object.status == 4:
+            RunningTask.objects.filter(scenario=self.object).delete()
+        self.config = self.object.configuration_for_template()
+        context = self.get_context_data(object=self.object)
+        context['config'] = self.config
+        return self.render_to_response(context)
+
+    def get_catchment_id(self):
+        return self.object.catchment.id
+
+    def get_region_id(self):
+        return self.object.region.id
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        scenario = self.object
+        run_inventory.delay(scenario.id)
+        return redirect('scenario-result', scenario.id)
 
 
 class ScenarioConfigurationUpdateView(UpdateWithInlinesView):  # TODO: Deal with permissions
@@ -334,12 +339,28 @@ class ScenarioEvaluationProgressView(DetailView):
 
 def get_evaluation_status(request, task_id=None):
     task_result = AsyncResult(task_id)
-    result = {
-        "task_id": task_id,
-        "task_status": task_result.status,
-        "task_result": task_result.result,
-        "task_info": task_result.info
-    }
+    if task_result.ready():
+        if task_result.successful():
+            result = {
+                'task_id': task_id,
+                'task_status': task_result.status,
+                'task_result': task_result.result,
+                'task_info': task_result.info
+            }
+        else:
+            result = {
+                'task_id': task_id,
+                'task_status': task_result.status,
+                'task_result': 'The task failed.',
+                'task_info': 'The task failed.'
+            }
+    else:
+        result = {
+            'task_id': task_id,
+            'task_status': task_result.status,
+            'task_result': task_result.result,
+            'task_info': task_result.info
+        }
     return JsonResponse(result, status=200)
 
 

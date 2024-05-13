@@ -1,4 +1,5 @@
 {% extends 'base_single_card.html' %}
+{% load static %}
 
 {% block card_header %}<strong>Scenario running</strong>{% endblock %}
 
@@ -6,9 +7,9 @@
     <p class="card-text">Your scenario is being calculated now.</p>
     <p class="card-text">Name of the scenario: {{ scenario.name }}</p>
     <p class="card-text">Depending on the size and complexity of your scenario, this may take a while. The evaluation
-        runs in the
-        background. You can do other things on this site or close your browser and return to this URL later. When
-        the calculations are ready, you will see the result here.</p>
+        runs in the background. You can do other things on this site or close your browser and return to this URL later.
+        When the calculations are ready, you will see the result here or be prompted to adjust the configuration if
+        needed.</p>
     <p class="card-text"><strong>Progress:</strong></p>
     <table class="table">
         <thead>
@@ -19,60 +20,23 @@
         </thead>
         <tbody id="tasks">
         {% for task in task_list.tasks %}
-            <tr>
-                <td id="{{ task.task_id }}">{{ task.algorithm_name }}</td>
+            <tr id="task-{{ task.task_id }}" data-task-id="{{ task.task_id }}"
+                data-status-url="{% url 'get_evaluation_status' task.task_id %}">
+                <td>{{ task.algorithm_name }}</td>
                 <td id="{{ task.task_id }}_status"></td>
             </tr>
         {% endfor %}
         </tbody>
     </table>
-    <div id="result-link"></div>
+    <p id="completion-message" class="card-text" style="display: none;">All tasks completed successfully! This page will
+        now refresh.</p>
+    <p id="error-message" class="card-text" style="display: none;">
+        One or more tasks failed. Please check your configuration.
+        <a href="{% url 'scenario-detail' scenario.id %}">Show configuration</a>
+    </p>
 {% endblock %}
 
 {% block javascript %}
     {{ block.super }}
-    {{ task_list|json_script:"task_list" }}
-
-    <script>
-        async function getStatus(task_id) {
-            let url = "{% url 'get_evaluation_status' task_id=0 %}".replace('0', task_id);
-            let response = await fetch(url);
-            return await response.json();
-        }
-
-        function writeStatus(status) {
-            let element_id = status.task_id + "_status";
-            document.getElementById(element_id).innerHTML = status.task_status;
-        }
-
-        function addResultLink() {
-            let button = document.createElement("BUTTON");
-            button.innerHTML = "View results";
-            button.onclick = () => {
-                window.location.href = window.location.href;
-            };
-            button.classList.add("btn");
-            button.classList.add("btn-primary");
-            document.getElementById("result-link").appendChild(button);
-        }
-
-        function observeTasks(task_list) {
-            if (task_list.length < 1) {
-                addResultLink();
-                return true;
-            }
-            task_list.forEach(async (task) => {
-                let status = await getStatus(task['task_id']);
-                writeStatus(status);
-                if (status.task_status === 'SUCCESS' || status.task_status === 'FAILURE') {
-                    task_list = task_list.filter(t => t.task_id !== status.task_id);
-                }
-            });
-            setTimeout(function() {
-                observeTasks(task_list);
-            }, 1000);
-        }
-
-        window.onload = () => observeTasks(JSON.parse(document.getElementById("task_list").textContent).tasks);
-    </script>
+    <script src="{% static 'js/evaluation_progress.js' %}"></script>
 {% endblock javascript %}

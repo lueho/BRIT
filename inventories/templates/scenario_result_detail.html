@@ -31,9 +31,19 @@
                                 Show progress
                             </a>
                         </div>
-                    {# status = FINISHED #}
+                    {# status = SUCCESS #}
                     {% elif object.status == 3 %}
-                        <p class="card-text">Show the summary results of the inventories:</p>
+                        <p class="card-text">Show the scenario configuration</p>
+                        <div class="text-center">
+                            <a class="btn btn-primary w-75"
+                               href="{% url 'scenario-detail' object.id %}">
+                                Show configuration
+                            </a>
+                        </div>
+                    {% endif %}
+                    {# status = FAILED #}
+                    {% if object.status == 4 %}
+                        <p class="card-text">The scenario evaluation failed. Please check your settings.</p>
                         <div class="text-center">
                             <a class="btn btn-primary w-75"
                                href="{% url 'scenario-detail' object.id %}">
