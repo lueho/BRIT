@@ -27,10 +27,10 @@ class ShowcaseMapView(GeoDataSetDetailView):
     load_region = True
     load_catchment = False
     load_features = True
-    feature_url = reverse_lazy('showcase-geojson')
-    feature_summary_url = reverse_lazy('showcase-summary')
+    feature_url = reverse_lazy('api-showcase-geojson')
+    feature_summary_url = reverse_lazy('api-showcase-summary')
     apply_filter_to_features = False
-    api_basename = 'showcase'
+    api_basename = 'api-showcase'
     region_layer_style = {
         'color': '#63c36c',
         'fillOpacity': 0,
@@ -51,7 +51,7 @@ class ShowcaseCreateView(OwnedObjectCreateView):
 class ShowcaseDetailView(MapMixin, DetailView):
     model = Showcase
     api_basename = 'showcase'
-    feature_url = reverse_lazy('showcase-geojson')
+    feature_url = reverse_lazy('api-showcase-geojson')
     load_region = False
     load_catchment = False
     permission_required = set()

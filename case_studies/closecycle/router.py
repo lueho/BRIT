@@ -4,4 +4,4 @@ from .viewsets import ShowcaseViewSet
 
 
 router = routers.DefaultRouter()
-router.register('showcase', ShowcaseViewSet, basename='showcase')
+router.register('showcase', ShowcaseViewSet, basename='api-showcase')
