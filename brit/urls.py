@@ -29,6 +29,7 @@ urlpatterns = [
     path('case_studies/hamburg/', include('case_studies.flexibi_hamburg.urls')),
     path('case_studies/nantes/', include('case_studies.flexibi_nantes.urls')),
     path('waste_collection/', include('case_studies.soilcom.urls')),
+    path('closecycle/', include('case_studies.closecycle.urls')),
     path('bibliography/', include('bibliography.urls')),
     path('cookies/', include('cookie_consent.urls')),
     path('privacy_policy/', PrivacyPolicyView.as_view(), name='privacypolicy'),

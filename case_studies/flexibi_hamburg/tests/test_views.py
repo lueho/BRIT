@@ -8,6 +8,7 @@ from ..models import HamburgRoadsideTrees
 
 class HamburgRoadsideTreesMapViewTestCase(ViewSetWithPermissionsTestCase):
     member_permissions = ['view_geodataset']
+    url_name = 'HamburgRoadsideTrees'
 
     @classmethod
     def setUpTestData(cls):
@@ -23,16 +24,17 @@ class HamburgRoadsideTreesMapViewTestCase(ViewSetWithPermissionsTestCase):
         )
 
     def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('HamburgRoadsideTrees'))
+        response = self.client.get(reverse(self.url_name))
         self.assertEqual(response.status_code, 200)
 
     def test_get_http_200_ok_for_logged_in_users(self):
         self.client.force_login(self.outsider)
-        response = self.client.get(reverse('HamburgRoadsideTrees'))
+        response = self.client.get(reverse(self.url_name))
         self.assertEqual(response.status_code, 200)
 
 
 class HamburgRoadSideTreeAPITestCase(ViewSetWithPermissionsTestCase):
+    url_name = 'data.hamburg_roadside_trees'
 
     @classmethod
     def setUpTestData(cls):
@@ -42,16 +44,16 @@ class HamburgRoadSideTreeAPITestCase(ViewSetWithPermissionsTestCase):
         )
 
     def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('data.hamburg_roadside_trees'))
+        response = self.client.get(reverse(self.url_name))
         self.assertEqual(response.status_code, 200)
 
     def test_get_http_200_ok_for_logged_in_users(self):
         self.client.force_login(self.outsider)
-        response = self.client.get(reverse('data.hamburg_roadside_trees'))
+        response = self.client.get(reverse(self.url_name))
         self.assertEqual(response.status_code, 200)
 
     def test_no_query_params_return_all_entries(self):
-        response = self.client.get(reverse('data.hamburg_roadside_trees'))
+        response = self.client.get(reverse(self.url_name))
         json = response.json()
         self.assertIn('geoJson', json)
         self.assertIn('features', json['geoJson'])
@@ -63,6 +65,7 @@ class HamburgRoadSideTreeAPITestCase(ViewSetWithPermissionsTestCase):
 
 class HamburgRoadsideTreeCatchmentAutocompleteViewTests(ViewWithPermissionsTestCase):
     member_permissions = ['view_geodataset']
+    url_name = 'hamburgroadsidetrees-catchment-autocomplete'
 
     @classmethod
     def setUpTestData(cls):
@@ -124,7 +127,7 @@ class HamburgRoadsideTreeCatchmentAutocompleteViewTests(ViewWithPermissionsTestC
                                                                   owner=cls.outsider)
 
     def test_only_inside_and_published_catchments_in_initial_queryset(self):
-        response = self.client.get(reverse('hamburgroadsidetrees-catchment-autocomplete'))
+        response = self.client.get(reverse(self.url_name))
         self.assertEqual(
             [
                 {'id': f'{self.hamburg_catchment.id}', 'selected_text': 'Hamburg', 'text': 'Hamburg'},
@@ -137,7 +140,7 @@ class HamburgRoadsideTreeCatchmentAutocompleteViewTests(ViewWithPermissionsTestC
         )
 
     def test_only_published_outsider_catchments_visible_to_other_users(self):
-        response = self.client.get(reverse('hamburgroadsidetrees-catchment-autocomplete'))
+        response = self.client.get(reverse(self.url_name))
         self.assertEqual(
             [
                 {'id': f'{self.hamburg_catchment.id}', 'selected_text': 'Hamburg', 'text': 'Hamburg'},
@@ -151,7 +154,7 @@ class HamburgRoadsideTreeCatchmentAutocompleteViewTests(ViewWithPermissionsTestC
 
     def test_all_owned_and_published_catchments_visible_to_outsider(self):
         self.client.force_login(self.outsider)
-        response = self.client.get(reverse('hamburgroadsidetrees-catchment-autocomplete'))
+        response = self.client.get(reverse(self.url_name))
         self.assertEqual(
             [
                 {'id': f'{self.hamburg_catchment.id}', 'selected_text': 'Hamburg', 'text': 'Hamburg'},

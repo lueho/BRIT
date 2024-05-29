@@ -1388,6 +1388,7 @@ class MaterialPropertyModalDeleteViewTestCase(ViewWithPermissionsTestCase):
 
 class MaterialPropertyValueModalDeleteViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = 'delete_materialpropertyvalue'
+    url_name = 'materialpropertyvalue-delete-modal'
 
     @classmethod
     def setUpTestData(cls):
@@ -1399,38 +1400,38 @@ class MaterialPropertyValueModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         )
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('materialpropertyvalue-delete-modal', kwargs={'pk': self.value.pk})
+        url = reverse(self.url_name, kwargs={'pk': self.value.pk})
         response = self.client.get(url)
         self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
 
     def test_get_http_403_forbidden_for_outsiders(self):
         self.client.force_login(self.outsider)
-        response = self.client.get(reverse('materialpropertyvalue-delete-modal', kwargs={'pk': self.value.pk}))
+        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.value.pk}))
         self.assertEqual(response.status_code, 403)
 
     def test_get_http_200_ok_for_members(self):
         self.client.force_login(self.member)
-        response = self.client.get(reverse('materialpropertyvalue-delete-modal', kwargs={'pk': self.value.pk}))
+        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.value.pk}))
         self.assertEqual(response.status_code, 200)
 
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
-        response = self.client.get(reverse('materialpropertyvalue-delete-modal', kwargs={'pk': self.value.pk}))
+        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.value.pk}))
         self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('materialpropertyvalue-delete-modal', kwargs={'pk': self.value.pk})
+        url = reverse(self.url_name, kwargs={'pk': self.value.pk})
         response = self.client.post(url)
         self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
 
     def test_post_http_403_forbidden_for_outsiders(self):
         self.client.force_login(self.outsider)
-        response = self.client.post(reverse('materialpropertyvalue-delete-modal', kwargs={'pk': self.value.pk}))
+        response = self.client.post(reverse(self.url_name, kwargs={'pk': self.value.pk}))
         self.assertEqual(response.status_code, 403)
 
     def test_post_success_and_http_302_redirect_for_members(self):
         self.client.force_login(self.member)
-        response = self.client.post(reverse('materialpropertyvalue-delete-modal', kwargs={'pk': self.value.pk}))
+        response = self.client.post(reverse(self.url_name, kwargs={'pk': self.value.pk}))
         with self.assertRaises(MaterialPropertyValue.DoesNotExist):
             MaterialPropertyValue.objects.get(pk=self.value.pk)
         self.assertRedirects(response, reverse('home'))

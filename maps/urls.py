@@ -36,7 +36,7 @@ from .views import (
     CatchmentRegionGeometryAPI,
     CatchmentRegionSummaryAPIView,
     MapsDashboardView,
-    MapsListView,
+    PublishedGeoDatasetFilterView,
     RegionGeometryAPI,
     NutsRegionMapView,
     NutsRegionAPIView,
@@ -49,7 +49,7 @@ from .views import (
     LocationCreateView, LocationDetailView, LocationUpdateView, LocationModalDeleteView
 )
 urlpatterns = [
-    path('list/', MapsListView.as_view(), name='maps_list'),
+    path('list/', PublishedGeoDatasetFilterView.as_view(), name='maps_list'),
     path('dashboard/', MapsDashboardView.as_view(), name='maps-dashboard'),
     path('attributes/', AttributeListView.as_view(), name='attribute-list'),
     path('attributes/create/', AttributeCreateView.as_view(), name='attribute-create'),

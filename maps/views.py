@@ -7,7 +7,7 @@ from django.forms import formset_factory
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404
 from django.urls import reverse_lazy, reverse
-from django.views.generic import DetailView, ListView, TemplateView
+from django.views.generic import DetailView, TemplateView
 from django.views.generic.edit import FormMixin
 from django_filters.views import FilterView
 from rest_framework.exceptions import NotFound, ParseError
@@ -21,7 +21,7 @@ from utils.views import (BRITFilterView, OwnedObjectCreateView, OwnedObjectDetai
                          OwnedObjectModalCreateView, OwnedObjectModalDeleteView, OwnedObjectModalDetailView,
                          OwnedObjectModalUpdateView, OwnedObjectModelSelectOptionsView, PublishedObjectFilterView,
                          OwnedObjectUpdateView, RestrictedOwnedObjectDetailView, UserOwnedObjectFilterView)
-from .filters import CatchmentFilter, RegionFilterSet, NutsRegionFilterSet
+from .filters import CatchmentFilter, RegionFilterSet, NutsRegionFilterSet, GeoDataSetFilterSet
 from .forms import (AttributeModalModelForm, AttributeModelForm, CatchmentCreateDrawCustomForm,
                     CatchmentCreateMergeLauForm, CatchmentModelForm,
                     RegionModelForm, RegionAttributeValueModalModelForm,
@@ -158,20 +158,18 @@ class MapsDashboardView(PermissionRequiredMixin, TemplateView):
     permission_required = set()
 
 
-class MapsListView(ListView):
-    template_name = 'maps_list.html'
-
-    def get_queryset(self):
-        user_groups = self.request.user.groups.all()
-        return GeoDataset.objects.filter(Q(visible_to_groups__in=user_groups) | Q(publish=True)).distinct()
-
-
 # ----------- Geodataset -----------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 class GeoDataSetMixin(MapMixin):
     region_url = reverse_lazy('data.region-geometries')
     catchment_url = reverse_lazy('data.catchment-geometries')
+
+
+class PublishedGeoDatasetFilterView(PublishedObjectFilterView):
+    model = GeoDataset
+    filterset_class = GeoDataSetFilterSet
+    template_name = 'maps_list.html'
 
 
 class GeoDataSetFormMixin(FormMixin):
@@ -201,7 +199,7 @@ class GeoDataSetDetailView(GeoDataSetMixin, FilterView):
         try:
             return GeoDataset.objects.get(model_name=self.model_name)
         except GeoDataset.DoesNotExist:
-            raise ImproperlyConfigured(f'No GeoDataset with model_name "{self.model_name}" found.')
+            raise ImproperlyConfigured(f'No GeoDataset with model_name {self.model_name} found.')
 
     def get_region_id(self):
         return self.get_object().region.id

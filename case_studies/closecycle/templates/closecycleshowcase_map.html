@@ -1,0 +1,9 @@
+{% extends 'filtered_map.html' %}
+
+{% block map_card_footer %}
+    <a href="{% url 'showcase-list' %}" class="mr-3">
+        <i class="fas fa-fw fa-list"></i> View as list
+    </a>
+{% endblock %}
+
+{% block filter_form_card %}{% endblock %}

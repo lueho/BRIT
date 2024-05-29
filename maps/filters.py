@@ -1,8 +1,8 @@
 from dal import autocomplete, forward
 from django_filters import CharFilter, ModelChoiceFilter
 
-from utils.filters import CrispyAutocompleteFilterSet
-from .models import Catchment, NutsRegion, Region
+from utils.filters import CrispyAutocompleteFilterSet, BaseCrispyFilterSet
+from .models import Catchment, NutsRegion, Region, GeoDataset
 
 
 class CatchmentFilter(CrispyAutocompleteFilterSet):
@@ -64,3 +64,9 @@ class NutsRegionFilterSet(CrispyAutocompleteFilterSet):
     class Meta:
         model = NutsRegion
         fields = ['level_0', 'level_1', 'level_2', 'level_3']
+
+
+class GeoDataSetFilterSet(BaseCrispyFilterSet):
+    class Meta:
+        model = GeoDataset
+        fields = ('id',)

@@ -1,48 +1,8 @@
-from collections import OrderedDict
-
-from rest_framework.fields import SkipField
-from rest_framework.relations import PKOnlyObject
-from rest_framework.serializers import CharField, ModelSerializer, SerializerMethodField, IntegerField, Serializer
+from rest_framework.serializers import CharField, ModelSerializer, SerializerMethodField, IntegerField
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
+from utils.serializers import FieldLabelModelSerializer
 from .models import (Catchment, Region, LauRegion, NutsRegion, GeoPolygon, RegionAttributeTextValue, Location)
-
-
-class FieldLabelMixin(Serializer):
-    field_labels_as_keys = False
-
-    def __init__(self, *args, **kwargs):
-        self.field_labels_as_keys = kwargs.pop('field_labels_as_keys', self.field_labels_as_keys)
-        super().__init__(*args, **kwargs)
-
-    def to_representation(self, instance):
-
-        ret = OrderedDict()
-        fields = self._readable_fields
-
-        for field in fields:
-            try:
-                attribute = field.get_attribute(instance)
-            except SkipField:
-                continue
-
-            # We skip `to_representation` for `None` values so that fields do
-            # not have to explicitly deal with that case.
-            #
-            # For related fields with `use_pk_only_optimization` we need to
-            # resolve the pk value.
-            check_for_none = attribute.pk if isinstance(attribute, PKOnlyObject) else attribute
-            key = field.label if self.field_labels_as_keys else field.field_name
-            if check_for_none is None:
-                ret[key] = None
-            else:
-                ret[key] = field.to_representation(attribute)
-
-        return ret
-
-
-class FieldLabelModelSerializer(FieldLabelMixin, ModelSerializer):
-    """Renders output with defined labels instead of field names"""
 
 
 class PolygonSerializer(GeoFeatureModelSerializer):
@@ -213,3 +173,58 @@ class LauRegionOptionSerializer(ModelSerializer):
     class Meta:
         model = LauRegion
         fields = ['id', 'name']
+
+
+def get_nested_attr(obj, attr_path):
+    """
+    Fetches a nested attribute from an object given an attribute path.
+
+    Args:
+        obj (object): The object to fetch the attribute from.
+        attr_path (str): The dot-separated path to the nested attribute.
+
+    Returns:
+        object: The nested attribute if found, otherwise None.
+    """
+    attrs = attr_path.split('.')
+    for attr in attrs:
+        obj = getattr(obj, attr, None)
+        if obj is None:
+            return None
+    return obj
+
+
+class BaseGeoFeatureModelSerializer(GeoFeatureModelSerializer):
+    """
+    Base serializer for models that include geographical data.
+
+    This serializer dynamically fetches nested geographical attributes
+    and uses a specified geometry serializer to return the geometry data
+    in GeoJSON format.
+
+    Attributes:
+        geom (SerializerMethodField): Method field to fetch and serialize the geometry data.
+
+    Methods:
+        get_geom(obj):
+            Fetches the nested geographical attribute using the path specified in the Meta class
+            and serializes it using the specified geometry serializer.
+    """
+    geom = SerializerMethodField()
+
+    def get_geom(self, obj):
+        """
+        Fetches the nested geographical attribute and serializes it.
+
+        Args:
+            obj (object): The object instance to fetch the geometry from.
+
+        Returns:
+            dict: The serialized GeoJSON geometry data, or None if not found.
+        """
+        attr_path = getattr(self.Meta, 'attr_path', '')
+        geo_serializer_class = getattr(self.Meta, 'geo_serializer_class', self.__class__)
+        geom_obj = get_nested_attr(obj, attr_path)
+        if geom_obj and hasattr(geom_obj, 'geom'):
+            return geo_serializer_class(geom_obj).data['geometry']
+        return None

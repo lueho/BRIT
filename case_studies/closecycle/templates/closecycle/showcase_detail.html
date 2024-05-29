@@ -1,0 +1,35 @@
+{% extends 'geo_detail_card.html' %}
+
+{% block title %}BRIT | CLOSECYCLE Showcase {{ object.name }}{% endblock %}
+
+{% block detail_header %}Showcase: {{ object.name }}{% endblock %}
+
+{% block detail_body %}
+    <p class="card-text"><strong>Name:</strong><br>{{ object.name }}</p>
+    {% if object.country %}
+        <p class="card-text"><strong>Country:</strong><br>{{ object.country }}</p>
+    {% endif %}
+    {% if object.description %}
+        <p class="card-text"><strong>Description:</strong><br>{{ object.description }}</p>
+    {% endif %}
+    {% block additional_details %}{% endblock %}
+{% endblock %}
+
+{% block detail_footer %}
+    <a href="javascript:history.back()" class="nowrap mr-2">
+        <i class="fas fa-fw fa-arrow-left"></i> back
+    </a>
+    <a href="{% url 'showcase-list' %}" class="nowrap mr-2">
+        <i class="fas fa-fw fa-list"></i> see all
+    </a>
+    {% if 'closecycle.change_showcase' in perms %}
+        <a href="{% url 'showcase-update' object.pk %}" class="nowrap mr-2">
+            <i class="fas fa-fw fa-edit"></i> edit
+        </a>
+    {% endif %}
+    {% if 'closecycle.delete_showcase' in perms %}
+        <a href="{% url 'showcase-delete-modal' object.pk %}" class="nowrap modal-link mr-2">
+            <i class="fas fa-fw fa-trash"></i> delete
+        </a>
+    {% endif %}
+{% endblock %}

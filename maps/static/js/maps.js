@@ -205,21 +205,29 @@ async function fetchFeatureGeometries(params) {
     }
 }
 
+/**
+ * Asynchronously fetches feature summaries from a server.
+ *
+ * @async
+ * @function fetchFeatureSummaries
+ * @param {(Object|string)} feature - The feature for which to fetch summaries.
+ * If an object is provided, it should have an 'id' property or a 'properties.id' property.
+ * If a string is provided, it should represent the feature id.
+ * @returns {Promise<Object>} A promise that resolves to the JSON response from the server.
+ * @throws Will log a warning if the provided feature id is not a valid integer number.
+ */
 async function fetchFeatureSummaries(feature) {
-    let featureId;
-    if (typeof (feature) === 'object') {
-        try {
-            featureId = feature.properties.id.toString();
-        } catch (error) {
-            console.warn('The provided feature does not contain an id property:', error);
-            return;
-        }
+    let featureId = typeof feature === 'object' ? feature.id || feature.properties.id : feature;
+    featureId = featureId.toString();
+
+    if (Number.isInteger(parseInt(featureId))) {
+        const dataurl = `${mapConfig.featureSummaryUrl}?id=${featureId}`;
+        const response = await fetch(dataurl);
+        const json = await response.json();
+        return json;
     } else {
-        featureId = feature.toString();
+        console.warn('The provided feature id is not a valid integer number:', featureId);
     }
-    const dataurl = mapConfig.featureSummaryUrl + '?' + 'id=' + featureId;
-    const response = await fetch(dataurl);
-    return await response.json();
 }
 
 function renderRegion(geoJson) {
@@ -315,6 +323,10 @@ function isValidHttpUrl(string) {
     return url.protocol === "http:" || url.protocol === "https:";
 }
 
+function capitalizeFirstLetter(string) {
+    return string.charAt(0).toUpperCase() + string.slice(1);
+}
+
 function renderSummaryContainer(summary, summary_container) {
 
     Object.keys(summary).forEach(key => {
@@ -323,11 +335,11 @@ function renderSummaryContainer(summary, summary_container) {
             const summaryElement = document.createElement('div');
             const labelElement = document.createElement('P');
             const boldLabelElement = document.createElement('B');
-            boldLabelElement.innerText = key;
+            boldLabelElement.innerText = capitalizeFirstLetter(key);
             let value = summary[key];
             if (typeof summary[key] === 'object') {
                 if ('label' in summary[key]) {
-                    boldLabelElement.innerText = summary[key].label;
+                    boldLabelElement.innerText = capitalizeFirstLetter(summary[key].label);
                 }
                 if ('value' in summary[key]) {
                     value = summary[key].value;
