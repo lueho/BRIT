@@ -2,13 +2,40 @@
 
 {% block title %}BRIT | CLOSECYCLE Showcases{% endblock %}
 
+{% block card_body %}
+    <table class="table">
+        <thead>
+        <tr>
+            <th>Name</th>
+            <th>Region</th>
+            <th>Description</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for object in object_list %}
+            <tr>
+                <td>
+                    <a href="{{ object.get_absolute_url }}">{{ object.name }}</a>
+                </td>
+                <td>
+                    <a href="{{ object.region.get_absolute_url }}">{{ object.region.name }}</a>
+                </td>
+                <td>{{ object.description }}</td>
+            </tr>
+        {% endfor %}
+        </tbody>
+        <tfoot>
+        </tfoot>
+    </table>
+{% endblock card_body %}
+
 {% block card_footer %}
     {% if 'closecycle.add_showcase' in perms %}
         <a href="{% url 'showcase-create' %}" class="mr-3">
             <i class="fas fa-fw fa-plus"></i> Add Showcase
         </a>
     {% endif %}
-    
+
     <a href="{% url 'Showcase' %}">
         <i class="fas fa-fw fa-map-marked-alt"></i> View as map
     </a>
