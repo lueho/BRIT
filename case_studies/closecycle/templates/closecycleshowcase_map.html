@@ -1,4 +1,5 @@
 {% extends 'filtered_map.html' %}
+{% load static %}
 
 {% block map_card_footer %}
     <a href="{% url 'showcase-list' %}" class="mr-3">
@@ -7,3 +8,9 @@
 {% endblock %}
 
 {% block filter_form_card %}{% endblock %}
+
+{% block javascript %}
+    {{ block.super }}
+    <script src="{% static 'lib/turf-inside/inside.min.js' %}"></script>
+    <script src="{% static 'js/showcase_map.min.js' %}"></script>
+{% endblock %}

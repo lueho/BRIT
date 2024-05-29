@@ -15,7 +15,7 @@ class ShowcaseModelSerializer(ModelSerializer):
 
 
 class ShowcaseFlatSerializer(ModelSerializer):
-    region = CharField(source='region.name', label='Tha REGION')
+    region = CharField(source='region.name')
 
     class Meta:
         model = Showcase
@@ -39,9 +39,10 @@ class ShowcaseSummaryListSerializer(ModelSerializer):
 
 
 class ShowcaseGeoFeatureModelSerializer(BaseGeoFeatureModelSerializer):
+    region = CharField(source='region.name')
     class Meta:
         model = Showcase
         geo_field = 'geom'
         attr_path = 'region.borders'
         geo_serializer_class = PolygonSerializer
-        fields = ['id', 'name', 'description']
+        fields = ['id', 'name', 'region']
