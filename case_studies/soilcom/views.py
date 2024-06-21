@@ -957,7 +957,7 @@ class WasteCollectionMapView(GeoDataSetDetailView):
     map_title = 'Household Waste Collection Europe'
     load_region = False
     load_catchment = False
-    load_features = False
+    load_features = True
     feature_url = reverse_lazy('collection-geometry-api')
     apply_filter_to_features = True
     adjust_bounds_to_features = False
