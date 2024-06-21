@@ -56,10 +56,18 @@ function createFeatureLayerBindings(collectionLayer) {
     collectionLayer.on('click', e => collectionClickHandler(e, collectionLayer));
 }
 
+function scrollToSummaries() {
+    const importantInfoElement = document.getElementById("filter_result_card");
+    if (importantInfoElement) {
+        importantInfoElement.scrollIntoView({behavior: 'smooth', block: 'start'});
+    }
+}
+
 async function getCollectionDetails(fid) {
     try {
         const summaries = await fetchFeatureSummaries(fid);
         renderSummaries(summaries);
+        scrollToSummaries();
         updateUrls(fid);
     } catch (error) {
         console.error(`Error fetching feature summaries for id ${fid}: ${error}`);
