@@ -24,7 +24,7 @@ class RoadsideTreesMapView(GeoDataSetDetailView):
     model_name = 'HamburgRoadsideTrees'
     template_name = 'hamburg_roadside_trees_map.html'
     filterset_class = HamburgRoadsideTreesFilterSet
-    map_title = 'Hamburg Roadside Trees'
+    map_title = 'Roadside Trees'
     load_region = True
     load_catchment = True
     load_features = False
