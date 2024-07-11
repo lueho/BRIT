@@ -6,6 +6,7 @@ from django.urls import path, include
 from django.views.generic import RedirectView
 from rest_framework.authtoken.views import obtain_auth_token
 
+from utils.views import DynamicRedirectView
 from .views import HomeView, AboutView, LearningView, PrivacyPolicyView
 
 admin.autodiscover()
@@ -34,6 +35,7 @@ urlpatterns = [
     path('cookies/', include('cookie_consent.urls')),
     path('privacy_policy/', PrivacyPolicyView.as_view(), name='privacypolicy'),
     path('api-token-auth/', obtain_auth_token, name='api-token-auth'),
+    path('<str:short_code>/', DynamicRedirectView.as_view(), name='redirect'),
 ]
 
 if settings.DEBUG:

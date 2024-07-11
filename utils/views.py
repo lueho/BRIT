@@ -1,5 +1,3 @@
-from urllib.parse import urlencode
-
 from bootstrap_modal_forms.generic import BSModalCreateView, BSModalDeleteView, BSModalReadView, BSModalUpdateView
 from bootstrap_modal_forms.mixins import is_ajax
 from django.contrib import messages
@@ -8,10 +6,15 @@ from django.contrib.messages.views import SuccessMessageMixin
 from django.core.exceptions import FieldError, ImproperlyConfigured, PermissionDenied
 from django.db.models.signals import post_save
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
+from django.shortcuts import get_object_or_404
 from django.template.loader import render_to_string
+from django.views import View
 from django.views.generic import CreateView, DetailView, ListView, TemplateView, UpdateView
 from django_filters.views import FilterView
 from factory.django import mute_signals
+from urllib.parse import urlencode
+
+from .models import Redirect
 
 
 class NextOrSuccessUrlMixin:
@@ -350,3 +353,23 @@ class OwnedObjectModelSelectOptionsView(PermissionRequiredMixin, ModelSelectOpti
 class UtilsDashboardView(PermissionRequiredMixin, TemplateView):
     template_name = 'utils_dashboard.html'
     permission_required = ('properties.view_property',)
+
+
+class DynamicRedirectView(View):
+    """
+    A view that handles dynamic redirection based on a short code.
+
+    This view looks up a `Redirect` object by its `short_code` and redirects the user
+    to the full path associated with that object. If no such object exists, a 404 error
+    is raised.
+
+    Attributes:
+        View (django.views.View): Inherits from Django's base class view.
+
+    Methods:
+        get: Handles GET requests to dynamically redirect based on a short code.
+    """
+
+    def get(self, request, short_code):
+        redirect_obj = get_object_or_404(Redirect, short_code=short_code)
+        return HttpResponseRedirect(f"{request.scheme}://{request.get_host()}{redirect_obj.full_path}")

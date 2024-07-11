@@ -136,3 +136,22 @@ class NamedUserObjectModel(OwnedObjectModel):
 
     def __str__(self):
         return self.name
+
+
+class Redirect(models.Model):
+    """
+    Model representing a redirection from a short code to a full path URL.
+
+    Attributes:
+        short_code (models.CharField): A unique identifier for the redirect, typically a shortened URL path.
+        full_path (models.TextField): The full URL path to which the short code should redirect.
+
+    Methods:
+        __str__(self): Returns a string representation of the Redirect instance, showing the short code and its corresponding full path.
+    """
+
+    short_code = models.CharField(max_length=50, unique=True)
+    full_path = models.TextField()
+
+    def __str__(self):
+        return f"{self.short_code} -> {self.full_path}"
