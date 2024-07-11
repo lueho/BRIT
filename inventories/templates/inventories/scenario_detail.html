@@ -55,19 +55,22 @@
                     </div>
                 </div>
             {% endfor %}
-            <div class="row mb-4">
-                <div class="col">
-                    <div class="card">
-                        <div class="card-header"></div>
-                        <div class="card-body">
-                            <a href="{% url 'scenarioinventory-create' scenario.id %}">
-                                <i class="fas fa-fw fa-plus"></i> Add inventory
-                            </a>
+            {% if user.is_authenticated %}
+                <!-- Add inventory button -->
+                <div class="row mb-4">
+                    <div class="col">
+                        <div class="card">
+                            <div class="card-header"></div>
+                            <div class="card-body">
+                                <a href="{% url 'scenarioconfiguration-create' scenario.id %}">
+                                    <i class="fas fa-fw fa-plus"></i> Add inventory
+                                </a>
+                            </div>
+                            <div class="card-footer"></div>
                         </div>
-                        <div class="card-footer"></div>
                     </div>
                 </div>
-            </div>
+            {% endif %}
         </div>
     </div>
 {% endblock %}
