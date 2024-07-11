@@ -4,12 +4,16 @@ import json
 from celery.result import AsyncResult
 from dal_select2.views import Select2QuerySetView
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse
+from django.http import JsonResponse
 from django.shortcuts import redirect, render
-from django.urls import reverse_lazy
+from django.urls import reverse_lazy, reverse
 from django.views.generic import CreateView, DetailView
 from extra_views import UpdateWithInlinesView
+from rest_framework import viewsets
+from rest_framework.permissions import BasePermission
 from rest_framework.views import APIView
+from rest_framework.viewsets import ReadOnlyModelViewSet
 
 from layer_manager.models import Layer
 from maps.serializers import BaseResultMapSerializer
@@ -17,13 +21,15 @@ from maps.views import MapMixin
 from materials.models import SampleSeries
 from utils.views import (OwnedObjectCreateView, OwnedObjectDetailView, OwnedObjectModalDeleteView,
                          OwnedObjectUpdateView, PublishedObjectFilterView, RestrictedOwnedObjectDetailView,
-                         UserOwnedObjectFilterView)
+                         UserOwnedObjectFilterView, ModelPermissionOrOwnerMixin,
+                         PermissionOrOwnerOrPublishedMixin)
+from utils.viewsets import AutoPermModelViewSet
 from .evaluations import ScenarioResult
 from .filters import ScenarioFilterSet
 from .forms import (ScenarioModelForm, SeasonalDistributionModelForm, ScenarioConfigurationModelForm,
                     ScenarioParameterSettingInline, NoFormTagFormSetHelper)
 from .models import (Algorithm, ParameterValue, RunningTask,
-                     Scenario, ScenarioConfiguration)
+                     Scenario, ScenarioConfiguration, ScenarioStatus)
 from .tasks import run_inventory
 
 
@@ -141,7 +147,7 @@ def download_scenario_summary(request, scenario_pk):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class ScenarioConfigurationCreateView(OwnedObjectCreateView):
+class ScenarioConfigurationCreateView(LoginRequiredMixin, OwnedObjectCreateView):
     """
     This view is responsible for creating a new ScenarioConfiguration instance.
     During the creation initially only the feedstock, dataset and algorithm are selected. For simplicity, the values
@@ -157,16 +163,16 @@ class ScenarioConfigurationCreateView(OwnedObjectCreateView):
     permission_required = set()
 
     def get_initial(self):
-        return {'scenario': Scenario.objects.get(id=self.kwargs.get('scenario_pk'))}
+        return {'scenario': Scenario.objects.get(id=self.kwargs.get('pk'))}
 
 
-class ScenarioConfigurationDetailView(MapMixin, RestrictedOwnedObjectDetailView):
+class ScenarioConfigurationDetailView(PermissionOrOwnerOrPublishedMixin, MapMixin, OwnedObjectDetailView):
     """Summary of the Scenario with complete configuration. Page for final review, which also contains the
     'run' button."""
 
     model = Scenario
     object = None
-    permission_required = set()
+    permission_required = ['inventories.view_scenario', 'inventories.view_scenarioconfiguration']
     config = None
 
     load_region = True
@@ -204,11 +210,12 @@ class ScenarioConfigurationDetailView(MapMixin, RestrictedOwnedObjectDetailView)
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         scenario = self.object
+        scenario.set_status(ScenarioStatus.Status.RUNNING)
         run_inventory.delay(scenario.id)
         return redirect('scenario-result', scenario.id)
 
 
-class ScenarioConfigurationUpdateView(UpdateWithInlinesView):  # TODO: Deal with permissions
+class ScenarioConfigurationUpdateView(ModelPermissionOrOwnerMixin, UpdateWithInlinesView):
     """
     This view is responsible for updating a ScenarioConfiguration instance. Note that the fields of the actual
     ScenarioConfiguration object are locked, once created. Updates in this view are done by altering the parameter
@@ -221,6 +228,7 @@ class ScenarioConfigurationUpdateView(UpdateWithInlinesView):  # TODO: Deal with
     inlines = [ScenarioParameterSettingInline]
     template_name = 'configure_algorithm.html'
     formset_helper_class = NoFormTagFormSetHelper
+    permission_required = 'inventories.change_scenarioconfiguration'
 
     def get_context_data(self, **kwargs):
         kwargs = super().get_context_data(**kwargs)
@@ -239,18 +247,36 @@ class ScenarioInventoryConfigurationModalDeleteView(OwnedObjectModalDeleteView):
 
     model = ScenarioConfiguration
     success_message = 'Successfully deleted.'
-    permission_required = set()
+    permission_required = ['inventories.delete_scenarioconfiguration']
 
     def get_success_url(self):
         return self.object.scenario.get_absolute_url()
 
 
-class ResultMapAPI(APIView):
-    """Rest API to get features from automatically generated result tables. Endpoint for Leaflet maps"""
+class LayerIsPublishedPermission(BasePermission):
 
-    @staticmethod
-    def get(request, *args, **kwargs):
-        layer = Layer.objects.get(table_name=kwargs['layer_name'])
+    def has_permission(self, request, view):
+        # The OPTIONS method is not associated with any action and should always be allowed
+        if request.method in ('OPTIONS', 'HEAD'):
+            return True
+
+        layer = Layer.objects.get(table_name=view.kwargs['layer_name'])
+        if view.action == 'retrieve' and layer.scenario.publication_status == 'published':
+            return True
+        return request.user and request.user.is_authenticated
+
+
+class ResultMapAPI(ReadOnlyModelViewSet):
+
+    queryset = Layer.objects.all()
+    permission_classes = [LayerIsPublishedPermission]
+
+    def retrieve(self, request, *args, **kwargs):
+        try:
+            layer = Layer.objects.get(table_name=kwargs['layer_name'])
+        except Layer.DoesNotExist:
+            return JsonResponse({'error': 'Layer not found'}, status=404)
+
         feature_collection = layer.get_feature_collection()
         features = feature_collection.objects.all()
         serializer_class = BaseResultMapSerializer
@@ -364,17 +390,42 @@ def get_evaluation_status(request, task_id=None):
     return JsonResponse(result, status=200)
 
 
-class ScenarioResultDetailMapView(DetailView):
+class ScenarioResultDetailMapView(MapMixin, DetailView):
     """View of an individual result map in large size"""
     model = Layer
     context_object_name = 'layer'
     template_name = 'result_detail_map.html'
+    region_url = reverse_lazy('data.region-geometries')
+    catchment_url = reverse_lazy('data.catchment-geometries')
+    catchment_layer_style = {
+        'color': '#04555E',
+        'fillOpacity': 0.1,
+        'weight': 1
+    }
+    feature_layer_style = {
+        'color': '#63c36c',
+        'fillOpacity': 1,
+        'radius': 5,
+        'stroke': False
+    }
 
     def get_object(self, **kwargs):
         scenario = Scenario.objects.get(id=self.kwargs.get('pk'))
         algorithm = Algorithm.objects.get(id=self.kwargs.get('algorithm_pk'))
         feedstock = SampleSeries.objects.get(id=self.kwargs.get('feedstock_pk'))
         return Layer.objects.get(scenario=scenario, algorithm=algorithm, feedstock=feedstock)
+
+    def get_map_title(self):
+        return "Result Map"
+
+    def get_region_id(self):
+        return self.object.scenario.region.id
+
+    def get_catchment_id(self):
+        return self.object.scenario.catchment.id
+
+    def get_feature_url(self):
+        return reverse('data.result_layer', args=[self.object.table_name])
 
 
 def download_scenario_result_summary(request, scenario_pk):

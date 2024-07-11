@@ -2092,7 +2092,7 @@ class SampleUpdateViewTestCase(ViewWithPermissionsTestCase):
         cls.sample = Sample.objects.create(name='Test Sample', series=cls.series)
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('sample-update', kwargs={'pk': self.series.pk})
+        url = reverse('sample-update', kwargs={'pk': self.sample.pk})
         response = self.client.get(url)
         self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
 
@@ -2112,7 +2112,7 @@ class SampleUpdateViewTestCase(ViewWithPermissionsTestCase):
         self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('sample-update', kwargs={'pk': self.series.pk})
+        url = reverse('sample-update', kwargs={'pk': self.sample.pk})
         response = self.client.post(url)
         self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
 

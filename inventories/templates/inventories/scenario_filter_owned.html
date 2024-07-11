@@ -7,7 +7,7 @@
         <i class="fas fa-fw fa-list"></i> Public inventories
     </a>
     {% if user.is_authenticated %}
-        <a href="{% url 'scenario-create' %}?next={{ request.get_full_path|urlencode }}" class="nowrap">
+        <a href="{% url 'scenario-create' %}" class="nowrap">
             <i class="fa fa-fw fa-plus"></i>
             <span>Add new inventory</span>
         </a>

@@ -43,3 +43,16 @@ class HasModelPermission(permissions.BasePermission):
                 return False
 
         return True
+
+
+class IsPublishedPermission(permissions.BasePermission):
+
+    def has_permission(self, request, view):
+        # The OPTIONS method is not associated with any action and should always be allowed
+        if request.method in ('OPTIONS', 'HEAD'):
+            return True
+
+        obj = view.get_object()
+        if hasattr(obj, 'publication_status') and obj.publication_status == 'published':
+            return True
+

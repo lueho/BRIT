@@ -11,7 +11,8 @@
 
 {% block detail_header %}Catchment: {{ object.name }}{% endblock %}
 
-{% block detail_top_image %}<div class="card-img-top">{% leaflet_map "main" %}</div>{% endblock %}
+{% block detail_top_image %}
+    <div class="card-img-top">{% leaflet_map "main" %}</div>{% endblock %}
 
 {% block detail_body %}
     <p class="card-text"><strong>Name:</strong><br>{{ object.name }}</p>
@@ -31,6 +32,16 @@
     {% if object.description %}
         <p class="card-text"><strong>Description:</strong><br>{{ object.description }}</p>
     {% endif %}
+    {% if object.scenarios.exists %}
+        <p class="card-text"><strong>Scenarios:</strong></p>
+            <ul>
+                {% for scenario in object.scenarios.all %}
+                    <li>
+                        <a href="{% url 'scenario-detail' scenario.pk %}">{{ scenario.name }}</a>
+                    </li>
+                {% endfor %}
+            </ul>
+    {% endif %}
     {% block additional_details %}{% endblock %}
 {% endblock %}
 
@@ -41,12 +52,12 @@
     <a href="{% url 'catchment-list' %}" class="nowrap mr-2">
         <i class="fas fa-fw fa-list"></i> see all
     </a>
-    {% if 'maps.change_catchment' in perms %}
-        <a href="{% url 'catchment-update' object.pk %}" class="nowrap mr-2">
+    {% if object.owner == request.user or 'maps.change_catchment' in perms %}
+        <a href="{% url 'catchment-update-draw-custom' object.pk %}" class="nowrap mr-2">
             <i class="fas fa-fw fa-edit"></i> edit
         </a>
     {% endif %}
-    {% if 'maps.delete_catchment' in perms %}
+    {% if object.owner == request.user or 'maps.delete_catchment' in perms %}
         <a href="{% url 'catchment-delete-modal' object.pk %}" class="nowrap modal-link mr-2">
             <i class="fas fa-fw fa-trash"></i> delete
         </a>

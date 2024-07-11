@@ -39,6 +39,34 @@ class UserOwnsObjectMixin(UserPassesTestMixin):
         return self.get_object().owner == self.request.user
 
 
+class ModelPermissionOrOwnerMixin(PermissionRequiredMixin):
+    """
+    A mixin that combines the PermissionRequiredMixin and UserOwnsObjectMixin. The user must either have the required
+    permission or own the object.
+    """
+
+    def has_permission(self):
+        return super().has_permission() or self.get_object().owner == self.request.user
+
+
+class PermissionOrOwnerOrPublishedMixin(PermissionRequiredMixin):
+    """
+    A mixin that combines the PermissionRequiredMixin and UserOwnsObjectMixin. The user must either have the required
+    permission or own the object.
+    """
+
+    def has_permission(self):
+        obj = self.get_object()
+        if hasattr(obj, 'publication_status') and obj.publication_status == 'published':
+            return True
+        elif hasattr(obj, 'owner') and obj.owner == self.request.user:
+            return True
+        elif super().has_permission():
+            return True
+        else:
+            return False
+
+
 class ModalMessageView(TemplateView):
     template_name = 'modal_message.html'
     title = 'Title'
@@ -242,7 +270,7 @@ class OwnedObjectModalDetailView(PermissionRequiredMixin, BSModalReadView):
         return context
 
 
-class OwnedObjectUpdateView(PermissionRequiredMixin, SuccessMessageMixin, NextOrSuccessUrlMixin, UpdateView):
+class OwnedObjectUpdateView(ModelPermissionOrOwnerMixin, SuccessMessageMixin, NextOrSuccessUrlMixin, UpdateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -264,7 +292,7 @@ class OwnedObjectUpdateView(PermissionRequiredMixin, SuccessMessageMixin, NextOr
         return template_names
 
 
-class OwnedObjectModalUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
+class OwnedObjectModalUpdateView(ModelPermissionOrOwnerMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
     template_name = 'modal_form.html'
     success_message = 'Object updated successfully.'
 
@@ -280,7 +308,7 @@ class OwnedObjectModalUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin,
         return str(self.object.pk)
 
 
-class OwnedObjectModalDeleteView(PermissionRequiredMixin, NextOrSuccessUrlMixin, BSModalDeleteView):
+class OwnedObjectModalDeleteView(ModelPermissionOrOwnerMixin, NextOrSuccessUrlMixin, BSModalDeleteView):
     template_name = 'modal_delete.html'
 
     def get_context_data(self, **kwargs):

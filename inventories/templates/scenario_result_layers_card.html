@@ -1,0 +1,15 @@
+<div class="card shadow mb-4">
+    <div class="card-header">Result layers</div>
+    <div class="card-body">
+        {% if object.layer_set.exists %}
+            <ul>
+                {% for layer in object.layer_set.all %}
+                    <li>
+                        <a href="{% url 'scenario_result_map' object.id layer.algorithm.id layer.feedstock.id %}">{{ layer.algorithm.name }} {{ layer.feedstock }}</a>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    </div>
+    <div class="card-footer"></div>
+</div>

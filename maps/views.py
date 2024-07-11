@@ -14,6 +14,7 @@ from django_filters.views import FilterView
 from rest_framework.exceptions import NotFound, ParseError
 from rest_framework.views import APIView, Response
 
+from inventories.models import Scenario
 from maps.serializers import (CatchmentSerializer, LauRegionOptionSerializer, LauRegionSummarySerializer,
                               NutsRegionCatchmentOptionSerializer, NutsRegionGeometrySerializer,
                               NutsRegionOptionSerializer, NutsRegionSummarySerializer, RegionGeoFeatureModelSerializer)
@@ -21,12 +22,14 @@ from utils.forms import DynamicTableInlineFormSetHelper
 from utils.views import (BRITFilterView, OwnedObjectCreateView, OwnedObjectDetailView, OwnedObjectListView,
                          OwnedObjectModalCreateView, OwnedObjectModalDeleteView, OwnedObjectModalDetailView,
                          OwnedObjectModalUpdateView, OwnedObjectModelSelectOptionsView, PublishedObjectFilterView,
-                         OwnedObjectUpdateView, RestrictedOwnedObjectDetailView, UserOwnedObjectFilterView)
+                         OwnedObjectUpdateView, RestrictedOwnedObjectDetailView, UserOwnedObjectFilterView,
+                         UserOwnsObjectMixin)
 from .filters import CatchmentFilter, RegionFilterSet, NutsRegionFilterSet, GeoDataSetFilterSet
-from .forms import (AttributeModalModelForm, AttributeModelForm, CatchmentCreateDrawCustomForm,
+from .forms import (AttributeModalModelForm, AttributeModelForm, CatchmentDrawCustomModelForm,
                     CatchmentCreateMergeLauForm, CatchmentModelForm,
                     RegionModelForm, RegionAttributeValueModalModelForm,
-                    RegionAttributeValueModelForm, RegionMergeForm, RegionMergeFormSet, LocationModelForm)
+                    RegionAttributeValueModelForm, RegionMergeForm, RegionMergeFormSet, LocationModelForm,
+                    )
 from .models import (Attribute, Catchment, GeoDataset, GeoPolygon, LauRegion, Location, NutsRegion, Region,
                      RegionAttributeValue)
 
@@ -67,8 +70,8 @@ class MapMixin:
                 'catchmentUrl': self.get_catchment_url(),
                 'catchmentLayerStyle': self.get_catchment_layer_style(),
                 'loadFeatures': self.get_load_features(),
-                'featureUrl': self.get_apply_filter_to_features(),
-                'applyFilterToFeatures': self.get_use_filter(),
+                'featureUrl': self.get_feature_url(),
+                'applyFilterToFeatures': self.get_apply_filter_to_features(),
                 'featureLayerStyle': self.get_feature_layer_style(),
                 'adjustBoundsToFeatures': self.get_adjust_bounds_to_features(),
                 'featureSummaryUrl': self.get_feature_summary_url(),
@@ -126,10 +129,10 @@ class MapMixin:
         else:
             return self.load_features
 
-    def get_apply_filter_to_features(self):
+    def get_feature_url(self):
         return self.feature_url
 
-    def get_use_filter(self):
+    def get_apply_filter_to_features(self):
         return self.apply_filter_to_features
 
     def get_feature_layer_style(self):
@@ -218,10 +221,17 @@ class GeoDataSetNameAutocompleteView(Select2QuerySetView):
         if algorithm_id:
             qs = qs.filter(algorithms__id=algorithm_id)
 
+        scenario_id = self.forwarded.get('scenario', None)
+        if scenario_id:
+            scenario = Scenario.objects.get(id=scenario_id)
+            scenario_geom = scenario.catchment.region.borders.geom
+            qs = qs.filter(region__borders__geom__covers=scenario_geom)
+
         if self.q:
             qs = qs.filter(name__icontains=self.q)
 
         return qs.order_by('name')
+
 
 # ----------- Location CRUD---------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
@@ -345,8 +355,15 @@ class CatchmentCreateSelectRegionView(LoginRequiredMixin, OwnedObjectCreateView)
 
 class CatchmentCreateDrawCustomView(LoginRequiredMixin, OwnedObjectCreateView):
     template_name = 'catchment_draw_form.html'
-    form_class = CatchmentCreateDrawCustomForm
+    form_class = CatchmentDrawCustomModelForm
     permission_required = set()
+
+    def form_valid(self, form):
+        instance = form.save(commit=False)
+        borders = GeoPolygon.objects.create(geom=form.cleaned_data['geom'])
+        instance.region = Region.objects.create(name=instance.name, borders=borders)
+        instance.save()
+        return super().form_valid(form)
 
 
 class CatchmentCreateMergeLauView(LoginRequiredMixin, OwnedObjectCreateView):
@@ -418,6 +435,24 @@ class CatchmentUpdateView(OwnedObjectUpdateView):
     model = Catchment
     form_class = CatchmentModelForm
     permission_required = 'maps.change_catchment'
+
+
+class CatchmentUpdateDrawCustomView(OwnedObjectUpdateView):
+    model = Catchment
+    form_class = CatchmentDrawCustomModelForm
+    template_name = 'catchment_draw_form.html'
+    catchment_url = reverse_lazy('data.catchment-geometries')
+    permission_required = set()
+
+    def get_initial(self):
+        initial = super().get_initial()
+        initial['geom'] = self.object.region.borders.geom
+        return initial
+
+    def form_valid(self, form):
+        self.object.region.borders.geom = form.cleaned_data['geom']
+        self.object.region.borders.save()
+        return super().form_valid(form)
 
 
 class CatchmentModalDeleteView(OwnedObjectModalDeleteView):

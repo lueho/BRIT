@@ -84,7 +84,7 @@ class CatchmentModelForm(AutoCompleteModelForm):
         fields = ('name', 'region', 'parent_region', 'description')
 
 
-class CatchmentCreateDrawCustomForm(AutoCompleteModelForm):
+class CatchmentDrawCustomModelForm(AutoCompleteModelForm):
     geom = MultiPolygonField(widget=LeafletWidget())
     parent_region = ModelChoiceField(
         queryset=Region.objects.all(),
@@ -95,15 +95,6 @@ class CatchmentCreateDrawCustomForm(AutoCompleteModelForm):
     class Meta:
         model = Catchment
         fields = ('name', 'geom', 'parent_region', 'description')
-
-    def save(self, commit=True):
-        geom = self.cleaned_data.pop('geom')
-        instance = super().save(commit=False)
-        borders = GeoPolygon.objects.create(geom=geom)
-        instance.region = Region.objects.create(name=instance.name, borders=borders)
-        if commit:
-            instance.save()
-        return instance
 
 
 class CatchmentCreateMergeLauForm(AutoCompleteModelForm):

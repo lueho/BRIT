@@ -2,6 +2,7 @@
 
 function parseFilterParameters() {
     const form = document.querySelector('form');
+    console.log(form);
     if (!form) {
         console.warn('No form found on the page. Returning an empty URLSearchParams object.');
         return new URLSearchParams();

@@ -61,13 +61,12 @@ class ScenarioConfigurationModelForm(AutoCompleteModelForm):
     )
     geodataset = ModelChoiceField(
         queryset=GeoDataset.objects.all(),
-        widget=ModelSelect2(url='geodataset-name-autocomplete', forward=['algorithm', ]),
+        widget=ModelSelect2(url='geodataset-name-autocomplete', forward=['scenario', 'algorithm', ]),
         # TODO: Limit choices with respect to feedstock
     )
     algorithm = ModelChoiceField(
         queryset=Algorithm.objects.all(),
-        widget=ModelSelect2(url='algorithm-name-autocomplete', forward=['geodataset', ]),
-        # TODO: Limit choices with respect to feedstock
+        widget=ModelSelect2(url='algorithm-name-autocomplete', forward=['geodataset', 'feedstock', ]),
     )
 
     class Meta:

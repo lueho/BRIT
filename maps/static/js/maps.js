@@ -195,8 +195,11 @@ function convertToFeatureCollection(data) {
 }
 
 async function fetchFeatureGeometries(params) {
+    console.log(params);
     const url = new URL(window.location.origin + mapConfig.featureUrl);
+    console.log(url);
     url.search = transformSearchParams(params).toString();
+    console.log(url);
     const response = await fetch(url);
     const geoJson = await response.json();
     renderFeatures(convertToFeatureCollection(geoJson));

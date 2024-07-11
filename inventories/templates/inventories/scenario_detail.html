@@ -35,21 +35,25 @@
                                     {% for setting in config.scenarioparametersetting_set.all %}
                                         <li><strong>{{ setting.parameter_value.parameter.descriptive_name }}:</strong>
                                             {{ setting.parameter_value }}
-                                            (<a href="{% url 'source-detail' setting.parameter_value.source.id %}">
+                                            {% if setting.parameter_value.source %}
+                                                (<a href="{% url 'source-detail' setting.parameter_value.source.id %}">
                                                 {{ setting.parameter_value.source }}
                                             </a>)
+                                            {% endif %}
                                         </li>
                                     {% endfor %}
                                 </ul>
                             </div>
                             <div class="card-footer">
-                                <a href="{% url 'scenarioinventory-update' config.id %}" class="nowrap mr-3">
-                                    <i class="fas fa-fw fa-edit"></i> Change parameters
-                                </a>
-                                <a href="{% url 'scenarioinventory-delete-modal' config.id %}"
-                                   class="nowrap mr-3 modal-link">
-                                    <i class="fas fa-fw fa-trash"></i> Remove
-                                </a>
+                                {% if object.owner == request.user or 'inventories.change_scenario' in perms %}
+                                    <a href="{% url 'scenarioconfiguration-update' config.id %}" class="nowrap mr-3">
+                                        <i class="fas fa-fw fa-edit"></i> Change parameters
+                                    </a>
+                                    <a href="{% url 'scenarioconfiguration-delete-modal' config.id %}?next={{ request.path }}"
+                                       class="nowrap mr-3 modal-link">
+                                        <i class="fas fa-fw fa-trash"></i> Remove
+                                    </a>
+                                {% endif %}
                             </div>
                         </div>
                     </div>

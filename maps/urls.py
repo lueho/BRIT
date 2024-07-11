@@ -47,7 +47,7 @@ from .views import (
     LauRegionOptionsAPI,
     NutsAndLauCatchmentPedigreeAPI,
     LocationListView,
-    LocationCreateView, LocationDetailView, LocationUpdateView, LocationModalDeleteView
+    LocationCreateView, LocationDetailView, LocationUpdateView, LocationModalDeleteView, CatchmentUpdateDrawCustomView
 )
 urlpatterns = [
     path('list/', PublishedGeoDatasetFilterView.as_view(), name='maps_list'),
@@ -82,6 +82,7 @@ urlpatterns = [
     path('catchments/create/modal/', CatchmentCreateSelectRegionView.as_view(), name='catchment-create-modal'),
     path('catchments/<int:pk>/', CatchmentDetailView.as_view(), name='catchment-detail'),
     path('catchments/<int:pk>/update/', CatchmentUpdateView.as_view(), name='catchment-update'),
+    path('catchments/<int:pk>/update/draw_custom', CatchmentUpdateDrawCustomView.as_view(), name='catchment-update-draw-custom'),
     path('catchments/<int:pk>/delete/modal/', CatchmentModalDeleteView.as_view(), name='catchment-delete-modal'),
     path('catchments/data/', RegionGeometryAPI.as_view(), name='data.catchments'),
     path('catchments/autocomplete/', CatchmentAutocompleteView.as_view(), name='catchment-autocomplete'),

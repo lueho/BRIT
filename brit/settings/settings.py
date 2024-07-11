@@ -98,6 +98,11 @@ WSGI_APPLICATION = 'brit.wsgi.application'
 
 DATABASES = {}
 
+DATABASE_SCHEMAS = {
+    'default_schema': 'public',
+    'layer_schema': 'result_layers',
+}
+
 # Password validation
 # https://docs.djangoproject.com/en/3.0/ref/settings/#auth-password-validators
 

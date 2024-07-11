@@ -98,7 +98,7 @@ class ParameterValue(NamedUserObjectModel):
 
     def __str__(self):
         if self.type == 1:
-            return f'{self.value} ({self.source})'
+            return f'{self.value}'
         elif self.type == 2:
             return f'{self.name}'
         return self.name
@@ -136,7 +136,7 @@ class ScenarioStatus(models.Model):
 class Scenario(NamedUserObjectModel):
     description = models.TextField(blank=True, null=True)
     region = models.ForeignKey(Region, on_delete=models.CASCADE, null=True)
-    catchment = models.ForeignKey(Catchment, on_delete=models.CASCADE, null=True, related_name='catchment')
+    catchment = models.ForeignKey(Catchment, on_delete=models.CASCADE, null=True, related_name='scenarios')
 
     @property
     def status(self):
