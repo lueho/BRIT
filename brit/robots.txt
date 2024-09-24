@@ -1,0 +1,8 @@
+user-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /users/
+Disallow: /media/
+Disallow: /static/
+
+Sitemap: https://bri-tool.herokuapp.com/sitemap.xml

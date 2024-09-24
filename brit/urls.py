@@ -2,15 +2,22 @@ import debug_toolbar
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
+from django.contrib.sitemaps.views import sitemap
 from django.urls import path, include
-from django.views.generic import RedirectView
+from django.views.generic import RedirectView, TemplateView
 from rest_framework.authtoken.views import obtain_auth_token
 
 from utils.views import DynamicRedirectView
+from .sitemaps import DynamicViewSitemap, HomepageSitemap
 from .views import HomeView, AboutView, LearningView, PrivacyPolicyView
 
 admin.autodiscover()
 admin.site.enable_nav_sidebar = False
+
+sitemaps = {
+    'homepage': HomepageSitemap,
+    'dynamic': DynamicViewSitemap,
+}
 
 urlpatterns = [
     path('', RedirectView.as_view(url='/home'), name='entry'),
@@ -35,6 +42,8 @@ urlpatterns = [
     path('cookies/', include('cookie_consent.urls')),
     path('privacy_policy/', PrivacyPolicyView.as_view(), name='privacypolicy'),
     path('api-token-auth/', obtain_auth_token, name='api-token-auth'),
+    path('sitemap.xml', sitemap, {'sitemaps': sitemaps}, name='django.contrib.sitemaps.views.sitemap'),
+    path('robots.txt', TemplateView.as_view(template_name="robots.txt", content_type="text/plain")),
     path('<str:short_code>/', DynamicRedirectView.as_view(), name='redirect'),
 ]
 
