@@ -32,3 +32,19 @@ CLOUDINARY_STORAGE = {
 }
 
 CRISPY_FAIL_SILENTLY = False
+
+
+# Override email backend for development
+EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+
+# Adjust logging for development
+LOGGING['loggers']['django']['level'] = 'DEBUG'
+LOGGING['loggers']['brit']['level'] = 'DEBUG'
+
+# Remove 'mail_admins' handler from all loggers
+for logger in LOGGING['loggers'].values():
+    if 'mail_admins' in logger['handlers']:
+        logger['handlers'].remove('mail_admins')
+
+# Remove the 'mail_admins' handler entirely
+LOGGING['handlers'].pop('mail_admins', None)
