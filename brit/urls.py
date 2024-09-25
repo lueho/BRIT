@@ -9,7 +9,7 @@ from rest_framework.authtoken.views import obtain_auth_token
 
 from utils.views import DynamicRedirectView
 from .sitemaps import DynamicViewSitemap, HomepageSitemap
-from .views import HomeView, AboutView, LearningView, PrivacyPolicyView
+from .views import HomeView, AboutView, LearningView, PrivacyPolicyView, CacheTestView, get_session, set_session
 
 admin.autodiscover()
 admin.site.enable_nav_sidebar = False
@@ -44,6 +44,9 @@ urlpatterns = [
     path('api-token-auth/', obtain_auth_token, name='api-token-auth'),
     path('sitemap.xml', sitemap, {'sitemaps': sitemaps}, name='django.contrib.sitemaps.views.sitemap'),
     path('robots.txt', TemplateView.as_view(template_name="robots.txt", content_type="text/plain")),
+    path('cache-test/', CacheTestView.as_view(), name='cache_test'),
+    path('set_settion/', set_session, name='set_session'),
+    path('get_settion/', get_session, name='get_session'),
     path('<str:short_code>/', DynamicRedirectView.as_view(), name='redirect'),
 ]
 

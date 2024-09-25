@@ -141,6 +141,24 @@ STATIC_URL = '/static/'
 
 MEDIA_URL = '/media/'
 
+# import ssl
+#
+# CACHES = {
+#     "default": {
+#         "BACKEND": "django_redis.cache.RedisCache",
+#         "LOCATION": os.environ.get("REDIS_URL"),
+#         "OPTIONS": {
+#             "CLIENT_CLASS": "django_redis.client.DefaultClient",
+#             "SSL": {
+#                 "ssl_cert_reqs": ssl.CERT_NONE
+#             },
+#             "CONNECTION_POOL_KWARGS": {
+#                 "ssl_cert_reqs": None,
+#             },
+#         }
+#     }
+# }
+
 STORAGES = {
     'default': {
         'BACKEND': 'storages.backends.s3boto3.S3Boto3Storage'
@@ -197,12 +215,6 @@ LOGIN_URL = '/users/login/'
 DEFAULT_AUTO_FIELD = 'django.db.models.AutoField'
 
 CELERY_BROKER_URL = os.environ.get("REDIS_URL")
-CELERY_BROKER_USE_SSL = {
-    'ssl_cert_reqs': ssl.CERT_NONE
-}
-CELERY_REDIS_BACKEND_USE_SSL = {
-    'ssl_cert_reqs': ssl.CERT_NONE
-}
 CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL")
 
 CRISPY_TEMPLATE_PACK = 'bootstrap4'
