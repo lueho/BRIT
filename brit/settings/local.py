@@ -21,29 +21,6 @@ DATABASES['default'] = {
     'PORT': os.environ.get('POSTGRES_PORT'),
 }
 
-CACHES = {
-    "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": os.environ.get("REDIS_URL"),
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
-            "SSL": {
-                "ssl_cert_reqs": ssl.CERT_NONE
-            },
-            "CONNECTION_POOL_KWARGS": {
-                "ssl_cert_reqs": None,
-            },
-        }
-    }
-}
-
-CELERY_BROKER_USE_SSL = {
-    'ssl_cert_reqs': ssl.CERT_NONE
-}
-CELERY_REDIS_BACKEND_USE_SSL = {
-    'ssl_cert_reqs': ssl.CERT_NONE
-}
-
 STATIC_ROOT = os.path.join(BASE_DIR, 'static_root')
 MEDIA_URL = '/media/'
 MEDIA_ROOT = os.path.join(BASE_DIR, 'media/')

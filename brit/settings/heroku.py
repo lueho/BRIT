@@ -20,19 +20,6 @@ DATABASES['default'] = dj_database_url.config(default=os.environ.get('DATABASE_U
                                               ssl_require=True)
 DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
 
-CACHES = {
-    "default": {
-        "BACKEND": "django_redis.cache.RedisCache",
-        "LOCATION": os.environ.get('REDIS_URL'),
-        "OPTIONS": {
-            "CLIENT_CLASS": "django_redis.client.DefaultClient",
-            "CONNECTION_POOL_KWARGS": {
-                "ssl_cert_reqs": None
-            },
-        }
-    }
-}
-
 DEBUG_PROPAGATE_EXCEPTIONS = True
 CRISPY_FAIL_SILENTLY = True
 
