@@ -38,8 +38,8 @@ CRISPY_FAIL_SILENTLY = False
 EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
 
 # Adjust logging for development
-LOGGING['loggers']['django']['level'] = 'DEBUG'
-LOGGING['loggers']['brit']['level'] = 'DEBUG'
+LOGGING['loggers']['django']['level'] = 'INFO'
+LOGGING['loggers']['brit']['level'] = 'INFO'
 
 # Remove 'mail_admins' handler from all loggers
 for logger in LOGGING['loggers'].values():

@@ -23,7 +23,4 @@ DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
 DEBUG_PROPAGATE_EXCEPTIONS = True
 CRISPY_FAIL_SILENTLY = True
 
-LOGGING['loggers']['django']['level'] = 'WARNING'
-LOGGING['loggers']['brit']['level'] = 'ERROR'
-
 django_heroku.settings(locals(), databases=False, staticfiles=False, logging=False)

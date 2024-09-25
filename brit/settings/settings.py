@@ -67,6 +67,7 @@ MIDDLEWARE = [
     'ambient_toolbox.middleware.current_user.CurrentUserMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'brit.middleware.ExceptionLoggingMiddleware',
 ]
 
 ROOT_URLCONF = 'brit.urls'
@@ -221,7 +222,7 @@ LOGGING = {
     'disable_existing_loggers': False,
     'formatters': {
         'verbose': {
-            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'format': '{levelname} {asctime} {module} {message}',
             'style': '{',
         },
     },
@@ -234,17 +235,18 @@ LOGGING = {
         'mail_admins': {
             'level': 'ERROR',
             'class': 'django.utils.log.AdminEmailHandler',
+            'include_html': True,
         },
     },
     'loggers': {
         'django': {
             'handlers': ['console', 'mail_admins'],
-            'level': 'INFO',
-            'propagate': True,
+            'level': 'WARNING',
+            'propagate': False,
         },
         'brit': {
             'handlers': ['console', 'mail_admins'],
-            'level': 'DEBUG',
+            'level': 'WARNING',
             'propagate': False,
         },
     },
