@@ -914,7 +914,7 @@ class CollectionCurrentListViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(self.url, follow=True)
         self.assertEqual(response.status_code, 200)
         self.assertEqual(len(response.context['object_list']), 10)
-        self.assertQuerysetEqual(
+        self.assertQuerySetEqual(
             Collection.objects.exclude(pk=old_collection.pk).order_by('id'),
             response.context['object_list']
         )
@@ -1823,7 +1823,7 @@ class CollectionAddAggregatedPropertyValueViewTestCase(ViewWithPermissionsTestCa
             'collections': self.catchment.downstream_collections,
         }
         self.assertIn('collections', initial)
-        self.assertQuerysetEqual(expected['collections'].order_by('id'), initial['collections'].order_by('id'))
+        self.assertQuerySetEqual(expected['collections'].order_by('id'), initial['collections'].order_by('id'))
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(

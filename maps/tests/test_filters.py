@@ -15,7 +15,7 @@ class CatchmentFilterTestCase(TestCase):
         filtr = CatchmentFilter(data, queryset=Catchment.objects.all())
         form = filtr.form
         self.assertTrue(form.is_valid())
-        self.assertQuerysetEqual(Catchment.objects.all(), filtr.qs)
+        self.assertQuerySetEqual(Catchment.objects.all(), filtr.qs)
 
     def test_filter_form_has_no_formtags(self):
         filtr = CatchmentFilter(queryset=Catchment.objects.all())

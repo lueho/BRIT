@@ -56,7 +56,7 @@ class SourceFilterTestCase(TestCase):
         request = factory.get(reverse('source-detail', kwargs={'pk': self.source.pk}), filter_params)
         qs = SourceFilter(request.GET, Source.objects.all()).qs
         self.assertEqual(2, qs.count())
-        self.assertQuerysetEqual(qs.order_by('id'), Source.objects.order_by('id'))
+        self.assertQuerySetEqual(qs.order_by('id'), Source.objects.order_by('id'))
 
     def test_author_icontains_finds_first_names(self):
         factory = RequestFactory()

@@ -106,7 +106,7 @@ class WasteStreamQuerysetTestCase(TestCase):
             id__in=[self.allowed_material_1.id, self.allowed_material_2.id]
         )
 
-        self.assertQuerysetEqual(
+        self.assertQuerySetEqual(
             WasteStream.objects.filter(id=self.waste_stream.id).order_by('id'),
             WasteStream.objects.match_allowed_materials(allowed_materials).order_by('id')
         )
@@ -116,7 +116,7 @@ class WasteStreamQuerysetTestCase(TestCase):
             id__in=[self.forbidden_material_1.id, self.forbidden_material_2.id]
         )
 
-        self.assertQuerysetEqual(
+        self.assertQuerySetEqual(
             WasteStream.objects.filter(id=self.waste_stream.id).order_by('id'),
             WasteStream.objects.match_forbidden_materials(forbidden_materials).order_by('id')
         )
@@ -545,72 +545,72 @@ class CollectionTestCase(TestCase):
         self.collection.valid_from = date.today() - timedelta(days=1)
         self.collection.valid_until = None
         self.collection.save()
-        self.assertQuerysetEqual(Collection.objects.currently_valid(), [self.collection])
+        self.assertQuerySetEqual(Collection.objects.currently_valid(), [self.collection])
 
     def test_currently_valid_does_not_return_collection_with_future_valid_from_date(self):
         self.collection.valid_from = date.today() + timedelta(days=1)
         self.collection.valid_until = None
         self.collection.save()
-        self.assertQuerysetEqual(Collection.objects.currently_valid(), [])
+        self.assertQuerySetEqual(Collection.objects.currently_valid(), [])
 
     def test_currently_valid_returns_collection_with_valid_from_date_today(self):
         self.collection.valid_from = date.today()
         self.collection.valid_until = None
         self.collection.save()
-        self.assertQuerysetEqual(Collection.objects.currently_valid(), [self.collection])
+        self.assertQuerySetEqual(Collection.objects.currently_valid(), [self.collection])
 
     def test_currently_valid_returns_collection_with_future_valid_until_date(self):
         self.collection.valid_from = date.today() - timedelta(days=1)
         self.collection.valid_until = date.today() + timedelta(days=1)
         self.collection.save()
-        self.assertQuerysetEqual(Collection.objects.currently_valid(), [self.collection])
+        self.assertQuerySetEqual(Collection.objects.currently_valid(), [self.collection])
 
     def test_currently_valid_does_not_return_collection_with_past_valid_until_date(self):
         self.collection.valid_from = date.today() - timedelta(days=2)
         self.collection.valid_until = date.today() - timedelta(days=1)
         self.collection.save()
-        self.assertQuerysetEqual(Collection.objects.currently_valid(), [])
+        self.assertQuerySetEqual(Collection.objects.currently_valid(), [])
 
     def test_archived_returns_collection_with_past_valid_until_date(self):
         self.collection.valid_from = date.today()
         self.collection.save()
-        self.assertQuerysetEqual(Collection.objects.archived(), [self.predecessor_collection])
+        self.assertQuerySetEqual(Collection.objects.archived(), [self.predecessor_collection])
 
     def test_archived_does_not_return_collection_with_future_valid_until_date(self):
         self.collection.valid_from = date.today() + timedelta(days=2)
         self.collection.save()
         self.predecessor_collection.valid_until = date.today() + timedelta(days=1)
         self.predecessor_collection.save()
-        self.assertQuerysetEqual(Collection.objects.archived(), [])
+        self.assertQuerySetEqual(Collection.objects.archived(), [])
 
     def test_archived_returns_collection_with_valid_until_date_today(self):
         self.collection.valid_from = date.today() + timedelta(days=1)
         self.collection.save()
-        self.assertQuerysetEqual(Collection.objects.archived(), [self.predecessor_collection])
+        self.assertQuerySetEqual(Collection.objects.archived(), [self.predecessor_collection])
 
     def test_valid_on_returns_collection_with_past_valid_from_date(self):
         day = date(2024, 6, 30)
-        self.assertQuerysetEqual(Collection.objects.valid_on(day), [self.collection])
+        self.assertQuerySetEqual(Collection.objects.valid_on(day), [self.collection])
 
     def test_valid_on_does_not_return_collection_with_future_valid_from_date(self):
         day = date(2022, 6, 30)
-        self.assertQuerysetEqual(Collection.objects.valid_on(day), [])
+        self.assertQuerySetEqual(Collection.objects.valid_on(day), [])
 
     def test_valid_on_returns_collection_with_given_valid_from_date(self):
         day = date(2024, 1, 1)
-        self.assertQuerysetEqual(Collection.objects.valid_on(day), [self.collection])
+        self.assertQuerySetEqual(Collection.objects.valid_on(day), [self.collection])
 
     def test_valid_on_returns_collection_with_future_valid_until_date(self):
         day = date(2024, 6, 30)
         self.collection.valid_until = day + timedelta(days=1)
         self.collection.save()
-        self.assertQuerysetEqual(Collection.objects.valid_on(day), [self.collection])
+        self.assertQuerySetEqual(Collection.objects.valid_on(day), [self.collection])
 
     def test_valid_on_does_not_return_collection_with_past_valid_until_date(self):
         day = date(2024, 6, 30)
         self.collection.valid_until = day - timedelta(days=1)
         self.collection.save()
-        self.assertQuerysetEqual(Collection.objects.valid_on(day), [])
+        self.assertQuerySetEqual(Collection.objects.valid_on(day), [])
 
     def test_predecessor_returns_predecessor_collection(self):
         self.collection.predecessors.add(self.predecessor_collection)
@@ -656,7 +656,7 @@ class CollectionSeasonTestCase(TestCase):
             first_timestep=Timestep.objects.default(),
             last_timestep=Timestep.objects.default()
         )
-        self.assertQuerysetEqual(
+        self.assertQuerySetEqual(
             Period.objects.filter(distribution=self.distribution),
             CollectionSeason.objects.all()
         )

@@ -32,7 +32,7 @@ class InputMaterialManagerTestCase(TestCase):
 
     def test_filter_returns_only_suitable_samples(self):
         qs = InputMaterial.objects.all().order_by('name')
-        self.assertQuerysetEqual(qs, InputMaterial.objects.filter(name='Suitable Sample'))
+        self.assertQuerySetEqual(qs, InputMaterial.objects.filter(name='Suitable Sample'))
 
 
 class InputMaterialTestCase(TestCase):

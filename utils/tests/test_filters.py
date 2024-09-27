@@ -67,14 +67,14 @@ class TestNullableRangeFilter(TestCase):
         filter_ = NullableRangeFilter(field_name='test_field')
         result = filter_.filter(DummyModel.objects.all(), range_with_null_flag)
         expected = DummyModel.objects.filter(id__in=[self.fifty.id, self.none.id])
-        self.assertQuerysetEqual(result, expected, ordered=False)
+        self.assertQuerySetEqual(result, expected, ordered=False)
 
     def test_filter_without_null_value(self):
         range_with_null_flag = (slice(20, 100), False)
         filter_ = NullableRangeFilter(field_name='test_field')
         result = filter_.filter(DummyModel.objects.all(), range_with_null_flag)
         expected = DummyModel.objects.filter(id__in=[self.fifty.id, self.hundred.id])
-        self.assertQuerysetEqual(result, expected, ordered=False)
+        self.assertQuerySetEqual(result, expected, ordered=False)
 
 
 class NullablePercentageRangeFilterTestCase(TestCase):
@@ -91,11 +91,11 @@ class NullablePercentageRangeFilterTestCase(TestCase):
         filter_ = NullablePercentageRangeFilter(field_name='test_field')
         result = filter_.filter(DummyModel.objects.all(), range_with_null_flag)
         expected = DummyModel.objects.filter(id__in=[self.fifty.id, self.none.id])
-        self.assertQuerysetEqual(result, expected, ordered=False)
+        self.assertQuerySetEqual(result, expected, ordered=False)
 
     def test_filter_without_null_value(self):
         range_with_null_flag = (slice(20, 100), False)
         filter_ = NullablePercentageRangeFilter(field_name='test_field')
         result = filter_.filter(DummyModel.objects.all(), range_with_null_flag)
         expected = DummyModel.objects.filter(id__in=[self.fifty.id, self.hundred.id])
-        self.assertQuerysetEqual(result, expected, ordered=False)
+        self.assertQuerySetEqual(result, expected, ordered=False)

@@ -282,7 +282,7 @@ class SampleSeriesTestCase(TestCase):
             elif field.name == 'temporal_distributions':
                 self.assertTrue(self.sample_series.temporal_distributions.exists())
                 self.assertTrue(duplicate.temporal_distributions.exists())
-                self.assertQuerysetEqual(
+                self.assertQuerySetEqual(
                     duplicate.temporal_distributions.all().order_by('id'),
                     self.sample_series.temporal_distributions.all().order_by('id')
                 )

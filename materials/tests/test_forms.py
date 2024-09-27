@@ -40,7 +40,7 @@ class AddComponentGroupModalModelFormTestCase(TestCase):
         )
         sample_series.add_component_group(self.group1)
         form = AddCompositionModalForm(instance=sample_series)
-        self.assertQuerysetEqual(
+        self.assertQuerySetEqual(
             form.fields['group'].queryset.order_by('id'),
             MaterialComponentGroup.objects.filter(name='Test Group 2').order_by('id')
         )
@@ -51,7 +51,7 @@ class AddComponentGroupModalModelFormTestCase(TestCase):
             material=self.material
         )
         form = AddCompositionModalForm(instance=sample_series)
-        self.assertQuerysetEqual(
+        self.assertQuerySetEqual(
             form.fields['fractions_of'].queryset.order_by('id'),
             MaterialComponent.objects.filter(id=MaterialComponent.objects.default().id).order_by('id')
         )
@@ -109,7 +109,7 @@ class AddComponentModalModelFormTestCase(TestCase):
         self.composition.add_component(self.component1, average=0.5, standard_deviation=0.02)
         self.composition.add_component(MaterialComponent.objects.other(), average=0.5, standard_deviation=0.1337)
         form = AddComponentModalForm(instance=self.composition)
-        self.assertQuerysetEqual(
+        self.assertQuerySetEqual(
             form.fields['component'].queryset.order_by('id'),
             MaterialComponent.objects.filter(name='Test Component 2').order_by('id')
         )

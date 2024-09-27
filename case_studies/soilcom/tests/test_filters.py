@@ -50,7 +50,7 @@ class WasteFlyerFilterTestCase(TestCase):
         data = {'catchment': self.catchment.id}
         filter_ = WasteFlyerFilter(data=data, queryset=WasteFlyer.objects.all())
         self.assertTrue(filter_.is_valid())
-        self.assertQuerysetEqual(filter_.qs.order_by('id'),
+        self.assertQuerySetEqual(filter_.qs.order_by('id'),
                                  WasteFlyer.objects.filter(abbreviation__in=('WF1', 'WF2', 'WF3')).order_by('id'))
 
 
@@ -92,18 +92,18 @@ class CollectionsPerYearFilterTestCase(TestCase):
         filter_ = CollectionsPerYearFilter()
         qs = filter_.filter(Collection.objects.all(), (slice(26, 52), False))
         expected = Collection.objects.filter(pk__in=[self.collection1.pk, self.collection2.pk])
-        self.assertQuerysetEqual(qs, expected, ordered=False)
+        self.assertQuerySetEqual(qs, expected, ordered=False)
 
     def test_filter_with_without_value_returns_full_queryset(self):
         filter_ = CollectionsPerYearFilter()
         qs = filter_.filter(Collection.objects.all(), None)
-        self.assertQuerysetEqual(qs, Collection.objects.all(), ordered=False)
+        self.assertQuerySetEqual(qs, Collection.objects.all(), ordered=False)
 
     def test_filter_by_collections_per_year_with_no_value(self):
         filter_ = CollectionsPerYearFilter()
         qs = filter_.filter(Collection.objects.all(), (slice(52, 100), True))
         expected = Collection.objects.filter(pk__in=[self.collection3.pk, self.collection4.pk])
-        self.assertQuerysetEqual(qs, expected, ordered=False)
+        self.assertQuerySetEqual(qs, expected, ordered=False)
 
 
 class ConnectionRateFilterTestCase(TestCase):
@@ -140,19 +140,19 @@ class ConnectionRateFilterTestCase(TestCase):
         filter_ = ConnectionRateFilter()
         qs = filter_.filter(Collection.objects.all(), (slice(50, 75), False))
         expected = Collection.objects.filter(pk__in=[self.collection1.pk, self.collection2.pk])
-        self.assertQuerysetEqual(qs, expected, ordered=False)
+        self.assertQuerySetEqual(qs, expected, ordered=False)
 
     def test_filter_with_without_value(self):
         filter_ = ConnectionRateFilter()
         qs = filter_.filter(Collection.objects.all(), None)
         expected = Collection.objects.all()
-        self.assertQuerysetEqual(qs, expected, ordered=False)
+        self.assertQuerySetEqual(qs, expected, ordered=False)
 
     def test_filter_including_null_values(self):
         filter_ = ConnectionRateFilter()
         qs = filter_.filter(Collection.objects.all(), (slice(50, 75), True))
         expected = Collection.objects.filter(pk__in=[self.collection1.pk, self.collection2.pk, self.collection4.pk])
-        self.assertQuerysetEqual(qs, expected, ordered=False)
+        self.assertQuerySetEqual(qs, expected, ordered=False)
 
 
 class SpecWasteCollectedFilterTestCase(TestCase):
@@ -189,19 +189,19 @@ class SpecWasteCollectedFilterTestCase(TestCase):
         filter_ = SpecWasteCollectedFilter()
         qs = filter_.filter(Collection.objects.all(), (slice(100, 200), False))
         expected = Collection.objects.filter(pk__in=[self.collection1.pk, self.collection2.pk])
-        self.assertQuerysetEqual(qs, expected, ordered=False)
+        self.assertQuerySetEqual(qs, expected, ordered=False)
 
     def test_filter_with_without_value(self):
         filter_ = SpecWasteCollectedFilter()
         qs = filter_.filter(Collection.objects.all(), None)
         expected = Collection.objects.all()
-        self.assertQuerysetEqual(qs, expected, ordered=False)
+        self.assertQuerySetEqual(qs, expected, ordered=False)
 
     def test_filter_including_null_values(self):
         filter_ = SpecWasteCollectedFilter()
         qs = filter_.filter(Collection.objects.all(), (slice(100, 200), True))
         expected = Collection.objects.filter(pk__in=[self.collection1.pk, self.collection2.pk, self.collection4.pk])
-        self.assertQuerysetEqual(qs, expected, ordered=False)
+        self.assertQuerySetEqual(qs, expected, ordered=False)
 
 
 class CollectionFilterTestCase(TestCase):
@@ -290,7 +290,7 @@ class CollectionFilterTestCase(TestCase):
 
     def test_only_initial_values_returns_complete_queryset(self):
         qs = CollectionFilterSet(self.data, queryset=Collection.objects.all()).qs
-        self.assertQuerysetEqual(Collection.objects.order_by('id'), qs.order_by('id'))
+        self.assertQuerySetEqual(Collection.objects.order_by('id'), qs.order_by('id'))
 
     def test_catchment_filter(self):
         self.data.update({'catchment': self.catchment.pk})
@@ -326,7 +326,7 @@ class CollectionFilterTestCase(TestCase):
         filtr = CollectionFilterSet(self.data, queryset=Collection.objects.all())
         qs = filtr.qs
         expected_qs = Collection.objects.filter(pk__in=[self.collection1.pk])
-        self.assertQuerysetEqual(expected_qs, qs, ordered=False)
+        self.assertQuerySetEqual(expected_qs, qs, ordered=False)
 
     def test_seasonal_frequency_filter_field_exists_in_filter_and_form(self):
         self.data.update({'seasonal_frequency': True})
@@ -349,7 +349,7 @@ class CollectionFilterTestCase(TestCase):
     def test_seasonal_frequency_filter_returns_all_collections_when_unselected(self):
         self.data.update({'seasonal_frequency': None})
         qs = CollectionFilterSet(self.data, queryset=Collection.objects.all()).qs
-        self.assertQuerysetEqual(Collection.objects.order_by('id'), qs.order_by('id'))
+        self.assertQuerySetEqual(Collection.objects.order_by('id'), qs.order_by('id'))
 
     def test_optional_frequency_filter_field_exists_in_filter_and_form(self):
         self.data.update({'optional_frequency': True})
@@ -379,7 +379,7 @@ class CollectionFilterTestCase(TestCase):
     def test_optional_frequency_filter_returns_all_collections_when_unselected(self):
         self.data.update({'optional_frequency': None})
         qs = CollectionFilterSet(self.data, queryset=Collection.objects.all()).qs
-        self.assertQuerysetEqual(Collection.objects.order_by('id'), qs.order_by('id'))
+        self.assertQuerySetEqual(Collection.objects.order_by('id'), qs.order_by('id'))
 
     def test_collections_per_year_field_exists_in_filter_form(self):
         filtr = CollectionFilterSet(queryset=Collection.objects.all())
@@ -394,7 +394,7 @@ class CollectionFilterTestCase(TestCase):
         })
         qs = CollectionFilterSet(self.data, queryset=Collection.objects.all()).qs
         expected = Collection.objects.filter(pk__in=[self.collection2.pk])
-        self.assertQuerysetEqual(qs, expected, ordered=False)
+        self.assertQuerySetEqual(qs, expected, ordered=False)
 
     def test_collections_per_year_range_filter_renders_with_calculated_boundaries(self):
         filtr = CollectionFilterSet(self.data, queryset=Collection.objects.all())
@@ -424,7 +424,7 @@ class CollectionFilterTestCase(TestCase):
              'spec_waste_collected_min': 0,
              'spec_waste_collected_max': 1000})
         filtr = CollectionFilterSet(data, queryset=Collection.objects.all())
-        self.assertQuerysetEqual(Collection.objects.all().order_by('id'), filtr.qs.order_by('id'))
+        self.assertQuerySetEqual(Collection.objects.all().order_by('id'), filtr.qs.order_by('id'))
 
     def test_filter_form_has_no_formtags(self):
         filtr = CollectionFilterSet(queryset=Collection.objects.all())

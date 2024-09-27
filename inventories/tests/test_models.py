@@ -29,27 +29,27 @@ class ScenarioTestCase(TestCase):
     def test_available_geodatasets_with_single_feedstock(self):
         feedstock = Material.objects.get(name='Feedstock 1')
         geodatasets = self.scenario.available_geodatasets(feedstock=feedstock)
-        self.assertQuerysetEqual(geodatasets, GeoDataset.objects.filter(name='Test Dataset'))
+        self.assertQuerySetEqual(geodatasets, GeoDataset.objects.filter(name='Test Dataset'))
 
     def test_available_geodatasets_with_feedstock_queryset(self):
         feedstocks = Material.objects.all()
         geodatasets = self.scenario.available_geodatasets(feedstocks=feedstocks)
-        self.assertQuerysetEqual(geodatasets, GeoDataset.objects.filter(name='Test Dataset'))
+        self.assertQuerySetEqual(geodatasets, GeoDataset.objects.filter(name='Test Dataset'))
 
     def test_available_geodatasets_with_missing_input(self):
         geodatasets = self.scenario.available_geodatasets()
-        self.assertQuerysetEqual(geodatasets, GeoDataset.objects.filter(name='Test Dataset'))
+        self.assertQuerySetEqual(geodatasets, GeoDataset.objects.filter(name='Test Dataset'))
 
     def test_available_inventory_algorithms_with_single_feedstock(self):
         feedstock = Material.objects.get(name='Feedstock 1')
         algorithms = self.scenario.available_inventory_algorithms(feedstock=feedstock)
-        self.assertQuerysetEqual(algorithms, InventoryAlgorithm.objects.filter(name='Test Algorithm'))
+        self.assertQuerySetEqual(algorithms, InventoryAlgorithm.objects.filter(name='Test Algorithm'))
 
     def test_available_inventory_algorithms_with_feedstock_queryset(self):
         feedstocks = Material.objects.all()
         algorithms = self.scenario.available_inventory_algorithms(feedstocks=feedstocks)
-        self.assertQuerysetEqual(algorithms, InventoryAlgorithm.objects.filter(name='Test Algorithm'))
+        self.assertQuerySetEqual(algorithms, InventoryAlgorithm.objects.filter(name='Test Algorithm'))
 
     def test_available_inventory_algorithms_with_missing_input(self):
         algorithms = self.scenario.available_inventory_algorithms()
-        self.assertQuerysetEqual(algorithms, InventoryAlgorithm.objects.filter(name='Test Algorithm'))
+        self.assertQuerySetEqual(algorithms, InventoryAlgorithm.objects.filter(name='Test Algorithm'))
