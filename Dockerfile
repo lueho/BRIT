@@ -21,4 +21,4 @@ COPY --chown=standard_user:standard_user . .
 
 RUN chmod +x *.sh
 
-RUN python manage.py collectstatic --no-input  --settings=brit.settings.heroku
+RUN python manage.py collectstatic --noinput

@@ -20,6 +20,8 @@ services:
       - ./:/app
     depends_on:
       - db
+      - redis
+      - celery
     ports:
       - "8000:8000"
     env_file:
@@ -36,7 +38,6 @@ services:
     env_file:
       - brit/settings/.env
     depends_on:
-      - web
       - redis
     networks:
       - full
