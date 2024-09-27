@@ -133,6 +133,7 @@ class NamedUserObjectModel(OwnedObjectModel):
 
     class Meta:
         abstract = True
+        ordering = ['name', 'id']
 
     def __str__(self):
         return self.name
