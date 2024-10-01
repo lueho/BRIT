@@ -1,3 +1,5 @@
+from urllib.parse import urlencode
+
 from bootstrap_modal_forms.generic import BSModalCreateView, BSModalDeleteView, BSModalReadView, BSModalUpdateView
 from bootstrap_modal_forms.mixins import is_ajax
 from django.contrib import messages
@@ -5,13 +7,13 @@ from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMix
 from django.contrib.messages.views import SuccessMessageMixin
 from django.core.exceptions import FieldError, ImproperlyConfigured, PermissionDenied
 from django.db.models.signals import post_save
-from django.http import HttpResponse, HttpResponseRedirect, JsonResponse, Http404
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
+from django.shortcuts import render
 from django.template.loader import render_to_string
 from django.views import View
 from django.views.generic import CreateView, DetailView, ListView, TemplateView, UpdateView
 from django_filters.views import FilterView
 from factory.django import mute_signals
-from urllib.parse import urlencode
 
 from .models import Redirect
 
@@ -365,4 +367,4 @@ class DynamicRedirectView(View):
             redirect_obj = Redirect.objects.get(short_code=short_code)
             return HttpResponseRedirect(f"{request.scheme}://{request.get_host()}{redirect_obj.full_path}")
         except Redirect.DoesNotExist:
-            raise Http404
+            return render(request, '404.html', status=404)
