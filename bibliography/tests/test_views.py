@@ -49,7 +49,8 @@ class AuthorCreateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('author-create'))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+        # "submit" is also used for the logout button, so we should see 2 submit buttons
+        self.assertContains(response, 'type="submit"', count=2, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('author-create'), data={})
@@ -201,7 +202,8 @@ class AuthorUpdateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('author-update', kwargs={'pk': self.author.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+        # "submit" is also used for the logout button, so we should see 2 submit buttons
+        self.assertContains(response, 'type="submit"', count=2, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('author-update', kwargs={'pk': self.author.pk}), data={})
@@ -374,7 +376,8 @@ class LicenceCreateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('licence-create'))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+        # "submit" is also used for the logout button, so we should see 2 submit buttons
+        self.assertContains(response, 'type="submit"', count=2, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('licence-create'), data={})
@@ -520,7 +523,8 @@ class LicenceUpdateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('licence-update', kwargs={'pk': self.licence.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+        # "submit" is also used for the logout button, so we should see 2 submit buttons
+        self.assertContains(response, 'type="submit"', count=2, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('licence-update', kwargs={'pk': self.licence.pk}), data={}, follow=True)
@@ -694,7 +698,8 @@ class SourceCreateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('source-create'))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+        # "submit" is also used for the logout button, so we should see 2 submit buttons
+        self.assertContains(response, 'type="submit"', count=2, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('source-create'), data={}, follow=True)
@@ -848,7 +853,8 @@ class SourceUpdateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('source-update', kwargs={'pk': self.source.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+        # "submit" is also used for the logout button, so we should see 2 submit buttons
+        self.assertContains(response, 'type="submit"', count=2, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('source-update', kwargs={'pk': self.source.pk}), data={}, follow=True)

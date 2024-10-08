@@ -186,7 +186,8 @@ class LocationCreateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('location-create'))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+        # "submit" is also used for the logout button, so we should see 2 submit buttons
+        self.assertContains(response, 'type="submit"', count=2, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('location-create')
@@ -273,7 +274,8 @@ class LocationUpdateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('location-update', kwargs={'pk': self.location.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+        # "submit" is also used for the logout button, so we should see 2 submit buttons
+        self.assertContains(response, 'type="submit"', count=2, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('location-update', kwargs={'pk': self.location.pk})
@@ -434,7 +436,8 @@ class RegionCreateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('region-create'))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+        # "submit" is also used for the logout button, so we should see 2 submit buttons
+        self.assertContains(response, 'type="submit"', count=2, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('region-create')
@@ -511,7 +514,8 @@ class RegionUpdateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('region-update', kwargs={'pk': self.region.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+        # "submit" is also used for the logout button, so we should see 2 submit buttons
+        self.assertContains(response, 'type="submit"', count=2, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('region-update', kwargs={'pk': self.region.pk})
@@ -691,7 +695,8 @@ class CatchmentCreateSelectRegionViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(self.url)
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+        # "submit" is also used for the logout button, so we should see 2 submit buttons
+        self.assertContains(response, 'type="submit"', count=2, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         response = self.client.post(self.url, data={}, follow=True)
@@ -741,7 +746,8 @@ class CatchmentCreateDrawCustomViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(self.url)
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+        # "submit" is also used for the logout button, so we should see 2 submit buttons
+        self.assertContains(response, 'type="submit"', count=2, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         response = self.client.post(self.url, data={}, follow=True)
@@ -814,7 +820,8 @@ class CatchmentCreateMergeLauViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(self.url)
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+        # "submit" is also used for the logout button, so we should see 2 submit buttons
+        self.assertContains(response, 'type="submit"', count=2, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         response = self.client.post(self.url, data={}, follow=True)
@@ -1024,7 +1031,8 @@ class CatchmentUpdateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('catchment-update', kwargs={'pk': self.catchment.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+        # "submit" is also used for the logout button, so we should see 2 submit buttons
+        self.assertContains(response, 'type="submit"', count=2, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('catchment-update', kwargs={'pk': self.catchment.pk})
@@ -1316,7 +1324,8 @@ class AttributeCreateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('attribute-create'))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+        # "submit" is also used for the logout button, so we should see 2 submit buttons
+        self.assertContains(response, 'type="submit"', count=2, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('attribute-create'), data={})
@@ -1443,7 +1452,8 @@ class AttributeUpdateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('attribute-update', kwargs={'pk': self.attribute.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+        # "submit" is also used for the logout button, so we should see 2 submit buttons
+        self.assertContains(response, 'type="submit"', count=2, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('attribute-update', kwargs={'pk': self.attribute.pk}), data={})
@@ -1599,7 +1609,8 @@ class RegionAttributeValueCreateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('regionattributevalue-create'))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+        # "submit" is also used for the logout button, so we should see 2 submit buttons
+        self.assertContains(response, 'type="submit"', count=2, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('regionattributevalue-create'), data={})
@@ -1758,7 +1769,8 @@ class RegionAttributeValueUpdateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('regionattributevalue-update', kwargs={'pk': self.value.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+        # "submit" is also used for the logout button, so we should see 2 submit buttons
+        self.assertContains(response, 'type="submit"', count=2, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse('regionattributevalue-update', kwargs={'pk': self.value.pk}), data={})
