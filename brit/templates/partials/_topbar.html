@@ -37,10 +37,7 @@
         <!-- Nav Item - Login/Logout -->
         <li class="nav-item">
             {% if user.is_authenticated %}
-                <form method="post" action="{% url 'auth_logout' %}" class="d-inline">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-link nav-link" id="logoutLink">Logout</button>
-                </form>
+                <a href="#" class="nav-item nav-link" id="logoutLink">Logout</a>
             {% else %}
                 <a href="
                         {% url 'auth_login' %}{% if request.path != '/users/logout/' and request.path != '/users/login/' %}?next={{ request.path }}{% endif %}"

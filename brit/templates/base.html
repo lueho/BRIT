@@ -104,27 +104,27 @@
 {% block javascript %}
     <script type="text/javascript">
 
-        $(document).ready(function () {
+        $(document).ready(function() {
 
-            $("#sidebarToggle").click()
+            $("#sidebarToggle").click();
 
-            $(".modal-link").each(function () {
+            $(".modal-link").each(function() {
                 $(this).modalForm({
                     formURL: $(this).attr("href"),
                     errorClass: ".is-invalid"
-                })
-                $(this).attr("href", "javascript:void(0)")
+                });
+                $(this).attr("href", "javascript:void(0)");
             });
         });
 
     </script>
 
     <script type="{% js_type_for_cookie_consent request "social" "*:.google.com" %}" data-varname="social">
-      (function() {
-        var po = document.createElement('script'); po.type = 'text/javascript'; po.async = true;
-        po.src = 'https://apis.google.com/js/plusone.js';
-        var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
-      })();
+        (function() {
+          var po = document.createElement('script'); po.type = 'text/javascript'; po.async = true;
+          po.src = 'https://apis.google.com/js/plusone.js';
+          var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
+        })();
     </script>
 
     {% if request|cookie_consent_enabled %}
@@ -167,6 +167,37 @@
             </script>
         {% endif %}
     {% endif %}
+
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const logoutLink = document.getElementById('logoutLink');
+
+            if (logoutLink) {
+                logoutLink.addEventListener('click', function(event) {
+                    event.preventDefault(); // Prevent the default link behavior
+
+                    // Make an AJAX POST request to log the user out
+                    fetch("{% url 'auth_logout' %}", {
+                        method: "POST",
+                        headers: {
+                            'X-CSRFToken': '{{ csrf_token }}',
+                        }
+                    }).then(response => {
+                        if (response.ok) {
+                            // Reload the current page if the logout was successful
+                            window.location.reload();
+                        } else {
+                            // If the reload might result in a 403, redirect to the start page
+                            window.location.href = "/";
+                        }
+                    }).catch(() => {
+                        // Handle network or other errors
+                        window.location.href = "/";
+                    });
+                });
+            }
+        });
+    </script>
 {% endblock javascript %}
 
 </body>
