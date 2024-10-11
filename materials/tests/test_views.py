@@ -61,8 +61,7 @@ class MaterialCategoryCreateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('materialcategory-create'))
-        # "submit" is also used for the logout button, so we should see 2 submit buttons
-        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialcategory-create')
@@ -103,8 +102,7 @@ class MaterialCategoryModalCreateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('materialcategory-create-modal'))
-        # "submit" is also used for the logout button, so we should see 2 submit buttons
-        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialcategory-create-modal')
@@ -185,8 +183,7 @@ class MaterialCategoryUpdateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('materialcategory-update', kwargs={'pk': self.category.pk}))
-        # "submit" is also used for the logout button, so we should see 2 submit buttons
-        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialcategory-update', kwargs={'pk': self.category.pk})
@@ -346,8 +343,7 @@ class MaterialCreateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('material-create'))
-        # "submit" is also used for the logout button, so we should see 2 submit buttons
-        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('material-create')
@@ -463,8 +459,7 @@ class MaterialUpdateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('material-update', kwargs={'pk': self.material.pk}))
-        # "submit" is also used for the logout button, so we should see 2 submit buttons
-        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('material-update', kwargs={'pk': self.material.pk})
@@ -618,8 +613,7 @@ class ComponentCreateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('materialcomponent-create'))
-        # "submit" is also used for the logout button, so we should see 2 submit buttons
-        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialcomponent-create')
@@ -740,8 +734,7 @@ class ComponentUpdateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('materialcomponent-update', kwargs={'pk': self.component.pk}))
-        # "submit" is also used for the logout button, so we should see 2 submit buttons
-        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialcomponent-update', kwargs={'pk': self.component.pk})
@@ -787,8 +780,7 @@ class ComponentModalUpdateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('materialcomponent-update-modal', kwargs={'pk': self.component.pk}))
-        # "submit" is also used for the logout button, so we should see 2 submit buttons
-        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialcomponent-update-modal', kwargs={'pk': self.component.pk})
@@ -890,8 +882,7 @@ class ComponentGroupCreateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('materialcomponentgroup-create'))
-        # "submit" is also used for the logout button, so we should see 2 submit buttons
-        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialcomponentgroup-create')
@@ -1012,8 +1003,7 @@ class ComponentGroupUpdateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('materialcomponentgroup-update', kwargs={'pk': self.group.pk}))
-        # "submit" is also used for the logout button, so we should see 2 submit buttons
-        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialcomponentgroup-update', kwargs={'pk': self.group.pk})
@@ -1161,8 +1151,7 @@ class MaterialPropertyCreateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('materialproperty-create'))
-        # "submit" is also used for the logout button, so we should see 2 submit buttons
-        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialproperty-create')
@@ -1283,8 +1272,7 @@ class MaterialPropertyUpdateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('materialproperty-update', kwargs={'pk': self.property.pk}))
-        # "submit" is also used for the logout button, so we should see 2 submit buttons
-        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialproperty-update', kwargs={'pk': self.property.pk})
@@ -1491,8 +1479,7 @@ class SampleSeriesCreateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('sampleseries-create'))
-        # "submit" is also used for the logout button, so we should see 2 submit buttons
-        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sampleseries-create')
@@ -1668,8 +1655,7 @@ class SampleSeriesUpdateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('sampleseries-update', kwargs={'pk': self.series.pk}))
-        # "submit" is also used for the logout button, so we should see 2 submit buttons
-        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sampleseries-update', kwargs={'pk': self.series.pk})
@@ -1812,8 +1798,7 @@ class SampleSeriesCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('sampleseries-duplicate', kwargs={'pk': self.series.pk}))
-        # "submit" is also used for the logout button, so we should see 2 submit buttons
-        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sampleseries-duplicate', kwargs={'pk': self.series.pk})
@@ -1937,8 +1922,7 @@ class SampleCreateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('sample-create'))
-        # "submit" is also used for the logout button, so we should see 2 submit buttons
-        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sample-create')
@@ -2125,8 +2109,7 @@ class SampleUpdateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('sample-update', kwargs={'pk': self.sample.pk}))
-        # "submit" is also used for the logout button, so we should see 2 submit buttons
-        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sample-update', kwargs={'pk': self.series.pk})
@@ -2281,8 +2264,7 @@ class SampleAddPropertyViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('sample-add-property', kwargs={'pk': self.sample.pk}))
-        # "submit" is also used for the logout button, so we should see 2 submit buttons
-        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sample-add-property', kwargs={'pk': self.sample.pk})
@@ -2410,8 +2392,7 @@ class SampleCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('sample-duplicate', kwargs={'pk': self.sample.pk}))
-        # "submit" is also used for the logout button, so we should see 2 submit buttons
-        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sample-duplicate', kwargs={'pk': self.sample.pk})
@@ -2536,8 +2517,7 @@ class CompositionCreateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('composition-create'))
-        # "submit" is also used for the logout button, so we should see 2 submit buttons
-        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('composition-create')
@@ -2590,8 +2570,7 @@ class CompositionModalCreateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('composition-create-modal'))
-        # "submit" is also used for the logout button, so we should see 2 submit buttons
-        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('composition-create-modal')
@@ -2702,8 +2681,7 @@ class CompositionUpdateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('composition-update', kwargs={'pk': self.composition.pk}))
-        # "submit" is also used for the logout button, so we should see 2 submit buttons
-        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('composition-update', kwargs={'pk': self.composition.pk})

@@ -96,8 +96,7 @@ class CollectionFrequencyCreateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(self.url)
-        # "submit" is also used for the logout button, so we should see 2 submit buttons
-        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_get_formset_queryset_returns_whole_year_season(self):
         request = RequestFactory().get(self.url)
@@ -227,8 +226,7 @@ class CollectionFrequencyUpdateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse(self.url_name, kwargs={'pk': self.frequency.pk}))
-        # "submit" is also used for the logout button, so we should see 2 submit buttons
-        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_form_contains_all_initials(self):
         self.client.force_login(self.member)
@@ -467,8 +465,7 @@ class CollectionPropertyValueCreateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(self.url)
-        # "submit" is also used for the logout button, so we should see 2 submit buttons
-        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(self.url)
@@ -569,8 +566,7 @@ class CollectionPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        # "submit" is also used for the logout button, so we should see 2 submit buttons
-        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse(self.url_name, kwargs={'pk': self.val.pk}))
@@ -681,8 +677,7 @@ class AggregatedCollectionPropertyValueCreateViewTestCase(ViewWithPermissionsTes
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(self.url)
-        # "submit" is also used for the logout button, so we should see 2 submit buttons
-        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(self.url)
@@ -784,8 +779,7 @@ class AggregatedCollectionPropertyValueUpdateViewTestCase(ViewWithPermissionsTes
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        # "submit" is also used for the logout button, so we should see 2 submit buttons
-        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(reverse(self.url_name, kwargs={'pk': self.val.pk}))
@@ -981,8 +975,7 @@ class CollectionCreateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(self.url)
-        # "submit" is also used for the logout button, so we should see 2 submit buttons
-        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_post_http_302_redirect_for_anonymous(self):
         response = self.client.post(self.url, kwargs={})
@@ -1225,8 +1218,7 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse(self.url_name, kwargs={'pk': self.collection.pk}))
-        # "submit" is also used for the logout button, so we should see 2 submit buttons
-        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_get_object(self):
         request = RequestFactory().get(reverse(self.url_name, kwargs={'pk': self.collection.id}))
@@ -1487,8 +1479,7 @@ class CollectionUpdateViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse(self.url_name, kwargs={'pk': self.collection.pk}))
-        # "submit" is also used for the logout button, so we should see 2 submit buttons
-        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_uses_custom_template(self):
         self.client.force_login(self.member)
@@ -1748,8 +1739,7 @@ class CollectionAddPropertyValueViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse(self.url_name, kwargs={'pk': self.collection.pk}))
-        # "submit" is also used for the logout button, so we should see 2 submit buttons
-        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_get_initial_has_collection(self):
         request = RequestFactory().get(reverse(self.url_name, kwargs={'pk': self.collection.id}))
@@ -1820,8 +1810,7 @@ class CollectionAddAggregatedPropertyValueViewTestCase(ViewWithPermissionsTestCa
         self.client.force_login(self.member)
         response = self.client.get(
             reverse(self.url_name, kwargs={'pk': self.catchment.pk}))
-        # "submit" is also used for the logout button, so we should see 2 submit buttons
-        self.assertContains(response, 'type="submit"', count=2, status_code=200)
+        self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
     def test_get_initial_has_collections(self):
         request = RequestFactory().get(
@@ -2013,8 +2002,7 @@ class CollectionWasteSamplesViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_one_submit_button_for_each_form(self):
         self.client.force_login(self.member)
         response = self.client.get(self.url)
-        # "submit" is also used for the logout button, so we should see 3 submit buttons
-        self.assertContains(response, 'type="submit"', count=3, status_code=200)
+        self.assertContains(response, 'type="submit"', count=2, status_code=200)
         self.assertContains(response, 'value="Add"')
         self.assertContains(response, 'value="Remove"')
 
@@ -2090,8 +2078,7 @@ class CollectionPredecessorsViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_one_submit_button_for_each_form(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse(self.url_name, kwargs={'pk': self.collection.pk}))
-        # "submit" is also used for the logout button, so we should see 3 submit buttons
-        self.assertContains(response, 'type="submit"', count=3, status_code=200)
+        self.assertContains(response, 'type="submit"', count=2, status_code=200)
         self.assertContains(response, 'value="Add"')
         self.assertContains(response, 'value="Remove"')
 
