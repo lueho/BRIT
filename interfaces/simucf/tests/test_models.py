@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase
 
@@ -68,63 +70,63 @@ class InputMaterialTestCase(TestCase):
 
     def test_property_carbohydrates_handles_missing_weightshare(self):
         WeightShare.objects.get(name='Carbohydrates').delete()
-        self.assertEqual(self.input.carbohydrates, 0.0)
+        self.assertEqual(self.input.carbohydrates, Decimal('0.0000000000'))
 
     def test_property_carbohydrates_returns_valid_value(self):
-        self.assertEqual(self.input.carbohydrates, 0.7)
+        self.assertEqual(self.input.carbohydrates, Decimal('0.7000000000'))
 
     def test_property_amino_acids_handles_missing_weightshare(self):
         WeightShare.objects.get(name='Amino Acids').delete()
-        self.assertEqual(self.input.amino_acids, 0.0)
+        self.assertEqual(self.input.amino_acids, Decimal('0.0000000000'))
 
     def test_property_amino_acids_returns_valid_value(self):
-        self.assertEqual(self.input.amino_acids, 0.7)
+        self.assertEqual(self.input.amino_acids, Decimal('0.7000000000'))
 
     def test_property_starch_handles_missing_weightshare(self):
         WeightShare.objects.get(name='Starches').delete()
-        self.assertEqual(self.input.starch, 0.0)
+        self.assertEqual(self.input.starch, Decimal('0.0000000000'))
 
     def test_property_starch_returns_valid_value(self):
-        self.assertEqual(self.input.starch, 0.7)
+        self.assertEqual(self.input.starch, Decimal('0.7000000000'))
 
     def test_property_hemicellulose_handles_missing_weightshare(self):
         WeightShare.objects.get(name='Hemicellulose').delete()
-        self.assertEqual(self.input.hemicellulose, 0.0)
+        self.assertEqual(self.input.hemicellulose, Decimal('0.0000000000'))
 
     def test_property_hemicellulose_returns_valid_value(self):
-        self.assertEqual(self.input.hemicellulose, 0.7)
+        self.assertEqual(self.input.hemicellulose, Decimal('0.7000000000'))
 
     def test_property_fats_handles_missing_weightshare(self):
         WeightShare.objects.get(name='Fats').delete()
-        self.assertEqual(self.input.fats, 0.0)
+        self.assertEqual(self.input.fats, Decimal('0.0000000000'))
 
     def test_property_fats_returns_valid_value(self):
-        self.assertEqual(self.input.fats, 0.7)
+        self.assertEqual(self.input.fats, Decimal('0.7000000000'))
 
     def test_property_waxs_handles_missing_weightshare(self):
         WeightShare.objects.get(name='Waxes').delete()
-        self.assertEqual(self.input.waxs, 0.0)
+        self.assertEqual(self.input.waxs, Decimal('0.0000000000'))
 
     def test_property_waxs_returns_valid_value(self):
-        self.assertEqual(self.input.waxs, 0.7)
+        self.assertEqual(self.input.waxs, Decimal('0.7000000000'))
 
     def test_property_proteins_handles_missing_weightshare(self):
         WeightShare.objects.get(name='Proteins').delete()
-        self.assertEqual(self.input.proteins, 0.0)
+        self.assertEqual(self.input.proteins, Decimal('0.0000000000'))
 
     def test_property_proteins_returns_valid_value(self):
-        self.assertEqual(self.input.proteins, 0.7)
+        self.assertEqual(self.input.proteins, Decimal('0.7000000000'))
 
     def test_property_cellulose_handles_missing_weightshare(self):
         WeightShare.objects.get(name='Cellulose').delete()
-        self.assertEqual(self.input.cellulose, 0.0)
+        self.assertEqual(self.input.cellulose, Decimal('0.0000000000'))
 
     def test_property_cellulose_returns_valid_value(self):
-        self.assertEqual(self.input.cellulose, 0.7)
+        self.assertEqual(self.input.cellulose, Decimal('0.7000000000'))
 
     def test_property_lignin_handles_missing_weightshare(self):
         WeightShare.objects.get(name='Lignin').delete()
-        self.assertEqual(self.input.lignin, 0.0)
+        self.assertEqual(self.input.lignin, Decimal('0.0000000000'))
 
     def test_property_lignin_returns_valid_value(self):
-        self.assertEqual(self.input.lignin, 0.7)
+        self.assertEqual(self.input.lignin, Decimal('0.7000000000'))

@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.db.models.signals import post_save
 from django.test import RequestFactory, TestCase
 from django.urls import reverse
@@ -6,16 +8,11 @@ from factory.django import mute_signals
 from bibliography.models import Source
 from distributions.models import Timestep
 from users.models import get_default_owner
-from ..models import MaterialComponent, MaterialComponentGroup, MaterialProperty, MaterialPropertyValue, Composition, \
-    Material, SampleSeries, Sample, WeightShare
-from ..serializers import (
-    CompositionDoughnutChartSerializer,
-    CompositionModelSerializer,
-    MaterialPropertyValueModelSerializer,
-    SampleSeriesModelSerializer,
-    SampleModelSerializer,
-    WeightShareModelSerializer,
-)
+from ..models import Composition, Material, MaterialComponent, MaterialComponentGroup, MaterialProperty, \
+    MaterialPropertyValue, Sample, SampleSeries, WeightShare
+from ..serializers import (CompositionDoughnutChartSerializer, CompositionModelSerializer,
+                           MaterialPropertyValueModelSerializer, SampleModelSerializer, SampleSeriesModelSerializer,
+                           WeightShareModelSerializer)
 
 
 class MaterialPropertySerializerTestCase(TestCase):
@@ -216,4 +213,7 @@ class CompositionDoughnutChartSerializerTestCase(TestCase):
         self.assertIn('data', data)
         self.assertIsInstance(data['data'], list)
         self.assertIsInstance(data['data'][0]['data'], list)
-        self.assertListEqual(data['data'][0]['data'], [0.2, 0.1, 0.7])
+        self.assertListEqual(
+            data['data'][0]['data'],
+            [Decimal('0.2000000000'), Decimal('0.1000000000'), Decimal('0.7000000000')]
+        )

@@ -1,14 +1,16 @@
+from decimal import Decimal
+
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Row, Field
+from crispy_forms.layout import Field, Layout, Row
 from django.core.exceptions import ValidationError
-from django.forms import HiddenInput, ModelChoiceField, ModelMultipleChoiceField, NumberInput, Widget
+from django.forms import DecimalField, HiddenInput, ModelChoiceField, ModelMultipleChoiceField, NumberInput, Widget
 from django.forms.models import BaseInlineFormSet
 from django.utils.safestring import mark_safe
 from extra_views import InlineFormSetFactory
 
-from bibliography.models import Source, SOURCE_TYPES
+from bibliography.models import SOURCE_TYPES, Source
 from distributions.models import TemporalDistribution
-from utils.forms import SimpleModelForm, ModalForm, ModalModelForm, ModalModelFormMixin
+from utils.forms import ModalForm, ModalModelForm, ModalModelFormMixin, SimpleModelForm
 from .models import (Composition, Material, MaterialCategory, MaterialComponent, MaterialComponentGroup,
                      MaterialProperty, MaterialPropertyValue, Sample, SampleSeries, WeightShare)
 
@@ -165,23 +167,56 @@ class AddSeasonalVariationForm(ModalForm):
         fields = ('temporal_distribution',)
 
 
+class PercentageDecimalField(DecimalField):
+    def to_python(self, value):
+        """
+        Convert the input percentage value to a decimal before validation.
+        """
+        value = super().to_python(value)
+        if value is not None:
+            return value / Decimal('100')
+        return value
+
+    def prepare_value(self, value):
+        """
+        Convert the decimal value to a percentage for display in the form.
+        """
+        if isinstance(value, Decimal):
+            return value * Decimal('100')
+        return value
+
+
 class WeightShareModelForm(SimpleModelForm):
+    average = PercentageDecimalField(
+        max_digits=11,
+        decimal_places=10,
+        label='Average (%)',
+        min_value=0,
+        max_value=100,
+        required=True,
+        error_messages={
+            'min_value': 'Average must be at least 0%.',
+            'max_value': 'Average cannot exceed 100%.',
+            'invalid': 'Enter a valid percentage.',
+        }
+    )
+    standard_deviation = PercentageDecimalField(
+        max_digits=11,
+        decimal_places=10,
+        label='Standard Deviation (%)',
+        min_value=0,
+        max_value=100,
+        required=True,
+        error_messages={
+            'min_value': 'Standard deviation must be at least 0%.',
+            'max_value': 'Standard deviation cannot exceed 100%.',
+            'invalid': 'Enter a valid percentage.',
+        }
+    )
+
     class Meta:
         model = WeightShare
         fields = ('component', 'average', 'standard_deviation',)
-
-    def __init__(self, *args, **kwargs):
-        if 'instance' in kwargs:
-            instance = kwargs.get('instance')
-            instance.average *= 100
-            instance.standard_deviation *= 100
-        super().__init__(*args, **kwargs)
-
-    def clean_average(self):
-        return self.cleaned_data.get('average') / 100
-
-    def clean_standard_deviation(self):
-        return self.cleaned_data.get('standard_deviation') / 100
 
 
 class WeightShareInlineForm(WeightShareModelForm):

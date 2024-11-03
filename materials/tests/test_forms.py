@@ -1,12 +1,13 @@
-from django.contrib.auth.models import User, Group, Permission
+from decimal import Decimal
+
+from django.contrib.auth.models import Group, Permission, User
 from django.forms import inlineformset_factory
 from django.test import TestCase
 
 from distributions.models import Timestep
-from ..forms import WeightShareModelForm, WeightShareInlineFormset, AddCompositionModalForm, \
-    AddComponentModalForm
-from ..models import Material, MaterialComponentGroup, Composition, MaterialComponent, \
-    WeightShare, Sample, get_default_owner, SampleSeries
+from ..forms import AddComponentModalForm, AddCompositionModalForm, WeightShareInlineFormset, WeightShareModelForm
+from ..models import Composition, Material, MaterialComponent, MaterialComponentGroup, Sample, SampleSeries, \
+    WeightShare, get_default_owner
 
 
 class AddComponentGroupModalModelFormTestCase(TestCase):
@@ -222,7 +223,7 @@ class CompositionUpdateFormTestCase(TestCase):
         shares = formset.save()
         for share in shares:
             self.assertLessEqual(share.average, 1)
-            self.assertEqual(share.standard_deviation, 0.015)
+            self.assertEqual(share.standard_deviation, Decimal('0.015'))
 
     def test_form_valid_if_averages_sum_up_to_100_percent(self):
         FormSet = inlineformset_factory(
@@ -269,11 +270,11 @@ class CompositionUpdateFormTestCase(TestCase):
             'shares-TOTAL_FORMS': '2',
             'shares-0-id': '',
             'shares-0-component': f'{components[0]}',
-            'shares-0-average': '999',
+            'shares-0-average': '100',
             'shares-0-standard_deviation': '0.01',
             'shares-1-id': '',
             'shares-1-component': f'{components[1]}',
-            'shares-1-average': '999',
+            'shares-1-average': '100',
             'shares-1-standard_deviation': '0.01',
         }
         formset = FormSet(data=data)

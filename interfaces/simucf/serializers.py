@@ -1,4 +1,4 @@
-from rest_framework.serializers import Serializer, DecimalField, SerializerMethodField, ListField
+from rest_framework.serializers import DecimalField, Serializer, SerializerMethodField
 
 
 class DecimalWithCommaField(DecimalField):
@@ -9,7 +9,7 @@ class DecimalWithCommaField(DecimalField):
 class SimuCF(object):
 
     def __init__(self, *args, **kwargs):
-        self.amount = float(kwargs.get('amount'))
+        self.amount = kwargs.get('amount')
         self.degr_mat_dry_solid_content = 66.6
         self.material = kwargs.get('material')
         self.carbohydrates = self.material.carbohydrates * self.amount
