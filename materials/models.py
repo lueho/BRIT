@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.conf import settings
 from django.db import models
 from django.db.models import Max
@@ -454,8 +456,18 @@ class WeightShare(NamedUserObjectModel):
     """
     component = models.ForeignKey(MaterialComponent, related_name='shares', on_delete=models.CASCADE)
     composition = models.ForeignKey(Composition, related_name='shares', on_delete=models.CASCADE)
-    average = models.FloatField(default=0.0)
-    standard_deviation = models.FloatField(default=0.0)
+    average = models.DecimalField(
+        max_digits=11,
+        decimal_places=10,
+        default=Decimal('0.0'),
+        null=False
+    )
+    standard_deviation = models.DecimalField(
+        max_digits=11,
+        decimal_places=10,
+        default=Decimal('0.0'),
+        null=False
+    )
 
     class Meta:
         ordering = ['-average']
