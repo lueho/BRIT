@@ -3,13 +3,13 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
 from django.contrib.sitemaps.views import sitemap
-from django.urls import path, include
+from django.urls import include, path
 from django.views.generic import RedirectView, TemplateView
 from rest_framework.authtoken.views import obtain_auth_token
 
 from utils.views import DynamicRedirectView
 from .sitemaps import DynamicViewSitemap, HomepageSitemap
-from .views import HomeView, AboutView, LearningView, PrivacyPolicyView, CacheTestView, get_session, set_session
+from .views import AboutView, CacheTestView, HomeView, LearningView, PrivacyPolicyView, get_session, set_session
 
 admin.autodiscover()
 admin.site.enable_nav_sidebar = False
@@ -20,7 +20,7 @@ sitemaps = {
 }
 
 urlpatterns = [
-    path('', RedirectView.as_view(url='/home'), name='entry'),
+    path('', RedirectView.as_view(url='/home/'), name='entry'),
     path('__debug__/', include(debug_toolbar.urls)),
     path('utils/', include('utils.urls')),
     path('home/', HomeView.as_view(), name='home'),
