@@ -118,7 +118,7 @@ class SampleSeries(NamedUserObjectModel):
     distribution of material properties and compositions over time can be described.
     """
     material = models.ForeignKey(Material, on_delete=models.PROTECT)
-    preview = models.ImageField(upload_to='images/material_sample_series/', blank=True, null=True)
+    preview = models.ImageField(upload_to='materials_sampleseries/', blank=True, null=True)
     publish = models.BooleanField(default=False)
     standard = models.BooleanField(default=True)
     temporal_distributions = models.ManyToManyField(TemporalDistribution)
@@ -282,7 +282,7 @@ class Sample(NamedUserObjectModel):
     series = models.ForeignKey(SampleSeries, related_name='samples', on_delete=models.CASCADE)
     timestep = models.ForeignKey(Timestep, related_name='samples', on_delete=models.PROTECT, null=True)
     taken_at = models.DateTimeField(blank=True, null=True)
-    preview = models.ImageField(upload_to='images/material_samples/', blank=True, null=True)
+    preview = models.ImageField(upload_to='materials_sample/', blank=True, null=True)
     properties = models.ManyToManyField(MaterialPropertyValue)
     sources = models.ManyToManyField(Source)
 

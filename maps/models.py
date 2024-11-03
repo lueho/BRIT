@@ -174,7 +174,7 @@ class GeoDataset(NamedUserObjectModel):
     """
     Holds meta information about datasets from the core module or scenario extensions.
     """
-    preview = models.ImageField(upload_to='images/geodatasets/', default='img/generic_map.png')
+    preview = models.ImageField(upload_to='maps_geodataset/', default='generic_map.png')
     publish = models.BooleanField(default=False)
     region = models.ForeignKey(Region, on_delete=models.CASCADE, null=False)
     model_name = models.CharField(max_length=56, choices=GIS_SOURCE_MODELS, null=True)
