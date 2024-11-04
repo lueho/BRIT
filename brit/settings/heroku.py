@@ -26,6 +26,31 @@ MIDDLEWARE.append('brit.middleware.ExceptionLoggingMiddleware')
 DATABASES['default'] = dj_database_url.config(conn_max_age=600, ssl_require=True)
 DATABASES['default']['ENGINE'] = 'django.contrib.gis.db.backends.postgis'
 
+STATICFILES_LOCATION = "static"
+STATIC_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/{STATICFILES_LOCATION}/"
+
+MEDIAFILES_LOCATION = "media"
+MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/{MEDIAFILES_LOCATION}/"
+
+STORAGES = {
+    'default': {
+        'BACKEND': 'storages.backends.s3boto3.S3Boto3Storage',
+        'OPTIONS': {
+            'bucket_name': AWS_STORAGE_BUCKET_NAME,
+            'custom_domain': AWS_S3_CUSTOM_DOMAIN,
+            'location': MEDIAFILES_LOCATION,
+        },
+    },
+    'staticfiles': {
+        'BACKEND': "brit.storages.StaticStorage",
+        'OPTIONS': {
+            'bucket_name': AWS_STORAGE_BUCKET_NAME,
+            'custom_domain': AWS_S3_CUSTOM_DOMAIN,
+            'location': STATICFILES_LOCATION,
+        },
+    },
+}
+
 # Logging settings
 # In production all logs of unhandled exceptions are mailed to the admins.
 LOGGING = {
