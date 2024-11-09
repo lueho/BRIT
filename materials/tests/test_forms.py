@@ -160,8 +160,8 @@ class CompositionUpdateFormTestCase(TestCase):
                 owner=owner,
                 component=component,
                 composition=composition,
-                average=0.2,
-                standard_deviation=0.01
+                average=Decimal('0.2000000000'),
+                standard_deviation=Decimal('0.0500000000')
             )
 
     def setUp(self):
@@ -185,14 +185,14 @@ class CompositionUpdateFormTestCase(TestCase):
             extra=0
         )
         formset = FormSet(instance=self.composition)
-        averages_sum = 0
+        averages_sum = Decimal('0.0')
         for form in formset:
             component = MaterialComponent.objects.get(id=form['component'].value())
             share = WeightShare.objects.get(component=component)
-            self.assertEqual(form['average'].value(), share.average * 100)
-            self.assertEqual(form['standard_deviation'].value(), share.standard_deviation * 100)
+            self.assertEqual(form['average'].value(), share.average * Decimal('100'))
+            self.assertEqual(form['standard_deviation'].value(), share.standard_deviation * Decimal('100'))
             averages_sum += form['average'].value()
-        self.assertEqual(averages_sum, 100)
+        self.assertEqual(averages_sum, Decimal('100'))
 
     def test_input_percentages_are_stored_as_fractions_of_one(self):
         FormSet = inlineformset_factory(
@@ -222,7 +222,7 @@ class CompositionUpdateFormTestCase(TestCase):
             form.instance.owner = self.owner
         shares = formset.save()
         for share in shares:
-            self.assertLessEqual(share.average, 1)
+            self.assertLessEqual(share.average, Decimal('1'))
             self.assertEqual(share.standard_deviation, Decimal('0.015'))
 
     def test_form_valid_if_averages_sum_up_to_100_percent(self):
@@ -253,8 +253,8 @@ class CompositionUpdateFormTestCase(TestCase):
             form.instance.owner = self.owner
         formset.save()
         for share in WeightShare.objects.all():
-            self.assertLessEqual(share.average, 1)
-            self.assertGreaterEqual(share.average, 0)
+            self.assertLessEqual(share.average, Decimal('1'))
+            self.assertGreaterEqual(share.average, Decimal('0'))
 
     def test_form_invalid_if_averages_dont_sum_up_to_100_percent(self):
         FormSet = inlineformset_factory(
@@ -281,5 +281,18 @@ class CompositionUpdateFormTestCase(TestCase):
         self.assertFalse(formset.is_valid())
         self.assertIn('Weight shares of components must sum up to 100%', formset.non_form_errors())
         for share in WeightShare.objects.all():
-            self.assertLessEqual(share.average, 1)
-            self.assertGreaterEqual(share.average, 0)
+            self.assertLessEqual(share.average, Decimal('1'))
+            self.assertGreaterEqual(share.average, Decimal('0'))
+
+    def test_form_fields_render_percentage_suffix(self):
+        FormSet = inlineformset_factory(
+            Composition,
+            WeightShare,
+            form=WeightShareModelForm,
+            formset=WeightShareInlineFormset,
+            extra=0
+        )
+        formset = FormSet(instance=self.composition)
+        for form in formset:
+            rendered_form = form.as_p()
+            self.assertIn('%', rendered_form)
