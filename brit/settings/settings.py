@@ -219,7 +219,7 @@ LEAFLET_CONFIG = {
     'RESET_VIEW': False,
     'NO_GLOBALS': False,
     'MIN_ZOOM': 4,
-    'MAX_ZOOM': 15,
+    'MAX_ZOOM': 22,
     'PLUGINS': {
         'draw': {
             'css': 'lib/leaflet-draw/leaflet.draw.min.css',
