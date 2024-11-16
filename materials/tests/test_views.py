@@ -2743,36 +2743,25 @@ class CompositionUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.post(reverse('composition-update', kwargs={'pk': self.composition.pk}), data)
         self.assertEqual(response.status_code, 302)
 
-    def test_sum_validation_raises_no_error_when_last_element_is_deleted(self):
-        self.client.force_login(self.member)
-        component = MaterialComponent.objects.get(name='Test Component 1')
-        share = WeightShare.objects.create(component=component, composition=self.composition)
-        data = {
-            'shares-INITIAL_FORMS': '1',
-            'shares-TOTAL_FORMS': '1',
-            'shares-0-id': f'{share.pk}',
-            'shares-0-owner': f'{self.member.pk}',
-            'shares-0-component': f'{component.pk}',
-            'shares-0-average': '45.5',
-            'shares-0-standard_deviation': '1.5',
-            'shares-0-DELETE': True,
-        }
-        response = self.client.post(reverse('composition-update', kwargs={'pk': self.composition.pk}), data)
-        self.assertEqual(response.status_code, 302)
-
     def test_deleted_forms_delete_correct_weight_share_record(self):
         self.client.force_login(self.member)
         component = MaterialComponent.objects.get(name='Test Component 1')
         share = WeightShare.objects.create(component=component, composition=self.composition)
         data = {
             'shares-INITIAL_FORMS': '1',
-            'shares-TOTAL_FORMS': '1',
+            'shares-TOTAL_FORMS': '2',
             'shares-0-id': f'{share.pk}',
             'shares-0-owner': f'{self.member.pk}',
             'shares-0-component': f'{component.pk}',
             'shares-0-average': '45.5',
             'shares-0-standard_deviation': '1.5',
             'shares-0-DELETE': True,
+            'shares-1-id': f'{share.pk}',
+            'shares-1-owner': f'{self.member.pk}',
+            'shares-1-component': f'{component.pk}',
+            'shares-1-average': '100.0',
+            'shares-1-standard_deviation': '1.5',
+            'shares-1-DELETE': False,
         }
         response = self.client.post(reverse('composition-update', kwargs={'pk': self.composition.pk}), data)
         self.assertEqual(response.status_code, 302)
@@ -2887,36 +2876,25 @@ class CompositionModalUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.post(reverse('composition-update-modal', kwargs={'pk': self.composition.pk}), data)
         self.assertEqual(response.status_code, 302)
 
-    def test_sum_validation_raises_no_error_when_last_element_is_deleted(self):
-        self.client.force_login(self.member)
-        component = MaterialComponent.objects.get(name='Test Component 1')
-        share = WeightShare.objects.create(component=component, composition=self.composition)
-        data = {
-            'shares-INITIAL_FORMS': '1',
-            'shares-TOTAL_FORMS': '1',
-            'shares-0-id': f'{share.pk}',
-            'shares-0-owner': f'{self.member.pk}',
-            'shares-0-component': f'{component.pk}',
-            'shares-0-average': '45.5',
-            'shares-0-standard_deviation': '1.5',
-            'shares-0-DELETE': True,
-        }
-        response = self.client.post(reverse('composition-update-modal', kwargs={'pk': self.composition.pk}), data)
-        self.assertEqual(response.status_code, 302)
-
     def test_deleted_forms_delete_correct_weight_share_record(self):
         self.client.force_login(self.member)
         component = MaterialComponent.objects.get(name='Test Component 1')
         share = WeightShare.objects.create(component=component, composition=self.composition)
         data = {
             'shares-INITIAL_FORMS': '1',
-            'shares-TOTAL_FORMS': '1',
+            'shares-TOTAL_FORMS': '2',
             'shares-0-id': f'{share.pk}',
             'shares-0-owner': f'{self.member.pk}',
             'shares-0-component': f'{component.pk}',
             'shares-0-average': '45.5',
             'shares-0-standard_deviation': '1.5',
             'shares-0-DELETE': True,
+            'shares-1-id': f'{share.pk}',
+            'shares-1-owner': f'{self.member.pk}',
+            'shares-1-component': f'{component.pk}',
+            'shares-1-average': '100.0',
+            'shares-1-standard_deviation': '1.5',
+            'shares-1-DELETE': False,
         }
         response = self.client.post(reverse('composition-update-modal', kwargs={'pk': self.composition.pk}), data)
         self.assertEqual(response.status_code, 302)

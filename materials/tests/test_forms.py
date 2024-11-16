@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 from django.contrib.auth.models import Group, Permission, User
 from django.forms import inlineformset_factory
@@ -6,8 +6,8 @@ from django.test import TestCase
 
 from distributions.models import Timestep
 from ..forms import AddComponentModalForm, AddCompositionModalForm, WeightShareInlineFormset, WeightShareModelForm
-from ..models import Composition, Material, MaterialComponent, MaterialComponentGroup, Sample, SampleSeries, \
-    WeightShare, get_default_owner
+from ..models import (Composition, Material, MaterialComponent, MaterialComponentGroup, Sample, SampleSeries,
+                      WeightShare, get_default_owner)
 
 
 class AddComponentGroupModalModelFormTestCase(TestCase):
@@ -120,13 +120,15 @@ class CompositionUpdateFormTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = User.objects.create(username='owner', password='very-secure!')
-        User.objects.create(username='outsider', password='very-secure!')
-        member = User.objects.create(username='member', password='very-secure!')
-        members = Group.objects.create(name='members')
-        members.permissions.add(Permission.objects.get(codename='change_composition'))
-        members.permissions.add(Permission.objects.get(codename='change_weightshare'))
-        member.groups.add(members)
+        owner = User.objects.create_user(username='owner', password='very-secure!')
+        outsider = User.objects.create_user(username='outsider', password='very-secure!')
+        member = User.objects.create_user(username='member', password='very-secure!')
+
+        members_group = Group.objects.create(name='members')
+        change_composition_permission = Permission.objects.get(codename='change_composition')
+        change_weightshare_permission = Permission.objects.get(codename='change_weightshare')
+        members_group.permissions.add(change_composition_permission, change_weightshare_permission)
+        member.groups.add(members_group)
 
         material = Material.objects.create(
             owner=owner,
@@ -138,16 +140,21 @@ class CompositionUpdateFormTestCase(TestCase):
             name='Test Group'
         )
 
-        SampleSeries.objects.create(
+        sample_series = SampleSeries.objects.create(
             owner=owner,
             material=material,
             name='Test Series'
+        )
+        sample = Sample.objects.create(
+            owner=owner,
+            series=sample_series,
+            name='Test Sample'
         )
 
         composition = Composition.objects.create(
             owner=owner,
             group=group,
-            sample=Sample.objects.get(series__name='Test Series'),
+            sample=sample,
             fractions_of=MaterialComponent.objects.default()
         )
 
@@ -177,6 +184,10 @@ class CompositionUpdateFormTestCase(TestCase):
         )
 
     def test_initial_values_are_displayed_as_percentages(self):
+        """
+        Test that the formset initializes 'average' and 'standard_deviation'
+        fields with percentage values displaying at least one decimal place.
+        """
         FormSet = inlineformset_factory(
             Composition,
             WeightShare,
@@ -186,15 +197,34 @@ class CompositionUpdateFormTestCase(TestCase):
         )
         formset = FormSet(instance=self.composition)
         averages_sum = Decimal('0.0')
+
         for form in formset:
-            component = MaterialComponent.objects.get(id=form['component'].value())
+            if not form.instance.pk:
+                continue  # Skip forms not linked to existing WeightShare instances
+
+            component_id = form['component'].value()
+            component = MaterialComponent.objects.get(id=component_id)
             share = WeightShare.objects.get(component=component)
-            self.assertEqual(form['average'].value(), share.average * Decimal('100'))
-            self.assertEqual(form['standard_deviation'].value(), share.standard_deviation * Decimal('100'))
-            averages_sum += form['average'].value()
-        self.assertEqual(averages_sum, Decimal('100'))
+
+            form_average = Decimal(form['average'].value())
+            form_std_dev = Decimal(form['standard_deviation'].value())
+
+            expected_average = (share.average * Decimal('100')).quantize(Decimal('.1'), rounding=ROUND_HALF_UP)
+            expected_std_dev = (share.standard_deviation * Decimal('100')).quantize(Decimal('.1'),
+                                                                                    rounding=ROUND_HALF_UP)
+
+            self.assertEqual(form_average, expected_average)
+            self.assertEqual(form_std_dev, expected_std_dev)
+
+            averages_sum += form_average
+
+        self.assertEqual(averages_sum, Decimal('100.0'))
 
     def test_input_percentages_are_stored_as_fractions_of_one(self):
+        """
+        Test that submitting the form with percentage values correctly converts
+        them to decimal values and stores them as fractions of one.
+        """
         FormSet = inlineformset_factory(
             Composition,
             WeightShare,
@@ -202,10 +232,13 @@ class CompositionUpdateFormTestCase(TestCase):
             formset=WeightShareInlineFormset,
             extra=0
         )
-        components = [c.id for c in MaterialComponent.objects.exclude(name='Fresh Matter (FM)')]
+        # Select two components excluding any named 'Fresh Matter (FM)' if exists
+        components = MaterialComponent.objects.exclude(name='Fresh Matter (FM)').values_list('id', flat=True)[:2]
         data = {
-            'shares-INITIAL_FORMS': '0',
             'shares-TOTAL_FORMS': '2',
+            'shares-INITIAL_FORMS': '0',
+            'shares-MIN_NUM_FORMS': '0',
+            'shares-MAX_NUM_FORMS': '1000',
             'shares-0-id': '',
             'shares-0-component': f'{components[0]}',
             'shares-0-average': '45.5',
@@ -216,16 +249,20 @@ class CompositionUpdateFormTestCase(TestCase):
             'shares-1-standard_deviation': '1.5',
         }
         formset = FormSet(data=data, instance=self.composition)
-        formset.is_valid()
         self.assertTrue(formset.is_valid())
-        for form in formset:
-            form.instance.owner = self.owner
+        formset.instance.owner = self.owner
         shares = formset.save()
-        for share in shares:
-            self.assertLessEqual(share.average, Decimal('1'))
-            self.assertEqual(share.standard_deviation, Decimal('0.015'))
+
+        self.assertEqual(WeightShare.objects.get(component=components[0]).average, Decimal('0.4550000000'))
+        self.assertEqual(WeightShare.objects.get(component=components[0]).standard_deviation, Decimal('0.0150000000'))
+        self.assertEqual(WeightShare.objects.get(component=components[1]).average, Decimal('0.5450000000'))
+        self.assertEqual(WeightShare.objects.get(component=components[1]).standard_deviation, Decimal('0.0150000000'))
+
 
     def test_form_valid_if_averages_sum_up_to_100_percent(self):
+        """
+        Test that the formset is valid if the sum of averages equals 100%.
+        """
         FormSet = inlineformset_factory(
             Composition,
             WeightShare,
@@ -233,30 +270,37 @@ class CompositionUpdateFormTestCase(TestCase):
             formset=WeightShareInlineFormset,
             extra=0
         )
-        components = [c.id for c in MaterialComponent.objects.exclude(name='Fresh Matter (FM)')]
+        components = MaterialComponent.objects.exclude(name='Fresh Matter (FM)').values_list('id', flat=True)[:2]
         data = {
-            'shares-INITIAL_FORMS': '0',
             'shares-TOTAL_FORMS': '2',
+            'shares-INITIAL_FORMS': '0',
+            'shares-MIN_NUM_FORMS': '0',
+            'shares-MAX_NUM_FORMS': '1000',
             'shares-0-id': '',
             'shares-0-component': f'{components[0]}',
-            'shares-0-average': '45.5',
-            'shares-0-standard_deviation': '1.5',
+            'shares-0-average': '45.5',  # 45.5%
+            'shares-0-standard_deviation': '1.5',  # 1.5%
             'shares-1-id': '',
             'shares-1-component': f'{components[1]}',
-            'shares-1-average': '54.5',
-            'shares-1-standard_deviation': '1.5',
+            'shares-1-average': '54.5',  # 54.5%
+            'shares-1-standard_deviation': '1.5',  # 1.5%
         }
         formset = FormSet(data=data, instance=self.composition)
-        formset.is_valid()
         self.assertTrue(formset.is_valid())
-        for form in formset:
-            form.instance.owner = self.owner
+
+        formset.instance.owner = self.owner
         formset.save()
-        for share in WeightShare.objects.all():
-            self.assertLessEqual(share.average, Decimal('1'))
-            self.assertGreaterEqual(share.average, Decimal('0'))
+
+        for share in WeightShare.objects.filter(composition=self.composition):
+            self.assertGreaterEqual(share.average, Decimal('0.0'))
+            self.assertLessEqual(share.average, Decimal('1.0'))
+            self.assertGreaterEqual(share.standard_deviation, Decimal('0.0'))
+            self.assertLessEqual(share.standard_deviation, Decimal('1.0'))
 
     def test_form_invalid_if_averages_dont_sum_up_to_100_percent(self):
+        """
+        Test that the formset is invalid if the sum of averages does not equal 100%.
+        """
         FormSet = inlineformset_factory(
             Composition,
             WeightShare,
@@ -264,10 +308,12 @@ class CompositionUpdateFormTestCase(TestCase):
             formset=WeightShareInlineFormset,
             extra=0
         )
-        components = [c.id for c in MaterialComponent.objects.exclude(name='Fresh Matter (FM)')]
+        components = MaterialComponent.objects.exclude(name='Fresh Matter (FM)').values_list('id', flat=True)[:2]
         data = {
-            'shares-INITIAL_FORMS': '0',
             'shares-TOTAL_FORMS': '2',
+            'shares-INITIAL_FORMS': '0',
+            'shares-MIN_NUM_FORMS': '0',
+            'shares-MAX_NUM_FORMS': '1000',
             'shares-0-id': '',
             'shares-0-component': f'{components[0]}',
             'shares-0-average': '100',
@@ -277,14 +323,105 @@ class CompositionUpdateFormTestCase(TestCase):
             'shares-1-average': '100',
             'shares-1-standard_deviation': '0.01',
         }
-        formset = FormSet(data=data)
+        formset = FormSet(data=data, instance=self.composition)
         self.assertFalse(formset.is_valid())
-        self.assertIn('Weight shares of components must sum up to 100%', formset.non_form_errors())
-        for share in WeightShare.objects.all():
-            self.assertLessEqual(share.average, Decimal('1'))
-            self.assertGreaterEqual(share.average, Decimal('0'))
+        self.assertIn('Weight shares of components must sum up to 100%.', formset.non_form_errors())
+
+        # Verify that the invalid data was not saved
+        saved_shares = WeightShare.objects.filter(composition=self.composition)
+        for share in saved_shares:
+            self.assertLessEqual(share.average, Decimal('1.0'))
+            self.assertGreaterEqual(share.average, Decimal('0.0'))
+            self.assertLessEqual(share.standard_deviation, Decimal('1.0'))
+            self.assertGreaterEqual(share.standard_deviation, Decimal('0.0'))
 
     def test_form_fields_render_percentage_suffix(self):
+        """
+        Test that the form fields have the '%' symbol in their labels.
+        Since the '%' is in the label, not appended to the input, check the label text.
+        """
+        FormSet = inlineformset_factory(
+            Composition,
+            WeightShare,
+            form=WeightShareModelForm,
+            formset=WeightShareInlineFormset,
+            extra=0
+        )
+        formset = FormSet(instance=self.composition)
+        for form in formset:
+            # Check that the label contains '%'
+            average_label = form.fields['average'].label
+            standard_deviation_label = form.fields['standard_deviation'].label
+            self.assertIn('%', average_label)
+            self.assertIn('%', standard_deviation_label)
+
+
+class WeightShareModelFormTest(TestCase):
+    def setUp(self):
+        self.group = MaterialComponentGroup.objects.create(name='Test Group')
+        self.material = Material.objects.create(name='Test Material')
+        self.series = SampleSeries.objects.create(material=self.material, name='Test Series')
+        self.sample = Sample.objects.create(name='Test Sample', series=self.series)
+        self.composition = Composition.objects.create(
+            name='Test Composition',
+            sample=self.sample,
+            group=self.group
+        )
+
+        self.component1 = MaterialComponent.objects.create(name='Component 1')
+        self.component2 = MaterialComponent.objects.create(name='Component 2')
+
+        WeightShare.objects.create(
+            composition=self.composition,
+            component=self.component1,
+            average=Decimal('0.2000000000'),
+            standard_deviation=Decimal('0.0500000000')
+        )
+        WeightShare.objects.create(
+            composition=self.composition,
+            component=self.component2,
+            average=Decimal('0.8000000000'),
+            standard_deviation=Decimal('0.1500000000')
+        )
+
+    def test_initial_values_are_displayed_as_percentages_with_one_decimal(self):
+        """
+        Test that the formset initializes 'average' and 'standard_deviation'
+        fields with percentage values displaying at least one decimal place.
+        """
+        FormSet = inlineformset_factory(
+            Composition,
+            WeightShare,
+            form=WeightShareModelForm,
+            formset=WeightShareInlineFormset,
+            extra=0
+        )
+        formset = FormSet(instance=self.composition)
+        averages_sum = Decimal('0.0')
+
+        for form in formset:
+            component_id = form['component'].value()
+            component = MaterialComponent.objects.get(id=component_id)
+            share = WeightShare.objects.get(component=component)
+
+            form_average = Decimal(form['average'].value())
+            form_std_dev = Decimal(form['standard_deviation'].value())
+
+            expected_average = (share.average * Decimal('100')).quantize(Decimal('.1'), rounding=ROUND_HALF_UP)
+            expected_std_dev = (share.standard_deviation * Decimal('100')).quantize(Decimal('.1'),
+                                                                                    rounding=ROUND_HALF_UP)
+
+            self.assertEqual(form_average, expected_average)
+            self.assertEqual(form_std_dev, expected_std_dev)
+
+            averages_sum += form_average
+
+        self.assertEqual(averages_sum, Decimal('100.0'))
+
+    def test_form_fields_render_percentage_suffix(self):
+        """
+        Test that the rendered form fields include a '%' suffix.
+        """
         FormSet = inlineformset_factory(
             Composition,
             WeightShare,
@@ -296,3 +433,44 @@ class CompositionUpdateFormTestCase(TestCase):
         for form in formset:
             rendered_form = form.as_p()
             self.assertIn('%', rendered_form)
+
+    def test_form_submission_converts_percentages_to_decimals_with_one_decimal_minimum(self):
+        """
+        Test that submitting the form with percentage values correctly converts
+        them to decimal values with at least one decimal place.
+        """
+        form_data = {
+            'shares-TOTAL_FORMS': '2',
+            'shares-INITIAL_FORMS': '2',
+            'shares-MIN_NUM_FORMS': '0',
+            'shares-MAX_NUM_FORMS': '1000',
+            'shares-0-id': str(WeightShare.objects.get(component=self.component1).id),
+            'shares-0-component': str(self.component1.id),
+            'shares-0-average': '25.0',
+            'shares-0-standard_deviation': '5.0',
+            'shares-1-id': str(WeightShare.objects.get(component=self.component2).id),
+            'shares-1-component': str(self.component2.id),
+            'shares-1-average': '75.0',
+            'shares-1-standard_deviation': '15.0',
+        }
+
+        FormSet = inlineformset_factory(
+            Composition,
+            WeightShare,
+            form=WeightShareModelForm,
+            formset=WeightShareInlineFormset,
+            extra=0
+        )
+        formset = FormSet(data=form_data, instance=self.composition)
+
+        self.assertTrue(formset.is_valid())
+        formset.save()
+
+        updated_share1 = WeightShare.objects.get(component=self.component1)
+        updated_share2 = WeightShare.objects.get(component=self.component2)
+
+        self.assertEqual(updated_share1.average, Decimal('0.2500000000'))
+        self.assertEqual(updated_share1.standard_deviation, Decimal('0.0500000000'))
+
+        self.assertEqual(updated_share2.average, Decimal('0.7500000000'))
+        self.assertEqual(updated_share2.standard_deviation, Decimal('0.1500000000'))

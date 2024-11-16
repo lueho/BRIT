@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Field, Layout, Row
@@ -174,26 +174,54 @@ class PercentageDecimalField(DecimalField):
         """
         value = super().to_python(value)
         if value is not None:
-            return value / Decimal('100')
+            return (value / Decimal('100')).quantize(Decimal('.0000000001'), rounding=ROUND_HALF_UP)
         return value
 
     def prepare_value(self, value):
         """
-        Convert the decimal value to a percentage for display in the form.
+        Convert the decimal value to a percentage string with at least one decimal place
+        for display in the form.
         """
         if isinstance(value, Decimal):
-            return value * Decimal('100')
+            percentage = value * Decimal('100')
+            percentage = percentage.quantize(Decimal('.0000000001'), rounding=ROUND_HALF_UP)
+            percentage_str = format(percentage, 'f')  # Fixed-point format
+
+            if '.' in percentage_str:
+                # Remove trailing zeros but ensure at least one decimal digit
+                percentage_str = percentage_str.rstrip('0').rstrip('.')
+                if '.' not in percentage_str:
+                    # If all decimals were stripped, add '.0'
+                    percentage_str += '.0'
+            else:
+                # No decimal point, add '.0'
+                percentage_str += '.0'
+
+            return percentage_str
         return value
+
+
+class PercentageInput(NumberInput):
+    def __init__(self, attrs=None):
+        if attrs is None:
+            attrs = {}
+        attrs.update({'class': 'percentage-input'})
+        super().__init__(attrs)
+
+    def render(self, name, value, attrs=None, renderer=None):
+        attrs = attrs or {}
+        attrs['step'] = 'any'
+        input_html = super().render(name, value, attrs, renderer)
+        return mark_safe(input_html)
 
 
 class WeightShareModelForm(SimpleModelForm):
     average = PercentageDecimalField(
-        max_digits=11,
-        decimal_places=10,
         label='Average (%)',
         min_value=0,
         max_value=100,
         required=True,
+        widget=PercentageInput(),
         error_messages={
             'min_value': 'Average must be at least 0%.',
             'max_value': 'Average cannot exceed 100%.',
@@ -201,12 +229,11 @@ class WeightShareModelForm(SimpleModelForm):
         }
     )
     standard_deviation = PercentageDecimalField(
-        max_digits=11,
-        decimal_places=10,
         label='Standard Deviation (%)',
         min_value=0,
         max_value=100,
         required=True,
+        widget=PercentageInput(),
         error_messages={
             'min_value': 'Standard deviation must be at least 0%.',
             'max_value': 'Standard deviation cannot exceed 100%.',
@@ -229,13 +256,25 @@ class WeightShareInlineForm(WeightShareModelForm):
 class WeightShareInlineFormset(BaseInlineFormSet):
 
     def clean(self):
-        if any(self.errors):
-            return
-        if self.forms and not all([form.cleaned_data['DELETE'] for form in self.forms]):
-            summe = sum([form.cleaned_data.get('average') for form in self.forms if not form.cleaned_data['DELETE']])
-            if summe != 1.0:
-                raise ValidationError('Weight shares of components must sum up to 100%')
         super().clean()
+
+        if any(self.errors):
+            # If any form has errors, skip further validation
+            return
+
+        total_average = Decimal('0.0')
+        for form in self.forms:
+            if self.can_delete and form.cleaned_data.get('DELETE'):
+                continue
+            average = form.cleaned_data.get('average')
+            if average is None:
+                continue  # Or handle as needed
+            total_average += average
+
+        # Define a tolerance for decimal comparison
+        tolerance = Decimal('0.0000001')
+        if not (Decimal('1.0') - tolerance <= total_average <= Decimal('1.0') + tolerance):
+            raise ValidationError('Weight shares of components must sum up to 100%.')
 
 
 class InlineWeightShare(InlineFormSetFactory):
@@ -248,8 +287,6 @@ class InlineWeightShare(InlineFormSetFactory):
         'can_delete': True,
         'widgets': {
             'owner': HiddenInput(),
-            'average': NumberInput(attrs={'min': 0, 'max': 100, 'step': 0.01}),
-            'standard_deviation': NumberInput(attrs={'min': 0, 'max': 100, 'step': 0.01})
         }
     }
 
