@@ -219,7 +219,7 @@ class SampleSeriesTestCase(TestCase):
         self.assertEqual(duplicate.owner, creator)
         for field in self.sample_series._meta.get_fields():
             if field.concrete and field.name not in ['id', 'owner', 'created_at', 'lastmodified_at',
-                                                     'visible_to_groups', 'temporal_distributions']:
+                                                     'temporal_distributions']:
                 self.assertEqual(getattr(duplicate, field.name), getattr(self.sample_series, field.name))
             elif field.name == 'samples':
                 self.assertTrue(self.sample_series.samples.exists())
@@ -301,7 +301,7 @@ class SampleTestCase(TestCase):
         self.assertEqual(duplicate.owner, creator)
         for field in self.sample._meta.get_fields():
             if field.concrete and field.name not in ['id', 'owner', 'preview', 'created_at', 'lastmodified_at',
-                                                     'visible_to_groups', 'properties', 'sources']:
+                                                     'properties', 'sources']:
                 self.assertEqual(getattr(duplicate, field.name), getattr(self.sample, field.name))
             elif field.name == 'compositions':
                 self.assertTrue(self.sample.compositions.exists())
@@ -428,8 +428,7 @@ class CompositionTestCase(TestCase):
         self.assertNotEqual(self.composition, duplicate)
         self.assertEqual(duplicate.owner, creator)
         for field in self.composition._meta.get_fields():
-            if field.concrete and field.name not in ['id', 'owner', 'created_at', 'lastmodified_at',
-                                                     'visible_to_groups']:
+            if field.concrete and field.name not in ['id', 'owner', 'created_at', 'lastmodified_at']:
                 self.assertEqual(getattr(duplicate, field.name), getattr(self.composition, field.name))
             elif field.name == 'shares':
                 self.assertTrue(self.composition.shares.exists())
@@ -539,5 +538,5 @@ class WeightShareTestCase(TestCase):
         self.assertNotEqual(self.share, duplicate)
         self.assertEqual(duplicate.owner, creator)
         for field in self.share._meta.get_fields():
-            if field.name not in ['id', 'owner', 'created_at', 'lastmodified_at', 'visible_to_groups']:
+            if field.name not in ['id', 'owner', 'created_at', 'lastmodified_at']:
                 self.assertEqual(getattr(duplicate, field.name), getattr(self.share, field.name))

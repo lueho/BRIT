@@ -4,9 +4,9 @@ from rest_framework import serializers
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from maps.models import GeoPolygon
-from utils.serializers import FieldLabelModelSerializer
 from materials.models import Material
 from utils.properties.models import Property
+from utils.serializers import FieldLabelModelSerializer
 from . import models
 
 
@@ -27,7 +27,7 @@ class WasteCollectionGeometrySerializer(GeoFeatureModelSerializer):
 
 class OwnedObjectModelSerializer(serializers.ModelSerializer):
     class Meta:
-        exclude = ('owner', 'created_at', 'created_by', 'lastmodified_at', 'lastmodified_by', 'visible_to_groups')
+        exclude = ('owner', 'created_at', 'created_by', 'lastmodified_at', 'lastmodified_by')
 
 
 class CollectorSerializer(OwnedObjectModelSerializer):

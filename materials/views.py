@@ -2,7 +2,6 @@ from bootstrap_modal_forms.generic import BSModalDeleteView, BSModalFormView, BS
 from crispy_forms.helper import FormHelper
 from dal import autocomplete
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.urls import reverse, reverse_lazy
 from django.views.generic import ListView, RedirectView, TemplateView
@@ -836,5 +835,4 @@ class FeaturedMaterialListView(ListView):
     model = SampleSeries
 
     def get_queryset(self):
-        user_groups = self.request.user.groups.all()
-        return SampleSeries.objects.filter(Q(visible_to_groups__in=user_groups) | Q(publish=True))
+        return SampleSeries.objects.filter(publish=True)
