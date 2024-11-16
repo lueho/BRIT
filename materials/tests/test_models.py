@@ -5,20 +5,9 @@ from django.urls import reverse
 from factory.django import mute_signals
 
 from distributions.models import TemporalDistribution, Timestep
-from materials.models import (
-    Material,
-    MaterialComponentGroup,
-    MaterialComponent,
-    SampleSeries,
-    MaterialProperty,
-    MaterialPropertyValue,
-    Sample,
-    Composition,
-    WeightShare,
-    get_default_component,
-    get_default_component_pk
-)
-from users.models import get_default_owner
+from materials.models import (Composition, Material, MaterialComponent, MaterialComponentGroup, MaterialProperty,
+                              MaterialPropertyValue, Sample, SampleSeries, WeightShare, get_default_component,
+                              get_default_component_pk)
 
 
 class InitialDataTestCase(TestCase):
@@ -71,54 +60,37 @@ class MaterialTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
         User.objects.create(username='standard_user')
         custom_distribution = TemporalDistribution.objects.create(
             name='Custom Distribution',
-            owner=owner
         )
         main_step1 = Timestep.objects.create(
             name='Timestep 1',
-            owner=owner,
             distribution=custom_distribution
         )
         main_step2 = Timestep.objects.create(
             name='Timestep 2',
-            owner=owner,
             distribution=custom_distribution
         )
-        MaterialComponentGroup.objects.create(
-            name='Custom Group',
-            owner=owner
-        )
+        MaterialComponentGroup.objects.create(name='Custom Group')
         MaterialComponent.objects.default()
-        MaterialComponent.objects.create(
-            name='Custom Component',
-            owner=owner
-        )
+        MaterialComponent.objects.create(name='Custom Component')
 
         with mute_signals(signals.post_save):
-            material1 = Material.objects.create(
-                name='Test Material 1',
-                owner=owner,
-            )
+            material1 = Material.objects.create(name='Test Material 1')
             sample_series = SampleSeries.objects.create(
-                owner=owner,
                 material=material1,
                 standard=True
             )
             Sample.objects.create(
-                owner=owner,
                 series=sample_series,
                 timestep=Timestep.objects.default()
             )
             Sample.objects.create(
-                owner=owner,
                 series=sample_series,
                 timestep=main_step1
             )
             Sample.objects.create(
-                owner=owner,
                 series=sample_series,
                 timestep=main_step2
             )
@@ -136,61 +108,43 @@ class SampleSeriesTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
         User.objects.create(username='standard_user')
         custom_distribution = TemporalDistribution.objects.create(
             name='Custom Distribution',
-            owner=owner
         )
         timestep1 = Timestep.objects.create(
             name='Timestep 1',
-            owner=owner,
             distribution=custom_distribution
         )
         timestep2 = Timestep.objects.create(
             name='Timestep 2',
-            owner=owner,
             distribution=custom_distribution
         )
-        MaterialComponentGroup.objects.create(
-            name='Custom Group',
-            owner=owner
-        )
+        MaterialComponentGroup.objects.create(name='Custom Group')
         MaterialComponent.objects.default()
-        MaterialComponent.objects.create(
-            name='Custom Component',
-            owner=owner
-        )
+        MaterialComponent.objects.create(name='Custom Component')
 
         with mute_signals(signals.post_save):
-            material1 = Material.objects.create(
-                name='Test Material 1',
-                owner=owner,
-            )
+            material1 = Material.objects.create(name='Test Material 1')
             sample_series = SampleSeries.objects.create(
-                owner=owner,
                 material=material1,
                 standard=True
             )
             Sample.objects.create(
-                owner=owner,
                 series=sample_series,
                 timestep=Timestep.objects.default()
             )
             Sample.objects.create(
-                owner=owner,
                 series=sample_series,
                 timestep=timestep1
             )
             Sample.objects.create(
-                owner=owner,
                 series=sample_series,
                 timestep=timestep2
             )
 
     def setUp(self):
         self.user = User.objects.get(username='standard_user')
-        self.owner = get_default_owner()
         self.material1 = Material.objects.get(name='Test Material 1')
         self.sample0 = Sample.objects.get(timestep=Timestep.objects.default())
         self.default_distribution = TemporalDistribution.objects.default()
@@ -199,10 +153,7 @@ class SampleSeriesTestCase(TestCase):
         self.custom_group = MaterialComponentGroup.objects.get(name='Custom Group')
         self.default_component = MaterialComponent.objects.default()
         self.custom_component = MaterialComponent.objects.get(name='Custom Component')
-        self.sample_series = SampleSeries.objects.create(
-            owner=get_default_owner(),
-            material=self.material1,
-        )
+        self.sample_series = SampleSeries.objects.create(material=self.material1)
 
     def test_add_temporal_distribution(self):
         self.sample_series.add_temporal_distribution(self.custom_distribution)
@@ -294,17 +245,9 @@ class MaterialPropertyTestCase(TestCase):
 
 class MaterialPropertyValueTestCase(TestCase):
 
-    @classmethod
-    def setUpTestData(cls):
-        pass
-
-    def setUp(self):
-        self.owner = get_default_owner()
-
     def test_duplicate_creates_new_instance_with_identical_field_values(self):
-        prop = MaterialProperty.objects.create(owner=self.owner, name='Test Property')
+        prop = MaterialProperty.objects.create(name='Test Property')
         value = MaterialPropertyValue.objects.create(
-            owner=self.owner,
             property=prop,
             average=27.3,
             standard_deviation=0.1337
@@ -323,36 +266,26 @@ class SampleTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        MaterialComponentGroup.objects.create(
-            name='Custom Group',
-            owner=owner
-        )
-        MaterialComponent.objects.create(
-            name='Custom Component',
-            owner=owner
-        )
-        material = Material.objects.create(owner=owner, name='Test Material')
+        MaterialComponentGroup.objects.create(name='Custom Group')
+        MaterialComponent.objects.create(name='Custom Component')
+        material = Material.objects.create(name='Test Material')
 
         with mute_signals(signals.post_save):
-            series = SampleSeries.objects.create(owner=owner, name='Test Series', material=material)
+            series = SampleSeries.objects.create(name='Test Series', material=material)
             Sample.objects.create(
-                owner=owner,
                 series=series,
                 timestep=Timestep.objects.default()
             )
 
-        prop = MaterialProperty.objects.create(owner=owner, name='Test Property', unit='Test Unit')
-        MaterialPropertyValue.objects.create(owner=owner, property=prop, average=12.3, standard_deviation=0.321)
+        prop = MaterialProperty.objects.create(name='Test Property', unit='Test Unit')
+        MaterialPropertyValue.objects.create(property=prop, average=12.3, standard_deviation=0.321)
 
     def setUp(self):
-        self.owner = get_default_owner()
         self.sample = Sample.objects.get(timestep=Timestep.objects.default())
         self.default_group = MaterialComponentGroup.objects.default()
         self.default_component = MaterialComponent.objects.default()
         self.custom_component = MaterialComponent.objects.get(name='Custom Component')
         self.composition = Composition.objects.create(
-            owner=self.owner,
             group=self.default_group,
             sample=self.sample,
             fractions_of=self.default_component
@@ -395,60 +328,44 @@ class CompositionTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
         User.objects.create(username='standard_user')
-        custom_distribution = TemporalDistribution.objects.create(
-            name='Custom Distribution',
-            owner=owner
-        )
+        custom_distribution = TemporalDistribution.objects.create(name='Custom Distribution')
         main_step1 = Timestep.objects.create(
             name='Timestep 1',
-            owner=owner,
             distribution=custom_distribution
         )
         main_step2 = Timestep.objects.create(
             name='Timestep 2',
-            owner=owner,
             distribution=custom_distribution
         )
         MaterialComponentGroup.objects.create(
             name='Custom Group',
-            owner=owner
         )
 
         MaterialComponent.objects.create(
             name='Custom Component',
-            owner=owner
         )
 
         with mute_signals(signals.post_save):
-            material1 = Material.objects.create(
-                name='Test Material 1',
-                owner=owner,
-            )
+            material1 = Material.objects.create(name='Test Material 1')
             sample_series = SampleSeries.objects.create(
-                owner=owner,
                 material=material1,
                 standard=True
             )
             Sample.objects.create(
-                owner=owner,
                 series=sample_series,
                 timestep=Timestep.objects.default()
             )
             Sample.objects.create(
-                owner=owner,
                 series=sample_series,
                 timestep=main_step1
             )
             Sample.objects.create(
-                owner=owner,
                 series=sample_series,
                 timestep=main_step2
             )
 
     def setUp(self):
-        self.owner = get_default_owner()
         self.user = User.objects.get(username='standard_user')
         self.material1 = Material.objects.get(name='Test Material 1')
         self.sample0 = Sample.objects.get(timestep=Timestep.objects.default())
@@ -501,7 +418,6 @@ class CompositionTestCase(TestCase):
     def test_duplicate_creates_new_instance_with_identical_field_values(self):
         creator = User.objects.create(username='creator')
         WeightShare.objects.create(
-            owner=self.owner,
             component=self.custom_component,
             composition=self.composition,
             average=0.9,
@@ -581,15 +497,13 @@ class WeightShareTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = User.objects.create(username='owner', password='very-secure!')
-        material = Material.objects.create(owner=owner, name='Test Material')
-        sample_series = SampleSeries.objects.create(owner=owner, material=material, name='Test Series')
-        sample = Sample.objects.create(owner=owner, series=sample_series)
-        component_group = MaterialComponentGroup.objects.create(owner=owner, name='Test Group')
-        composition = Composition.objects.create(owner=owner, sample=sample, group=component_group)
-        component = MaterialComponent.objects.create(owner=owner, name='Test Component')
+        material = Material.objects.create(name='Test Material')
+        sample_series = SampleSeries.objects.create(material=material, name='Test Series')
+        sample = Sample.objects.create(series=sample_series)
+        component_group = MaterialComponentGroup.objects.create(name='Test Group')
+        composition = Composition.objects.create(sample=sample, group=component_group)
+        component = MaterialComponent.objects.create(name='Test Component')
         WeightShare.objects.create(
-            owner=owner,
             composition=composition,
             component=component,
             average=1.0,

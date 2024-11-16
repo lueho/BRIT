@@ -1,15 +1,14 @@
 from django.apps import apps
-from django.contrib.auth.models import User
-from django.contrib.gis.geos import GEOSGeometry, Point, Polygon, MultiPolygon
+from django.contrib.gis.geos import GEOSGeometry, MultiPolygon, Point, Polygon
 from django.db import connection
 from django.db.models.query import QuerySet
 from django.test import TestCase
 
 from case_studies.flexibi_hamburg.models import HamburgGreenAreas
-from distributions.models import Timestep, TemporalDistribution
-from inventories.models import Scenario, InventoryAlgorithm
-from layer_manager.models import DistributionSet, DistributionShare, LayerAggregatedDistribution, Layer, LayerField
-from maps.models import Catchment, Region, GeoDataset
+from distributions.models import TemporalDistribution, Timestep
+from inventories.models import InventoryAlgorithm, Scenario
+from layer_manager.models import DistributionSet, DistributionShare, Layer, LayerAggregatedDistribution, LayerField
+from maps.models import Catchment, GeoDataset, Region
 from materials.models import Material, MaterialComponent, SampleSeries
 
 
@@ -18,31 +17,25 @@ class LayerTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         Point(12, 34)
-        owner = User.objects.create(username='owner', password='very-secure!')
         region = Region.objects.create(
-            owner=owner,
             name='Test Region'
         )
         catchment = Catchment.objects.create(
-            owner=owner,
             name='Test Catchment',
             region=region
         )
         Scenario.objects.create(
-            owner=owner,
             name='Test Scenario',
             region=region,
             catchment=catchment
         )
 
         geodataset = GeoDataset.objects.create(
-            owner=owner,
             name='Test Geodataset',
             region=region
         )
 
         feedstock = Material.objects.create(
-            owner=owner,
             name='Test Feedstock'
         )
 
@@ -62,7 +55,6 @@ class LayerTestCase(TestCase):
             geom=MultiPolygon([Polygon(((0, 0), (0, 1), (1, 1), (0, 0))), Polygon(((1, 1), (1, 2), (2, 2), (1, 1)))])
         )
         SampleSeries.objects.create(
-            owner=owner,
             material=feedstock,
             name='Feedstock Test Series'
         )

@@ -9,7 +9,6 @@ from factory.django import mute_signals
 from distributions.models import Period, TemporalDistribution, Timestep
 from maps.models import GeoDataset, Region
 from materials.models import Material
-from users.models import get_default_owner
 from utils.tests.testcases import comparable_model_dict
 from ..models import (Collection, CollectionCatchment, CollectionCountOptions, CollectionFrequency, CollectionSeason,
                       CollectionSystem, WasteCategory, WasteFlyer, WasteStream)
@@ -33,7 +32,6 @@ class InitialDataTestCase(TestCase):
     @staticmethod
     def test_household_biowaste_collection_dataset_is_initialized():
         GeoDataset.objects.get(
-            owner=get_default_owner(),
             name='Household Biowaste Collection',
             model_name='WasteCollection',
             region=Region.objects.get(name='Europe (NUTS)')

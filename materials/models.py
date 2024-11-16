@@ -76,21 +76,19 @@ def add_type_component(sender, instance, created, **kwargs):
 
 def get_default_component():
     return MaterialComponent.objects.get_or_create(
-        owner=get_default_owner(),
         name=getattr(settings, 'DEFAULT_MATERIALCOMPONENT_NAME', 'Fresh Matter (FM)')
     )[0]
 
 
 def get_default_component_pk():
     return MaterialComponent.objects.get_or_create(
-        owner=get_default_owner(),
         name=getattr(settings, 'DEFAULT_MATERIALCOMPONENT_NAME', 'Fresh Matter (FM)')
     )[0].pk
 
 
 class MaterialComponentGroupManager(models.Manager):
     def default(self):
-        return self.get_queryset().get(name='Total Material', owner=get_default_owner())
+        return self.get_queryset().get(name='Total Material')
 
 
 class MaterialComponentGroup(NamedUserObjectModel):
@@ -108,7 +106,6 @@ class MaterialComponentGroup(NamedUserObjectModel):
 
 def get_default_group():
     return MaterialComponentGroup.objects.get_or_create(
-        owner=get_default_owner(),
         name=getattr(settings, 'DEFAULT_MATERIALCOMPONENTGROUP_NAME', 'Total Material')
     )[0]
 

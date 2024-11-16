@@ -7,9 +7,8 @@ from factory.django import mute_signals
 
 from bibliography.models import Source
 from distributions.models import Timestep
-from users.models import get_default_owner
-from ..models import Composition, Material, MaterialComponent, MaterialComponentGroup, MaterialProperty, \
-    MaterialPropertyValue, Sample, SampleSeries, WeightShare
+from ..models import (Composition, Material, MaterialComponent, MaterialComponentGroup, MaterialProperty,
+                      MaterialPropertyValue, Sample, SampleSeries, WeightShare)
 from ..serializers import (CompositionDoughnutChartSerializer, CompositionModelSerializer,
                            MaterialPropertyValueModelSerializer, SampleModelSerializer, SampleSeriesModelSerializer,
                            WeightShareModelSerializer)
@@ -19,14 +18,11 @@ class MaterialPropertySerializerTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
         prop = MaterialProperty.objects.create(
-            owner=owner,
             name='Test Property',
             unit='Test Unit'
         )
         MaterialPropertyValue.objects.create(
-            owner=owner,
             property=prop,
             average=123.321,
             standard_deviation=0.1337
@@ -50,9 +46,8 @@ class SampleSeriesModelSerializerTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        material = Material.objects.create(owner=owner, name='Test Material')
-        series = SampleSeries.objects.create(owner=owner, name='Test Series', material=material)
+        material = Material.objects.create(name='Test Material')
+        SampleSeries.objects.create(name='Test Series', material=material)
 
     def setUp(self):
         self.series = SampleSeries.objects.get(name='Test Series')
@@ -68,13 +63,12 @@ class SampleSerializerTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        material = Material.objects.create(owner=owner, name='Test Material')
-        series = SampleSeries.objects.create(owner=owner, name='Test Series', material=material)
-        sample = Sample.objects.create(owner=owner, name='Test Sample', series=series,
+        material = Material.objects.create(name='Test Material')
+        series = SampleSeries.objects.create(name='Test Series', material=material)
+        sample = Sample.objects.create(name='Test Sample', series=series,
                                        timestep=Timestep.objects.default())
         with mute_signals(post_save):
-            source = Source.objects.create(owner=owner, title='Test Source')
+            source = Source.objects.create(title='Test Source')
         sample.sources.add(source)
 
     def setUp(self):
@@ -103,18 +97,15 @@ class CompositionSerializerTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        material = Material.objects.create(owner=owner, name='Test Material')
-        series = SampleSeries.objects.create(owner=owner, name='Test Series', material=material)
+        material = Material.objects.create(name='Test Material')
+        series = SampleSeries.objects.create(name='Test Series', material=material)
         sample = Sample.objects.create(
-            owner=owner,
             name='Test Sample',
             series=series,
             timestep=Timestep.objects.default()
         )
-        group = MaterialComponentGroup.objects.create(owner=owner, name='Test Group')
+        group = MaterialComponentGroup.objects.create(name='Test Group')
         composition = Composition.objects.create(
-            owner=owner,
             group=group,
             sample=sample,
             fractions_of=MaterialComponent.objects.default()
@@ -142,25 +133,21 @@ class WeightShareModelSerializerTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        material = Material.objects.create(owner=owner, name='Test Material')
-        series = SampleSeries.objects.create(owner=owner, name='Test Series', material=material)
+        material = Material.objects.create(name='Test Material')
+        series = SampleSeries.objects.create(name='Test Series', material=material)
         sample = Sample.objects.create(
-            owner=owner,
             name='Test Sample',
             series=series,
             timestep=Timestep.objects.default()
         )
-        group = MaterialComponentGroup.objects.create(owner=owner, name='Test Group')
+        group = MaterialComponentGroup.objects.create(name='Test Group')
         composition = Composition.objects.create(
-            owner=owner,
             name='Test Composition',
             group=group,
             sample=sample,
             fractions_of=MaterialComponent.objects.default()
         )
         WeightShare.objects.create(
-            owner=owner,
             component=MaterialComponent.objects.default(),
             composition=composition,
             average=0.9,
@@ -182,19 +169,17 @@ class CompositionDoughnutChartSerializerTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        material = Material.objects.create(owner=owner, name='Test Material')
-        series = SampleSeries.objects.create(owner=owner, name='Test Series', material=material)
-        sample = Sample.objects.create(owner=owner, name='Test Sample', series=series)
-        group = MaterialComponentGroup.objects.create(owner=owner, name='Test Group')
+        material = Material.objects.create(name='Test Material')
+        series = SampleSeries.objects.create(name='Test Series', material=material)
+        sample = Sample.objects.create(name='Test Sample', series=series)
+        group = MaterialComponentGroup.objects.create(name='Test Group')
         composition = Composition.objects.create(
-            owner=owner,
             sample=sample,
             group=group,
             fractions_of=MaterialComponent.objects.default()
         )
-        component1 = MaterialComponent.objects.create(owner=owner, name='Test Component 1')
-        component2 = MaterialComponent.objects.create(owner=owner, name='Test Component 2')
+        component1 = MaterialComponent.objects.create(name='Test Component 1')
+        component2 = MaterialComponent.objects.create(name='Test Component 2')
         composition.add_component(MaterialComponent.objects.other(), average=0.7, standard_deviation=0.1337)
         composition.add_component(component1, average=0.1, standard_deviation=0.1337)
         composition.add_component(component2, average=0.2, standard_deviation=0.1337)

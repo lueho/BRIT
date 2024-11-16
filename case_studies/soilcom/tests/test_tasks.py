@@ -1,21 +1,20 @@
 from collections import namedtuple
 
 from celery import chord
-from django.contrib.auth.models import User, Permission
+from django.contrib.auth.models import Permission, User
 from django.db.models import signals
 from django.http.request import MultiValueDict, QueryDict
 from django.test import TestCase
 from factory.django import mute_signals
-from mock import patch, Mock
+from mock import Mock, patch
 
 from maps.models import Region
-from users.models import get_default_owner
-from ..models import (Collection, CollectionCatchment, CollectionSystem, CollectionFrequency, Collector,
+from ..models import (Collection, CollectionCatchment, CollectionFrequency, CollectionSystem, Collector,
                       MaterialCategory, WasteCategory, WasteComponent, WasteFlyer, WasteStream)
 from ..renderers import CollectionXLSXRenderer
 from ..serializers import CollectionFlatSerializer
-from ..tasks import (export_collections_to_file, check_wasteflyer_urls, check_wasteflyer_url,
-                     check_wasteflyer_urls_callback)
+from ..tasks import (check_wasteflyer_url, check_wasteflyer_urls, check_wasteflyer_urls_callback,
+                     export_collections_to_file)
 
 
 @patch('utils.file_export.storages.write_file_for_download')
@@ -23,37 +22,33 @@ class ExportCollectionToFileTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
         User.objects.create(username='outsider')
         member = User.objects.create(username='member')
         member.user_permissions.add(Permission.objects.get(codename='add_collection'))
 
-        MaterialCategory.objects.create(owner=owner, name='Biowaste component')
-        material1 = WasteComponent.objects.create(owner=owner, name='Test material 1')
-        material2 = WasteComponent.objects.create(owner=owner, name='Test material 2')
+        MaterialCategory.objects.create(name='Biowaste component')
+        material1 = WasteComponent.objects.create(name='Test material 1')
+        material2 = WasteComponent.objects.create(name='Test material 2')
         waste_stream = WasteStream.objects.create(
-            owner=owner,
             name='Test waste stream',
-            category=WasteCategory.objects.create(owner=owner, name='Test category'),
+            category=WasteCategory.objects.create(name='Test category'),
         )
         waste_stream.allowed_materials.add(material1)
         waste_stream.allowed_materials.add(material2)
         with mute_signals(signals.post_save):
             waste_flyer = WasteFlyer.objects.create(
-                owner=owner,
                 abbreviation='WasteFlyer123',
                 url='https://www.test-flyer.org'
             )
-        frequency = CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
-        region = Region.objects.create(owner=owner, name='Test Region')
-        catchment = CollectionCatchment.objects.create(owner=owner, name='Test catchment', region=region)
+        frequency = CollectionFrequency.objects.create(name='Test Frequency')
+        region = Region.objects.create(name='Test Region')
+        catchment = CollectionCatchment.objects.create(name='Test catchment', region=region)
         for i in range(1, 3):
             collection = Collection.objects.create(
-                owner=owner,
                 name=f'collection{i}',
                 catchment=catchment,
-                collector=Collector.objects.create(owner=owner, name=f'collector{i}'),
-                collection_system=CollectionSystem.objects.create(owner=owner, name='Test system'),
+                collector=Collector.objects.create(name=f'collector{i}'),
+                collection_system=CollectionSystem.objects.create(name='Test system'),
                 waste_stream=waste_stream,
                 frequency=frequency,
                 description='This is a test case.'
@@ -91,11 +86,9 @@ class CheckWasteFlyerUrlsTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
         with mute_signals(signals.post_save):
             for i in range(1, 5):
                 WasteFlyer.objects.create(
-                    owner=owner,
                     title=f'Waste flyer {i}',
                     abbreviation=f'WF{i}',
                     url_valid=i % 2 == 0

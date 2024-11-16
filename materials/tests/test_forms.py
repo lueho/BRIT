@@ -7,38 +7,24 @@ from django.test import TestCase
 from distributions.models import Timestep
 from ..forms import AddComponentModalForm, AddCompositionModalForm, WeightShareInlineFormset, WeightShareModelForm
 from ..models import (Composition, Material, MaterialComponent, MaterialComponentGroup, Sample, SampleSeries,
-                      WeightShare, get_default_owner)
+                      WeightShare)
 
 
 class AddComponentGroupModalModelFormTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        material = Material.objects.create(
-            owner=owner,
-            name='Test Material'
-        )
-        MaterialComponentGroup.objects.create(
-            owner=owner,
-            name='Test Group 1'
-        )
-        MaterialComponentGroup.objects.create(
-            owner=owner,
-            name='Test Group 2'
-        )
+        Material.objects.create(name='Test Material')
+        MaterialComponentGroup.objects.create(name='Test Group 1')
+        MaterialComponentGroup.objects.create(name='Test Group 2')
 
     def setUp(self):
-        self.owner = get_default_owner()
         self.material = Material.objects.get(name='Test Material')
         self.group1 = MaterialComponentGroup.objects.get(name='Test Group 1')
         self.group2 = MaterialComponentGroup.objects.get(name='Test Group 2')
 
     def test_initial_group_queryset_has_only_unused_groups(self):
-        sample_series = SampleSeries.objects.create(
-            owner=self.owner,
-            material=self.material
-        )
+        sample_series = SampleSeries.objects.create(material=self.material)
         sample_series.add_component_group(self.group1)
         form = AddCompositionModalForm(instance=sample_series)
         self.assertQuerySetEqual(
@@ -47,10 +33,7 @@ class AddComponentGroupModalModelFormTestCase(TestCase):
         )
 
     def test_initial_fractions_of_queryset_has_only_used_components(self):
-        sample_series = SampleSeries.objects.create(
-            owner=self.owner,
-            material=self.material
-        )
+        sample_series = SampleSeries.objects.create(material=self.material)
         form = AddCompositionModalForm(instance=sample_series)
         self.assertQuerySetEqual(
             form.fields['fractions_of'].queryset.order_by('id'),
@@ -62,44 +45,29 @@ class AddComponentModalModelFormTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        material = Material.objects.create(
-            owner=owner,
-            name='Test Material'
-        )
+        material = Material.objects.create(name='Test Material')
         sample_series = SampleSeries.objects.create(
-            owner=owner,
             material=material,
             name='Test Series',
         )
         sample = Sample.objects.get(
-            owner=owner,
             series=sample_series,
             timestep=Timestep.objects.default()
         )
         component_group = MaterialComponentGroup.objects.create(
-            owner=owner,
             name='Test Group'
         )
         Composition.objects.create(
-            owner=owner,
             sample=sample,
             group=component_group,
             fractions_of=MaterialComponent.objects.default()
         )
 
-        MaterialComponent.objects.create(
-            owner=owner,
-            name='Test Component 1'
-        )
+        MaterialComponent.objects.create(name='Test Component 1')
 
-        MaterialComponent.objects.create(
-            owner=owner,
-            name='Test Component 2'
-        )
+        MaterialComponent.objects.create(name='Test Component 2')
 
     def setUp(self):
-        self.owner = get_default_owner()
         self.component_group = MaterialComponentGroup.objects.get(name='Test Group')
         self.sample = Sample.objects.get(series__name='Test Series', timestep=Timestep.objects.default())
         self.composition = Composition.objects.get(sample=self.sample, group=self.component_group)
@@ -175,13 +143,8 @@ class CompositionUpdateFormTestCase(TestCase):
         self.owner = User.objects.get(username='owner')
         self.outsider = User.objects.get(username='outsider')
         self.member = User.objects.get(username='member')
-        self.composition = Composition.objects.get(
-            group__name='Test Group'
-        )
-        self.material = Material.objects.get(
-            owner=self.owner,
-            name='Test Material'
-        )
+        self.composition = Composition.objects.get(group__name='Test Group')
+        self.material = Material.objects.get(name='Test Material')
 
     def test_initial_values_are_displayed_as_percentages(self):
         """

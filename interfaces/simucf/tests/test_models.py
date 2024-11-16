@@ -3,9 +3,8 @@ from decimal import Decimal
 from django.core.exceptions import ImproperlyConfigured
 from django.test import TestCase
 
-from materials.models import Composition, Material, MaterialComponent, MaterialComponentGroup, Sample, SampleSeries, \
-    WeightShare
-from users.models import get_default_owner
+from materials.models import (Composition, Material, MaterialComponent, MaterialComponentGroup, Sample, SampleSeries,
+                              WeightShare)
 from ..models import InputMaterial
 
 
@@ -13,24 +12,26 @@ class InputMaterialManagerTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        material = Material.objects.create(owner=owner, name='Test Material')
-        series = SampleSeries.objects.create(owner=owner, name='Test Series', material=material)
-        suitable_sample = Sample.objects.create(owner=owner, name='Suitable Sample', series=series)
-        Sample.objects.create(owner=owner, name='Unsuitable Sample', series=series)
-        unsuitable_sample = Sample.objects.create(owner=owner, name='Unsuitable Sample', series=series)
-        group = MaterialComponentGroup.objects.create(owner=owner, name='Biochemical Composition')
-        Composition.objects.create(owner=owner, group=group, sample=unsuitable_sample)
-        composition = Composition.objects.create(owner=owner, group=group, sample=suitable_sample)
+        material = Material.objects.create(name='Test Material')
+        series = SampleSeries.objects.create(name='Test Series', material=material)
+        suitable_sample = Sample.objects.create(name='Suitable Sample', series=series)
+        Sample.objects.create(name='Unsuitable Sample', series=series)
+        unsuitable_sample = Sample.objects.create(name='Unsuitable Sample', series=series)
+        group = MaterialComponentGroup.objects.create(name='Biochemical Composition')
+        Composition.objects.create(group=group, sample=unsuitable_sample)
+        composition = Composition.objects.create(group=group, sample=suitable_sample)
         component_names = [
             'Carbohydrates', 'Amino Acids', 'Starches', 'Hemicellulose', 'Fats',
             'Waxes', 'Proteins', 'Cellulose', 'Lignin'
         ]
         for name in component_names:
-            component = MaterialComponent.objects.create(owner=owner, name=name)
+            component = MaterialComponent.objects.create(name=name)
             WeightShare.objects.create(
-                owner=owner, name=name, composition=composition,
-                component=component, average=0.7)
+                name=name,
+                composition=composition,
+                component=component,
+                average=0.7
+            )
 
     def test_filter_returns_only_suitable_samples(self):
         qs = InputMaterial.objects.all().order_by('name')
@@ -41,21 +42,23 @@ class InputMaterialTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        material = Material.objects.create(owner=owner, name='Test Material')
-        series = SampleSeries.objects.create(owner=owner, name='Test Series', material=material)
-        sample = Sample.objects.create(owner=owner, name='Test Sample', series=series)
-        group = MaterialComponentGroup.objects.create(owner=owner, name='Biochemical Composition')
-        composition = Composition.objects.create(owner=owner, group=group, sample=sample)
+        material = Material.objects.create(name='Test Material')
+        series = SampleSeries.objects.create(name='Test Series', material=material)
+        sample = Sample.objects.create(name='Test Sample', series=series)
+        group = MaterialComponentGroup.objects.create(name='Biochemical Composition')
+        composition = Composition.objects.create(group=group, sample=sample)
         component_names = [
             'Carbohydrates', 'Amino Acids', 'Starches', 'Hemicellulose', 'Fats',
             'Waxes', 'Proteins', 'Cellulose', 'Lignin'
         ]
         for name in component_names:
-            component = MaterialComponent.objects.create(owner=owner, name=name)
+            component = MaterialComponent.objects.create(name=name)
             WeightShare.objects.create(
-                owner=owner, name=name, composition=composition,
-                component=component, average=0.7)
+                name=name,
+                composition=composition,
+                component=component,
+                average=0.7
+            )
 
     def setUp(self):
         self.input = InputMaterial.objects.get(name='Test Sample')

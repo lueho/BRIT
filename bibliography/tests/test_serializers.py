@@ -6,10 +6,9 @@ from django.test import RequestFactory, TestCase
 from django.urls import reverse
 from factory.django import mute_signals
 
-from users.models import get_default_owner
 from ..models import Author, Licence, Source
-from ..serializers import (AuthorModelSerializer, HyperlinkedAuthorSerializer, HyperlinkedSourceSerializer,
-                           HyperlinkedLicenceSerializer, SourceAbbreviationSerializer, SourceModelSerializer)
+from ..serializers import (AuthorModelSerializer, HyperlinkedAuthorSerializer, HyperlinkedLicenceSerializer,
+                           HyperlinkedSourceSerializer, SourceAbbreviationSerializer, SourceModelSerializer)
 
 
 class SourceSerializerTest(TestCase):
@@ -122,8 +121,7 @@ class HyperlinkedLicenceSerializerTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        cls.licence = Licence.objects.create(owner=owner, name='Test Licence', reference_url='https://www.licence.com')
+        cls.licence = Licence.objects.create(name='Test Licence', reference_url='https://www.licence.com')
 
     def test_data_rep(self):
         request = RequestFactory().get(reverse('licence-detail', kwargs={'pk': self.licence.pk}))
@@ -139,8 +137,7 @@ class HyperlinkedAuthorSerializerTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        cls.author = Author.objects.create(owner=owner, first_names='Test', last_names='author')
+        cls.author = Author.objects.create(first_names='Test', last_names='author')
 
     def test_data_rep(self):
         request = RequestFactory().get(reverse('author-detail', kwargs={'pk': self.author.pk}))
@@ -159,13 +156,11 @@ class HyperlinkedSourceSerializerTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         cls.maxDiff = None
-        owner = get_default_owner()
-        cls.author1 = Author.objects.create(owner=owner, first_names='One', last_names='Test Author')
-        cls.author2 = Author.objects.create(owner=owner, first_names='Two', last_names='Test Author')
-        licence = Licence.objects.create(owner=owner, name='Test Licence', reference_url='https://www.licence.com')
+        cls.author1 = Author.objects.create(first_names='One', last_names='Test Author')
+        cls.author2 = Author.objects.create(first_names='Two', last_names='Test Author')
+        licence = Licence.objects.create(name='Test Licence', reference_url='https://www.licence.com')
         with mute_signals(post_save):
             source = Source.objects.create(
-                owner=owner,
                 type='custom',
                 title='Test Source',
                 abbreviation='TS1',
@@ -228,9 +223,8 @@ class SourceAbbreviationSerializerTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
         with mute_signals(post_save):
-            Source.objects.create(owner=owner, title='Test Source', abbreviation='(TS, 1955)')
+            Source.objects.create(title='Test Source', abbreviation='(TS, 1955)')
 
     def setUp(self):
         self.source = Source.objects.get(title='Test Source')

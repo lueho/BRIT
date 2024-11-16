@@ -1,9 +1,8 @@
 from django.db.models.signals import post_save
-from django.test import TestCase, RequestFactory
+from django.test import RequestFactory, TestCase
 from django.urls import reverse
 from factory.django import mute_signals
 
-from users.models import get_default_owner
 from ..filters import SourceFilter
 from ..models import Author, Licence, Source
 
@@ -14,13 +13,11 @@ class SourceFilterTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        cls.author1 = Author.objects.create(owner=owner, first_names='One', last_names='Test Author')
-        author2 = Author.objects.create(owner=owner, first_names='Two', last_names='Test Author')
-        licence = Licence.objects.create(owner=owner, name='Test Licence', reference_url='https://www.test-licence.org')
+        cls.author1 = Author.objects.create(first_names='One', last_names='Test Author')
+        author2 = Author.objects.create(first_names='Two', last_names='Test Author')
+        licence = Licence.objects.create(name='Test Licence', reference_url='https://www.test-licence.org')
         with mute_signals(post_save):
             cls.source = Source.objects.create(
-                owner=owner,
                 type='custom',
                 title='Test Custom Source',
                 abbreviation='TS1',
@@ -30,7 +27,6 @@ class SourceFilterTestCase(TestCase):
         cls.source.authors.add(author2)
         with mute_signals(post_save):
             source = Source.objects.create(
-                owner=owner,
                 type='book',
                 title='Test Book',
                 abbreviation='TS2',

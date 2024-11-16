@@ -6,9 +6,7 @@ from django.dispatch import receiver
 from django.urls import reverse
 
 from distributions.models import TemporalDistribution, Timestep
-from materials.models import Material, SampleSeries, MaterialComponent, MaterialComponentGroup, \
-    Composition
-from users.models import get_default_owner
+from materials.models import (Composition, Material, MaterialComponent, MaterialComponentGroup, SampleSeries)
 from utils.models import NamedUserObjectModel
 
 
@@ -265,12 +263,11 @@ class BaseObjectManager(models.Manager):
     DISTRIBUTION = 'Months of the year'
 
     def initialize(self):
-        owner = get_default_owner()
-        distribution, created = TemporalDistribution.objects.get_or_create(name=self.DISTRIBUTION, owner=owner)
+        distribution, created = TemporalDistribution.objects.get_or_create(name=self.DISTRIBUTION)
         if created:
             months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
             for month in months:
-                Timestep.objects.create(owner=owner, name=month, distribution=distribution)
+                Timestep.objects.create(name=month, distribution=distribution)
 
         return super().create(
             reference_distribution=distribution,

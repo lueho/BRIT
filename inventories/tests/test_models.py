@@ -1,7 +1,6 @@
 from django.test import TestCase
 
 from maps.models import Region
-from users.models import get_default_owner
 from ..models import GeoDataset, InventoryAlgorithm, Material, Scenario
 
 
@@ -9,13 +8,12 @@ class ScenarioTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        feedstock1 = Material.objects.create(owner=owner, name='Feedstock 1')
-        Material.objects.create(owner=owner, name='Feedstock 2')
-        region = Region.objects.create(owner=owner, name='Test Region')
-        Scenario.objects.create(owner=owner, name='Test Scenario', region=region)
+        feedstock1 = Material.objects.create(name='Feedstock 1')
+        Material.objects.create(name='Feedstock 2')
+        region = Region.objects.create(name='Test Region')
+        Scenario.objects.create(name='Test Scenario', region=region)
 
-        geodataset = GeoDataset.objects.create(owner=owner, name='Test Dataset', region=region)
+        geodataset = GeoDataset.objects.create(name='Test Dataset', region=region)
         algorithm = InventoryAlgorithm.objects.create(
             name='Test Algorithm',
             geodataset=geodataset
@@ -23,7 +21,6 @@ class ScenarioTestCase(TestCase):
         algorithm.feedstocks.add(feedstock1)
 
     def setUp(self):
-        self.owner = get_default_owner()
         self.scenario = Scenario.objects.get(name='Test Scenario')
 
     def test_available_geodatasets_with_single_feedstock(self):

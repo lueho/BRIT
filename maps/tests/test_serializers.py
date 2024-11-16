@@ -2,8 +2,7 @@ import datetime
 
 from django.test import TestCase, modify_settings
 
-from users.models import get_default_owner
-from ..models import NutsRegion, Attribute, RegionAttributeValue, RegionAttributeTextValue
+from ..models import Attribute, NutsRegion, RegionAttributeTextValue, RegionAttributeValue
 from ..serializers import NutsRegionSummarySerializer
 
 
@@ -12,32 +11,27 @@ class NutsRegionSummarySerializerTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
-        attribute = Attribute.objects.create(owner=owner, name='Population density', unit='1/km²')
+        attribute = Attribute.objects.create(name='Population density', unit='1/km²')
         region = NutsRegion.objects.create(
-            owner=owner,
             nuts_id='TE57',
             name_latn='Test NUTS'
         )
         RegionAttributeValue.objects.create(
-            owner=owner,
             attribute=attribute,
             region=region,
             value=123.321,
             date=datetime.date(2018, 1, 1)
         )
         RegionAttributeValue.objects.create(
-            owner=owner,
             attribute=attribute,
             region=region,
             value=123.321,
             date=datetime.date(2019, 1, 1)
         )
-        Attribute.objects.get_or_create(owner=owner, name='Urban rural remoteness', unit='')
-        Attribute.objects.create(owner=owner, name='Population', unit='')
+        Attribute.objects.get_or_create(name='Urban rural remoteness', unit='')
+        Attribute.objects.create(name='Population', unit='')
 
     def setUp(self):
-        self.owner = get_default_owner()
         self.region = NutsRegion.objects.get(nuts_id='TE57')
         self.urban_rural_remoteness = Attribute.objects.get(name='Urban rural remoteness')
 
@@ -48,7 +42,6 @@ class NutsRegionSummarySerializerTestCase(TestCase):
 
     def test_population_method_field_returns_value_as_integer(self):
         RegionAttributeValue.objects.create(
-            owner=self.owner,
             attribute=Attribute.objects.get(name='Population'),
             region=self.region,
             value=123321,
@@ -75,7 +68,6 @@ class NutsRegionSummarySerializerTestCase(TestCase):
 
     def test_urban_rural_remoteness_method_field_returns_existing_values(self):
         RegionAttributeTextValue.objects.create(
-            owner=self.owner,
             attribute=self.urban_rural_remoteness,
             region=self.region,
             value='intermediate, close to a city',

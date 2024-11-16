@@ -4,12 +4,11 @@ from django.db import models
 from django.test import TestCase
 from factory.django import mute_signals
 
-from maps.models import Attribute, RegionAttributeValue, NutsRegion, LauRegion
+from maps.models import Attribute, LauRegion, NutsRegion, RegionAttributeValue
 from materials.models import MaterialCategory
-from users.models import get_default_owner
 from ..models import (Collection, CollectionCatchment, CollectionFrequency, CollectionSystem, Collector, FeeSystem,
                       WasteCategory, WasteComponent, WasteFlyer, WasteStream)
-from ..serializers import CollectionModelSerializer, CollectionFlatSerializer
+from ..serializers import CollectionFlatSerializer, CollectionModelSerializer
 
 
 class CollectionModelSerializerTestCase(TestCase):
@@ -82,8 +81,6 @@ class CollectionFlatSerializerTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.owner = get_default_owner()
-
         MaterialCategory.objects.create(name='Biowaste component')
         cls.allowed_material_1 = WasteComponent.objects.create(name='Allowed Material 1')
         cls.allowed_material_2 = WasteComponent.objects.create(name='Allowed Material 2')

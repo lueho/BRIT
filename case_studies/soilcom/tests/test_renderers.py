@@ -1,20 +1,18 @@
 import codecs
 import csv
 from datetime import date
-from factory.django import mute_signals
 from io import BytesIO
-from openpyxl import load_workbook
 
-from django.contrib.auth.models import User, Permission
+from django.contrib.auth.models import Permission, User
 from django.db.models import signals
 from django.test import TestCase
+from factory.django import mute_signals
+from openpyxl import load_workbook
 
 from maps.models import NutsRegion
 from materials.models import MaterialCategory
-from users.models import get_default_owner
-
-from ..models import (Collection, CollectionCatchment, Collector, CollectionSystem, FeeSystem, WasteCategory,
-                      WasteComponent, WasteFlyer, WasteStream, CollectionFrequency)
+from ..models import (Collection, CollectionCatchment, CollectionFrequency, CollectionSystem, Collector, FeeSystem,
+                      WasteCategory, WasteComponent, WasteFlyer, WasteStream)
 from ..renderers import CollectionCSVRenderer, CollectionXLSXRenderer
 from ..serializers import CollectionFlatSerializer
 
@@ -23,7 +21,6 @@ class CollectionCSVRendererTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
         MaterialCategory.objects.create(name='Biowaste component')
         cls.allowed_material_1 = WasteComponent.objects.create(name='Allowed Material 1')
         cls.allowed_material_2 = WasteComponent.objects.create(name='Allowed Material 2')
@@ -39,19 +36,18 @@ class CollectionCSVRendererTestCase(TestCase):
         waste_stream.forbidden_materials.add(cls.forbidden_material_2)
         with mute_signals(signals.post_save):
             waste_flyer = WasteFlyer.objects.create(
-                owner=owner,
                 abbreviation='WasteFlyer123',
                 url='https://www.test-flyer.org'
             )
-        frequency = CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
-        nuts = NutsRegion.objects.create(owner=owner, name='Test NUTS', nuts_id='DE123', cntr_code='DE')
-        catchment = CollectionCatchment.objects.create(owner=owner, name='Test catchment', region=nuts.region_ptr)
+        frequency = CollectionFrequency.objects.create(name='Test Frequency')
+        nuts = NutsRegion.objects.create(name='Test NUTS', nuts_id='DE123', cntr_code='DE')
+        catchment = CollectionCatchment.objects.create(name='Test catchment', region=nuts.region_ptr)
         for i in range(1, 3):
             collection = Collection.objects.create(
                 name=f'collection{i}',
                 catchment=catchment,
-                collector=Collector.objects.create(owner=owner, name=f'collector{1}'),
-                collection_system=CollectionSystem.objects.create(owner=owner, name='Test system'),
+                collector=Collector.objects.create(name=f'collector{1}'),
+                collection_system=CollectionSystem.objects.create(name='Test system'),
                 waste_stream=waste_stream,
                 fee_system=FeeSystem.objects.create(name='Fixed fee'),
                 frequency=frequency,
@@ -105,7 +101,6 @@ class CollectionXLSXRendererTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = get_default_owner()
         User.objects.create(username='outsider')
         member = User.objects.create(username='member')
         member.user_permissions.add(Permission.objects.get(codename='add_collection'))
@@ -125,20 +120,18 @@ class CollectionXLSXRendererTestCase(TestCase):
         waste_stream.forbidden_materials.add(cls.forbidden_material_2)
         with mute_signals(signals.post_save):
             waste_flyer = WasteFlyer.objects.create(
-                owner=owner,
                 abbreviation='WasteFlyer123',
                 url='https://www.test-flyer.org'
             )
-        frequency = CollectionFrequency.objects.create(owner=owner, name='Test Frequency')
-        nuts = NutsRegion.objects.create(owner=owner, name='Test NUTS', nuts_id='DE123', cntr_code='DE')
-        catchment = CollectionCatchment.objects.create(owner=owner, name='Test catchment', region=nuts.region_ptr)
+        frequency = CollectionFrequency.objects.create(name='Test Frequency')
+        nuts = NutsRegion.objects.create(name='Test NUTS', nuts_id='DE123', cntr_code='DE')
+        catchment = CollectionCatchment.objects.create(name='Test catchment', region=nuts.region_ptr)
         for i in range(1, 3):
             collection = Collection.objects.create(
-                owner=owner,
                 name=f'collection{i}',
                 catchment=catchment,
-                collector=Collector.objects.create(owner=owner, name=f'collector{1}'),
-                collection_system=CollectionSystem.objects.create(owner=owner, name='Test system'),
+                collector=Collector.objects.create(name=f'collector{1}'),
+                collection_system=CollectionSystem.objects.create(name='Test system'),
                 waste_stream=waste_stream,
                 frequency=frequency,
                 description='This is a test case.'

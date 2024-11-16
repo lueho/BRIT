@@ -1,9 +1,8 @@
-from django.contrib.auth.models import User
 from django.contrib.gis.geos import Point
 from django.db.models import QuerySet
 from django.test import TestCase
 
-from maps.models import Location, GeoPolygon
+from maps.models import GeoPolygon, Location
 from ..models import Catchment, LauRegion, NutsRegion, Region
 
 
@@ -121,56 +120,47 @@ class NutsRegionTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        owner = User.objects.create(username='owner', password='very-secure!')
         nuts0 = NutsRegion.objects.create(
-            owner=owner,
             nuts_id='UK',
             levl_code=0,
             name_latn='United Kingdom'
         )
         nuts1 = NutsRegion.objects.create(
-            owner=owner,
             nuts_id='UKH',
             levl_code=1,
             name_latn='East of England',
             parent=nuts0
         )
         nuts2 = NutsRegion.objects.create(
-            owner=owner,
             nuts_id='UKH1',
             levl_code=2,
             name_latn='East Anglia',
             parent=nuts1
         )
         NutsRegion.objects.create(
-            owner=owner,
             nuts_id='UKH2',
             levl_code=2,
             name_latn='Bedfordshire and Hertfordshire',
             parent=nuts1
         )
         NutsRegion.objects.create(
-            owner=owner,
             nuts_id='UKH11',
             levl_code=3,
             name_latn='Peterborough',
             parent=nuts2
         )
         nuts3 = NutsRegion.objects.create(
-            owner=owner,
             nuts_id='UKH14',
             levl_code=3,
             name_latn='Suffolk',
             parent=nuts2
         )
         LauRegion.objects.create(
-            owner=owner,
             lau_id='E07000200',
             lau_name='Babergh',
             nuts_parent=nuts3
         )
         LauRegion.objects.create(
-            owner=owner,
             lau_id='E07000202',
             lau_name='Ipswich',
             nuts_parent=nuts3
