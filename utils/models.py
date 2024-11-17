@@ -84,6 +84,21 @@ def get_default_owner_pk():
     return get_default_owner().pk
 
 
+class GlobalObject(CRUDUrlsMixin, models.Model):
+    """
+    Abstract base model for Global Objects.
+    """
+    name = models.CharField(max_length=255, unique=True)
+    description = models.TextField(blank=True, null=True)
+
+    class Meta:
+        abstract = True
+        ordering = ['name']
+
+    def __str__(self):
+        return self.name
+
+
 STATUS_CHOICES = (
     ('private', 'Private'),
     ('review', 'Under Review'),
