@@ -1,6 +1,6 @@
 from rest_framework.viewsets import ModelViewSet
 
-from .permissions import HasModelPermission
+from .permissions import HasModelPermission, IsStaffOrReadOnly
 
 
 class AutoPermModelViewSet(ModelViewSet):
@@ -61,3 +61,13 @@ class AutoPermModelViewSet(ModelViewSet):
         # This triggers the lazy initialization of permission_required if needed
         _ = self.permission_required
         return super().get_permissions()
+
+
+class GlobalObjectViewSet(ModelViewSet):
+    """
+    Base viewset for Global Objects.
+    Implements read and write permissions.
+    Read: Any user (authenticated or not)
+    Write: Only staff users
+    """
+    permission_classes = [IsStaffOrReadOnly]

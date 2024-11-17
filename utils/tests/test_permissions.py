@@ -1,11 +1,119 @@
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, Mock
 
 from django.contrib.auth.models import User
 from django.core.exceptions import ImproperlyConfigured
-from django.test import TestCase, RequestFactory
+from django.test import RequestFactory, TestCase
+from rest_framework.request import Request
+from rest_framework.test import APIRequestFactory, force_authenticate
 from rest_framework.views import APIView
 
-from ..permissions import HasModelPermission
+from ..permissions import HasModelPermission, IsStaffOrReadOnly
+
+
+class IsStaffOrReadOnlyPermissionTestCase(TestCase):
+    def setUp(self):
+        self.permission = IsStaffOrReadOnly()
+        self.factory = APIRequestFactory()
+
+        self.staff_user = User.objects.create_user(
+            username='staffuser',
+            password='password123',
+            is_staff=True
+        )
+        self.regular_user = User.objects.create_user(
+            username='regularuser',
+            password='password123',
+            is_staff=False
+        )
+
+    def make_request(self, method, user=None, data=None):
+        """
+        Helper method to create a DRF Request object with the specified method and user.
+        """
+        method_lower = method.lower()
+        if method_lower == 'get':
+            request = self.factory.get('/fake-url/', data=data, format='json')
+        elif method_lower == 'post':
+            request = self.factory.post('/fake-url/', data=data, format='json')
+        elif method_lower == 'put':
+            request = self.factory.put('/fake-url/', data=data, format='json')
+        elif method_lower == 'patch':
+            request = self.factory.patch('/fake-url/', data=data, format='json')
+        elif method_lower == 'delete':
+            request = self.factory.delete('/fake-url/')
+        elif method_lower == 'head':
+            request = self.factory.head('/fake-url/')
+        elif method_lower == 'options':
+            request = self.factory.options('/fake-url/')
+        else:
+            raise ValueError(f"Unsupported HTTP method: {method.upper()}")
+
+        if user:
+            force_authenticate(request, user=user)
+
+        # Wrap the request with DRF's Request to add additional attributes
+        return Request(request)
+
+    def test_safe_methods_allow_any(self):
+        """
+        Ensure that safe methods are allowed for any user, authenticated or not.
+        """
+        safe_methods = ['GET', 'HEAD', 'OPTIONS']
+        for method in safe_methods:
+            with self.subTest(method=method):
+                request = self.make_request(method)
+                view = Mock()
+                has_perm = self.permission.has_permission(request, view)
+                self.assertTrue(
+                    has_perm,
+                    f"Safe method {method} should be allowed for any user."
+                )
+
+    def test_write_methods_denied_for_unauthenticated_users(self):
+        """
+        Ensure that write methods are denied for unauthenticated users.
+        """
+        write_methods = ['POST', 'PUT', 'PATCH', 'DELETE']
+        for method in write_methods:
+            with self.subTest(method=method):
+                request = self.make_request(method, data={'name': 'Test'})
+                view = Mock()
+                has_perm = self.permission.has_permission(request, view)
+                self.assertFalse(
+                    has_perm,
+                    f"Write method {method} should be denied for unauthenticated users."
+                )
+
+    def test_write_methods_denied_for_authenticated_non_staff_users(self):
+        """
+        Ensure that write methods are denied for authenticated non-staff users.
+        """
+        write_methods = ['POST', 'PUT', 'PATCH', 'DELETE']
+        for method in write_methods:
+            with self.subTest(method=method):
+                request = self.make_request(method, user=self.regular_user, data={'name': 'Test'})
+                view = Mock()
+                has_perm = self.permission.has_permission(request, view)
+                self.assertFalse(
+                    has_perm,
+                    f"Write method {method} should be denied for non-staff users."
+                )
+
+    def test_write_methods_allowed_for_staff_users(self):
+        """
+        Ensure that write methods are allowed for authenticated staff users.
+        """
+        write_methods = ['POST', 'PUT', 'PATCH', 'DELETE']
+        self.assertTrue(self.staff_user.is_staff)
+        for method in write_methods:
+            with self.subTest(method=method):
+                request = self.make_request(method, user=self.staff_user, data={'name': 'Test'})
+                view = Mock()
+                has_perm = self.permission.has_permission(request, view)
+                self.assertTrue(
+                    has_perm,
+                    f"Write method {method} should be allowed for staff users."
+                )
 
 
 class HasModelPermissionTestCase(TestCase):

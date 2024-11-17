@@ -2,6 +2,19 @@ from django.core.exceptions import ImproperlyConfigured
 from rest_framework import permissions
 
 
+class IsStaffOrReadOnly(permissions.BasePermission):
+    """
+    Custom permission to allow read-only access to anyone,
+    and write access only to staff users.
+    """
+
+    def has_permission(self, request, view):
+        if request.method in permissions.SAFE_METHODS:
+            return True
+
+        return request.user and request.user.is_authenticated and request.user.is_staff
+
+
 class HasModelPermission(permissions.BasePermission):
     """
     A custom permission class that extends the base permission class provided by Django REST Framework.
