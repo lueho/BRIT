@@ -1,13 +1,12 @@
 from django.db import models
 
-from ..models import GlobalObject
 
-
-class TestGlobalObject(GlobalObject):
+class TestGlobalObject(models.Model):
     """
-    Concrete implementation of GlobalObject for testing purposes.
+    Concrete dummy of GlobalObject for testing purposes.
     """
-    pass
+    name = models.CharField(max_length=255, unique=True)
+    description = models.TextField()
 
 
 class DummyModel(models.Model):

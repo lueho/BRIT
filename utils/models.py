@@ -84,7 +84,7 @@ def get_default_owner_pk():
     return get_default_owner().pk
 
 
-class GlobalObject(CRUDUrlsMixin, models.Model):
+class GlobalObject(CRUDUrlsMixin, CommonInfo):
     """
     Abstract base model for Global Objects.
     """

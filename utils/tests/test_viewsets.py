@@ -1,7 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 from django.contrib.auth.models import AnonymousUser, User
-from django.test import TestCase
+from django.test import TestCase, modify_settings
 from rest_framework import serializers, status
 from rest_framework.test import APIRequestFactory
 
@@ -15,6 +15,7 @@ class MockSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'description']
 
 
+@modify_settings(MIDDLEWARE={'remove': 'ambient_toolbox.middleware.current_user.CurrentUserMiddleware'})
 class GlobalObjectViewSetTestCase(TestCase):
     def setUp(self):
         self.factory = APIRequestFactory()
