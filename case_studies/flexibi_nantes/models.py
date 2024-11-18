@@ -7,7 +7,7 @@ from django.urls import reverse
 
 from distributions.models import TemporalDistribution, Timestep
 from materials.models import (Composition, Material, MaterialComponent, MaterialComponentGroup, SampleSeries)
-from utils.models import NamedUserObjectModel
+from utils.models import NamedUserCreatedObject
 
 
 class NantesGreenhouses(models.Model):
@@ -156,7 +156,7 @@ class Greenhouse(models.Model):
         return f'Greenhouse: {h}, {l}, {g}, {s}'
 
 
-class Culture(NamedUserObjectModel):
+class Culture(NamedUserCreatedObject):
     residue = models.ForeignKey(SampleSeries, on_delete=models.PROTECT, null=True)
 
 

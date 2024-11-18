@@ -1,10 +1,10 @@
 from django.conf import settings
 from django.db import models
 
-from ..models import NamedUserObjectModel, get_default_owner
+from ..models import NamedUserCreatedObject, get_default_owner
 
 
-class Unit(NamedUserObjectModel):
+class Unit(NamedUserCreatedObject):
     dimensionless = models.BooleanField(default=False, null=True)
     reference_quantity = models.ForeignKey(
         'Property',
@@ -25,7 +25,7 @@ def get_default_unit_pk():
     )[0].pk
 
 
-class Property(NamedUserObjectModel):
+class Property(NamedUserCreatedObject):
     """
     Defines properties that can be shared among other models. Allows to compare instances of different models that share
     the same properties while enforcing the use of matching units.
@@ -34,7 +34,7 @@ class Property(NamedUserObjectModel):
     allowed_units = models.ManyToManyField(Unit)
 
 
-class PropertyValue(NamedUserObjectModel):
+class PropertyValue(NamedUserCreatedObject):
     """
     Serves to link any abstract property definition (see "Property" class) to a concrete instance
     of any other model with a concrete value. Intended to be related to other models through many-to-many relations.

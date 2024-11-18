@@ -11,14 +11,14 @@ from factory.django import mute_signals
 from bibliography.models import Source
 from distributions.models import TemporalDistribution, Timestep
 from users.models import get_default_owner
-from utils.models import NamedUserObjectModel
+from utils.models import NamedUserCreatedObject
 
 
-class MaterialCategory(NamedUserObjectModel):
+class MaterialCategory(NamedUserCreatedObject):
     pass
 
 
-class BaseMaterial(NamedUserObjectModel):
+class BaseMaterial(NamedUserCreatedObject):
     """
     Base for all specialized models of material
     """
@@ -91,7 +91,7 @@ class MaterialComponentGroupManager(models.Manager):
         return self.get_queryset().get(name='Total Material')
 
 
-class MaterialComponentGroup(NamedUserObjectModel):
+class MaterialComponentGroup(NamedUserCreatedObject):
     """
     Definition of a group of components that belong together to form a composition which can be described with
     weight fractions. E.g. Macro component, chemical elements, etc. The actual composition is described in its own
@@ -110,7 +110,7 @@ def get_default_group():
     )[0]
 
 
-class SampleSeries(NamedUserObjectModel):
+class SampleSeries(NamedUserCreatedObject):
     """
     Sample series are used to add concrete experimental data to the abstract semantic definition of materials. A sample
     series consists of several samples that are taken from a comparable source at different times. That way a temporal
@@ -250,14 +250,14 @@ def add_default_temporal_distribution(sender, instance, created, **kwargs):
         instance.add_temporal_distribution(TemporalDistribution.objects.default())
 
 
-class MaterialProperty(NamedUserObjectModel):
+class MaterialProperty(NamedUserCreatedObject):
     unit = models.CharField(max_length=63)
 
     def __str__(self):
         return f'{self.name} [{self.unit}]'
 
 
-class MaterialPropertyValue(NamedUserObjectModel):
+class MaterialPropertyValue(NamedUserCreatedObject):
     property = models.ForeignKey(MaterialProperty, on_delete=models.PROTECT)
     average = models.FloatField()
     standard_deviation = models.FloatField()
@@ -273,7 +273,7 @@ class MaterialPropertyValue(NamedUserObjectModel):
         return duplicate
 
 
-class Sample(NamedUserObjectModel):
+class Sample(NamedUserCreatedObject):
     """
     Representation of a single sample that was taken at a specific location and time. Equivalent samples are associated
     with a SampleSeries to temporal distribution of properties and composition.
@@ -316,7 +316,7 @@ def add_default_composition(sender, instance, created, **kwargs):
         composition.add_component(MaterialComponent.objects.default())
 
 
-class Composition(NamedUserObjectModel):
+class Composition(NamedUserCreatedObject):
     """
     Utility model to store the settings for component groups for each material in each customization. This model is not
     supposed to be edited directly by a user. It depends on user objects and must be deleted, when any of the user
@@ -446,7 +446,7 @@ def add_next_order_value(sender, instance, created, **kwargs):
         instance.save()
 
 
-class WeightShare(NamedUserObjectModel):
+class WeightShare(NamedUserCreatedObject):
     """
     Holds the actual values of weight fractions that are part of any material composition. This model is not edited
     directly to maintain consistency within compositions. Use API of Composition instead.

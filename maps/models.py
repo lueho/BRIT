@@ -10,7 +10,7 @@ from tree_queries.models import TreeNode
 from tree_queries.query import TreeQuerySet
 
 from bibliography.models import Source
-from utils.models import NamedUserObjectModel, OwnedObjectQuerySet
+from utils.models import NamedUserCreatedObject, UserCreatedObjectQuerySet
 
 TYPES = (
     ('administrative', 'administrative'),
@@ -272,7 +272,7 @@ class ModelMapConfiguration(models.Model):
         ordering = ['model_name']
 
 
-class Location(NamedUserObjectModel):
+class Location(NamedUserCreatedObject):
     geom = PointField(null=True)
     address = models.CharField(max_length=255, null=True, blank=True)
 
@@ -288,7 +288,7 @@ class GeoPolygon(models.Model):
     geom = MultiPolygonField(blank=True, null=True)
 
 
-class Region(NamedUserObjectModel):
+class Region(NamedUserCreatedObject):
     country = models.CharField(max_length=56, null=False)
     borders = models.ForeignKey(GeoPolygon, on_delete=models.PROTECT, null=True)
     composed_of = models.ManyToManyField('self', symmetrical=False, related_name='composing_regions', blank=True)
@@ -374,7 +374,7 @@ class LauRegion(Region):
         return f'{self.lau_name} ({self.lau_id})'
 
 
-class CatchmentQueryset(OwnedObjectQuerySet, TreeQuerySet):
+class CatchmentQueryset(UserCreatedObjectQuerySet, TreeQuerySet):
     pass
 
 
@@ -389,7 +389,7 @@ class CatchmentManager(models.Manager):
         return self.get_queryset().ancestors(*args, **kwargs)
 
 
-class Catchment(NamedUserObjectModel, TreeNode):
+class Catchment(NamedUserCreatedObject, TreeNode):
     parent_region = models.ForeignKey(Region, on_delete=models.CASCADE, related_name='child_catchments', null=True)
     region = models.ForeignKey(Region, on_delete=models.CASCADE, null=True)
     type = models.CharField(max_length=14, choices=TYPES, default='custom')
@@ -417,7 +417,7 @@ def delete_unused_custom_region(sender, instance, **kwargs):
         instance.region.delete()
 
 
-class GeoDataset(NamedUserObjectModel):
+class GeoDataset(NamedUserCreatedObject):
     """
     Holds meta information about datasets from the core module or scenario extensions.
     """
@@ -437,7 +437,7 @@ class GeoDataset(NamedUserObjectModel):
         return reverse(f'{self.model_name}')
 
 
-class Attribute(NamedUserObjectModel):
+class Attribute(NamedUserCreatedObject):
     """
     Defines an attribute class that can be attached to features of a map.
     """
@@ -447,7 +447,7 @@ class Attribute(NamedUserObjectModel):
         return f'{self.name} [{self.unit}]'
 
 
-class RegionAttributeValue(NamedUserObjectModel):
+class RegionAttributeValue(NamedUserCreatedObject):
     """
     Attaches a value of an attribute class to a region
     """
@@ -458,7 +458,7 @@ class RegionAttributeValue(NamedUserObjectModel):
     standard_deviation = models.FloatField(default=0.0, blank=True, null=True)
 
 
-class RegionAttributeTextValue(NamedUserObjectModel):
+class RegionAttributeTextValue(NamedUserCreatedObject):
     """
     Attaches a category value of an attribute class to a region
     """

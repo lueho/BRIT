@@ -2,10 +2,10 @@ from django.contrib.gis.db.models import PointField
 from django.db.models import CharField, ForeignKey, Model, PROTECT
 
 from maps.models import Region
-from utils.models import NamedUserObjectModel
+from utils.models import NamedUserCreatedObject
 
 
-class Showcase(NamedUserObjectModel):
+class Showcase(NamedUserCreatedObject):
     """
     Showcases are used in the CLOSECYCLE project to demonstrate possibilities or Territorial Biorefinery Hubs.
     """
