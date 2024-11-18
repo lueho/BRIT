@@ -106,7 +106,7 @@ STATUS_CHOICES = (
 )
 
 
-class OwnedObjectQuerySet(models.QuerySet):
+class UserCreatedObjectQuerySet(models.QuerySet):
     def published(self):
         return self.filter(publication_status='published')
 
@@ -117,9 +117,9 @@ class OwnedObjectQuerySet(models.QuerySet):
         return self.filter(models.Q(owner=user) | models.Q(publication_status='published'))
 
 
-class OwnedObjectManager(models.Manager):
+class UserCreatedObjectManager(models.Manager):
     def get_queryset(self):
-        return OwnedObjectQuerySet(self.model, using=self._db)
+        return UserCreatedObjectQuerySet(self.model, using=self._db)
 
     def published(self):
         return self.get_queryset().published()
@@ -131,17 +131,17 @@ class OwnedObjectManager(models.Manager):
         return self.get_queryset().accessible_by_user(user)
 
 
-class OwnedObjectModel(CRUDUrlsMixin, CommonInfo):
+class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
     owner = models.ForeignKey(User, on_delete=models.PROTECT, default=get_default_owner_pk)
     publication_status = models.CharField(max_length=10, choices=STATUS_CHOICES, default='private')
 
-    objects = OwnedObjectManager()
+    objects = UserCreatedObjectManager()
 
     class Meta:
         abstract = True
 
 
-class NamedUserObjectModel(OwnedObjectModel):
+class NamedUserCreatedObject(UserCreatedObject):
     name = models.CharField(max_length=255)
     description = models.TextField(blank=True, null=True)
 

@@ -3,10 +3,10 @@ from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-from utils.models import NamedUserObjectModel, CRUDUrlsMixin, OwnedObjectModel
+from utils.models import CRUDUrlsMixin, NamedUserCreatedObject, UserCreatedObject
 
 
-class Author(OwnedObjectModel):
+class Author(UserCreatedObject):
     first_names = models.CharField(max_length=1023, null=True, blank=True)
     middle_names = models.CharField(max_length=1023, null=True, blank=True)  # New field
     last_names = models.CharField(max_length=1023, null=True, blank=True)
@@ -49,7 +49,7 @@ class Author(OwnedObjectModel):
         return name
 
 
-class Licence(NamedUserObjectModel):
+class Licence(NamedUserCreatedObject):
     reference_url = models.URLField(null=True, blank=True)
 
     def __str__(self):
@@ -73,7 +73,7 @@ SOURCE_TYPES = (
 )
 
 
-class Source(OwnedObjectModel):
+class Source(UserCreatedObject):
     type = models.CharField(max_length=255, choices=SOURCE_TYPES, default='custom')
     authors = models.ManyToManyField(Author, related_name='sources')
     publisher = models.CharField(max_length=127, blank=True, null=True)

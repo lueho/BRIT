@@ -14,7 +14,7 @@ from distributions.models import Period, TemporalDistribution, Timestep
 from maps.models import Catchment, GeoPolygon
 from materials.models import Material, MaterialCategory, Sample, SampleSeries
 from users.models import get_default_owner
-from utils.models import NamedUserObjectModel, OwnedObjectModel, OwnedObjectManager
+from utils.models import NamedUserCreatedObject, UserCreatedObject, UserCreatedObjectManager
 from utils.properties.models import PropertyValue
 
 
@@ -39,7 +39,7 @@ class CollectionCatchment(Catchment):
         return qs
 
 
-class Collector(NamedUserObjectModel):
+class Collector(NamedUserCreatedObject):
     website = models.URLField(max_length=511, blank=True, null=True)
     catchment = models.ForeignKey(CollectionCatchment, blank=True, null=True, on_delete=models.CASCADE)
 
@@ -47,7 +47,7 @@ class Collector(NamedUserObjectModel):
         verbose_name = 'Waste Collector'
 
 
-class CollectionSystem(NamedUserObjectModel):
+class CollectionSystem(NamedUserCreatedObject):
     class Meta:
         verbose_name = 'Waste Collection System'
 
@@ -55,13 +55,13 @@ class CollectionSystem(NamedUserObjectModel):
         return self.name
 
 
-class WasteCategory(NamedUserObjectModel):
+class WasteCategory(NamedUserCreatedObject):
     class Meta:
         verbose_name = 'Waste Category'
         verbose_name_plural = 'Waste categories'
 
 
-class WasteComponentManager(OwnedObjectManager):
+class WasteComponentManager(UserCreatedObjectManager):
 
     def get_queryset(self):
         categories = MaterialCategory.objects.filter(name__in=('Biowaste component',))
@@ -216,7 +216,7 @@ class WasteStreamQuerySet(models.query.QuerySet):
         return instance, created
 
 
-class WasteStreamManager(OwnedObjectManager):
+class WasteStreamManager(UserCreatedObjectManager):
 
     def get_queryset(self):
         return WasteStreamQuerySet(self.model, using=self._db)
@@ -228,7 +228,7 @@ class WasteStreamManager(OwnedObjectManager):
         return self.get_queryset().match_forbidden_materials(forbidden_materials)
 
 
-class WasteStream(NamedUserObjectModel):
+class WasteStream(NamedUserCreatedObject):
     """Describes Waste Streams that are collected in Collections. This model is managed automatically by
     the Collection model. Instances of this model must not be created, edited or deleted manually."""
     category = models.ForeignKey(WasteCategory, on_delete=models.PROTECT)
@@ -242,7 +242,7 @@ class WasteStream(NamedUserObjectModel):
         verbose_name = 'Waste Stream'
 
 
-class WasteFlyerManager(OwnedObjectManager):
+class WasteFlyerManager(UserCreatedObjectManager):
 
     def get_queryset(self):
         return super().get_queryset().filter(type='waste_flyer')
@@ -273,7 +273,7 @@ def check_url_valid(sender, instance, created, **kwargs):
         celery.current_app.send_task('check_wasteflyer_url', (instance.pk,))
 
 
-class CollectionSeasonManager(OwnedObjectManager):
+class CollectionSeasonManager(UserCreatedObjectManager):
 
     def get_queryset(self):
         distribution = TemporalDistribution.objects.get(owner=get_default_owner(), name='Months of the year')
@@ -298,7 +298,7 @@ FREQUENCY_TYPES = (
 )
 
 
-class CollectionFrequency(NamedUserObjectModel):
+class CollectionFrequency(NamedUserCreatedObject):
     type = models.CharField(max_length=16, choices=FREQUENCY_TYPES, default='Fixed')
     seasons = models.ManyToManyField(CollectionSeason, through='CollectionCountOptions')
 
@@ -322,7 +322,7 @@ class CollectionFrequency(NamedUserObjectModel):
         return self.collectioncountoptions_set.aggregate(Sum('standard'))['standard__sum']
 
 
-class CollectionCountOptions(OwnedObjectModel):
+class CollectionCountOptions(UserCreatedObject):
     """
     The available options of how many collections  will be provided within a given season. Is used as 'through' model
     for the many-to-many relation of CollectionFrequency and CollectionSeason.
@@ -342,7 +342,7 @@ class CollectionCountOptions(OwnedObjectModel):
 YEAR_VALIDATOR = RegexValidator(r'^([0-9]{4})$', message='Year needs to be in YYYY format.', code='invalid year')
 
 
-class FeeSystem(NamedUserObjectModel):
+class FeeSystem(NamedUserCreatedObject):
     pass
 
 
@@ -358,7 +358,7 @@ class CollectionQuerySet(models.query.QuerySet):
         return self.filter(valid_until__lt=timezone.now().date())
 
 
-class Collection(NamedUserObjectModel):
+class Collection(NamedUserCreatedObject):
     collector = models.ForeignKey(Collector, on_delete=models.CASCADE, blank=True, null=True)
     catchment = models.ForeignKey(CollectionCatchment, on_delete=models.PROTECT, blank=True, null=True,
                                   related_name='collections')
