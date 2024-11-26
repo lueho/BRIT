@@ -1,16 +1,22 @@
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from rest_framework.viewsets import ReadOnlyModelViewSet
 
-from .models import Showcase
-from .serializers import ShowcaseModelSerializer, ShowcaseGeoFeatureModelSerializer, ShowcaseSummaryListSerializer
+from utils.viewsets import AutoPermModelViewSet
+from .models import BiogasPlantsSweden, Showcase
+from .serializers import (BiogasPlantsSwedenSimpleModelSerializer, ShowcaseGeoFeatureModelSerializer,
+                          ShowcaseModelSerializer, ShowcaseSummaryListSerializer)
 
 
-class ShowcaseViewSet(ReadOnlyModelViewSet):
+class ShowcaseViewSet(AutoPermModelViewSet):
     queryset = Showcase.objects.all()
-    filterset_fields = ('id', 'region__country')
     serializer_class = ShowcaseModelSerializer
-    permission_classes = []
+    filterset_fields = ('id', 'region__country')
+    custom_permission_required = {
+        'list': None,
+        'retrieve': None,
+        'geojson': None,
+        'summaries': None,
+    }
 
     @action(detail=False, methods=['get'])
     def geojson(self, request, *args, **kwargs):
@@ -29,7 +35,7 @@ class ShowcaseViewSet(ReadOnlyModelViewSet):
         return Response(serializer.data)
 
     @action(detail=False, methods=['get'])
-    def summary(self, request, *args, **kwargs):
+    def summaries(self, request, *args, **kwargs):
         """
         Custom action to retrieve the summary of a Showcase instance.
 
@@ -43,3 +49,15 @@ class ShowcaseViewSet(ReadOnlyModelViewSet):
         queryset = self.filter_queryset(self.get_queryset())
         serializer = ShowcaseSummaryListSerializer(queryset, many=True, context={'request': request})
         return Response(serializer.data[0])
+
+
+class SwedenBiogasPlantsViewSet(AutoPermModelViewSet):
+    queryset = BiogasPlantsSweden.objects.all()
+    serializer_class = BiogasPlantsSwedenSimpleModelSerializer
+    # filterset_class = BiogasPlantsSwedenFilterSet
+    custom_permission_required = {
+        'list': None,
+        'retrieve': None,
+        'geojson': None,
+        'summaries': None,
+    }

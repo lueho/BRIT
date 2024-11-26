@@ -6,21 +6,16 @@ from dal.autocomplete import Select2QuerySetView
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.db.models import Max
 from django.forms.models import model_to_dict
-from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
+from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse, reverse_lazy
 from django.views import View
 from django.views.generic import TemplateView
-from django_filters import rest_framework as rf_filters
-from rest_framework.generics import GenericAPIView
-from rest_framework.response import Response
-from rest_framework.views import APIView
-from rest_framework.viewsets import ReadOnlyModelViewSet
 
 import case_studies.soilcom.tasks
 from bibliography.views import (SourceCheckUrlView, SourceCreateView, SourceModalCreateView, SourceModalDeleteView,
                                 SourceModalDetailView, SourceModalUpdateView, SourceUpdateView)
 from maps.forms import NutsAndLauCatchmentQueryForm
-from maps.views import CatchmentDetailView, GeoDataSetDetailView, GeoDataSetFormMixin, GeoDataSetMixin
+from maps.views import CatchmentDetailView, GeoDataSetFilteredMapView, GeoDataSetFormMixin, MapMixin
 from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineFormSetMixin
 from utils.views import (BRITFilterView, OwnedObjectCreateView, OwnedObjectDetailView, OwnedObjectListView,
                          OwnedObjectModalCreateView, OwnedObjectModalDeleteView, OwnedObjectModalDetailView,
@@ -38,7 +33,6 @@ from .models import (AggregatedCollectionPropertyValue, Collection, CollectionCa
                      CollectionFrequency,
                      CollectionPropertyValue, CollectionSeason,
                      CollectionSystem, Collector, WasteCategory, WasteComponent, WasteFlyer, WasteStream)
-from .serializers import CollectionFlatSerializer, CollectionModelSerializer, WasteCollectionGeometrySerializer
 from .tasks import check_wasteflyer_urls
 
 
@@ -917,7 +911,7 @@ class CollectionPredecessorsView(OwnedObjectUpdateView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CatchmentSelectView(GeoDataSetFormMixin, GeoDataSetMixin, TemplateView):
+class CatchmentSelectView(GeoDataSetFormMixin, MapMixin, TemplateView):
     template_name = 'waste_collection_catchment_list.html'
     form_class = NutsAndLauCatchmentQueryForm
     region_url = reverse_lazy('data.catchment_region_geometries')
@@ -936,7 +930,7 @@ class CatchmentSelectView(GeoDataSetFormMixin, GeoDataSetMixin, TemplateView):
 
     def get_initial(self):
         initial = {}
-        region_id = self.get_region_id()
+        region_id = self.get_region_feature_id()
         catchment_id = self.request.GET.get('catchment')
         if catchment_id:
             catchment = CollectionCatchment.objects.get(id=catchment_id)
@@ -946,48 +940,20 @@ class CatchmentSelectView(GeoDataSetFormMixin, GeoDataSetMixin, TemplateView):
             initial['region'] = region_id
         return initial
 
-    def get_region_id(self):
+    def get_region_feature_id(self):
         return self.request.GET.get('region')
 
 
-class WasteCollectionMapView(GeoDataSetDetailView):
+class WasteCollectionMapView(GeoDataSetFilteredMapView):
     model_name = 'WasteCollection'
     template_name = 'waste_collection_map.html'
     filterset_class = CollectionFilterSet
+    features_layer_api_basename = 'api-waste-collection'
     map_title = 'Household Waste Collection Europe'
-    load_region = False
-    load_catchment = False
-    load_features = True
-    feature_url = reverse_lazy('collection-geometry-api')
-    apply_filter_to_features = True
-    adjust_bounds_to_features = False
-    feature_summary_url = reverse_lazy('collection-summary-api')
 
 
 # ----------- API ------------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
-
-
-class CollectionGeometryAPI(GenericAPIView):
-    queryset = Collection.objects.select_related('catchment', 'waste_stream__category', 'collection_system')
-    serializer_class = WasteCollectionGeometrySerializer
-    filter_backends = (rf_filters.DjangoFilterBackend,)
-    filterset_class = CollectionFilterSet
-    authentication_classes = []
-    permission_classes = []
-
-    def get(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        serializer = self.get_serializer(queryset, many=True)
-        data = {'geoJson': serializer.data}
-        return JsonResponse(data)
-
-
-class CollectionViewSet(ReadOnlyModelViewSet):
-    queryset = Collection.objects.all()
-    serializer_class = CollectionFlatSerializer
-    filter_backends = (rf_filters.DjangoFilterBackend,)
-    filterset_class = CollectionFilterSet
 
 
 class CollectionListFileExportView(LoginRequiredMixin, View):
@@ -1014,17 +980,3 @@ class CollectionListFileExportProgressView(LoginRequiredMixin, View):
             'details': result.info,
         }
         return HttpResponse(json.dumps(response_data), content_type='application/json')
-
-
-class CollectionSummaryAPI(APIView):
-    authentication_classes = []
-    permission_classes = []
-
-    @staticmethod
-    def get(request):
-        serializer = CollectionModelSerializer(
-            Collection.objects.filter(id=request.query_params.get('id')),
-            many=True,
-            field_labels_as_keys=True,
-            context={'request': request})
-        return Response({'summaries': serializer.data})

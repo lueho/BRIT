@@ -1,16 +1,16 @@
 from dal import autocomplete, forward
 from django_filters import CharFilter, ModelChoiceFilter
 
-from utils.filters import CrispyAutocompleteFilterSet, BaseCrispyFilterSet
-from .models import Catchment, NutsRegion, Region, GeoDataset
+from utils.filters import BaseCrispyFilterSet, CrispyAutocompleteFilterSet
+from .models import Catchment, GeoDataset, NutsRegion, Region
 
 
-class CatchmentFilter(CrispyAutocompleteFilterSet):
+class CatchmentFilterSet(CrispyAutocompleteFilterSet):
     name = CharFilter(lookup_expr='icontains')
 
     class Meta:
         model = Catchment
-        fields = ('name', 'type',)
+        fields = ('id', 'name', 'type',)
 
 
 class RegionFilterSet(CrispyAutocompleteFilterSet):

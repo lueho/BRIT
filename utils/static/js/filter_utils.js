@@ -14,6 +14,7 @@ function lockFilter() {
     const submitButtons = document.querySelectorAll('.submit-filter');
     submitButtons.forEach(btn => {
         btn.value = 'Loading...';
+        btn.textContent = 'Loading...';
         btn.disabled = true;
     });
 }
@@ -26,6 +27,7 @@ function unlockFilter() {
     const submitButtons = document.querySelectorAll('.submit-filter');
     submitButtons.forEach(btn => {
         btn.value = 'Filter';
+        btn.textContent = 'Filter';
         btn.disabled = false;
     });
 }

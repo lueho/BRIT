@@ -1,23 +1,29 @@
 from django.contrib.gis.geos import Point
 from django.urls import reverse
 
-from maps.models import Catchment, GeoDataset, GeoPolygon, Region
-from utils.tests.testcases import ViewSetWithPermissionsTestCase, ViewWithPermissionsTestCase
+from maps.models import (Catchment, GeoDataset, GeoPolygon, MapConfiguration, MapLayerConfiguration, MapLayerStyle,
+                         Region)
+from utils.tests.testcases import ViewWithPermissionsTestCase
 from ..models import HamburgRoadsideTrees
 
 
-class HamburgRoadsideTreesMapViewTestCase(ViewSetWithPermissionsTestCase):
+class HamburgRoadsideTreesMapViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = ['view_geodataset']
     url_name = 'HamburgRoadsideTrees'
 
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
+        style = MapLayerStyle.objects.create(name='default')
+        layer = MapLayerConfiguration.objects.create(name='default', layer_type='features', style=style)
+        map_config = MapConfiguration.objects.create(name='default')
+        map_config.layers.add(layer)
         cls.dataset = GeoDataset.objects.create(
             name='Hamburg Roadside Trees',
             description='Roadside trees in Hamburg',
             model_name='HamburgRoadsideTrees',
-            region=Region.objects.create(name='Hamburg', country='Germany')
+            region=Region.objects.create(name='Hamburg', country='Germany'),
+            map_configuration=map_config
         )
         cls.tree = HamburgRoadsideTrees.objects.create(
             geom=Point(0, 0, srid=4326)
@@ -31,36 +37,6 @@ class HamburgRoadsideTreesMapViewTestCase(ViewSetWithPermissionsTestCase):
         self.client.force_login(self.outsider)
         response = self.client.get(reverse(self.url_name))
         self.assertEqual(response.status_code, 200)
-
-
-class HamburgRoadSideTreeAPITestCase(ViewSetWithPermissionsTestCase):
-    url_name = 'data.hamburg_roadside_trees'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        HamburgRoadsideTrees.objects.create(
-            geom=Point(0, 0, srid=4326)
-        )
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse(self.url_name))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse(self.url_name))
-        self.assertEqual(response.status_code, 200)
-
-    def test_no_query_params_return_all_entries(self):
-        response = self.client.get(reverse(self.url_name))
-        json = response.json()
-        self.assertIn('geoJson', json)
-        self.assertIn('features', json['geoJson'])
-        self.assertIn('summaries', json)
-        self.assertIn('tree_count', json['summaries'][0])
-        self.assertEqual(1, len(json['geoJson']['features']))
-        self.assertEqual(1, json['summaries'][0]['tree_count']['value'])
 
 
 class HamburgRoadsideTreeCatchmentAutocompleteViewTests(ViewWithPermissionsTestCase):

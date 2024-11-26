@@ -1,4 +1,4 @@
-{% extends 'simple_detail_card.html' %}
+{% extends 'geo_detail_card.html' %}
 {% load static %}
 {% load leaflet_tags %}
 
@@ -10,8 +10,6 @@
 {% block title %}BRIT | Maps | Catchment: {{ object.name }}{% endblock %}
 
 {% block detail_header %}Catchment: {{ object.name }}{% endblock %}
-
-{% block detail_top_image %}<div class="card-img-top">{% leaflet_map "main" %}</div>{% endblock %}
 
 {% block detail_body %}
     <p class="card-text"><strong>Name:</strong><br>{{ object.name }}</p>
@@ -52,19 +50,3 @@
         </a>
     {% endif %}
 {% endblock %}
-
-{% block javascript %}
-    {{ block.super }}
-    <script src="{% static 'js/maps.js' %}"></script>
-    {{ map_config|json_script:"mapConfig" }}
-    <script type="text/javascript">
-        function getQueryParameters() {
-            const params = new URLSearchParams();
-            params.append('catchment', {{ object.pk }});
-            return params;
-        }
-
-        const mapConfig = JSON.parse(document.getElementById("mapConfig").textContent);
-        window.onload = () => loadMap(mapConfig);
-    </script>
-{% endblock javascript %}

@@ -1,8 +1,11 @@
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from django.contrib.gis.db.models import MultiPolygonField, PointField
-from django.db import models
-from django.db.models.signals import post_delete
+from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
+from django.db import models, transaction
+from django.db.models.signals import post_delete, pre_save
 from django.dispatch import receiver
-from django.urls import reverse
+from django.urls import NoReverseMatch, reverse
 from tree_queries.models import TreeNode
 from tree_queries.query import TreeQuerySet
 
@@ -23,6 +26,250 @@ GIS_SOURCE_MODELS = (
     ('NutsRegion', 'NutsRegion'),
     ('WasteCollection', 'WasteCollection')
 )
+
+LAYER_TYPE_CHOICES = [
+    ('region', 'Region'),
+    ('catchment', 'Catchment'),
+    ('features', 'Features'),
+]
+
+LINE_CAP_CHOICES = [
+    ('butt', 'Butt'),
+    ('round', 'Round'),
+    ('square', 'Square'),
+]
+
+LINE_JOIN_CHOICES = [
+    ('miter', 'Miter'),
+    ('round', 'Round'),
+    ('bevel', 'Bevel'),
+]
+
+FILL_RULE_CHOICES = [
+    ('evenodd', 'Even-Odd'),
+    ('nonzero', 'Non-Zero'),
+]
+
+HEX_COLOR_REGEX = RegexValidator(
+    regex=r'^#(?:[0-9a-fA-F]{3}){1,2}$',
+    message='Enter a valid hex color code.'
+)
+
+
+class MapLayerStyle(NamedUserObjectModel):
+    stroke = models.BooleanField(
+        default=True,
+        help_text="If False, the layer will not have a stroke."
+    )
+    color = models.CharField(
+        max_length=7,
+        default='#3388ff',
+        validators=[HEX_COLOR_REGEX],
+        help_text="Stroke color for the layer in hexadecimal format."
+    )
+    weight = models.PositiveIntegerField(
+        default=3,
+        help_text="Stroke width in pixels."
+    )
+    opacity = models.FloatField(
+        default=1.0,
+        validators=[MinValueValidator(0.0), MaxValueValidator(1.0)],
+        help_text="Stroke opacity, between 0 and 1."
+    )
+    fill = models.BooleanField(
+        default=True,
+        help_text="If False, the layer will not have a fill."
+    )
+    fill_color = models.CharField(
+        max_length=7,
+        blank=True,
+        validators=[HEX_COLOR_REGEX],
+        help_text="Fill color for the layer in hexadecimal format."
+    )
+    fill_opacity = models.FloatField(
+        default=0.2,
+        validators=[MinValueValidator(0.0), MaxValueValidator(1.0)],
+        help_text="Fill opacity, between 0 and 1."
+    )
+    dash_array = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="Define the stroke dash pattern, e.g., '5, 10'."
+    )
+    dash_offset = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="Define the stroke dash offset."
+    )
+    line_cap = models.CharField(
+        max_length=10,
+        choices=LINE_CAP_CHOICES,
+        default='round',
+        help_text="Shape to be used at the end of the stroke."
+    )
+    line_join = models.CharField(
+        max_length=10,
+        choices=LINE_JOIN_CHOICES,
+        default='round',
+        help_text="Shape to be used at the joints between segments."
+    )
+    fill_rule = models.CharField(
+        max_length=10,
+        choices=FILL_RULE_CHOICES,
+        default='evenodd',
+        help_text="Rule used to determine if a point is inside the path."
+    )
+    class_name = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="CSS class name(s) to add to the layer for additional styling."
+    )
+    radius = models.FloatField(
+        default=10.0,
+        help_text="Radius of the circle marker in pixels."
+    )
+    bubbling_mouse_events = models.BooleanField(
+        default=True,
+        help_text="When true, a mouse event on this path will trigger the same event on the map."
+    )
+
+
+def get_default_layer_style(layer_type):
+    default_style_names = {
+        'region': 'Default Region Layer Style',
+        'catchment': 'Default Catchment Layer Style',
+        'features': 'Default Features Layer Style',
+    }
+
+    style_name = default_style_names.get(layer_type, 'Default Style')
+
+    style, created = MapLayerStyle.objects.get_or_create(
+        name=style_name,
+        defaults={
+            'stroke': True,
+            'color': '#000000',
+            'weight': 3,
+            'opacity': 1.0,
+            'fill': True,
+            'fill_color': '#FFFFFF',
+            'fill_opacity': 0.2,
+            'dash_array': '',
+            'dash_offset': '',
+            'line_cap': 'round',
+            'line_join': 'round',
+            'fill_rule': 'evenodd',
+            'class_name': '',
+            'radius': 10.0,
+            'bubbling_mouse_events': True,
+        }
+    )
+    return style
+
+
+class MapLayerConfiguration(NamedUserObjectModel):
+    layer_type = models.CharField(
+        max_length=50,
+        choices=LAYER_TYPE_CHOICES,
+        help_text="Type of the layer (region, catchment, feature)."
+    )
+    load_layer = models.BooleanField(
+        default=True,
+        help_text="If False, the dataset will not be loaded initially to avoid long loading times."
+    )
+    feature_id = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Unique identifier for the feature if fixed."
+    )
+    style = models.ForeignKey(
+        MapLayerStyle,
+        on_delete=models.PROTECT,
+        related_name='layer_configurations',
+        help_text="Styling information for the layer."
+    )
+
+    api_basename = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Base name for API used to derive endpoint urls for geometries, details and summaries"
+    )
+
+    def get_geometries_url(self):
+        if self.api_basename:
+            try:
+                return reverse(f'{self.api_basename}-geojson').rstrip('/') + '/'
+            except NoReverseMatch:
+                return None
+        return None
+
+    def get_features_layer_details_url_template(self):
+        if self.api_basename:
+            try:
+                template = reverse(
+                    f'{self.api_basename}-detail',
+                    kwargs={'pk': None}
+                ).replace('None', '').rstrip('/') + '/'
+                return template
+            except NoReverseMatch:
+                return None
+        return None
+
+    def get_layer_summary_url(self):
+        if self.api_basename:
+            try:
+                return reverse(f'{self.api_basename}-summaries')
+            except NoReverseMatch:
+                return None
+        return None
+
+
+@receiver(pre_save, sender=MapLayerConfiguration)
+def assign_default_layer_style(sender, instance, **kwargs):
+    if not instance.style_id:
+        with transaction.atomic():
+            instance.style = get_default_layer_style(instance.layer_type)
+
+
+class MapConfiguration(NamedUserObjectModel):
+    layers = models.ManyToManyField(
+        MapLayerConfiguration,
+        related_name='map_configurations',
+        help_text="Layers associated with this map configuration."
+    )
+    adjust_bounds_to_layer = models.CharField(
+        max_length=50,
+        choices=LAYER_TYPE_CHOICES,
+        default='region',
+        help_text="Layer to which the map bounds should be adjusted."
+    )
+    apply_filter_to_features = models.BooleanField(default=False)
+    load_features_layer_summary = models.BooleanField(default=False)
+
+
+def get_model_choices():
+    from django.apps import apps
+    existing_models = apps.get_models()
+    return [
+        (model.__name__, f"{model._meta.app_label}.{model.__name__}")
+        for model in existing_models
+        if not model._meta.abstract
+    ]
+
+
+class ModelMapConfiguration(models.Model):
+    model_name = models.CharField(
+        max_length=100,
+        unique=True,
+        choices=get_model_choices
+    )
+    map_config = models.ForeignKey(
+        'MapConfiguration',
+        on_delete=models.CASCADE,
+        related_name='model_map_configurations'
+    )
+
+    class Meta:
+        ordering = ['model_name']
 
 
 class Location(NamedUserObjectModel):
@@ -176,16 +423,18 @@ class GeoDataset(NamedUserObjectModel):
     """
     preview = models.ImageField(upload_to='maps_geodataset/', default='generic_map.png')
     publish = models.BooleanField(default=False)
-    region = models.ForeignKey(Region, on_delete=models.CASCADE, null=False)
-    model_name = models.CharField(max_length=56, choices=GIS_SOURCE_MODELS, null=True)
+    region = models.ForeignKey(Region, on_delete=models.CASCADE, null=False, related_name='geodatasets')
+    model_name = models.CharField(max_length=56, choices=GIS_SOURCE_MODELS,
+                                  null=True)  # TODO remove when switch to generic view is done
     sources = models.ManyToManyField(Source, related_name='geodatasets')
-    resources = models.ManyToManyField(Source, related_name='resource_to_geodatasets')
+    data_content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE, null=True)
+    data_object_id = models.PositiveIntegerField(null=True)
+    data_object = GenericForeignKey('data_content_type', 'data_object_id')
+    map_configuration = models.ForeignKey(MapConfiguration, on_delete=models.PROTECT, null=True,
+                                          related_name='geodatasets')
 
     def get_absolute_url(self):
         return reverse(f'{self.model_name}')
-
-    def __str__(self):
-        return self.name
 
 
 class Attribute(NamedUserObjectModel):

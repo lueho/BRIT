@@ -1,5 +1,4 @@
 import json
-from collections import OrderedDict
 from datetime import date, timedelta
 from urllib.parse import urlencode
 
@@ -14,7 +13,7 @@ from factory.django import mute_signals
 from mock import Mock, patch
 
 from distributions.models import TemporalDistribution, Timestep
-from maps.models import Region
+from maps.models import GeoDataset, MapConfiguration, MapLayerConfiguration, MapLayerStyle, Region
 from materials.models import Material, MaterialCategory, Sample, SampleSeries
 from utils.properties.models import Property, Unit
 from utils.tests.testcases import ViewWithPermissionsTestCase
@@ -891,13 +890,13 @@ class CollectionCurrentListViewTestCase(ViewWithPermissionsTestCase):
 
     def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(self.url)
-        self.assertRedirects(response, f'{self.url}?load_features=True&valid_on={date.today()}',
+        self.assertRedirects(response, f'{self.url}?valid_on={date.today()}',
                              fetch_redirect_response=True)
 
     def test_get_http_200_ok_for_logged_in_users(self):
         self.client.force_login(self.outsider)
         response = self.client.get(self.url)
-        self.assertRedirects(response, f'{self.url}?load_features=True&valid_on={date.today()}',
+        self.assertRedirects(response, f'{self.url}?valid_on={date.today()}',
                              fetch_redirect_response=True)
 
     def test_pagination_works_without_further_query_parameters(self):
@@ -1851,69 +1850,6 @@ class CollectionAddAggregatedPropertyValueViewTestCase(ViewWithPermissionsTestCa
         self.assertEqual(response.status_code, 302)
 
 
-class CollectionSummaryAPIViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'change_collection'
-    url = reverse('collection-summary-api')
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-
-        MaterialCategory.objects.create(name='Biowaste component')
-        material1 = WasteComponent.objects.create(name='Test material 1')
-        material2 = WasteComponent.objects.create(name='Test material 2')
-        waste_stream = WasteStream.objects.create(
-            name='Test waste stream',
-            category=WasteCategory.objects.create(name='Test category'),
-        )
-        waste_stream.allowed_materials.add(material1)
-        waste_stream.allowed_materials.add(material2)
-        with mute_signals(signals.post_save):
-            waste_flyer = WasteFlyer.objects.create(
-                abbreviation='WasteFlyer123',
-                url='https://www.test-flyer.org'
-            )
-        frequency = CollectionFrequency.objects.create(name='Test Frequency')
-        cls.collection = Collection.objects.create(
-            name='collection1',
-            catchment=CollectionCatchment.objects.create(name='Test catchment'),
-            collector=Collector.objects.create(name='Test collector'),
-            collection_system=CollectionSystem.objects.create(name='Test system'),
-            waste_stream=waste_stream,
-            frequency=frequency,
-            description='This is a test case.'
-        )
-        cls.collection.flyers.add(waste_flyer)
-
-    def test_get_http_200_ok_for_group_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(self.url, {'pk': self.collection.pk})
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_returns_correct_summary_on_existing_collection_id(self):
-        self.maxDiff = None
-        self.client.force_login(self.member)
-        response = self.client.get(self.url, {'id': self.collection.id})
-        expected = {'summaries': [
-            OrderedDict([
-                ('id', self.collection.id),
-                ('Catchment', self.collection.catchment.name),
-                ('Collector', self.collection.collector.name),
-                ('Collection system', self.collection.collection_system.name),
-                ('Waste category', self.collection.waste_stream.category.name),
-                ('Allowed materials', [m.name for m in self.collection.waste_stream.allowed_materials.all()]),
-                ('Forbidden materials', [m.name for m in self.collection.waste_stream.forbidden_materials.all()]),
-                ('Frequency', self.collection.frequency.name),
-                ('Valid from', self.collection.valid_from.strftime('%Y-%m-%d')),
-                ('Valid until', None),
-                ('Sources', [flyer.url for flyer in self.collection.flyers.all()]),
-                ('Comments', self.collection.description)
-            ]),
-        ]
-        }
-        self.assertDictEqual(response.data, expected)
-
-
 @patch('case_studies.soilcom.tasks.export_collections_to_file.delay')
 class CollectionListFileExportViewTestCase(ViewWithPermissionsTestCase):
     url = reverse('collection-export')
@@ -2185,7 +2121,21 @@ class WasteCollectionMapViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
+        style = MapLayerStyle.objects.create(name='default')
+        layer = MapLayerConfiguration.objects.create(name='default', layer_type='features', style=style)
+        map_config = MapConfiguration.objects.create(name='default')
+        map_config.layers.add(layer)
         region = Region.objects.create(name='Test Region')
+        cls.dataset, _ = GeoDataset.objects.get_or_create(
+            model_name='WasteCollection',
+            defaults={
+                'name': 'Waste Collections Europe',
+                'description': 'Waste Collection Systems of Europe',
+                'region': region,
+            }
+        )
+        cls.dataset.map_configuration = map_config
+        cls.dataset.save()
         catchment = CollectionCatchment.objects.create(name='Test Catchment', region=region)
         cls.collection = Collection.objects.create(name='Test Collection', catchment=catchment)
 

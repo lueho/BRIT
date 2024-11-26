@@ -1,28 +1,12 @@
-from django.urls import path
+from django.urls import include, path
 
-from .views import (
-    CultureListView,
-    CultureCreateView,
-    CultureDetailView,
-    CultureUpdateView,
-    CultureDeleteView,
-    GreenhouseCreateView,
-    GreenhouseGrowthCycleCreateView,
-    GreenhouseDeleteView,
-    GreenhouseDetailView,
-    GreenhouseListView,
-    GreenhouseUpdateView,
-    UpdateGreenhouseGrowthCycleValuesView,
-    GreenhousesMapView,
-    NantesGreenhousesListFileExportView,
-    NantesGreenhousesListFileExportProgressView,
-    NantesGreenhousesCatchmentAutocompleteView,
-    NantesGreenhousesAPIView,
-    GrowthCycleDetailView,
-    GrowthCycleCreateView,
-    GrowthCycleDeleteView,
-    GrowthTimeStepSetModalUpdateView,
-)
+from .rounter import router
+from .views import (CultureCreateView, CultureDeleteView, CultureDetailView, CultureListView, CultureUpdateView,
+                    GreenhouseCreateView, GreenhouseDeleteView, GreenhouseDetailView, GreenhouseGrowthCycleCreateView,
+                    GreenhouseListView, GreenhouseUpdateView, GreenhousesMapView, GrowthCycleCreateView,
+                    GrowthCycleDeleteView, GrowthCycleDetailView, GrowthTimeStepSetModalUpdateView,
+                    NantesGreenhousesCatchmentAutocompleteView, NantesGreenhousesListFileExportProgressView,
+                    NantesGreenhousesListFileExportView, UpdateGreenhouseGrowthCycleValuesView)
 
 urlpatterns = [
     path('cultures/', CultureListView.as_view(), name='culture-list'),
@@ -30,11 +14,12 @@ urlpatterns = [
     path('cultures/<int:pk>/', CultureDetailView.as_view(), name='culture-detail'),
     path('cultures/<int:pk>/update/', CultureUpdateView.as_view(), name='culture-update'),
     path('cultures/<int:pk>/delete/', CultureDeleteView.as_view(), name='culture-delete'),
-    path('greenhouses/data/', NantesGreenhousesAPIView.as_view(), name='data.nantes_greenhouses'),
     path('greenhouses/map/', GreenhousesMapView.as_view(), name='NantesGreenhouses'),
     path('roadside_trees/export/', NantesGreenhousesListFileExportView.as_view(), name='nantesgreenhouses-export'),
-    path('roadside_trees/export/<str:task_id>/progress/', NantesGreenhousesListFileExportProgressView.as_view(), name='nantesgreenhouses-export-progress'),
-    path('greenhouses/catchment_autocomplete/', NantesGreenhousesCatchmentAutocompleteView.as_view(), name='nantesgreenhouses-catchment-autocomplete'),
+    path('roadside_trees/export/<str:task_id>/progress/', NantesGreenhousesListFileExportProgressView.as_view(),
+         name='nantesgreenhouses-export-progress'),
+    path('greenhouses/catchment_autocomplete/', NantesGreenhousesCatchmentAutocompleteView.as_view(),
+         name='nantesgreenhouses-catchment-autocomplete'),
     path('greenhouses/', GreenhouseListView.as_view(), name='greenhouse-list'),
     path('greenhouses/create/', GreenhouseCreateView.as_view(), name='greenhouse-create'),
     path('greenhouses/<int:pk>/', GreenhouseDetailView.as_view(), name='greenhouse-detail'),
@@ -46,5 +31,7 @@ urlpatterns = [
     path('growthcycles/create_inline/', GreenhouseGrowthCycleCreateView.as_view(), name='growth_cycle_create_inline'),
     path('growthcycles/<int:pk>/', GrowthCycleDetailView.as_view(), name='growthcycle-detail'),
     path('growthcycles/<int:pk>/delete/', GrowthCycleDeleteView.as_view(), name='growthcycle-delete'),
-    path('growthcycles/timesteps/<int:pk>/update', GrowthTimeStepSetModalUpdateView.as_view(), name='growth_cycle_timestep_update')
+    path('growthcycles/timesteps/<int:pk>/update', GrowthTimeStepSetModalUpdateView.as_view(),
+         name='growth_cycle_timestep_update'),
+    path('api/', include(router.urls)),
 ]

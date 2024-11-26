@@ -2,23 +2,22 @@
 
 // Load 'lib/turf-inside/inside.min.js' script before this
 
-function selectFeature(feature) {
-    feature.bringToFront();
-    feature.setStyle({
-        "color": "#f49a33",
-    });
-}
+const fieldConfig = {
+    name: {
+        include: true,
+        format: (value) => value || ''
+    },
+    description: {
+        include: true,
+        format: (value) => value || ''
+    },
+};
 
-function resetFeatureStyles(featureGroup) {
-    featureGroup.resetStyle();
-    featureGroup.bringToBack();
-}
-
-function showcaseClickHandler(e, featureGroup) {
+function featureClickHandler(e, featureGroup) {
     resetFeatureStyles(featureGroup);
 
-    // Find intersecting features by region
     const intersectingFeatures = new Map();
+
     featureGroup.eachLayer(layer => {
         if (layer instanceof L.Polygon) {
             const polygon = layer.toGeoJSON();
@@ -44,7 +43,7 @@ function showcaseClickHandler(e, featureGroup) {
         const features = intersectingFeatures.get(region);
         const feature = features[0];
         selectFeature(feature);
-        getShowcaseDetails(feature.feature.id);
+        getFeatureDetails(feature.feature.id);
     } else {
         // Select all overlapping features
         intersectingFeatures.forEach(features => {
@@ -75,26 +74,29 @@ function showcaseClickHandler(e, featureGroup) {
     }
 }
 
-function handleShowcaseClick(id, region, featureIndex) {
+async function handleShowcaseClick(id, region, featureIndex) {
     resetFeatureStyles(window.featureGroup);
-
     const feature = window.intersectingFeatures.get(region)[featureIndex];
     selectFeature(feature);
-
-    getShowcaseDetails(id);
-
+    await getFeatureDetails(feature.feature.id);
     map.closePopup();
 }
 
-async function getShowcaseDetails(fid) {
-    try {
-        const summaries = await fetchFeatureSummaries(fid);
-        renderSummaries(summaries);
-    } catch (error) {
-        console.error(`Error fetching feature summaries for id ${fid}: ${error}`);
+function scrollToSummaries() {
+    const importantInfoElement = document.getElementById("filter_result_card");
+    if (importantInfoElement) {
+        importantInfoElement.scrollIntoView({behavior: 'smooth', block: 'start'});
     }
 }
 
 function createFeatureLayerBindings(showcaseLayer) {
-    showcaseLayer.on('click', e => showcaseClickHandler(e, showcaseLayer));
+    showcaseLayer.on('click', e => featureClickHandler(e, showcaseLayer));
 }
+
+function uncollapseInfoCardBody() {
+    const infoCardBody = document.getElementById("info-card-body");
+    if (infoCardBody) {
+        infoCardBody.classList.remove("collapse");
+    }
+}
+document.addEventListener("DOMContentLoaded", uncollapseInfoCardBody);

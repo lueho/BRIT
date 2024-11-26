@@ -3,16 +3,66 @@
 // Load 'lib/turf-inside/inside.min.js' script before this
 // Load 'js/maps.js' script before this
 
-function selectFeature(feature) {
-    feature.bringToFront();
-    feature.setStyle({
-        "color": "#f49a33",
-    });
-}
+const fieldConfig = {
+    catchment: {
+        include: true,
+        format: (value) => value || ''
+    },
+    collector: {
+        include: true,
+        format: (value) => value || ''
+    },
+    collection_system: {
+        include: true,
+        format: (value) => value || ''
+    },
+    waste_category: {
+        include: true,
+        format: (value) => value || ''
+    },
+    allowed_materials: {
+        include: true,
+        format: (value) => formatList(value, ', ')
+    },
+    forbidden_materials: {
+        include: true,
+        format: (value) => formatList(value, ', ')
+    },
+    fee_system: {
+        include: true,
+        format: (value) => value || ''
+    },
+    population: {
+        include: false,
+        format: (value) => value ? value.toLocaleString() : ''
+    },
+    population_density: {
+        include: false,
+        format: (value) => value ? value.toFixed(2) : ''
+    },
+    comments: {
+        include: false,
+        format: (value) => formatList(value, '; ')
+    },
+    valid_from: {
+        include: false,
+        format: (value) => value ? new Date(value).toLocaleDateString() : ''
+    },
+    lastmodified_at: {
+        include: false,
+        format: (value) => value ? new Date(value).toLocaleDateString() : ''
+    },
+    sources: {
+        include: true,
+        format: (value) => {
+            const urlList = formatUrls(value);
+            return urlList ? `<ul class="list-disc pl-4">${urlList}</ul>` : '';
+        }
+    }
+};
 
-function collectionClickHandler(e, featureGroup) {
-    featureGroup.resetStyle();
-    featureGroup.bringToBack();
+function featureClickHandler(e, featureGroup) {
+    resetFeatureStyles(featureGroup);
 
     const intersectingFeatures = new Set();
 
@@ -35,7 +85,7 @@ function collectionClickHandler(e, featureGroup) {
             const waste_category = feature.feature.properties.waste_category;
             const collection_system = feature.feature.properties.collection_system;
             selectFeature(feature);
-            return `<a href="javascript:void(0)" onclick="getCollectionDetails(${feature.feature.properties.id})">${waste_category} - ${collection_system}</a><br>`;
+            return `<a href="javascript:void(0)" onclick="getFeatureDetails(${feature.feature.properties.id})">${waste_category} - ${collection_system}</a><br>`;
         }).join("");
     }
 
@@ -44,33 +94,22 @@ function collectionClickHandler(e, featureGroup) {
     });
 }
 
-function createFeatureLayerBindings(collectionLayer) {
-    collectionLayer.bindTooltip(function (layer) {
+function createFeatureLayerBindings(featuresLayer) {
+    featuresLayer.bindTooltip(function(layer) {
         return layer.feature.properties.catchment.toString();
     });
 
-    collectionLayer.bindPopup(function (layer) {
+    featuresLayer.bindPopup(function(layer) {
         return layer.feature.properties.catchment.toString();
     });
 
-    collectionLayer.on('click', e => collectionClickHandler(e, collectionLayer));
+    featuresLayer.on('click', e => featureClickHandler(e, featuresLayer));
 }
 
 function scrollToSummaries() {
     const importantInfoElement = document.getElementById("filter_result_card");
     if (importantInfoElement) {
         importantInfoElement.scrollIntoView({behavior: 'smooth', block: 'start'});
-    }
-}
-
-async function getCollectionDetails(fid) {
-    try {
-        const summaries = await fetchFeatureSummaries(fid);
-        renderSummaries(summaries);
-        scrollToSummaries();
-        updateUrls(fid);
-    } catch (error) {
-        console.error(`Error fetching feature summaries for id ${fid}: ${error}`);
     }
 }
 
@@ -144,4 +183,8 @@ function clickedListButton() {
 function clickedListLink() {
     const listLink = document.getElementById('link-collections-as-list');
     window.location.href = listLink.dataset.hrefTemplate + '?' + parseFilterParameters().toString();
+}
+
+function adaptMapConfig() {
+    mapConfig.layerOrder = ['features', 'region', 'catchment'];
 }

@@ -16,11 +16,6 @@ class HasModelPermission(permissions.BasePermission):
         if request.method in ('OPTIONS', 'HEAD'):
             return True
 
-        # The DRF ViewSet handles the authentication separately from the permission check. In order to send the correct
-        # response, the permission check should be skipped for non-authenticated users.
-        if not request.user.is_authenticated:
-            return True
-
         if not hasattr(view, 'permission_required'):
             raise ImproperlyConfigured("View does not have a 'permission_required' attribute.")
 

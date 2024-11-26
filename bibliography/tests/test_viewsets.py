@@ -18,9 +18,9 @@ class AuthorViewSetPermissionTestCase(ViewSetWithPermissionsTestCase):
         }
         self.author = Author.objects.create(**self.author_data)
 
-    def test_list_401_unauthorized_for_anonymous(self):
+    def test_list_200_ok_for_anonymous(self):
         response = self.client.get(reverse('api-author-list'))
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_list_200_ok_for_outsiders(self):
         self.client.force_login(self.outsider)
@@ -46,9 +46,9 @@ class AuthorViewSetPermissionTestCase(ViewSetWithPermissionsTestCase):
         response = self.client.post(reverse('api-author-list'), self.author_data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
 
-    def test_retrieve_401_unauthorized_for_anonymous(self):
+    def test_retrieve_200_ok_for_anonymous(self):
         response = self.client.get(reverse('api-author-detail', args=[self.author.id]), format='json')
-        self.assertEqual(response.status_code, status.HTTP_401_UNAUTHORIZED)
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_retrieve_200_ok_for_outsider(self):
         self.client.force_login(self.outsider)
@@ -71,7 +71,8 @@ class AuthorViewSetPermissionTestCase(ViewSetWithPermissionsTestCase):
 
     def test_update_200_ok_for_member(self):
         self.client.force_login(self.member)
-        response = self.client.put(reverse('api-author-detail', args=[self.author.id]), self.author_data, content_type='application/json')
+        response = self.client.put(reverse('api-author-detail', args=[self.author.id]), self.author_data,
+                                   content_type='application/json')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
     def test_delete_401_unauthorized_for_anonymous(self):

@@ -1,17 +1,23 @@
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Column, Field, Layout, Row
 from dal.autocomplete import ModelSelect2
-# from django.contrib.gis.db.models import MultiPolygonField
 from django.contrib.gis.forms import MultiPolygonField
 from django.db.models import Subquery
-from django.forms import (BaseFormSet, ChoiceField, DateInput, DateField, ModelChoiceField, MultipleChoiceField,
+from django.forms import (BaseFormSet, ChoiceField, DateField, DateInput, ModelChoiceField, MultipleChoiceField,
                           ValidationError)
 from django.forms.widgets import CheckboxSelectMultiple, RadioSelect
 from django.urls import reverse
 from leaflet.forms.widgets import LeafletWidget
 
-from utils.forms import AutoCompleteForm, AutoCompleteModelForm, SimpleForm, SimpleModelForm, ModalModelFormMixin
-from .models import Attribute, Region, Catchment, GeoPolygon, LauRegion, NutsRegion, RegionAttributeValue, Location
+from utils.forms import AutoCompleteForm, AutoCompleteModelForm, ModalModelFormMixin, SimpleForm, SimpleModelForm
+from .models import (Attribute, Catchment, GeoDataset, GeoPolygon, LauRegion, Location, NutsRegion, Region,
+                     RegionAttributeValue)
+
+
+class GeoDataSetModelForm(AutoCompleteModelForm):
+    class Meta:
+        model = GeoDataset
+        fields = ('name', 'publish', 'model_name', 'description')
 
 
 class LocationModelForm(SimpleModelForm):

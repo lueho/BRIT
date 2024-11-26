@@ -5,152 +5,229 @@ from django.core.exceptions import ImproperlyConfigured
 from django.db.models import Q, Subquery
 from django.forms import formset_factory
 from django.http import JsonResponse
-from django.shortcuts import get_object_or_404
-from django.urls import reverse_lazy, reverse
+from django.urls import NoReverseMatch, reverse, reverse_lazy
 from django.views.generic import DetailView, TemplateView
 from django.views.generic.edit import FormMixin
 from django_filters.views import FilterView
 from rest_framework.exceptions import NotFound, ParseError
 from rest_framework.views import APIView, Response
 
-from maps.serializers import (CatchmentSerializer, LauRegionOptionSerializer, LauRegionSummarySerializer,
-                              NutsRegionCatchmentOptionSerializer, NutsRegionGeometrySerializer,
-                              NutsRegionOptionSerializer, NutsRegionSummarySerializer, RegionGeoFeatureModelSerializer)
+from maps.serializers import (CatchmentGeoFeatureModelSerializer, LauRegionOptionSerializer, LauRegionSummarySerializer,
+                              MapConfigurationSerializer,
+                              NutsRegionCatchmentOptionSerializer, NutsRegionOptionSerializer,
+                              NutsRegionSummarySerializer, RegionGeoFeatureModelSerializer)
 from utils.forms import DynamicTableInlineFormSetHelper
 from utils.views import (BRITFilterView, OwnedObjectCreateView, OwnedObjectDetailView, OwnedObjectListView,
                          OwnedObjectModalCreateView, OwnedObjectModalDeleteView, OwnedObjectModalDetailView,
-                         OwnedObjectModalUpdateView, OwnedObjectModelSelectOptionsView, PublishedObjectFilterView,
-                         OwnedObjectUpdateView, RestrictedOwnedObjectDetailView, UserOwnedObjectFilterView)
-from .filters import CatchmentFilter, RegionFilterSet, NutsRegionFilterSet, GeoDataSetFilterSet
+                         OwnedObjectModalUpdateView, OwnedObjectModelSelectOptionsView, OwnedObjectUpdateView,
+                         PublishedObjectFilterView, RestrictedOwnedObjectDetailView, UserOwnedObjectFilterView)
+from .filters import CatchmentFilterSet, GeoDataSetFilterSet, NutsRegionFilterSet, RegionFilterSet
 from .forms import (AttributeModalModelForm, AttributeModelForm, CatchmentCreateDrawCustomForm,
-                    CatchmentCreateMergeLauForm, CatchmentModelForm,
-                    RegionModelForm, RegionAttributeValueModalModelForm,
-                    RegionAttributeValueModelForm, RegionMergeForm, RegionMergeFormSet, LocationModelForm)
-from .models import (Attribute, Catchment, GeoDataset, GeoPolygon, LauRegion, Location, NutsRegion, Region,
-                     RegionAttributeValue)
+                    CatchmentCreateMergeLauForm, CatchmentModelForm, GeoDataSetModelForm, LocationModelForm,
+                    RegionAttributeValueModalModelForm, RegionAttributeValueModelForm, RegionMergeForm,
+                    RegionMergeFormSet, RegionModelForm)
+from .models import (Attribute, Catchment, GeoDataset, GeoPolygon, LauRegion, Location, MapConfiguration,
+                     ModelMapConfiguration, NutsRegion, Region, RegionAttributeValue)
 
 
 class MapMixin:
     """
-    Provides functionality for the integration of maps with leaflet.
+    Mixin to add 'map_config' to the context.
+    Retrieves MapConfiguration based on the view type and context.
     """
+
+    map_config_related_name = 'map_configuration'
     map_title = None
-    load_region = True
-    region_id = None
-    region_url = None
-    region_layer_style = None
-    load_catchment = True
-    catchment_url = None
-    catchment_id = None
-    catchment_layer_style = None
-    load_features = True
-    feature_url = None
-    apply_filter_to_features = False
-    feature_layer_style = None
-    adjust_bounds_to_features = True
-    feature_summary_url = None
-    api_basename = None
-    feature_details_url = None
+    model_name = None
+    features_layer_api_basename = None
+    api_prefix = 'api-'
+    api_geom_suffix = '-geojson'
+
+    def get_map_title(self):
+        """
+        Retrieves the title of the map.
+        Override this method in child classes for custom retrieval logic.
+        """
+        return self.map_title
+
+    def get_catchment_feature_id(self):
+        """Override to provide a custom catchment ID"""
+        if hasattr(self, 'object'):
+            if hasattr(self.object, 'catchment'):
+                if isinstance(self.object.catchment, Catchment):
+                    return self.object.catchment.id
+        return None
+
+    def get_region_feature_id(self):
+        """Override to provide a custom region ID"""
+        if hasattr(self, 'object'):
+            if hasattr(self.object, 'region'):
+                if isinstance(self.object.region, Region):
+                    return self.object.region.id
+        return None
+
+    def get_features_feature_id(self):
+        """Override to provide a custom feature ID"""
+        return None
+
+    def get_features_geometries_url(self):
+        if self.features_layer_api_basename:
+            try:
+                return reverse(f'{self.features_layer_api_basename}{self.api_geom_suffix}')
+            except NoReverseMatch:
+                return None
+        return None
+
+    def get_features_layer_details_url_template(self):
+        if self.features_layer_api_basename:
+            try:
+                template = reverse(
+                    f'{self.features_layer_api_basename}-detail',
+                    kwargs={'pk': None}
+                ).replace('None', '').rstrip('/') + '/'
+                return template
+            except NoReverseMatch:
+                print('no url found')
+                return None
+        return None
+
+    def get_features_layer_summary_url(self):
+        if self.features_layer_api_basename:
+            try:
+                return reverse(f'{self.features_layer_api_basename}-summaries')
+            except NoReverseMatch:
+                return None
+        return None
+
+    def get_map_configuration(self):
+        """
+        Retrieves the appropriate MapConfiguration instance.
+        Override this method in child classes for custom retrieval logic.
+        """
+
+        # If the object has a MapConfiguration assigned to it by attribute, use it
+        if hasattr(self, 'object') and self.object:
+            try:
+                return getattr(self.object, self.map_config_related_name)
+            except AttributeError:
+                pass
+
+        # If a model is given (e.g. in a DetailView), which has a MapConfiguration, use it
+        if hasattr(self, 'model') and self.model:
+            self.model_name = self.model.__name__
+            try:
+                model_config = ModelMapConfiguration.objects.get(model_name=self.model_name)
+                return model_config.map_config
+            except ModelMapConfiguration.DoesNotExist:
+                pass
+
+        # If the model is not explicitly given (e.g. in a FilterView), find the model based on the FilterSet
+        if hasattr(self, 'filterset_class') and self.filterset_class:
+            self.model_name = self.filterset_class.Meta.model.__name__
+            try:
+                model_config = ModelMapConfiguration.objects.get(model_name=self.model_name)
+                return model_config.map_config
+            except ModelMapConfiguration.DoesNotExist:
+                pass
+
+        # Alternatively, determine MapConfiguration based on request or other logic
+        # For example, based on query parameters
+        map_config_id = self.request.GET.get('map_config_id')
+        if map_config_id:
+            try:
+                return MapConfiguration.objects.get(id=map_config_id)
+            except MapConfiguration.DoesNotExist:
+                pass
+
+        # If no MapConfiguration is found, fall back to default. While the default has api_basenames for the region
+        # and the catchment layer, the api_basename for the features layer is not set and needs to be found.
+
+        # If the api_basename is not found via MapConfiguration instance and is not set explicitly but the view has a
+        # model associated with it, try to find the API by naming convention.
+        if not self.features_layer_api_basename and self.model_name:
+            api_basename_candidate = f'{self.api_prefix}{self.model_name.lower()}'
+            try:
+                reverse(f'{api_basename_candidate}{self.api_geom_suffix}')
+                self.features_layer_api_basename = api_basename_candidate
+            except NoReverseMatch:
+                pass
+
+        return MapConfiguration.objects.get(name='Default Map Configuration')
+
+    def get_override_params(self):
+        params = {}
+
+        # If filter parameters are set, assume that features should be loaded.
+        if self.request.GET:
+            params['load_features'] = True
+
+        # Previous assumption can be overridden by explicitly setting the load_features parameter.
+        for key in ['load_region', 'load_catchment', 'load_features']:
+            value = self.request.GET.get(key)
+            if value:
+                params[key] = value == 'true'
+
+        # In case no filter parameters are set, use the default load_<layer_type> values defined in the layer configurations.
+
+        if self.get_region_feature_id():
+            params['region_feature_id'] = self.get_region_feature_id()
+
+        if self.get_catchment_feature_id():
+            params['catchment_feature_id'] = self.get_catchment_feature_id()
+
+        if self.get_features_feature_id():
+            params['features_feature_id'] = self.get_features_feature_id()
+
+        if self.get_features_geometries_url():
+            params['features_geometries_url'] = self.get_features_geometries_url()
+
+        if self.get_features_layer_details_url_template():
+            params['features_layer_details_url_template'] = self.get_features_layer_details_url_template()
+
+        if self.get_features_layer_summary_url():
+            params['features_layer_summary_url'] = self.get_features_layer_summary_url()
+
+        if hasattr(self, 'object'):
+            params['features_feature_id'] = getattr(self.object, 'pk', None)
+
+        return params
+
+    def get_map_config_serialized(self):
+        """
+        Serializes the MapConfiguration instance.
+        Returns JSON data or None if no MapConfiguration is found.
+        """
+        map_config = self.get_map_configuration()
+        if map_config:
+            serializer = MapConfigurationSerializer(
+                map_config,
+                context={
+                    'request': self.request,
+                    'override_params': self.get_override_params()
+                },
+            )
+            return serializer.data
+        return None
+
+    def post_process_map_config(self, map_config):
+        """
+        Override this method to post-process the map configuration before returning it.
+        """
+        if not map_config.get('regionId') or not map_config.get('regionLayerGeometriesUrl'):
+            map_config['loadRegion'] = False
+        if not map_config.get('catchmentId') or not map_config.get('catchmentLayerGeometriesUrl'):
+            map_config['loadCatchment'] = False
+        if not map_config.get('featuresLayerGeometriesUrl'):
+            map_config['loadFeatures'] = False
+        return map_config
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update({
             'map_title': self.get_map_title(),
-            'map_config': {
-                'loadRegion': self.get_load_region(),
-                'regionId': self.get_region_id(),
-                'regionUrl': self.get_region_url(),
-                'regionLayerStyle': self.get_region_layer_style(),
-                'loadCatchment': self.get_load_catchment(),
-                'catchmentId': self.get_catchment_id(),
-                'catchmentUrl': self.get_catchment_url(),
-                'catchmentLayerStyle': self.get_catchment_layer_style(),
-                'loadFeatures': self.get_load_features(),
-                'featureUrl': self.get_apply_filter_to_features(),
-                'applyFilterToFeatures': self.get_use_filter(),
-                'featureLayerStyle': self.get_feature_layer_style(),
-                'adjustBoundsToFeatures': self.get_adjust_bounds_to_features(),
-                'featureSummaryUrl': self.get_feature_summary_url(),
-                'featureDetailsUrl': self.get_feature_details_url(),
-            }
+            'map_config': self.post_process_map_config(self.get_map_config_serialized()),
         })
         return context
-
-    def get_map_title(self):
-        return self.map_title
-
-    def get_load_region(self):
-        if self.request.GET.get('load_region'):
-            return self.request.GET.get('load_region') == 'true'
-        else:
-            return self.load_region
-
-    def get_region_id(self):
-        return self.region_id
-
-    def get_region_url(self):
-        return self.region_url
-
-    def get_region_layer_style(self):
-        if not self.region_layer_style:
-            self.region_layer_style = {
-                'color': '#A1221C',
-                'fillOpacity': 0.0
-            }
-        return self.region_layer_style
-
-    def get_load_catchment(self):
-        if self.request.GET.get('load_catchment'):
-            return self.request.GET.get('load_catchment') == 'true'
-        else:
-            return self.load_catchment
-
-    def get_catchment_id(self):
-        return self.catchment_id
-
-    def get_catchment_url(self):
-        return self.catchment_url
-
-    def get_catchment_layer_style(self):
-        if not self.catchment_layer_style:
-            self.catchment_layer_style = {
-                'color': '#A1221C',
-                'fillOpacity': 0.0
-            }
-        return self.catchment_layer_style
-
-    def get_load_features(self):
-        if self.request.GET.get('load_features'):
-            return self.request.GET.get('load_features') == 'true'
-        else:
-            return self.load_features
-
-    def get_apply_filter_to_features(self):
-        return self.feature_url
-
-    def get_use_filter(self):
-        return self.apply_filter_to_features
-
-    def get_feature_layer_style(self):
-        if not self.feature_layer_style:
-            self.feature_layer_style = {
-                'color': '#04555E',
-            }
-        return self.feature_layer_style
-
-    def get_adjust_bounds_to_features(self):
-        return self.adjust_bounds_to_features
-
-    def get_feature_summary_url(self):
-        return self.feature_summary_url
-
-    def get_api_basename(self):
-        return self.api_basename
-
-    def get_feature_details_url(self):
-        if not self.feature_details_url and self.api_basename:
-            self.feature_details_url = reverse(f'{self.api_basename}-detail', kwargs={'pk': 0})[:-2]
-        return self.feature_details_url
 
 
 class MapsDashboardView(PermissionRequiredMixin, TemplateView):
@@ -160,10 +237,6 @@ class MapsDashboardView(PermissionRequiredMixin, TemplateView):
 
 # ----------- Geodataset -----------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
-
-class GeoDataSetMixin(MapMixin):
-    region_url = reverse_lazy('data.region-geometries')
-    catchment_url = reverse_lazy('data.catchment-geometries')
 
 
 class PublishedGeoDatasetFilterView(PublishedObjectFilterView):
@@ -190,19 +263,56 @@ class GeoDataSetFormMixin(FormMixin):
             return self.filterset_class(self.request.GET).form
 
 
-class GeoDataSetDetailView(GeoDataSetMixin, FilterView):
-    model_name = None
-    filterset_class = None
+# ----------- GeoDataSet CRUD---------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class GeoDataSetListView(OwnedObjectListView):
+    model = GeoDataset
+    permission_required = set()
+
+
+class GeoDataSetCreateView(OwnedObjectCreateView):
+    model = GeoDataset
+    form_class = GeoDataSetModelForm
+    permission_required = 'maps.add_geodataset'
+
+
+class GeoDataSetFilteredMapView(MapMixin, FilterView):
+    model_name = None  # TODO: Remove this for pk
     template_name = 'filtered_map.html'
 
-    def get_object(self):
+    def get_dataset(self):
         try:
             return GeoDataset.objects.get(model_name=self.model_name)
         except GeoDataset.DoesNotExist:
             raise ImproperlyConfigured(f'No GeoDataset with model_name {self.model_name} found.')
 
-    def get_region_id(self):
-        return self.get_object().region.id
+    def get_region_feature_id(self):
+        return self.get_dataset().region_id
+
+    def get_map_configuration(self):
+        dataset = self.get_dataset()
+        if dataset.map_configuration:
+            return dataset.map_configuration
+        else:
+            return MapConfiguration.objects.get(name='Default Map Configuration')
+
+    # def get_dataset(self):
+    #     return GeoDataset.objects.get(pk=self.kwargs.get('pk')) # TODO: Implement this functionality
+
+
+class GeoDataSetUpdateView(OwnedObjectUpdateView):
+    model = GeoDataset
+    form_class = GeoDataSetModelForm
+    permission_required = 'maps.change_geodataset'
+
+
+class GeoDataSetModalDeleteView(OwnedObjectModalDeleteView):
+    model = GeoDataset
+    success_url = reverse_lazy('geodataset-list')
+    success_message = 'deletion successful'
+    permission_required = 'maps.delete_geodataset'
 
 
 # ----------- Location CRUD---------------------------------------------------------------------------------------------
@@ -222,9 +332,6 @@ class LocationCreateView(OwnedObjectCreateView):
 
 class LocationDetailView(MapMixin, OwnedObjectDetailView):
     model = Location
-    feature_url = reverse_lazy('api-location-geojson')
-    load_region = False
-    load_catchment = False
     permission_required = set()
 
 
@@ -251,23 +358,15 @@ class RegionListView(BRITFilterView):
     ordering = 'name'
 
 
-class RegionMapView(LoginRequiredMixin, GeoDataSetMixin, FilterView):
+class RegionMapView(LoginRequiredMixin, MapMixin, FilterView):
     template_name = 'region_map.html'
     filterset_class = RegionFilterSet
     map_title = 'Regions'
-    feature_url = reverse_lazy('api-region-geojson')
-    feature_summary_url = reverse_lazy('api-region-list')
-    apply_filter_to_features = True
-    load_region = False
-    load_catchment = False
-    load_features = False
 
 
 class RegionDetailView(MapMixin, DetailView):
     model = Region
-    feature_url = reverse_lazy('api-region-geojson')
-    load_region = False
-    load_catchment = False
+    features_layer_api_basename = 'api-region'
     permission_required = set()
 
 
@@ -296,22 +395,18 @@ class RegionModalDeleteView(OwnedObjectModalDeleteView):
 
 class PublishedCatchmentListView(PublishedObjectFilterView):
     model = Catchment
-    filterset_class = CatchmentFilter
+    filterset_class = CatchmentFilterSet
     ordering = 'name'
 
 
 class UserOwnedCatchmentListView(UserOwnedObjectFilterView):
     model = Catchment
-    filterset_class = CatchmentFilter
+    filterset_class = CatchmentFilterSet
     ordering = 'name'
 
 
 class CatchmentDetailView(MapMixin, RestrictedOwnedObjectDetailView):
     model = Catchment
-    catchment_url = reverse_lazy('data.catchment-geometries')
-    feature_url = reverse_lazy('data.catchment-geometries')
-    load_region = False
-    load_catchment = False
     permission_required = set()
 
 
@@ -472,21 +567,6 @@ class RegionOfLauAutocompleteView(autocomplete.Select2QuerySetView):
         return qs
 
 
-class CatchmentGeometryAPI(APIView):
-    authentication_classes = []
-    permission_classes = []
-
-    @staticmethod
-    def get(request, *args, **kwargs):
-        catchment_id = request.query_params.get('catchment', None)
-        if catchment_id:
-            catchment = get_object_or_404(Catchment, id=int(catchment_id))
-            regions = Region.objects.filter(id=catchment.region_id)
-            serializer = RegionGeoFeatureModelSerializer(regions, many=True)
-            return Response({'geoJson': serializer.data})
-        return Response({})
-
-
 class CatchmentOptionGeometryAPI(APIView):
     authentication_classes = []
     permission_classes = []
@@ -500,27 +580,8 @@ class CatchmentOptionGeometryAPI(APIView):
             parent_catchment = Catchment.objects.get(id=parent_id)
             parent_region = parent_catchment.region
             qs = parent_region.child_catchments.all()
-            serializer = CatchmentSerializer(qs, many=True)
+            serializer = CatchmentGeoFeatureModelSerializer(qs, many=True)
             return JsonResponse({'geoJson': serializer.data})
-
-
-class RegionGeometryAPI(APIView):
-    """
-    Takes the id of a region and returns its geometry as GeoJSON.
-    """
-
-    authentication_classes = []
-    permission_classes = []
-
-    @staticmethod
-    def get(request, *args, **kwargs):
-        if 'pk' in request.query_params:
-            region_id = request.query_params.get('pk')
-            regions = Region.objects.filter(id=region_id)
-            serializer = RegionGeoFeatureModelSerializer(regions, many=True)
-            return JsonResponse({'geoJson': serializer.data})
-
-        return JsonResponse({})
 
 
 # ----------- NutsRegions ----------------------------------------------------------------------------------------------
@@ -596,42 +657,39 @@ class CatchmentRegionSummaryAPIView(APIView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class NutsRegionMapView(GeoDataSetDetailView):
+class NutsRegionMapView(GeoDataSetFilteredMapView):
     model_name = 'NutsRegion'
     template_name = 'nuts_region_map.html'
     filterset_class = NutsRegionFilterSet
+    features_layer_api_basename = 'api-nuts-region'
     map_title = 'NUTS Regions'
-    load_region = False
-    load_catchment = False
-    load_features = False
-    feature_url = reverse_lazy('data.nutsregion')
-    feature_summary_url = reverse_lazy('data.nutsregion-summary')
-    region_url = reverse_lazy('data.nutsregion')
-    adjust_bounds_to_features = True
-    feature_layer_style = {
-        'color': '#4061d2',
-    }
 
 
-class NutsRegionAPIView(APIView):
+class NutsRegionParentsDetailAPI(APIView):
+    """
+    API to fetch all parent levels of a specific NUTS region.
+    """
     authentication_classes = []
     permission_classes = []
 
-    @staticmethod
-    def get(request):
-        qs = NutsRegion.objects.all()
+    def get(self, request, pk):
+        try:
+            region = NutsRegion.objects.get(pk=pk)
+        except NutsRegion.DoesNotExist:
+            raise NotFound('A NUTS region with the provided ID does not exist.')
 
-        if 'pk' in request.query_params:
-            qs = qs.filter(pk=request.query_params['pk'])
-        if 'levl_code' in request.query_params:
-            qs = qs.filter(levl_code=request.query_params['levl_code'])
-        if 'cntr_code[]' in request.query_params:
-            qs = qs.filter(cntr_code__in=request.query_params.getlist('cntr_code[]'))
-        if 'parent_id' in request.query_params:
-            qs = qs.filter(parent_id=request.query_params['parent_id'])
+        data = {}
+        current_region = region
 
-        serializer = NutsRegionGeometrySerializer(qs, many=True)
-        return JsonResponse({'geoJson': serializer.data})
+        for lvl in range(current_region.levl_code - 1, -1, -1):
+            if current_region.parent:
+                current_region = current_region.parent
+                serializer = NutsRegionOptionSerializer(current_region)
+                data[f'level_{lvl}'] = serializer.data
+            else:
+                break  # No more parents available
+
+        return Response(data)
 
 
 class NutsRegionPedigreeAPI(APIView):

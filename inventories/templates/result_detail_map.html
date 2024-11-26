@@ -1,189 +1,56 @@
-{% extends 'base.html' %}
+{% extends 'filtered_map.html' %}
 {% load static %}
 
-{% block content %}
-    {% load leaflet_tags %}
+{% block filter_form_card %}{% endblock filter_form_card %}
+{% block filter_result_card %}{% endblock filter_result_card %}
 
-    {% leaflet_js %}
-    {% leaflet_css %}
-
-    <!-- Outer wrapper -->
-    <div class="row h-100">
-
-        <!-- Left action column -->
-        <div class="col-sm-3">
-
-            <!-- Accordion -->
-            <div class="accordion">
-
-                <!-- Filter Form Card-->
-                <div class="card shadow">
-                    <div class="card-header" role="button" data-toggle="collapse" href="#filter-card-body"
-                         aria-expanded="true" aria-controls="filter-card-body">
-                        <b>Source information</b>
-                    </div>
-                    <div class="card-body collapse show" id="filter-card-body">
-                        <table>
-                            <tr>
-                                <td>Feedstock: {{ object.feedstock.material.name }}</td>
-                            </tr>
-                            <tr>
-                                <td>Dataset: {{ object.algorithm.geodataset.name }}</td>
-                            </tr>
-                            <tr>
-                                <td>Algorithm: {{ object.algorithm.name }}</td>
-                            </tr>
-                        </table>
-                    </div>
-                </div>
-                <!-- End Filter Form Card-->
-
-                <!-- Result Card -->
-                <div class="card shadow">
-                    <div class="card-header"><b>Results</b></div>
-                    <div class="card-body">
-                        <table>
-                            {% for aggval in object.layeraggregatedvalue_set.all %}
-                                <tr>
-                                    <td>{{ aggval.name }}</td>
-                                    <td>{{ aggval.value }}</td>
-                                    <td>{{ aggval.unit }}</td>
-                                </tr>
-                            {% endfor %}
-                        </table>
-                    </div>
-                </div>
-                <!-- End Result Card -->
-
-            </div>
-            <!-- End Accordion -->
+{% block extra_cards %}
+    <div class="card shadow">
+        <div class="card-header"
+             role="button"
+             data-toggle="collapse"
+             href="#information-card-body"
+             aria-expanded="true"
+             aria-controls="filter-card-body">
+            <strong>Source information</strong>
         </div>
-        <!-- End Left Action Column -->
-
-        <!-- Map Column -->
-        <div class="col">
-            <div class="card shadow">
-                <div class="card-body p-0">
-                    {% leaflet_map "main" %}
-                </div>
-            </div>
+        <div class="card-body collapse show" id="information-card-body">
+            <p class="card-text">
+                <strong>Feedstock:</strong><br>
+                {{ object.feedstock.material.name }}
+            </p>
+            <p class="card-text">
+                <strong>Dataset:</strong><br>
+                {{ object.algorithm.geodataset.name }}
+            </p>
+            <p class="card-text">
+                <strong>Algorithm:</strong><br>
+                {{ object.algorithm.name }}
+            </p>
         </div>
-        <!-- End Map Column -->
-
     </div>
-    <!-- End Outer Wrapper -->
+    <div class="card shadow">
+        <div class="card-header"
+             role="button"
+             data-toggle="collapse"
+             href="#results-card-body"
+             aria-expanded="true"
+             aria-controls="filter-card-body">
+            <strong>Results</strong>
+        </div>
+        <div class="card-body collapse show" id="results-card-body">
+                {% for aggval in object.layeraggregatedvalue_set.all %}
+                    <p class="card-text">
+                        <strong>{{ aggval.name }}:</strong><br>
+                        {{ aggval.value }} {{ aggval.unit }}
+                    </p>
+                {% endfor %}
+        </div>
+    </div>
+{% endblock extra_cards %}
 
-{% endblock content %}
 
 {% block javascript %}
     {{ block.super }}
-    <script src="{% static 'js/map-styles.js' %}"></script>
-
-    <script type="text/javascript">
-
-        let map;
-        let pointLayer;
-        let region_layer;
-        let catchment_layer;
-
-        const resultRenderer = L.canvas({padding: 0.5});
-
-        window.addEventListener("map:init", function (event) {
-            map = event.detail.map;
-        });
-
-        async function fetchRegionGeometry(region_id) {
-
-            // Define query string for REST API
-            let params = L.Util.extend({
-                region_id: region_id
-            });
-
-            const url = "{% url 'data.region-geometries' %}" + L.Util.getParamString(params);
-
-            // Remove existing layer
-            if (region_layer !== undefined) {
-                map.removeLayer(region_layer);
-            }
-
-            // Fetch data from REST API
-            let response = await fetch(url);
-            let data = await response.json();
-
-            // Render geodata on map
-            let geodata;
-            geodata = data['geoJson'];
-            region_layer = L.geoJson(geodata, {
-                style: region_layer_style
-            })
-            region_layer.addTo(map);
-        }
-
-        async function fetchCatchmentGeometry(catchment_id) {
-
-            // Define query string for REST API
-            let params = L.Util.extend({
-                catchment_id: catchment_id
-            });
-
-            let url = "{% url 'data.catchment-geometries' %}" + L.Util.getParamString(params);
-
-            // Remove existing layer
-            if (catchment_layer !== undefined) {
-                map.removeLayer(catchment_layer);
-            }
-
-            // Fetch data from REST API
-            let response = await fetch(url);
-            let data = await response.json();
-
-            // Render geodata on map
-            let geodata;
-            geodata = data['geoJson'];
-            catchment_layer = L.geoJson(geodata, {
-                style: catchment_layer_style
-            })
-            catchment_layer.addTo(map);
-            map.fitBounds(catchment_layer.getBounds())
-        }
-
-        async function queryDatasets() {
-
-            const dataurl = "{% url 'data.result_layer' layer.table_name %}";
-
-            // Fetch data from REST API
-            let response = await fetch(dataurl);
-            let data = await response.json();
-
-            // Render geodata on map
-            let geodata = data['geoJson'];
-            let region_id = data['region_id'];
-            await fetchRegionGeometry(region_id);
-            let catchment_id = data['catchment_id']
-            await fetchCatchmentGeometry(catchment_id)
-
-            pointLayer = L.geoJson(geodata, {
-                pointToLayer: function (feature, latlng) {
-                    return L.circleMarker(latlng, {
-                        renderer: resultRenderer,
-                        color: '#63c36c',
-                        fillOpacity: 1,
-                        radius: 5,
-                        stroke: false
-                    })
-                },
-                onEachFeature: function onEachFeature(feature, layer) {
-                }
-            }).addTo(map);
-
-        }
-
-        function onLoad() {
-            queryDatasets()
-            map.invalidateSize();
-        }
-
-        window.onload = () => onLoad();
-
-    </script>
+    <script src="{% static 'js/result_detail_map.min.js' %}"></script>
 {% endblock %}

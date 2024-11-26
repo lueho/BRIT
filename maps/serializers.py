@@ -1,8 +1,105 @@
-from rest_framework.serializers import CharField, ModelSerializer, SerializerMethodField, IntegerField
+from rest_framework.serializers import CharField, IntegerField, ModelSerializer, SerializerMethodField
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from utils.serializers import FieldLabelModelSerializer
-from .models import (Catchment, Region, LauRegion, NutsRegion, GeoPolygon, RegionAttributeTextValue, Location)
+from .models import (Catchment, GeoPolygon, LauRegion, Location, MapConfiguration, MapLayerConfiguration, MapLayerStyle,
+                     NutsRegion, Region, RegionAttributeTextValue)
+
+
+class MapLayerStyleSerializer(ModelSerializer):
+    class Meta:
+        model = MapLayerStyle
+        fields = ['color', 'weight', 'opacity', 'fill_color', 'fill_opacity', 'dash_array', 'line_cap', 'line_join',
+                  'fill_rule', 'class_name', 'radius']
+
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        # Convert field names from snake_case to camelCase for compatibility with Leaflet
+        return {
+            'color': rep['color'],
+            'weight': rep['weight'],
+            'opacity': rep['opacity'],
+            'fillColor': rep['fill_color'],
+            'fillOpacity': rep['fill_opacity'],
+            'dashArray': rep['dash_array'],
+            'lineCap': rep['line_cap'],
+            'lineJoin': rep['line_join'],
+            'fillRule': rep['fill_rule'],
+            'className': rep['class_name'],
+            'radius': rep['radius'],
+        }
+
+
+class MapLayerConfigurationSerializer(ModelSerializer):
+    style = MapLayerStyleSerializer()
+    geometries_url = SerializerMethodField()
+    layer_summary_url = SerializerMethodField()
+    features_layer_details_url_template = SerializerMethodField()
+
+    class Meta:
+        model = MapLayerConfiguration
+        fields = ['name', 'layer_type', 'load_layer', 'feature_id', 'style', 'api_basename', 'geometries_url',
+                  'layer_summary_url', 'features_layer_details_url_template']
+
+    def get_geometries_url(self, obj):
+        return obj.get_geometries_url() or ''
+
+    def get_layer_summary_url(self, obj):
+        return obj.get_layer_summary_url() or ''
+
+    def get_features_layer_details_url_template(self, obj):
+        return obj.get_features_layer_details_url_template() or ''
+
+
+class MapConfigurationSerializer(ModelSerializer):
+    layers = MapLayerConfigurationSerializer(many=True)
+
+    class Meta:
+        model = MapConfiguration
+        fields = ['layers', 'adjust_bounds_to_layer', 'apply_filter_to_features', 'load_features_layer_summary']
+
+    def to_representation(self, instance):
+        rep = super().to_representation(instance)
+        override_params = self.context.get('override_params', {})
+
+        map_config = {
+            'adjustBoundsToLayer': rep['adjust_bounds_to_layer'],
+            'applyFilterToFeatures': rep['apply_filter_to_features'],
+            'loadFeaturesLayerSummary': rep['load_features_layer_summary']
+        }
+
+        for layer in rep['layers']:
+            layer_type = layer['layer_type']
+
+            map_config[f'{layer_type}Id'] = override_params.get(
+                f'{layer_type}_feature_id',
+                layer.get('feature_id')
+            )
+            map_config[f'{layer_type}LayerStyle'] = override_params.get(
+                f'{layer_type}_layer_style',
+                layer['style']
+            )
+            map_config[f'{layer_type}LayerGeometriesUrl'] = override_params.get(
+                f'{layer_type}_geometries_url',
+                layer['geometries_url']
+            )
+            map_config[f'{layer_type}LayerDetailsUrlTemplate'] = override_params.get(
+                f'{layer_type}_layer_details_url_template',
+                layer['features_layer_details_url_template']
+            )
+            map_config[f'{layer_type}LayerSummariesUrl'] = override_params.get(
+                f'{layer_type}_layer_summary_url',
+                layer['layer_summary_url']
+            )
+
+            # The load switch should only be true if the geometries URL is set
+            map_config[f'load{layer_type.capitalize()}'] = (
+                override_params.get(f'load_{layer_type}', layer['load_layer'])
+                if map_config[f'{layer_type}LayerGeometriesUrl']
+                else False
+            )
+
+        return map_config
 
 
 class PolygonSerializer(GeoFeatureModelSerializer):
@@ -10,6 +107,10 @@ class PolygonSerializer(GeoFeatureModelSerializer):
         model = GeoPolygon
         geo_field = 'geom'
         fields = '__all__'
+
+
+# ----------- Regions --------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 class LocationModelSerializer(ModelSerializer):
@@ -63,7 +164,13 @@ class GeoreferencedCatchment(GeoPolygon, Catchment):
     pass
 
 
-class CatchmentSerializer(GeoFeatureModelSerializer):
+class CatchmentModelSerializer(ModelSerializer):
+    class Meta:
+        model = Catchment
+        fields = ('id', 'name', 'parent_region', 'region', 'type', 'description')
+
+
+class CatchmentGeoFeatureModelSerializer(GeoFeatureModelSerializer):
     level = IntegerField()
 
     class Meta:
@@ -76,6 +183,27 @@ class CatchmentQuerySerializer(ModelSerializer):
     class Meta:
         model = Catchment
         fields = ['owner', 'parent_region', 'type', 'name']
+
+
+class NutsRegionModelSerializer(ModelSerializer):
+    population = SerializerMethodField()
+
+    class Meta:
+        model = NutsRegion
+        fields = ('nuts_id', 'name', 'levl_code', 'cntr_code', 'parent_id', 'population')
+        field_detail_levels = {
+            'basic': ['nuts_id', 'name', 'levl_code', 'cntr_code', 'parent_id'],
+            'extended': ['population', ]
+        }
+
+    @staticmethod
+    def get_population(obj):
+        qs = obj.regionattributevalue_set.filter(attribute__name='Population').order_by('-date')
+        if qs.exists():
+            pop = qs[0]
+            return f'{int(pop.value)} ({pop.date.year})'
+        else:
+            return None
 
 
 class GeoreferencedNutsRegion(GeoPolygon, NutsRegion):
@@ -122,7 +250,7 @@ class NutsRegionSummarySerializer(FieldLabelModelSerializer):
 
     class Meta:
         model = NutsRegion
-        fields = ('nuts_id', 'name', 'population', 'population_density', 'urban_rural_remoteness')
+        fields = ('id', 'nuts_id', 'name', 'population', 'population_density', 'urban_rural_remoteness')
 
     @staticmethod
     def get_population(obj):
