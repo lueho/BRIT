@@ -1,5 +1,6 @@
 from rest_framework import routers
-from .views import CollectionViewSet
+
+from .viewsets import CollectionViewSet
 
 router = routers.DefaultRouter()
-router.register('collection', CollectionViewSet, basename='api-collection')
+router.register('collection', CollectionViewSet, basename='api-waste-collection')

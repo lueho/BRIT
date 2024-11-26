@@ -4,81 +4,21 @@ from celery.result import AsyncResult
 from dal import autocomplete
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Q
-from django.http import HttpResponse, JsonResponse
-from django.urls import reverse_lazy
+from django.http import HttpResponse
 from django.views import View
-from django_filters import rest_framework as rf_filters
-from rest_framework.generics import GenericAPIView
-from rest_framework.permissions import IsAuthenticated, AllowAny
-from rest_framework.viewsets import ReadOnlyModelViewSet
 
 import case_studies.flexibi_hamburg.tasks
 from maps.models import Catchment, GeoDataset
-from maps.views import GeoDataSetDetailView
+from maps.views import GeoDataSetFilteredMapView
 from .filters import HamburgRoadsideTreesFilterSet
-from .models import HamburgRoadsideTrees
-from .serializers import HamburgRoadsideTreeGeometrySerializer, HamburgRoadsideTreeSimpleModelSerializer
 
 
-class RoadsideTreesMapView(GeoDataSetDetailView):
+class RoadsideTreesMapView(GeoDataSetFilteredMapView):
     model_name = 'HamburgRoadsideTrees'
     template_name = 'hamburg_roadside_trees_map.html'
     filterset_class = HamburgRoadsideTreesFilterSet
+    features_layer_api_basename = 'api-hamburg-roadside-trees'
     map_title = 'Roadside Trees'
-    load_region = True
-    load_catchment = True
-    load_features = False
-    feature_url = reverse_lazy('data.hamburg_roadside_trees')
-    apply_filter_to_features = True
-    api_basename = 'api-hamburgroadsidetree'
-    feature_layer_style = {
-        'color': '#63c36c',
-        'fillOpacity': 1,
-        'radius': 5,
-        'stroke': False
-    }
-    catchment_layer_style = {
-        'color': '#04555E',
-        'fillOpacity': 0.1,
-        'weight': 1
-    }
-
-
-class HamburgRoadsideTreeViewSet(ReadOnlyModelViewSet):
-    queryset = HamburgRoadsideTrees.objects.all()
-    serializer_class = HamburgRoadsideTreeSimpleModelSerializer
-    filter_backends = (rf_filters.DjangoFilterBackend,)
-    filterset_class = HamburgRoadsideTreesFilterSet
-
-    def get_permissions(self):
-        if self.action == 'retrieve':
-            permission_classes = [AllowAny]
-        else:
-            permission_classes = [IsAuthenticated]
-        return [permission() for permission in permission_classes]
-
-
-class HamburgRoadsideTreeAPIView(GenericAPIView):
-    queryset = HamburgRoadsideTrees.objects.all()
-    serializer_class = HamburgRoadsideTreeGeometrySerializer
-    filter_backends = (rf_filters.DjangoFilterBackend,)
-    filterset_class = HamburgRoadsideTreesFilterSet
-    authentication_classes = []
-    permission_classes = []
-
-    def get(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        serializer = self.get_serializer(queryset, many=True)
-        data = {
-            'geoJson': serializer.data,
-            'summaries': [{
-                'tree_count': {
-                    'label': 'Number of trees',
-                    'value': len(serializer.data['features'])
-                },
-            }]
-        }
-        return JsonResponse(data)
 
 
 class HamburgRoadsideTreesListFileExportView(LoginRequiredMixin, View):

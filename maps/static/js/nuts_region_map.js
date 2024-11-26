@@ -1,5 +1,35 @@
 "use strict";
 
+let isProgrammaticChange = false;
+
+const fieldConfig = {
+    nuts_id: {
+        include: true, format: (value) => value || ''
+    },
+    name: {
+        include: true, format: (value) => value || ''
+    },
+    population: {
+        include: true, format: (value) => value || ''
+    },
+    population_density: {
+        include: true, format: (value) => value || ''
+    },
+    urban_rural_remoteness: {
+        include: true, format: (value) => value || ''
+    },
+};
+
+function lockForm() {
+    document.querySelectorAll("select")
+        .forEach(selector => selector.disabled = true);
+}
+
+function unlockForm() {
+    document.querySelectorAll("select")
+        .forEach(selector => selector.disabled = false);
+}
+
 async function updateLayers({region_params, catchment_params, feature_params} = {}) {
     const promises = [
         region_params && fetchRegionGeometry(region_params),
@@ -12,46 +42,185 @@ async function updateLayers({region_params, catchment_params, feature_params} = 
 
 function cleanup() {
     hideLoadingIndicator();
+    unlockForm();
     unlockFilter();
-    document.querySelectorAll("select").forEach(selector => selector.disabled = false);
+}
+
+function adaptMapConfig() {
+    mapConfig.layerOrder = ['features', 'region', 'catchment'];
 }
 
 async function clickedFeature(event) {
-    document.querySelectorAll("select").forEach(selector => selector.disabled = true);
+    lockForm();
     const feature = event.layer.feature;
-    const featureValue = feature.properties.id;
-    const summary = (await fetchFeatureSummaries(feature)).summaries[0];
-    const text = `${summary.Name} (${summary['Nuts id']})`;
+    const featureId = feature.properties.id;
+    const featureDetails = await fetchFeatureDetails(featureId);
+    renderFeatureDetails(featureDetails);
+    setSelect2Value(
+        `#id_level_${feature.properties.level}`,
+        featureId,
+        `${featureDetails.name} (${featureDetails.nuts_id})`
+    );
+    await updateMapAccordingToSelection();
+}
 
-    $(`#id_level_${feature.properties.level}`).select2("trigger", "select", {
-        data: {id: featureValue, text: text}
+/**
+ * Ensures the initial query parameter `levl_code=0` is set on a fresh page load.
+ */
+function getQueryParameters() {
+    const params = new URLSearchParams(window.location.search);
+
+    if ([...params.keys()].length === 0) {
+        params.append('levl_code', '0');
+
+        const newUrl = `${window.location.pathname}?${params.toString()}`;
+        window.history.replaceState({}, '', newUrl);
+    }
+    return params;
+}
+
+function setSelect2Value(selectSelector, id, name) {
+    const select = $(selectSelector);
+
+    if (!select.find('option[value="' + id + '"]').length) {
+        const option = new Option(name, id, true, true);
+        setProgrammaticChange(() => {
+            select.append(option).trigger('change');
+        });
+    } else {
+        setProgrammaticChange(() => {
+            select.val(id).trigger('change');
+        });
+    }
+}
+
+async function populateParents(regionId) {
+    try {
+        const response = await fetch(`/maps/api/nutsregion/${regionId}/parents/`);
+        if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+        }
+        const data = await response.json();
+
+        for (const [key, value] of Object.entries(data)) {
+            const level = key.split('_')[1];
+
+            if (value) {
+                setSelect2Value(`#id_level_${level}`, value.id, value.name);
+            }
+        }
+    } catch (error) {
+        console.error('Error fetching parent regions:', error);
+    }
+}
+
+function setProgrammaticChange(callback) {
+    isProgrammaticChange = true;
+    callback();
+    isProgrammaticChange = false;
+}
+
+async function updateMapAccordingToSelection() {
+
+
+    const level0 = document.getElementById('id_level_0').value;
+    const level1 = document.getElementById('id_level_1').value;
+    const level2 = document.getElementById('id_level_2').value;
+    const level3 = document.getElementById('id_level_3').value;
+
+    const selectedLevel = level3 || level2 || level1 || level0;
+
+    if (selectedLevel) {
+        mapConfig.adjustBoundsToLayer = 'catchment';
+        setLayerOrder(['region', 'features', 'catchment']);
+        if (level3) {
+            await updateLayers({
+                catchment_params: {id: selectedLevel},
+                feature_params: {id: selectedLevel}
+            });
+        } else {
+            await updateLayers({
+                catchment_params: {id: selectedLevel},
+                feature_params: {parent_id: selectedLevel}
+            });
+        }
+    } else {
+        mapConfig.adjustBoundsToLayer = 'region';
+        setLayerOrder(['features', 'region']);
+
+        await updateLayers({
+            feature_params: {levl_code: 0}
+        });
+    }
+}
+
+function clearFields(fields) {
+    setProgrammaticChange(() => {
+        fields.forEach(function(field) {
+            const element = document.getElementById(`id_${field}`);
+            if (element) {
+                element.value = null;
+                const event = new Event('change', {bubbles: true});
+                element.dispatchEvent(event);
+            }
+
+        });
     });
+}
 
-    renderSummaries(await fetchFeatureSummaries(feature));
-    document.querySelectorAll("select").forEach(selector => selector.disabled = false);
+function resetFeatureDetails() {
+    setLayerOrder(defaultLayerOrder);
+    renderFeatureDetails({});
 }
 
 const changedSelect = async function(e) {
-    // Ensure this function is triggered only for select elements
-    if (e.target.tagName === 'SELECT') {
-        document.querySelectorAll("select").forEach(selector => selector.disabled = true);
+    if (isProgrammaticChange || e.target.tagName !== 'SELECT') {
+        return;
+    }
+    lockForm();
 
-        const target = e.target;
-        if (!target.value) {
-            // Fallback logic in case the target value is not available
-            // Make sure this logic accurately finds the intended target
-        }
-        if (target.value) {
-            await updateLayers({region_params: {pk: target.value}, feature_params: {parent_id: target.value}});
-            renderSummaries(await fetchFeatureSummaries(target.value));
-            await updateUrls(target.value);
+    const changedField = e.target.id;
+    let regionId = e.target.value;
+
+    if (regionId) {
+        await populateParents(regionId);
+        clearLowerFields(changedField);
+    } else {
+        clearLowerFields(changedField);
+        if (changedField === 'id_level_0') {
+            resetFeatureDetails();
         }
 
-        document.querySelectorAll("select").forEach(selector => selector.disabled = false);
+        const parentFieldMap = {
+            'id_level_1': 'id_level_0',
+            'id_level_2': 'id_level_1',
+            'id_level_3': 'id_level_2'
+        };
+        if (parentFieldMap[changedField]) {
+            regionId = document.getElementById(parentFieldMap[changedField]).value;
+        }
+    }
+
+    await updateMapAccordingToSelection();
+
+    if (regionId) {
+        const details = await fetchFeatureDetails(regionId);
+        await renderFeatureDetails(details);
     }
 };
 
-document.querySelector('form').addEventListener("change", changedSelect, false);
 
+function clearLowerFields(level) {
+    const fieldMap = {
+        id_level_0: ['level_1', 'level_2', 'level_3'],
+        id_level_1: ['level_2', 'level_3'],
+        id_level_2: ['level_3'],
+        id_level_3: []
+    };
+    if (fieldMap[level]) {
+        clearFields(fieldMap[level]);
+    }
+}
+
+// TODO: Do this without JQuery
 $('form').on('change', 'select', changedSelect);
-

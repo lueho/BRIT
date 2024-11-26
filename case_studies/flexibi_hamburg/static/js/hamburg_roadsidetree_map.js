@@ -2,7 +2,7 @@
 
 async function clickedFeature(e) {
     const featureId = e.layer.feature.id;
-    const url = `${mapConfig.featureDetailsUrl}${featureId}/`;
+    const url = `${mapConfig.featuresLayerDetailsUrlTemplate}${featureId}/`;
     const response = await fetch(url);
     const json = await response.json();
     const html = `

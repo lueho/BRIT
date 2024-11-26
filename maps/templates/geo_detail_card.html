@@ -15,12 +15,6 @@
     <script src="{% static 'js/maps.js' %}"></script>
     {{ map_config|json_script:"mapConfig" }}
     <script type="text/javascript">
-        function getQueryParameters() {
-            const params = new URLSearchParams();
-            params.append('id', {{ object.id }});
-            return params;
-        }
-
         const mapConfig = JSON.parse(document.getElementById("mapConfig").textContent);
         window.onload = () => loadMap(mapConfig);
     </script>

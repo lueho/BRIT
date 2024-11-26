@@ -33,7 +33,7 @@ urlpatterns = [
         'scenarios/<int:scenario_pk>/materials/<int:material_pk>/<int:component_pk>/seasonal_distributions/create/',
         SeasonalDistributionCreateView.as_view(),
         name='seasonal_distribution_create'),
-    path('scenarios/<int:pk>/<int:algorithm_pk>/<int:feedstock_pk>', ScenarioResultDetailMapView.as_view(),
+    path('scenarios/<int:pk>/<int:algorithm_pk>/<int:feedstock_pk>/', ScenarioResultDetailMapView.as_view(),
          name='scenario_result_map'),
     path('scenarios/<int:pk>/evaluating/', ScenarioEvaluationProgressView.as_view(),
          name='scenario_evaluation_progress'),

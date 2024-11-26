@@ -7,28 +7,22 @@ from dal import autocomplete
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
-from django.db.models import Sum
-from django.http import HttpResponse, JsonResponse
-from django.http import HttpResponseRedirect
-from django.urls import reverse
-from django.urls import reverse_lazy
+from django.http import HttpResponse, HttpResponseRedirect
+from django.urls import reverse, reverse_lazy
 from django.views import View
 from django.views.generic import DetailView, UpdateView
-from django_filters import rest_framework as rf_filters
 from extra_views import CreateWithInlinesView, UpdateWithInlinesView
-from rest_framework.generics import GenericAPIView
 
 import case_studies.flexibi_nantes.tasks
 from maps.models import Catchment, GeoDataset
-from maps.views import GeoDataSetDetailView
+from maps.views import GeoDataSetFilteredMapView
 from materials.models import MaterialComponentGroup
 from utils.views import (BRITFilterView, NextOrSuccessUrlMixin, OwnedObjectListView, UserOwnsObjectMixin)
 from .filters import GreenhouseTypeFilter, NantesGreenhousesFilterSet
 from .forms import (CultureModelForm, GreenhouseGrowthCycle, GreenhouseModalModelForm, GrowthCycleCreateForm,
                     GrowthShareFormSetHelper, GrowthTimestepInline, InlineGrowthShare,
                     UpdateGreenhouseGrowthCycleValuesForm)
-from .models import Culture, Greenhouse, GrowthTimeStepSet, NantesGreenhouses
-from .serializers import NantesGreenhousesGeometrySerializer
+from .models import Culture, Greenhouse, GrowthTimeStepSet
 
 
 # ----------- Culture CRUD ---------------------------------------------------------------------------------------------
@@ -291,52 +285,12 @@ class NantesGreenhousesCatchmentAutocompleteView(autocomplete.Select2QuerySetVie
         return qs
 
 
-class GreenhousesMapView(GeoDataSetDetailView):
+class GreenhousesMapView(GeoDataSetFilteredMapView):
     model_name = 'NantesGreenhouses'
-    template_name = 'greenhouse_map.html'
+    template_name = 'nantes_greenhouses_map.html'
     filterset_class = NantesGreenhousesFilterSet
+    features_layer_api_basename = 'api-nantes-greenhouses'
     map_title = 'Nantes Greenhouses'
-    load_region = True
-    load_catchment = True
-    load_features = True
-    feature_url = reverse_lazy('data.nantes_greenhouses')
-    apply_filter_to_features = True
-    feature_layer_style = {
-        'color': '#4061d2',
-        'fillOpacity': 1,
-        'radius': 5,
-        'stroke': False
-    }
-    catchment_layer_style = {
-        'color': '#04555E',
-        'fillOpacity': 0.1,
-        'weight': 1
-    }
-
-
-class NantesGreenhousesAPIView(GenericAPIView):
-    queryset = NantesGreenhouses.objects.all()
-    serializer_class = NantesGreenhousesGeometrySerializer
-    filter_backends = (rf_filters.DjangoFilterBackend,)
-    filterset_class = NantesGreenhousesFilterSet
-    permission_classes = set()
-
-    def get(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        area = queryset.aggregate(Sum('surface_ha'))['surface_ha__sum']
-        area = str(round(area, 1)) if area else str(0)
-        serializer = self.get_serializer(queryset, many=True)
-        data = {
-            'geoJson': serializer.data,
-            'summaries': [
-                {
-                    'greenhouse_count': {'label': 'Number of greenhouses',
-                                         'value': f'{len(serializer.data["features"])}'},
-                    'growth_area': {'label': 'Total growth area', 'value': f'{area} ha'}
-                },
-            ]
-        }
-        return JsonResponse(data)
 
 
 class NantesGreenhousesListFileExportView(LoginRequiredMixin, View):

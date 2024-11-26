@@ -163,7 +163,7 @@ class Scenario(NamedUserObjectModel):
     description = models.TextField(blank=True, null=True)
     region = models.ForeignKey(Region, on_delete=models.CASCADE, null=True)
     catchment = models.ForeignKey(Catchment, on_delete=models.CASCADE, null=True,
-                                  related_name='catchment')  # TODO: make many-to-many?
+                                  related_name='scenarios')  # TODO: make many-to-many?
 
     @property
     def status(self):

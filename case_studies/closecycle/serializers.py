@@ -1,9 +1,11 @@
+from rest_framework import serializers
 from rest_framework.fields import CharField
 from rest_framework.serializers import ModelSerializer
+from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from case_studies.closecycle.models import Showcase
-from maps.serializers import PolygonSerializer, BaseGeoFeatureModelSerializer, RegionModelSerializer
-from utils.serializers import FieldLabelModelSerializer
+from maps.serializers import BaseGeoFeatureModelSerializer, PolygonSerializer, RegionModelSerializer
+from .models import BiogasPlantsSweden
 
 
 class ShowcaseModelSerializer(ModelSerializer):
@@ -40,9 +42,32 @@ class ShowcaseSummaryListSerializer(ModelSerializer):
 
 class ShowcaseGeoFeatureModelSerializer(BaseGeoFeatureModelSerializer):
     region = CharField(source='region.name')
+
     class Meta:
         model = Showcase
         geo_field = 'geom'
         attr_path = 'region.borders'
         geo_serializer_class = PolygonSerializer
         fields = ['id', 'name', 'region']
+
+
+class BiogasPlantsSwedenSimpleModelSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BiogasPlantsSweden
+        fields = ('id', 'type', 'county', 'creation_year', 'size', 'to_upgrade', 'main_type', 'sub_type', 'tech_type',)
+
+
+class BiogasPlantsSwedenGeometrySerializer(GeoFeatureModelSerializer):
+    class Meta:
+        model = BiogasPlantsSweden
+        geo_field = 'geom'
+        fields = ('id',)
+
+
+class BiogasPlantsSwedenFlatSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = BiogasPlantsSweden
+        fields = (
+            'id', 'type', 'name', 'county', 'city', 'municipality', 'creation_year', 'size', 'to_upgrade', 'main_type',
+            'sub_type', 'tech_type'
+        )

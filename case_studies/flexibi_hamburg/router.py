@@ -1,6 +1,6 @@
 from rest_framework import routers
 
-from .views import HamburgRoadsideTreeViewSet
+from .viewsets import HamburgRoadsideTreeViewSet
 
 router = routers.DefaultRouter()
-router.register('hamburgroadsidetree', HamburgRoadsideTreeViewSet, basename='api-hamburgroadsidetree')
+router.register('hamburg_roadside_trees', HamburgRoadsideTreeViewSet, basename='api-hamburg-roadside-trees')

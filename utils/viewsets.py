@@ -1,4 +1,3 @@
-from rest_framework.permissions import IsAuthenticated
 from rest_framework.viewsets import ModelViewSet
 
 from .permissions import HasModelPermission
@@ -15,7 +14,7 @@ class AutoPermModelViewSet(ModelViewSet):
     permission_classes (list): The list of permission classes that are used to check if a request has permission to perform an action.
     custom_permission_required (dict): A dictionary mapping action names to permission strings for any custom permissions.
     """
-    permission_classes = [IsAuthenticated, HasModelPermission]
+    permission_classes = [HasModelPermission]
     custom_permission_required = {}
     _permission_required_generated = False
 

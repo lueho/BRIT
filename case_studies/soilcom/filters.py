@@ -1,16 +1,15 @@
 import math
-
 from crispy_forms.bootstrap import Accordion
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Column, Field, Layout, Row, Submit
 from dal import autocomplete
 from django.db.models import Avg, Count, Max, Q, Sum
-from django.forms import CheckboxInput, CheckboxSelectMultiple, DateInput, RadioSelect
+from django.forms import CheckboxSelectMultiple, DateInput, RadioSelect
 from django.utils import timezone
 from django_filters import (BooleanFilter, CharFilter, DateFilter, ModelChoiceFilter, ModelMultipleChoiceFilter)
 
 from utils.crispy_fields import FilterAccordionGroup, RangeSliderField
-from utils.filters import (CrispyAutocompleteFilterSet, BaseCrispyFilterSet, NullableRangeFilter)
+from utils.filters import (BaseCrispyFilterSet, CrispyAutocompleteFilterSet, NullableRangeFilter)
 from utils.widgets import NullableRangeSliderWidget
 from .models import (Collection, CollectionCatchment, CollectionCountOptions, CollectionFrequency,
                      CollectionPropertyValue, Collector, FeeSystem, WasteCategory, WasteComponent, WasteFlyer, )
@@ -59,7 +58,6 @@ class CollectionFilterFormHelper(FormHelper):
                 RangeSliderField('spec_waste_collected'),
                 'fee_system',
                 'valid_on',
-                Field('load_features', type='hidden'),
                 Submit('filter', 'Filter', css_id='submit-id-basic-filter', css_class='submit-filter')
             )
         )
@@ -191,17 +189,12 @@ class CollectionFilterSet(CrispyAutocompleteFilterSet):
     )
     valid_on = DateFilter(method='filter_valid_on', widget=DateInput(attrs={'type': 'date'}),
                           initial=timezone.now().date(), label='Valid on')
-    load_features = BooleanFilter(
-        label='Load features',
-        initial=True,
-        widget=CheckboxInput(), method='get_load_features'
-    )
 
     class Meta:
         model = Collection
         fields = ('catchment', 'collector', 'collection_system', 'waste_category', 'allowed_materials',
                   'forbidden_materials', 'connection_rate', 'seasonal_frequency', 'optional_frequency',
-                  'collections_per_year', 'spec_waste_collected', 'fee_system', 'valid_on', 'load_features')
+                  'collections_per_year', 'spec_waste_collected', 'fee_system', 'valid_on')
         # catchment_filter must always be applied first, because it grabs the initial queryset and does not filter any
         # existing queryset.
         order_by = ['catchment_filter']
@@ -250,10 +243,6 @@ class CollectionFilterSet(CrispyAutocompleteFilterSet):
     @staticmethod
     def filter_valid_on(qs, _, value):
         return qs.filter(Q(valid_from__lte=value), Q(valid_until__gte=value) | Q(valid_until=None))
-
-    @staticmethod
-    def get_load_features(qs, _, __):
-        return qs
 
 
 class WasteFlyerFilter(CrispyAutocompleteFilterSet):

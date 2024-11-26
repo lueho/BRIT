@@ -1,6 +1,6 @@
 from django.test import TestCase
 
-from ..filters import CatchmentFilter
+from ..filters import CatchmentFilterSet
 from ..models import Catchment
 
 
@@ -12,11 +12,11 @@ class CatchmentFilterTestCase(TestCase):
 
     def test_filter_valid_on_valid_input(self):
         data = {'name': 'Catchment'}
-        filtr = CatchmentFilter(data, queryset=Catchment.objects.all())
+        filtr = CatchmentFilterSet(data, queryset=Catchment.objects.all())
         form = filtr.form
         self.assertTrue(form.is_valid())
         self.assertQuerySetEqual(Catchment.objects.all(), filtr.qs)
 
     def test_filter_form_has_no_formtags(self):
-        filtr = CatchmentFilter(queryset=Catchment.objects.all())
+        filtr = CatchmentFilterSet(queryset=Catchment.objects.all())
         self.assertFalse(filtr.form.helper.form_tag)

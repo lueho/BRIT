@@ -159,8 +159,6 @@ SITEMAP_ITEMS = [
     '/waste_collection/collections/create/',
     '/waste_collection/collections/autocomplete/',
     '/waste_collection/collections/map/',
-    '/waste_collection/collections/api/geometries/',
-    '/waste_collection/collections/api/summaries/',
     '/waste_collection/catchment_selection/',
     '/waste_collection/api/collection/',
     '/waste_collection/api/',

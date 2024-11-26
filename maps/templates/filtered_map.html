@@ -21,7 +21,12 @@
                     <div class="card-header"><b>
                         {% block map_card_header %}{{ map_title }}{% endblock %}
                     </b></div>
-                    <div class="card-body p-0 vh-75">
+                    <div class="card-body p-0 vh-75" style="position: relative;">
+                        <div id="map-overlay" style="display: none">
+                            <div class="overlay-content">
+                                <p>This dataset is large. Loading it completely can take a while. Please choose filter parameters first.</p>
+                            </div>
+                        </div>
                         {% leaflet_map "main" %}
                     </div>
                     <div class="card-footer">
@@ -49,7 +54,8 @@
                                 {% endblock filter_form %}
 
                                 {% block filter_form_buttons %}
-                                    <button class="btn btn-primary" id="filter-button" onclick="clickedFilterButton()">
+                                    <button class="btn btn-primary submit-filter" id="filter-button"
+                                            onclick="clickedFilterButton()">
                                         Filter
                                     </button>
                                 {% endblock filter_form_buttons %}
@@ -93,8 +99,6 @@
 
     </div>
 
-
-
 {% endblock content %}
 
 {% block javascript %}
@@ -112,10 +116,6 @@
         const mapConfig = JSON.parse(document.getElementById("mapConfig").textContent);
         window.onload = () => {
             loadMap(mapConfig);
-            document.querySelectorAll('.submit-filter').forEach(btn => {
-                btn.type = 'button';
-                btn.onclick = clickedFilterButton;
-            });
         };
     </script>
 {% endblock %}

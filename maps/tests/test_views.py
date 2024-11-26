@@ -3,14 +3,13 @@ from unittest.mock import patch
 
 from django.conf import settings
 from django.contrib.gis.geos import MultiPolygon, Point, Polygon
-from django.test import TestCase, RequestFactory
+from django.test import RequestFactory, TestCase
 from django.urls import reverse, reverse_lazy
-from django.utils.http import urlencode
 
 from maps.views import CatchmentCreateMergeLauView
-from utils.tests.testcases import ViewWithPermissionsTestCase, ViewSetWithPermissionsTestCase
-from ..models import (Attribute, RegionAttributeValue, Catchment, LauRegion, NutsRegion, Region, GeoDataset, GeoPolygon,
-                      Location)
+from utils.tests.testcases import ViewSetWithPermissionsTestCase, ViewWithPermissionsTestCase
+from ..models import (Attribute, Catchment, GeoDataset, GeoPolygon, LauRegion, Location, MapConfiguration,
+                      MapLayerConfiguration, MapLayerStyle, NutsRegion, Region, RegionAttributeValue)
 from ..views import MapMixin
 
 
@@ -25,106 +24,154 @@ class DummyMapView(MapMixin, DummyBaseView):
 
 class MapMixinTestCase(TestCase):
     def setUp(self):
+        default_layer_style = MapLayerStyle.objects.create(
+            color='#000000',
+            weight=1,
+            opacity=1,
+            fill_color='#000000',
+        )
+        layers = []
+        for layer_type in ['region', 'catchment', 'features']:
+            layers.append(
+                MapLayerConfiguration.objects.create(
+                    name=f'The {layer_type} layer',
+                    layer_type=layer_type,
+                    load_layer=True,
+                    feature_id='1',
+                    api_basename='api-catchment' if layer_type == 'features' else f'api-{layer_type}',
+                    style=default_layer_style
+                )
+            )
+        self.map_config = MapConfiguration.objects.create(
+            name='Test Map Configuration',
+            adjust_bounds_to_layer='features',
+            load_features_layer_summary=True,
+        )
+        self.map_config.layers.set(layers)
         self.factory = RequestFactory()
         self.view = DummyMapView()
+
+    def mock_reverse_side_effect(name, *args, **kwargs):
+        if '-detail' in name:
+            return f"https://example.com/api/{name.split('-')[1]}/"
+        else:
+            return f"https://example.com/api/{name.split('-')[1]}/" + (
+                f"{name.split('-')[2]}/" if len(name.split('-')) > 2 else "")
 
     def test_get_map_title(self):
         self.view.map_title = "Test Title"
         self.assertEqual(self.view.get_map_title(), "Test Title")
 
-    def test_get_load_region(self):
+    @patch('maps.views.MapMixin.get_region_feature_id')
+    def test_override_load_region(self, mock_get_region_feature_id):
+        mock_get_region_feature_id.return_value = 123
         request = self.factory.get('/?load_region=true')
         self.view.request = request
-        self.assertTrue(self.view.get_load_region())
+        map_config = self.view.get_context_data()['map_config']
+        self.assertTrue(map_config['loadRegion'])
 
         request = self.factory.get('/?load_region=false')
         self.view.request = request
-        self.assertFalse(self.view.get_load_region())
+        map_config = self.view.get_context_data()['map_config']
+        self.assertFalse(map_config['loadRegion'])
 
-        request = self.factory.get('/')
-        self.view.request = request
-        self.view.load_region = False
-        self.assertFalse(self.view.get_load_region())
-
-    def test_get_load_catchment(self):
+    @patch('maps.views.MapMixin.get_catchment_feature_id')
+    def test_override_load_catchment(self, mock_get_catchment_feature_id):
+        mock_get_catchment_feature_id.return_value = 123
         request = self.factory.get('/?load_catchment=true')
         self.view.request = request
-        self.assertTrue(self.view.get_load_catchment())
+        map_config = self.view.get_context_data()['map_config']
+        self.assertTrue(map_config['loadCatchment'])
 
         request = self.factory.get('/?load_catchment=false')
         self.view.request = request
-        self.assertFalse(self.view.get_load_catchment())
+        map_config = self.view.get_context_data()['map_config']
+        self.assertFalse(map_config['loadCatchment'])
 
-        request = self.factory.get('/')
+    @patch('maps.views.MapMixin.get_features_geometries_url')
+    def test_override_load_features(self, mock_get_features_geometries_url):
+        mock_get_features_geometries_url.return_value = 'features/'
+        request = self.factory.get(f'/?load_features=true&map_config_id={self.map_config.id}')
         self.view.request = request
-        self.view.load_catchment = False
-        self.assertFalse(self.view.get_load_catchment())
+        map_config = self.view.get_context_data()['map_config']
+        self.assertTrue(map_config['loadFeatures'])
+
+        request = self.factory.get('/?load_features=false')
+        self.view.request = request
+        map_config = self.view.get_context_data()['map_config']
+        self.assertFalse(map_config['loadFeatures'])
 
     @patch('maps.views.reverse')
-    def get_feature_details_url(self, mock_reverse):
-        self.view.feature_details_url = 'test-url'
-        self.assertEqual(self.view.get_feature_details_url(), 'test-url')
+    def get_features_layer_details_url_template(self, mock_reverse):
+        self.view.features_layer_details_url_template = 'test-url'
+        self.assertEqual(self.view.get_features_layer_details_url_template(), 'test-url')
 
-        self.view.feature_details_url = None
+        self.view.features_layer_details_url_template = None
         self.view.api_basename = 'test-api'
         mock_reverse.return_value = '/mocked/url/0/'
-        result = self.view.get_feature_details_url()
+        result = self.view.get_features_layer_details_url_template()
         mock_reverse.assert_called_once_with('test-api')
         self.assertEqual(result, '/mocked/url/')
 
     @patch('maps.views.reverse')
     def test_get_context_data(self, mock_reverse):
-        request = self.factory.get('/')
+        request = self.factory.get(f'/?map_config_id={self.map_config.id}')
         self.view.request = request
         mock_reverse.return_value = '/mocked/url/0/'
 
         self.view.map_title = 'Test title'
-        self.view.load_region = True
-        self.view.region_id = None
-        self.view.region_url = None
-        self.view.region_layer_style = None
-        self.view.load_catchment = True
-        self.view.catchment_url = None
-        self.view.catchment_id = None
-        self.view.catchment_layer_style = None
-        self.view.load_features = True
-        self.view.feature_url = None
-        self.view.apply_filter_to_features = False
-        self.view.feature_layer_style = {
-            'color': '#63c36c',
-            'fillOpacity': 1,
-            'radius': 5,
-            'stroke': False
-        }
-        self.view.adjust_bounds_to_features = True
-        self.view.feature_summary_url = None
-        self.view.api_basename = 'test-api'
-        self.view.feature_details_url = None
-
         context = self.view.get_context_data()
         map_config = context['map_config']
 
+        layer_style = {
+            'color': '#000000',
+            'weight': 1,
+            'opacity': 1.0,
+            'fillColor': '#000000',
+            'fillOpacity': 0.2,
+            'dashArray': '',
+            'lineCap': 'round',
+            'lineJoin': 'round',
+            'fillRule': 'evenodd',
+            'className': '',
+            'radius': 10.0
+        }
+
         self.assertEqual(context['map_title'], 'Test title')
+        self.assertEqual(map_config['regionId'], '1')
+        self.assertEqual(map_config['regionLayerGeometriesUrl'], '/maps/api/region/geojson/')
         self.assertTrue(map_config['loadRegion'])
-        self.assertEqual(map_config['regionId'], None)
-        self.assertEqual(map_config['regionUrl'], None)
-        self.assertDictEqual(map_config['regionLayerStyle'], {'color': '#A1221C', 'fillOpacity': 0.0})
+        self.assertDictEqual(map_config['regionLayerStyle'], layer_style)
         self.assertEqual(map_config['loadCatchment'], True)
-        self.assertEqual(map_config['catchmentUrl'], None)
-        self.assertEqual(map_config['catchmentId'], None)
-        self.assertDictEqual(map_config['catchmentLayerStyle'], {'color': '#A1221C', 'fillOpacity': 0.0})
+        self.assertEqual(map_config['catchmentLayerGeometriesUrl'], '/maps/api/catchment/geojson/')
+        self.assertEqual(map_config['catchmentId'], '1')
+        self.assertDictEqual(map_config['catchmentLayerStyle'], layer_style)
         self.assertEqual(map_config['loadFeatures'], True)
-        self.assertEqual(map_config['featureUrl'], None)
+        self.assertEqual(map_config['featuresLayerGeometriesUrl'], '/maps/api/catchment/geojson/')
         self.assertEqual(map_config['applyFilterToFeatures'], False)
-        self.assertDictEqual(map_config['featureLayerStyle'], {
-            'color': '#63c36c',
-            'fillOpacity': 1,
-            'radius': 5,
-            'stroke': False
-        })
-        self.assertEqual(map_config['adjustBoundsToFeatures'], True)
-        self.assertEqual(map_config['featureSummaryUrl'], None)
-        self.assertEqual(map_config['featureDetailsUrl'], '/mocked/url/')
+        self.assertDictEqual(map_config['featuresLayerStyle'], layer_style)
+        self.assertEqual(map_config['adjustBoundsToLayer'], 'features')
+        self.assertEqual(map_config['featuresLayerSummariesUrl'], '')
+        self.assertEqual(map_config['featuresLayerDetailsUrlTemplate'], '/maps/api/catchment/')
+
+    def test_layer_not_loaded_when_url_missing(self):
+        for layer in self.map_config.layers.all():
+            layer.load_layer = True
+            layer.api_basename = ''
+            layer.save()
+
+        request = self.factory.get(f'/?map_config_id={self.map_config.id}')
+        self.view.request = request
+        self.view.map_title = 'Test title'
+        context = self.view.get_context_data()
+        map_config = context['map_config']
+
+        self.assertEqual(map_config['regionLayerGeometriesUrl'], '')
+        self.assertEqual(map_config['catchmentLayerGeometriesUrl'], '')
+        self.assertEqual(map_config['featuresLayerGeometriesUrl'], '')
+        self.assertFalse(map_config['loadRegion'])
+        self.assertFalse(map_config['loadCatchment'])
+        self.assertFalse(map_config['loadFeatures'])
 
 
 # ----------- Location CRUD---------------------------------------------------------------------------------------------
@@ -1093,29 +1140,21 @@ class CatchmentModalDeleteViewTestCase(ViewWithPermissionsTestCase):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CatchmentGeometryAPITestCase(ViewWithPermissionsTestCase):
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.catchment = Catchment.objects.create(name='Test Catchment')
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(
-            reverse('data.catchment-geometries') + '?' + urlencode({'catchment': self.catchment.pk}))
-        self.assertEqual(200, response.status_code)
-
-
 class NutsRegionMapViewTestCase(ViewWithPermissionsTestCase):
 
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
+        style = MapLayerStyle.objects.create(name='default')
+        layer = MapLayerConfiguration.objects.create(name='default', layer_type='features', style=style)
+        map_config = MapConfiguration.objects.create(name='default')
+        map_config.layers.add(layer)
         region = Region.objects.create(name='Test Region')
         GeoDataset.objects.create(
             name='Test Dataset',
             region=region,
-            model_name='NutsRegion'
+            model_name='NutsRegion',
+            map_configuration=map_config
         )
 
     def test_get_http_200_ok_for_anonymous(self):

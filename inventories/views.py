@@ -79,22 +79,6 @@ class ScenarioDetailView(MapMixin, RestrictedOwnedObjectDetailView):
     config = None
     allow_edit = False
 
-    load_region = True
-    region_url = reverse_lazy('data.region-geometries')
-    region_layer_style = {
-        "color": "#A1221C",
-        "fillOpacity": 0.0
-    }
-
-    load_catchment = True
-    catchment_url = reverse_lazy('data.catchment-geometries')
-    catchment_layer_style = {
-        'color': '#4061d2',
-    }
-
-    load_features = False
-    adjust_bounds_to_features = False
-
     def get(self, request, *args, **kwargs):
         self.object = self.get_object()
         self.config = self.object.configuration_for_template()
@@ -102,12 +86,6 @@ class ScenarioDetailView(MapMixin, RestrictedOwnedObjectDetailView):
         context['config'] = self.config
         context['allow_edit'] = self.allow_edit
         return self.render_to_response(context)
-
-    def get_catchment_id(self):
-        return self.object.catchment.id
-
-    def get_region_id(self):
-        return self.object.region.id
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
@@ -354,26 +332,9 @@ class ScenarioResultView(MapMixin, OwnedObjectDetailView):
 
     template_name = 'scenario_result_detail.html'
     model = Scenario
-    object = None
     permission_required = set()
     context_object_name = 'scenario'
     allow_edit = False
-
-    load_region = True
-    region_url = reverse_lazy('data.region-geometries')
-    region_layer_style = {
-        "color": "#A1221C",
-        "fillOpacity": 0.0
-    }
-
-    load_catchment = True
-    catchment_url = reverse_lazy('data.catchment-geometries')
-    catchment_layer_style = {
-        'color': '#4061d2',
-    }
-
-    load_features = False
-    adjust_bounds_to_features = False
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -403,12 +364,6 @@ class ScenarioResultView(MapMixin, OwnedObjectDetailView):
             context = self.get_context_data()
             return self.render_to_response(context)
 
-    def get_catchment_id(self):
-        return self.object.catchment.id
-
-    def get_region_id(self):
-        return self.object.region.id
-
 
 class ScenarioEvaluationProgressView(DetailView):
     """
@@ -420,7 +375,7 @@ class ScenarioEvaluationProgressView(DetailView):
     model = Scenario
 
 
-class ScenarioResultDetailMapView(DetailView):
+class ScenarioResultDetailMapView(MapMixin, DetailView):
     """View of an individual result map in large size"""
     model = Layer
     context_object_name = 'layer'
@@ -431,6 +386,15 @@ class ScenarioResultDetailMapView(DetailView):
         algorithm = InventoryAlgorithm.objects.get(id=self.kwargs.get('algorithm_pk'))
         feedstock = SampleSeries.objects.get(id=self.kwargs.get('feedstock_pk'))
         return Layer.objects.get(scenario=scenario, algorithm=algorithm, feedstock=feedstock)
+
+    def get_region_feature_id(self):
+        return self.object.algorithm.geodataset.region.id
+
+    def get_catchment_feature_id(self):
+        return self.object.scenario.catchment.id
+
+    def get_map_title(self):
+        return f'{self.object.scenario.name}: {self.object.algorithm.geodataset.name}'
 
 
 def download_scenario_result_summary(request, scenario_pk):
