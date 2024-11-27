@@ -11,10 +11,10 @@ from extra_views import UpdateWithInlinesView
 from bibliography.forms import SourceSimpleFilterForm
 from distributions.models import TemporalDistribution
 from distributions.plots import DoughnutChart
-from utils.views import (BRITFilterView, NextOrSuccessUrlMixin, OwnedObjectCreateView, OwnedObjectDetailView,
+from utils.views import (NextOrSuccessUrlMixin, OwnedObjectCreateView, OwnedObjectDetailView,
                          OwnedObjectListView, OwnedObjectModalCreateView, OwnedObjectModalDeleteView,
                          OwnedObjectModalDetailView, OwnedObjectModalUpdateView, OwnedObjectUpdateView,
-                         UserOwnsObjectMixin)
+                         PublishedObjectFilterView, UserOwnedObjectFilterView, UserOwnsObjectMixin)
 from .filters import SampleFilter
 from .forms import (AddComponentModalForm, AddCompositionModalForm, AddLiteratureSourceForm, AddSeasonalVariationForm,
                     ComponentGroupModalModelForm, ComponentGroupModelForm, ComponentModalModelForm, ComponentModelForm,
@@ -405,11 +405,15 @@ class SampleSeriesModalAddDistributionView(OwnedObjectModalUpdateView):
 # ----------- Sample CRUD ----------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class SampleListView(BRITFilterView):
+
+class PublishedSampleListView(PublishedObjectFilterView):
     model = Sample
     filterset_class = SampleFilter
-    ordering = 'id'
-    permission_required = set()
+
+
+class UserOwnedSampleListView(UserOwnedObjectFilterView):
+    model = Sample
+    filterset_class = SampleFilter
 
 
 class FeaturedSampleListView(OwnedObjectListView):
