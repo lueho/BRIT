@@ -4,7 +4,7 @@ from . import views
 from .router import router
 
 urlpatterns = [
-    path('', views.MaterialsDashboardView.as_view(), name='material-dashboard'),
+    path('', views.MaterialsDashboardView.as_view(), name='materials-dashboard'),
     path('list/', views.MaterialListView.as_view(), name='material-list'),
     path('create/', views.MaterialCreateView.as_view(), name='material-create'),
     path('create/modal/', views.MaterialModalCreateView.as_view(), name='material-create-modal'),
