@@ -10,18 +10,18 @@ class MaterialDashboardViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = 'change_material'
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('material-dashboard')
+        url = reverse('materials-dashboard')
         response = self.client.get(url)
         self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
 
     def test_get_http_403_ok_for_outsiders(self):
         self.client.force_login(self.outsider)
-        response = self.client.get(reverse('material-dashboard'))
+        response = self.client.get(reverse('materials-dashboard'))
         self.assertEqual(403, response.status_code)
 
     def test_get_http_200_ok_for_members(self):
         self.client.force_login(self.member)
-        response = self.client.get(reverse('material-dashboard'))
+        response = self.client.get(reverse('materials-dashboard'))
         self.assertEqual(200, response.status_code)
 
 
@@ -2039,7 +2039,7 @@ class SampleDetailViewTestCase(ViewWithPermissionsTestCase):
         self.assertContains(response, reverse('sample-update-modal', kwargs={'pk': self.sample.pk}))
         self.assertContains(response, reverse('sample-add-source', kwargs={'pk': self.sample.pk}))
         self.assertContains(response, reverse('sample-duplicate-modal', kwargs={'pk': self.sample.pk}))
-        self.assertContains(response, reverse('material-dashboard'))
+        self.assertContains(response, reverse('materials-dashboard'))
         self.assertContains(response, reverse('sample-update', kwargs={'pk': self.sample.pk}))
         self.assertContains(response, reverse('sample-delete-modal', kwargs={'pk': self.sample.pk}))
         self.assertContains(response, reverse('sample-add-property-modal', kwargs={'pk': self.sample.pk}))
@@ -2053,7 +2053,7 @@ class SampleDetailViewTestCase(ViewWithPermissionsTestCase):
         self.assertNotContains(response, reverse('sample-update-modal', kwargs={'pk': self.sample.pk}))
         self.assertNotContains(response, reverse('sample-add-source', kwargs={'pk': self.sample.pk}))
         self.assertNotContains(response, reverse('sample-duplicate-modal', kwargs={'pk': self.sample.pk}))
-        self.assertNotContains(response, f'href="{reverse("material-dashboard")}"')
+        self.assertNotContains(response, f'href="{reverse("materials-dashboard")}"')
         self.assertNotContains(response, reverse('sample-update', kwargs={'pk': self.sample.pk}))
         self.assertNotContains(response, reverse('sample-delete-modal', kwargs={'pk': self.sample.pk}))
         self.assertNotContains(response, reverse('sample-add-property-modal', kwargs={'pk': self.sample.pk}))
