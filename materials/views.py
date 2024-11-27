@@ -15,7 +15,7 @@ from utils.views import (NextOrSuccessUrlMixin, OwnedObjectCreateView, OwnedObje
                          OwnedObjectListView, OwnedObjectModalCreateView, OwnedObjectModalDeleteView,
                          OwnedObjectModalDetailView, OwnedObjectModalUpdateView, OwnedObjectUpdateView,
                          PublishedObjectFilterView, UserOwnedObjectFilterView, UserOwnsObjectMixin)
-from .filters import SampleFilter
+from .filters import SampleFilter, SampleSeriesFilter
 from .forms import (AddComponentModalForm, AddCompositionModalForm, AddLiteratureSourceForm, AddSeasonalVariationForm,
                     ComponentGroupModalModelForm, ComponentGroupModelForm, ComponentModalModelForm, ComponentModelForm,
                     ComponentShareDistributionFormSetHelper, Composition, CompositionModalModelForm,
@@ -315,9 +315,15 @@ class MaterialPropertyValueModalDeleteView(OwnedObjectModalDeleteView):
 # ----------- Sample Series CRUD ---------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class SampleSeriesListView(OwnedObjectListView):
+
+class PublishedSampleSeriesListView(PublishedObjectFilterView):
     model = SampleSeries
-    permission_required = set()
+    filterset_class = SampleSeriesFilter
+
+
+class UserOwnedSampleSeriesListView(UserOwnedObjectFilterView):
+    model = SampleSeries
+    filterset_class = SampleSeriesFilter
 
 
 class SampleSeriesCreateView(OwnedObjectCreateView):

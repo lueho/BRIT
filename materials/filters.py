@@ -32,6 +32,17 @@ class SampleFilter(CrispyAutocompleteFilterSet):
         fields = ('material', 'timestep')
 
 
+class SampleSeriesFilter(CrispyAutocompleteFilterSet):
+    material = ModelChoiceFilter(queryset=Material.objects.filter(type='material'),
+                                 field_name='material__name',
+                                 label='Material',
+                                 widget=autocomplete.ModelSelect2(url='material-autocomplete'))
+
+    class Meta:
+        model = SampleSeries
+        fields = ('material',)
+
+
 class SampleFilterSet(rf_filters.FilterSet):
     class Meta:
         model = Sample
