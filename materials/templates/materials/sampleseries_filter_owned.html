@@ -1,0 +1,67 @@
+{% extends 'filtered_list.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}BRIT | Materials | Sample Series{% endblock %}
+
+{% block list_header %}<strong>My Sample Series</strong>{% endblock %}
+
+{% block list_body %}
+    <table class="table table-responsive-stack">
+        <thead>
+        <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Material</th>
+            <th>Public</th>
+        </tr>
+        </thead>
+        <tbody>
+        {% for object in object_list %}
+            <tr>
+                <td data-label="ID"><a href="{{ object.get_absolute_url }}">{{ object.id }}</a></td>
+                <td data-label="Name"><a href="{{ object.get_absolute_url }}">{{ object.name }}</a></td>
+                <td data-label="Material"><a href="{{ object.material.get_absolute_url }}">{{ object.material.name }}</a></td>
+                <td data-label="Public">
+                    {% if object.publication_status == 'published' %}
+                        <i class="fas fa-fw fa-check"></i>
+                    {% elif object.publication_status == 'review' %}
+                        <i class="fas fa-fw fa-times"></i>
+                    {% elif object.publication_status == 'private' %}
+                        <i class="fas fa-fw fa-lock"></i>
+                    {% endif %}
+                </td>
+            </tr>
+        {% endfor %}
+        </tbody>
+        <tfoot>
+        </tfoot>
+    </table>
+{% endblock list_body %}
+
+{% block list_footer %}
+    <a class="mr-2 text-nowrap" href="{% url 'sampleseries-list' %}">
+        <i class="fas fa-fw fa-list"></i> Public series
+    </a>
+    {% if user.is_authenticated %}
+        <a href="{% url 'sampleseries-create' %}?next={{ request.get_full_path|urlencode }}" class="nowrap">
+            <i class="fa fa-fw fa-plus"></i>
+            <span>Add new series</span>
+        </a>
+    {% endif %}
+    {% if 'materials.change_sampleseries' in perms %}
+        <a href="{% url 'materials-dashboard' %}" class="ml-3 nowrap">
+            <i class="fas fa-fw fa-cog"></i> Dashboard
+        </a>
+    {% endif %}
+{% endblock list_footer %}
+
+{% block filter_body %}
+    <form method="get">
+        {% crispy filter.form %}
+        <button id="btn-filter" class="btn btn-primary" type="submit">Filter</button>
+    </form>
+{% endblock filter_body %}
+
+{% block javascript %}
+    {{ block.super }}
+{% endblock javascript %}
