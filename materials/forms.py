@@ -2,15 +2,16 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Field, Layout, Row
+from dal import autocomplete
 from django.core.exceptions import ValidationError
-from django.forms import DecimalField, HiddenInput, ModelChoiceField, ModelMultipleChoiceField, NumberInput, Widget
+from django.forms import DateTimeInput, DecimalField, HiddenInput, ModelChoiceField, NumberInput, Widget
 from django.forms.models import BaseInlineFormSet
 from django.utils.safestring import mark_safe
 from extra_views import InlineFormSetFactory
 
-from bibliography.models import SOURCE_TYPES, Source
+from bibliography.models import Source
 from distributions.models import TemporalDistribution
-from utils.forms import ModalForm, ModalModelForm, ModalModelFormMixin, SimpleModelForm
+from utils.forms import AutoCompleteModelForm, ModalForm, ModalModelForm, ModalModelFormMixin, SimpleModelForm
 from .models import (Composition, Material, MaterialCategory, MaterialComponent, MaterialComponentGroup,
                      MaterialProperty, MaterialPropertyValue, Sample, SampleSeries, WeightShare)
 
@@ -99,15 +100,19 @@ class SampleSeriesAddTemporalDistributionModalModelForm(ModalModelForm):
             self.instance.temporal_distributions.all())
 
 
-class SampleModelForm(SimpleModelForm):
-    sources = ModelMultipleChoiceField(
-        queryset=Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by('abbreviation'),
-        required=False
-    )
-
+class SampleModelForm(AutoCompleteModelForm):
     class Meta:
         model = Sample
         fields = ('name', 'series', 'timestep', 'taken_at', 'description', 'preview', 'sources')
+        widgets = {
+            'series': autocomplete.ModelSelect2(url='sampleseries-autocomplete'),
+            'taken_at': DateTimeInput(attrs={'type': 'datetime-local'}),
+            'sources': autocomplete.ModelSelect2Multiple(url='source-autocomplete'),
+        }
+        labels = {
+            'taken_at': 'Date/Time',
+            'preview': 'Image',
+        }
 
 
 class SampleModalModelForm(ModalModelFormMixin, SampleModelForm):
