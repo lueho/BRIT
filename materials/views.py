@@ -408,6 +408,19 @@ class SampleSeriesModalAddDistributionView(OwnedObjectModalUpdateView):
         return HttpResponseRedirect(self.get_success_url())
 
 
+class SampleSeriesAutoCompleteView(autocomplete.Select2QuerySetView):
+    def get_queryset(self):
+        if not self.request.user.is_authenticated:
+            return SampleSeries.objects.none()
+
+        qs = SampleSeries.objects.filter(owner=self.request.user)
+
+        if self.q:
+            qs = qs.filter(name__icontains=self.q)
+
+        return qs
+
+
 # ----------- Sample CRUD ----------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 

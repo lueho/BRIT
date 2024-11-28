@@ -15,6 +15,7 @@ urlpatterns = [
     path('<int:pk>/delete/', views.MaterialModalDeleteView.as_view(), name='material-delete-modal'),
     path('autocomplete/', views.MaterialAutocompleteView.as_view(), name='material-autocomplete'),
     path('sample_series/', views.PublishedSampleSeriesListView.as_view(), name='sampleseries-list'),
+    path('sample_series/autocomplete/', views.SampleSeriesAutoCompleteView.as_view(), name='sampleseries-autocomplete'),
     path('sample_series/featured', views.FeaturedMaterialListView.as_view(), name='sampleseries-list-featured'),
     path('sample_series/user/', views.UserOwnedSampleSeriesListView.as_view(), name='sampleseries-list-owned'),
     path('sample_series/create/', views.SampleSeriesCreateView.as_view(), name='sampleseries-create'),
