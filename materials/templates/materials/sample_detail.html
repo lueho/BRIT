@@ -64,7 +64,7 @@
                 </div>
                 <div class="card-footer">
                     <div class="dropdown">
-                        <button class="btn btn-secondary dropdown-toggle" type="button" id="editDropdown"
+                        <button class="btn btn-primary dropdown-toggle" type="button" id="editDropdown"
                                 data-toggle="dropdown" aria-expanded="false">
                             Edit Options
                         </button>
@@ -73,9 +73,6 @@
                                 <a class="dropdown-item"
                                    href="{% url 'sample-update' object.id %}?next={{ request.path }}">
                                     <i class="fas fa-edit"></i> Edit
-                                </a>
-                                <a class="dropdown-item" href="{% url 'sample-add-source' object.pk %}">
-                                    <i class="fas fa-book-open"></i> Add source
                                 </a>
                                 <a class="dropdown-item" href="{% url 'sample-duplicate' object.id %}">
                                     <i class="fas fa-fw fa-copy"></i> Duplicate

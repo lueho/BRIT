@@ -142,7 +142,7 @@ class SampleModelSerializer(ModelSerializer):
         model = Sample
         fields = (
             'name', 'material', 'material_name', 'material_url', 'series', 'series_name', 'series_url', 'timestep',
-            'datetime', 'image', 'compositions', 'properties', 'sources')
+            'datetime', 'image', 'compositions', 'properties', 'sources', 'description')
 
 
 # ----------- API ------------------------------------------------------------------------------------------------------

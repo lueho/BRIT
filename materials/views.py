@@ -527,16 +527,6 @@ class SampleModalAddPropertyView(OwnedObjectModalCreateView):
         return reverse('sample-detail', kwargs={'pk': self.kwargs.get('pk')})
 
 
-class SampleAddSourceView(OwnedObjectUpdateView):
-    model = Sample
-    form_class = SourceSimpleFilterForm
-    permission_required = 'materials.change_sample'
-
-    def form_valid(self, form):
-        self.object.sources.add(form.cleaned_data['source'])
-        return HttpResponseRedirect(self.get_success_url())
-
-
 class SampleCreateDuplicateView(OwnedObjectUpdateView):
     model = Sample
     form_class = SampleModelForm

@@ -39,7 +39,6 @@ urlpatterns = [
     path('samples/<int:pk>/delete/modal/', views.SampleModalDeleteView.as_view(), name='sample-delete-modal'),
     path('samples/<int:pk>/add_property', views.SampleAddPropertyView.as_view(), name='sample-add-property'),
     path('samples/<int:pk>/add_property/modal/', views.SampleModalAddPropertyView.as_view(), name='sample-add-property-modal'),
-    path('samples/<int:pk>/add_source/', views.SampleAddSourceView.as_view(), name='sample-add-source'),
     path('samples/<int:pk>/duplicate/', views.SampleCreateDuplicateView.as_view(), name='sample-duplicate'),
     path('samples/<int:pk>/duplicate/modal/', views.SampleModalCreateDuplicateView.as_view(), name='sample-duplicate-modal'),
     path('categories/', views.MaterialCategoryListView.as_view(), name='materialcategory-list'),
