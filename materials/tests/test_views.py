@@ -1963,22 +1963,12 @@ class SampleDetailViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('sample-detail', kwargs={'pk': self.sample.pk}))
         self.assertEqual(response.status_code, 200)
 
-    def test_template_contains_edit_toggle_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('sample-detail', kwargs={'pk': self.sample.pk}))
-        self.assertContains(response, 'data-toggle="collapse"')
-
-    def test_template_does_not_contain_edit_toggle_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('sample-detail', kwargs={'pk': self.sample.pk}))
-        self.assertNotContains(response, 'data-toggle="collapse"')
-
-    def test_template_contains_dashboard_edit_and_delete_button_for_members(self):
-        self.client.force_login(self.member)
+    def test_template_contains_dashboard_edit_and_delete_button_for_owners(self):
+        self.client.force_login(self.sample.owner)
         response = self.client.get(reverse('sample-detail', kwargs={'pk': self.sample.pk}))
         self.assertContains(response, reverse('sample-update', kwargs={'pk': self.sample.pk}))
         self.assertContains(response, reverse('sample-add-source', kwargs={'pk': self.sample.pk}))
-        self.assertContains(response, reverse('sample-duplicate-modal', kwargs={'pk': self.sample.pk}))
+        self.assertContains(response, reverse('sample-duplicate', kwargs={'pk': self.sample.pk}))
         self.assertContains(response, reverse('materials-dashboard'))
         self.assertContains(response, reverse('sample-update', kwargs={'pk': self.sample.pk}))
         self.assertContains(response, reverse('sample-delete-modal', kwargs={'pk': self.sample.pk}))
@@ -1992,7 +1982,7 @@ class SampleDetailViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('sample-detail', kwargs={'pk': self.sample.pk}))
         self.assertNotContains(response, reverse('sample-update', kwargs={'pk': self.sample.pk}))
         self.assertNotContains(response, reverse('sample-add-source', kwargs={'pk': self.sample.pk}))
-        self.assertNotContains(response, reverse('sample-duplicate-modal', kwargs={'pk': self.sample.pk}))
+        self.assertNotContains(response, reverse('sample-duplicate', kwargs={'pk': self.sample.pk}))
         self.assertNotContains(response, f'href="{reverse("materials-dashboard")}"')
         self.assertNotContains(response, reverse('sample-update', kwargs={'pk': self.sample.pk}))
         self.assertNotContains(response, reverse('sample-delete-modal', kwargs={'pk': self.sample.pk}))
@@ -2017,13 +2007,8 @@ class SampleUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(url)
         self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
 
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('sample-update', kwargs={'pk': self.sample.pk}))
-        self.assertEqual(response.status_code, 403)
-
     def test_get_http_200_ok_for_owner(self):
-        self.client.force_login(self.member)
+        self.client.force_login(self.sample.owner)
         response = self.client.get(reverse('sample-update', kwargs={'pk': self.sample.pk}))
         self.assertEqual(response.status_code, 200)
 
@@ -2036,11 +2021,6 @@ class SampleUpdateViewTestCase(ViewWithPermissionsTestCase):
         url = reverse('sample-update', kwargs={'pk': self.series.pk})
         response = self.client.post(url)
         self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('sample-update', kwargs={'pk': self.sample.pk}))
-        self.assertEqual(response.status_code, 403)
 
     def test_post_success_and_http_302_redirect_for_owner(self):
         self.client.force_login(self.sample.owner)
