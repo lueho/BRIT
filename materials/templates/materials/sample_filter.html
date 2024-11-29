@@ -10,24 +10,20 @@
         <thead>
         <tr>
             <th>Id</th>
-            <th>Sample Series</th>
+            <th>Name</th>
             <th>Material</th>
-            <th>Timestep</th>
         </tr>
         </thead>
         <tbody>
         {% for object in object_list %}
             <tr>
                 <td data-label="Id"><a href="{{ object.get_absolute_url }}">{{ object.id }}</a></td>
-                <td data-label="Sample Series"><a href="{% url 'sampleseries-detail' object.series.pk %}">{{ object.series.name }}</a></td>
+                <td data-label="Name"><a href="{% url 'sampleseries-detail' object.pk %}">{{ object.name }}</a></td>
                 <td data-label="Material">
                     <a href="{% url 'material-detail' object.material.pk %}">
                         {{ object.material.name }}
                     </a>
                 </td>
-                <td data-label="Timestamp"><a href="{% url 'timestep-detail-modal' object.timestep.pk %}" class="modal-link">
-                    {{ object.timestep.name }}
-                </a></td>
             </tr>
         {% endfor %}
         </tbody>
