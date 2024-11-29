@@ -61,50 +61,30 @@
                             {% endfor %}
                         </p>
                     {% endif %}
-
-                    {% if 'materials.change_sample' in perms %}
-                        <p class="card-text"><strong><label for="id_toggle_edit">Edit:</label></strong><br>
-                            <span data-toggle="collapse" data-target=".multi-collapse" aria-expanded="false"
-                                  aria-controls="add-component-group">
-                                <input id="id_toggle_edit" type="checkbox" data-toggle="toggle" data-on="On"
-                                       data-off="Off" data-onstyle="primary" data-offstyle="secondary" data-size="mini">
-                        </span>
-                        </p>
-                    {% endif %}
-
                 </div>
                 <div class="card-footer">
-                    <div class="collapse multi-collapse">
-                        {% if 'materials.change_sample' in perms %}
-                            <a href="{% url 'sample-update' object.id %}?next={{ request.path }}"
-                               class="nowrap mr-3">
-                                <i class="fas fa-fw fa-edit"></i> Edit
-                            </a>
-                        {% endif %}
-                        {% if 'materials.change_sample' in perms %}
-                            <a href="{% url 'sample-add-source' object.pk %}"
-                               class="nowrap mr-3">
-                                <i class="fas fa-fw fa-book-open"></i> Add source
-                            </a>
-                        {% endif %}
-                        {% if 'materials.add_sample' in perms %}
-                            <a href="{% url 'sample-duplicate-modal' object.id %}"
-                               class="modal-link nowrap mr-3">
-                                <i class="fas fa-fw fa-copy"></i> Duplicate
-                            </a>
-                        {% endif %}
-                        {% if 'materials.change_material' in perms %}
-                            <a href="{% url 'materials-dashboard' %}"
-                               class="nowrap mr-3">
-                                <i class="fas fa-fw fa-cog"></i> Dashboard
-                            </a>
-                        {% endif %}
-                        {% if 'materials.delete_sample' in perms %}
-                            <a href="{% url 'sample-delete-modal' object.pk%}"
-                               class="nowrap mr-3">
-                                <i class="fas fa-fw fa-cog"></i> Dashboard
-                            </a>
-                        {% endif %}
+                    <div class="dropdown">
+                        <button class="btn btn-secondary dropdown-toggle" type="button" id="editDropdown"
+                                data-toggle="dropdown" aria-expanded="false">
+                            Edit Options
+                        </button>
+                        <div class="dropdown-menu" aria-labelledby="editDropdown">
+                            {% if request.user == object.owner %}
+                                <a class="dropdown-item"
+                                   href="{% url 'sample-update' object.id %}?next={{ request.path }}">
+                                    <i class="fas fa-edit"></i> Edit
+                                </a>
+                                <a class="dropdown-item" href="{% url 'sample-add-source' object.pk %}">
+                                    <i class="fas fa-book-open"></i> Add source
+                                </a>
+                                <a class="dropdown-item" href="{% url 'sample-duplicate' object.id %}">
+                                    <i class="fas fa-fw fa-copy"></i> Duplicate
+                                </a>
+                                <a class="dropdown-item modal-link" href="{% url 'sample-delete-modal' object.pk %}">
+                                    <i class="fas fa-fw fa-trash"></i> Delete
+                                </a>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -122,7 +102,7 @@
                             <th>Property</th>
                             <th>Value</th>
                             {% if 'materials.delete_materialpropertyvalue' in perms %}
-                            <th class="collapse multi-collapse">Remove</th>
+                                <th class="collapse multi-collapse">Remove</th>
                             {% endif %}
                         </tr>
                         </thead>
@@ -134,14 +114,14 @@
                                 <td>{{ property.average }}
                                     ± {{ property.standard_deviation }} {{ property.property.unit }}</td>
                                 {% if 'materials.delete_materialpropertyvalue' in perms %}
-                                <td class="collapse multi-collapse">
-                                    <div class="collapse multi-collapse">
-                                        <a href="{% url 'materialpropertyvalue-delete-modal' property.id %}?next={{ request.path }}"
-                                           class="modal-link">
-                                            <i class="fas fa-fw fa-trash"></i>
-                                        </a>
-                                    </div>
-                                </td>
+                                    <td class="collapse multi-collapse">
+                                        <div class="collapse multi-collapse">
+                                            <a href="{% url 'materialpropertyvalue-delete-modal' property.id %}?next={{ request.path }}"
+                                               class="modal-link">
+                                                <i class="fas fa-fw fa-trash"></i>
+                                            </a>
+                                        </div>
+                                    </td>
                                 {% endif %}
 
                             </tr>
@@ -156,12 +136,12 @@
                 </div>
                 <div class="card-footer">
                     {% if 'materials.add_materialpropertyvalue' in perms %}
-                    <div class="collapse multi-collapse">
-                        <a href="{% url 'sample-add-property-modal' object.id %}"
-                           class="modal-link">
-                            <i class="fas fa-fw fa-plus"></i> Add property
-                        </a>
-                    </div>
+                        <div class="collapse multi-collapse">
+                            <a href="{% url 'sample-add-property-modal' object.id %}"
+                               class="modal-link">
+                                <i class="fas fa-fw fa-plus"></i> Add property
+                            </a>
+                        </div>
                     {% endif %}
                 </div>
             </div>
@@ -239,26 +219,26 @@
                     </div>
                     <div class="card-footer">
                         {% if 'materials.change_composition' in perms %}
-                        <div class="collapse multi-collapse"
-                             id="options-composition-{{ composition.id }}">
-                            <a id="move-group-{{ composition.id }}-left"
-                               href="{% url 'composition-order-down' composition.id %}?next={{ request.path }}">
-                                <i class="fas fa-fw fa-arrow-left"></i>
-                            </a>
-                            <a id="edit-group-{{ composition.id }}"
-                               href="{% url 'composition-update' composition.id %}?next={{ request.path }}">
-                                <i class="fas fa-fw fa-edit"></i> Edit
-                            </a>
-                            <a id="remove-group-{{ composition.id }}"
-                               class="modal-link"
-                               href="{% url 'composition-delete-modal' composition.id %}?next={{ request.path }}">
-                                <i class="fas fa-fw fa-trash"></i> Delete
-                            </a>
-                            <a id="move-group-{{ composition.id }}-right"
-                               href="{% url 'composition-order-up' composition.id %}?next={{ request.path }}">
-                                <i class="fas fa-fw fa-arrow-right"></i>
-                            </a>
-                        </div>
+                            <div class="collapse multi-collapse"
+                                 id="options-composition-{{ composition.id }}">
+                                <a id="move-group-{{ composition.id }}-left"
+                                   href="{% url 'composition-order-down' composition.id %}?next={{ request.path }}">
+                                    <i class="fas fa-fw fa-arrow-left"></i>
+                                </a>
+                                <a id="edit-group-{{ composition.id }}"
+                                   href="{% url 'composition-update' composition.id %}?next={{ request.path }}">
+                                    <i class="fas fa-fw fa-edit"></i> Edit
+                                </a>
+                                <a id="remove-group-{{ composition.id }}"
+                                   class="modal-link"
+                                   href="{% url 'composition-delete-modal' composition.id %}?next={{ request.path }}">
+                                    <i class="fas fa-fw fa-trash"></i> Delete
+                                </a>
+                                <a id="move-group-{{ composition.id }}-right"
+                                   href="{% url 'composition-order-up' composition.id %}?next={{ request.path }}">
+                                    <i class="fas fa-fw fa-arrow-right"></i>
+                                </a>
+                            </div>
                         {% endif %}
                     </div>
                 </div>
@@ -266,22 +246,22 @@
         {% endfor %}
     </div>
     {% if 'materials.add_composition' in perms %}
-    <div class="collapse multi-collapse" id="add-component-group">
-        <div class="row">
-            <div class="col mt-4">
-                <div class="card border-left-primary border">
-                    <div class="card-header"></div>
-                    <div class="card-body">
-                        <a href="{% url 'sampleseries-add-composition' data.series %}?next={{ request.path }}"
-                           class="modal-link">
-                            <i class="fas fa-fw fa-plus"></i> Add composition
-                        </a>
+        <div class="collapse multi-collapse" id="add-component-group">
+            <div class="row">
+                <div class="col mt-4">
+                    <div class="card border-left-primary border">
+                        <div class="card-header"></div>
+                        <div class="card-body">
+                            <a href="{% url 'sampleseries-add-composition' data.series %}?next={{ request.path }}"
+                               class="modal-link">
+                                <i class="fas fa-fw fa-plus"></i> Add composition
+                            </a>
+                        </div>
+                        <div class="card-footer"></div>
                     </div>
-                    <div class="card-footer"></div>
                 </div>
             </div>
         </div>
-    </div>
     {% endif %}
 
 {% endblock content %}

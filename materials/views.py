@@ -14,7 +14,8 @@ from distributions.plots import DoughnutChart
 from utils.views import (NextOrSuccessUrlMixin, OwnedObjectCreateView, OwnedObjectDetailView,
                          OwnedObjectListView, OwnedObjectModalCreateView, OwnedObjectModalDeleteView,
                          OwnedObjectModalDetailView, OwnedObjectModalUpdateView, OwnedObjectUpdateView,
-                         PublishedObjectFilterView, UserOwnedObjectFilterView, UserOwnsObjectMixin)
+                         PublishedObjectFilterView, UserCreatedObjectUpdateView, UserOwnedObjectFilterView,
+                         UserOwnsObjectMixin)
 from .filters import SampleFilter, SampleSeriesFilter
 from .forms import (AddComponentModalForm, AddCompositionModalForm, AddLiteratureSourceForm, AddSeasonalVariationForm,
                     ComponentGroupModalModelForm, ComponentGroupModelForm, ComponentModalModelForm, ComponentModelForm,
@@ -471,10 +472,9 @@ class SampleDetailView(OwnedObjectDetailView):
         return context
 
 
-class SampleUpdateView(OwnedObjectUpdateView):
+class SampleUpdateView(UserCreatedObjectUpdateView):
     model = Sample
     form_class = SampleModelForm
-    permission_required = 'materials.change_sample'
 
 
 class SampleModalDeleteView(OwnedObjectModalDeleteView):

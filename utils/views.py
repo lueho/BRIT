@@ -37,6 +37,11 @@ class UserOwnsObjectMixin(UserPassesTestMixin):
     """
 
     def test_func(self):
+        # If the user is not authenticated, fail the test
+        if not self.request.user.is_authenticated:
+            return False
+
+        # Allow access only if the user owns the object
         return self.get_object().owner == self.request.user
 
 
@@ -243,7 +248,28 @@ class OwnedObjectModalDetailView(PermissionRequiredMixin, BSModalReadView):
         return context
 
 
+class UserCreatedObjectUpdateView(UserOwnsObjectMixin, NextOrSuccessUrlMixin, UpdateView):
+    # TODO: Implement permission flow for publication process and moderators.
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'form_title': f'Update {self.object._meta.verbose_name}',
+            'submit_button_text': 'Save'
+        })
+        return context
+
+    def get_template_names(self):
+        try:
+            template_names = super().get_template_names()
+        except ImproperlyConfigured:
+            template_names = []
+        template_names.append('simple_form_card.html')
+        return template_names
+
+
 class OwnedObjectUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin, UpdateView):
+    # TODO: EOL this in favor of UserCreatedObjectUpdateView
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
