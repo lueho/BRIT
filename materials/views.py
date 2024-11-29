@@ -527,10 +527,9 @@ class SampleModalAddPropertyView(OwnedObjectModalCreateView):
         return reverse('sample-detail', kwargs={'pk': self.kwargs.get('pk')})
 
 
-class SampleCreateDuplicateView(OwnedObjectUpdateView):
+class SampleCreateDuplicateView(UserCreatedObjectUpdateView):
     model = Sample
     form_class = SampleModelForm
-    permission_required = 'materials.add_sample'
     object = None
 
     def form_valid(self, form):
