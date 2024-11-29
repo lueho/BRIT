@@ -76,8 +76,8 @@
                 <div class="card-footer">
                     <div class="collapse multi-collapse">
                         {% if 'materials.change_sample' in perms %}
-                            <a href="{% url 'sample-update-modal' object.id %}?next={{ request.path }}"
-                               class="modal-link nowrap mr-3">
+                            <a href="{% url 'sample-update' object.id %}?next={{ request.path }}"
+                               class="nowrap mr-3">
                                 <i class="fas fa-fw fa-edit"></i> Edit
                             </a>
                         {% endif %}

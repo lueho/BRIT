@@ -1,4 +1,4 @@
-from django.urls import path, include
+from django.urls import include, path
 
 from . import views
 from .router import router
@@ -34,11 +34,8 @@ urlpatterns = [
     path('samples/featured', views.FeaturedSampleListView.as_view(), name='sample-list-featured'),
     path('samples/user/', views.UserOwnedSampleListView.as_view(), name='sample-list-owned'),
     path('samples/create/', views.SampleCreateView.as_view(), name='sample-create'),
-    path('samples/create/modal', views.SampleModalCreateView.as_view(), name='sample-create-modal'),
     path('samples/<int:pk>/', views.SampleDetailView.as_view(), name='sample-detail'),
-    path('samples/<int:pk>/modal/', views.SampleModalDetailView.as_view(), name='sample-detail-modal'),
     path('samples/<int:pk>/update/', views.SampleUpdateView.as_view(), name='sample-update'),
-    path('samples/<int:pk>/update/modal/', views.SampleModalUpdateView.as_view(), name='sample-update-modal'),
     path('samples/<int:pk>/delete/modal/', views.SampleModalDeleteView.as_view(), name='sample-delete-modal'),
     path('samples/<int:pk>/add_property', views.SampleAddPropertyView.as_view(), name='sample-add-property'),
     path('samples/<int:pk>/add_property/modal/', views.SampleModalAddPropertyView.as_view(), name='sample-add-property-modal'),
