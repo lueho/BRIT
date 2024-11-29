@@ -1,11 +1,26 @@
 from collections import OrderedDict
 
+from rest_framework import serializers
 from rest_framework.fields import SkipField
 from rest_framework.relations import PKOnlyObject
-from rest_framework.serializers import Serializer, ModelSerializer
+from rest_framework.serializers import ModelSerializer, Serializer
+
+
+class UserCreatedObjectSerializer(serializers.ModelSerializer):
+    owner = serializers.ReadOnlyField(source='owner.username')
+
+    class Meta:
+        fields = [
+            'id', 'owner', 'name', 'description', 'publication_status', 'created_at', 'created_by', 'lastmodified_at',
+            'last_modified_by'
+        ]
+        read_only_fields = ['owner', 'publication_status', 'created_at', 'created_by', 'lastmodified_at',
+                            'last_modified_by']
 
 
 class FieldLabelMixin(Serializer):
+    # TODO: EOL this class
+
     field_labels_as_keys = False
 
     def __init__(self, *args, **kwargs):

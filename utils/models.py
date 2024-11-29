@@ -1,6 +1,8 @@
 from ambient_toolbox.models import CommonInfo
 from django.contrib.auth.models import Group, User
+from django.core.exceptions import ValidationError
 from django.db import models
+from django.db.models import Q
 from django.urls import exceptions, reverse
 
 from users.models import get_default_owner
@@ -113,8 +115,31 @@ class UserCreatedObjectQuerySet(models.QuerySet):
     def owned_by_user(self, user):
         return self.filter(owner=user)
 
+    def reviewable_by_user(self, user):
+        if self._is_moderator(user):
+            return self.filter(publication_status='review')
+        else:
+            return self.none()
+
     def accessible_by_user(self, user):
-        return self.filter(models.Q(owner=user) | models.Q(publication_status='published'))
+        if self._is_moderator(user):
+            return self.all()
+        else:
+            return self.filter(
+                Q(owner=user) |
+                Q(publication_status='published') |
+                Q(publication_status='review', owner=user)
+            )
+
+    def _is_moderator(self, user):
+        """
+        Determines if the user has moderation permissions for the model.
+        Assumes that a permission named 'can_moderate_<modelname>' exists.
+        """
+        model_name = self.model._meta.model_name
+        perm_codename = f'can_moderate_{model_name}'
+        app_label = self.model._meta.app_label
+        return user.is_staff or user.has_perm(f'{app_label}.{perm_codename}')
 
 
 class UserCreatedObjectManager(models.Manager):
@@ -126,6 +151,9 @@ class UserCreatedObjectManager(models.Manager):
 
     def owned_by_user(self, user):
         return self.get_queryset().owned_by_user(user)
+
+    def reviewable_by_user(self, user):
+        return self.get_queryset().reviewable_by_user(user)
 
     def accessible_by_user(self, user):
         return self.get_queryset().accessible_by_user(user)
@@ -139,6 +167,34 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
 
     class Meta:
         abstract = True
+
+    def register_for_review(self):
+        if self.publication_status != 'private':
+            raise ValidationError("Only private objects can be registered for review.")
+        self.publication_status = 'review'
+        self.save()
+        # TODO: Implement notification to moderators
+
+    def withdraw_from_review(self):
+        if self.publication_status != 'review':
+            raise ValidationError("Only objects in review can be withdrawn.")
+        self.publication_status = 'private'
+        self.save()
+        # TODO: Implement notification to moderators
+
+    def approve(self):
+        if self.publication_status != 'review':
+            raise ValidationError("Only objects in review can be approved.")
+        self.publication_status = 'published'
+        self.save()
+        # TODO: Implement notification to the owner
+
+    def reject(self):
+        if self.publication_status != 'review':
+            raise ValidationError("Only objects in review can be rejected.")
+        self.publication_status = 'private'
+        self.save()
+        # TODO: Implement notification to the owner
 
 
 class NamedUserCreatedObject(UserCreatedObject):
