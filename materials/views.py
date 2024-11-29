@@ -538,17 +538,6 @@ class SampleCreateDuplicateView(OwnedObjectUpdateView):
         return super().form_valid(form)
 
 
-class SampleModalCreateDuplicateView(OwnedObjectModalUpdateView):
-    model = Sample
-    form_class = SampleModalModelForm
-    permission_required = 'materials.add_sample'
-    object = None
-
-    def form_valid(self, form):
-        self.object = self.object.duplicate(creator=self.request.user, **form.cleaned_data)
-        return super().form_valid(form)
-
-
 # ----------- Composition CRUD -----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 

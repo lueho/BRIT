@@ -2267,63 +2267,6 @@ class SampleCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
         self.assertRedirects(response, reverse('sample-detail', kwargs={'pk': created_pk}))
 
 
-class SampleModalCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'add_sample'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.material = Material.objects.create(name='Test Material')
-        cls.series = SampleSeries.objects.create(name='Test Series', material=cls.material)
-        distribution = TemporalDistribution.objects.create(name='Test Distribution')
-        timestep = Timestep.objects.create(name='Test Timestep 1', distribution=distribution)
-        Timestep.objects.create(name='Test Timestep 2', distribution=distribution)
-        cls.sample = Sample.objects.create(name='Test Sample', material=cls.material, series=cls.series, timestep=timestep)
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('sample-duplicate-modal', kwargs={'pk': self.sample.pk})
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('sample-duplicate-modal', kwargs={'pk': self.sample.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('sample-duplicate-modal', kwargs={'pk': self.sample.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('sample-duplicate-modal', kwargs={'pk': self.sample.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('sample-duplicate-modal', kwargs={'pk': self.sample.pk})
-        response = self.client.post(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-        self.assertEqual(response.status_code, 302)
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('sample-duplicate-modal', kwargs={'pk': self.sample.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        data = {
-            'name': 'Test Sample Duplicate',
-            'material': self.material.pk,
-            'series': self.series.pk,
-            'timestep': Timestep.objects.get(name='Test Timestep 2').pk
-        }
-        response = self.client.post(reverse('sample-duplicate-modal', kwargs={'pk': self.sample.pk}), data, follow=True)
-        pk = response.context['object'].id
-        self.assertRedirects(response, reverse('sample-detail', kwargs={'pk': pk}))
-
-
 # ----------- Composition CRUD -----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
