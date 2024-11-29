@@ -17,6 +17,10 @@
                 {% endif %}
                 <div class="card-body">
                     <p class="card-text">
+                        <strong>Name:</strong><br>
+                        {{ object.name }}
+                    </p>
+                    <p class="card-text">
                         <b>Material:</b><br>
                         <a href="{% url 'material-detail-modal' object.material.pk %}"
                            class="modal-link">{{ object.material.name }}</a>
@@ -62,11 +66,31 @@
                         </p>
                     {% endif %}
                 </div>
-                <div class="card-footer">
+                <div class="card-footer d-flex">
                     <div class="dropdown">
-                        <button class="btn btn-primary dropdown-toggle" type="button" id="editDropdown"
+                        <button class="btn btn-secondary dropdown-toggle" type="button" id="navigateDropdown"
                                 data-toggle="dropdown" aria-expanded="false">
-                            Edit Options
+                            Navigate
+                        </button>
+                        <div class="dropdown-menu" aria-labelledby="navigateDropdown">
+                            <a class="dropdown-item"
+                               href="{% url 'sample-list' %}">
+                                <i class="fas fa-fw fa-list"></i> Public Samples
+                            </a>
+                            <a class="dropdown-item"
+                               href="{% url 'sample-list-owned' %}">
+                                <i class="fas fa-fw fa-list"></i> My Samples
+                            </a>
+                            <a class="dropdown-item"
+                               href="{% url 'materials-dashboard' %}">
+                                <i class="fas fa-fw fa-cog"></i> Dashboard
+                            </a>
+                        </div>
+                    </div>
+                    <div class="dropdown">
+                        <button class="btn btn-secondary dropdown-toggle ml-3" type="button" id="editDropdown"
+                                data-toggle="dropdown" aria-expanded="false">
+                            Options
                         </button>
                         <div class="dropdown-menu" aria-labelledby="editDropdown">
                             {% if request.user == object.owner %}

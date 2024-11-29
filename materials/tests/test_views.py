@@ -2229,18 +2229,13 @@ class SampleCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(url)
         self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
 
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('sample-duplicate', kwargs={'pk': self.sample.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
+    def test_get_http_200_ok_for_owner(self):
+        self.client.force_login(self.sample.owner)
         response = self.client.get(reverse('sample-duplicate', kwargs={'pk': self.sample.pk}))
         self.assertEqual(response.status_code, 200)
 
     def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
+        self.client.force_login(self.sample.owner)
         response = self.client.get(reverse('sample-duplicate', kwargs={'pk': self.sample.pk}))
         self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
@@ -2249,13 +2244,8 @@ class SampleCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.post(url)
         self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
 
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('sample-duplicate', kwargs={'pk': self.sample.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
+    def test_post_success_and_http_302_redirect_for_owner(self):
+        self.client.force_login(self.sample.owner)
         data = {
             'name': 'Test Sample Duplicate',
             'material': self.material.pk,
@@ -2263,8 +2253,19 @@ class SampleCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
             'timestep': Timestep.objects.get(name='Test Timestep 2').pk
         }
         response = self.client.post(reverse('sample-duplicate', kwargs={'pk': self.sample.pk}), data, follow=True)
-        created_pk = Sample.objects.get(name='Test Sample Duplicate').pk
-        self.assertRedirects(response, reverse('sample-detail', kwargs={'pk': created_pk}))
+        duplicate = Sample.objects.get(name='Test Sample Duplicate')
+        self.assertRedirects(response, reverse('sample-detail', kwargs={'pk': duplicate.pk}))
+
+    def test_newly_created_sample_has_user_as_owner(self):
+        self.client.force_login(self.sample.owner)
+        data = {
+            'name': 'Test Sample Duplicate',
+            'material': self.material.pk,
+            'series': self.series.pk,
+            'timestep': Timestep.objects.get(name='Test Timestep 2').pk
+        }
+        self.client.post(reverse('sample-duplicate', kwargs={'pk': self.sample.pk}), data)
+        self.assertEqual(Sample.objects.get(name='Test Sample Duplicate').owner, self.sample.owner)
 
 
 # ----------- Composition CRUD -----------------------------------------------------------------------------------------
