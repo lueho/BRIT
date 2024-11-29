@@ -56,7 +56,7 @@ HEX_COLOR_REGEX = RegexValidator(
 )
 
 
-class MapLayerStyle(NamedUserObjectModel):
+class MapLayerStyle(NamedUserCreatedObject):
     stroke = models.BooleanField(
         default=True,
         help_text="If False, the layer will not have a stroke."
@@ -166,7 +166,7 @@ def get_default_layer_style(layer_type):
     return style
 
 
-class MapLayerConfiguration(NamedUserObjectModel):
+class MapLayerConfiguration(NamedUserCreatedObject):
     layer_type = models.CharField(
         max_length=50,
         choices=LAYER_TYPE_CHOICES,
@@ -230,7 +230,7 @@ def assign_default_layer_style(sender, instance, **kwargs):
             instance.style = get_default_layer_style(instance.layer_type)
 
 
-class MapConfiguration(NamedUserObjectModel):
+class MapConfiguration(NamedUserCreatedObject):
     layers = models.ManyToManyField(
         MapLayerConfiguration,
         related_name='map_configurations',
