@@ -8,13 +8,13 @@ from django.views.generic import ListView, RedirectView, TemplateView
 from django.views.generic.detail import SingleObjectMixin
 from extra_views import UpdateWithInlinesView
 
-from bibliography.forms import SourceSimpleFilterForm
 from distributions.models import TemporalDistribution
 from distributions.plots import DoughnutChart
 from utils.views import (NextOrSuccessUrlMixin, OwnedObjectCreateView, OwnedObjectDetailView,
                          OwnedObjectListView, OwnedObjectModalCreateView, OwnedObjectModalDeleteView,
                          OwnedObjectModalDetailView, OwnedObjectModalUpdateView, OwnedObjectUpdateView,
-                         PublishedObjectFilterView, UserCreatedObjectUpdateView, UserOwnedObjectFilterView,
+                         PublishedObjectFilterView, UserCreatedObjectModalDeleteView, UserCreatedObjectUpdateView,
+                         UserOwnedObjectFilterView,
                          UserOwnsObjectMixin)
 from .filters import SampleFilter, SampleSeriesFilter
 from .forms import (AddComponentModalForm, AddCompositionModalForm, AddLiteratureSourceForm, AddSeasonalVariationForm,
@@ -477,12 +477,11 @@ class SampleUpdateView(UserCreatedObjectUpdateView):
     form_class = SampleModelForm
 
 
-class SampleModalDeleteView(OwnedObjectModalDeleteView):
+class SampleModalDeleteView(UserCreatedObjectModalDeleteView):
     template_name = 'modal_delete.html'
     model = Sample
     success_message = 'Successfully deleted.'
     success_url = reverse_lazy('sample-list')
-    permission_required = 'materials.delete_sample'
 
 
 # ----------- Sample Utilities -----------------------------------------------------------------------------------------

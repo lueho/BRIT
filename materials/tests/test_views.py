@@ -2052,13 +2052,13 @@ class SampleModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('sample-delete-modal', kwargs={'pk': self.sample.pk}))
         self.assertEqual(response.status_code, 403)
 
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
+    def test_get_http_200_ok_for_owners(self):
+        self.client.force_login(self.sample.owner)
         response = self.client.get(reverse('sample-delete-modal', kwargs={'pk': self.sample.pk}))
         self.assertEqual(response.status_code, 200)
 
     def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
+        self.client.force_login(self.sample.owner)
         response = self.client.get(reverse('sample-delete-modal', kwargs={'pk': self.sample.pk}))
         self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
@@ -2072,8 +2072,8 @@ class SampleModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.post(reverse('sample-delete-modal', kwargs={'pk': self.sample.pk}))
         self.assertEqual(response.status_code, 403)
 
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
+    def test_post_success_and_http_302_redirect_for_owners(self):
+        self.client.force_login(self.sample.owner)
         response = self.client.post(reverse('sample-delete-modal', kwargs={'pk': self.sample.pk}))
         with self.assertRaises(Sample.DoesNotExist):
             Sample.objects.get(pk=self.sample.pk)
