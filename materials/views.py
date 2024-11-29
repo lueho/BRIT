@@ -1,7 +1,7 @@
 from bootstrap_modal_forms.generic import BSModalDeleteView, BSModalFormView, BSModalReadView, BSModalUpdateView
 from crispy_forms.helper import FormHelper
 from dal import autocomplete
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin, UserPassesTestMixin
 from django.http import HttpResponseRedirect
 from django.urls import reverse, reverse_lazy
 from django.views.generic import ListView, RedirectView, TemplateView
@@ -13,7 +13,8 @@ from distributions.plots import DoughnutChart
 from utils.views import (NextOrSuccessUrlMixin, OwnedObjectCreateView, OwnedObjectDetailView,
                          OwnedObjectListView, OwnedObjectModalCreateView, OwnedObjectModalDeleteView,
                          OwnedObjectModalDetailView, OwnedObjectModalUpdateView, OwnedObjectUpdateView,
-                         PublishedObjectFilterView, UserCreatedObjectModalDeleteView, UserCreatedObjectUpdateView,
+                         PublishedObjectFilterView, UserCreatedObjectModalDeleteView,
+                         UserCreatedObjectUpdateView,
                          UserOwnedObjectFilterView,
                          UserOwnsObjectMixin)
 from .filters import PublishedSampleFilter, SampleSeriesFilter, UserOwnedSampleFilter
@@ -511,7 +512,7 @@ class UserOwnedSampleAutoCompleteView(SampleAutoCompleteView):
         return super().get_queryset().filter(owner=self.request.user)
 
 
-class SampleAddPropertyView(OwnedObjectCreateView):
+class SampleAddPropertyView(UserPassesTestMixin, OwnedObjectCreateView):
     form_class = MaterialPropertyValueModelForm
     permission_required = 'materials.add_materialpropertyvalue'
 
@@ -522,13 +523,18 @@ class SampleAddPropertyView(OwnedObjectCreateView):
         sample.properties.add(property_value)
         return HttpResponseRedirect(self.get_success_url())
 
+    def test_func(self):
+        if not self.request.user.is_authenticated:
+            return False
+        sample = Sample.objects.get(pk=self.kwargs.get('pk'))
+        return self.request.user == sample.owner
+
     def get_success_url(self):
         return reverse('sample-detail', kwargs={'pk': self.kwargs.get('pk')})
 
 
-class SampleModalAddPropertyView(OwnedObjectModalCreateView):
+class SampleModalAddPropertyView(UserPassesTestMixin, OwnedObjectModalCreateView):
     form_class = MaterialPropertyValueModalModelForm
-    permission_required = 'materials.add_materialpropertyvalue'
 
     def form_valid(self, form):
         form.instance.owner = self.request.user
@@ -536,6 +542,12 @@ class SampleModalAddPropertyView(OwnedObjectModalCreateView):
         sample = Sample.objects.get(pk=self.kwargs.get('pk'))
         sample.properties.add(property_value)
         return HttpResponseRedirect(self.get_success_url())
+
+    def test_func(self):
+        if not self.request.user.is_authenticated:
+            return False
+        sample = Sample.objects.get(pk=self.kwargs.get('pk'))
+        return self.request.user == sample.owner
 
     def get_success_url(self):
         return reverse('sample-detail', kwargs={'pk': self.kwargs.get('pk')})
