@@ -1947,58 +1947,6 @@ class SampleCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertRedirects(response, reverse('sample-detail', kwargs={'pk': created_pk}))
 
 
-class SampleModalCreateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'add_sample'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.material = Material.objects.create(name='Test Material')
-        cls.series = SampleSeries.objects.create(name='Test Series', material=cls.material)
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('sample-create-modal')
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('sample-create-modal'))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('sample-create-modal'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('sample-create-modal'))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('sample-create-modal')
-        response = self.client.post(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('sample-create-modal'))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        data = {
-            'name': 'Test Sample',
-            'material': self.material.pk,
-            'series': self.series.pk,
-            'timestep': Timestep.objects.default().pk,
-        }
-        response = self.client.post(reverse('sample-create-modal'), data, follow=True)
-        pk = response.context['object'].id
-        self.assertRedirects(response, reverse('sample-detail', kwargs={'pk': pk}))
-
-
 class SampleDetailViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = ['view_material', 'add_material', 'change_material', 'delete_material',
                           'view_sample', 'add_sample', 'change_sample', 'delete_sample',
@@ -2038,7 +1986,7 @@ class SampleDetailViewTestCase(ViewWithPermissionsTestCase):
     def test_template_contains_dashboard_edit_and_delete_button_for_members(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('sample-detail', kwargs={'pk': self.sample.pk}))
-        self.assertContains(response, reverse('sample-update-modal', kwargs={'pk': self.sample.pk}))
+        self.assertContains(response, reverse('sample-update', kwargs={'pk': self.sample.pk}))
         self.assertContains(response, reverse('sample-add-source', kwargs={'pk': self.sample.pk}))
         self.assertContains(response, reverse('sample-duplicate-modal', kwargs={'pk': self.sample.pk}))
         self.assertContains(response, reverse('materials-dashboard'))
@@ -2052,7 +2000,7 @@ class SampleDetailViewTestCase(ViewWithPermissionsTestCase):
     def test_template_does_not_contain_dashboard_edit_and_delete_button_for_outsiders(self):
         self.client.force_login(self.outsider)
         response = self.client.get(reverse('sample-detail', kwargs={'pk': self.sample.pk}))
-        self.assertNotContains(response, reverse('sample-update-modal', kwargs={'pk': self.sample.pk}))
+        self.assertNotContains(response, reverse('sample-update', kwargs={'pk': self.sample.pk}))
         self.assertNotContains(response, reverse('sample-add-source', kwargs={'pk': self.sample.pk}))
         self.assertNotContains(response, reverse('sample-duplicate-modal', kwargs={'pk': self.sample.pk}))
         self.assertNotContains(response, f'href="{reverse("materials-dashboard")}"')
@@ -2062,25 +2010,6 @@ class SampleDetailViewTestCase(ViewWithPermissionsTestCase):
         self.assertNotContains(response, reverse('materialpropertyvalue-delete-modal', kwargs={'pk': self.prop_val.pk}))
         self.assertNotContains(response, reverse('sampleseries-add-composition', kwargs={'pk': self.sample.pk}))
         self.assertNotContains(response, 'edit-group-')
-
-
-class SampleModalDetailViewTestCase(ViewWithPermissionsTestCase):
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        material = Material.objects.create(name='Test Material')
-        series = SampleSeries.objects.create(name='Test Series', material=material)
-        cls.sample = Sample.objects.create(name='Test Sample', material=material, series=series)
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('sample-detail-modal', kwargs={'pk': self.sample.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('sample-detail-modal', kwargs={'pk': self.sample.pk}))
-        self.assertEqual(response.status_code, 200)
 
 
 class SampleUpdateViewTestCase(ViewWithPermissionsTestCase):
@@ -2103,13 +2032,13 @@ class SampleUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('sample-update', kwargs={'pk': self.sample.pk}))
         self.assertEqual(response.status_code, 403)
 
-    def test_get_http_200_ok_for_members(self):
+    def test_get_http_200_ok_for_owner(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('sample-update', kwargs={'pk': self.sample.pk}))
         self.assertEqual(response.status_code, 200)
 
     def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
+        self.client.force_login(self.sample.owner)
         response = self.client.get(reverse('sample-update', kwargs={'pk': self.sample.pk}))
         self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
@@ -2123,60 +2052,8 @@ class SampleUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.post(reverse('sample-update', kwargs={'pk': self.sample.pk}))
         self.assertEqual(response.status_code, 403)
 
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        data = {
-            'name': 'Updated Test Sample',
-            'material': self.material.pk,
-            'series': self.series.pk,
-            'timestep': Timestep.objects.default().pk,
-        }
-        response = self.client.post(reverse('sample-update', kwargs={'pk': self.sample.pk}), data)
-        self.assertRedirects(response, reverse('sample-detail', kwargs={'pk': self.sample.pk}))
-
-
-class SampleModalUpdateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'change_sample'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.material = Material.objects.create(name='Test Material')
-        cls.series = SampleSeries.objects.create(name='Test Series', material=cls.material)
-        cls.sample = Sample.objects.create(name='Test Sample', material=cls.material, series=cls.series)
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('sample-update-modal', kwargs={'pk': self.sample.pk})
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('sample-update-modal', kwargs={'pk': self.sample.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('sample-update-modal', kwargs={'pk': self.sample.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('sample-update-modal', kwargs={'pk': self.sample.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('sample-update-modal', kwargs={'pk': self.sample.pk})
-        response = self.client.post(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('sample-update-modal', kwargs={'pk': self.sample.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
+    def test_post_success_and_http_302_redirect_for_owner(self):
+        self.client.force_login(self.sample.owner)
         data = {
             'name': 'Updated Test Sample',
             'material': self.material.pk,
@@ -2376,7 +2253,8 @@ class SampleCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
         distribution = TemporalDistribution.objects.create(name='Test Distribution')
         timestep = Timestep.objects.create(name='Test Timestep 1', distribution=distribution)
         Timestep.objects.create(name='Test Timestep 2', distribution=distribution)
-        cls.sample = Sample.objects.create(name='Test Sample', material=cls.material, series=cls.series, timestep=timestep)
+        cls.sample = Sample.objects.create(name='Test Sample', material=cls.material, series=cls.series,
+                                           timestep=timestep)
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sample-duplicate', kwargs={'pk': self.sample.pk})

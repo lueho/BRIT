@@ -471,21 +471,9 @@ class SampleDetailView(OwnedObjectDetailView):
         return context
 
 
-class SampleModalDetailView(OwnedObjectModalDetailView):
-    template_name = 'modal_detail.html'
-    model = Sample
-    permission_required = set()
-
-
 class SampleUpdateView(OwnedObjectUpdateView):
     model = Sample
     form_class = SampleModelForm
-    permission_required = 'materials.change_sample'
-
-
-class SampleModalUpdateView(OwnedObjectModalUpdateView):
-    model = Sample
-    form_class = SampleModalModelForm
     permission_required = 'materials.change_sample'
 
 
