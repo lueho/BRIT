@@ -21,8 +21,8 @@
                 <td data-label="Id"><a href="{{ object.get_absolute_url }}">{{ object.id }}</a></td>
                 <td data-label="Sample Series"><a href="{% url 'sampleseries-detail' object.series.pk %}">{{ object.series.name }}</a></td>
                 <td data-label="Material">
-                    <a href="{% url 'material-detail' object.series.material.pk %}">
-                        {{ object.series.material.name }}
+                    <a href="{% url 'material-detail' object.material.pk %}">
+                        {{ object.material.name }}
                     </a>
                 </td>
                 <td data-label="Timestamp"><a href="{% url 'timestep-detail-modal' object.timestep.pk %}" class="modal-link">

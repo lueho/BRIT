@@ -4,7 +4,8 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Field, Layout, Row
 from dal import autocomplete
 from django.core.exceptions import ValidationError
-from django.forms import DateTimeInput, DecimalField, HiddenInput, ModelChoiceField, NumberInput, Widget
+from django.forms import (DateTimeInput, DecimalField, HiddenInput, ModelChoiceField, ModelMultipleChoiceField,
+                          NumberInput, Widget)
 from django.forms.models import BaseInlineFormSet
 from django.utils.safestring import mark_safe
 from extra_views import InlineFormSetFactory
@@ -79,7 +80,7 @@ class MaterialPropertyValueModalModelForm(ModalModelFormMixin, MaterialPropertyV
 class SampleSeriesModelForm(SimpleModelForm):
     class Meta:
         model = SampleSeries
-        fields = ('name', 'material', 'publish', 'description', 'preview')
+        fields = ('name', 'material', 'image', 'publish', 'description')
         labels = {'publish': 'featured'}
 
 
@@ -101,17 +102,24 @@ class SampleSeriesAddTemporalDistributionModalModelForm(ModalModelForm):
 
 
 class SampleModelForm(AutoCompleteModelForm):
+    sources = ModelMultipleChoiceField(
+        queryset=Source.objects.all(),
+        required=False,
+        widget=autocomplete.ModelSelect2Multiple(url='source-autocomplete'),
+        help_text='Optional: Select multiple sources if applicable.'
+    )
+
     class Meta:
         model = Sample
-        fields = ('name', 'series', 'timestep', 'taken_at', 'description', 'preview', 'sources')
+        fields = ('name', 'material', 'image', 'datetime', 'location', 'description', 'series', 'timestep', 'sources')
         widgets = {
             'series': autocomplete.ModelSelect2(url='sampleseries-autocomplete'),
-            'taken_at': DateTimeInput(attrs={'type': 'datetime-local'}),
-            'sources': autocomplete.ModelSelect2Multiple(url='source-autocomplete'),
+            'datetime': DateTimeInput(attrs={'type': 'datetime-local'}),
+            'material': autocomplete.ModelSelect2(url='material-autocomplete'),
         }
         labels = {
-            'taken_at': 'Date/Time',
-            'preview': 'Image',
+            'datetime': 'Date/Time',
+            'image': 'Image',
         }
 
 

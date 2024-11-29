@@ -1,17 +1,9 @@
-from rest_framework.serializers import PrimaryKeyRelatedField, ReadOnlyField, StringRelatedField, \
-    HyperlinkedRelatedField, ModelSerializer, SerializerMethodField
+from rest_framework.serializers import HyperlinkedRelatedField, ModelSerializer, ReadOnlyField, SerializerMethodField, \
+    StringRelatedField
 
 from bibliography.serializers import SourceAbbreviationSerializer
 from distributions.models import TemporalDistribution
-from .models import (
-    Material,
-    MaterialComponent,
-    SampleSeries,
-    Sample,
-    MaterialPropertyValue,
-    Composition,
-    WeightShare,
-)
+from .models import (Composition, Material, MaterialComponent, MaterialPropertyValue, Sample, SampleSeries, WeightShare)
 
 
 class WeightShareModelSerializer(ModelSerializer):
@@ -137,12 +129,11 @@ class SampleSeriesModelSerializer(ModelSerializer):
 
 
 class SampleModelSerializer(ModelSerializer):
-    material = PrimaryKeyRelatedField(source='series.material', read_only=True)
-    material_name = StringRelatedField(source='series.material')
-    material_url = HyperlinkedRelatedField(source='series.material', read_only=True, view_name='material-detail-modal')
+    material_name = StringRelatedField(source='material')
+    material_url = HyperlinkedRelatedField(source='material', read_only=True, view_name='material-detail')
     timestep = StringRelatedField()
     series_name = StringRelatedField(source='series')
-    series_url = HyperlinkedRelatedField(source='series', read_only=True, view_name='sampleseries-detail-modal')
+    series_url = HyperlinkedRelatedField(source='series', read_only=True, view_name='sampleseries-detail')
     compositions = CompositionModelSerializer(many=True)
     properties = MaterialPropertyValueModelSerializer(many=True)
     sources = SourceAbbreviationSerializer(many=True)
@@ -151,8 +142,7 @@ class SampleModelSerializer(ModelSerializer):
         model = Sample
         fields = (
             'name', 'material', 'material_name', 'material_url', 'series', 'series_name', 'series_url', 'timestep',
-            'taken_at', 'preview',
-            'compositions', 'properties', 'sources')
+            'datetime', 'image', 'compositions', 'properties', 'sources')
 
 
 # ----------- API ------------------------------------------------------------------------------------------------------

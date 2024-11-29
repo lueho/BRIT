@@ -1901,8 +1901,8 @@ class SampleCreateViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        material = Material.objects.create(name='Test Material')
-        cls.series = SampleSeries.objects.create(name='Test Series', material=material)
+        cls.material = Material.objects.create(name='Test Material')
+        cls.series = SampleSeries.objects.create(name='Test Series', material=cls.material)
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sample-create')
@@ -1938,6 +1938,7 @@ class SampleCreateViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         data = {
             'name': 'Test Sample',
+            'material': self.material.pk,
             'series': self.series.pk,
             'timestep': Timestep.objects.default().pk,
         }
@@ -1952,8 +1953,8 @@ class SampleModalCreateViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        material = Material.objects.create(name='Test Material')
-        cls.series = SampleSeries.objects.create(name='Test Series', material=material)
+        cls.material = Material.objects.create(name='Test Material')
+        cls.series = SampleSeries.objects.create(name='Test Series', material=cls.material)
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sample-create-modal')
@@ -1989,6 +1990,7 @@ class SampleModalCreateViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         data = {
             'name': 'Test Sample',
+            'material': self.material.pk,
             'series': self.series.pk,
             'timestep': Timestep.objects.default().pk,
         }
@@ -2009,7 +2011,7 @@ class SampleDetailViewTestCase(ViewWithPermissionsTestCase):
         super().setUpTestData()
         material = Material.objects.create(name='Test Material')
         series = SampleSeries.objects.create(name='Test Series', material=material)
-        cls.sample = Sample.objects.create(name='Test Sample', series=series)
+        cls.sample = Sample.objects.create(name='Test Sample', material=material, series=series)
         prop = MaterialProperty.objects.create(name='Test Property', unit='Test Unit')
         cls.prop_val = MaterialPropertyValue.objects.create(property=prop, average=123.3, standard_deviation=0.13)
         cls.sample.properties.add(cls.prop_val)
@@ -2069,7 +2071,7 @@ class SampleModalDetailViewTestCase(ViewWithPermissionsTestCase):
         super().setUpTestData()
         material = Material.objects.create(name='Test Material')
         series = SampleSeries.objects.create(name='Test Series', material=material)
-        cls.sample = Sample.objects.create(name='Test Sample', series=series)
+        cls.sample = Sample.objects.create(name='Test Sample', material=material, series=series)
 
     def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse('sample-detail-modal', kwargs={'pk': self.sample.pk}))
@@ -2087,9 +2089,9 @@ class SampleUpdateViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        material = Material.objects.create(name='Test Material')
-        cls.series = SampleSeries.objects.create(name='Test Series', material=material)
-        cls.sample = Sample.objects.create(name='Test Sample', series=cls.series)
+        cls.material = Material.objects.create(name='Test Material')
+        cls.series = SampleSeries.objects.create(name='Test Series', material=cls.material)
+        cls.sample = Sample.objects.create(name='Test Sample', material=cls.material, series=cls.series)
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sample-update', kwargs={'pk': self.series.pk})
@@ -2125,6 +2127,7 @@ class SampleUpdateViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         data = {
             'name': 'Updated Test Sample',
+            'material': self.material.pk,
             'series': self.series.pk,
             'timestep': Timestep.objects.default().pk,
         }
@@ -2138,9 +2141,9 @@ class SampleModalUpdateViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        material = Material.objects.create(name='Test Material')
-        cls.series = SampleSeries.objects.create(name='Test Series', material=material)
-        cls.sample = Sample.objects.create(name='Test Sample', series=cls.series)
+        cls.material = Material.objects.create(name='Test Material')
+        cls.series = SampleSeries.objects.create(name='Test Series', material=cls.material)
+        cls.sample = Sample.objects.create(name='Test Sample', material=cls.material, series=cls.series)
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sample-update-modal', kwargs={'pk': self.sample.pk})
@@ -2176,6 +2179,7 @@ class SampleModalUpdateViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         data = {
             'name': 'Updated Test Sample',
+            'material': self.material.pk,
             'series': self.series.pk,
             'timestep': Timestep.objects.default().pk,
         }
@@ -2191,7 +2195,7 @@ class SampleModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         super().setUpTestData()
         material = Material.objects.create(name='Test Material')
         cls.series = SampleSeries.objects.create(name='Test Series', material=material)
-        cls.sample = Sample.objects.create(name='Test Sample', series=cls.series)
+        cls.sample = Sample.objects.create(name='Test Sample', material=material, series=cls.series)
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sample-delete-modal', kwargs={'pk': self.sample.pk})
@@ -2243,7 +2247,7 @@ class SampleAddPropertyViewTestCase(ViewWithPermissionsTestCase):
         super().setUpTestData()
         material = Material.objects.create(name='Test Material')
         series = SampleSeries.objects.create(name='Test Series', material=material)
-        cls.sample = Sample.objects.create(name='Test Sample', series=series)
+        cls.sample = Sample.objects.create(name='Test Sample', material=material, series=series)
         MaterialProperty.objects.create(name='Test Property', unit='Test Unit')
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
@@ -2306,7 +2310,7 @@ class SampleModalAddPropertyViewTestCase(ViewWithPermissionsTestCase):
         super().setUpTestData()
         material = Material.objects.create(name='Test Material')
         series = SampleSeries.objects.create(name='Test Series', material=material)
-        cls.sample = Sample.objects.create(name='Test Sample', series=series)
+        cls.sample = Sample.objects.create(name='Test Sample', material=material, series=series)
         MaterialProperty.objects.create(name='Test Property', unit='Test Unit')
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
@@ -2367,12 +2371,12 @@ class SampleCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        material = Material.objects.create(name='Test Material')
-        cls.series = SampleSeries.objects.create(name='Test Series', material=material)
+        cls.material = Material.objects.create(name='Test Material')
+        cls.series = SampleSeries.objects.create(name='Test Series', material=cls.material)
         distribution = TemporalDistribution.objects.create(name='Test Distribution')
         timestep = Timestep.objects.create(name='Test Timestep 1', distribution=distribution)
         Timestep.objects.create(name='Test Timestep 2', distribution=distribution)
-        cls.sample = Sample.objects.create(name='Test Sample', series=cls.series, timestep=timestep)
+        cls.sample = Sample.objects.create(name='Test Sample', material=cls.material, series=cls.series, timestep=timestep)
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sample-duplicate', kwargs={'pk': self.sample.pk})
@@ -2408,6 +2412,7 @@ class SampleCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         data = {
             'name': 'Test Sample Duplicate',
+            'material': self.material.pk,
             'series': self.series.pk,
             'timestep': Timestep.objects.get(name='Test Timestep 2').pk
         }
@@ -2422,12 +2427,12 @@ class SampleModalCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        material = Material.objects.create(name='Test Material')
-        cls.series = SampleSeries.objects.create(name='Test Series', material=material)
+        cls.material = Material.objects.create(name='Test Material')
+        cls.series = SampleSeries.objects.create(name='Test Series', material=cls.material)
         distribution = TemporalDistribution.objects.create(name='Test Distribution')
         timestep = Timestep.objects.create(name='Test Timestep 1', distribution=distribution)
         Timestep.objects.create(name='Test Timestep 2', distribution=distribution)
-        cls.sample = Sample.objects.create(name='Test Sample', series=cls.series, timestep=timestep)
+        cls.sample = Sample.objects.create(name='Test Sample', material=cls.material, series=cls.series, timestep=timestep)
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sample-duplicate-modal', kwargs={'pk': self.sample.pk})
@@ -2464,6 +2469,7 @@ class SampleModalCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         data = {
             'name': 'Test Sample Duplicate',
+            'material': self.material.pk,
             'series': self.series.pk,
             'timestep': Timestep.objects.get(name='Test Timestep 2').pk
         }
@@ -2496,7 +2502,7 @@ class CompositionCreateViewTestCase(ViewWithPermissionsTestCase):
         super().setUpTestData()
         material = Material.objects.create(name='Test Material')
         series = SampleSeries.objects.create(name='Test Series', material=material)
-        cls.sample = Sample.objects.create(name='Test Sample', series=series)
+        cls.sample = Sample.objects.create(name='Test Sample', material=material, series=series)
         cls.custom_group = MaterialComponentGroup.objects.create(name='Test Group')
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
@@ -2549,7 +2555,7 @@ class CompositionModalCreateViewTestCase(ViewWithPermissionsTestCase):
         super().setUpTestData()
         material = Material.objects.create(name='Test Material')
         series = SampleSeries.objects.create(name='Test Series', material=material)
-        cls.sample = Sample.objects.create(name='Test Sample', series=series)
+        cls.sample = Sample.objects.create(name='Test Sample', material=material, series=series)
         cls.custom_group = MaterialComponentGroup.objects.create(name='Test Group')
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
@@ -2601,7 +2607,7 @@ class CompositionDetailViewTestCase(ViewWithPermissionsTestCase):
         super().setUpTestData()
         material = Material.objects.create(name='Test Material')
         series = SampleSeries.objects.create(name='Test Series', material=material)
-        sample = Sample.objects.create(name='Test Sample', series=series)
+        sample = Sample.objects.create(name='Test Sample', material=material, series=series)
         group = MaterialComponentGroup.objects.create(name='Test Group')
         cls.composition = Composition.objects.create(name='Test Composition', group=group, sample=sample)
 
@@ -2622,7 +2628,7 @@ class CompositionModalDetailViewTestCase(ViewWithPermissionsTestCase):
         super().setUpTestData()
         material = Material.objects.create(name='Test Material')
         series = SampleSeries.objects.create(name='Test Series', material=material)
-        sample = Sample.objects.create(name='Test Sample', series=series)
+        sample = Sample.objects.create(name='Test Sample', material=material, series=series)
         group = MaterialComponentGroup.objects.create(name='Test Group')
         cls.composition = Composition.objects.create(name='Test Composition', group=group, sample=sample)
 

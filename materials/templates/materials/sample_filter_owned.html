@@ -22,7 +22,7 @@
                 <td data-label="ID"><a href="{{ object.get_absolute_url }}">{{ object.id }}</a></td>
                 <td data-label="Name"><a href="{{ object.get_absolute_url }}">{{ object.name }}</a></td>
                 <td data-label="Series"><a href="{{ object.series.get_absolute_url }}">{{ object.series.name }}</a></td>
-                <td data-label="Material"><a href="{{ object.series.material.get_absolute_url }}">{{ object.series.material.name }}</a></td>
+                <td data-label="Material"><a href="{{ object.material.get_absolute_url }}">{{ object.material.name }}</a></td>
                 <td data-label="Public">
                     {% if object.publication_status == 'published' %}
                         <i class="fas fa-fw fa-check"></i>
