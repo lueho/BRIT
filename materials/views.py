@@ -442,9 +442,9 @@ class FeaturedSampleListView(OwnedObjectListView):
     permission_required = set()
 
 
-class SampleCreateView(OwnedObjectCreateView):
+class SampleCreateView(LoginRequiredMixin, OwnedObjectCreateView):
     form_class = SampleModelForm
-    permission_required = 'materials.add_sample'
+    permission_required = set()
 
 
 class SampleModalCreateView(OwnedObjectModalCreateView):
