@@ -1909,13 +1909,8 @@ class SampleCreateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(url)
         self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
 
-    def test_get_http_403_forbidden_for_outsiders(self):
+    def test_get_http_200_ok_for_authenticated_users(self):
         self.client.force_login(self.outsider)
-        response = self.client.get(reverse('sample-create'))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
         response = self.client.get(reverse('sample-create'))
         self.assertEqual(response.status_code, 200)
 
@@ -1929,13 +1924,8 @@ class SampleCreateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.post(url)
         self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
 
-    def test_post_http_403_forbidden_for_outsiders(self):
+    def test_post_success_and_http_302_redirect_for_authenticated_users(self):
         self.client.force_login(self.outsider)
-        response = self.client.post(reverse('sample-create'))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
         data = {
             'name': 'Test Sample',
             'material': self.material.pk,
@@ -1943,7 +1933,7 @@ class SampleCreateViewTestCase(ViewWithPermissionsTestCase):
             'timestep': Timestep.objects.default().pk,
         }
         response = self.client.post(reverse('sample-create'), data, follow=True)
-        created_pk = list(response.context.get('messages'))[0].message
+        created_pk = Sample.objects.get(name='Test Sample').pk
         self.assertRedirects(response, reverse('sample-detail', kwargs={'pk': created_pk}))
 
 
