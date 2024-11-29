@@ -353,7 +353,7 @@ def add_default_composition(sender, instance, created, **kwargs):
             sample=instance,
             fractions_of=get_default_component(),
         )
-        composition.add_component(MaterialComponent.objects.default())
+        composition.add_component(MaterialComponent.objects.default(), average=1.0)
 
 
 class Composition(NamedUserCreatedObject):
