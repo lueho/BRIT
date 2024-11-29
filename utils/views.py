@@ -243,7 +243,7 @@ class OwnedObjectModalDetailView(PermissionRequiredMixin, BSModalReadView):
         return context
 
 
-class OwnedObjectUpdateView(PermissionRequiredMixin, SuccessMessageMixin, NextOrSuccessUrlMixin, UpdateView):
+class OwnedObjectUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin, UpdateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -252,9 +252,6 @@ class OwnedObjectUpdateView(PermissionRequiredMixin, SuccessMessageMixin, NextOr
             'submit_button_text': 'Save'
         })
         return context
-
-    def get_success_message(self, cleaned_data):
-        return str(self.object.pk)
 
     def get_template_names(self):
         try:
