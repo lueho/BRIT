@@ -87,6 +87,7 @@
                             </a>
                         </div>
                     </div>
+                    {% if request.user == object.owner %}
                     <div class="dropdown">
                         <button class="btn btn-secondary dropdown-toggle ml-3" type="button" id="editDropdown"
                                 data-toggle="dropdown" aria-expanded="false">
@@ -107,6 +108,7 @@
                             {% endif %}
                         </div>
                     </div>
+                    {% endif %}
                 </div>
             </div>
         </div>
