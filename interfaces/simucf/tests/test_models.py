@@ -14,9 +14,9 @@ class InputMaterialManagerTestCase(TestCase):
     def setUpTestData(cls):
         material = Material.objects.create(name='Test Material')
         series = SampleSeries.objects.create(name='Test Series', material=material)
-        suitable_sample = Sample.objects.create(name='Suitable Sample', series=series)
-        Sample.objects.create(name='Unsuitable Sample', series=series)
-        unsuitable_sample = Sample.objects.create(name='Unsuitable Sample', series=series)
+        suitable_sample = Sample.objects.create(name='Suitable Sample', material=material, series=series)
+        Sample.objects.create(name='Unsuitable Sample', material=material, series=series)
+        unsuitable_sample = Sample.objects.create(name='Unsuitable Sample', material=material, series=series)
         group = MaterialComponentGroup.objects.create(name='Biochemical Composition')
         Composition.objects.create(group=group, sample=unsuitable_sample)
         composition = Composition.objects.create(group=group, sample=suitable_sample)
@@ -44,7 +44,7 @@ class InputMaterialTestCase(TestCase):
     def setUpTestData(cls):
         material = Material.objects.create(name='Test Material')
         series = SampleSeries.objects.create(name='Test Series', material=material)
-        sample = Sample.objects.create(name='Test Sample', series=series)
+        sample = Sample.objects.create(name='Test Sample', material=material, series=series)
         group = MaterialComponentGroup.objects.create(name='Biochemical Composition')
         composition = Composition.objects.create(group=group, sample=sample)
         component_names = [

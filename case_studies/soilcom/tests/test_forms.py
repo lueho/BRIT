@@ -459,10 +459,11 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
 
 class CollectionAddWasteSampleFormTestCase(TestCase):
     def setUp(self):
+        self.material = Material.objects.create(name="Test Material")
         self.sample = Sample.objects.create(
             name="Test Sample",
-            series=SampleSeries.objects.create(name="Test Series",
-                                               material=Material.objects.create(name="Test Material")),
+            material=self.material,
+            series=SampleSeries.objects.create(name="Test Series", material=self.material),
         )
 
     def test_form_is_valid_with_existing_sample(self):
@@ -492,10 +493,11 @@ class CollectionRemoveWasteSampleFormTestCase(TestCase):
             collection_system=collection_system,
             waste_stream=waste_stream,
         )
+        cls.material = Material.objects.create(name="Test Material")
         cls.sample = Sample.objects.create(
             name="Test Sample",
-            series=SampleSeries.objects.create(name="Test Series",
-                                               material=Material.objects.create(name="Test Material")),
+            material=cls.material,
+            series=SampleSeries.objects.create(name="Test Series", material=cls.material),
         )
 
     def test_collection_remove_waste_sample_form_valid(self):
@@ -512,10 +514,11 @@ class CollectionRemoveWasteSampleFormTestCase(TestCase):
         self.assertFalse(form.is_valid())
 
     def test_collection_remove_waste_sample_form_no_sample_in_collection(self):
+        material = Material.objects.create(name="Other Material")
         other_sample = Sample.objects.create(
             name="Other Sample",
-            series=SampleSeries.objects.create(name="Other Series",
-                                               material=Material.objects.create(name="Other Material")),
+            material=material,
+            series=SampleSeries.objects.create(name="Other Series", material=material),
         )
         form = CollectionRemoveWasteSampleForm(data={'sample': other_sample.id}, instance=self.collection)
         self.assertFalse(form.is_valid())

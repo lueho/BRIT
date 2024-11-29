@@ -115,6 +115,7 @@ class CompositionUpdateFormTestCase(TestCase):
         )
         sample = Sample.objects.create(
             owner=owner,
+            material=material,
             series=sample_series,
             name='Test Sample'
         )
@@ -324,7 +325,7 @@ class WeightShareModelFormTest(TestCase):
         self.group = MaterialComponentGroup.objects.create(name='Test Group')
         self.material = Material.objects.create(name='Test Material')
         self.series = SampleSeries.objects.create(material=self.material, name='Test Series')
-        self.sample = Sample.objects.create(name='Test Sample', series=self.series)
+        self.sample = Sample.objects.create(name='Test Sample', material=self.material, series=self.series)
         self.composition = Composition.objects.create(
             name='Test Composition',
             sample=self.sample,

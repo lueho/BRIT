@@ -15,7 +15,7 @@ class MaterialSerializerTestCase(TestCase):
     def setUpTestData(cls):
         material = Material.objects.create(name='Test Material')
         series = SampleSeries.objects.create(name='Test Series', material=material)
-        sample = Sample.objects.create(name='Test Sample', series=series)
+        sample = Sample.objects.create(name='Test Sample', material=material, series=series)
         group = MaterialComponentGroup.objects.create(name='Biochemical Composition')
         composition = Composition.objects.create(group=group, sample=sample)
         component_names = [

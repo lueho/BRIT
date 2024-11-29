@@ -10,16 +10,16 @@
                 <div class="card-header">
                     <h2 class="card-title">Sample Details</h2>
                 </div>
-                {% if object.preview %}
+                {% if object.image %}
                     <div class="card-img-top">
-                        <img class="w-100 m-0" src="{{ object.preview.url }}" alt="Image of sample">
+                        <img class="w-100 m-0" src="{{ object.image.url }}" alt="Image of sample">
                     </div>
                 {% endif %}
                 <div class="card-body">
                     <p class="card-text">
                         <b>Material:</b><br>
-                        <a href="{% url 'material-detail-modal' object.series.material.pk %}"
-                           class="modal-link">{{ object.series.material.name }}</a>
+                        <a href="{% url 'material-detail-modal' object.material.pk %}"
+                           class="modal-link">{{ object.material.name }}</a>
                     </p>
 
                     {% if object.series %}
@@ -37,10 +37,10 @@
                         </p>
                     {% endif %}
 
-                    {% if data.taken_at %}
+                    {% if data.datetime %}
                         <p class="card-text">
                             <b>Taken on:</b><br>
-                            {{ data.taken_at }}
+                            {{ data.datetime }}
                         </p>
                     {% endif %}
 

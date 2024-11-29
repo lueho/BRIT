@@ -1917,8 +1917,8 @@ class CollectionWasteSamplesViewTestCase(ViewWithPermissionsTestCase):
         cls.collection = Collection.objects.create(name='Test Collection')
         material = Material.objects.create(name='Test Material')
         series = SampleSeries.objects.create(name='Test Series', material=material)
-        cls.collection.samples.add(Sample.objects.create(name='Test Sample 1', series=series))
-        Sample.objects.create(name='Test Sample 2', series=series)
+        cls.collection.samples.add(Sample.objects.create(name='Test Sample 1', material=material, series=series))
+        Sample.objects.create(name='Test Sample 2', material=material, series=series)
         cls.url = reverse('collection-wastesamples', kwargs={'pk': cls.collection.pk})
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):

@@ -46,6 +46,18 @@ class Material(BaseMaterial):
         proxy = True
 
 
+def get_default_material():
+    return Material.objects.get_or_create(
+        name=getattr(settings, 'DEFAULT_MATERIAL_NAME', 'Other')
+    )[0]
+
+
+def get_default_material_pk():
+    return Material.objects.get_or_create(
+        name=getattr(settings, 'DEFAULT_MATERIAL_NAME', 'Other')
+    )[0].pk
+
+
 class MaterialComponentManager(models.Manager):
     def default(self):
         return self.get_queryset().get(name='Fresh Matter (FM)', owner=get_default_owner())
@@ -116,8 +128,13 @@ class SampleSeries(NamedUserCreatedObject):
     series consists of several samples that are taken from a comparable source at different times. That way a temporal
     distribution of material properties and compositions over time can be described.
     """
-    material = models.ForeignKey(Material, on_delete=models.PROTECT)
-    preview = models.ImageField(upload_to='materials_sampleseries/', blank=True, null=True)
+    material = models.ForeignKey(
+        Material,
+        default=get_default_material_pk,
+        on_delete=models.PROTECT,
+        related_name='sample_series'
+    )
+    image = models.ImageField(upload_to='materials_sampleseries/', blank=True, null=True)
     publish = models.BooleanField(default=False)
     standard = models.BooleanField(default=True)
     temporal_distributions = models.ManyToManyField(TemporalDistribution)
@@ -162,7 +179,7 @@ class SampleSeries(NamedUserCreatedObject):
 
         # Use average and standard deviation of component averages as default values for all timesteps
         for timestep in distribution.timestep_set.all():
-            Sample.objects.create(owner=self.owner, series=self, timestep=timestep)
+            Sample.objects.create(owner=self.owner, material=self.material, series=self, timestep=timestep)
 
     def remove_temporal_distribution(self, distribution):
         """
@@ -278,20 +295,43 @@ class Sample(NamedUserCreatedObject):
     Representation of a single sample that was taken at a specific location and time. Equivalent samples are associated
     with a SampleSeries to temporal distribution of properties and composition.
     """
-    series = models.ForeignKey(SampleSeries, related_name='samples', on_delete=models.CASCADE)
-    timestep = models.ForeignKey(Timestep, related_name='samples', on_delete=models.PROTECT, null=True)
-    taken_at = models.DateTimeField(blank=True, null=True)
-    preview = models.ImageField(upload_to='materials_sample/', blank=True, null=True)
-    properties = models.ManyToManyField(MaterialPropertyValue)
+    image = models.ImageField(upload_to='materials_sample/', blank=True, null=True)
+    material = models.ForeignKey(
+        Material,
+        default=get_default_material_pk,
+        on_delete=models.PROTECT,
+        related_name='samples',
+        help_text='If no option fits, please choose "Other" and specify the material in the description.'
+    )
+    datetime = models.DateTimeField(blank=True, null=True, help_text='Choose 00:00 if time is unknown.')
+    location = models.CharField(max_length=511, blank=True, null=True, help_text='Name of town, address or coordinates')
+    series = models.ForeignKey(
+        SampleSeries,
+        related_name='samples',
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        help_text='If this sample belongs to a sample series or campaign, select it here.'
+    )
+    timestep = models.ForeignKey(
+        Timestep,
+        related_name='samples',
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        help_text='If the sample represents a specific time step in a series, select it here.'
+    )
     sources = models.ManyToManyField(Source)
+    properties = models.ManyToManyField(MaterialPropertyValue)
 
     def duplicate(self, creator, **kwargs):
         with mute_signals(post_save):
             duplicate = Sample.objects.create(
                 owner=creator,
+                material=kwargs.get('material', self.material),
                 series=kwargs.get('series', self.series),
                 timestep=kwargs.get('timestep', self.timestep),
-                taken_at=kwargs.get('taken_at', self.taken_at),
+                datetime=kwargs.get('datetime', self.datetime),
             )
         for composition in self.compositions.all():
             duplicate_composition = composition.duplicate(creator)
@@ -332,7 +372,7 @@ class Composition(NamedUserCreatedObject):
 
     @property
     def material(self):
-        return self.sample.series.material
+        return self.sample.material
 
     @property
     def timestep(self):
@@ -475,7 +515,7 @@ class WeightShare(NamedUserCreatedObject):
 
     @property
     def material(self):
-        return self.composition.sample.series.material
+        return self.composition.sample.material
 
     @property
     def material_settings(self):
