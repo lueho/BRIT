@@ -2105,13 +2105,13 @@ class SampleAddPropertyViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('sample-add-property', kwargs={'pk': self.sample.pk}))
         self.assertEqual(response.status_code, 403)
 
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
+    def test_get_http_200_ok_for_owners(self):
+        self.client.force_login(self.sample.owner)
         response = self.client.get(reverse('sample-add-property', kwargs={'pk': self.sample.pk}))
         self.assertEqual(response.status_code, 200)
 
     def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
+        self.client.force_login(self.sample.owner)
         response = self.client.get(reverse('sample-add-property', kwargs={'pk': self.sample.pk}))
         self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
@@ -2125,8 +2125,8 @@ class SampleAddPropertyViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.post(reverse('sample-add-property', kwargs={'pk': self.sample.pk}))
         self.assertEqual(response.status_code, 403)
 
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
+    def test_post_success_and_http_302_redirect_for_owners(self):
+        self.client.force_login(self.sample.owner)
         data = {
             'property': MaterialProperty.objects.get(name='Test Property').pk,
             'average': 123.321,
@@ -2136,7 +2136,7 @@ class SampleAddPropertyViewTestCase(ViewWithPermissionsTestCase):
         self.assertRedirects(response, reverse('sample-detail', kwargs={'pk': self.sample.pk}))
 
     def test_post_creates_value_and_adds_it_to_sample(self):
-        self.client.force_login(self.member)
+        self.client.force_login(self.sample.owner)
         data = {
             'property': MaterialProperty.objects.get(name='Test Property').pk,
             'average': 123.321,
@@ -2154,8 +2154,8 @@ class SampleModalAddPropertyViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         material = Material.objects.create(name='Test Material')
-        series = SampleSeries.objects.create(name='Test Series', material=material)
-        cls.sample = Sample.objects.create(name='Test Sample', material=material, series=series)
+        series = SampleSeries.objects.create(owner=cls.owner, name='Test Series', material=material)
+        cls.sample = Sample.objects.create(owner=cls.owner, name='Test Sample', material=material, series=series)
         MaterialProperty.objects.create(name='Test Property', unit='Test Unit')
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
@@ -2168,13 +2168,13 @@ class SampleModalAddPropertyViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('sample-add-property-modal', kwargs={'pk': self.sample.pk}))
         self.assertEqual(response.status_code, 403)
 
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
+    def test_get_http_200_ok_for_owners(self):
+        self.client.force_login(self.sample.owner)
         response = self.client.get(reverse('sample-add-property-modal', kwargs={'pk': self.sample.pk}))
         self.assertEqual(response.status_code, 200)
 
     def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
+        self.client.force_login(self.sample.owner)
         response = self.client.get(reverse('sample-add-property-modal', kwargs={'pk': self.sample.pk}))
         self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
@@ -2188,8 +2188,8 @@ class SampleModalAddPropertyViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.post(reverse('sample-add-property-modal', kwargs={'pk': self.sample.pk}))
         self.assertEqual(response.status_code, 403)
 
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
+    def test_post_success_and_http_302_redirect_for_owners(self):
+        self.client.force_login(self.sample.owner)
         data = {
             'property': MaterialProperty.objects.get(name='Test Property').pk,
             'average': 123.321,
@@ -2199,7 +2199,7 @@ class SampleModalAddPropertyViewTestCase(ViewWithPermissionsTestCase):
         self.assertRedirects(response, reverse('sample-detail', kwargs={'pk': self.sample.pk}))
 
     def test_post_creates_value_and_adds_it_to_sample(self):
-        self.client.force_login(self.member)
+        self.client.force_login(self.sample.owner)
         data = {
             'property': MaterialProperty.objects.get(name='Test Property').pk,
             'average': 123.321,

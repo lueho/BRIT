@@ -88,26 +88,27 @@
                         </div>
                     </div>
                     {% if request.user == object.owner %}
-                    <div class="dropdown">
-                        <button class="btn btn-secondary dropdown-toggle ml-3" type="button" id="editDropdown"
-                                data-toggle="dropdown" aria-expanded="false">
-                            Options
-                        </button>
-                        <div class="dropdown-menu" aria-labelledby="editDropdown">
-                            {% if request.user == object.owner %}
-                                <a class="dropdown-item"
-                                   href="{% url 'sample-update' object.id %}?next={{ request.path }}">
-                                    <i class="fas fa-edit"></i> Edit
-                                </a>
-                                <a class="dropdown-item" href="{% url 'sample-duplicate' object.id %}">
-                                    <i class="fas fa-fw fa-copy"></i> Duplicate
-                                </a>
-                                <a class="dropdown-item modal-link" href="{% url 'sample-delete-modal' object.pk %}">
-                                    <i class="fas fa-fw fa-trash"></i> Delete
-                                </a>
-                            {% endif %}
+                        <div class="dropdown">
+                            <button class="btn btn-secondary dropdown-toggle ml-3" type="button" id="editDropdown"
+                                    data-toggle="dropdown" aria-expanded="false">
+                                Options
+                            </button>
+                            <div class="dropdown-menu" aria-labelledby="editDropdown">
+                                {% if request.user == object.owner %}
+                                    <a class="dropdown-item"
+                                       href="{% url 'sample-update' object.id %}?next={{ request.path }}">
+                                        <i class="fas fa-edit"></i> Edit
+                                    </a>
+                                    <a class="dropdown-item" href="{% url 'sample-duplicate' object.id %}">
+                                        <i class="fas fa-fw fa-copy"></i> Duplicate
+                                    </a>
+                                    <a class="dropdown-item modal-link"
+                                       href="{% url 'sample-delete-modal' object.pk %}">
+                                        <i class="fas fa-fw fa-trash"></i> Delete
+                                    </a>
+                                {% endif %}
+                            </div>
                         </div>
-                    </div>
                     {% endif %}
                 </div>
             </div>
@@ -137,16 +138,11 @@
                                 <td>{{ property.average }}
                                     ± {{ property.standard_deviation }} {{ property.property.unit }}</td>
                                 {% if 'materials.delete_materialpropertyvalue' in perms %}
-                                    <td class="collapse multi-collapse">
-                                        <div class="collapse multi-collapse">
-                                            <a href="{% url 'materialpropertyvalue-delete-modal' property.id %}?next={{ request.path }}"
-                                               class="modal-link">
-                                                <i class="fas fa-fw fa-trash"></i>
-                                            </a>
-                                        </div>
-                                    </td>
+                                    <a href="{% url 'materialpropertyvalue-delete-modal' property.id %}?next={{ request.path }}"
+                                       class="modal-link">
+                                        <i class="fas fa-fw fa-trash"></i>
+                                    </a>
                                 {% endif %}
-
                             </tr>
                         {% endfor %}
                         </tbody>
@@ -158,13 +154,11 @@
                     {% endif %}
                 </div>
                 <div class="card-footer">
-                    {% if 'materials.add_materialpropertyvalue' in perms %}
-                        <div class="collapse multi-collapse">
-                            <a href="{% url 'sample-add-property-modal' object.id %}"
-                               class="modal-link">
-                                <i class="fas fa-fw fa-plus"></i> Add property
-                            </a>
-                        </div>
+                    {% if request.user == object.owner %}
+                        <a href="{% url 'sample-add-property-modal' object.id %}"
+                           class="modal-link">
+                            <i class="fas fa-fw fa-plus"></i> Add property
+                        </a>
                     {% endif %}
                 </div>
             </div>
