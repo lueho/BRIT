@@ -1812,9 +1812,9 @@ class SampleSeriesCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
 
     def test_post_success_and_http_302_redirect_for_members(self):
         self.client.force_login(self.member)
-        data = {'name': 'Test Series Duplicate', 'material': self.material.pk}
+        data = {'name': 'Test Series Duplicate', 'material': self.material.pk, 'description': 'New Duplicate'}
         response = self.client.post(reverse('sampleseries-duplicate', kwargs={'pk': self.series.pk}), data, follow=True)
-        created_pk = list(response.context.get('messages'))[0].message
+        created_pk = SampleSeries.objects.get(name='Test Series Duplicate', description='New Duplicate').pk
         self.assertRedirects(response, reverse('sampleseries-detail', kwargs={'pk': created_pk}))
 
 
@@ -2285,7 +2285,7 @@ class SampleCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
             'timestep': Timestep.objects.get(name='Test Timestep 2').pk
         }
         response = self.client.post(reverse('sample-duplicate', kwargs={'pk': self.sample.pk}), data, follow=True)
-        created_pk = list(response.context.get('messages'))[0].message
+        created_pk = Sample.objects.get(name='Test Sample Duplicate').pk
         self.assertRedirects(response, reverse('sample-detail', kwargs={'pk': created_pk}))
 
 
