@@ -1,6 +1,5 @@
 from dal import autocomplete
-from django_filters import ModelChoiceFilter
-from django_filters import rest_framework as rf_filters
+from django_filters import ModelChoiceFilter, rest_framework as rf_filters
 
 from utils.filters import CrispyAutocompleteFilterSet
 from .models import Composition, Material, Sample, SampleSeries
@@ -22,14 +21,44 @@ class CompositionFilterSet(rf_filters.FilterSet):
 
 
 class SampleFilter(CrispyAutocompleteFilterSet):
+    name = ModelChoiceFilter(
+        queryset=Sample.objects.none(),
+        field_name='name',
+        label='Sample Name',
+        widget=autocomplete.ModelSelect2(url='sample-autocomplete')
+    )
     material = ModelChoiceFilter(queryset=Material.objects.filter(type='material'),
-                                 field_name='series__material__name',
+                                 field_name='material__name',
                                  label='Material',
                                  widget=autocomplete.ModelSelect2(url='material-autocomplete'))
 
     class Meta:
         model = Sample
-        fields = ('material', 'timestep')
+        fields = ('name', 'material',)
+
+
+class PublishedSampleFilter(SampleFilter):
+    name = ModelChoiceFilter(
+        queryset=Sample.objects.filter(publication_status='published'),
+        field_name='name',
+        label='Sample Name',
+        widget=autocomplete.ModelSelect2(url='sample-autocomplete-published')
+    )
+
+
+class UserOwnedSampleFilter(SampleFilter):
+    name = ModelChoiceFilter(
+        queryset=Sample.objects.filter(publication_status='published'),
+        field_name='name',
+        label='Sample Name',
+        widget=autocomplete.ModelSelect2(url='sample-autocomplete-owned')
+    )
+
+    def __init__(self, *args, **kwargs):
+        user = kwargs.pop('user', None)
+        super().__init__(*args, **kwargs)
+        if user:
+            self.filters['name'].queryset = Sample.objects.filter(owner=user)
 
 
 class SampleSeriesFilter(CrispyAutocompleteFilterSet):

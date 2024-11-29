@@ -16,7 +16,7 @@ from utils.views import (NextOrSuccessUrlMixin, OwnedObjectCreateView, OwnedObje
                          PublishedObjectFilterView, UserCreatedObjectModalDeleteView, UserCreatedObjectUpdateView,
                          UserOwnedObjectFilterView,
                          UserOwnsObjectMixin)
-from .filters import SampleFilter, SampleSeriesFilter
+from .filters import PublishedSampleFilter, SampleSeriesFilter, UserOwnedSampleFilter
 from .forms import (AddComponentModalForm, AddCompositionModalForm, AddLiteratureSourceForm, AddSeasonalVariationForm,
                     ComponentGroupModalModelForm, ComponentGroupModelForm, ComponentModalModelForm, ComponentModelForm,
                     ComponentShareDistributionFormSetHelper, Composition, CompositionModalModelForm,
@@ -428,12 +428,17 @@ class SampleSeriesAutoCompleteView(autocomplete.Select2QuerySetView):
 
 class PublishedSampleListView(PublishedObjectFilterView):
     model = Sample
-    filterset_class = SampleFilter
+    filterset_class = PublishedSampleFilter
 
 
 class UserOwnedSampleListView(UserOwnedObjectFilterView):
     model = Sample
-    filterset_class = SampleFilter
+    filterset_class = UserOwnedSampleFilter
+
+    def get_filterset_kwargs(self, filterset_class):
+        kwargs = super().get_filterset_kwargs(filterset_class)
+        kwargs['user'] = self.request.user
+        return kwargs
 
 
 class FeaturedSampleListView(OwnedObjectListView):
@@ -494,6 +499,16 @@ class SampleAutoCompleteView(autocomplete.Select2QuerySetView):
         if self.q:
             qs = qs.filter(name__icontains=self.q)
         return qs
+
+
+class PublishedSampleAutoCompleteView(SampleAutoCompleteView):
+    def get_queryset(self):
+        return super().get_queryset().filter(publication_status='published')
+
+
+class UserOwnedSampleAutoCompleteView(SampleAutoCompleteView):
+    def get_queryset(self):
+        return super().get_queryset().filter(owner=self.request.user)
 
 
 class SampleAddPropertyView(OwnedObjectCreateView):
