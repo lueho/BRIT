@@ -5,7 +5,9 @@ from dal import autocomplete
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Q
 from django.http import HttpResponse
+from django.utils.decorators import method_decorator
 from django.views import View
+from django.views.decorators.clickjacking import xframe_options_exempt
 
 import case_studies.flexibi_hamburg.tasks
 from maps.models import Catchment, GeoDataset
@@ -16,6 +18,15 @@ from .filters import HamburgRoadsideTreesFilterSet
 class RoadsideTreesMapView(GeoDataSetFilteredMapView):
     model_name = 'HamburgRoadsideTrees'
     template_name = 'hamburg_roadside_trees_map.html'
+    filterset_class = HamburgRoadsideTreesFilterSet
+    features_layer_api_basename = 'api-hamburg-roadside-trees'
+    map_title = 'Roadside Trees'
+
+
+@method_decorator(xframe_options_exempt, name='dispatch')
+class RoadsideTreesMapIframeView(GeoDataSetFilteredMapView):
+    model_name = 'HamburgRoadsideTrees'
+    template_name = 'hamburg_roadside_trees_map_iframe.html'
     filterset_class = HamburgRoadsideTreesFilterSet
     features_layer_api_basename = 'api-hamburg-roadside-trees'
     map_title = 'Roadside Trees'

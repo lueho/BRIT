@@ -1,0 +1,77 @@
+{% load static %}
+
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+    <meta name="description" content="The tool for categorization and inventorization of bioresources, including GIS">
+    <meta name="author" content="Phillipp Lüssenhop">
+    {% block meta %}{% endblock meta %}
+
+    <title>{% block title %}BRIT | Bioresource Information Tool{% endblock title %}</title>
+    {% include 'partials/_analytics.html' %}
+
+    <link rel="icon" href="{% static 'img/favicon.ico' %}" type="image/x-icon">
+
+    <!-- Custom fonts for this template-->
+    <link href="{% static 'lib/fontawesome-free/css/all.min.css' %}" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Nunito" rel="stylesheet">
+
+    <!-- Custom styles for this template-->
+    <link href="{% static 'css/sb-admin-2.min.css' %}" rel="stylesheet">
+    <link href="{% static 'lib/jquery-ui/css/jquery-ui.min.css' %}" rel="stylesheet">
+    <link href="{% static 'lib/jquery-ui/css/jquery-ui.structure.min.css' %}" rel="stylesheet">
+    <link href="{% static 'lib/jquery-ui/css/jquery-ui.theme.min.css' %}" rel="stylesheet">
+    <link href="{% static 'lib/bootstrap4-toggle/css/bootstrap4-toggle.min.css' %}" rel="stylesheet">
+    <link href="{% static 'css/brit.min.css' %}" rel="stylesheet">
+
+    {% block style_sheets %}{% endblock style_sheets %}
+
+    <style>{% block style %}{% endblock style %}</style>
+
+</head>
+
+
+<body id="page-top">
+
+<div id="wrapper">
+    <div id="content-wrapper" class="d-flex flex-column">
+        <div id="content">
+            <div class="container-fluid">
+                {% block content %}{% endblock content %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Scroll to Top Button-->
+<a class="scroll-to-top rounded" href="#page-top">
+    <i class="fas fa-angle-up"></i>
+</a>
+
+<script src="{% static 'lib/jquery/jquery.min.js' %}"></script>
+<script src="{% static 'lib/jquery-ui/js/jquery-ui.min.js' %}"></script>
+
+<!-- Bootstrap core JavaScript-->
+<script src="{% static 'lib/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
+
+<!-- Core plugin JavaScript-->
+<script src="{% static 'lib/jquery-easing/jquery.easing.min.js' %}"></script>
+
+<!-- Custom scripts for all pages-->
+<script src="{% static 'js/sb-admin-2.min.js' %}"></script>
+<script src="{% static 'js/jquery.bootstrap.modal.forms.js' %}"></script>
+<script src="{% static 'lib/bootstrap4-toggle/js/bootstrap4-toggle.min.js' %}"></script>
+<script type="text/javascript" src={% static "cookie_consent/cookiebar.js" %}></script>
+
+<!-- Page level plugins -->
+<script src="{% static 'lib/chart.js/Chart.min.js' %}"></script>
+
+{% block javascript %}{% endblock javascript %}
+
+</body>
+
+</html>

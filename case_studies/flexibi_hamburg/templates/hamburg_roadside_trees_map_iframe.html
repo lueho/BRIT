@@ -1,0 +1,44 @@
+{% extends 'filtered_map_iframe.html' %}
+{% load static %}
+{% load crispy_forms_tags %}
+{% load file_export_tags %}
+
+{% block map_card_footer %}
+    {% if user.is_authenticated %}
+        {% export_link "csv" 'hamburgroadsidetrees-export' 'hamburgroadsidetrees-export-progress' %}
+        {% export_link "xlsx" 'hamburgroadsidetrees-export' 'hamburgroadsidetrees-export-progress' %}
+    {% endif %}
+{% endblock %}
+
+{% block extra_cards %}
+
+    <div class="card shadow">
+        <div class="card-header"
+             role="button"
+             data-toggle="collapse"
+             href="#learning-card-body"
+             aria-expanded="true"
+             aria-controls="learning-card-body">
+            <strong><i class="fas fa-fw fa-graduation-cap"></i> Learning material</strong>
+        </div>
+        <div class="card-body collapse" id="learning-card-body">
+            <p class="card-text">
+                To learn more about residue wood pathways in bioresource management, check out the Lectures for
+                Future series "Residue and by-Product Based Bioresources" of the Hamburg Open Online University.
+                Recommended lecture for this topic:<br>
+                <a href="https://www.hoou.de/projects/lff/pages/residue-and-by-product-based-bioresources"
+                   target="_blank">"Wood Pathways: From Sustainable Forests to Sustainable Products"
+                </a>
+            </p>
+        </div>
+    </div>
+
+{% endblock %}
+
+{% block javascript %}
+    {{ block.super }}
+    <script src="{% static 'lib/turf-inside/inside.min.js' %}"></script>
+    <script src="{% static 'js/file_export.min.js' %}"></script>
+    <script src="{% static 'js/hamburg_roadsidetree_map.min.js' %}"></script>
+
+{% endblock javascript %}

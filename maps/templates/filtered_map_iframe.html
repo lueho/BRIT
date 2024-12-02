@@ -1,0 +1,123 @@
+{% extends 'base_iframe.html' %}
+{% load static %}
+{% load leaflet_tags %}
+{% load crispy_forms_tags %}
+
+{% block style_sheets %}
+    {{ block.super }}
+    <link rel="stylesheet" href="{% static 'css/maps.min.css' %}">
+{% endblock style_sheets %}
+
+{% block title %}Maps | {{ map_title }}{% endblock %}
+
+{% block content %}
+    <div class="row">
+        <div class="col">
+            {% block map_content %}
+                {% leaflet_js %}
+                {% leaflet_css %}
+
+                <div class="card shadow">
+                    <div class="card-header"><b>
+                        {% block map_card_header %}{{ map_title }}{% endblock %}
+                    </b></div>
+                    <div class="card-body p-0 vh-75" style="position: relative;">
+                        <div id="map-overlay" style="display: none">
+                            <div class="overlay-content">
+                                <p>This dataset is large. Loading it completely can take a while. Please choose filter parameters first.</p>
+                            </div>
+                        </div>
+                        {% leaflet_map "main" %}
+                    </div>
+                    <div class="card-footer">
+                        {% block map_card_footer %}{% endblock %}
+                    </div>
+                </div>
+            {% endblock map_content %}
+        </div>
+
+        <div class="col-sm-3">
+            {% block user_actions %}
+                <div class="accordion">
+                    {% block filter_form_card %}
+                        <div class="card shadow">
+                            <div class="card-header" role="button" data-toggle="collapse" href="#filter-card-body"
+                                 aria-expanded="true" aria-controls="filter-card-body">
+                                <b>Filter</b>
+                            </div>
+                            <div class="card-body collapse show" id="filter-card-body">
+
+                                {% block filter_form %}
+                                    <form method="GET">
+                                        {% crispy filter.form %}
+                                    </form>
+                                {% endblock filter_form %}
+
+                                {% block filter_form_buttons %}
+                                    <button class="btn btn-primary submit-filter" id="filter-button"
+                                            onclick="clickedFilterButton()">
+                                        Filter
+                                    </button>
+                                {% endblock filter_form_buttons %}
+
+                            </div>
+                        </div>
+                    {% endblock filter_form_card %}
+
+                    {% block filter_result_card %}
+                        <div class="card shadow">
+                            <div class="card-header"
+                                 role="button"
+                                 data-toggle="collapse"
+                                 href="#info-card-body"
+                                 aria-expanded="true"
+                                 aria-controls="info-card-body">
+                                <b>Summary</b>
+                            </div>
+                            <div class="card-body collapse" id="info-card-body">
+                                <div id="summary-container">
+                                    <p class="card-text">No data selected, yet.</p>
+                                </div>
+                                {% if object.sources.first %}
+                                    <p class="card-text mt-3">
+                                        <strong>Sources:</strong><br>
+                                        {% for source in object.sources.all %}
+                                            <a href="{% url 'source-detail-modal' source.id %}"
+                                               class="modal-link">
+                                                {{ source.abbreviation }}{% if not forloop.last %},{% endif %}
+                                            </a>
+                                        {% endfor %}
+                                    </p>
+                                {% endif %}
+                            </div>
+                        </div>
+                    {% endblock filter_result_card %}
+                    {% block extra_cards %}{% endblock extra_cards %}
+                </div>
+            {% endblock user_actions %}
+        </div>
+
+    </div>
+
+{% endblock content %}
+
+{% block javascript %}
+    {{ block.super }}
+    {# For filters that use forms with autocomplete fields, the inclusion of form media is suppressed #}
+    {# by the form helper. It needs to be included after loading jquery.js and before select2-bootstrap4.css #}
+    {# See AutoCompleteMixin class in utils/forms.#}
+    {{ filter.form.media }}
+    <link rel="stylesheet" href="{% static 'lib/select2-bootstrap-theme/select2-bootstrap4.min.css' %}">
+    <script src="{% static 'js/filter_utils.min.js' %}"></script>
+    <script src="{% static 'js/maps.min.js' %}"></script>
+
+    {{ map_config|json_script:"mapConfig" }}
+    <script type="text/javascript">
+        const mapConfig = JSON.parse(document.getElementById("mapConfig").textContent);
+        window.onload = () => {
+            loadMap(mapConfig);
+        };
+    </script>
+{% endblock %}
+
+

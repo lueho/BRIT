@@ -3,10 +3,11 @@ from django.views.generic import RedirectView
 
 from .router import router
 from .views import (HamburgRoadsideTreeCatchmentAutocompleteView, HamburgRoadsideTreesListFileExportProgressView,
-                    HamburgRoadsideTreesListFileExportView, RoadsideTreesMapView)
+                    HamburgRoadsideTreesListFileExportView, RoadsideTreesMapIframeView, RoadsideTreesMapView)
 
 urlpatterns = [
     path('roadside_trees/map/', RoadsideTreesMapView.as_view(), name='HamburgRoadsideTrees'),
+    path('roadside_trees/map/iframe/', RoadsideTreesMapIframeView.as_view(), name='HamburgRoadsideTreesIframe'),
     path('roadside_trees/export/', HamburgRoadsideTreesListFileExportView.as_view(),
          name='hamburgroadsidetrees-export'),
     path('roadside_trees/export/<str:task_id>/progress/', HamburgRoadsideTreesListFileExportProgressView.as_view(),

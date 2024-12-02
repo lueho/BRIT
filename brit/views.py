@@ -1,6 +1,9 @@
+from django.utils.decorators import method_decorator
+from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.generic import TemplateView
 
 
+@method_decorator(xframe_options_exempt, name='dispatch')
 class HomeView(TemplateView):
     template_name = 'home.html'
 
@@ -18,7 +21,6 @@ class PrivacyPolicyView(TemplateView):
 
 
 from django.core.cache import cache
-from django.http import HttpResponse
 from django.views import View
 import time
 
@@ -46,9 +48,11 @@ class CacheTestView(View):
 
 from django.http import HttpResponse
 
+
 def set_session(request):
     request.session['test_key'] = 'test_value'
     return HttpResponse("Session value set")
+
 
 def get_session(request):
     value = request.session.get('test_key', 'Not found')
