@@ -125,8 +125,8 @@
                         <tr>
                             <th>Property</th>
                             <th>Value</th>
-                            {% if 'materials.delete_materialpropertyvalue' in perms %}
-                                <th class="collapse multi-collapse">Remove</th>
+                            {% if request.user == object.owner %}
+                                <th class="remove-property collapse multi-collapse">Remove</th>
                             {% endif %}
                         </tr>
                         </thead>
@@ -137,34 +137,33 @@
                                        class="modal-link">{{ property.property.name }}</a></td>
                                 <td>{{ property.average }}
                                     ± {{ property.standard_deviation }} {{ property.property.unit }}</td>
-                                {% if 'materials.delete_materialpropertyvalue' in perms %}
-                                    <a href="{% url 'materialpropertyvalue-delete-modal' property.id %}?next={{ request.path }}"
-                                       class="modal-link">
-                                        <i class="fas fa-fw fa-trash"></i>
-                                    </a>
+                                {% if request.user == object.owner %}
+                                    <td class="remove-property collapse multi-collapse">
+                                        <a href="{% url 'materialpropertyvalue-delete-modal' property.id %}?next={{ request.path }}"
+                                           class="modal-link">
+                                            <i class="fas fa-fw fa-trash"></i>
+                                        </a>
+                                    </td>
                                 {% endif %}
                             </tr>
                         {% endfor %}
                         </tbody>
                     </table>
-                    {% if property.description %}
-                        <p class="card-text">
-                            {{ property.description }}
-                        </p>
-                    {% endif %}
                 </div>
                 <div class="card-footer">
                     {% if request.user == object.owner %}
-                        <a href="{% url 'sample-add-property-modal' object.id %}"
-                           class="modal-link">
+                        <a href="{% url 'sample-add-property' object.id %}">
                             <i class="fas fa-fw fa-plus"></i> Add property
+                        </a>
+                        <a class="ml-3" href="javascript:void(0);" data-toggle="collapse" data-target=".remove-property"
+                           aria-expanded="false" aria-controls="remove-property">
+                            <i class="fas fa-fw fa-minus"></i> Remove properties
                         </a>
                     {% endif %}
                 </div>
             </div>
         </div>
     </div>
-    <!-- end basic material definition -->
 
     <div class="row">
         {% for composition in data.compositions %}
@@ -235,7 +234,7 @@
                         <b>Shares of:</b> {{ composition.fractions_of_name }}
                     </div>
                     <div class="card-footer">
-                        {% if 'materials.change_composition' in perms %}
+                        {% if request.user == object.owner %}
                             <div class="collapse multi-collapse"
                                  id="options-composition-{{ composition.id }}">
                                 <a id="move-group-{{ composition.id }}-left"
@@ -262,15 +261,14 @@
             </div>
         {% endfor %}
     </div>
-    {% if 'materials.add_composition' in perms %}
-        <div class="collapse multi-collapse" id="add-component-group">
+    {% if request.user == object.owner %}
+        <div id="add-component-group">
             <div class="row">
                 <div class="col mt-4">
                     <div class="card border-left-primary border">
                         <div class="card-header"></div>
                         <div class="card-body">
-                            <a href="{% url 'sampleseries-add-composition' data.series %}?next={{ request.path }}"
-                               class="modal-link">
+                            <a href="{% url 'sample-add-composition' object.id %}?next={{ request.path }}">
                                 <i class="fas fa-fw fa-plus"></i> Add composition
                             </a>
                         </div>
@@ -298,14 +296,6 @@
             container.appendChild(canvas);
             new Chart(canvas.getContext('2d'), charts[key]);
         });
-
-        window.onload = function() {
-            {% if 'materials.change_sample' in perms %}
-                const btn = document.getElementById('id_toggle_edit');
-                btn.click();
-                $('#id_toggle_edit').bootstrapToggle('on');
-            {% endif %}
-        };
 
     </script>
 

@@ -324,6 +324,13 @@ class Sample(NamedUserCreatedObject):
     sources = models.ManyToManyField(Source)
     properties = models.ManyToManyField(MaterialPropertyValue)
 
+    @property
+    def group_ids(self):
+        """
+        Ids of component groups that have been assigned to this sample.
+        """
+        return [setting['group'] for setting in Composition.objects.filter(sample=self).values('group').distinct()]
+
     def duplicate(self, creator, **kwargs):
         with mute_signals(post_save):
             duplicate = Sample.objects.create(
