@@ -11,7 +11,7 @@
 {% block title %}Maps | {{ map_title }}{% endblock %}
 
 {% block content %}
-    <div class="row">
+    <div class="row pt-4 pb-4">
         <div class="col">
             {% block map_content %}
                 {% leaflet_js %}
@@ -36,7 +36,7 @@
             {% endblock map_content %}
         </div>
 
-        <div class="col-sm-3">
+        <div class="col-sm-4">
             {% block user_actions %}
                 <div class="accordion">
                     {% block filter_form_card %}

@@ -1,26 +1,28 @@
-.numeric-slider .ui-draggable, .numeric-slider .ui-droppable {
-  background-position: top;
+.slider-checkbox-group {
+    background-color: #f9f9f9; /* Light background for distinction */
+    border: 1px solid #e0e0e0; /* Subtle border */
+    border-radius: 8px;
 }
 
-.numeric-slider .ui-widget-header {
-  background: #006fba;
-}
-
-.numeric-slider .value {
-  position: absolute;
-  top: 30px;
-  left: 50%;
-  margin: 0 0 0 -20px;
-  width: 40px;
-  text-align: center;
-  display: block;
-  font-weight: normal;
-}
-
-.numeric-slider {
-  text-align: center;
+.numeric-slider-range {
+    width: 100%;
+    margin-top: 10px;
 }
 
 .numeric-slider-range-text {
-  text-align: center;
+    display: block;
+    text-align: center;
+    margin-top: 5px;
+    font-size: 1rem;
+}
+
+.custom-checkbox .form-text {
+    font-size: 0.85rem;
+    color: #6c757d;
+}
+
+@media (max-width: 576px) {
+    .slider-checkbox-group {
+        padding: 1rem;
+    }
 }
