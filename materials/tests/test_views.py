@@ -1,3 +1,4 @@
+from django.contrib.auth.models import User
 from django.urls import reverse
 
 from distributions.models import TemporalDistribution, Timestep
@@ -1393,8 +1394,14 @@ class MaterialPropertyValueModalDeleteViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
+        property = MaterialProperty.objects.create(
+            owner=cls.member,
+            name='Test Property',
+            unit='Test Unit'
+        )
         cls.value = MaterialPropertyValue.objects.create(
-            property=MaterialProperty.objects.create(name='Test Property', unit='Test Unit'),
+            owner=cls.member,
+            property=property,
             average=123.312,
             standard_deviation=0.1337
         )

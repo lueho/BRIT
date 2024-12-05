@@ -13,7 +13,8 @@ from distributions.plots import DoughnutChart
 from utils.views import (NextOrSuccessUrlMixin, OwnedObjectCreateView, OwnedObjectDetailView,
                          OwnedObjectListView, OwnedObjectModalCreateView, OwnedObjectModalDeleteView,
                          OwnedObjectModalDetailView, OwnedObjectModalUpdateView, OwnedObjectUpdateView,
-                         PublishedObjectFilterView, UserCreatedObjectCreateView, UserCreatedObjectModalCreateView,
+                         PublishedObjectFilterView,
+                         UserCreatedObjectCreateView, UserCreatedObjectModalCreateView,
                          UserCreatedObjectModalDeleteView,
                          UserCreatedObjectUpdateView,
                          UserOwnedObjectFilterView,
@@ -599,7 +600,7 @@ class CompositionListView(OwnedObjectListView):
     permission_required = set()
 
 
-class CompositionCreateView(UserCreatedObjectCreateView):
+class CompositionCreateView(OwnedObjectCreateView):
     form_class = CompositionModelForm
     permission_required = 'materials.add_composition'
 
