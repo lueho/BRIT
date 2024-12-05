@@ -156,6 +156,15 @@ class MaterialAutocompleteView(autocomplete.Select2QuerySetView):
 # ----------- Material Components CRUD ---------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
+
+class ComponentAutoCompleteView(autocomplete.Select2QuerySetView):
+    def get_queryset(self):
+        qs = MaterialComponent.objects.all()
+        if self.q:
+            qs = qs.filter(name__icontains=self.q)
+        return qs
+
+
 class ComponentListView(OwnedObjectListView):
     model = MaterialComponent
     permission_required = set()
@@ -517,11 +526,9 @@ class SampleAddCompositionView(UserPassesTestMixin, UserCreatedObjectCreateView)
     sample = None
     form_class = SampleAddCompositionForm
 
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs['user'] = self.request.user
-        kwargs['sample'] = self.sample
-        return kwargs
+    def get_initial(self):
+        self.sample = self.get_sample()
+        return {'sample': self.sample}
 
     def form_valid(self, form):
         form.instance.owner = self.request.user
@@ -529,17 +536,27 @@ class SampleAddCompositionView(UserPassesTestMixin, UserCreatedObjectCreateView)
         self.sample.compositions.add(composition)
         return HttpResponseRedirect(self.get_success_url())
 
+    def get_sample(self):
+        if not self.sample:
+            self.sample = Sample.objects.get(pk=self.kwargs.get('pk'))
+            return self.sample
+
     def test_func(self):
         if not self.request.user.is_authenticated:
             return False
+        self.sample = self.get_sample()
         return self.request.user == self.sample.owner
 
     def get_success_url(self):
         return reverse('sample-detail', kwargs={'pk': self.kwargs.get('pk')})
 
     def get(self, request, *args, **kwargs):
-        self.sample = Sample.objects.get(pk=self.kwargs.get('pk'))
+        self.sample = self.get_sample()
         return super().get(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        self.sample = self.get_sample()
+        return super().post(request, *args, **kwargs)
 
 
 class SampleAddPropertyView(UserPassesTestMixin, UserCreatedObjectCreateView):
@@ -587,9 +604,18 @@ class SampleCreateDuplicateView(UserCreatedObjectUpdateView):
     form_class = SampleModelForm
     object = None
 
+    def get_initial(self):
+        initial = super().get_initial()
+        initial['name'] = f'{self.object.name} (copy)'
+        return initial
+
     def form_valid(self, form):
         self.object = self.object.duplicate(creator=self.request.user, **form.cleaned_data)
-        return super().form_valid(form)
+        self.new_object = self.object
+        return HttpResponseRedirect(self.get_success_url())
+
+    def get_success_url(self):
+        return self.new_object.get_absolute_url()
 
 
 # ----------- Composition CRUD -----------------------------------------------------------------------------------------
@@ -621,14 +647,10 @@ class CompositionModalDetailView(OwnedObjectModalDetailView):
     permission_required = set()
 
 
-class CompositionUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin, UpdateWithInlinesView):
+class CompositionUpdateView(UserPassesTestMixin, NextOrSuccessUrlMixin, UpdateWithInlinesView):
     model = Composition
     inlines = [InlineWeightShare, ]
     fields = set()
-    permission_required = (
-        'materials.change_composition',
-        'materials.change_weightshare',
-    )
 
     def get_context_data(self, **kwargs):
         inline_helper = WeightShareUpdateFormSetHelper()
@@ -641,6 +663,11 @@ class CompositionUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin, Upda
         }
         context.update(kwargs)
         return super().get_context_data(**context)
+
+    def test_func(self):
+        if not self.request.user.is_authenticated:
+            return False
+        return self.request.user == self.get_object().owner
 
 
 class CompositionModalUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin, UpdateWithInlinesView):
@@ -668,12 +695,11 @@ class CompositionModalUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin,
         return super().get_context_data(**context)
 
 
-class CompositionModalDeleteView(OwnedObjectModalDeleteView):
+class CompositionModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Composition
     template_name = 'modal_delete.html'
     success_message = 'Successfully removed'
     success_url = reverse_lazy('composition-list')
-    permission_required = 'materials.delete_composition'
 
     def get_success_url(self):
         return reverse('sample-detail', kwargs={'pk': self.object.sample.pk})
@@ -702,7 +728,7 @@ class AddComponentView(PermissionRequiredMixin, NextOrSuccessUrlMixin, BSModalUp
         return HttpResponseRedirect(self.get_success_url())
 
 
-class CompositionOrderUpView(PermissionRequiredMixin, SingleObjectMixin, RedirectView):
+class CompositionOrderUpView((UserOwnsObjectMixin), SingleObjectMixin, RedirectView):
     model = Composition
     object = None
     permission_required = 'materials.change_composition'
@@ -716,7 +742,7 @@ class CompositionOrderUpView(PermissionRequiredMixin, SingleObjectMixin, Redirec
         return super().get(request, *args, **kwargs)
 
 
-class CompositionOrderDownView(PermissionRequiredMixin, SingleObjectMixin, RedirectView):
+class CompositionOrderDownView(UserOwnsObjectMixin, SingleObjectMixin, RedirectView):
     model = Composition
     object = None
     permission_required = 'materials.change_composition'

@@ -59,6 +59,7 @@ urlpatterns = [
     path('components/<int:pk>/update/', views.ComponentUpdateView.as_view(), name='materialcomponent-update'),
     path('components/<int:pk>/update/modal/', views.ComponentUpdateView.as_view(), name='materialcomponent-update-modal'),
     path('components/<int:pk>/delete/modal/', views.ComponentModalDeleteView.as_view(), name='materialcomponent-delete-modal'),
+    path('components/autocomplete/', views.ComponentAutoCompleteView.as_view(), name='materialcomponent-autocomplete'),
     path('componentgroups/', views.ComponentGroupListView.as_view(), name='materialcomponentgroup-list'),
     path('componentgroups/create/', views.ComponentGroupCreateView.as_view(), name='materialcomponentgroup-create'),
     path('componentgroups/create/modal/', views.ComponentGroupModalCreateView.as_view(), name='materialcomponentgroup-create-modal'),

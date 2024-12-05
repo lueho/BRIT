@@ -233,28 +233,32 @@
                         </div>
                         <b>Shares of:</b> {{ composition.fractions_of_name }}
                     </div>
-                    <div class="card-footer">
+                    <div class="card-footer d-flex">
                         {% if request.user == object.owner %}
-                            <div class="collapse multi-collapse"
-                                 id="options-composition-{{ composition.id }}">
                                 <a id="move-group-{{ composition.id }}-left"
-                                   href="{% url 'composition-order-down' composition.id %}?next={{ request.path }}">
+                                   href="{% url 'composition-order-down' composition.id %}?next={{ request.path }}"
+                                   class="mr-3 nowrap"
+                                >
                                     <i class="fas fa-fw fa-arrow-left"></i>
                                 </a>
                                 <a id="edit-group-{{ composition.id }}"
-                                   href="{% url 'composition-update' composition.id %}?next={{ request.path }}">
+                                   href="{% url 'composition-update' composition.id %}?next={{ request.path }}"
+                                   class="mr-3 nowrap"
+                                >
                                     <i class="fas fa-fw fa-edit"></i> Edit
                                 </a>
                                 <a id="remove-group-{{ composition.id }}"
-                                   class="modal-link"
-                                   href="{% url 'composition-delete-modal' composition.id %}?next={{ request.path }}">
+                                   href="{% url 'composition-delete-modal' composition.id %}?next={{ request.path }}"
+                                   class="mr-3 nowrap modal-link"
+                                >
                                     <i class="fas fa-fw fa-trash"></i> Delete
                                 </a>
                                 <a id="move-group-{{ composition.id }}-right"
-                                   href="{% url 'composition-order-up' composition.id %}?next={{ request.path }}">
+                                   href="{% url 'composition-order-up' composition.id %}?next={{ request.path }}"
+                                      class="ml-auto nowrap"
+                                >
                                     <i class="fas fa-fw fa-arrow-right"></i>
                                 </a>
-                            </div>
                         {% endif %}
                     </div>
                 </div>

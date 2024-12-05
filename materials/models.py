@@ -77,6 +77,7 @@ class MaterialComponent(BaseMaterial):
     class Meta:
         proxy = True
         verbose_name = 'component'
+        ordering = ['name']
 
 
 @receiver(post_save, sender=MaterialComponent)
@@ -331,10 +332,21 @@ class Sample(NamedUserCreatedObject):
         """
         return [setting['group'] for setting in Composition.objects.filter(sample=self).values('group').distinct()]
 
+    @property
+    def components(self):
+        """
+        Queryset of all components that have been assigned to this group.
+        """
+        return MaterialComponent.objects.filter(id__in=[share['component'] for share in
+                                                        WeightShare.objects.filter(
+                                                            composition__sample=self).values(
+                                                            'component').distinct()])
+
     def duplicate(self, creator, **kwargs):
         with mute_signals(post_save):
             duplicate = Sample.objects.create(
                 owner=creator,
+                name=kwargs.get('name', f'{self.name} (copy)'),
                 material=kwargs.get('material', self.material),
                 series=kwargs.get('series', self.series),
                 timestep=kwargs.get('timestep', self.timestep),
@@ -369,9 +381,24 @@ class Composition(NamedUserCreatedObject):
     supposed to be edited directly by a user. It depends on user objects and must be deleted, when any of the user
     objects it depends on is deleted.
     """
-    group = models.ForeignKey(MaterialComponentGroup, related_name='compositions', on_delete=models.PROTECT)
-    sample = models.ForeignKey(Sample, related_name='compositions', on_delete=models.CASCADE)
-    fractions_of = models.ForeignKey(MaterialComponent, on_delete=models.PROTECT, default=get_default_component_pk)
+    sample = models.ForeignKey(
+        Sample,
+        related_name='compositions',
+        on_delete=models.CASCADE,
+        help_text='The sample that this composition is part of.'
+    )
+    group = models.ForeignKey(
+        MaterialComponentGroup,
+        related_name='compositions',
+        on_delete=models.PROTECT,
+        help_text='The group of components that this composition is part of. Typically determined by type of analysis.'
+    )
+    fractions_of = models.ForeignKey(
+        MaterialComponent,
+        on_delete=models.PROTECT,
+        default=get_default_component_pk,
+        help_text='The component that the weight fractions of this composition are fractions of. Must be a component that is already defined.'
+    )
     order = models.IntegerField(default=90)
 
     class Meta:
@@ -392,6 +419,7 @@ class Composition(NamedUserCreatedObject):
         """
         return [share['component'] for share in self.shares.values('component').distinct()]
 
+    @property
     def components(self):
         """
         Queryset of all components that have been assigned to this group.

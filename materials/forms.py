@@ -138,25 +138,30 @@ class CompositionModalModelForm(ModalModelFormMixin, CompositionModelForm):
 
 
 class SampleAddCompositionForm(AutoCompleteModelForm):
+    sample = ModelChoiceField(queryset=Sample.objects.none())
     class Meta:
         model = Composition
-        fields = ('group', 'fractions_of')
+        fields = ('sample', 'group', 'fractions_of')
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        sample = kwargs.get('sample')
+        sample = kwargs['initial'].get('sample')
+        self.fields['sample'].queryset = Sample.objects.filter(id=sample.id)
+        self.fields['sample'].empty_label = None
         self.fields['group'].queryset = MaterialComponentGroup.objects.exclude(id__in=sample.group_ids)
-        self.fields['fractions_of'].queryset = self.instance.components
+        self.fields['group'].empty_label = None
+        self.fields['fractions_of'].queryset = sample.components
         self.fields['fractions_of'].empty_label = None
 
 
 class AddCompositionModalForm(ModalModelForm):
+    sample = ModelChoiceField(queryset=Sample.objects.all())
     group = ModelChoiceField(queryset=MaterialComponentGroup.objects.all())
     fractions_of = ModelChoiceField(queryset=MaterialComponent.objects.all())
 
     class Meta:
         model = SampleSeries
-        fields = ['group', 'fractions_of', ]
+        fields = ['sample', 'group', 'fractions_of', ]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -310,6 +315,7 @@ class InlineWeightShare(InlineFormSetFactory):
         'form': WeightShareModelForm,
         'formset': WeightShareInlineFormset,
         'extra': 0,
+        'min_num':1,
         'can_delete': True,
         'widgets': {
             'owner': HiddenInput(),
@@ -359,7 +365,8 @@ class ModalInlineComponentShare(InlineFormSetFactory):
     factory_kwargs = {
         'form': WeightShareInlineForm,
         'formset': WeightShareInlineFormset,
-        'extra': 0,
+        'extra': 1,
+        'min_num': 1,
         'can_delete': True,
         'widgets': {
             'component': PlainTextComponentWidget(),

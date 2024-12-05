@@ -32,29 +32,39 @@
 
 {% block javascript %}
     <script src="{% static 'js/dynamic-formset.js' %}"></script>
-    <script type="text/javascript">
-        // Corrected formset container ID
-        const formsetContainer = document.getElementById('form-container');
-        if (formsetContainer) {
-            const formRows = formsetContainer.getElementsByClassName('formset-form-row');
-            for (let row of formRows) {
-                const selectField = row.getElementsByTagName('select')[0];
-                if (selectField) {
-                    Array.from(selectField.options).forEach(opt => {
-                        if (!opt.selected) {
-                            opt.remove();
-                        }
-                    });
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            const percentageInputs = document.querySelectorAll('.percentage-input');
+            const managementFormTotalForms = document.getElementById('shares-TOTAL_FORMS');
+            const managementFormMinForms = parseInt(document.querySelector('[name="form-MIN_NUM_FORMS"]').value) || 1;
+
+            // make sure that on pre-existing forms, only the selected option is available for the component field
+            const formsetContainer = document.getElementById('form-container');
+            if (formsetContainer) {
+                const formRows = formsetContainer.getElementsByClassName('formset-form-row');
+                for (let row of formRows) {
+                    const selectField = row.getElementsByTagName('select')[0];
+                    if (selectField) {
+                        Array.from(selectField.options).forEach(opt => {
+                            if (!opt.selected) {
+                                opt.remove();
+                            }
+                        });
+                    }
                 }
             }
-        }
-    </script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function () {
-            const percentageInputs = document.querySelectorAll('.percentage-input');
 
-            percentageInputs.forEach(function (input) {
-                input.addEventListener('input', function () {
+            // Initial load: check if the formset is below the minimum number of forms, and add forms if necessary
+            if (parseInt(managementFormTotalForms.value) < managementFormMinForms) {
+                let formsToAdd = managementFormMinForms - parseInt(managementFormTotalForms.value);
+                while (formsToAdd > 0) {
+                    addForm();
+                    formsToAdd--;
+                }
+            }
+
+            percentageInputs.forEach(function(input) {
+                input.addEventListener('input', function() {
                     const value = input.value;
 
                     // Regex to allow only up to 10 decimal places and integer part up to 3 digits
