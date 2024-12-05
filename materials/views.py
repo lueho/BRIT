@@ -13,7 +13,8 @@ from distributions.plots import DoughnutChart
 from utils.views import (NextOrSuccessUrlMixin, OwnedObjectCreateView, OwnedObjectDetailView,
                          OwnedObjectListView, OwnedObjectModalCreateView, OwnedObjectModalDeleteView,
                          OwnedObjectModalDetailView, OwnedObjectModalUpdateView, OwnedObjectUpdateView,
-                         PublishedObjectFilterView, UserCreatedObjectModalDeleteView,
+                         PublishedObjectFilterView, UserCreatedObjectCreateView, UserCreatedObjectModalCreateView,
+                         UserCreatedObjectModalDeleteView,
                          UserCreatedObjectUpdateView,
                          UserOwnedObjectFilterView,
                          UserOwnsObjectMixin)
@@ -24,7 +25,7 @@ from .forms import (AddComponentModalForm, AddCompositionModalForm, AddLiteratur
                     CompositionModelForm, InlineWeightShare, MaterialCategoryModalModelForm, MaterialCategoryModelForm,
                     MaterialModalModelForm, MaterialModelForm, MaterialPropertyModalModelForm,
                     MaterialPropertyModelForm, MaterialPropertyValueModalModelForm, MaterialPropertyValueModelForm,
-                    ModalInlineComponentShare, SampleModalModelForm, SampleModelForm,
+                    ModalInlineComponentShare, SampleAddCompositionForm, SampleModalModelForm, SampleModelForm,
                     SampleSeriesAddTemporalDistributionModalModelForm, SampleSeriesModalModelForm,
                     SampleSeriesModelForm, WeightShareUpdateFormSetHelper)
 from .models import (Material, MaterialCategory, MaterialComponent, MaterialComponentGroup, MaterialProperty,
@@ -306,12 +307,11 @@ class MaterialPropertyModalDeleteView(OwnedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class MaterialPropertyValueModalDeleteView(OwnedObjectModalDeleteView):
+class MaterialPropertyValueModalDeleteView(UserCreatedObjectModalDeleteView):
     template_name = 'modal_delete.html'
     model = MaterialPropertyValue
     success_message = 'Successfully deleted.'
     success_url = reverse_lazy('home')
-    permission_required = 'materials.delete_materialpropertyvalue'
 
 
 # ----------- Sample Series CRUD ---------------------------------------------------------------------------------------
@@ -512,9 +512,37 @@ class UserOwnedSampleAutoCompleteView(SampleAutoCompleteView):
         return super().get_queryset().filter(owner=self.request.user)
 
 
-class SampleAddPropertyView(UserPassesTestMixin, OwnedObjectCreateView):
+class SampleAddCompositionView(UserPassesTestMixin, UserCreatedObjectCreateView):
+    sample = None
+    form_class = SampleAddCompositionForm
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        kwargs['sample'] = self.sample
+        return kwargs
+
+    def form_valid(self, form):
+        form.instance.owner = self.request.user
+        composition = form.save()
+        self.sample.compositions.add(composition)
+        return HttpResponseRedirect(self.get_success_url())
+
+    def test_func(self):
+        if not self.request.user.is_authenticated:
+            return False
+        return self.request.user == self.sample.owner
+
+    def get_success_url(self):
+        return reverse('sample-detail', kwargs={'pk': self.kwargs.get('pk')})
+
+    def get(self, request, *args, **kwargs):
+        self.sample = Sample.objects.get(pk=self.kwargs.get('pk'))
+        return super().get(request, *args, **kwargs)
+
+
+class SampleAddPropertyView(UserPassesTestMixin, UserCreatedObjectCreateView):
     form_class = MaterialPropertyValueModelForm
-    permission_required = 'materials.add_materialpropertyvalue'
 
     def form_valid(self, form):
         form.instance.owner = self.request.user
@@ -533,7 +561,7 @@ class SampleAddPropertyView(UserPassesTestMixin, OwnedObjectCreateView):
         return reverse('sample-detail', kwargs={'pk': self.kwargs.get('pk')})
 
 
-class SampleModalAddPropertyView(UserPassesTestMixin, OwnedObjectModalCreateView):
+class SampleModalAddPropertyView(UserPassesTestMixin, UserCreatedObjectModalCreateView):
     form_class = MaterialPropertyValueModalModelForm
 
     def form_valid(self, form):
@@ -571,7 +599,7 @@ class CompositionListView(OwnedObjectListView):
     permission_required = set()
 
 
-class CompositionCreateView(OwnedObjectCreateView):
+class CompositionCreateView(UserCreatedObjectCreateView):
     form_class = CompositionModelForm
     permission_required = 'materials.add_composition'
 

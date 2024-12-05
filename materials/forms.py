@@ -137,6 +137,19 @@ class CompositionModalModelForm(ModalModelFormMixin, CompositionModelForm):
     pass
 
 
+class SampleAddCompositionForm(AutoCompleteModelForm):
+    class Meta:
+        model = Composition
+        fields = ('group', 'fractions_of')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        sample = kwargs.get('sample')
+        self.fields['group'].queryset = MaterialComponentGroup.objects.exclude(id__in=sample.group_ids)
+        self.fields['fractions_of'].queryset = self.instance.components
+        self.fields['fractions_of'].empty_label = None
+
+
 class AddCompositionModalForm(ModalModelForm):
     group = ModelChoiceField(queryset=MaterialComponentGroup.objects.all())
     fractions_of = ModelChoiceField(queryset=MaterialComponent.objects.all())

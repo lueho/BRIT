@@ -39,6 +39,7 @@ urlpatterns = [
     path('samples/<int:pk>/', views.SampleDetailView.as_view(), name='sample-detail'),
     path('samples/<int:pk>/update/', views.SampleUpdateView.as_view(), name='sample-update'),
     path('samples/<int:pk>/delete/modal/', views.SampleModalDeleteView.as_view(), name='sample-delete-modal'),
+    path('samples/<int:pk>/composition/add/', views.SampleAddCompositionView.as_view(), name='sample-add-composition'),
     path('samples/<int:pk>/add_property', views.SampleAddPropertyView.as_view(), name='sample-add-property'),
     path('samples/<int:pk>/add_property/modal/', views.SampleModalAddPropertyView.as_view(), name='sample-add-property-modal'),
     path('samples/<int:pk>/duplicate/', views.SampleCreateDuplicateView.as_view(), name='sample-duplicate'),
