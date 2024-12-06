@@ -1,10 +1,12 @@
 from django.urls import include, path
+from django.views.generic import RedirectView
 
 from . import views
 from .router import router
 
 urlpatterns = [
-    path('', views.MaterialsDashboardView.as_view(), name='materials-dashboard'),
+    path('', RedirectView.as_view(url='/materials/samples/featured/'), name='materials-home'),
+    path('dashboard/', views.MaterialsDashboardView.as_view(), name='materials-dashboard'),
     path('list/', views.MaterialListView.as_view(), name='material-list'),
     path('create/', views.MaterialCreateView.as_view(), name='material-create'),
     path('create/modal/', views.MaterialModalCreateView.as_view(), name='material-create-modal'),
@@ -16,7 +18,7 @@ urlpatterns = [
     path('autocomplete/', views.MaterialAutocompleteView.as_view(), name='material-autocomplete'),
     path('sample_series/', views.PublishedSampleSeriesListView.as_view(), name='sampleseries-list'),
     path('sample_series/autocomplete/', views.SampleSeriesAutoCompleteView.as_view(), name='sampleseries-autocomplete'),
-    path('sample_series/featured', views.FeaturedMaterialListView.as_view(), name='sampleseries-list-featured'),
+    path('sample_series/featured/', views.FeaturedMaterialListView.as_view(), name='sampleseries-list-featured'),
     path('sample_series/user/', views.UserOwnedSampleSeriesListView.as_view(), name='sampleseries-list-owned'),
     path('sample_series/create/', views.SampleSeriesCreateView.as_view(), name='sampleseries-create'),
     path('sample_series/create/modal', views.SampleSeriesModalCreateView.as_view(), name='sampleseries-create-modal'),
@@ -33,7 +35,7 @@ urlpatterns = [
     path('samples/autocomplete/', views.SampleAutoCompleteView.as_view(), name='sample-autocomplete'),
     path('samples/autocomplete/published/', views.PublishedSampleAutoCompleteView.as_view(), name='sample-autocomplete-published'),
     path('samples/autocomplete/owned/', views.UserOwnedSampleAutoCompleteView.as_view(), name='sample-autocomplete-owned'),
-    path('samples/featured', views.FeaturedSampleListView.as_view(), name='sample-list-featured'),
+    path('samples/featured/', views.FeaturedSampleListView.as_view(), name='sample-list-featured'),
     path('samples/user/', views.UserOwnedSampleListView.as_view(), name='sample-list-owned'),
     path('samples/create/', views.SampleCreateView.as_view(), name='sample-create'),
     path('samples/<int:pk>/', views.SampleDetailView.as_view(), name='sample-detail'),
