@@ -17,7 +17,8 @@ class CollectionViewSet(AutoPermModelViewSet):
     custom_permission_required = {
         'list': None,
         'retrieve': None,
-        'geojson': None
+        'geojson': None,
+        'summaries': None,
     }
 
     @action(detail=False, methods=['get'])
