@@ -1980,7 +1980,7 @@ class SampleDetailViewTestCase(ViewWithPermissionsTestCase):
         self.assertContains(response, reverse('sample-delete-modal', kwargs={'pk': self.sample.pk}))
         self.assertContains(response, reverse('sample-add-property', kwargs={'pk': self.sample.pk}))
         self.assertContains(response, reverse('materialpropertyvalue-delete-modal', kwargs={'pk': self.prop_val.pk}))
-        self.assertContains(response, reverse('sampleseries-add-composition', kwargs={'pk': self.sample.series.pk}))
+        self.assertContains(response, reverse('sample-add-composition', kwargs={'pk': self.sample.series.pk}))
         self.assertContains(response, 'edit-group-')
 
     def test_template_does_not_contain_dashboard_edit_and_delete_button_for_outsiders(self):
@@ -1992,7 +1992,7 @@ class SampleDetailViewTestCase(ViewWithPermissionsTestCase):
         self.assertNotContains(response, reverse('sample-delete-modal', kwargs={'pk': self.sample.pk}))
         self.assertNotContains(response, reverse('sample-add-property-modal', kwargs={'pk': self.sample.pk}))
         self.assertNotContains(response, reverse('materialpropertyvalue-delete-modal', kwargs={'pk': self.prop_val.pk}))
-        self.assertNotContains(response, reverse('sampleseries-add-composition', kwargs={'pk': self.sample.pk}))
+        self.assertNotContains(response, reverse('sample-add-composition', kwargs={'pk': self.sample.pk}))
         self.assertNotContains(response, 'edit-group-')
 
 
@@ -2839,7 +2839,7 @@ class ComponentOrderUpViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         material = Material.objects.create(name='Test Material')
-        cls.component_group = MaterialComponentGroup.objects.create(name='Test Group')
+        cls.component_group = MaterialComponentGroup.objects.create(owner=cls.member, name='Test Group')
         cls.series = SampleSeries.objects.create(name='Test Series', material=material)
         MaterialComponent.objects.create(name='Test Component')
         cls.default_component = MaterialComponent.objects.default()
@@ -2877,7 +2877,7 @@ class ComponentOrderDownViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         material = Material.objects.create(name='Test Material')
-        cls.component_group = MaterialComponentGroup.objects.create(name='Test Group')
+        cls.component_group = MaterialComponentGroup.objects.create(owner=cls.member, name='Test Group')
         cls.series = SampleSeries.objects.create(name='Test Series', material=material)
         cls.default_component = MaterialComponent.objects.default()
         cls.sample = Sample.objects.get(series=cls.series, timestep=Timestep.objects.default())

@@ -309,7 +309,7 @@ class SampleTestCase(TestCase):
         for field in self.sample._meta.get_fields():
             if field.concrete and field.name not in ['id', 'owner', 'image', 'created_at', 'lastmodified_at',
                                                      'properties', 'sources']:
-                self.assertEqual(getattr(duplicate, field.name), getattr(self.sample, field.name))
+                self.assertEqual(getattr(duplicate, f'{field.name} (copy)'), getattr(self.sample, field.name))
             elif field.name == 'compositions':
                 self.assertTrue(self.sample.compositions.exists())
                 self.assertTrue(duplicate.compositions.exists())
