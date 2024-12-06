@@ -1,28 +1,32 @@
 from bootstrap_modal_forms.generic import BSModalDeleteView, BSModalFormView, BSModalReadView, BSModalUpdateView
 from crispy_forms.helper import FormHelper
 from dal import autocomplete
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin, UserPassesTestMixin
 from django.http import HttpResponseRedirect
 from django.urls import reverse, reverse_lazy
 from django.views.generic import ListView, RedirectView, TemplateView
 from django.views.generic.detail import SingleObjectMixin
 from extra_views import UpdateWithInlinesView
 
-from bibliography.forms import SourceSimpleFilterForm
 from distributions.models import TemporalDistribution
 from distributions.plots import DoughnutChart
-from utils.views import (BRITFilterView, NextOrSuccessUrlMixin, OwnedObjectCreateView, OwnedObjectDetailView,
+from utils.views import (NextOrSuccessUrlMixin, OwnedObjectCreateView, OwnedObjectDetailView,
                          OwnedObjectListView, OwnedObjectModalCreateView, OwnedObjectModalDeleteView,
                          OwnedObjectModalDetailView, OwnedObjectModalUpdateView, OwnedObjectUpdateView,
+                         PublishedObjectFilterView,
+                         UserCreatedObjectCreateView, UserCreatedObjectModalCreateView,
+                         UserCreatedObjectModalDeleteView,
+                         UserCreatedObjectUpdateView,
+                         UserOwnedObjectFilterView,
                          UserOwnsObjectMixin)
-from .filters import SampleFilter
+from .filters import PublishedSampleFilter, SampleSeriesFilter, UserOwnedSampleFilter
 from .forms import (AddComponentModalForm, AddCompositionModalForm, AddLiteratureSourceForm, AddSeasonalVariationForm,
                     ComponentGroupModalModelForm, ComponentGroupModelForm, ComponentModalModelForm, ComponentModelForm,
                     ComponentShareDistributionFormSetHelper, Composition, CompositionModalModelForm,
                     CompositionModelForm, InlineWeightShare, MaterialCategoryModalModelForm, MaterialCategoryModelForm,
                     MaterialModalModelForm, MaterialModelForm, MaterialPropertyModalModelForm,
                     MaterialPropertyModelForm, MaterialPropertyValueModalModelForm, MaterialPropertyValueModelForm,
-                    ModalInlineComponentShare, SampleModalModelForm, SampleModelForm,
+                    ModalInlineComponentShare, SampleAddCompositionForm, SampleModalModelForm, SampleModelForm,
                     SampleSeriesAddTemporalDistributionModalModelForm, SampleSeriesModalModelForm,
                     SampleSeriesModelForm, WeightShareUpdateFormSetHelper)
 from .models import (Material, MaterialCategory, MaterialComponent, MaterialComponentGroup, MaterialProperty,
@@ -151,6 +155,15 @@ class MaterialAutocompleteView(autocomplete.Select2QuerySetView):
 
 # ----------- Material Components CRUD ---------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
+
+
+class ComponentAutoCompleteView(autocomplete.Select2QuerySetView):
+    def get_queryset(self):
+        qs = MaterialComponent.objects.all()
+        if self.q:
+            qs = qs.filter(name__icontains=self.q)
+        return qs
+
 
 class ComponentListView(OwnedObjectListView):
     model = MaterialComponent
@@ -304,20 +317,25 @@ class MaterialPropertyModalDeleteView(OwnedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class MaterialPropertyValueModalDeleteView(OwnedObjectModalDeleteView):
+class MaterialPropertyValueModalDeleteView(UserCreatedObjectModalDeleteView):
     template_name = 'modal_delete.html'
     model = MaterialPropertyValue
     success_message = 'Successfully deleted.'
     success_url = reverse_lazy('home')
-    permission_required = 'materials.delete_materialpropertyvalue'
 
 
 # ----------- Sample Series CRUD ---------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class SampleSeriesListView(OwnedObjectListView):
+
+class PublishedSampleSeriesListView(PublishedObjectFilterView):
     model = SampleSeries
-    permission_required = set()
+    filterset_class = SampleSeriesFilter
+
+
+class UserOwnedSampleSeriesListView(UserOwnedObjectFilterView):
+    model = SampleSeries
+    filterset_class = SampleSeriesFilter
 
 
 class SampleSeriesCreateView(OwnedObjectCreateView):
@@ -402,14 +420,36 @@ class SampleSeriesModalAddDistributionView(OwnedObjectModalUpdateView):
         return HttpResponseRedirect(self.get_success_url())
 
 
+class SampleSeriesAutoCompleteView(autocomplete.Select2QuerySetView):
+    def get_queryset(self):
+        if not self.request.user.is_authenticated:
+            return SampleSeries.objects.none()
+
+        qs = SampleSeries.objects.filter(owner=self.request.user)
+
+        if self.q:
+            qs = qs.filter(name__icontains=self.q)
+
+        return qs
+
+
 # ----------- Sample CRUD ----------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class SampleListView(BRITFilterView):
+
+class PublishedSampleListView(PublishedObjectFilterView):
     model = Sample
-    filterset_class = SampleFilter
-    ordering = 'id'
-    permission_required = set()
+    filterset_class = PublishedSampleFilter
+
+
+class UserOwnedSampleListView(UserOwnedObjectFilterView):
+    model = Sample
+    filterset_class = UserOwnedSampleFilter
+
+    def get_filterset_kwargs(self, filterset_class):
+        kwargs = super().get_filterset_kwargs(filterset_class)
+        kwargs['user'] = self.request.user
+        return kwargs
 
 
 class FeaturedSampleListView(OwnedObjectListView):
@@ -419,9 +459,9 @@ class FeaturedSampleListView(OwnedObjectListView):
     permission_required = set()
 
 
-class SampleCreateView(OwnedObjectCreateView):
+class SampleCreateView(LoginRequiredMixin, OwnedObjectCreateView):
     form_class = SampleModelForm
-    permission_required = 'materials.add_sample'
+    permission_required = set()
 
 
 class SampleModalCreateView(OwnedObjectModalCreateView):
@@ -448,30 +488,16 @@ class SampleDetailView(OwnedObjectDetailView):
         return context
 
 
-class SampleModalDetailView(OwnedObjectModalDetailView):
-    template_name = 'modal_detail.html'
-    model = Sample
-    permission_required = set()
-
-
-class SampleUpdateView(OwnedObjectUpdateView):
+class SampleUpdateView(UserCreatedObjectUpdateView):
     model = Sample
     form_class = SampleModelForm
-    permission_required = 'materials.change_sample'
 
 
-class SampleModalUpdateView(OwnedObjectModalUpdateView):
-    model = Sample
-    form_class = SampleModalModelForm
-    permission_required = 'materials.change_sample'
-
-
-class SampleModalDeleteView(OwnedObjectModalDeleteView):
+class SampleModalDeleteView(UserCreatedObjectModalDeleteView):
     template_name = 'modal_delete.html'
     model = Sample
     success_message = 'Successfully deleted.'
     success_url = reverse_lazy('sample-list')
-    permission_required = 'materials.delete_sample'
 
 
 # ----------- Sample Utilities -----------------------------------------------------------------------------------------
@@ -486,9 +512,55 @@ class SampleAutoCompleteView(autocomplete.Select2QuerySetView):
         return qs
 
 
-class SampleAddPropertyView(OwnedObjectCreateView):
+class PublishedSampleAutoCompleteView(SampleAutoCompleteView):
+    def get_queryset(self):
+        return super().get_queryset().filter(publication_status='published')
+
+
+class UserOwnedSampleAutoCompleteView(SampleAutoCompleteView):
+    def get_queryset(self):
+        return super().get_queryset().filter(owner=self.request.user)
+
+
+class SampleAddCompositionView(UserPassesTestMixin, UserCreatedObjectCreateView):
+    sample = None
+    form_class = SampleAddCompositionForm
+
+    def get_initial(self):
+        self.sample = self.get_sample()
+        return {'sample': self.sample}
+
+    def form_valid(self, form):
+        form.instance.owner = self.request.user
+        composition = form.save()
+        self.sample.compositions.add(composition)
+        return HttpResponseRedirect(self.get_success_url())
+
+    def get_sample(self):
+        if not self.sample:
+            self.sample = Sample.objects.get(pk=self.kwargs.get('pk'))
+            return self.sample
+
+    def test_func(self):
+        if not self.request.user.is_authenticated:
+            return False
+        self.sample = self.get_sample()
+        return self.request.user == self.sample.owner
+
+    def get_success_url(self):
+        return reverse('sample-detail', kwargs={'pk': self.kwargs.get('pk')})
+
+    def get(self, request, *args, **kwargs):
+        self.sample = self.get_sample()
+        return super().get(request, *args, **kwargs)
+
+    def post(self, request, *args, **kwargs):
+        self.sample = self.get_sample()
+        return super().post(request, *args, **kwargs)
+
+
+class SampleAddPropertyView(UserPassesTestMixin, UserCreatedObjectCreateView):
     form_class = MaterialPropertyValueModelForm
-    permission_required = 'materials.add_materialpropertyvalue'
 
     def form_valid(self, form):
         form.instance.owner = self.request.user
@@ -497,13 +569,18 @@ class SampleAddPropertyView(OwnedObjectCreateView):
         sample.properties.add(property_value)
         return HttpResponseRedirect(self.get_success_url())
 
+    def test_func(self):
+        if not self.request.user.is_authenticated:
+            return False
+        sample = Sample.objects.get(pk=self.kwargs.get('pk'))
+        return self.request.user == sample.owner
+
     def get_success_url(self):
         return reverse('sample-detail', kwargs={'pk': self.kwargs.get('pk')})
 
 
-class SampleModalAddPropertyView(OwnedObjectModalCreateView):
+class SampleModalAddPropertyView(UserPassesTestMixin, UserCreatedObjectModalCreateView):
     form_class = MaterialPropertyValueModalModelForm
-    permission_required = 'materials.add_materialpropertyvalue'
 
     def form_valid(self, form):
         form.instance.owner = self.request.user
@@ -512,40 +589,33 @@ class SampleModalAddPropertyView(OwnedObjectModalCreateView):
         sample.properties.add(property_value)
         return HttpResponseRedirect(self.get_success_url())
 
+    def test_func(self):
+        if not self.request.user.is_authenticated:
+            return False
+        sample = Sample.objects.get(pk=self.kwargs.get('pk'))
+        return self.request.user == sample.owner
+
     def get_success_url(self):
         return reverse('sample-detail', kwargs={'pk': self.kwargs.get('pk')})
 
 
-class SampleAddSourceView(OwnedObjectUpdateView):
-    model = Sample
-    form_class = SourceSimpleFilterForm
-    permission_required = 'materials.change_sample'
-
-    def form_valid(self, form):
-        self.object.sources.add(form.cleaned_data['source'])
-        return HttpResponseRedirect(self.get_success_url())
-
-
-class SampleCreateDuplicateView(OwnedObjectUpdateView):
+class SampleCreateDuplicateView(UserCreatedObjectUpdateView):
     model = Sample
     form_class = SampleModelForm
-    permission_required = 'materials.add_sample'
     object = None
+
+    def get_initial(self):
+        initial = super().get_initial()
+        initial['name'] = f'{self.object.name} (copy)'
+        return initial
 
     def form_valid(self, form):
         self.object = self.object.duplicate(creator=self.request.user, **form.cleaned_data)
-        return super().form_valid(form)
+        self.new_object = self.object
+        return HttpResponseRedirect(self.get_success_url())
 
-
-class SampleModalCreateDuplicateView(OwnedObjectModalUpdateView):
-    model = Sample
-    form_class = SampleModalModelForm
-    permission_required = 'materials.add_sample'
-    object = None
-
-    def form_valid(self, form):
-        self.object = self.object.duplicate(creator=self.request.user, **form.cleaned_data)
-        return super().form_valid(form)
+    def get_success_url(self):
+        return self.new_object.get_absolute_url()
 
 
 # ----------- Composition CRUD -----------------------------------------------------------------------------------------
@@ -577,14 +647,10 @@ class CompositionModalDetailView(OwnedObjectModalDetailView):
     permission_required = set()
 
 
-class CompositionUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin, UpdateWithInlinesView):
+class CompositionUpdateView(UserPassesTestMixin, NextOrSuccessUrlMixin, UpdateWithInlinesView):
     model = Composition
     inlines = [InlineWeightShare, ]
     fields = set()
-    permission_required = (
-        'materials.change_composition',
-        'materials.change_weightshare',
-    )
 
     def get_context_data(self, **kwargs):
         inline_helper = WeightShareUpdateFormSetHelper()
@@ -597,6 +663,11 @@ class CompositionUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin, Upda
         }
         context.update(kwargs)
         return super().get_context_data(**context)
+
+    def test_func(self):
+        if not self.request.user.is_authenticated:
+            return False
+        return self.request.user == self.get_object().owner
 
 
 class CompositionModalUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin, UpdateWithInlinesView):
@@ -624,12 +695,11 @@ class CompositionModalUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin,
         return super().get_context_data(**context)
 
 
-class CompositionModalDeleteView(OwnedObjectModalDeleteView):
+class CompositionModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Composition
     template_name = 'modal_delete.html'
     success_message = 'Successfully removed'
     success_url = reverse_lazy('composition-list')
-    permission_required = 'materials.delete_composition'
 
     def get_success_url(self):
         return reverse('sample-detail', kwargs={'pk': self.object.sample.pk})
@@ -658,7 +728,7 @@ class AddComponentView(PermissionRequiredMixin, NextOrSuccessUrlMixin, BSModalUp
         return HttpResponseRedirect(self.get_success_url())
 
 
-class CompositionOrderUpView(PermissionRequiredMixin, SingleObjectMixin, RedirectView):
+class CompositionOrderUpView((UserOwnsObjectMixin), SingleObjectMixin, RedirectView):
     model = Composition
     object = None
     permission_required = 'materials.change_composition'
@@ -672,7 +742,7 @@ class CompositionOrderUpView(PermissionRequiredMixin, SingleObjectMixin, Redirec
         return super().get(request, *args, **kwargs)
 
 
-class CompositionOrderDownView(PermissionRequiredMixin, SingleObjectMixin, RedirectView):
+class CompositionOrderDownView(UserOwnsObjectMixin, SingleObjectMixin, RedirectView):
     model = Composition
     object = None
     permission_required = 'materials.change_composition'

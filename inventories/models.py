@@ -13,7 +13,7 @@ from bibliography.models import Source
 from distributions.models import Timestep
 from maps.models import Catchment, GeoDataset, Region
 from materials.models import Material, SampleSeries
-from utils.models import NamedUserObjectModel
+from utils.models import NamedUserCreatedObject
 from .exceptions import BlockedRunningScenario
 
 
@@ -157,7 +157,7 @@ class ScenarioStatus(models.Model):
         return f'Status of Scenario {self.scenario}: {self.status}'
 
 
-class Scenario(NamedUserObjectModel):
+class Scenario(NamedUserCreatedObject):
     name = models.CharField(max_length=56, default='Custom Scenario')
     owner = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
     description = models.TextField(blank=True, null=True)

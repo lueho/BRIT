@@ -11,14 +11,14 @@ from factory.django import mute_signals
 from bibliography.models import Source
 from distributions.models import TemporalDistribution, Timestep
 from users.models import get_default_owner
-from utils.models import NamedUserObjectModel
+from utils.models import NamedUserCreatedObject
 
 
-class MaterialCategory(NamedUserObjectModel):
+class MaterialCategory(NamedUserCreatedObject):
     pass
 
 
-class BaseMaterial(NamedUserObjectModel):
+class BaseMaterial(NamedUserCreatedObject):
     """
     Base for all specialized models of material
     """
@@ -46,6 +46,18 @@ class Material(BaseMaterial):
         proxy = True
 
 
+def get_default_material():
+    return Material.objects.get_or_create(
+        name=getattr(settings, 'DEFAULT_MATERIAL_NAME', 'Other')
+    )[0]
+
+
+def get_default_material_pk():
+    return Material.objects.get_or_create(
+        name=getattr(settings, 'DEFAULT_MATERIAL_NAME', 'Other')
+    )[0].pk
+
+
 class MaterialComponentManager(models.Manager):
     def default(self):
         return self.get_queryset().get(name='Fresh Matter (FM)', owner=get_default_owner())
@@ -65,6 +77,7 @@ class MaterialComponent(BaseMaterial):
     class Meta:
         proxy = True
         verbose_name = 'component'
+        ordering = ['name']
 
 
 @receiver(post_save, sender=MaterialComponent)
@@ -91,7 +104,7 @@ class MaterialComponentGroupManager(models.Manager):
         return self.get_queryset().get(name='Total Material')
 
 
-class MaterialComponentGroup(NamedUserObjectModel):
+class MaterialComponentGroup(NamedUserCreatedObject):
     """
     Definition of a group of components that belong together to form a composition which can be described with
     weight fractions. E.g. Macro component, chemical elements, etc. The actual composition is described in its own
@@ -110,14 +123,19 @@ def get_default_group():
     )[0]
 
 
-class SampleSeries(NamedUserObjectModel):
+class SampleSeries(NamedUserCreatedObject):
     """
     Sample series are used to add concrete experimental data to the abstract semantic definition of materials. A sample
     series consists of several samples that are taken from a comparable source at different times. That way a temporal
     distribution of material properties and compositions over time can be described.
     """
-    material = models.ForeignKey(Material, on_delete=models.PROTECT)
-    preview = models.ImageField(upload_to='materials_sampleseries/', blank=True, null=True)
+    material = models.ForeignKey(
+        Material,
+        default=get_default_material_pk,
+        on_delete=models.PROTECT,
+        related_name='sample_series'
+    )
+    image = models.ImageField(upload_to='materials_sampleseries/', blank=True, null=True)
     publish = models.BooleanField(default=False)
     standard = models.BooleanField(default=True)
     temporal_distributions = models.ManyToManyField(TemporalDistribution)
@@ -162,7 +180,7 @@ class SampleSeries(NamedUserObjectModel):
 
         # Use average and standard deviation of component averages as default values for all timesteps
         for timestep in distribution.timestep_set.all():
-            Sample.objects.create(owner=self.owner, series=self, timestep=timestep)
+            Sample.objects.create(owner=self.owner, material=self.material, series=self, timestep=timestep)
 
     def remove_temporal_distribution(self, distribution):
         """
@@ -250,14 +268,14 @@ def add_default_temporal_distribution(sender, instance, created, **kwargs):
         instance.add_temporal_distribution(TemporalDistribution.objects.default())
 
 
-class MaterialProperty(NamedUserObjectModel):
+class MaterialProperty(NamedUserCreatedObject):
     unit = models.CharField(max_length=63)
 
     def __str__(self):
         return f'{self.name} [{self.unit}]'
 
 
-class MaterialPropertyValue(NamedUserObjectModel):
+class MaterialPropertyValue(NamedUserCreatedObject):
     property = models.ForeignKey(MaterialProperty, on_delete=models.PROTECT)
     average = models.FloatField()
     standard_deviation = models.FloatField()
@@ -273,25 +291,66 @@ class MaterialPropertyValue(NamedUserObjectModel):
         return duplicate
 
 
-class Sample(NamedUserObjectModel):
+class Sample(NamedUserCreatedObject):
     """
     Representation of a single sample that was taken at a specific location and time. Equivalent samples are associated
     with a SampleSeries to temporal distribution of properties and composition.
     """
-    series = models.ForeignKey(SampleSeries, related_name='samples', on_delete=models.CASCADE)
-    timestep = models.ForeignKey(Timestep, related_name='samples', on_delete=models.PROTECT, null=True)
-    taken_at = models.DateTimeField(blank=True, null=True)
-    preview = models.ImageField(upload_to='materials_sample/', blank=True, null=True)
-    properties = models.ManyToManyField(MaterialPropertyValue)
+    image = models.ImageField(upload_to='materials_sample/', blank=True, null=True)
+    material = models.ForeignKey(
+        Material,
+        default=get_default_material_pk,
+        on_delete=models.PROTECT,
+        related_name='samples',
+        help_text='If no option fits, please choose "Other" and specify the material in the description.'
+    )
+    datetime = models.DateTimeField(blank=True, null=True, help_text='Choose 00:00 if time is unknown.')
+    location = models.CharField(max_length=511, blank=True, null=True, help_text='Name of town, address or coordinates')
+    series = models.ForeignKey(
+        SampleSeries,
+        related_name='samples',
+        on_delete=models.SET_NULL,
+        blank=True,
+        null=True,
+        help_text='If this sample belongs to a sample series or campaign, select it here.'
+    )
+    timestep = models.ForeignKey(
+        Timestep,
+        related_name='samples',
+        on_delete=models.PROTECT,
+        blank=True,
+        null=True,
+        help_text='If the sample represents a specific time step in a series, select it here.'
+    )
     sources = models.ManyToManyField(Source)
+    properties = models.ManyToManyField(MaterialPropertyValue)
+
+    @property
+    def group_ids(self):
+        """
+        Ids of component groups that have been assigned to this sample.
+        """
+        return [setting['group'] for setting in Composition.objects.filter(sample=self).values('group').distinct()]
+
+    @property
+    def components(self):
+        """
+        Queryset of all components that have been assigned to this group.
+        """
+        return MaterialComponent.objects.filter(id__in=[share['component'] for share in
+                                                        WeightShare.objects.filter(
+                                                            composition__sample=self).values(
+                                                            'component').distinct()])
 
     def duplicate(self, creator, **kwargs):
         with mute_signals(post_save):
             duplicate = Sample.objects.create(
                 owner=creator,
+                name=kwargs.get('name', f'{self.name} (copy)'),
+                material=kwargs.get('material', self.material),
                 series=kwargs.get('series', self.series),
                 timestep=kwargs.get('timestep', self.timestep),
-                taken_at=kwargs.get('taken_at', self.taken_at),
+                datetime=kwargs.get('datetime', self.datetime),
             )
         for composition in self.compositions.all():
             duplicate_composition = composition.duplicate(creator)
@@ -313,18 +372,33 @@ def add_default_composition(sender, instance, created, **kwargs):
             sample=instance,
             fractions_of=get_default_component(),
         )
-        composition.add_component(MaterialComponent.objects.default())
+        composition.add_component(MaterialComponent.objects.default(), average=1.0)
 
 
-class Composition(NamedUserObjectModel):
+class Composition(NamedUserCreatedObject):
     """
     Utility model to store the settings for component groups for each material in each customization. This model is not
     supposed to be edited directly by a user. It depends on user objects and must be deleted, when any of the user
     objects it depends on is deleted.
     """
-    group = models.ForeignKey(MaterialComponentGroup, related_name='compositions', on_delete=models.PROTECT)
-    sample = models.ForeignKey(Sample, related_name='compositions', on_delete=models.CASCADE)
-    fractions_of = models.ForeignKey(MaterialComponent, on_delete=models.PROTECT, default=get_default_component_pk)
+    sample = models.ForeignKey(
+        Sample,
+        related_name='compositions',
+        on_delete=models.CASCADE,
+        help_text='The sample that this composition is part of.'
+    )
+    group = models.ForeignKey(
+        MaterialComponentGroup,
+        related_name='compositions',
+        on_delete=models.PROTECT,
+        help_text='The group of components that this composition is part of. Typically determined by type of analysis.'
+    )
+    fractions_of = models.ForeignKey(
+        MaterialComponent,
+        on_delete=models.PROTECT,
+        default=get_default_component_pk,
+        help_text='The component that the weight fractions of this composition are fractions of. Must be a component that is already defined.'
+    )
     order = models.IntegerField(default=90)
 
     class Meta:
@@ -332,7 +406,7 @@ class Composition(NamedUserObjectModel):
 
     @property
     def material(self):
-        return self.sample.series.material
+        return self.sample.material
 
     @property
     def timestep(self):
@@ -345,6 +419,7 @@ class Composition(NamedUserObjectModel):
         """
         return [share['component'] for share in self.shares.values('component').distinct()]
 
+    @property
     def components(self):
         """
         Queryset of all components that have been assigned to this group.
@@ -446,7 +521,7 @@ def add_next_order_value(sender, instance, created, **kwargs):
         instance.save()
 
 
-class WeightShare(NamedUserObjectModel):
+class WeightShare(NamedUserCreatedObject):
     """
     Holds the actual values of weight fractions that are part of any material composition. This model is not edited
     directly to maintain consistency within compositions. Use API of Composition instead.
@@ -475,7 +550,7 @@ class WeightShare(NamedUserObjectModel):
 
     @property
     def material(self):
-        return self.composition.sample.series.material
+        return self.composition.sample.material
 
     @property
     def material_settings(self):

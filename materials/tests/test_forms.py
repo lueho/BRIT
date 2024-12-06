@@ -108,14 +108,9 @@ class CompositionUpdateFormTestCase(TestCase):
             name='Test Group'
         )
 
-        sample_series = SampleSeries.objects.create(
-            owner=owner,
-            material=material,
-            name='Test Series'
-        )
         sample = Sample.objects.create(
             owner=owner,
-            series=sample_series,
+            material=material,
             name='Test Sample'
         )
 
@@ -195,8 +190,17 @@ class CompositionUpdateFormTestCase(TestCase):
             formset=WeightShareInlineFormset,
             extra=0
         )
-        # Select two components excluding any named 'Fresh Matter (FM)' if exists
-        components = MaterialComponent.objects.exclude(name='Fresh Matter (FM)').values_list('id', flat=True)[:2]
+        components = MaterialComponent.objects.exclude(
+            name__in=('Fresh Matter (FM)', 'Other')
+        ).values_list('id', flat=True)[:2]
+
+        new_composition = Composition.objects.create(
+            owner=self.owner,
+            group=self.composition.group,
+            sample=self.composition.sample,
+            fractions_of=self.composition.fractions_of
+        )
+
         data = {
             'shares-TOTAL_FORMS': '2',
             'shares-INITIAL_FORMS': '0',
@@ -211,15 +215,35 @@ class CompositionUpdateFormTestCase(TestCase):
             'shares-1-average': '54.5',
             'shares-1-standard_deviation': '1.5',
         }
-        formset = FormSet(data=data, instance=self.composition)
+        formset = FormSet(data=data, instance=new_composition)
         self.assertTrue(formset.is_valid())
         formset.instance.owner = self.owner
-        shares = formset.save()
+        formset.save()
 
-        self.assertEqual(WeightShare.objects.get(component=components[0]).average, Decimal('0.4550000000'))
-        self.assertEqual(WeightShare.objects.get(component=components[0]).standard_deviation, Decimal('0.0150000000'))
-        self.assertEqual(WeightShare.objects.get(component=components[1]).average, Decimal('0.5450000000'))
-        self.assertEqual(WeightShare.objects.get(component=components[1]).standard_deviation, Decimal('0.0150000000'))
+        self.assertEqual(
+            WeightShare.objects.get(
+                component=components[0],
+                composition=new_composition
+            ).average, Decimal('0.4550000000')
+        )
+        self.assertEqual(
+            WeightShare.objects.get(
+                component=components[0],
+                composition=new_composition
+            ).standard_deviation, Decimal('0.0150000000')
+        )
+        self.assertEqual(
+            WeightShare.objects.get(
+                component=components[1],
+                composition=new_composition
+            ).average, Decimal('0.5450000000')
+        )
+        self.assertEqual(
+            WeightShare.objects.get(
+                component=components[1],
+                composition=new_composition
+            ).standard_deviation, Decimal('0.0150000000')
+        )
 
 
     def test_form_valid_if_averages_sum_up_to_100_percent(self):
@@ -324,7 +348,7 @@ class WeightShareModelFormTest(TestCase):
         self.group = MaterialComponentGroup.objects.create(name='Test Group')
         self.material = Material.objects.create(name='Test Material')
         self.series = SampleSeries.objects.create(material=self.material, name='Test Series')
-        self.sample = Sample.objects.create(name='Test Sample', series=self.series)
+        self.sample = Sample.objects.create(name='Test Sample', material=self.material, series=self.series)
         self.composition = Composition.objects.create(
             name='Test Composition',
             sample=self.sample,

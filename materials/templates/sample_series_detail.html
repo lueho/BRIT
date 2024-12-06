@@ -9,9 +9,9 @@
                 <div class="card-header">
                     <b>{{ object.material.name }}</b>
                 </div>
-                {% if object.preview %}
+                {% if object.image %}
                     <div class="card-img-top">
-                        <img class="w-100 m-0" src="{{ object.preview.url }}" alt="Image of {{ object.material.name }}">
+                        <img class="w-100 m-0" src="{{ object.image.url }}" alt="Image of {{ object.material.name }}">
                     </div>
                 {% endif %}
                 <div class="card-body">
@@ -61,7 +61,7 @@
                             </a>
                         {% endif %}
                         {% if 'materials.view_material' in perms %}
-                            <a href="{% url 'material-dashboard' %}" class="nowrap mr-3">
+                            <a href="{% url 'materials-dashboard' %}" class="nowrap mr-3">
                                 <i class="fas fa-fw fa-cog"></i> Dashboard
                             </a>
                         {% endif %}

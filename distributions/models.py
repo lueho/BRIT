@@ -4,8 +4,8 @@ from django.db.models import Max
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-from utils.models import NamedUserObjectModel, OwnedObjectModel
 from users.models import get_default_owner
+from utils.models import NamedUserCreatedObject, UserCreatedObject
 
 
 class TemporalDistributionManager(models.Manager):
@@ -13,7 +13,7 @@ class TemporalDistributionManager(models.Manager):
         return self.get_queryset().get(name='Average', owner=get_default_owner())
 
 
-class TemporalDistribution(NamedUserObjectModel):
+class TemporalDistribution(NamedUserCreatedObject):
     """
     Model to organize timesteps into named distributions (e.g. months are timesteps of the temporal distribution 'months
     of the year').
@@ -33,7 +33,7 @@ class TimestepManager(models.Manager):
         return self.get_queryset().get(name='Average', owner=get_default_owner())
 
 
-class Timestep(NamedUserObjectModel):
+class Timestep(NamedUserCreatedObject):
     """
     Defines a timestep for organisation of seasonal distributions
     """
@@ -62,7 +62,7 @@ def add_next_order_value(sender, instance, created, **kwargs):
         instance.save()
 
 
-class Period(OwnedObjectModel):
+class Period(UserCreatedObject):
     """
     A period is a part of a full temporal distribution. Any temporal distribution can be divided into an arbitrary
     number of periods, each of which has a start and stop timestep.

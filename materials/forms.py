@@ -2,15 +2,17 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Field, Layout, Row
+from dal import autocomplete
 from django.core.exceptions import ValidationError
-from django.forms import DecimalField, HiddenInput, ModelChoiceField, ModelMultipleChoiceField, NumberInput, Widget
+from django.forms import (DateTimeInput, DecimalField, HiddenInput, ModelChoiceField, ModelMultipleChoiceField,
+                          NumberInput, Widget)
 from django.forms.models import BaseInlineFormSet
 from django.utils.safestring import mark_safe
 from extra_views import InlineFormSetFactory
 
-from bibliography.models import SOURCE_TYPES, Source
+from bibliography.models import Source
 from distributions.models import TemporalDistribution
-from utils.forms import ModalForm, ModalModelForm, ModalModelFormMixin, SimpleModelForm
+from utils.forms import AutoCompleteModelForm, ModalForm, ModalModelForm, ModalModelFormMixin, SimpleModelForm
 from .models import (Composition, Material, MaterialCategory, MaterialComponent, MaterialComponentGroup,
                      MaterialProperty, MaterialPropertyValue, Sample, SampleSeries, WeightShare)
 
@@ -78,7 +80,7 @@ class MaterialPropertyValueModalModelForm(ModalModelFormMixin, MaterialPropertyV
 class SampleSeriesModelForm(SimpleModelForm):
     class Meta:
         model = SampleSeries
-        fields = ('name', 'material', 'publish', 'description', 'preview')
+        fields = ('name', 'material', 'image', 'publish', 'description')
         labels = {'publish': 'featured'}
 
 
@@ -99,15 +101,26 @@ class SampleSeriesAddTemporalDistributionModalModelForm(ModalModelForm):
             self.instance.temporal_distributions.all())
 
 
-class SampleModelForm(SimpleModelForm):
+class SampleModelForm(AutoCompleteModelForm):
     sources = ModelMultipleChoiceField(
-        queryset=Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by('abbreviation'),
-        required=False
+        queryset=Source.objects.all(),
+        required=False,
+        widget=autocomplete.ModelSelect2Multiple(url='source-autocomplete'),
+        help_text='Optional: Select multiple sources if applicable.'
     )
 
     class Meta:
         model = Sample
-        fields = ('name', 'series', 'timestep', 'taken_at', 'description', 'preview', 'sources')
+        fields = ('name', 'material', 'image', 'datetime', 'location', 'description', 'series', 'timestep', 'sources')
+        widgets = {
+            'series': autocomplete.ModelSelect2(url='sampleseries-autocomplete'),
+            'datetime': DateTimeInput(attrs={'type': 'datetime-local'}),
+            'material': autocomplete.ModelSelect2(url='material-autocomplete'),
+        }
+        labels = {
+            'datetime': 'Date/Time',
+            'image': 'Image',
+        }
 
 
 class SampleModalModelForm(ModalModelFormMixin, SampleModelForm):
@@ -122,6 +135,23 @@ class CompositionModelForm(SimpleModelForm):
 
 class CompositionModalModelForm(ModalModelFormMixin, CompositionModelForm):
     pass
+
+
+class SampleAddCompositionForm(AutoCompleteModelForm):
+    sample = ModelChoiceField(queryset=Sample.objects.none())
+    class Meta:
+        model = Composition
+        fields = ('sample', 'group', 'fractions_of')
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        sample = kwargs['initial'].get('sample')
+        self.fields['sample'].queryset = Sample.objects.filter(id=sample.id)
+        self.fields['sample'].empty_label = None
+        self.fields['group'].queryset = MaterialComponentGroup.objects.exclude(id__in=sample.group_ids)
+        self.fields['group'].empty_label = None
+        self.fields['fractions_of'].queryset = sample.components
+        self.fields['fractions_of'].empty_label = None
 
 
 class AddCompositionModalForm(ModalModelForm):
@@ -284,6 +314,7 @@ class InlineWeightShare(InlineFormSetFactory):
         'form': WeightShareModelForm,
         'formset': WeightShareInlineFormset,
         'extra': 0,
+        'min_num':1,
         'can_delete': True,
         'widgets': {
             'owner': HiddenInput(),
@@ -333,7 +364,8 @@ class ModalInlineComponentShare(InlineFormSetFactory):
     factory_kwargs = {
         'form': WeightShareInlineForm,
         'formset': WeightShareInlineFormset,
-        'extra': 0,
+        'extra': 1,
+        'min_num': 1,
         'can_delete': True,
         'widgets': {
             'component': PlainTextComponentWidget(),

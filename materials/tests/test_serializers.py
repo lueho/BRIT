@@ -65,7 +65,7 @@ class SampleSerializerTestCase(TestCase):
     def setUpTestData(cls):
         material = Material.objects.create(name='Test Material')
         series = SampleSeries.objects.create(name='Test Series', material=material)
-        sample = Sample.objects.create(name='Test Sample', series=series,
+        sample = Sample.objects.create(name='Test Sample', material=material, series=series,
                                        timestep=Timestep.objects.default())
         with mute_signals(post_save):
             source = Source.objects.create(title='Test Source')
@@ -86,8 +86,8 @@ class SampleSerializerTestCase(TestCase):
         self.assertEqual(data['series_name'], 'Test Series')
         self.assertIn('series_url', data)
         self.assertIn('timestep', data)
-        self.assertIn('taken_at', data)
-        self.assertIn('preview', data)
+        self.assertIn('datetime', data)
+        self.assertIn('image', data)
         self.assertIn('compositions', data)
         self.assertIn('properties', data)
         self.assertIn('sources', data)
@@ -101,6 +101,7 @@ class CompositionSerializerTestCase(TestCase):
         series = SampleSeries.objects.create(name='Test Series', material=material)
         sample = Sample.objects.create(
             name='Test Sample',
+            material=material,
             series=series,
             timestep=Timestep.objects.default()
         )
@@ -137,6 +138,7 @@ class WeightShareModelSerializerTestCase(TestCase):
         series = SampleSeries.objects.create(name='Test Series', material=material)
         sample = Sample.objects.create(
             name='Test Sample',
+            material=material,
             series=series,
             timestep=Timestep.objects.default()
         )
@@ -171,7 +173,7 @@ class CompositionDoughnutChartSerializerTestCase(TestCase):
     def setUpTestData(cls):
         material = Material.objects.create(name='Test Material')
         series = SampleSeries.objects.create(name='Test Series', material=material)
-        sample = Sample.objects.create(name='Test Sample', series=series)
+        sample = Sample.objects.create(name='Test Sample', material=material, series=series)
         group = MaterialComponentGroup.objects.create(name='Test Group')
         composition = Composition.objects.create(
             sample=sample,

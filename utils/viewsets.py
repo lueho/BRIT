@@ -1,6 +1,12 @@
+from django.core.exceptions import ValidationError
+from django.db.models import Q
+from django.shortcuts import get_object_or_404
+from rest_framework import permissions, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
-from .permissions import HasModelPermission
+from .permissions import HasModelPermission, IsStaffOrReadOnly, UserCreatedObjectPermission
 
 
 class AutoPermModelViewSet(ModelViewSet):
@@ -61,3 +67,133 @@ class AutoPermModelViewSet(ModelViewSet):
         # This triggers the lazy initialization of permission_required if needed
         _ = self.permission_required
         return super().get_permissions()
+
+
+class GlobalObjectViewSet(ModelViewSet):
+    """
+    Base viewset for Global Objects.
+    Implements read and write permissions.
+    Read: Any user (authenticated or not)
+    Write: Only staff users
+    """
+    permission_classes = [IsStaffOrReadOnly]
+
+
+class UserCreatedObjectViewSet(viewsets.ModelViewSet):
+    """
+    Base viewset for all user-created objects.
+    Implements generic permissions and common actions.
+    """
+    permission_classes = [UserCreatedObjectPermission]
+    serializer_class = None  # Must be set in the concrete viewset
+    queryset = None  # Must be set in the concrete viewset
+
+    def get_queryset(self):
+        user = self.request.user
+        model = self.queryset.model
+
+        if user.is_authenticated:
+            # Check if user has moderation permissions
+            if self._is_moderator(user, model):
+                return model.objects.all()
+            else:
+                # Owners can see their own objects and published or review objects
+                return model.objects.filter(
+                    Q(owner=user) |
+                    Q(publication_status='published') |
+                    Q(publication_status='review', owner=user)
+                )
+        else:
+            # Unauthenticated users can only see published objects
+            return model.objects.filter(publication_status='published')
+
+    def perform_create(self, serializer):
+        serializer.save(owner=self.request.user)
+
+    def _is_moderator(self, user, model):
+        """
+        Determines if the user has moderation permissions for the model.
+        """
+        perm_codename = f'can_moderate_{model._meta.model_name}'
+        app_label = model._meta.app_label
+        return user.has_perm(f'{app_label}.{perm_codename}') or user.is_staff
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def register_for_review(self, request, pk=None):
+        """
+        Allows owners to register an object for review.
+        """
+        obj = get_object_or_404(self.get_queryset(), pk=pk)
+
+        # Enforce object-level permissions
+        self.check_object_permissions(request, obj)
+
+        try:
+            obj.register_for_review()
+            return Response(
+                {'status': f'{self.queryset.model.__name__} has been submitted for review.'},
+                status=status.HTTP_200_OK
+            )
+        except ValidationError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'], permission_classes=[permissions.IsAuthenticated])
+    def withdraw_from_review(self, request, pk=None):
+        """
+        Allows owners to withdraw an object from review.
+        """
+        obj = get_object_or_404(self.get_queryset(), pk=pk)
+
+        # Enforce object-level permissions
+        self.check_object_permissions(request, obj)
+
+        try:
+            obj.withdraw_from_review()
+            return Response(
+                {'status': f'{self.queryset.model.__name__} has been withdrawn from review.'},
+                status=status.HTTP_200_OK
+            )
+        except ValidationError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'], permission_classes=[UserCreatedObjectPermission])
+    def approve(self, request, pk=None):
+        """
+        Approve an object in 'review' state.
+        Only accessible to moderators.
+        """
+        obj = get_object_or_404(self.get_queryset(), pk=pk)
+
+        # Enforce object-level permissions
+        self.check_object_permissions(request, obj)
+
+        try:
+            obj.approve()  # Utilize the model's approve method for consistency
+            # TODO: Implement notification to the owner
+            return Response(
+                {'status': f'{self.queryset.model.__name__} has been approved and is now published.'},
+                status=status.HTTP_200_OK
+            )
+        except ValidationError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+    @action(detail=True, methods=['post'], permission_classes=[UserCreatedObjectPermission])
+    def reject(self, request, pk=None):
+        """
+        Reject an object in 'review' state.
+        Only accessible to moderators.
+        """
+        obj = get_object_or_404(self.get_queryset(), pk=pk)
+
+        # Enforce object-level permissions
+        self.check_object_permissions(request, obj)
+
+        try:
+            obj.reject()
+            # TODO: Implement notification to the owner
+            return Response(
+                {'status': f'{self.queryset.model.__name__} has been rejected and is now private.'},
+                status=status.HTTP_200_OK
+            )
+        except ValidationError as e:
+            return Response({'error': str(e)}, status=status.HTTP_400_BAD_REQUEST)

@@ -129,7 +129,7 @@ class SampleViewSetTestCase(ViewSetWithPermissionsTestCase):
         super().setUpTestData()
         cls.material = Material.objects.create(name='Test Material')
         cls.series = SampleSeries.objects.create(material=cls.material, name='Test Series')
-        cls.sample = Sample.objects.create(series=cls.series, name='Test Sample')
+        cls.sample = Sample.objects.create(series=cls.series, material=cls.material, name='Test Sample')
 
     def test_get_list_http_401_unauthenticated_for_not_authenticated_user(self):
         response = self.client.get(reverse('api-sample-list'))
@@ -187,7 +187,7 @@ class CompositionViewSetTestCase(ViewSetWithPermissionsTestCase):
         super().setUpTestData()
         cls.material = Material.objects.create(name='Test Material')
         cls.series = SampleSeries.objects.create(material=cls.material, name='Test Series')
-        cls.sample = Sample.objects.create(series=cls.series, name='Test Sample')
+        cls.sample = Sample.objects.create(series=cls.series, material=cls.material, name='Test Sample')
         cls.group = MaterialComponentGroup.objects.create(name='Test Component Group')
         cls.composition = Composition.objects.create(name='Test Composition', sample=cls.sample, group=cls.group)
 

@@ -83,14 +83,17 @@ class MaterialTestCase(TestCase):
                 standard=True
             )
             Sample.objects.create(
+                material=material1,
                 series=sample_series,
                 timestep=Timestep.objects.default()
             )
             Sample.objects.create(
+                material=material1,
                 series=sample_series,
                 timestep=main_step1
             )
             Sample.objects.create(
+                material=material1,
                 series=sample_series,
                 timestep=main_step2
             )
@@ -131,14 +134,17 @@ class SampleSeriesTestCase(TestCase):
                 standard=True
             )
             Sample.objects.create(
+                material=material1,
                 series=sample_series,
                 timestep=Timestep.objects.default()
             )
             Sample.objects.create(
+                material=material1,
                 series=sample_series,
                 timestep=timestep1
             )
             Sample.objects.create(
+                material=material1,
                 series=sample_series,
                 timestep=timestep2
             )
@@ -228,7 +234,7 @@ class SampleSeriesTestCase(TestCase):
                     duplicate.samples.get(
                         owner=creator,
                         timestep=sample.timestep,
-                        taken_at=sample.taken_at,
+                        datetime=sample.datetime,
                     )
             elif field.name == 'temporal_distributions':
                 self.assertTrue(self.sample_series.temporal_distributions.exists())
@@ -273,6 +279,7 @@ class SampleTestCase(TestCase):
         with mute_signals(signals.post_save):
             series = SampleSeries.objects.create(name='Test Series', material=material)
             Sample.objects.create(
+                material=material,
                 series=series,
                 timestep=Timestep.objects.default()
             )
@@ -300,9 +307,12 @@ class SampleTestCase(TestCase):
         self.assertNotEqual(duplicate, self.sample)
         self.assertEqual(duplicate.owner, creator)
         for field in self.sample._meta.get_fields():
-            if field.concrete and field.name not in ['id', 'owner', 'preview', 'created_at', 'lastmodified_at',
+            if field.concrete and field.name not in ['id', 'owner', 'image', 'created_at', 'lastmodified_at',
                                                      'properties', 'sources']:
-                self.assertEqual(getattr(duplicate, field.name), getattr(self.sample, field.name))
+                if field.name == 'name':
+                    self.assertEqual(duplicate.name, f'{self.sample.name} (copy)')
+                else:
+                    self.assertEqual(getattr(duplicate, field.name), getattr(self.sample, field.name))
             elif field.name == 'compositions':
                 self.assertTrue(self.sample.compositions.exists())
                 self.assertTrue(duplicate.compositions.exists())
@@ -353,14 +363,17 @@ class CompositionTestCase(TestCase):
                 standard=True
             )
             Sample.objects.create(
+                material=material1,
                 series=sample_series,
                 timestep=Timestep.objects.default()
             )
             Sample.objects.create(
+                material=material1,
                 series=sample_series,
                 timestep=main_step1
             )
             Sample.objects.create(
+                material=material1,
                 series=sample_series,
                 timestep=main_step2
             )
@@ -394,8 +407,8 @@ class CompositionTestCase(TestCase):
         self.assertEqual(self.composition.owner, self.user)
 
         self.composition.add_component(self.default_component)
-        self.assertEqual(self.composition.components().count(), 1)
-        self.assertEqual(self.composition.components().first(), self.default_component)
+        self.assertEqual(self.composition.components.count(), 1)
+        self.assertEqual(self.composition.components.first(), self.default_component)
 
     def test_group_settings_add_component_on_distribution(self):
         self.composition.add_component(self.default_component)
@@ -403,7 +416,7 @@ class CompositionTestCase(TestCase):
         self.composition.add_component(self.custom_component)
 
         self.assertEqual(self.composition.sample.series.temporal_distributions.all().count(), 1)
-        self.assertEqual(self.composition.components().count(), 2)
+        self.assertEqual(self.composition.components.count(), 2)
         self.assertEqual(WeightShare.objects.all().count(), 4)
 
     def test_group_settings_add_distribution_on_component(self):
@@ -412,7 +425,7 @@ class CompositionTestCase(TestCase):
         self.composition.add_temporal_distribution(self.custom_distribution)
 
         self.assertEqual(self.composition.sample.series.temporal_distributions.all().count(), 1)
-        self.assertEqual(self.composition.components().count(), 2)
+        self.assertEqual(self.composition.components.count(), 2)
         self.assertEqual(WeightShare.objects.all().count(), 4)
 
     def test_duplicate_creates_new_instance_with_identical_field_values(self):
@@ -498,7 +511,7 @@ class WeightShareTestCase(TestCase):
     def setUpTestData(cls):
         material = Material.objects.create(name='Test Material')
         sample_series = SampleSeries.objects.create(material=material, name='Test Series')
-        sample = Sample.objects.create(series=sample_series)
+        sample = Sample.objects.create(material=material, series=sample_series)
         component_group = MaterialComponentGroup.objects.create(name='Test Group')
         composition = Composition.objects.create(sample=sample, group=component_group)
         component = MaterialComponent.objects.create(name='Test Component')

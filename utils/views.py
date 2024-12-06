@@ -37,6 +37,11 @@ class UserOwnsObjectMixin(UserPassesTestMixin):
     """
 
     def test_func(self):
+        # If the user is not authenticated, fail the test
+        if not self.request.user.is_authenticated:
+            return False
+
+        # Allow access only if the user owns the object
         return self.get_object().owner == self.request.user
 
 
@@ -148,6 +153,13 @@ class OwnedObjectListView(PermissionRequiredMixin, ListView):
 
 
 class CreateOwnedObjectMixin(PermissionRequiredMixin, NextOrSuccessUrlMixin):
+    # TODO: EOL
+    def form_valid(self, form):
+        form.instance.owner = self.request.user
+        return super().form_valid(form)
+
+
+class CreateUserObjectMixin(LoginRequiredMixin, NextOrSuccessUrlMixin):
     def form_valid(self, form):
         form.instance.owner = self.request.user
         return super().form_valid(form)
@@ -174,7 +186,58 @@ class OwnedObjectCreateView(CreateOwnedObjectMixin, SuccessMessageMixin, CreateV
         return template_names
 
 
+class UserCreatedObjectCreateView(CreateUserObjectMixin, SuccessMessageMixin, CreateView):
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'form_title': f'Create New {self.form_class._meta.model._meta.verbose_name}',
+        })
+        return context
+
+    def get_success_message(self, cleaned_data):
+        return str(self.object.pk)
+
+    def get_template_names(self):
+        try:
+            template_names = super().get_template_names()
+        except ImproperlyConfigured:
+            template_names = []
+        template_names.append('simple_form_card.html')
+        return template_names
+
+
 class OwnedObjectModalCreateView(CreateOwnedObjectMixin, BSModalCreateView):
+    template_name = 'modal_form.html'
+    success_message = 'Object created successfully.'
+    object = None
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'modal_title': f'Create New {self.form_class._meta.model._meta.verbose_name}',
+            'submit_button_text': 'Save'
+        })
+        return context
+
+    def get_success_message(self):
+        return str(self.object.pk)
+
+    def form_valid(self, form):
+        isAjaxRequest = is_ajax(self.request.META)
+        asyncUpdate = self.request.POST.get('asyncUpdate') == 'True'
+
+        if isAjaxRequest:
+            if asyncUpdate:
+                self.object = form.save()
+            return HttpResponse(status=204)
+        with mute_signals(post_save):
+            self.object = form.save()
+        messages.success(self.request, self.get_success_message())
+        return HttpResponseRedirect(self.get_success_url())
+
+
+class UserCreatedObjectModalCreateView(CreateUserObjectMixin, BSModalCreateView):
     template_name = 'modal_form.html'
     success_message = 'Object created successfully.'
     object = None
@@ -243,7 +306,8 @@ class OwnedObjectModalDetailView(PermissionRequiredMixin, BSModalReadView):
         return context
 
 
-class OwnedObjectUpdateView(PermissionRequiredMixin, SuccessMessageMixin, NextOrSuccessUrlMixin, UpdateView):
+class UserCreatedObjectUpdateView(UserOwnsObjectMixin, NextOrSuccessUrlMixin, UpdateView):
+    # TODO: Implement permission flow for publication process and moderators.
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -253,8 +317,25 @@ class OwnedObjectUpdateView(PermissionRequiredMixin, SuccessMessageMixin, NextOr
         })
         return context
 
-    def get_success_message(self, cleaned_data):
-        return str(self.object.pk)
+    def get_template_names(self):
+        try:
+            template_names = super().get_template_names()
+        except ImproperlyConfigured:
+            template_names = []
+        template_names.append('simple_form_card.html')
+        return template_names
+
+
+class OwnedObjectUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin, UpdateView):
+    # TODO: EOL this in favor of UserCreatedObjectUpdateView
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'form_title': f'Update {self.object._meta.verbose_name}',
+            'submit_button_text': 'Save'
+        })
+        return context
 
     def get_template_names(self):
         try:
@@ -279,6 +360,18 @@ class OwnedObjectModalUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin,
 
     def get_success_message(self):
         return str(self.object.pk)
+
+
+class UserCreatedObjectModalDeleteView(UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalDeleteView):
+    template_name = 'modal_delete.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'form_title': f'Delete {self.object._meta.verbose_name}',
+            'submit_button_text': 'Delete'
+        })
+        return context
 
 
 class OwnedObjectModalDeleteView(PermissionRequiredMixin, NextOrSuccessUrlMixin, BSModalDeleteView):

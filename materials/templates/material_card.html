@@ -1,10 +1,10 @@
 {% load static %}
 
 <div class="card shadow h-100">
-    <div class="card-header"><a class="stretched-link" href="{{ object.get_absolute_url }}"><b>{{ object.series.material.name }}</b></a></div>
-    {% if object.preview %}
+    <div class="card-header"><a class="stretched-link" href="{{ object.get_absolute_url }}"><b>{{ object.material.name }}</b></a></div>
+    {% if object.image %}
     <div class="card-img-top">
-        <img class="w-100 m-0" src="{{ object.preview.url }}" alt="Maps Module Cover Image">
+        <img class="w-100 m-0" src="{{ object.image.url }}" alt="Maps Module Cover Image">
     </div>
     {% endif %}
     <div class="card-body">

@@ -20,12 +20,14 @@ class ViewWithPermissionsTestCase(UserLoginTestCase):
     - outsider: no permissions
     - outsider: authenticated but without any special permissions
     - member: has permissions which are specified in the member_permissions class variable"""
+    owner = None
     outsider = None
     member = None
     member_permissions = None
 
     @classmethod
     def setUpTestData(cls):
+        cls.owner = User.objects.create(username='owner')
         cls.outsider = User.objects.create(username='outsider')
         cls.member = User.objects.create(username='member')
         if cls.member_permissions:
