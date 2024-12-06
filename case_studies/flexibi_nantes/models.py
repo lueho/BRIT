@@ -198,7 +198,7 @@ class GreenhouseGrowthCycle(models.Model):
     @property
     def table_data(self):
         table_data = []
-        components = self.group_settings.components()
+        components = self.group_settings.components
         for component in components:
             table_row = {'Component': component.name}
             shares = GrowthShare.objects.filter(

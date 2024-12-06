@@ -309,7 +309,10 @@ class SampleTestCase(TestCase):
         for field in self.sample._meta.get_fields():
             if field.concrete and field.name not in ['id', 'owner', 'image', 'created_at', 'lastmodified_at',
                                                      'properties', 'sources']:
-                self.assertEqual(getattr(duplicate, f'{field.name} (copy)'), getattr(self.sample, field.name))
+                if field.name == 'name':
+                    self.assertEqual(duplicate.name, f'{self.sample.name} (copy)')
+                else:
+                    self.assertEqual(getattr(duplicate, field.name), getattr(self.sample, field.name))
             elif field.name == 'compositions':
                 self.assertTrue(self.sample.compositions.exists())
                 self.assertTrue(duplicate.compositions.exists())
@@ -404,8 +407,8 @@ class CompositionTestCase(TestCase):
         self.assertEqual(self.composition.owner, self.user)
 
         self.composition.add_component(self.default_component)
-        self.assertEqual(self.composition.components().count(), 1)
-        self.assertEqual(self.composition.components().first(), self.default_component)
+        self.assertEqual(self.composition.components.count(), 1)
+        self.assertEqual(self.composition.components.first(), self.default_component)
 
     def test_group_settings_add_component_on_distribution(self):
         self.composition.add_component(self.default_component)
@@ -413,7 +416,7 @@ class CompositionTestCase(TestCase):
         self.composition.add_component(self.custom_component)
 
         self.assertEqual(self.composition.sample.series.temporal_distributions.all().count(), 1)
-        self.assertEqual(self.composition.components().count(), 2)
+        self.assertEqual(self.composition.components.count(), 2)
         self.assertEqual(WeightShare.objects.all().count(), 4)
 
     def test_group_settings_add_distribution_on_component(self):
@@ -422,7 +425,7 @@ class CompositionTestCase(TestCase):
         self.composition.add_temporal_distribution(self.custom_distribution)
 
         self.assertEqual(self.composition.sample.series.temporal_distributions.all().count(), 1)
-        self.assertEqual(self.composition.components().count(), 2)
+        self.assertEqual(self.composition.components.count(), 2)
         self.assertEqual(WeightShare.objects.all().count(), 4)
 
     def test_duplicate_creates_new_instance_with_identical_field_values(self):
