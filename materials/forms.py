@@ -155,13 +155,12 @@ class SampleAddCompositionForm(AutoCompleteModelForm):
 
 
 class AddCompositionModalForm(ModalModelForm):
-    sample = ModelChoiceField(queryset=Sample.objects.all())
     group = ModelChoiceField(queryset=MaterialComponentGroup.objects.all())
     fractions_of = ModelChoiceField(queryset=MaterialComponent.objects.all())
 
     class Meta:
         model = SampleSeries
-        fields = ['sample', 'group', 'fractions_of', ]
+        fields = ['group', 'fractions_of', ]
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)

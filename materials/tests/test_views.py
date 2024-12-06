@@ -1980,7 +1980,7 @@ class SampleDetailViewTestCase(ViewWithPermissionsTestCase):
         self.assertContains(response, reverse('sample-delete-modal', kwargs={'pk': self.sample.pk}))
         self.assertContains(response, reverse('sample-add-property', kwargs={'pk': self.sample.pk}))
         self.assertContains(response, reverse('materialpropertyvalue-delete-modal', kwargs={'pk': self.prop_val.pk}))
-        self.assertContains(response, reverse('sample-add-composition', kwargs={'pk': self.sample.series.pk}))
+        self.assertContains(response, reverse('sample-add-composition', kwargs={'pk': self.sample.pk}))
         self.assertContains(response, 'edit-group-')
 
     def test_template_does_not_contain_dashboard_edit_and_delete_button_for_outsiders(self):
@@ -2444,11 +2444,12 @@ class CompositionUpdateViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        material = Material.objects.create(name='Test Material')
-        group = MaterialComponentGroup.objects.create(name='Test Group')
-        SampleSeries.objects.create(name='Test Series', material=material)
+        material = Material.objects.create(owner=cls.member, name='Test Material')
+        group = MaterialComponentGroup.objects.create(owner=cls.member,name='Test Group')
+        SampleSeries.objects.create(owner=cls.member,name='Test Series', material=material)
         cls.sample = Sample.objects.get(series__name='Test Series')
         cls.composition = Composition.objects.create(
+            owner=cls.member,
             group=group,
             sample=cls.sample,
             fractions_of=MaterialComponent.objects.default()
@@ -2457,6 +2458,7 @@ class CompositionUpdateViewTestCase(ViewWithPermissionsTestCase):
         for i in range(2):
             component = MaterialComponent.objects.create(name=f'Test Component {i}')
             WeightShare.objects.create(
+                owner=cls.member,
                 component=component,
                 composition=cls.composition,
                 average=0.2,
@@ -2473,7 +2475,7 @@ class CompositionUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('composition-update', kwargs={'pk': self.composition.pk}))
         self.assertEqual(response.status_code, 403)
 
-    def test_get_http_200_ok_for_members(self):
+    def test_get_http_200_ok_for_owner(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('composition-update', kwargs={'pk': self.composition.pk}))
         self.assertEqual(response.status_code, 200)
@@ -2495,7 +2497,7 @@ class CompositionUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.post(reverse('composition-update', kwargs={'pk': self.composition.pk}))
         self.assertEqual(response.status_code, 403)
 
-    def test_post_success_and_http_302_redirect_for_members(self):
+    def test_post_success_and_http_302_redirect_for_owner(self):
         self.client.force_login(self.member)
         components = [c.pk for c in MaterialComponent.objects.exclude(name='Fresh Matter (FM)')]
         shares = [s.pk for s in WeightShare.objects.exclude(component__name='Fresh Matter (FM)')]
@@ -2710,14 +2712,14 @@ class CompositionModalDeleteViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        material = Material.objects.create(name='Test Material')
-        cls.component_group = MaterialComponentGroup.objects.create(name='Test Group')
-        cls.series = SampleSeries.objects.create(name='Test Series', material=material)
+        material = Material.objects.create(owner=cls.member, name='Test Material')
+        cls.component_group = MaterialComponentGroup.objects.create(owner=cls.member, name='Test Group')
+        cls.series = SampleSeries.objects.create(owner=cls.member, name='Test Series', material=material)
         cls.default_component = MaterialComponent.objects.default()
         cls.sample = Sample.objects.get(series=cls.series, timestep=Timestep.objects.default())
 
     def setUp(self):
-        self.composition = Composition.objects.create(sample=self.sample, group=self.component_group)
+        self.composition = Composition.objects.create(owner=self.member, sample=self.sample, group=self.component_group)
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('composition-delete-modal', kwargs={'pk': self.composition.pk})
@@ -2847,6 +2849,7 @@ class ComponentOrderUpViewTestCase(ViewWithPermissionsTestCase):
 
     def setUp(self):
         self.composition = Composition.objects.create(
+            owner=self.member,
             sample=self.sample,
             group=self.component_group,
             fractions_of=self.default_component
@@ -2862,7 +2865,7 @@ class ComponentOrderUpViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('composition-order-up', kwargs={'pk': self.composition.pk}))
         self.assertEqual(response.status_code, 403)
 
-    def test_get_success_and_http_302_redirect_for_members(self):
+    def test_get_success_and_http_302_redirect_for_owner(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('composition-order-up', kwargs={'pk': self.composition.pk}))
         self.assertEqual(response.status_code, 302)
@@ -2876,19 +2879,20 @@ class ComponentOrderDownViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        material = Material.objects.create(name='Test Material')
+        material = Material.objects.create(owner=cls.member, name='Test Material')
         cls.component_group = MaterialComponentGroup.objects.create(owner=cls.member, name='Test Group')
-        cls.series = SampleSeries.objects.create(name='Test Series', material=material)
+        cls.series = SampleSeries.objects.create(owner=cls.member, name='Test Series', material=material)
         cls.default_component = MaterialComponent.objects.default()
         cls.sample = Sample.objects.get(series=cls.series, timestep=Timestep.objects.default())
 
     def setUp(self):
         self.composition = Composition.objects.create(
+            owner=self.member,
             sample=self.sample,
             group=self.component_group,
             fractions_of=self.default_component
         )
-        self.component = MaterialComponent.objects.create(name='Test Component')
+        self.component = MaterialComponent.objects.create(owner=self.member, name='Test Component')
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('composition-order-down', kwargs={'pk': self.composition.pk})
@@ -2900,7 +2904,7 @@ class ComponentOrderDownViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse('composition-order-down', kwargs={'pk': self.composition.pk}))
         self.assertEqual(response.status_code, 403)
 
-    def test_get_success_and_http_302_redirect_for_members(self):
+    def test_get_success_and_http_302_redirect_for_owner(self):
         self.client.force_login(self.member)
         response = self.client.get(reverse('composition-order-down', kwargs={'pk': self.composition.pk}))
         self.assertEqual(response.status_code, 302)
