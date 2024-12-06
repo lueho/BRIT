@@ -8,7 +8,7 @@
     </p>
     {% if object.catchment %}
         <p class="card-text"><strong>Catchment:</strong><br>
-        <a href="{% url 'collectioncatchment-detail' object.catchment.pk %}">{{ object.catchment }}</a>
+            <a href="{% url 'collectioncatchment-detail' object.catchment.pk %}">{{ object.catchment }}</a>
         </p>
 
     {% endif %}
@@ -16,18 +16,20 @@
         <p class="card-text"><strong>Comments:</strong><br>{{ object.description }}</p>
     {% endif %}
 
-        <p class="card-text"><strong>Collections:</strong><br>
-    {% if object.collection_set.exists %}
-        </p>
-        <ul>
-            {% for collection in object.collection_set.all %}
-                <li><a href="{{ collection.get_absolute_url }}">{{ collection.name }}</a></li>
-            {% endfor %}
-        </ul>
-    {% else %}
-        No collections so far<br></p>
+    <p class="card-text"><strong>Collections:</strong><br>
+        {% if object.collection_set.exists %}
+            </p>
+            <ul>
+                {% for collection in object.collection_set.all %}
+                    <li><a href="{{ collection.get_absolute_url }}">{{ collection.name }}</a></li>
+                {% endfor %}
+            </ul>
+        {% else %}
+            No collections so far<br></p>
+        {% endif %}
+    {% if request.user == object.owner %}
+        <a href="{% url 'collection-create' %}?collector={{ object.pk }}">
+            <i class="fas fa-fw fa-plus"></i> Create a new collection for this collector
+        </a>
     {% endif %}
-    <a href="{% url 'collection-create' %}?collector={{ object.pk }}">
-        <i class="fas fa-fw fa-plus"></i> Create a new collection for this collector
-    </a>
 {% endblock %}

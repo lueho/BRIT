@@ -267,6 +267,24 @@ class UserCreatedObjectModalCreateView(CreateUserObjectMixin, BSModalCreateView)
         return HttpResponseRedirect(self.get_success_url())
 
 
+class UserCreatedObjectDetailView(DetailView):
+    """
+    A view to display the details of a user created object only if it is either published or owned by the currently
+    logged-in user.
+    """
+
+    def get_queryset(self):
+        qs = super().get_queryset()
+        return qs.filter(publication_status='published') | qs.filter(owner=self.request.user)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'model_name': self.object._meta.verbose_name.capitalize(),
+        })
+        return context
+
+
 class OwnedObjectDetailView(PermissionRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):

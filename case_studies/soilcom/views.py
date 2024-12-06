@@ -19,7 +19,8 @@ from maps.views import CatchmentDetailView, GeoDataSetFilteredMapView, GeoDataSe
 from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineFormSetMixin
 from utils.views import (BRITFilterView, OwnedObjectCreateView, OwnedObjectDetailView, OwnedObjectListView,
                          OwnedObjectModalCreateView, OwnedObjectModalDeleteView, OwnedObjectModalDetailView,
-                         OwnedObjectModalUpdateView, OwnedObjectModelSelectOptionsView, OwnedObjectUpdateView)
+                         OwnedObjectModalUpdateView, OwnedObjectModelSelectOptionsView, OwnedObjectUpdateView,
+                         UserCreatedObjectDetailView)
 from .filters import CollectionFilterSet, CollectorFilter, WasteFlyerFilter
 from .forms import (AggregatedCollectionPropertyValueModelForm, BaseWasteFlyerUrlFormSet, CollectionAddPredecessorForm,
                     CollectionAddWasteSampleForm, CollectionFrequencyModalModelForm, CollectionFrequencyModelForm,
@@ -72,9 +73,8 @@ class CollectorModalCreateView(OwnedObjectModalCreateView):
     permission_required = 'soilcom.add_collector'
 
 
-class CollectorDetailView(OwnedObjectDetailView):
+class CollectorDetailView(UserCreatedObjectDetailView):
     model = Collector
-    permission_required = 'soilcom.view_collector'
 
 
 class CollectorModalDetailView(OwnedObjectModalDetailView):
