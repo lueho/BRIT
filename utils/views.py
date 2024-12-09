@@ -275,7 +275,10 @@ class UserCreatedObjectDetailView(DetailView):
 
     def get_queryset(self):
         qs = super().get_queryset()
-        return qs.filter(publication_status='published') | qs.filter(owner=self.request.user)
+        if self.request.user.is_authenticated:
+            return qs.filter(publication_status='published') | qs.filter(owner=self.request.user)
+        else:
+            return qs.filter(publication_status='published')
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
