@@ -15,7 +15,7 @@ from mock import Mock, patch
 from distributions.models import TemporalDistribution, Timestep
 from maps.models import GeoDataset, MapConfiguration, MapLayerConfiguration, MapLayerStyle, Region
 from materials.models import Material, MaterialCategory, Sample, SampleSeries
-from utils.properties.models import Property, Unit
+from utils.properties.models import Property, PropertyUnit
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 from .. import views
 from ..forms import BaseWasteFlyerUrlFormSet, CollectionModelForm
@@ -556,7 +556,7 @@ class CollectionPropertyValueCreateViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.collection = Collection.objects.create(name='Test Collection')
-        cls.unit = Unit.objects.create(name='Test Unit')
+        cls.unit = PropertyUnit.objects.create(name='Test Unit')
         cls.prop = Property.objects.create(name='Test Property')
         cls.prop.allowed_units.add(cls.unit)
 
@@ -618,7 +618,7 @@ class CollectionPropertyValueCRUDViewsTestCase(AbstractTestCases.UserCreatedObje
         return {
             'collection': Collection.objects.create(name='Test Collection'),
             'property': Property.objects.create(name='Test Property'),
-            'unit': Unit.objects.create(name='Test Unit'),
+            'unit': PropertyUnit.objects.create(name='Test Unit'),
         }
 
 
@@ -630,7 +630,7 @@ class CollectionPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.collection = Collection.objects.create(name='Test Collection')
-        cls.unit = Unit.objects.create(name='Test Unit')
+        cls.unit = PropertyUnit.objects.create(name='Test Unit')
         cls.prop = Property.objects.create(name='Test Property')
         cls.prop.allowed_units.add(cls.unit)
         cls.val = CollectionPropertyValue.objects.create(
@@ -748,7 +748,7 @@ class AggregatedCollectionPropertyValueCreateViewTestCase(ViewWithPermissionsTes
         super().setUpTestData()
         Collection.objects.create(name='Test Collection 1')
         Collection.objects.create(name='Test Collection 2')
-        cls.unit = Unit.objects.create(name='Test Unit')
+        cls.unit = PropertyUnit.objects.create(name='Test Unit')
         cls.prop = Property.objects.create(name='Test Property')
         cls.prop.allowed_units.add(cls.unit)
 
@@ -809,7 +809,7 @@ class AggregatedCollectionPropertyValueCRUDViewsTestCase(AbstractTestCases.UserC
     def create_related_objects(cls):
         return {
             'property': Property.objects.create(name='Test Property'),
-            'unit': Unit.objects.create(name='Test Unit'),
+            'unit': PropertyUnit.objects.create(name='Test Unit'),
         }
 
 
@@ -820,7 +820,7 @@ class AggregatedCollectionPropertyValueUpdateViewTestCase(ViewWithPermissionsTes
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.unit = Unit.objects.create(name='Test Unit')
+        cls.unit = PropertyUnit.objects.create(name='Test Unit')
         cls.prop = Property.objects.create(name='Test Property')
         cls.prop.allowed_units.add(cls.unit)
         cls.val = AggregatedCollectionPropertyValue.objects.create(
@@ -1786,7 +1786,7 @@ class CollectionAddPropertyValueViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.collection = Collection.objects.create(name='Test Collection')
-        cls.unit = Unit.objects.create(name='Test Unit')
+        cls.unit = PropertyUnit.objects.create(name='Test Unit')
         cls.prop = Property.objects.create(name='Test Property')
         cls.prop.allowed_units.add(cls.unit)
 
@@ -1853,7 +1853,7 @@ class CollectionAddAggregatedPropertyValueViewTestCase(ViewWithPermissionsTestCa
         cls.catchment = CollectionCatchment.objects.create()
         Collection.objects.create(catchment=CollectionCatchment.objects.create(parent=cls.catchment))
         Collection.objects.create(catchment=CollectionCatchment.objects.create(parent=cls.catchment))
-        cls.unit = Unit.objects.create(name='Test Unit')
+        cls.unit = PropertyUnit.objects.create(name='Test Unit')
         cls.prop = Property.objects.create(name='Test Property')
         cls.prop.allowed_units.add(cls.unit)
 

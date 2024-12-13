@@ -3,8 +3,6 @@
 import django.db.models.deletion
 from django.db import migrations, models
 
-import utils.properties.models
-
 
 class Migration(migrations.Migration):
 
@@ -17,13 +15,13 @@ class Migration(migrations.Migration):
         migrations.AddField(
             model_name='aggregatedcollectionpropertyvalue',
             name='unit',
-            field=models.ForeignKey(default=utils.properties.models.get_default_unit_pk,
-                                    on_delete=django.db.models.deletion.PROTECT, to='utils.unit'),
+            field=models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='utils.unit', blank=True,
+                                    null=True),
         ),
         migrations.AddField(
             model_name='collectionpropertyvalue',
             name='unit',
-            field=models.ForeignKey(default=utils.properties.models.get_default_unit_pk,
-                                    on_delete=django.db.models.deletion.PROTECT, to='utils.unit'),
+            field=models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='utils.unit', blank=True,
+                                    null=True),
         ),
     ]

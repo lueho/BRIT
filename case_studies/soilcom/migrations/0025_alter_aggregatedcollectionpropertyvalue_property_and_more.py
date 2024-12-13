@@ -3,8 +3,6 @@
 import django.db.models.deletion
 from django.db import migrations, models
 
-import utils.properties.models
-
 
 class Migration(migrations.Migration):
     dependencies = [
@@ -21,8 +19,8 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='aggregatedcollectionpropertyvalue',
             name='unit',
-            field=models.ForeignKey(default=utils.properties.models.get_default_unit_pk,
-                                    on_delete=django.db.models.deletion.PROTECT, to='properties.unit'),
+            field=models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='properties.unit', blank=True,
+                                    null=True),
         ),
         migrations.AlterField(
             model_name='collectionpropertyvalue',
@@ -32,7 +30,7 @@ class Migration(migrations.Migration):
         migrations.AlterField(
             model_name='collectionpropertyvalue',
             name='unit',
-            field=models.ForeignKey(default=utils.properties.models.get_default_unit_pk,
-                                    on_delete=django.db.models.deletion.PROTECT, to='properties.unit'),
+            field=models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='properties.unit', blank=True,
+                                    null=True),
         ),
     ]
