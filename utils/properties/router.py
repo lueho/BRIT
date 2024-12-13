@@ -1,7 +1,7 @@
 from rest_framework import routers
 
-from .viewsets import PropertyViewSet, UnitViewSet
+from .viewsets import PropertyUnitViewSet, PropertyViewSet
 
 router = routers.DefaultRouter()
-router.register('unit', UnitViewSet, basename='api-unit')
+router.register('unit', PropertyUnitViewSet, basename='api-propertyunit')
 router.register('property', PropertyViewSet, basename='api-property')

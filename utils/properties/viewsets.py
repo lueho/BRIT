@@ -1,12 +1,12 @@
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
-from utils.properties.serializers import PropertyModelSerializer, UnitModelSerializer
-from .models import Property, Unit
+from utils.properties.serializers import PropertyModelSerializer, PropertyUnitModelSerializer
+from .models import Property, PropertyUnit
 
 
-class UnitViewSet(ReadOnlyModelViewSet):
-    queryset = Unit.objects.all()
-    serializer_class = UnitModelSerializer
+class PropertyUnitViewSet(ReadOnlyModelViewSet):
+    queryset = PropertyUnit.objects.all()
+    serializer_class = PropertyUnitModelSerializer
 
 
 class PropertyViewSet(ReadOnlyModelViewSet):

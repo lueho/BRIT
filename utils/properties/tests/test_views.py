@@ -1,7 +1,7 @@
 from django.urls import reverse
 
 from utils.tests.testcases import ViewWithPermissionsTestCase
-from ..models import Property, Unit
+from ..models import Property, PropertyUnit
 
 
 class UnitListViewTestCase(ViewWithPermissionsTestCase):
@@ -9,27 +9,27 @@ class UnitListViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        Unit.objects.create(name='Test Unit 1')
-        Unit.objects.create(name='Test Unit 2')
+        PropertyUnit.objects.create(name='Test Unit 1')
+        PropertyUnit.objects.create(name='Test Unit 2')
 
     def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('unit-list'))
+        response = self.client.get(reverse('propertyunit-list'))
         self.assertEqual(response.status_code, 200)
 
     def test_get_http_200_ok_for_outsiders(self):
         self.client.force_login(self.outsider)
-        response = self.client.get(reverse('unit-list'))
+        response = self.client.get(reverse('propertyunit-list'))
         self.assertEqual(response.status_code, 200)
 
     def test_get_http_200_ok_for_member(self):
         self.client.force_login(self.member)
-        response = self.client.get(reverse('unit-list'))
+        response = self.client.get(reverse('propertyunit-list'))
         self.assertEqual(response.status_code, 200)
 
 
 class UnitCreateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ['add_unit']
-    url = reverse('unit-create')
+    member_permissions = ['add_propertyunit']
+    url = reverse('propertyunit-create')
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         response = self.client.get(self.url)
@@ -57,8 +57,8 @@ class UnitCreateViewTestCase(ViewWithPermissionsTestCase):
     def test_post_http_302_redirect_to_detail_view_for_member(self):
         self.client.force_login(self.member)
         response = self.client.post(self.url, data={'name': 'Test Unit'})
-        unit = Unit.objects.get(name='Test Unit')
-        self.assertRedirects(response, reverse('unit-detail', kwargs={'pk': unit.pk}))
+        unit = PropertyUnit.objects.get(name='Test Unit')
+        self.assertRedirects(response, reverse('propertyunit-detail', kwargs={'pk': unit.pk}))
 
 
 class UnitDetailViewTestCase(ViewWithPermissionsTestCase):
@@ -66,99 +66,101 @@ class UnitDetailViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.unit = Unit.objects.create(name='Test Unit')
+        cls.unit = PropertyUnit.objects.create(name='Test Unit')
 
     def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('unit-detail', kwargs={'pk': self.unit.pk}))
+        response = self.client.get(reverse('propertyunit-detail', kwargs={'pk': self.unit.pk}))
         self.assertEqual(response.status_code, 200)
 
     def test_get_http_200_ok_for_outsiders(self):
         self.client.force_login(self.outsider)
-        response = self.client.get(reverse('unit-detail', kwargs={'pk': self.unit.pk}))
+        response = self.client.get(reverse('propertyunit-detail', kwargs={'pk': self.unit.pk}))
         self.assertEqual(response.status_code, 200)
 
     def test_get_http_200_ok_for_member(self):
         self.client.force_login(self.member)
-        response = self.client.get(reverse('unit-detail', kwargs={'pk': self.unit.pk}))
+        response = self.client.get(reverse('propertyunit-detail', kwargs={'pk': self.unit.pk}))
         self.assertEqual(response.status_code, 200)
 
 
 class UnitUpdateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ['change_unit']
+    member_permissions = ['change_propertyunit']
 
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.unit = Unit.objects.create(name='Test Unit')
+        cls.unit = PropertyUnit.objects.create(name='Test Unit')
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('unit-update', kwargs={'pk': self.unit.pk})
+        url = reverse('propertyunit-update', kwargs={'pk': self.unit.pk})
         response = self.client.get(url)
         self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
 
     def test_get_http_403_for_outsiders(self):
         self.client.force_login(self.outsider)
-        response = self.client.get(reverse('unit-update', kwargs={'pk': self.unit.pk}))
+        response = self.client.get(reverse('propertyunit-update', kwargs={'pk': self.unit.pk}))
         self.assertEqual(response.status_code, 403)
 
     def test_get_http_200_ok_for_member(self):
         self.client.force_login(self.member)
-        response = self.client.get(reverse('unit-update', kwargs={'pk': self.unit.pk}))
+        response = self.client.get(reverse('propertyunit-update', kwargs={'pk': self.unit.pk}))
         self.assertEqual(response.status_code, 200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('unit-update', kwargs={'pk': self.unit.pk})
+        url = reverse('propertyunit-update', kwargs={'pk': self.unit.pk})
         response = self.client.post(url, data={'name': 'Test Unit'})
         self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
 
     def test_post_http_403_for_outsiders(self):
         self.client.force_login(self.outsider)
-        response = self.client.post(reverse('unit-update', kwargs={'pk': self.unit.pk}), data={'name': 'Test Unit'})
+        response = self.client.post(reverse('propertyunit-update', kwargs={'pk': self.unit.pk}),
+                                    data={'name': 'Test Unit'})
         self.assertEqual(response.status_code, 403)
 
     def test_post_http_302_redirect_to_detail_view_for_member(self):
         self.client.force_login(self.member)
-        response = self.client.post(reverse('unit-update', kwargs={'pk': self.unit.pk}), data={'name': 'Test Unit'})
-        self.assertRedirects(response, reverse('unit-detail', kwargs={'pk': self.unit.pk}))
+        response = self.client.post(reverse('propertyunit-update', kwargs={'pk': self.unit.pk}),
+                                    data={'name': 'Test Unit'})
+        self.assertRedirects(response, reverse('propertyunit-detail', kwargs={'pk': self.unit.pk}))
 
 
 class UnitModalDeleteViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ['delete_unit']
+    member_permissions = ['delete_propertyunit']
 
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.unit = Unit.objects.create(name='Test Unit')
+        cls.unit = PropertyUnit.objects.create(name='Test Unit')
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('unit-delete-modal', kwargs={'pk': self.unit.pk})
+        url = reverse('propertyunit-delete-modal', kwargs={'pk': self.unit.pk})
         response = self.client.get(url)
         self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
 
     def test_get_http_403_for_outsiders(self):
         self.client.force_login(self.outsider)
-        response = self.client.get(reverse('unit-delete-modal', kwargs={'pk': self.unit.pk}))
+        response = self.client.get(reverse('propertyunit-delete-modal', kwargs={'pk': self.unit.pk}))
         self.assertEqual(response.status_code, 403)
 
     def test_get_http_200_ok_for_member(self):
         self.client.force_login(self.member)
-        response = self.client.get(reverse('unit-delete-modal', kwargs={'pk': self.unit.pk}))
+        response = self.client.get(reverse('propertyunit-delete-modal', kwargs={'pk': self.unit.pk}))
         self.assertEqual(response.status_code, 200)
 
     def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('unit-delete-modal', kwargs={'pk': self.unit.pk})
+        url = reverse('propertyunit-delete-modal', kwargs={'pk': self.unit.pk})
         response = self.client.post(url)
         self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
 
     def test_post_http_403_for_outsiders(self):
         self.client.force_login(self.outsider)
-        response = self.client.post(reverse('unit-delete-modal', kwargs={'pk': self.unit.pk}))
+        response = self.client.post(reverse('propertyunit-delete-modal', kwargs={'pk': self.unit.pk}))
         self.assertEqual(response.status_code, 403)
 
     def test_post_http_302_redirect_to_list_view_for_member(self):
         self.client.force_login(self.member)
-        response = self.client.post(reverse('unit-delete-modal', kwargs={'pk': self.unit.pk}))
-        self.assertRedirects(response, reverse('unit-list'))
+        response = self.client.post(reverse('propertyunit-delete-modal', kwargs={'pk': self.unit.pk}))
+        self.assertRedirects(response, reverse('propertyunit-list'))
 
 
 class PropertyListViewTestCase(ViewWithPermissionsTestCase):
@@ -213,7 +215,7 @@ class PropertyCreateViewTestCase(ViewWithPermissionsTestCase):
 
     def test_post_http_302_redirect_to_detail_for_member(self):
         self.client.force_login(self.member)
-        unit = Unit.objects.create(name='Test Unit')
+        unit = PropertyUnit.objects.create(name='Test Unit')
         response = self.client.post(self.url, data={'name': 'Test Property', 'allowed_units': [unit.pk]})
         prop = Property.objects.get(name='Test Property')
         self.assertRedirects(response, reverse('property-detail', kwargs={'pk': prop.pk}))
@@ -250,7 +252,7 @@ class PropertyUpdateViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.unit = Unit.objects.create(name='Test Unit')
+        cls.unit = PropertyUnit.objects.create(name='Test Unit')
         cls.prop = Property.objects.create(name='Test Property')
         cls.prop.allowed_units.add(cls.unit)
 
@@ -335,9 +337,9 @@ class PropertyUnitOptionsViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        allowed_unit_1 = Unit.objects.create(name='Allowed Unit 1')
-        allowed_unit_2 = Unit.objects.create(name='Allowed Unit 2')
-        Unit.objects.create(name='Not Allowed Unit')
+        allowed_unit_1 = PropertyUnit.objects.create(name='Allowed Unit 1')
+        allowed_unit_2 = PropertyUnit.objects.create(name='Allowed Unit 2')
+        PropertyUnit.objects.create(name='Not Allowed Unit')
         cls.prop = Property.objects.create(name='Test Property')
         cls.prop.allowed_units.set([allowed_unit_1, allowed_unit_2])
 
@@ -356,7 +358,7 @@ class PropertyUnitOptionsViewTestCase(ViewWithPermissionsTestCase):
             reverse('property-unit-options', kwargs={'pk': self.prop.pk}))
         self.assertEqual(response.status_code, 200)
         options = response.json()['options']
-        for unit in Unit.objects.all():
+        for unit in PropertyUnit.objects.all():
             option = f'<option value="{unit.id}"'
             if unit in self.prop.allowed_units.all():
                 self.assertIn(option, options)

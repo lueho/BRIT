@@ -1,16 +1,16 @@
 from rest_framework.serializers import ModelSerializer
 
-from utils.properties.models import (Property, PropertyValue, Unit, )
+from utils.properties.models import (Property, PropertyUnit, PropertyValue)
 
 
-class UnitModelSerializer(ModelSerializer):
+class PropertyUnitModelSerializer(ModelSerializer):
     class Meta:
-        model = Unit
+        model = PropertyUnit
         fields = ('id', 'name', 'dimensionless', 'reference_quantity', 'description')
 
 
 class PropertyModelSerializer(ModelSerializer):
-    allowed_units = UnitModelSerializer(many=True)
+    allowed_units = PropertyUnitModelSerializer(many=True)
 
     class Meta:
         model = Property

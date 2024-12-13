@@ -1,10 +1,10 @@
-from .models import Property, Unit
+from .models import Property, PropertyUnit
 from ..forms import SimpleModelForm
 
 
-class UnitModelForm(SimpleModelForm):
+class PropertyUnitModelForm(SimpleModelForm):
     class Meta:
-        model = Unit
+        model = PropertyUnit
         fields = ['name', 'dimensionless', 'reference_quantity', 'description']
 
 

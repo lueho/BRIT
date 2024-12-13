@@ -1,39 +1,39 @@
 from django.urls import reverse_lazy
 
-from .forms import PropertyModelForm, UnitModelForm
-from .models import Property, Unit
+from .forms import PropertyModelForm, PropertyUnitModelForm
+from .models import Property, PropertyUnit
 from ..views import OwnedObjectCreateView, OwnedObjectDetailView, OwnedObjectListView, OwnedObjectModalDeleteView, \
     OwnedObjectModelSelectOptionsView, OwnedObjectUpdateView
 
 
-class UnitListView(OwnedObjectListView):
-    model = Unit
+class PropertyUnitListView(OwnedObjectListView):
+    model = PropertyUnit
     permission_required = set()
 
 
-class UnitCreateView(OwnedObjectCreateView):
-    model = Unit
-    form_class = UnitModelForm
-    permission_required = ('properties.add_unit',)
+class PropertyUnitCreateView(OwnedObjectCreateView):
+    model = PropertyUnit
+    form_class = PropertyUnitModelForm
+    permission_required = ('properties.add_propertyunit',)
 
 
-class UnitDetailView(OwnedObjectDetailView):
+class PropertyUnitDetailView(OwnedObjectDetailView):
     template_name = 'simple_detail_card.html'
-    model = Unit
+    model = PropertyUnit
     permission_required = set()
 
 
-class UnitUpdateView(OwnedObjectUpdateView):
-    model = Unit
-    form_class = UnitModelForm
-    permission_required = ('properties.change_unit',)
+class PropertyUnitUpdateView(OwnedObjectUpdateView):
+    model = PropertyUnit
+    form_class = PropertyUnitModelForm
+    permission_required = ('properties.change_propertyunit',)
 
 
-class UnitModalDeleteView(OwnedObjectModalDeleteView):
-    model = Unit
-    permission_required = ('properties.delete_unit',)
-    success_message = 'Unit deleted successfully.'
-    success_url = reverse_lazy('unit-list')
+class PropertyUnitModalDeleteView(OwnedObjectModalDeleteView):
+    model = PropertyUnit
+    permission_required = ('properties.delete_propertyunit',)
+    success_message = 'Property unit deleted successfully.'
+    success_url = reverse_lazy('propertyunit-list')
 
 
 class PropertyListView(OwnedObjectListView):
