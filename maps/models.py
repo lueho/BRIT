@@ -436,7 +436,7 @@ class GeoDataset(NamedUserCreatedObject):
     def get_absolute_url(self):
         return reverse(f'{self.model_name}')
 
-
+# TODO: Check if this should be moved to utils app
 class Attribute(NamedUserCreatedObject):
     """
     Defines an attribute class that can be attached to features of a map.

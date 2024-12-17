@@ -1,197 +1,66 @@
 {% extends 'base.html' %}
-{% load leaflet_tags %}
-{% load static %}
 
-{% block title %}Inventories | {{ object.name }}{% endblock %}
+{% block title %}BRIT | Inventories | {{ object.name }}{% endblock %}
 
 {% block content %}
 
-    {% leaflet_js %}
-    {% leaflet_css %}
-
-    <div class="row">
-        <div class="col col-12 col-lg-3 mb-4">
-            <div class="accordion">
-                <div class="card shadow">
-                    <div class="card-header"><b>{{ object.name }}</b></div>
-                    <div class="card-body p-0">
-                        {% leaflet_map "main" %}
-                        <div class="card-text p-2">
-                            <p>{{ object.description }}</p>
-                            <p id="region" data-region-id="{{ object.region.id }}"><b>Region</b>: {{ object.region }}
-                            </p>
-                            <p id="catchment" data-catchment-id="{{ object.catchment.id }}">
-                                <b>Catchment</b>: {{ object.catchment }}
-                            </p>
-                            <div class="collapse multi-collapse">
-                                <a href="{% url 'scenario-update' object.id %}" class="mr-3"><i
-                                        class="fas fa-fw fa-edit"></i> edit</a>
-                                <a href="{% url 'scenario-update' object.id %}?next={{ request.path }}">
-                                    Edit <i class="fas fa-fw fa-edit"></i>
-                                </a>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="card-header"
-                         role="button"
-                         data-toggle="collapse"
-                         href="#sources-body-{{ group_settings.id }}"
-                         aria-expanded="true"
-                         aria-controls="sources-body-{{ group_settings.id }}">
-                        <b>Options</b>
-                    </div>
-                    <div class="card-body collapse" id="sources-body-{{ group_settings.id }}">
-                        <table class="table">
-                            <tr>
-
-                                {# status = CHANGED #}
-                                {% if object.status == 1 %}
-                                    <td class="col-3">
-                                        <p>Start the evaluation of this inventory scenario.</p>
-                                        <div class="text-center">
-                                            <form method="post">
-                                                {% csrf_token %}
-                                                <button type="submit" name="run" class="btn btn-primary">
-                                                    Run
-                                                </button>
-                                            </form>
-                                        </div>
-                                    </td>
-                                    {# status = RUNNING #}
-                                {% elif object.status == 2 %}
-                                    <td class="col-3">
-                                        <p>The scenario evaluation is currently running.</p>
-                                        <div class="text-center">
-                                            <a class="btn btn-primary w-75"
-                                               href="{% url 'scenario-result' object.id %}">
-                                                Show progress
-                                            </a>
-                                        </div>
-                                    </td>
-                                    {# status = FINISHED #}
-                                {% elif object.status == 3 %}
-                                    <td class="col-3">
-                                        <p>Show the summary results of the inventories:</p>
-                                        <div class="text-center">
-                                            <a class="btn btn-primary w-75"
-                                               href="{% url 'scenario-result' object.id %}">
-                                                Show results
-                                            </a>
-                                        </div>
-                                    </td>
-                                {% endif %}
-                            </tr>
-                            <tr>
-                                <td class="col-2">
-                                    <p>Download the scenario definition as .json file</p>
-                                    <div class="text-center">
-                                        <a class="btn btn-primary w-75"
-                                           href="{% url 'download_scenario_summary' object.id %}">
-                                            Download
-                                        </a>
-                                    </div>
-                                </td>
-                            </tr>
-                            {% if allow_edit %}
-                                <tr>
-                                    <td class="col-2">
-                                        <P>Change the settings of this inventory scenario</P>
-                                        <div class="text-center">
-                                            <button
-                                                    class="btn btn-primary w-75"
-                                                    type="button"
-                                                    data-toggle="collapse"
-                                                    data-target=".multi-collapse"
-                                                    aria-expanded="false"
-                                                    aria-controls="add-component-group">
-                                                Edit
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            {% endif %}
-                        </table>
-                    </div>
-                    <div class="card-footer"></div>
-                </div>
-            </div>
+    <div class="row mb-4">
+        <div class="col col-12 col-lg-3">
+            {% include 'scenario_detail_card.html' %}
+            {% include 'scenario_evaluation_card.html' %}
         </div>
         <div class="col col-12 col-lg-9">
             {% for feedstock, algos in config.items %}
                 {% for algo, parameters in algos.items %}
-                    <div class="row mb-3">
+                    <div class="row mb-4">
                         <div class="col">
                             <div class="card shadow">
                                 <div class="card-header">
                                     <b>Inventory {{ forloop.parentloop.counter }}</b>
                                 </div>
                                 <div class="card-body">
-                                    <table class="table">
-                                        <p><b>Feedstock</b>: {{ feedstock.name }}</p>
-                                        <p><b>Dataset</b>: {{ algo.geodataset }}</p>
-                                        <p><b>Algorithm</b>: {{ algo.name }}</p>
-                                        <tr>
-                                            <th>Parameters:</th>
-                                        </tr>
+                                    <p class="card-text"><strong>Feedstock</strong>: {{ feedstock.name }}</p>
+                                    <p class="card-text"><strong>Dataset</strong>: {{ algo.geodataset }}</p>
+                                    <p class="card-text"><strong>Algorithm</strong>: {{ algo.name }}</p>
+                                    <p class="card-text"><strong>Settings</strong>:</p>
+                                    <ul>
                                         {% for parameter, value in parameters.items %}
-                                            <tr>
-                                                <td>
-                                                    {{ parameter.descriptive_name }}:
-                                                </td>
-                                                <td>{{ value }}</td>
-                                            </tr>
+                                            <li>{{ parameter.descriptive_name }}: {{ value }}</li>
                                         {% endfor %}
-                                    </table>
+                                    </ul>
                                 </div>
                                 <div class="card-footer">
-                                    <div class="collapse multi-collapse">
-                                        <a href="{% url 'scenario_update_config' scenario.id algo.id %}"
-                                           class="mx-2">
+                                    {% if request.user == object.owner %}
+                                        <a href="{% url 'scenario_update_config' scenario.id algo.id %}" class="mr-3">
                                             <i class="fas fa-fw fa-edit"></i> Edit
                                         </a>
                                         <a href="{% url 'remove_algorithm_from_scenario' scenario.id feedstock.id algo.id %}"
-                                           class="mx-2">
+                                           class="mr-3">
                                             <i class="fas fa-fw fa-trash"></i> Remove from configuration
                                         </a>
-                                    </div>
+                                    {% endif %}
                                 </div>
                             </div>
                         </div>
                     </div>
                 {% endfor %}
             {% endfor %}
-        </div>
-    </div>
 
-    <!-- Inventory definition row -->
-    <div class="row mt-2">
-        <div class="col">
-
-            <div class="collapse multi-collapse">
-                <div class="card border-left-primary border">
-                    <div class="card-header">
-                    </div>
-                    <div class="card-body">
-                        <a href="{% url 'add_scenario_configuration' scenario.id %}">
-                            <i class="fas fa-fw fa-plus"></i> Add inventory
-                        </a>
-                    </div>
-                    <div class="card-footer">
+            <div class="row">
+                <div class="col">
+                    <div class="card border-left-primary border">
+                        <div class="card-header"></div>
+                        <div class="card-body">
+                            <a href="{% url 'add_scenario_configuration' scenario.id %}">
+                                <i class="fas fa-fw fa-plus"></i> Add inventory
+                            </a>
+                        </div>
+                        <div class="card-footer"></div>
                     </div>
                 </div>
             </div>
+
         </div>
     </div>
-    <!-- end of inventory definition row -->
 
-{% endblock %}
-
-{% block javascript %}
-    {{ block.super }}
-    <script src="{% static 'js/maps.js' %}"></script>
-    {{ map_config|json_script:"mapConfig" }}
-    <script type="text/javascript">
-        const mapConfig = JSON.parse(document.getElementById("mapConfig").textContent);
-        window.onload = () => loadMap(mapConfig);
-    </script>
 {% endblock %}

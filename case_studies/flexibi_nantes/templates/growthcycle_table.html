@@ -16,16 +16,18 @@
     {% endfor %}
     </tbody>
     <tfoot>
-    <tr>
-        <td></td>
-        {% for timestep in growth_cycle.timesteps %}
-            <td>
-                <a href="{% url 'growth_cycle_timestep_update' pk=timestep.id %}"
-                   class="modal-link toggle-edit">
-                    <i class="fas fa-fw fa-edit"></i>
-                </a>
-            </td>
-        {% endfor %}
-    </tr>
+    {% if request.user == object.owner %}
+        <tr>
+            <td></td>
+            {% for timestep in growth_cycle.growthtimestepset_set.all %}
+                <td>
+                    <a href="{% url 'greenhousegrowthcycle-timestep-update-modal' pk=timestep.id %}"
+                       class="modal-link">
+                        <i class="fas fa-fw fa-edit"></i>
+                    </a>
+                </td>
+            {% endfor %}
+        </tr>
+    {% endif %}
     </tfoot>
 </table>

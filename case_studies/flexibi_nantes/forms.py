@@ -30,6 +30,12 @@ class GreenhouseModalModelForm(ModalModelFormMixin, GreenhouseModelForm):
 class GreenhouseGrowthCycleModelForm(SimpleModelForm):
     class Meta:
         model = GreenhouseGrowthCycle
+        fields = ('cycle_number', 'culture', 'greenhouse')
+
+
+class GrowthCycleModelForm(SimpleModelForm):
+    class Meta:
+        model = GreenhouseGrowthCycle
         fields = ()
 
 
@@ -50,10 +56,10 @@ class PlainTextComponentWidget(Widget):
     def render(self, name, value, attrs=None, renderer=None):
         if hasattr(self, 'initial'):
             value = self.initial
-        object_name = MaterialComponent.objects.get(id=value).name
+        obj = MaterialComponent.objects.filter(id=value).first()
 
         return mark_safe("<div style=\"min-width: 7em; padding-right: 12px;\">" + (str(
-            object_name) if value is not None else '-') + "</div>" + f"<input type='hidden' name='{name}' value='{value}'>")
+            obj.name) if value is not None else '-') + "</div>" + f"<input type='hidden' name='{name}' value='{value}'>")
 
 
 class InlineGrowthShare(InlineFormSetFactory):
@@ -92,5 +98,5 @@ class AddGreenhouseGrowthCycleModelForm(SimpleModelForm):
         fields = ()
 
 
-class UpdateGreenhouseGrowthCycleValuesForm(GreenhouseGrowthCycleModelForm):
+class UpdateGreenhouseGrowthCycleValuesForm(GrowthCycleModelForm):
     pass

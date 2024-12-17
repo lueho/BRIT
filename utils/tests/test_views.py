@@ -7,7 +7,7 @@ from django_filters import CharFilter, FilterSet
 from django_filters.views import FilterView
 
 from utils.properties.models import Property
-from .testcases import ViewWithPermissionsTestCase
+from utils.tests.testcases import ViewWithPermissionsTestCase
 from ..views import FilterDefaultsMixin, BRITFilterView
 
 

@@ -3,11 +3,11 @@
 {% block title %}BRIT | {{ object.name }} details{% endblock %}
 
 {% block content %}
-    <div class="row">
+    <div class="row mb-4">
         <div class="col">
             <div class="card shadow">
                 <div class="card-header"><strong>
-                    {% block detail_header %}{{ model_name }} details{% endblock %}</strong></div>
+                    {% block detail_header %}{{ object.verbose_name|capfirst }} details{% endblock %}</strong></div>
 
                 {% block detail_top_image %}{% endblock %}
 
@@ -21,27 +21,45 @@
                 </div>
                 <div class="card-footer">
                     {% block detail_footer %}
-                        <a href="javascript:history.go(-1)" class="nowrap">
-                            <i class="fas fa-fw fa-arrow-left">
-                            </i> back
-                        </a>
-                        <a href="{{ object.list_url }}" class="ml-3">
-                            <i class="fas fa-fw fa-list">
-                            </i> see all
-                        </a>
+                        {% block back_button %}
+                            <a href="javascript:history.go(-1)" class="nowrap">
+                                <i class="fas fa-fw fa-arrow-left">
+                                </i> back
+                            </a>
+                        {% endblock back_button %}
+                        {% block list_link %}
+                            {% if object.list_url %}
+                                <a href="{{ object.list_url }}" class="ml-3">
+                                    <i class="fas fa-fw fa-list">
+                                    </i> see all
+                                </a>
+                            {% endif %}
+                        {% endblock list_link %}
                         {% if request.user == object.owner %}
-                            <a href="{{ object.update_url }}" class="ml-3">
-                                <i class="fas fa-fw fa-edit">
-                                </i> edit
-                            </a>
-                            <a href="{{ object.modal_delete_url }}" class="modal-link ml-3">
-                                <i class="fas fa-fw fa-trash">
-                                </i> delete
-                            </a>
+                            {% block update_link %}
+                                {% if object.update_url %}
+                                    <a href="{{ object.update_url }}" class="ml-3">
+                                        <i class="fas fa-fw fa-edit">
+                                        </i> edit
+                                    </a>
+                                {% endif %}
+                            {% endblock update_link %}
+                            {% block delete_link %}
+                                {% if object.modal_delete_url %}
+                                    <a href="{{ object.modal_delete_url }}" class="modal-link ml-3">
+                                        <i class="fas fa-fw fa-trash">
+                                        </i> delete
+                                    </a>
+                                {% endif %}
+                            {% endblock delete_link %}
                         {% endif %}
+                        {% block additional_footer_links %}{% endblock %}
                     {% endblock detail_footer %}
                 </div>
             </div>
         </div>
+    </div>
+    <div class="row mb-4">
+        {% block second_row %}{% endblock %}
     </div>
 {% endblock %}

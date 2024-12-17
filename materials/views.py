@@ -3,6 +3,7 @@ from crispy_forms.helper import FormHelper
 from dal import autocomplete
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin, UserPassesTestMixin
 from django.http import HttpResponseRedirect
+from django.shortcuts import get_object_or_404
 from django.urls import reverse, reverse_lazy
 from django.views.generic import ListView, RedirectView, TemplateView
 from django.views.generic.detail import SingleObjectMixin
@@ -10,14 +11,12 @@ from extra_views import UpdateWithInlinesView
 
 from distributions.models import TemporalDistribution
 from distributions.plots import DoughnutChart
-from utils.views import (NextOrSuccessUrlMixin, OwnedObjectCreateView, OwnedObjectDetailView,
-                         OwnedObjectListView, OwnedObjectModalCreateView, OwnedObjectModalDeleteView,
-                         OwnedObjectModalDetailView, OwnedObjectModalUpdateView, OwnedObjectUpdateView,
-                         PublishedObjectFilterView,
-                         UserCreatedObjectCreateView, UserCreatedObjectModalCreateView,
-                         UserCreatedObjectModalDeleteView,
-                         UserCreatedObjectUpdateView,
-                         UserOwnedObjectFilterView,
+from utils.views import (NextOrSuccessUrlMixin, OwnedObjectCreateView, OwnedObjectListView, OwnedObjectModalCreateView,
+                         OwnedObjectModalDeleteView, OwnedObjectModalDetailView, OwnedObjectModalUpdateView,
+                         OwnedObjectUpdateView, PublishedObjectFilterView, UserCreatedObjectAccessMixin,
+                         UserCreatedObjectCreateView,
+                         UserCreatedObjectDetailView, UserCreatedObjectModalCreateView,
+                         UserCreatedObjectModalDeleteView, UserCreatedObjectUpdateView, UserOwnedObjectFilterView,
                          UserOwnsObjectMixin)
 from .filters import PublishedSampleFilter, SampleSeriesFilter, UserOwnedSampleFilter
 from .forms import (AddComponentModalForm, AddCompositionModalForm, AddLiteratureSourceForm, AddSeasonalVariationForm,
@@ -57,10 +56,8 @@ class MaterialCategoryModalCreateView(OwnedObjectModalCreateView):
     permission_required = 'materials.add_materialcategory'
 
 
-class MaterialCategoryDetailView(OwnedObjectDetailView):
-    template_name = 'simple_detail_card.html'
+class MaterialCategoryDetailView(UserCreatedObjectDetailView):
     model = MaterialCategory
-    permission_required = set()
 
 
 class MaterialCategoryModalDetailView(OwnedObjectModalDetailView):
@@ -109,10 +106,8 @@ class MaterialModalCreateView(OwnedObjectModalCreateView):
     permission_required = 'materials.add_material'
 
 
-class MaterialDetailView(OwnedObjectDetailView):
-    template_name = 'simple_detail_card.html'
+class MaterialDetailView(UserCreatedObjectDetailView):
     model = Material
-    permission_required = set()
 
 
 class MaterialModalDetailView(OwnedObjectModalDetailView):
@@ -180,10 +175,8 @@ class ComponentModalCreateView(OwnedObjectModalCreateView):
     permission_required = 'materials.add_materialcomponent'
 
 
-class ComponentDetailView(OwnedObjectDetailView):
-    template_name = 'simple_detail_card.html'
+class ComponentDetailView(UserCreatedObjectDetailView):
     model = MaterialComponent
-    permission_required = set()
 
 
 class ComponentModalDetailView(OwnedObjectModalDetailView):
@@ -216,46 +209,44 @@ class ComponentModalDeleteView(OwnedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class ComponentGroupListView(OwnedObjectListView):
+class MaterialComponentGroupListView(OwnedObjectListView):
     model = MaterialComponentGroup
     permission_required = set()
 
 
-class ComponentGroupCreateView(OwnedObjectCreateView):
+class MaterialComponentGroupCreateView(OwnedObjectCreateView):
     form_class = ComponentGroupModelForm
     permission_required = 'materials.add_materialcomponentgroup'
 
 
-class ComponentGroupDetailView(OwnedObjectDetailView):
-    template_name = 'simple_detail_card.html'
+class MaterialComponentGroupDetailView(UserCreatedObjectDetailView):
     model = MaterialComponentGroup
-    permission_required = set()
 
 
-class ComponentGroupModalCreateView(OwnedObjectModalCreateView):
+class MaterialComponentGroupModalCreateView(OwnedObjectModalCreateView):
     form_class = ComponentGroupModalModelForm
     permission_required = 'materials.add_materialcomponentgroup'
 
 
-class ComponentGroupModalDetailView(OwnedObjectModalDetailView):
+class MaterialComponentGroupModalDetailView(OwnedObjectModalDetailView):
     template_name = 'modal_detail.html'
     model = MaterialComponentGroup
     permission_required = set()
 
 
-class ComponentGroupUpdateView(OwnedObjectUpdateView):
+class MaterialComponentGroupUpdateView(OwnedObjectUpdateView):
     model = MaterialComponentGroup
     form_class = ComponentGroupModelForm
     permission_required = 'materials.change_materialcomponentgroup'
 
 
-class ComponentGroupModalUpdateView(OwnedObjectModalUpdateView):
+class MaterialComponentGroupModalUpdateView(OwnedObjectModalUpdateView):
     model = MaterialComponentGroup
     form_class = ComponentGroupModalModelForm
     permission_required = 'materials.change_materialcomponentgroup'
 
 
-class ComponentGroupModalDeleteView(OwnedObjectModalDeleteView):
+class MaterialComponentGroupModalDeleteView(OwnedObjectModalDeleteView):
     template_name = 'modal_delete.html'
     model = MaterialComponentGroup
     success_message = 'Successfully deleted.'
@@ -281,10 +272,8 @@ class MaterialPropertyModalCreateView(OwnedObjectModalCreateView):
     permission_required = 'materials.add_materialproperty'
 
 
-class MaterialPropertyDetailView(OwnedObjectDetailView):
-    template_name = 'simple_detail_card.html'
+class MaterialPropertyDetailView(UserCreatedObjectDetailView):
     model = MaterialProperty
-    permission_required = set()
 
 
 class MaterialPropertyModalDetailView(OwnedObjectModalDetailView):
@@ -348,10 +337,8 @@ class SampleSeriesModalCreateView(OwnedObjectModalCreateView):
     permission_required = 'materials.add_sampleseries'
 
 
-class SampleSeriesDetailView(OwnedObjectDetailView):
+class SampleSeriesDetailView(UserCreatedObjectDetailView):
     model = SampleSeries
-    template_name = 'sample_series_detail.html'
-    permission_required = set()
 
     def get_context_data(self, **kwargs):
         kwargs['data'] = SampleSeriesModelSerializer(self.object).data
@@ -469,9 +456,8 @@ class SampleModalCreateView(OwnedObjectModalCreateView):
     permission_required = 'materials.add_sample'
 
 
-class SampleDetailView(OwnedObjectDetailView):
+class SampleDetailView(UserCreatedObjectDetailView):
     model = Sample
-    permission_required = set()
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -636,9 +622,13 @@ class CompositionModalCreateView(OwnedObjectModalCreateView):
     permission_required = 'materials.add_composition'
 
 
-class CompositionDetailView(OwnedObjectDetailView):
+class CompositionDetailView(UserCreatedObjectDetailView):
     model = Composition
-    permission_required = set()
+
+    def get(self, request, *args, **kwargs):
+        # Redirect to the detail page of the sample that the composition belongs to
+        composition = get_object_or_404(Composition, id=kwargs.get('pk'))
+        return HttpResponseRedirect(composition.sample.get_absolute_url())
 
 
 class CompositionModalDetailView(OwnedObjectModalDetailView):

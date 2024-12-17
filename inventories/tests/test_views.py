@@ -1,7 +1,7 @@
 from django.urls import reverse
 
 from maps.models import Catchment, Region
-from utils.tests.testcases import ViewWithPermissionsTestCase
+from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 from ..models import Scenario
 
 
@@ -69,25 +69,21 @@ class ScenarioCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertRedirects(response, reverse('scenario-detail', kwargs={'pk': created_pk}))
 
 
-class ScenarioDetailViewTestCase(ViewWithPermissionsTestCase):
+class ScenarioCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model = Scenario
+    view_detail_name = 'scenario-detail'
+    view_update_name = 'scenario-update'
+    view_delete_name = 'scenario-delete-modal'
+
+    create_object_data = {'name': 'Test Scenario'}
 
     @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
+    def create_related_objects(cls):
         region = Region.objects.create(name='Test Region')
-        catchment = Catchment.objects.create(name='Test Catchment', region=region, parent_region=region)
-        cls.scenario = Scenario.objects.create(
-            name='Test Scenario', region=region, catchment=catchment, publication_status='published'
-        )
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('scenario-detail', kwargs={'pk': self.scenario.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('scenario-detail', kwargs={'pk': self.scenario.pk}))
-        self.assertEqual(response.status_code, 200)
+        return {
+            'region': region,
+            'catchment': Catchment.objects.create(name='Test Catchment', region=region, parent_region=region)
+        }
 
 
 class ScenarioUpdateViewTestCase(ViewWithPermissionsTestCase):
@@ -179,15 +175,18 @@ class ScenarioModalDeleteViewTestCase(ViewWithPermissionsTestCase):
             Scenario.objects.get(pk=self.scenario.pk)
 
 
-class ScenarioResultDetailViewTestCase(ViewWithPermissionsTestCase):
+class ScenarioResultCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model = Scenario
+    view_detail_name = 'scenario-result'
+    view_update_name = 'scenario-update'
+    view_delete_name = 'scenario-delete-modal'
+
+    create_object_data = {'name': 'Test Scenario'}
 
     @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
+    def create_related_objects(cls):
         region = Region.objects.create(name='Test Region')
-        catchment = Catchment.objects.create(name='Test Catchment', region=region, parent_region=region)
-        cls.scenario = Scenario.objects.create(name='Test Scenario', region=region, catchment=catchment)
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('scenario-result', kwargs={'pk': self.scenario.pk}))
-        self.assertEqual(response.status_code, 200)
+        return {
+            'region': region,
+            'catchment': Catchment.objects.create(name='Test Catchment', region=region, parent_region=region)
+        }

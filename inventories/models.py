@@ -165,6 +165,8 @@ class Scenario(NamedUserCreatedObject):
     catchment = models.ForeignKey(Catchment, on_delete=models.CASCADE, null=True,
                                   related_name='scenarios')  # TODO: make many-to-many?
 
+    # TODO: Add duplicate functionality
+
     @property
     def status(self):
         return ScenarioStatus.Status(self.scenariostatus.status)

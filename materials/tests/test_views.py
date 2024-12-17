@@ -1,8 +1,7 @@
-from django.contrib.auth.models import User
 from django.urls import reverse
 
 from distributions.models import TemporalDistribution, Timestep
-from utils.tests.testcases import ViewWithPermissionsTestCase
+from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 from ..models import (Composition, Material, MaterialCategory, MaterialComponent, MaterialComponentGroup,
                       MaterialProperty, MaterialPropertyValue, Sample, SampleSeries, WeightShare)
 
@@ -28,6 +27,16 @@ class MaterialDashboardViewTestCase(ViewWithPermissionsTestCase):
 
 # ----------- Material Category CRUD -----------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
+
+
+class MaterialCategoryCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model = MaterialCategory
+    view_detail_name = 'materialcategory-detail'
+    view_update_name = 'materialcategory-update'
+    view_delete_name = 'materialcategory-delete-modal'
+
+    create_object_data = {'name': 'Test Category'}
+
 
 class MaterialCategoryListViewTestCase(ViewWithPermissionsTestCase):
 
@@ -124,23 +133,6 @@ class MaterialCategoryModalCreateViewTestCase(ViewWithPermissionsTestCase):
         )
 
 
-class MaterialCategoryDetailViewTestCase(ViewWithPermissionsTestCase):
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.category = MaterialCategory.objects.create(name='Test Category')
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('materialcategory-detail', kwargs={'pk': self.category.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('materialcategory-detail', kwargs={'pk': self.category.pk}))
-        self.assertEqual(response.status_code, 200)
-
-
 class MaterialCategoryModalDetailViewTestCase(ViewWithPermissionsTestCase):
 
     @classmethod
@@ -164,7 +156,7 @@ class MaterialCategoryUpdateViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.category = MaterialCategory.objects.create(name='Test Category')
+        cls.category = MaterialCategory.objects.create(name='Test Category', publication_status='published', )
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialcategory-update', kwargs={'pk': self.category.pk})
@@ -210,7 +202,7 @@ class MaterialCategoryModalUpdateViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.category = MaterialCategory.objects.create(name='Test Category')
+        cls.category = MaterialCategory.objects.create(name='Test Category', publication_status='published', )
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialcategory-update-modal', kwargs={'pk': self.category.pk})
@@ -338,7 +330,7 @@ class MaterialCreateViewTestCase(ViewWithPermissionsTestCase):
 
     def test_get_http_200_ok_for_members(self):
         self.client.force_login(self.member)
-        response = self.client.get(reverse('material-create-modal'))
+        response = self.client.get(reverse('material-create'))
         self.assertEqual(response.status_code, 200)
 
     def test_form_contains_exactly_one_submit_button(self):
@@ -400,21 +392,21 @@ class MaterialModalCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertRedirects(response, reverse('material-detail', kwargs={'pk': pk}))
 
 
-class MaterialDetailViewTestCase(ViewWithPermissionsTestCase):
+class MaterialCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model = Material
+    view_detail_name = 'material-detail'
+    view_update_name = 'material-update'
+    view_delete_name = 'material-delete-modal'
+
+    create_object_data = {'name': 'Test Material'}
 
     @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.material = Material.objects.create(name='Test Material')
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('material-detail', kwargs={'pk': self.material.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('material-detail', kwargs={'pk': self.material.pk}))
-        self.assertEqual(response.status_code, 200)
+    def create_published_object(cls):
+        published_material = super().create_published_object()
+        # Change the name in order to prevent unique key constraint violation
+        published_material.name = 'Published Test Material'
+        published_material.save()
+        return published_material
 
 
 class SourceModalDetailViewTestCase(ViewWithPermissionsTestCase):
@@ -440,7 +432,7 @@ class MaterialUpdateViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.material = Material.objects.create(name='Test Material')
+        cls.material = Material.objects.create(name='Test Material', publication_status='published')
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('material-update', kwargs={'pk': self.material.pk})
@@ -486,7 +478,7 @@ class MaterialModalUpdateViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.material = Material.objects.create(name='Test Material')
+        cls.material = Material.objects.create(name='Test Material', publication_status='published')
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('material-update-modal', kwargs={'pk': self.material.pk})
@@ -675,21 +667,21 @@ class ComponentModalCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertRedirects(response, reverse('materialcomponent-detail', kwargs={'pk': pk}))
 
 
-class ComponentDetailViewTestCase(ViewWithPermissionsTestCase):
+class MaterialComponentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model = MaterialComponent
+    view_detail_name = 'materialcomponent-detail'
+    view_update_name = 'materialcomponent-update'
+    view_delete_name = 'materialcomponent-delete-modal'
+
+    create_object_data = {'name': 'Test Component'}
 
     @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.component = MaterialComponent.objects.create(name='Test Component')
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('materialcomponent-detail', kwargs={'pk': self.component.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('materialcomponent-detail', kwargs={'pk': self.component.pk}))
-        self.assertEqual(response.status_code, 200)
+    def create_published_object(cls):
+        published_component = super().create_published_object()
+        # Change the name in order to prevent unique key constraint violation
+        published_component.name = 'Published Test Component'
+        published_component.save()
+        return published_component
 
 
 class ComponentModalDetailViewTestCase(ViewWithPermissionsTestCase):
@@ -715,7 +707,7 @@ class ComponentUpdateViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.component = MaterialComponent.objects.create(name='Test Component')
+        cls.component = MaterialComponent.objects.create(name='Test Component', publication_status='published', )
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialcomponent-update', kwargs={'pk': self.component.pk})
@@ -761,7 +753,7 @@ class ComponentModalUpdateViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.component = MaterialComponent.objects.create(name='Test Component')
+        cls.component = MaterialComponent.objects.create(name='Test Component', publication_status='published', )
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialcomponent-update-modal', kwargs={'pk': self.component.pk})
@@ -944,21 +936,21 @@ class ComponentGroupModalCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertRedirects(response, reverse('materialcomponentgroup-detail', kwargs={'pk': pk}))
 
 
-class ComponentGroupDetailViewTestCase(ViewWithPermissionsTestCase):
+class MaterialComponentGroupCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model = MaterialComponentGroup
+    view_detail_name = 'materialcomponentgroup-detail'
+    view_update_name = 'materialcomponentgroup-update'
+    view_delete_name = 'materialcomponentgroup-delete-modal'
+
+    create_object_data = {'name': 'Test Group'}
 
     @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.group = MaterialComponentGroup.objects.create(name='Test Group')
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('materialcomponentgroup-detail', kwargs={'pk': self.group.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('materialcomponentgroup-detail', kwargs={'pk': self.group.pk}))
-        self.assertEqual(response.status_code, 200)
+    def create_published_object(cls):
+        published_group = super().create_published_object()
+        # Change the name in order to prevent unique key constraint violation
+        published_group.name = 'Published Test Group'
+        published_group.save()
+        return published_group
 
 
 class ComponentGroupModalDetailViewTestCase(ViewWithPermissionsTestCase):
@@ -984,7 +976,7 @@ class ComponentGroupUpdateViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.group = MaterialComponentGroup.objects.create(name='Test Group')
+        cls.group = MaterialComponentGroup.objects.create(name='Test Group', publication_status='published', )
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialcomponentgroup-update', kwargs={'pk': self.group.pk})
@@ -1030,7 +1022,7 @@ class ComponentGroupModalUpdateViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.group = MaterialComponentGroup.objects.create(name='Test Group')
+        cls.group = MaterialComponentGroup.objects.create(name='Test Group', publication_status='published', )
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialcomponentgroup-update-modal', kwargs={'pk': self.group.pk})
@@ -1213,21 +1205,13 @@ class MaterialPropertyModalCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertRedirects(response, reverse('materialproperty-detail', kwargs={'pk': created_pk}))
 
 
-class MaterialPropertyDetailViewTestCase(ViewWithPermissionsTestCase):
+class MaterialPropertyCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model = MaterialProperty
+    view_detail_name = 'materialproperty-detail'
+    view_update_name = 'materialproperty-update'
+    view_delete_name = 'materialproperty-delete-modal'
 
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.property = MaterialProperty.objects.create(name='Test Property', unit='Test Unit')
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('materialproperty-detail', kwargs={'pk': self.property.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('materialproperty-detail', kwargs={'pk': self.property.pk}))
-        self.assertEqual(response.status_code, 200)
+    create_object_data = {'name': 'Test Property', 'unit': 'Test Unit'}
 
 
 class MaterialPropertyModalDetailViewTestCase(ViewWithPermissionsTestCase):
@@ -1253,7 +1237,11 @@ class MaterialPropertyUpdateViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.property = MaterialProperty.objects.create(name='Test Property', unit='Test Unit')
+        cls.property = MaterialProperty.objects.create(
+            name='Test Property',
+            unit='Test Unit',
+            publication_status='published',
+        )
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialproperty-update', kwargs={'pk': self.property.pk})
@@ -1298,7 +1286,7 @@ class MaterialPropertyModalUpdateViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.property = MaterialProperty.objects.create(name='Test Property', unit='Test Unit')
+        cls.property = MaterialProperty.objects.create(owner=cls.member, name='Test Property', unit='Test Unit')
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('materialproperty-update-modal', kwargs={'pk': self.property.pk})
@@ -1552,44 +1540,18 @@ class SampleSeriesModalCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertRedirects(response, reverse('sampleseries-detail', kwargs={'pk': pk}))
 
 
-class SampleSeriesDetailViewTestCase(ViewWithPermissionsTestCase):
+class SampleSeriesCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model = SampleSeries
+    view_detail_name = 'sampleseries-detail'
+    view_update_name = 'sampleseries-update'
+    view_delete_name = 'sampleseries-delete-modal'
+
+    create_object_data = {'name': 'Test Series'}
 
     @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-
+    def create_related_objects(cls):
         material = Material.objects.create(name='Test Material')
-        cls.series = SampleSeries.objects.create(name='Test Series', material=material)
-        temporal_distribution = TemporalDistribution.objects.create(name='Test Distribution')
-        Timestep.objects.create(name='Test Timestep', distribution=temporal_distribution)
-        composition = Composition.objects.create(
-            group=MaterialComponentGroup.objects.create(name='Test Group'),
-            sample=Sample.objects.get(series__name='Test Series'),
-            fractions_of=MaterialComponent.objects.default()
-        )
-
-        for i in range(2):
-            component = MaterialComponent.objects.create(name=f'Test Component {i}')
-            WeightShare.objects.create(
-                component=component,
-                composition=composition,
-                average=0.2,
-                standard_deviation=0.01
-            )
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('sampleseries-detail', kwargs={'pk': self.series.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('sampleseries-detail', kwargs={'pk': self.series.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('sampleseries-detail', kwargs={'pk': self.series.pk}))
-        self.assertEqual(response.status_code, 200)
+        return {'material': material}
 
 
 class SampleSeriesModalDetailViewTestCase(ViewWithPermissionsTestCase):
@@ -1642,7 +1604,11 @@ class SampleSeriesUpdateViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.material = Material.objects.create(name='Test Material')
-        cls.series = SampleSeries.objects.create(name='Test Series', material=cls.material)
+        cls.series = SampleSeries.objects.create(
+            name='Test Series',
+            material=cls.material,
+            publication_status='published',
+        )
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sampleseries-update', kwargs={'pk': self.series.pk})
@@ -1688,7 +1654,11 @@ class SampleSeriesModalUpdateViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.material = Material.objects.create(name='Test Material')
-        cls.series = SampleSeries.objects.create(name='Test Series', material=cls.material)
+        cls.series = SampleSeries.objects.create(
+            name='Test Series',
+            material=cls.material,
+            publication_status='published',
+        )
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sampleseries-update-modal', kwargs={'pk': self.series.pk})
@@ -1785,7 +1755,11 @@ class SampleSeriesCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.material = Material.objects.create(name='Test Material')
-        cls.series = SampleSeries.objects.create(name='Test Series', material=cls.material)
+        cls.series = SampleSeries.objects.create(
+            name='Test Series',
+            material=cls.material,
+            publication_status='published',
+        )
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sampleseries-duplicate', kwargs={'pk': self.series.pk})
@@ -1944,56 +1918,85 @@ class SampleCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertRedirects(response, reverse('sample-detail', kwargs={'pk': created_pk}))
 
 
-class SampleDetailViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ['view_material', 'add_material', 'change_material', 'delete_material',
-                          'view_sample', 'add_sample', 'change_sample', 'delete_sample',
-                          'view_composition', 'add_composition', 'change_composition', 'delete_composition',
-                          'view_materialpropertyvalue', 'add_materialpropertyvalue', 'change_materialpropertyvalue',
-                          'delete_materialpropertyvalue']
+class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model = Sample
+    view_detail_name = 'sample-detail'
+    view_update_name = 'sample-update'
+    view_delete_name = 'sample-delete-modal'
+
+    create_object_data = {'name': 'Test Sample'}
 
     @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
+    def create_related_objects(cls):
         material = Material.objects.create(name='Test Material')
-        series = SampleSeries.objects.create(name='Test Series', material=material)
-        cls.sample = Sample.objects.create(name='Test Sample', material=material, series=series)
         prop = MaterialProperty.objects.create(name='Test Property', unit='Test Unit')
-        cls.prop_val = MaterialPropertyValue.objects.create(property=prop, average=123.3, standard_deviation=0.13)
-        cls.sample.properties.add(cls.prop_val)
+        MaterialPropertyValue.objects.create(
+            name='Test Value',
+            property=prop,
+            average=123.3,
+            standard_deviation=0.13
+        )
+        return {'material': material}
 
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('sample-detail', kwargs={'pk': self.sample.pk}))
-        self.assertEqual(response.status_code, 200)
+    @classmethod
+    def create_published_object(cls):
+        published_sample = super().create_published_object()
+        property_value = MaterialPropertyValue.objects.get(name='Test Value')
+        published_sample.properties.add(property_value)
+        return published_sample
 
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('sample-detail', kwargs={'pk': self.sample.pk}))
-        self.assertEqual(response.status_code, 200)
+    @classmethod
+    def create_unpublished_object(cls):
+        unpublished_sample = super().create_unpublished_object()
+        property_value = MaterialPropertyValue.objects.get(name='Test Value')
+        unpublished_sample.properties.add(property_value)
+        return unpublished_sample
 
-    def test_template_contains_dashboard_edit_and_delete_button_for_owners(self):
-        self.client.force_login(self.sample.owner)
-        response = self.client.get(reverse('sample-detail', kwargs={'pk': self.sample.pk}))
-        self.assertContains(response, reverse('sample-update', kwargs={'pk': self.sample.pk}))
-        self.assertContains(response, reverse('sample-duplicate', kwargs={'pk': self.sample.pk}))
-        self.assertContains(response, reverse('materials-dashboard'))
-        self.assertContains(response, reverse('sample-update', kwargs={'pk': self.sample.pk}))
-        self.assertContains(response, reverse('sample-delete-modal', kwargs={'pk': self.sample.pk}))
-        self.assertContains(response, reverse('sample-add-property', kwargs={'pk': self.sample.pk}))
-        self.assertContains(response, reverse('materialpropertyvalue-delete-modal', kwargs={'pk': self.prop_val.pk}))
-        self.assertContains(response, reverse('sample-add-composition', kwargs={'pk': self.sample.pk}))
+    def test_template_contains_edit_and_delete_buttons_for_owners(self):
+        self.client.force_login(self.owner_user)
+        url = self.get_detail_url(self.published_object.pk)
+        response = self.client.get(url)
+        self.assertContains(response, self.get_update_url(self.published_object.pk))
+        self.assertContains(response, self.get_delete_url(self.published_object.pk))
+        self.assertContains(response, reverse('sample-duplicate', kwargs={'pk': self.published_object.pk}))
+        self.assertContains(
+            response,
+            reverse('sample-add-property', kwargs={'pk': self.published_object.pk})
+        )
+        self.assertContains(
+            response,
+            reverse('sample-add-composition', kwargs={'pk': self.published_object.pk})
+        )
+
+        property_value = MaterialPropertyValue.objects.get(name='Test Value')
+        self.assertContains(
+            response,
+            reverse('materialpropertyvalue-delete-modal', kwargs={'pk': property_value.pk}))
         self.assertContains(response, 'edit-group-')
+        self.assertContains(response, reverse('materials-dashboard'))
 
-    def test_template_does_not_contain_dashboard_edit_and_delete_button_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('sample-detail', kwargs={'pk': self.sample.pk}))
-        self.assertNotContains(response, reverse('sample-update', kwargs={'pk': self.sample.pk}))
-        self.assertNotContains(response, reverse('sample-duplicate', kwargs={'pk': self.sample.pk}))
-        self.assertNotContains(response, reverse('sample-update', kwargs={'pk': self.sample.pk}))
-        self.assertNotContains(response, reverse('sample-delete-modal', kwargs={'pk': self.sample.pk}))
-        self.assertNotContains(response, reverse('sample-add-property-modal', kwargs={'pk': self.sample.pk}))
-        self.assertNotContains(response, reverse('materialpropertyvalue-delete-modal', kwargs={'pk': self.prop_val.pk}))
-        self.assertNotContains(response, reverse('sample-add-composition', kwargs={'pk': self.sample.pk}))
+    def test_template_does_not_contain_edit_and_delete_button_for_non_owner_users(self):
+        self.client.force_login(self.non_owner_user)
+        url = self.get_detail_url(self.published_object.pk)
+        response = self.client.get(url)
+        self.assertNotContains(response, self.get_update_url(self.published_object.pk))
+        self.assertNotContains(response, self.get_delete_url(self.published_object.pk))
+        self.assertNotContains(response, reverse('sample-duplicate', kwargs={'pk': self.published_object.pk}))
+        self.assertNotContains(
+            response,
+            reverse('sample-add-property', kwargs={'pk': self.published_object.pk})
+        )
+        self.assertNotContains(
+            response,
+            reverse('sample-add-composition', kwargs={'pk': self.published_object.pk})
+        )
+
+        property_value = MaterialPropertyValue.objects.get(name='Test Value')
+        self.assertNotContains(
+            response,
+            reverse('materialpropertyvalue-delete-modal', kwargs={'pk': property_value.pk}))
         self.assertNotContains(response, 'edit-group-')
+        self.assertContains(response, reverse('materials-dashboard'))
 
 
 class SampleUpdateViewTestCase(ViewWithPermissionsTestCase):
@@ -2298,7 +2301,12 @@ class CompositionCreateViewTestCase(ViewWithPermissionsTestCase):
         super().setUpTestData()
         material = Material.objects.create(name='Test Material')
         series = SampleSeries.objects.create(name='Test Series', material=material)
-        cls.sample = Sample.objects.create(name='Test Sample', material=material, series=series)
+        cls.sample = Sample.objects.create(
+            name='Test Sample',
+            material=material,
+            series=series,
+            publication_status='published',
+        )
         cls.custom_group = MaterialComponentGroup.objects.create(name='Test Group')
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
@@ -2351,7 +2359,7 @@ class CompositionModalCreateViewTestCase(ViewWithPermissionsTestCase):
         super().setUpTestData()
         material = Material.objects.create(name='Test Material')
         series = SampleSeries.objects.create(name='Test Series', material=material)
-        cls.sample = Sample.objects.create(name='Test Sample', material=material, series=series)
+        cls.sample = Sample.objects.create(owner=cls.member, name='Test Sample', material=material, series=series)
         cls.custom_group = MaterialComponentGroup.objects.create(name='Test Group')
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
@@ -2396,25 +2404,95 @@ class CompositionModalCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertRedirects(response, reverse('sample-detail', kwargs={'pk': self.sample.pk}))
 
 
-class CompositionDetailViewTestCase(ViewWithPermissionsTestCase):
+class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model = Composition
+    view_detail_name = 'composition-detail'
+    view_update_name = 'composition-update'
+    view_delete_name = 'composition-delete-modal'
+
+    create_object_data = {'name': 'Test Composition'}
 
     @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
+    def create_related_objects(cls):
         material = Material.objects.create(name='Test Material')
-        series = SampleSeries.objects.create(name='Test Series', material=material)
-        sample = Sample.objects.create(name='Test Sample', material=material, series=series)
+        published_sample = Sample.objects.create(
+            owner=cls.owner_user,
+            name='Published Test Sample',
+            material=material,
+            publication_status='published',
+        )
+        unpublished_sample = Sample.objects.create(
+            owner=cls.owner_user,
+            name='Private Test Sample',
+            material=material,
+        )
         group = MaterialComponentGroup.objects.create(name='Test Group')
-        cls.composition = Composition.objects.create(name='Test Composition', group=group, sample=sample)
+        return {'published_sample': published_sample, 'unpublished_sample': unpublished_sample, 'group': group}
 
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('composition-detail', kwargs={'pk': self.composition.pk}))
-        self.assertEqual(response.status_code, 200)
+    @classmethod
+    def create_published_object(cls):
+        data = cls.create_object_data.copy()
+        data['publication_status'] = 'published'
+        data.update({
+            'sample': cls.related_objects['published_sample'],
+            'group': cls.related_objects['group']
+        })
+        return cls.model.objects.create(owner=cls.owner_user, **data)
 
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('composition-detail', kwargs={'pk': self.composition.pk}))
-        self.assertEqual(response.status_code, 200)
+    @classmethod
+    def create_unpublished_object(cls):
+        data = cls.create_object_data.copy()
+        data['publication_status'] = 'private'
+        data.update({
+            'sample': cls.related_objects['unpublished_sample'],
+            'group': cls.related_objects['group']
+        })
+        return cls.model.objects.create(owner=cls.owner_user, **data)
+
+    def test_detail_view_published_as_anonymous(self):
+        url = self.get_detail_url(self.published_object.pk)
+        response = self.client.get(url, follow=True)
+        redirect_url = reverse('sample-detail', kwargs={'pk': self.published_object.sample.pk})
+        self.assertRedirects(response, redirect_url)
+
+    def test_detail_view_published_as_authenticated_owner(self):
+        self.client.force_login(self.owner_user)
+        url = self.get_detail_url(self.published_object.pk)
+        response = self.client.get(url, follow=True)
+        redirect_url = reverse('sample-detail', kwargs={'pk': self.published_object.sample.pk})
+        self.assertRedirects(response, redirect_url)
+
+    def test_detail_view_published_as_authenticated_non_owner(self):
+        self.client.force_login(self.non_owner_user)
+        url = self.get_detail_url(self.published_object.pk)
+        response = self.client.get(url, follow=True)
+        redirect_url = reverse('sample-detail', kwargs={'pk': self.published_object.sample.pk})
+        self.assertRedirects(response, redirect_url)
+
+    def test_detail_view_unpublished_as_owner(self):
+        self.client.force_login(self.owner_user)
+        url = self.get_detail_url(self.unpublished_object.pk)
+        response = self.client.get(url, follow=True)
+        redirect_url = reverse('sample-detail', kwargs={'pk': self.unpublished_object.sample.pk})
+        self.assertRedirects(response, redirect_url)
+
+    def test_detail_view_unpublished_as_non_owner(self):
+        self.client.force_login(self.non_owner_user)
+        url = self.get_detail_url(self.unpublished_object.pk)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 403)
+        self.assertContains(response, self.permission_denied_message, status_code=403)
+
+    def test_detail_view_unpublished_as_anonymous(self):
+        url = self.get_detail_url(self.unpublished_object.pk)
+        response = self.client.get(url)
+        redirect_url = reverse("composition-detail", kwargs={"pk": self.unpublished_object.pk})
+        self.assertRedirects(response, f'{reverse("auth_login")}?next={redirect_url}')
+
+    def test_detail_view_nonexistent_object(self):
+        url = self.get_detail_url(pk=9999)  # Assuming this PK does not exist
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 404)
 
 
 class CompositionModalDetailViewTestCase(ViewWithPermissionsTestCase):
@@ -2445,14 +2523,15 @@ class CompositionUpdateViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         material = Material.objects.create(owner=cls.member, name='Test Material')
-        group = MaterialComponentGroup.objects.create(owner=cls.member,name='Test Group')
-        SampleSeries.objects.create(owner=cls.member,name='Test Series', material=material)
+        group = MaterialComponentGroup.objects.create(owner=cls.member, name='Test Group')
+        SampleSeries.objects.create(owner=cls.member, name='Test Series', material=material)
         cls.sample = Sample.objects.get(series__name='Test Series')
         cls.composition = Composition.objects.create(
             owner=cls.member,
             group=group,
             sample=cls.sample,
-            fractions_of=MaterialComponent.objects.default()
+            fractions_of=MaterialComponent.objects.default(),
+            publication_status='published',
         )
 
         for i in range(2):
@@ -2581,7 +2660,7 @@ class CompositionModalUpdateViewTestCase(ViewWithPermissionsTestCase):
         super().setUpTestData()
         material = Material.objects.create(name='Test Material')
         group = MaterialComponentGroup.objects.create(name='Test Group')
-        SampleSeries.objects.create(name='Test Series', material=material)
+        SampleSeries.objects.create(owner=cls.member, name='Test Series', material=material)
         cls.sample = Sample.objects.get(series__name='Test Series')
         cls.composition = Composition.objects.create(
             group=group,
@@ -2781,7 +2860,12 @@ class AddComponentViewTestCase(ViewWithPermissionsTestCase):
         cls.component_group = MaterialComponentGroup.objects.create(name='Test Group')
         cls.series = SampleSeries.objects.create(name='Test Series', material=material)
         cls.default_component = MaterialComponent.objects.default()
-        cls.sample = Sample.objects.get(series=cls.series, timestep=Timestep.objects.default())
+        cls.sample = Sample.objects.get(
+            series=cls.series,
+            timestep=Timestep.objects.default(),
+        )
+        cls.sample.publication_status = 'published'
+        cls.sample.save()
 
     def setUp(self):
         self.composition = Composition.objects.create(
@@ -2842,7 +2926,7 @@ class ComponentOrderUpViewTestCase(ViewWithPermissionsTestCase):
         super().setUpTestData()
         material = Material.objects.create(name='Test Material')
         cls.component_group = MaterialComponentGroup.objects.create(owner=cls.member, name='Test Group')
-        cls.series = SampleSeries.objects.create(name='Test Series', material=material)
+        cls.series = SampleSeries.objects.create(owner=cls.member, name='Test Series', material=material)
         MaterialComponent.objects.create(name='Test Component')
         cls.default_component = MaterialComponent.objects.default()
         cls.sample = Sample.objects.get(series=cls.series, timestep=Timestep.objects.default())
@@ -2923,7 +3007,7 @@ class WeightShareModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         super().setUpTestData()
         material = Material.objects.create(name='Test Material')
         component_group = MaterialComponentGroup.objects.create(name='Test Group')
-        SampleSeries.objects.create(name='Test Series', material=material)
+        SampleSeries.objects.create(owner=cls.member, name='Test Series', material=material)
         cls.sample = Sample.objects.get(series__name='Test Series')
         cls.component = MaterialComponent.objects.create(name='Test Component')
         cls.composition = Composition.objects.create(sample=cls.sample, group=component_group)
@@ -2981,7 +3065,11 @@ class AddCompositionViewTestCase(ViewWithPermissionsTestCase):
         super().setUpTestData()
         material = Material.objects.create(name='Test Material')
         cls.component_group = MaterialComponentGroup.objects.create(name='Test Group')
-        cls.series = SampleSeries.objects.create(name='Test Series', material=material)
+        cls.series = SampleSeries.objects.create(
+            name='Test Series',
+            material=material,
+            publication_status='published',
+        )
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('sampleseries-add-composition', kwargs={'pk': self.series.pk})

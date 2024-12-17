@@ -2,8 +2,8 @@ from django.urls import reverse_lazy
 
 from .forms import PropertyModelForm, UnitModelForm
 from .models import Property, Unit
-from ..views import OwnedObjectCreateView, OwnedObjectDetailView, OwnedObjectListView, OwnedObjectModalDeleteView, \
-    OwnedObjectModelSelectOptionsView, OwnedObjectUpdateView
+from ..views import (OwnedObjectCreateView, OwnedObjectListView, OwnedObjectModalDeleteView,
+                     OwnedObjectModelSelectOptionsView, OwnedObjectUpdateView, UserCreatedObjectDetailView)
 
 
 class UnitListView(OwnedObjectListView):
@@ -17,10 +17,8 @@ class UnitCreateView(OwnedObjectCreateView):
     permission_required = ('properties.add_unit',)
 
 
-class UnitDetailView(OwnedObjectDetailView):
-    template_name = 'simple_detail_card.html'
+class UnitDetailView(UserCreatedObjectDetailView):
     model = Unit
-    permission_required = set()
 
 
 class UnitUpdateView(OwnedObjectUpdateView):
@@ -47,9 +45,8 @@ class PropertyCreateView(OwnedObjectCreateView):
     permission_required = ('properties.add_property',)
 
 
-class PropertyDetailView(OwnedObjectDetailView):
+class PropertyDetailView(UserCreatedObjectDetailView):
     model = Property
-    permission_required = set()
 
 
 class PropertyUpdateView(OwnedObjectUpdateView):

@@ -1,6 +1,6 @@
 from django.urls import reverse
 
-from utils.tests.testcases import ViewWithPermissionsTestCase
+from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 from ..models import Property, Unit
 
 
@@ -61,26 +61,21 @@ class UnitCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertRedirects(response, reverse('unit-detail', kwargs={'pk': unit.pk}))
 
 
-class UnitDetailViewTestCase(ViewWithPermissionsTestCase):
+class UnitCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model = Unit
+    view_detail_name = 'unit-detail'
+    view_update_name = 'unit-update'
+    view_delete_name = 'unit-delete-modal'
+
+    create_object_data = {'name': 'Test Unit'}
 
     @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.unit = Unit.objects.create(name='Test Unit')
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('unit-detail', kwargs={'pk': self.unit.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('unit-detail', kwargs={'pk': self.unit.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_member(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('unit-detail', kwargs={'pk': self.unit.pk}))
-        self.assertEqual(response.status_code, 200)
+    def create_published_object(cls):
+        # Change the name of the published object to avoid unique constraint violation
+        unit = super().create_published_object()
+        unit.name = 'Test Unit 2'
+        unit.save()
+        return unit
 
 
 class UnitUpdateViewTestCase(ViewWithPermissionsTestCase):
@@ -89,7 +84,7 @@ class UnitUpdateViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.unit = Unit.objects.create(name='Test Unit')
+        cls.unit = Unit.objects.create(name='Test Unit', publication_status='published', )
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('unit-update', kwargs={'pk': self.unit.pk})
@@ -221,27 +216,17 @@ class PropertyCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(Property.objects.first().name, 'Test Property')
 
 
-class PropertyDetailViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ['view_property']
+class PropertyCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model = Property
+    view_detail_name = 'property-detail'
+    view_update_name = 'property-update'
+    view_delete_name = 'property-delete-modal'
+
+    create_object_data = {'name': 'Test Property'}
 
     @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.prop = Property.objects.create(name='Test Property')
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('property-detail', kwargs={'pk': self.prop.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('property-detail', kwargs={'pk': self.prop.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_member(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('property-detail', kwargs={'pk': self.prop.pk}))
-        self.assertEqual(response.status_code, 200)
+    def create_related_objects(cls):
+        return {'unit': Unit.objects.create(name='Test Unit')}
 
 
 class PropertyUpdateViewTestCase(ViewWithPermissionsTestCase):
@@ -251,7 +236,7 @@ class PropertyUpdateViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.unit = Unit.objects.create(name='Test Unit')
-        cls.prop = Property.objects.create(name='Test Property')
+        cls.prop = Property.objects.create(name='Test Property', publication_status='published', )
         cls.prop.allowed_units.add(cls.unit)
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):

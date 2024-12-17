@@ -17,9 +17,12 @@ import case_studies.flexibi_nantes.tasks
 from maps.models import Catchment, GeoDataset
 from maps.views import GeoDataSetFilteredMapView
 from materials.models import MaterialComponentGroup
-from utils.views import (BRITFilterView, NextOrSuccessUrlMixin, OwnedObjectListView, UserOwnsObjectMixin)
+from utils.views import (BRITFilterView, NextOrSuccessUrlMixin, OwnedObjectListView, OwnedObjectUpdateView,
+                         UserOwnsObjectMixin, UserCreatedObjectDetailView)
 from .filters import GreenhouseTypeFilter, NantesGreenhousesFilterSet
-from .forms import (CultureModelForm, GreenhouseGrowthCycle, GreenhouseModalModelForm, GrowthCycleCreateForm,
+from .forms import (CultureModelForm, GreenhouseGrowthCycle, GreenhouseGrowthCycleModelForm, GrowthCycleModelForm,
+                    GreenhouseModalModelForm,
+                    GrowthCycleCreateForm,
                     GrowthShareFormSetHelper, GrowthTimestepInline, InlineGrowthShare,
                     UpdateGreenhouseGrowthCycleValuesForm)
 from .models import Culture, Greenhouse, GrowthTimeStepSet
@@ -49,7 +52,11 @@ class CultureCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, BSModalCreate
         return super().form_valid(form)
 
 
-class CultureDetailView(UserOwnsObjectMixin, BSModalReadView):
+class CultureDetailView(UserCreatedObjectDetailView):
+    model = Culture
+
+
+class CultureModalDetailView(UserOwnsObjectMixin, BSModalReadView):
     model = Culture
     template_name = 'modal_detail.html'
 
@@ -75,7 +82,7 @@ class CultureUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUr
         return context
 
 
-class CultureDeleteView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalDeleteView):
+class CultureModalDeleteView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalDeleteView):
     model = Culture
     template_name = 'modal_delete.html'
     success_message = 'Successfully deleted.'
@@ -115,7 +122,7 @@ class GreenhouseCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, BSModalCre
         return super().form_valid(form)
 
 
-class GreenhouseDetailView(DetailView):
+class GreenhouseDetailView(UserCreatedObjectDetailView):
     model = Greenhouse
     template_name = 'greenhouse_detail.html'
 
@@ -139,7 +146,7 @@ class GreenhouseUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSucces
         return context
 
 
-class GreenhouseDeleteView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalDeleteView):
+class GreenhouseModalDeleteView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalDeleteView):
     model = Greenhouse
     template_name = 'modal_delete.html'
     success_message = 'Successfully deleted.'
@@ -201,7 +208,7 @@ class GrowthCycleCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, BSModalCr
         return HttpResponseRedirect(self.get_success_url())
 
 
-class GrowthCycleDetailView(DetailView):
+class GrowthCycleDetailView(UserCreatedObjectDetailView):
     model = GreenhouseGrowthCycle
     template_name = 'growthcycle_detail.html'
 
@@ -211,7 +218,13 @@ class GrowthCycleDetailView(DetailView):
         return super().get_context_data(**kwargs)
 
 
-class GrowthCycleDeleteView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalDeleteView):
+class GrowthCycleUpdateView(OwnedObjectUpdateView):
+    model = GreenhouseGrowthCycle
+    form_class = GreenhouseGrowthCycleModelForm
+    permission_required = ('flexibi_nantes.change_greenhousegrowthcycle',)
+
+
+class GrowthCycleModalDeleteView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalDeleteView):
     model = GreenhouseGrowthCycle
     template_name = 'modal_delete.html'
     success_message = 'Successfully deleted.'

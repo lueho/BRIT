@@ -3,9 +3,9 @@ from urllib.parse import urlencode
 from bootstrap_modal_forms.generic import BSModalCreateView, BSModalDeleteView, BSModalReadView, BSModalUpdateView
 from bootstrap_modal_forms.mixins import is_ajax
 from django.contrib import messages
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.mixins import AccessMixin, LoginRequiredMixin, PermissionRequiredMixin, UserPassesTestMixin
 from django.contrib.messages.views import SuccessMessageMixin
-from django.core.exceptions import FieldError, ImproperlyConfigured, PermissionDenied
+from django.core.exceptions import FieldError, ImproperlyConfigured
 from django.db.models.signals import post_save
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import render
@@ -152,6 +152,44 @@ class OwnedObjectListView(PermissionRequiredMixin, ListView):
         return template_names
 
 
+class UserCreatedObjectAccessMixin(UserPassesTestMixin):
+    """
+    A Mixin to control access to objects based on 'publication_status' and 'owner'.
+
+    - Published objects ('publication_status' == 'published') are accessible to all users.
+    - Unpublished objects are only accessible to their owners.
+    """
+    publication_status_field = 'publication_status'
+    owner_field = 'owner'
+    published_status = 'published'
+    permission_denied_message = "You do not have permission to access this object."
+
+    def test_func(self):
+
+        obj = self.get_object()
+
+        # Ensure the object has the required fields
+        if not hasattr(obj, self.publication_status_field) or not hasattr(obj, self.owner_field):
+            raise AttributeError(
+                f"The model {obj.__class__.__name__} must have '{self.publication_status_field}' and '{self.owner_field}' fields."
+            )
+
+        publication_status = getattr(obj, self.publication_status_field)
+        owner = getattr(obj, self.owner_field)
+        user = self.request.user
+
+        if publication_status == self.published_status:
+            # Published: accessible to all
+            return True
+        else:
+            if user.is_authenticated:
+                # Private: accessible only to the owner
+                return owner == user
+            else:
+                # Private: not accessible for unauthenticated users
+                return False
+
+
 class CreateOwnedObjectMixin(PermissionRequiredMixin, NextOrSuccessUrlMixin):
     # TODO: EOL
     def form_valid(self, form):
@@ -234,7 +272,7 @@ class OwnedObjectModalCreateView(CreateOwnedObjectMixin, BSModalCreateView):
         with mute_signals(post_save):
             self.object = form.save()
         messages.success(self.request, self.get_success_message())
-        return HttpResponseRedirect(self.get_success_url())
+        return super().form_valid(form)
 
 
 class UserCreatedObjectModalCreateView(CreateUserObjectMixin, BSModalCreateView):
@@ -267,55 +305,19 @@ class UserCreatedObjectModalCreateView(CreateUserObjectMixin, BSModalCreateView)
         return HttpResponseRedirect(self.get_success_url())
 
 
-class UserCreatedObjectDetailView(DetailView):
+class UserCreatedObjectDetailView(UserCreatedObjectAccessMixin, DetailView):
     """
     A view to display the details of a user created object only if it is either published or owned by the currently
-    logged-in user.
+    logged-in user. Views that inherit from this view must use models that inherit from UserCreatedObject.
     """
 
-    def get_queryset(self):
-        qs = super().get_queryset()
-        if self.request.user.is_authenticated:
-            return qs.filter(publication_status='published') | qs.filter(owner=self.request.user)
-        else:
-            return qs.filter(publication_status='published')
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({
-            'model_name': self.object._meta.verbose_name.capitalize(),
-        })
-        return context
-
-
-class OwnedObjectDetailView(PermissionRequiredMixin, DetailView):
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({
-            'model_name': self.object._meta.verbose_name.capitalize(),
-        })
-        return context
-
-
-class RestrictedOwnedObjectDetailView(OwnedObjectDetailView):
-
-    def get_queryset(self):
-        """
-        Override the get_queryset to filter based on owner or publication status.
-        If the user does not have access to the requested object, raise PermissionDenied.
-        """
-        qs = super().get_queryset()
-
-        if self.request.user.is_authenticated:
-            qs_filtered = qs.accessible_by_user(self.request.user)
-        else:
-            qs_filtered = qs.published()
-
-        if not qs_filtered.exists():
-            raise PermissionDenied("You do not have permission to view this object.")
-
-        return qs_filtered
+    def get_template_names(self):
+        try:
+            template_names = super().get_template_names()
+        except ImproperlyConfigured:
+            template_names = []
+        template_names.append('simple_detail_card.html')
+        return template_names
 
 
 class OwnedObjectModalDetailView(PermissionRequiredMixin, BSModalReadView):

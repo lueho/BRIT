@@ -15,12 +15,13 @@ import case_studies.soilcom.tasks
 from bibliography.views import (SourceCheckUrlView, SourceCreateView, SourceModalCreateView, SourceModalDeleteView,
                                 SourceModalDetailView, SourceModalUpdateView, SourceUpdateView)
 from maps.forms import NutsAndLauCatchmentQueryForm
-from maps.views import CatchmentDetailView, GeoDataSetFilteredMapView, GeoDataSetFormMixin, MapMixin
+from maps.views import CatchmentDetailView, GeoDataSetFilteredMapView, \
+    GeoDataSetFormMixin, \
+    MapMixin
 from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineFormSetMixin
-from utils.views import (BRITFilterView, OwnedObjectCreateView, OwnedObjectDetailView, OwnedObjectListView,
-                         OwnedObjectModalCreateView, OwnedObjectModalDeleteView, OwnedObjectModalDetailView,
-                         OwnedObjectModalUpdateView, OwnedObjectModelSelectOptionsView, OwnedObjectUpdateView,
-                         UserCreatedObjectDetailView)
+from utils.views import (BRITFilterView, OwnedObjectCreateView, OwnedObjectListView, OwnedObjectModalCreateView,
+                         OwnedObjectModalDeleteView, OwnedObjectModalDetailView, OwnedObjectModalUpdateView,
+                         OwnedObjectModelSelectOptionsView, OwnedObjectUpdateView, UserCreatedObjectDetailView)
 from .filters import CollectionFilterSet, CollectorFilter, WasteFlyerFilter
 from .forms import (AggregatedCollectionPropertyValueModelForm, BaseWasteFlyerUrlFormSet, CollectionAddPredecessorForm,
                     CollectionAddWasteSampleForm, CollectionFrequencyModalModelForm, CollectionFrequencyModelForm,
@@ -40,15 +41,6 @@ from .tasks import check_wasteflyer_urls
 class CollectionHomeView(PermissionRequiredMixin, TemplateView):
     template_name = 'waste_collection_home.html'
     permission_required = 'soilcom.view_collection'
-
-
-# ----------- CollectionCatchment CRUD ---------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-class CollectionCatchmentDetailView(CatchmentDetailView):
-    model = CollectionCatchment
-    permission_required = set()
 
 
 # ----------- Collector CRUD -------------------------------------------------------------------------------------------
@@ -134,10 +126,9 @@ class CollectionSystemModalCreateView(OwnedObjectModalCreateView):
     permission_required = 'soilcom.add_collectionsystem'
 
 
-class CollectionSystemDetailView(OwnedObjectDetailView):
+class CollectionSystemDetailView(UserCreatedObjectDetailView):
     template_name = 'simple_detail_card.html'
     model = CollectionSystem
-    permission_required = 'soilcom.view_collectionsystem'
 
 
 class CollectionSystemModalDetailView(OwnedObjectModalDetailView):
@@ -186,10 +177,8 @@ class WasteCategoryModalCreateView(OwnedObjectModalCreateView):
     permission_required = 'soilcom.add_wastecategory'
 
 
-class WasteCategoryDetailView(OwnedObjectDetailView):
-    template_name = 'simple_detail_card.html'
+class WasteCategoryDetailView(UserCreatedObjectDetailView):
     model = WasteCategory
-    permission_required = 'soilcom.view_wastecategory'
 
 
 class WasteCategoryModalDetailView(OwnedObjectModalDetailView):
@@ -238,10 +227,8 @@ class WasteComponentModalCreateView(OwnedObjectModalCreateView):
     permission_required = 'soilcom.add_wastecomponent'
 
 
-class WasteComponentDetailView(OwnedObjectDetailView):
-    template_name = 'simple_detail_card.html'
+class WasteComponentDetailView(UserCreatedObjectDetailView):
     model = WasteComponent
-    permission_required = 'soilcom.view_wastecomponent'
 
 
 class WasteComponentModalDetailView(OwnedObjectModalDetailView):
@@ -290,10 +277,8 @@ class WasteStreamModalCreateView(OwnedObjectModalCreateView):
     permission_required = 'soilcom.add_wastestream'
 
 
-class WasteStreamDetailView(OwnedObjectDetailView):
-    template_name = 'simple_detail_card.html'
+class WasteStreamDetailView(UserCreatedObjectDetailView):
     model = WasteStream
-    permission_required = 'soilcom.view_wastestream'
 
 
 class WasteStreamModalDetailView(OwnedObjectModalDetailView):
@@ -351,9 +336,8 @@ class WasteFlyerModalCreateView(SourceModalCreateView):
         return super().form_valid(form)
 
 
-class WasteFlyerDetailView(OwnedObjectDetailView):
+class WasteFlyerDetailView(UserCreatedObjectDetailView):
     model = WasteFlyer
-    permission_required = set()
 
 
 class WasteFlyerModalDetailView(SourceModalDetailView):
@@ -471,9 +455,8 @@ class FrequencyCreateView(M2MInlineFormSetMixin, OwnedObjectCreateView):
             return self.render_to_response(context)
 
 
-class FrequencyDetailView(OwnedObjectDetailView):
+class FrequencyDetailView(UserCreatedObjectDetailView):
     model = CollectionFrequency
-    permission_required = set()
 
 
 class FrequencyModalDetailView(OwnedObjectModalDetailView):
@@ -558,9 +541,8 @@ class CollectionPropertyValueCreateView(OwnedObjectCreateView):
     permission_required = 'soilcom.add_collectionpropertyvalue'
 
 
-class CollectionPropertyValueDetailView(OwnedObjectDetailView):
+class CollectionPropertyValueDetailView(UserCreatedObjectDetailView):
     model = CollectionPropertyValue
-    permission_required = set()
 
 
 class CollectionPropertyValueUpdateView(OwnedObjectUpdateView):
@@ -588,9 +570,8 @@ class AggregatedCollectionPropertyValueCreateView(OwnedObjectCreateView):
     permission_required = 'soilcom.add_aggregatedcollectionpropertyvalue'
 
 
-class AggregatedCollectionPropertyValueDetailView(OwnedObjectDetailView):
+class AggregatedCollectionPropertyValueDetailView(UserCreatedObjectDetailView):
     model = AggregatedCollectionPropertyValue
-    permission_required = set()
 
 
 class AggregatedCollectionPropertyValueUpdateView(OwnedObjectUpdateView):
@@ -607,6 +588,14 @@ class AggregatedCollectionPropertyValueModalDeleteView(OwnedObjectModalDeleteVie
 
     def get_success_url(self):
         return reverse('collection-list')
+
+
+# ----------- CollectionCatchment CRUD ---------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class CollectionCatchmentDetailView(CatchmentDetailView):
+    model = CollectionCatchment
 
 
 # ----------- Collection CRUD ------------------------------------------------------------------------------------------
@@ -729,9 +718,8 @@ class CollectionCreateNewVersionView(CollectionCopyView):
             return self.render_to_response(context)
 
 
-class CollectionDetailView(OwnedObjectDetailView):
+class CollectionDetailView(UserCreatedObjectDetailView):
     model = Collection
-    permission_required = set()
 
 
 class CollectionModalDetailView(OwnedObjectModalDetailView):

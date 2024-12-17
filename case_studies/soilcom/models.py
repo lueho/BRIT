@@ -14,7 +14,7 @@ from distributions.models import Period, TemporalDistribution, Timestep
 from maps.models import Catchment, GeoPolygon
 from materials.models import Material, MaterialCategory, Sample, SampleSeries
 from users.models import get_default_owner
-from utils.models import NamedUserCreatedObject, UserCreatedObject, UserCreatedObjectManager
+from utils.models import NamedUserCreatedObject, UserCreatedObject, UserCreatedObjectManager, UserCreatedObjectQuerySet
 from utils.properties.models import PropertyValue
 
 
@@ -44,12 +44,12 @@ class Collector(NamedUserCreatedObject):
     catchment = models.ForeignKey(CollectionCatchment, blank=True, null=True, on_delete=models.CASCADE)
 
     class Meta:
-        verbose_name = 'Waste Collector'
+        verbose_name = 'waste collector'
 
 
 class CollectionSystem(NamedUserCreatedObject):
     class Meta:
-        verbose_name = 'Waste Collection System'
+        verbose_name = 'waste collection system'
 
     def __str__(self):
         return self.name
@@ -57,8 +57,7 @@ class CollectionSystem(NamedUserCreatedObject):
 
 class WasteCategory(NamedUserCreatedObject):
     class Meta:
-        verbose_name = 'Waste Category'
-        verbose_name_plural = 'Waste categories'
+        verbose_name_plural = 'waste categories'
 
 
 class WasteComponentManager(UserCreatedObjectManager):
@@ -83,7 +82,7 @@ def add_material_category(sender, instance, created, **kwargs):
         instance.save()
 
 
-class WasteStreamQuerySet(models.query.QuerySet):
+class WasteStreamQuerySet(UserCreatedObjectQuerySet):
 
     def match_allowed_materials(self, allowed_materials):
         if allowed_materials is not None and allowed_materials.exists():
@@ -346,7 +345,7 @@ class FeeSystem(NamedUserCreatedObject):
     pass
 
 
-class CollectionQuerySet(models.query.QuerySet):
+class CollectionQuerySet(UserCreatedObjectQuerySet):
 
     def valid_on(self, date):
         return self.filter(Q(valid_from__lte=date), Q(valid_until__gte=date) | Q(valid_until=None))

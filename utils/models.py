@@ -196,6 +196,10 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
         self.save()
         # TODO: Implement notification to the owner
 
+    @property
+    def verbose_name(self):
+        return self._meta.verbose_name
+
 
 class NamedUserCreatedObject(UserCreatedObject):
     name = models.CharField(max_length=255)

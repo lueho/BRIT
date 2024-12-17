@@ -1,0 +1,23 @@
+{% extends 'simple_detail_card.html' %}
+
+{% block detail_body %}
+    <p class="card-text">
+        <strong>Name:</strong><br>
+        {{ object.name }}
+    </p>
+    <p class="card-text">
+        <strong>Dimensionless:</strong>
+        {{ object.dimensionless }}
+    </p>
+    {% if object.reference_quantity %}
+        <p class="card-text">
+        <strong>Unit:</strong><br>
+        <a href="{{ object.reference_quantity.get_absolute_url }}">{{ object.reference_quantity.name }}</a>
+    {% endif %}
+    {% if object.description %}
+        <p class="card-text">
+            <strong>Description:</strong><br>
+            {{ object.description }}
+        </p>
+    {% endif %}
+{% endblock detail_body %}

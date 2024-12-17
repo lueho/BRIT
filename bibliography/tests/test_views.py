@@ -4,7 +4,7 @@ from django.db.models.signals import post_save
 from django.urls import reverse
 from factory.django import mute_signals
 
-from utils.tests.testcases import ViewWithPermissionsTestCase
+from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 from ..models import Author, Licence, Source
 
 
@@ -126,25 +126,13 @@ class AuthorModalCreateViewTestCase(ViewWithPermissionsTestCase):
         )
 
 
-class AuthorDetailViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ['view_author']
+class AuthorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model = Author
+    view_detail_name = 'author-detail'
+    view_update_name = 'author-update'
+    view_delete_name = 'author-delete-modal'
 
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.author = Author.objects.create(
-            first_names='Test',
-            last_names='Author',
-        )
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('author-detail', kwargs={'pk': self.author.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('author-detail', kwargs={'pk': self.author.pk}))
-        self.assertEqual(response.status_code, 200)
+    create_object_data = {'last_names': 'Test Author'}
 
 
 class AuthorModalDetailViewTestCase(ViewWithPermissionsTestCase):
@@ -177,6 +165,7 @@ class AuthorUpdateViewTestCase(ViewWithPermissionsTestCase):
         cls.author = Author.objects.create(
             first_names='Test',
             last_names='Author',
+            publication_status='published',
         )
 
     def test_get_http_302_redirect_for_anonymous(self):
@@ -238,6 +227,7 @@ class AuthorModalUpdateViewTestCase(ViewWithPermissionsTestCase):
         cls.author = Author.objects.create(
             first_names='Test',
             last_names='Author',
+            publication_status='published'
         )
 
     def test_get_http_302_redirect_for_anonymous(self):
@@ -439,31 +429,19 @@ class LicenceModalCreateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.post(reverse('licence-create-modal'), data=data, follow=True)
         self.assertRedirects(
             response,
-            f"{reverse('licence-detail', kwargs={'pk': Licence.objects.first().pk})}",
+            f"{reverse('licence-detail', kwargs={'pk': Licence.objects.get(name='Test Licence').pk})}",
             status_code=302,
             target_status_code=200
         )
 
 
-class LicenceDetailViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ['view_licence']
+class LicenceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model = Licence
+    view_detail_name = 'licence-detail'
+    view_update_name = 'licence-update'
+    view_delete_name = 'licence-delete-modal'
 
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.licence = Licence.objects.create(
-            name='Test Licence',
-            reference_url='https://www.reference-url.org',
-        )
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('licence-detail', kwargs={'pk': self.licence.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('licence-detail', kwargs={'pk': self.licence.pk}))
-        self.assertEqual(response.status_code, 200)
+    create_object_data = {'name': 'Test Licence'}
 
 
 class LicenceModalDetailViewTestCase(ViewWithPermissionsTestCase):
@@ -496,6 +474,7 @@ class LicenceUpdateViewTestCase(ViewWithPermissionsTestCase):
         cls.licence = Licence.objects.create(
             name='Test Licence',
             reference_url='https://www.reference-url.org',
+            publication_status='published',
         )
 
     def test_get_http_302_redirect_for_anonymous(self):
@@ -557,6 +536,7 @@ class LicenceModalUpdateViewTestCase(ViewWithPermissionsTestCase):
         cls.licence = Licence.objects.create(
             name='Test Licence',
             reference_url='https://www.reference-url.org',
+            publication_status='published',
         )
 
     def test_get_http_302_redirect_for_anonymous(self):
@@ -767,27 +747,37 @@ class SourceModalCreateViewTestCase(ViewWithPermissionsTestCase):
         )
 
 
-class SourceDetailViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ['view_source']
+class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model = Source
+    view_detail_name = 'source-detail'
+    view_update_name = 'source-update'
+    view_delete_name = 'source-delete-modal'
 
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        with mute_signals(post_save):
-            cls.source = Source.objects.create(
-                abbreviation='TS1',
-                type='article',
-                title='Test Source'
-            )
+    create_object_data = {
+        'abbreviation': 'TS1',
+        'type': 'article',
+        'title': 'Test Source',
+        'url': 'https://www.test-url.org'
+    }
 
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('source-detail', kwargs={'pk': self.source.pk}))
-        self.assertEqual(response.status_code, 200)
+    def test_detail_view_unpublished_contains_check_url_button_for_owner(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_detail_url(self.unpublished_object.pk))
+        self.assertContains(response, 'check url')
 
-    def test_get_http_200_ok_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('source-detail', kwargs={'pk': self.source.pk}))
-        self.assertEqual(response.status_code, 200)
+    def test_detail_view_published_contains_check_url_button_for_owner(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_detail_url(self.published_object.pk))
+        self.assertContains(response, 'check url')
+
+    def test_detail_view_published_doesnt_contain_check_url_button_for_anonymous(self):
+        response = self.client.get(self.get_detail_url(self.published_object.pk))
+        self.assertNotContains(response, 'check url')
+
+    def test_detail_view_published_doesnt_contain_check_url_button_for_non_owner(self):
+        self.client.force_login(self.non_owner_user)
+        response = self.client.get(self.get_detail_url(self.published_object.pk))
+        self.assertNotContains(response, 'check url')
 
 
 class SourceModalDetailViewTestCase(ViewWithPermissionsTestCase):
@@ -823,7 +813,8 @@ class SourceUpdateViewTestCase(ViewWithPermissionsTestCase):
             cls.source = Source.objects.create(
                 abbreviation='TS1',
                 type='article',
-                title='Test Source'
+                title='Test Source',
+                publication_status='published',
             )
 
     def test_get_http_302_redirect_for_anonymous(self):
@@ -894,7 +885,8 @@ class SourceModalUpdateViewTestCase(ViewWithPermissionsTestCase):
             cls.source = Source.objects.create(
                 abbreviation='TS1',
                 type='article',
-                title='Test Source'
+                title='Test Source',
+                publication_status='published',
             )
 
     def test_get_http_302_redirect_for_anonymous(self):

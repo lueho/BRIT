@@ -9,16 +9,3 @@
         <p class="card-text"><strong>Allowed Units:</strong><br>{{ object.allowed_units.all|join:', ' }}</p>
     {% endif %}
 {% endblock %}
-
-{% block detail_footer %}
-    {% if 'change_property' in perms %}
-        <a href="{% url 'property-update' object.pk %}" class="mr-3">
-            <i class="fas fa-fw fa-edit"></i> edit
-        </a>
-    {% endif %}
-    {% if 'delete-property' in perms %}
-        <a href="{% url 'property-delete-modal' object.pk %}" class="mr-3 modal-link">
-            <i class="fas fa-fw fa-trash"></i> delete
-        </a>
-    {% endif %}
-{% endblock %}

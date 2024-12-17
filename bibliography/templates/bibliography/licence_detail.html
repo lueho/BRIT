@@ -1,38 +1,18 @@
-{% extends 'base.html' %}
+{% extends 'simple_detail_card.html' %}
 
-{% block title %}BRIT | {{ object }} details{% endblock %}
-
-{% block content %}
-
-    <div class="card shadow">
-        <div class="card-header"><strong>Licence Details</strong></div>
-        <div class="card-body">
-            <p><strong>Name:</strong><br>
-                {{ object.name }}
-            </p>
-            {% if object.reference_url %}
-                <p><strong>Reference url:</strong><br>
-                    <a href="{{ object.reference_url }}" target="_blank">{{ object.reference_url }}</a>
-                </p>
-            {% endif %}
-            {% if object.description %}
-                <p><strong>Description:</strong><br>
-                    {{ object.description }}
-                </p>
-            {% endif %}
-        </div>
-        <div class="card-footer">
-            <a href="javascript:history.go(-1)"><i class="fas fa-fw fa-arrow-left"></i> back</a>
-            <a href="{% url 'licence-list' %}" class="nowrap ml-3">
-                <i class="fas fa-fw fa-list"></i> see all</a>
-            {% if perms.bibliography.change_source %}
-                <a href="{% url 'licence-update' object.id %}" class="ml-3"><i class="fas fa-fw fa-edit"></i> edit</a>
-            {% endif %}
-            {% if perms.bibliography.delete_source %}
-                <a href="{% url 'licence-delete-modal' object.id %}" class="ml-3 modal-link"><i
-                        class="fas fa-fw fa-trash"></i> delete</a>
-            {% endif %}
-        </div>
-    </div>
-
-{% endblock content %}
+{% block detail_body %}
+    <p class="card-text"><strong>Name:</strong><br>
+        {{ object.name }}
+    </p>
+    {% if object.reference_url %}
+        <p class="card-text"><strong>Reference url:</strong><br>
+            <a href="{{ object.reference_url }}" target="_blank">{{ object.reference_url }}</a>
+        </p>
+    {% endif %}
+    {% if object.description %}
+        <p class="card-text"><strong>Description:</strong><br>
+            {{ object.description }}
+        </p>
+    {% endif %}
+{% endblock detail_body %}
+        

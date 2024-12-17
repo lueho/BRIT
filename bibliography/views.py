@@ -10,9 +10,10 @@ from django.views import View
 from django.views.generic import TemplateView
 
 from utils import views
+from utils.views import UserCreatedObjectDetailView
 from .filters import SourceFilter
-from .forms import AuthorModalModelForm, AuthorModelForm, LicenceModalModelForm, LicenceModelForm, SourceModalModelForm, \
-    SourceModelForm
+from .forms import (AuthorModalModelForm, AuthorModelForm, LicenceModalModelForm, LicenceModelForm,
+                    SourceModalModelForm, SourceModelForm)
 from .models import Author, Licence, SOURCE_TYPES, Source
 from .serializers import HyperlinkedSourceSerializer
 from .tasks import check_source_url, check_source_urls
@@ -41,9 +42,8 @@ class AuthorModalCreateView(views.OwnedObjectModalCreateView):
     permission_required = 'bibliography.add_author'
 
 
-class AuthorDetailView(views.OwnedObjectDetailView):
+class AuthorDetailView(UserCreatedObjectDetailView):
     model = Author
-    permission_required = set()
 
 
 class AuthorModalDetailView(views.OwnedObjectModalDetailView):
@@ -90,9 +90,8 @@ class LicenceModalCreateView(views.OwnedObjectModalCreateView):
     permission_required = 'bibliography.add_licence'
 
 
-class LicenceDetailView(views.OwnedObjectDetailView):
+class LicenceDetailView(UserCreatedObjectDetailView):
     model = Licence
-    permission_required = set()
 
 
 class LicenceModalDetailView(views.OwnedObjectModalDetailView):
@@ -152,17 +151,8 @@ class SourceModalCreateView(views.OwnedObjectModalCreateView):
     permission_required = 'bibliography.add_source'
 
 
-class SourceDetailView(views.OwnedObjectDetailView):
+class SourceDetailView(UserCreatedObjectDetailView):
     model = Source
-    permission_required = set()
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        serializer = HyperlinkedSourceSerializer(self.object, context={'request': self.request})
-        context.update({
-            'object_data': serializer.data
-        })
-        return context
 
 
 class SourceModalDetailView(views.OwnedObjectModalDetailView):
@@ -171,6 +161,7 @@ class SourceModalDetailView(views.OwnedObjectModalDetailView):
     permission_required = set()
 
     def get_context_data(self, **kwargs):
+        # TODO: Documentation
         context = super().get_context_data(**kwargs)
         serializer = HyperlinkedSourceSerializer(self.object, context={'request': self.request})
         context.update({
@@ -249,8 +240,11 @@ class SourceListCheckUrlsView(PermissionRequiredMixin, View):
 
 class SourceAutocompleteView(Select2QuerySetView):
     def get_queryset(self):
-
         qs = Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by('abbreviation')
         if self.q:
-            qs = qs.filter(Q(title__icontains=self.q) | Q(authors__last_names__icontains=self.q) | Q(authors__first_names__icontains=self.q)).distinct()
+            qs = qs.filter(
+                Q(title__icontains=self.q) |
+                Q(authors__last_names__icontains=self.q) |
+                Q(authors__first_names__icontains=self.q)
+            ).distinct()
         return qs

@@ -1,0 +1,37 @@
+<div class="card shadow mb-4">
+    <div class="card-header"><strong>Evaluation</strong></div>
+    <div class="card-body" id="sources-body-{{ group_settings.id }}">
+
+        {# status = CHANGED #}
+        {% if object.status == 1 %}
+            <p>This scenario is not evaluated, yet.</p>
+            <div class="text-center">
+                <form method="post">
+                    {% csrf_token %}
+                    <button type="submit" name="run" class="btn btn-primary">
+                        Start evaluation
+                    </button>
+                </form>
+            </div>
+            {# status = RUNNING #}
+        {% elif object.status == 2 %}
+            <p>The evaluation is still running.</p>
+            <div class="text-center">
+                <a class="btn btn-primary w-75"
+                   href="{% url 'scenario-result' object.id %}">
+                    Follow progress
+                </a>
+            </div>
+            {# status = FINISHED #}
+        {% elif object.status == 3 %}
+            <p>The results are ready!</p>
+            <div class="text-center">
+                <a class="btn btn-primary w-75"
+                   href="{% url 'scenario-result' object.id %}">
+                    Show results
+                </a>
+            </div>
+        {% endif %}
+    </div>
+    <div class="card-footer"></div>
+</div>

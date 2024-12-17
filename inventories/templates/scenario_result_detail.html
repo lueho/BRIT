@@ -1,66 +1,29 @@
 {% extends 'base.html' %}
-{% load leaflet_tags %}
 {% load static %}
 
 {% block title %}Inventories | {{ object.name }}{% endblock %}
 
 {% block content %}
-    {% leaflet_js %}
-    {% leaflet_css %}
 
-    <div class="row">
-        <div class="col col-12 col-lg-3 mb-4">
-            <div class="accordion">
-                <div class="card shadow">
-                    <div class="card-header"><b>{{ object.name }}</b></div>
-                    <div class="card-body p-0">
-                        {% leaflet_map "main" %}
-                        <div class="card-text p-2">
-                            <p>{{ object.description }}</p>
-                            <p id="region" data-region-id="{{ object.region.id }}"><b>Region</b>: {{ object.region }}
-                            </p>
-                            <p id="catchment" data-catchment-id="{{ object.catchment.id }}">
-                                <b>Catchment</b>: {{ object.catchment }}</p>
-                        </div>
+    <div class="row mb-4">
+
+        <div class="col col-12 col-lg-3">
+            {% include 'scenario_detail_card.html' %}
+            <div class="card shadow">
+                <div class="card-header"><strong>Evaluation</strong></div>
+                <div class="card-body" id="sources-body-{{ group_settings.id }}">
+                    <p class="card-text">The results are ready! </p>
+                    <div class="text-center">
+                        <a class="btn btn-primary w-75"
+                           href="{% url 'scenario-detail' object.id %}">
+                            Show settings
+                        </a>
                     </div>
-                    <div class="card-header"
-                         role="button"
-                         data-toggle="collapse"
-                         href="#sources-body-{{ group_settings.id }}"
-                         aria-expanded="true"
-                         aria-controls="sources-body-{{ group_settings.id }}">
-                        <b>Options</b>
-                    </div>
-                    <div class="card-body collapse" id="sources-body-{{ group_settings.id }}">
-                        <table class="table">
-                            <tr>
-                                <td class="col-2">
-                                    <p>Download the summary as .json for further processing</p>
-                                    <div class="text-center">
-                                        <a class="btn btn-primary w-75"
-                                           href="{% url 'download_result_summary' object.id %}">
-                                            Download
-                                        </a>
-                                    </div>
-                                </td>
-                            </tr>
-                            <tr>
-                                <td class="col-3">
-                                    <p>Show the configuration of the inventories:</p>
-                                    <div class="text-center">
-                                        <a class="btn btn-primary w-75"
-                                           href="{% url 'scenario-detail' object.id %}">
-                                            Show config
-                                        </a>
-                                    </div>
-                                </td>
-                            </tr>
-                        </table>
-                    </div>
-                    <div class="card-footer"></div>
                 </div>
+                <div class="card-footer"></div>
             </div>
         </div>
+
         <div class="col col-12 col-lg-9">
             <div class="row">
                 {% for id, c in charts.items %}
@@ -77,63 +40,54 @@
                     </div>
                 {% endfor %}
             </div>
-        </div>
-    </div>
-    <!-- end of second row -->
 
-    <!-- third row -->
-    <div class="collapse multi-collapse">
-        <div class="row mt-2">
-            <div class="col">
-                <div class="card shadow">
-                    <div class="card-header"><b>Results by inventory</b></div>
-                    <div class="card-body">
-                        {% for layer in layers %}
-                            <div class="row">
-                                <div class="col col-12">
-                                    <div class="card border-left-primary border">
-                                        <div class="card-header">
-                                            <h6 class="m-0 font-weight-bold text-primary">
-                                                Feedstock: {{ layer.feedstock.name }} -
-                                                Dataset: {{ layer.inventory_algorithm.geodataset }} -
-                                                Algorithm: {{ layer.inventory_algorithm.name }}</h6>
-                                        </div>
-                                        <div class="card-body">
-                                            {% for aggregate in layer.aggregated_results %}
-                                                <span>{{ aggregate.name }}: {{ aggregate.value }} {{ aggregate.unit }} - </span>
-                                            {% endfor %}
-                                            <a href="{% url 'scenario_result_map' layer.scenario.pk layer.inventory_algorithm.pk layer.feedstock.pk %}">
-                                                <i class="fas fa-fw fa-map"></i> show map
-                                            </a>
-                                        </div>
-                                        <div class="card-footer">
+            <div class="row">
+                <div class="col">
+                    <div class="card shadow">
+                        <div class="card-header"><strong>Results by inventory</strong></div>
+                        <div class="card-body">
+                            {% for layer in layers %}
+                                <div class="row mb-2">
+                                    <div class="col col-12">
+                                        <div class="card border-left-primary border">
+                                            <div class="card-header">
+                                                <strong>Feedstock:</strong> {{ layer.feedstock.name }} -
+                                                <strong>Dataset:</strong> {{ layer.inventory_algorithm.geodataset }} -
+                                                <strong>Algorithm:</strong> {{ layer.inventory_algorithm.name }}
+                                            </div>
+                                            <div class="card-body">
+                                                {% for aggregate in layer.aggregated_results %}
+                                                    <span>{{ aggregate.name }}: {{ aggregate.value }} {{ aggregate.unit }} - </span>
+                                                {% endfor %}
+                                            </div>
+                                            <div class="card-footer">
+{#                                                <a href="{% url 'scenario_result_map' layer.scenario.pk layer.inventory_algorithm.pk layer.feedstock.pk %}">#}
+{#                                                    <i class="fas fa-fw fa-map"></i> show map#}
+{#                                                </a>#}
+                                            </div>
                                         </div>
                                     </div>
                                 </div>
-                            </div>
-                        {% endfor %}
+                            {% endfor %}
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
     </div>
-    <!-- end of third row -->
 
 {% endblock content %}
 
 {% block javascript %}
-
     {{ block.super }}
     {{ plot_data|json_script:"plot_data" }}
     {{ charts|json_script:"charts" }}
-    {{ map_config|json_script:"mapConfig" }}
 
     <script src="{% static 'js/feedstock_summary_bar_chart.js' %}"></script>
-    <script src="{% static 'js/maps.js' %}"></script>
     <script>
         let charts = JSON.parse(document.getElementById("charts").textContent);
         for (const [id, chart] of Object.entries(charts)) {
-            let ctx = document.getElementById(id)
+            let ctx = document.getElementById(id);
             const args = chartDefinition(
                 chart["type"],
                 chart["labels"],
@@ -142,11 +96,7 @@
                 chart["show_legend"],
             );
             let ch = new Chart(ctx, args);
-            document.getElementById('legend-' + ch.canvas.id).innerHTML = ch.generateLegend()
+            document.getElementById('legend-' + ch.canvas.id).innerHTML = ch.generateLegend();
         }
-
-        const mapConfig = JSON.parse(document.getElementById("mapConfig").textContent);
-        window.onload = () => loadMap(mapConfig);
     </script>
-
 {% endblock javascript %}

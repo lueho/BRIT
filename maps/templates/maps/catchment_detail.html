@@ -1,11 +1,4 @@
 {% extends 'geo_detail_card.html' %}
-{% load static %}
-{% load leaflet_tags %}
-
-{% block style_sheets %}
-    {% leaflet_js %}
-    {% leaflet_css %}
-{% endblock %}
 
 {% block title %}BRIT | Maps | Catchment: {{ object.name }}{% endblock %}
 
@@ -30,23 +23,4 @@
         <p class="card-text"><strong>Description:</strong><br>{{ object.description }}</p>
     {% endif %}
     {% block additional_details %}{% endblock %}
-{% endblock %}
-
-{% block detail_footer %}
-    <a href="javascript:history.go(-1)" class="nowrap mr-2">
-        <i class="fas fa-fw fa-arrow-left"></i> back
-    </a>
-    <a href="{% url 'catchment-list' %}" class="nowrap mr-2">
-        <i class="fas fa-fw fa-list"></i> see all
-    </a>
-    {% if 'maps.change_catchment' in perms %}
-        <a href="{% url 'catchment-update' object.pk %}" class="nowrap mr-2">
-            <i class="fas fa-fw fa-edit"></i> edit
-        </a>
-    {% endif %}
-    {% if 'maps.delete_catchment' in perms %}
-        <a href="{% url 'catchment-delete-modal' object.pk %}" class="nowrap modal-link mr-2">
-            <i class="fas fa-fw fa-trash"></i> delete
-        </a>
-    {% endif %}
 {% endblock %}

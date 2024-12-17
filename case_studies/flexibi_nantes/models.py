@@ -7,7 +7,7 @@ from django.urls import reverse
 
 from distributions.models import TemporalDistribution, Timestep
 from materials.models import (Composition, Material, MaterialComponent, MaterialComponentGroup, SampleSeries)
-from utils.models import NamedUserCreatedObject
+from utils.models import NamedUserCreatedObject, UserCreatedObject, UserCreatedObjectManager
 
 
 class NantesGreenhouses(models.Model):
@@ -35,7 +35,7 @@ class NantesGreenhouses(models.Model):
     above_ground = models.BooleanField(blank=True, null=True)
 
 
-class GreenhouseManager(models.Manager):
+class GreenhouseManager(UserCreatedObjectManager):
 
     def types(self):
         types = []
@@ -51,9 +51,7 @@ class GreenhouseManager(models.Manager):
         return types
 
 
-class Greenhouse(models.Model):
-    owner = models.ForeignKey(User, on_delete=models.CASCADE, default=1)
-    name = models.CharField(max_length=255, blank=True, null=True)
+class Greenhouse(NamedUserCreatedObject):
     heated = models.BooleanField(blank=True, null=True)
     lighted = models.BooleanField(blank=True, null=True)
     high_wire = models.BooleanField(blank=True, null=True)
@@ -160,8 +158,7 @@ class Culture(NamedUserCreatedObject):
     residue = models.ForeignKey(SampleSeries, on_delete=models.PROTECT, null=True)
 
 
-class GreenhouseGrowthCycle(models.Model):
-    owner = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
+class GreenhouseGrowthCycle(UserCreatedObject):
     cycle_number = models.IntegerField(default=1)
     culture = models.ForeignKey(Culture, on_delete=models.CASCADE, null=True)
     greenhouse = models.ForeignKey(Greenhouse, on_delete=models.CASCADE, null=True)
@@ -247,8 +244,7 @@ class GrowthTimeStepSet(models.Model):
         return self.growth_cycle.greenhouse.get_absolute_url()
 
 
-class GrowthShare(models.Model):
-    owner = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
+class GrowthShare(UserCreatedObject):
     component = models.ForeignKey(MaterialComponent, on_delete=models.CASCADE, null=True)
     timestepset = models.ForeignKey(GrowthTimeStepSet, on_delete=models.CASCADE, null=True)
     average = models.FloatField(default=0.0)

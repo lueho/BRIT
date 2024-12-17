@@ -7,7 +7,7 @@ from django.test import RequestFactory, TestCase
 from django.urls import reverse, reverse_lazy
 
 from maps.views import CatchmentCreateMergeLauView
-from utils.tests.testcases import ViewSetWithPermissionsTestCase, ViewWithPermissionsTestCase
+from utils.tests.testcases import AbstractTestCases, ViewSetWithPermissionsTestCase, ViewWithPermissionsTestCase
 from ..models import (Attribute, Catchment, GeoDataset, GeoPolygon, LauRegion, Location, MapConfiguration,
                       MapLayerConfiguration, MapLayerStyle, NutsRegion, Region, RegionAttributeValue)
 from ..views import MapMixin
@@ -257,36 +257,17 @@ class LocationCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertRedirects(response, reverse('location-detail', kwargs={'pk': pk}))
 
 
-class LocationDetailViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ['change_location', 'delete_location']
+class LocationCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model = Location
+    view_detail_name = 'location-detail'
+    view_update_name = 'location-update'
+    view_delete_name = 'location-delete-modal'
 
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        location_data = {
-            'name': 'Test Location',
-            'address': 'Test Address',
-            'geom': Point(0, 0)
-        }
-        cls.location = Location.objects.create(**location_data)
-
-    def test_get_http_200_pk_for_anonymous(self):
-        self.assertIsNotNone(self.location.pk)
-        response = self.client.get(reverse('location-detail', kwargs={'pk': self.location.pk}))
-        self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'maps/location_detail.html')
-
-    def test_edit_and_delete_button_not_available_for_outsider(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('location-detail', kwargs={'pk': self.location.pk}))
-        self.assertNotContains(response, reverse('location-update', kwargs={'pk': self.location.pk}))
-        self.assertNotContains(response, reverse('location-delete-modal', kwargs={'pk': self.location.pk}))
-
-    def test_edit_button_available_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('location-detail', kwargs={'pk': self.location.pk}))
-        self.assertContains(response, reverse('location-update', kwargs={'pk': self.location.pk}))
-        self.assertContains(response, reverse('location-delete-modal', kwargs={'pk': self.location.pk}))
+    create_object_data = {
+        'name': 'Test Location',
+        'address': 'Test Address',
+        'geom': Point(0, 0),
+    }
 
 
 class LocationUpdateViewTestCase(ViewWithPermissionsTestCase):
@@ -298,7 +279,8 @@ class LocationUpdateViewTestCase(ViewWithPermissionsTestCase):
         location_data = {
             'name': 'Test Location',
             'address': 'Test Address',
-            'geom': Point(0, 0)
+            'geom': Point(0, 0),
+            'publication_status': 'published',
         }
         cls.location = Location.objects.create(**location_data)
 
@@ -505,31 +487,16 @@ class RegionCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertRedirects(response, reverse('region-detail', kwargs={'pk': pk}))
 
 
-class RegionDetailViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ['change_region', 'delete_region']
+class RegionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model = Region
+    view_detail_name = 'region-detail'
+    view_update_name = 'region-update'
+    view_delete_name = 'region-delete-modal'
 
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.region = Region.objects.create(name='Test Region')
-
-    def test_get_http_200_pk_for_anonymous(self):
-        self.assertIsNotNone(self.region.pk)
-        response = self.client.get(reverse('region-detail', kwargs={'pk': self.region.pk}))
-        self.assertEqual(response.status_code, 200)
-        self.assertTemplateUsed(response, 'maps/region_detail.html')
-
-    def test_edit_and_delete_button_not_available_for_outsider(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('region-detail', kwargs={'pk': self.region.pk}))
-        self.assertNotContains(response, reverse('region-update', kwargs={'pk': self.region.pk}))
-        self.assertNotContains(response, reverse('region-delete-modal', kwargs={'pk': self.region.pk}))
-
-    def test_edit_button_available_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('region-detail', kwargs={'pk': self.region.pk}))
-        self.assertContains(response, reverse('region-update', kwargs={'pk': self.region.pk}))
-        self.assertContains(response, reverse('region-delete-modal', kwargs={'pk': self.region.pk}))
+    create_object_data = {
+        'name': 'Test Region',
+        'country': 'DE',
+    }
 
 
 class RegionUpdateViewTestCase(ViewWithPermissionsTestCase):
@@ -538,7 +505,7 @@ class RegionUpdateViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.region = Region.objects.create(name='Test Region')
+        cls.region = Region.objects.create(owner=cls.member, name='Test Region')
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse('region-update', kwargs={'pk': self.region.pk})
@@ -570,7 +537,7 @@ class RegionUpdateViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.post(reverse('region-update', kwargs={'pk': self.region.pk}), data={})
         self.assertEqual(403, response.status_code)
 
-    def test_post_success_and_http_302_redirect_to_success_url_for_member(self):
+    def test_post_success_and_http_302_redirect_to_success_url_for_owner(self):
         self.client.force_login(self.member)
         data = {
             'name': 'Updated Test Region',
@@ -1018,30 +985,19 @@ class CatchmentCreateMergeLauViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(302, response.status_code)
 
 
-class CatchmentDetailViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ['change_catchment', 'delete_catchment']
+class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model = Catchment
+    view_detail_name = 'catchment-detail'
+    view_update_name = 'catchment-update'
+    view_delete_name = 'catchment-delete-modal'
+
+    create_object_data = {
+        'name': 'Test Catchment',
+    }
 
     @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.catchment = Catchment.objects.create(name='Test Catchment', publication_status='published')
-
-    def test_get_http_200_pk_for_anonymous(self):
-        response = self.client.get(reverse('catchment-detail', kwargs={'pk': self.catchment.pk}))
-        self.assertEqual(200, response.status_code)
-        self.assertTemplateUsed(response, 'maps/catchment_detail.html')
-
-    def test_edit_and_delete_button_not_available_for_outsider(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('catchment-detail', kwargs={'pk': self.catchment.pk}))
-        self.assertNotContains(response, reverse('catchment-update', kwargs={'pk': self.catchment.pk}))
-        self.assertNotContains(response, reverse('catchment-delete-modal', kwargs={'pk': self.catchment.pk}))
-
-    def test_edit_button_available_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('catchment-detail', kwargs={'pk': self.catchment.pk}))
-        self.assertContains(response, reverse('catchment-update', kwargs={'pk': self.catchment.pk}))
-        self.assertContains(response, reverse('catchment-delete-modal', kwargs={'pk': self.catchment.pk}))
+    def create_related_objects(cls):
+        return {'region': Region.objects.create(name='Test Region')}
 
 
 class CatchmentUpdateViewTestCase(ViewWithPermissionsTestCase):
@@ -1411,25 +1367,16 @@ class AttributeModalCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 302)
 
 
-class AttributeDetailViewTestCase(ViewWithPermissionsTestCase):
+class AttributeCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model = Attribute
+    view_detail_name = 'attribute-detail'
+    view_update_name = 'attribute-update'
+    view_delete_name = 'attribute-delete-modal'
 
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.attribute = Attribute.objects.create(
-            name='Test Attribute',
-            unit='Test Unit',
-            description='This ist a test element'
-        )
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('attribute-detail', kwargs={'pk': self.attribute.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('attribute-detail', kwargs={'pk': self.attribute.pk}))
-        self.assertEqual(response.status_code, 200)
+    create_object_data = {
+        'name': 'Test Attribute',
+        'unit': 'Test Unit',
+    }
 
 
 class AttributeModalDetailViewTestCase(ViewWithPermissionsTestCase):
@@ -1712,29 +1659,23 @@ class RegionAttributeValueModalCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 302)
 
 
-class RegionAttributeValueDetailViewTestCase(ViewWithPermissionsTestCase):
-    value = None
+class RegionAttributeValueCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model = RegionAttributeValue
+    view_detail_name = 'regionattributevalue-detail'
+    view_update_name = 'regionattributevalue-update'
+    view_delete_name = 'regionattributevalue-delete-modal'
+
+    create_object_data = {
+        'name': 'Test Value',
+        'value': 123.321
+    }
 
     @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        region = Region.objects.create(name='Test Region')
-        attribute = Attribute.objects.create(name='Test Attribute', unit='Test Unit')
-        cls.value = RegionAttributeValue.objects.create(
-            name='Test Value',
-            region=region,
-            attribute=attribute,
-            value=123.312
-        )
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('regionattributevalue-detail', kwargs={'pk': self.value.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('regionattributevalue-detail', kwargs={'pk': self.value.pk}))
-        self.assertEqual(response.status_code, 200)
+    def create_related_objects(cls):
+        return {
+            'region': Region.objects.create(name='Test Region'),
+            'attribute': Attribute.objects.create(name='Test Attribute', unit='Test Unit')
+        }
 
 
 class RegionAttributeValueModalDetailViewTestCase(ViewWithPermissionsTestCase):

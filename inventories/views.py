@@ -17,9 +17,8 @@ from maps.models import Catchment, GeoDataset
 from maps.serializers import BaseResultMapSerializer
 from maps.views import MapMixin
 from materials.models import SampleSeries
-from utils.views import (OwnedObjectCreateView, OwnedObjectDetailView, OwnedObjectModalDeleteView,
-                         OwnedObjectUpdateView, PublishedObjectFilterView, RestrictedOwnedObjectDetailView,
-                         UserOwnedObjectFilterView)
+from utils.views import (OwnedObjectCreateView, OwnedObjectModalDeleteView, OwnedObjectUpdateView,
+                         PublishedObjectFilterView, UserCreatedObjectDetailView, UserOwnedObjectFilterView)
 from .evaluations import ScenarioResult
 from .filters import ScenarioFilterSet
 from .forms import (ScenarioInventoryConfigurationAddForm, ScenarioInventoryConfigurationUpdateForm,
@@ -69,13 +68,12 @@ class ScenarioCreateView(LoginRequiredMixin, OwnedObjectCreateView):
     permission_required = set()
 
 
-class ScenarioDetailView(MapMixin, RestrictedOwnedObjectDetailView):
+class ScenarioDetailView(MapMixin, UserCreatedObjectDetailView):
     """Summary of the Scenario with complete configuration. Page for final review, which also contains the
     'run' button."""
 
     model = Scenario
     object = None
-    permission_required = set()
     config = None
     allow_edit = False
 
@@ -325,16 +323,13 @@ class ResultMapAPI(APIView):
         return JsonResponse(data, safe=False)
 
 
-class ScenarioResultView(MapMixin, OwnedObjectDetailView):
+class ScenarioResultView(MapMixin, UserCreatedObjectDetailView):
     """
     View with summaries of the results of each algorithm and a total summary.
     """
 
     template_name = 'scenario_result_detail.html'
     model = Scenario
-    permission_required = set()
-    context_object_name = 'scenario'
-    allow_edit = False
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -342,7 +337,6 @@ class ScenarioResultView(MapMixin, OwnedObjectDetailView):
         result = ScenarioResult(scenario)
         context['layers'] = [layer.as_dict() for layer in result.layers]
         context['charts'] = result.get_charts()
-        context['allow_edit'] = self.allow_edit
         return context
 
     def get(self, request, *args, **kwargs):

@@ -6,7 +6,7 @@ from django.db.models import Q, Subquery
 from django.forms import formset_factory
 from django.http import JsonResponse
 from django.urls import NoReverseMatch, reverse, reverse_lazy
-from django.views.generic import DetailView, TemplateView
+from django.views.generic import TemplateView
 from django.views.generic.edit import FormMixin
 from django_filters.views import FilterView
 from rest_framework.exceptions import NotFound, ParseError
@@ -17,10 +17,10 @@ from maps.serializers import (CatchmentGeoFeatureModelSerializer, LauRegionOptio
                               NutsRegionCatchmentOptionSerializer, NutsRegionOptionSerializer,
                               NutsRegionSummarySerializer, RegionGeoFeatureModelSerializer)
 from utils.forms import DynamicTableInlineFormSetHelper
-from utils.views import (BRITFilterView, OwnedObjectCreateView, OwnedObjectDetailView, OwnedObjectListView,
-                         OwnedObjectModalCreateView, OwnedObjectModalDeleteView, OwnedObjectModalDetailView,
-                         OwnedObjectModalUpdateView, OwnedObjectModelSelectOptionsView, OwnedObjectUpdateView,
-                         PublishedObjectFilterView, RestrictedOwnedObjectDetailView, UserOwnedObjectFilterView)
+from utils.views import (BRITFilterView, OwnedObjectCreateView, OwnedObjectListView, OwnedObjectModalCreateView,
+                         OwnedObjectModalDeleteView, OwnedObjectModalDetailView, OwnedObjectModalUpdateView,
+                         OwnedObjectModelSelectOptionsView, OwnedObjectUpdateView, PublishedObjectFilterView,
+                         UserCreatedObjectDetailView, UserOwnedObjectFilterView)
 from .filters import CatchmentFilterSet, GeoDataSetFilterSet, NutsRegionFilterSet, RegionFilterSet
 from .forms import (AttributeModalModelForm, AttributeModelForm, CatchmentCreateDrawCustomForm,
                     CatchmentCreateMergeLauForm, CatchmentModelForm, GeoDataSetModelForm, LocationModelForm,
@@ -87,7 +87,6 @@ class MapMixin:
                 ).replace('None', '').rstrip('/') + '/'
                 return template
             except NoReverseMatch:
-                print('no url found')
                 return None
         return None
 
@@ -330,9 +329,8 @@ class LocationCreateView(OwnedObjectCreateView):
     permission_required = 'maps.add_location'
 
 
-class LocationDetailView(MapMixin, OwnedObjectDetailView):
+class LocationDetailView(MapMixin, UserCreatedObjectDetailView):
     model = Location
-    permission_required = set()
 
 
 class LocationUpdateView(OwnedObjectUpdateView):
@@ -364,10 +362,9 @@ class RegionMapView(LoginRequiredMixin, MapMixin, FilterView):
     map_title = 'Regions'
 
 
-class RegionDetailView(MapMixin, DetailView):
+class RegionDetailView(MapMixin, UserCreatedObjectDetailView):
     model = Region
     features_layer_api_basename = 'api-region'
-    permission_required = set()
 
 
 class RegionCreateView(OwnedObjectCreateView):
@@ -405,9 +402,8 @@ class UserOwnedCatchmentListView(UserOwnedObjectFilterView):
     ordering = 'name'
 
 
-class CatchmentDetailView(MapMixin, RestrictedOwnedObjectDetailView):
+class CatchmentDetailView(MapMixin, UserCreatedObjectDetailView):
     model = Catchment
-    permission_required = set()
 
 
 class CatchmentCreateView(TemplateView):
@@ -821,10 +817,9 @@ class AttributeModalCreateView(OwnedObjectModalCreateView):
     permission_required = 'maps.add_attribute'
 
 
-class AttributeDetailView(OwnedObjectDetailView):
+class AttributeDetailView(UserCreatedObjectDetailView):
     template_name = 'attribute_detail.html'
     model = Attribute
-    permission_required = set()
 
 
 class AttributeModalDetailView(OwnedObjectModalDetailView):
@@ -873,10 +868,8 @@ class RegionAttributeValueModalCreateView(OwnedObjectModalCreateView):
     permission_required = 'maps.add_regionattributevalue'
 
 
-class RegionAttributeValueDetailView(OwnedObjectDetailView):
-    template_name = 'regionattributevalue_detail.html'
+class RegionAttributeValueDetailView(UserCreatedObjectDetailView):
     model = RegionAttributeValue
-    permission_required = set()
 
 
 class RegionAttributeValueModalDetailView(OwnedObjectModalDetailView):

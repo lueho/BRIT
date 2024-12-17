@@ -3,90 +3,67 @@
 
 {% block content %}
 
-    <div class="row">
-        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+    <div class="row mb-4">
+        <div class="col col-12 col-md-6 col-lg-3">
             <div class="card shadow">
-                <div class="card-header">
-                    <b>{{ object.material.name }}</b>
-                </div>
+                <div class="card-header"><strong>{{ object.material.name }}</strong></div>
                 {% if object.image %}
                     <div class="card-img-top">
                         <img class="w-100 m-0" src="{{ object.image.url }}" alt="Image of {{ object.material.name }}">
                     </div>
                 {% endif %}
                 <div class="card-body">
-
                     {% if object.name %}
                         <p class="card-text">
                             <strong>Series name:</strong><br>
                             {{ object.name }}
                         </p>
                     {% endif %}
-
                     <p class="card-text">
                         <b>Material:</b><br>
                         <a href="{% url 'material-detail-modal' object.material.pk %}"
                            class="modal-link">{{ object.material.name }}</a>
                     </p>
-
                     {% if object.material.description %}
                         <p class="card-text">
                             <strong>Description:</strong><br>
                             {{ object.material.description }}
                         </p>
                     {% endif %}
-
-                    {% if perms.materials %}
-                        <p class="card-text"><strong><label for="id_toggle_edit">Edit:</label></strong><br>
-                            <span data-toggle="collapse" data-target=".multi-collapse" aria-expanded="false"
-                                  aria-controls="btn-edit-sample-series">
-                            <input id="id_toggle_edit" type="checkbox" data-toggle="toggle" data-on="On"
-                                   data-off="Off" data-onstyle="primary" data-offstyle="secondary" data-size="mini">
-                        </span>
-                        </p>
-                    {% endif %}
                 </div>
                 <div class="card-footer">
                     <div id="btn-edit-sample-series" class="collapse multi-collapse">
-                        {% if 'materials.change_sampleseries' in perms %}
-                            <a href="{% url 'sampleseries-update-modal' object.pk %}?next={{ request.path }}"
-                               class="modal-link nowrap mr-3">
+                        {% if request.user == object.owner %}
+                            <a href="{% url 'sampleseries-update' object.pk %}?next={{ request.path }}"
+                               class="nowrap mr-3">
                                 <i class="fas fa-fw fa-edit"></i> Edit
                             </a>
-                        {% endif %}
-                        {% if 'materials.add_sampleseries' in perms %}
-                            <a href="{% url 'sampleseries-duplicate-modal' object.pk %}"
-                               class="modal-link nowrap mr-3">
+                            <a href="{% url 'sampleseries-duplicate' object.pk %}"
+                               class="nowrap mr-3">
                                 <i class="fas fa-fw fa-copy"></i> Duplicate
                             </a>
-                        {% endif %}
-                        {% if 'materials.view_material' in perms %}
-                            <a href="{% url 'materials-dashboard' %}" class="nowrap mr-3">
-                                <i class="fas fa-fw fa-cog"></i> Dashboard
-                            </a>
-                        {% endif %}
-                        {% if 'materials.change_sampleseries' in perms %}
                             <a href="{% url 'sampleseries-add-distribution-modal' object.pk %}"
                                class="modal-link nowrap mr-3">
                                 <i class="fas fa-fw fa-plus-circle"></i> Add distribution
                             </a>
-                        {% endif %}
-                        {% if 'materials.delete_sampleseries' in perms %}
                             <a href="{% url 'sampleseries-delete-modal' object.pk %}"
                                class="modal-link nowrap mr-3">
                                 <i class="fas fa-fw fa-trash"></i> Delete
                             </a>
                         {% endif %}
+                        <a href="{% url 'materials-dashboard' %}" class="nowrap mr-3">
+                            <i class="fas fa-fw fa-cog"></i> Dashboard
+                        </a>
                     </div>
                 </div>
             </div>
         </div>
     </div>
 
-    <div class="row">
+    <div class="row mb-4">
         {% for distribution in data.distributions %}
-            <div class="col col-12 col-md-6 col-lg-3 mt-4">
-                <div class="card shadow mt-3">
+            <div class="col col-12 col-md-6 col-lg-3">
+                <div class="card shadow h-100">
                     <div class="card-header">
                         <h2 class="card-title">{{ distribution.name }}</h2>
                     </div>
@@ -106,17 +83,3 @@
     </div>
 
 {% endblock content %}
-
-{% block javascript %}
-    {{ block.super }}
-
-    <script>
-        window.onload = function() {
-            {% if 'materials.change_material' in perms %}
-                const btn = document.getElementById('id_toggle_edit');
-                btn.click();
-                $('#id_toggle_edit').bootstrapToggle('on');
-            {% endif %}
-        };
-    </script>
-{% endblock javascript %}

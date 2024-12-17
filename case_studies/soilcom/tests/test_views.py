@@ -16,7 +16,7 @@ from distributions.models import TemporalDistribution, Timestep
 from maps.models import GeoDataset, MapConfiguration, MapLayerConfiguration, MapLayerStyle, Region
 from materials.models import Material, MaterialCategory, Sample, SampleSeries
 from utils.properties.models import Property, Unit
-from utils.tests.testcases import ViewWithPermissionsTestCase
+from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 from .. import views
 from ..forms import BaseWasteFlyerUrlFormSet, CollectionModelForm
 from ..models import (AggregatedCollectionPropertyValue, Collection, CollectionCatchment, CollectionCountOptions,
@@ -24,33 +24,155 @@ from ..models import (AggregatedCollectionPropertyValue, Collection, CollectionC
                       WasteCategory, WasteComponent, WasteFlyer, WasteStream)
 
 
-# ----------- Collection Catchment CRUD --------------------------------------------------------------------------------
+# ----------- Collector CRUD -------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CollectionCatchmentDetailViewTestCase(ViewWithPermissionsTestCase):
-    url_name = 'collectioncatchment-detail'
+class CollectorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model = Collector
+    view_detail_name = 'collector-detail'
+    view_update_name = 'collector-update'
+    view_delete_name = 'collector-delete-modal'
+
+    create_object_data = {'name': 'Test Collector'}
+
+
+# ----------- Collection System CRUD -----------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class CollectionSystemCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model = CollectionSystem
+    view_detail_name = 'collectionsystem-detail'
+    view_update_name = 'collectionsystem-update'
+    view_delete_name = 'collectionsystem-delete-modal'
+
+    create_object_data = {'name': 'Test Collection System'}
+
+
+# ----------- Waste Category CRUD --------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class WasteCategoryCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model = WasteCategory
+    view_detail_name = 'wastecategory-detail'
+    view_update_name = 'wastecategory-update'
+    view_delete_name = 'wastecategory-delete-modal'
+
+    create_object_data = {'name': 'Test Waste Category'}
+
+
+# ----------- Waste Component CRUD -------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class WasteComponentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model = WasteComponent
+    view_detail_name = 'wastecomponent-detail'
+    view_update_name = 'wastecomponent-update'
+    view_delete_name = 'wastecomponent-delete-modal'
+
+    create_object_data = {'name': 'Test Waste Component'}
+
+    @classmethod
+    def create_related_objects(cls):
+        MaterialCategory.objects.create(name='Biowaste component')
+        return {}
+
+    @classmethod
+    def create_published_object(cls):
+        # This method is overridden to give another name to the published object because of the unique name constraint
+        data = cls.create_object_data.copy()
+        data['name'] = f'{data["name"]} (published)'
+        data['publication_status'] = 'published'
+        data.update(cls.related_objects)
+        return cls.model.objects.create(owner=cls.owner_user, **data)
+
+
+# ----------- Waste Stream CRUD ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class WasteStreamCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model = WasteStream
+    view_detail_name = 'wastestream-detail'
+    view_update_name = 'wastestream-update'
+    view_delete_name = 'wastestream-delete-modal'
+
+    create_object_data = {'name': 'Test Waste Stream'}
+
+    @classmethod
+    def create_related_objects(cls):
+        return {'category': WasteCategory.objects.create(name='Biowaste')}
+
+
+# ----------- WasteFlyer CRUD ------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class WasteFlyerListViewTestCase(ViewWithPermissionsTestCase):
+    member_permissions = ('view_wasteflyer', 'change_wasteflyer',)
 
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        region = Region.objects.create(name='Test Region')
-        cls.catchment = CollectionCatchment.objects.create(
-            name='Test Catchment', region=region, publication_status='published'
-        )
+        with mute_signals(signals.post_save):
+            WasteFlyer.objects.create(
+                abbreviation='Flyer1',
+                url='https://www.test-flyer.org'
+            )
+            WasteFlyer.objects.create(
+                abbreviation='Flyer2',
+                url='https://www.best-flyer.org'
+            )
+            WasteFlyer.objects.create(
+                abbreviation='Flyer3',
+                url='https://www.rest-flyer.org'
+            )
 
     def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.catchment.pk}))
+        response = self.client.get(reverse('wasteflyer-list'))
         self.assertEqual(response.status_code, 200)
 
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.catchment.pk}))
-        self.assertEqual(response.status_code, 200)
+    def test_all_flyers_are_included(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('wasteflyer-list'))
+        self.assertIn('object_list', response.context)
+        self.assertEqual(len(response.context['object_list']), 3)
 
-    def test_collectioncatchment_template_is_used(self):
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.catchment.pk}))
-        self.assertTemplateUsed(response, 'soilcom/collectioncatchment_detail.html')
+    def test_contains_check_urls_button_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('wasteflyer-list'))
+        self.assertContains(response, 'check urls')
+
+
+class WasteFlyerCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model = WasteFlyer
+    view_detail_name = 'wasteflyer-detail'
+    view_update_name = 'wasteflyer-update'
+    view_delete_name = 'wasteflyer-delete-modal'
+
+    create_object_data = {'abbreviation': 'Test Flyer', 'url': 'https://www.test-flyer.org'}
+
+    def test_detail_view_unpublished_contains_check_url_button_for_owner(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_detail_url(self.unpublished_object.pk))
+        self.assertContains(response, 'check url')
+
+    def test_detail_view_published_contains_check_url_button_for_owner(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_detail_url(self.published_object.pk))
+        self.assertContains(response, 'check url')
+
+    def test_detail_view_published_doesnt_contain_check_url_button_for_anonymous(self):
+        response = self.client.get(self.get_detail_url(self.published_object.pk))
+        self.assertNotContains(response, 'check url')
+
+    def test_detail_view_published_doesnt_contain_check_url_button_for_non_owner(self):
+        self.client.force_login(self.non_owner_user)
+        response = self.client.get(self.get_detail_url(self.published_object.pk))
+        self.assertNotContains(response, 'check url')
 
 
 # ----------- Collection Frequency CRUD --------------------------------------------------------------------------------
@@ -145,22 +267,13 @@ class CollectionFrequencyCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertListEqual(seasons, list(frequency.seasons.order_by('first_timestep__order')))
 
 
-class CollectionFrequencyDetailViewTestCase(ViewWithPermissionsTestCase):
-    url_name = 'collectionfrequency-detail'
+class CollectionFrequencyCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model = CollectionFrequency
+    view_detail_name = 'collectionfrequency-detail'
+    view_update_name = 'collectionfrequency-update'
+    view_delete_name = 'collectionfrequency-delete-modal'
 
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.frequency = CollectionFrequency.objects.create(name='Test Frequency')
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.frequency.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.frequency.pk}))
-        self.assertEqual(response.status_code, 200)
+    create_object_data = {'name': 'Test Frequency'}
 
 
 class CollectionFrequencyModalDetailViewTestCase(ViewWithPermissionsTestCase):
@@ -489,44 +602,24 @@ class CollectionPropertyValueCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 302)
 
 
-class CollectionPropertyValueDetailViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ('change_collectionpropertyvalue', 'delete_collectionpropertyvalue')
-    url_name = 'collectionpropertyvalue-detail'
+class CollectionPropertyValueCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model = CollectionPropertyValue
+    view_detail_name = 'collectionpropertyvalue-detail'
+    view_update_name = 'collectionpropertyvalue-update'
+    view_delete_name = 'collectionpropertyvalue-delete-modal'
+
+    create_object_data = {
+        'average': 123.5,
+        'standard_deviation': 12.54
+    }
 
     @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        collection = Collection.objects.create(name='Test Collection')
-        cls.unit = Unit.objects.create(name='Test unit')
-        prop = Property.objects.create(name='Test Property')
-        cls.val = CollectionPropertyValue.objects.create(
-            collection=collection,
-            property=prop,
-            unit=cls.unit,
-            average=123.5,
-            standard_deviation=12.54
-        )
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_template_contains_edit_and_delete_button_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        self.assertContains(response, reverse('collectionpropertyvalue-update', kwargs={'pk': self.val.pk}))
-        self.assertContains(response, reverse('collectionpropertyvalue-delete-modal', kwargs={'pk': self.val.pk}))
-
-    def test_template_does_not_contain_edit_and_delete_button_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        self.assertNotContains(response, reverse('collectionpropertyvalue-update', kwargs={'pk': self.val.pk}))
-        self.assertNotContains(response, reverse('collectionpropertyvalue-delete-modal', kwargs={'pk': self.val.pk}))
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        self.assertEqual(response.status_code, 200)
+    def create_related_objects(cls):
+        return {
+            'collection': Collection.objects.create(name='Test Collection'),
+            'property': Property.objects.create(name='Test Property'),
+            'unit': Unit.objects.create(name='Test Unit'),
+        }
 
 
 class CollectionPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
@@ -701,45 +794,23 @@ class AggregatedCollectionPropertyValueCreateViewTestCase(ViewWithPermissionsTes
         self.assertEqual(response.status_code, 302)
 
 
-class AggregatedCollectionPropertyValueDetailViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ('change_aggregatedcollectionpropertyvalue', 'delete_aggregatedcollectionpropertyvalue')
-    url_name = 'aggregatedcollectionpropertyvalue-detail'
+class AggregatedCollectionPropertyValueCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model = AggregatedCollectionPropertyValue
+    view_detail_name = 'aggregatedcollectionpropertyvalue-detail'
+    view_update_name = 'aggregatedcollectionpropertyvalue-update'
+    view_delete_name = 'aggregatedcollectionpropertyvalue-delete-modal'
+
+    create_object_data = {
+        'average': 123.5,
+        'standard_deviation': 12.54
+    }
 
     @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.prop = Property.objects.create(name='Test Property', unit='Test Unit')
-        cls.val = AggregatedCollectionPropertyValue.objects.create(
-            property=cls.prop,
-            average=123.5,
-            standard_deviation=12.54
-        )
-        cls.val.collections.add(Collection.objects.create(name='Test Collection 1'))
-        cls.val.collections.add(Collection.objects.create(name='Test Collection 2'))
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_template_contains_edit_and_delete_button_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        self.assertContains(response, reverse('aggregatedcollectionpropertyvalue-update', kwargs={'pk': self.val.pk}))
-        self.assertContains(response,
-                            reverse('aggregatedcollectionpropertyvalue-delete-modal', kwargs={'pk': self.val.pk}))
-
-    def test_template_does_not_contain_edit_and_delete_button_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        self.assertNotContains(response,
-                               reverse('aggregatedcollectionpropertyvalue-update', kwargs={'pk': self.val.pk}))
-        self.assertNotContains(response,
-                               reverse('aggregatedcollectionpropertyvalue-delete-modal', kwargs={'pk': self.val.pk}))
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        self.assertEqual(response.status_code, 200)
+    def create_related_objects(cls):
+        return {
+            'property': Property.objects.create(name='Test Property'),
+            'unit': Unit.objects.create(name='Test Unit'),
+        }
 
 
 class AggregatedCollectionPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
@@ -869,6 +940,23 @@ class AggregatedCollectionPropertyValueModalDeleteViewTestCase(ViewWithPermissio
             reverse(self.url_name, kwargs={'pk': self.val.pk}))
         self.assertEqual(Collection.objects.count(), 2)
         self.assertEqual(response.status_code, 302)
+
+
+# ----------- Collection Catchment CRUD --------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class CollectionCatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model = CollectionCatchment
+    view_detail_name = 'collectioncatchment-detail'
+    view_update_name = 'collectioncatchment-update'  # CollectionCatchment is a proxy model of Catchment
+    view_delete_name = 'collectioncatchment-delete-modal'  # CollectionCatchment is a proxy model of Catchment
+
+    create_object_data = {'name': 'Test Catchment'}
+
+    def test_collectioncatchment_template_is_used(self):
+        response = self.client.get(self.get_detail_url(self.published_object.pk))
+        self.assertTemplateUsed(response, 'soilcom/collectioncatchment_detail.html')
 
 
 # ----------- Collection CRUD ------------------------------------------------------------------------------------------
@@ -1071,13 +1159,16 @@ class CollectionCreateViewTestCase(ViewWithPermissionsTestCase):
         self.assertFalse(new_collection.waste_stream.allowed_materials.exists())
 
 
-class CollectionDetailViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ['view_collection', 'change_collection', 'delete_collection']
-    url_name = 'collection-detail'
+class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model = Collection
+    view_detail_name = 'collection-detail'
+    view_update_name = 'collection-update'
+    view_delete_name = 'collection-delete-modal'
+
+    create_object_data = {'name': 'Test Collection'}
 
     @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
+    def create_related_objects(cls):
         catchment = CollectionCatchment.objects.create(name='Test catchment')
         collector = Collector.objects.create(name='Test collector')
         collection_system = CollectionSystem.objects.create(name='Test system')
@@ -1087,74 +1178,52 @@ class CollectionDetailViewTestCase(ViewWithPermissionsTestCase):
             category=waste_category,
         )
         frequency = CollectionFrequency.objects.create(name='Test Frequency')
+        Collection.objects.create(
+            catchment=catchment,
+            collector=collector,
+            collection_system=collection_system,
+            waste_stream=waste_stream,
+            frequency=frequency,
+            valid_from=date.today() - timedelta(days=365),
+            valid_until=date.today() - timedelta(days=1),
+            description='Predecessor Collection 1'
+        )
+        Collection.objects.create(
+            catchment=catchment,
+            collector=collector,
+            collection_system=collection_system,
+            waste_stream=waste_stream,
+            frequency=frequency,
+            valid_from=date.today() - timedelta(days=365),
+            valid_until=date.today() - timedelta(days=1),
+            description='Predecessor Collection 2'
+        )
+        return {
+            'catchment': catchment,
+            'collector': collector,
+            'collection_system': collection_system,
+            'waste_stream': waste_stream,
+            'frequency': frequency,
+        }
 
-        cls.collection = Collection.objects.create(
-            name='Test Collection',
-            catchment=catchment,
-            collector=collector,
-            collection_system=collection_system,
-            waste_stream=waste_stream,
-            frequency=frequency,
-            valid_from=date.today(),
-            valid_until=date.today() + timedelta(days=365),
-        )
-        cls.predecessor_collection_1 = Collection.objects.create(
-            name='Predecessor Collection',
-            catchment=catchment,
-            collector=collector,
-            collection_system=collection_system,
-            waste_stream=waste_stream,
-            frequency=frequency,
-            valid_from=date.today() - timedelta(days=365),
-            valid_until=date.today() - timedelta(days=1),
-        )
-        cls.predecessor_collection_2 = Collection.objects.create(
-            name='Predecessor Collection 2',
-            catchment=catchment,
-            collector=collector,
-            collection_system=collection_system,
-            waste_stream=waste_stream,
-            frequency=frequency,
-            valid_from=date.today() - timedelta(days=365),
-            valid_until=date.today() - timedelta(days=1),
-        )
-        cls.collection.add_predecessor(cls.predecessor_collection_1)
-        cls.collection.add_predecessor(cls.predecessor_collection_2)
+    @classmethod
+    def create_published_object(cls):
+        collection = super().create_published_object()
+        collection.add_predecessor(Collection.objects.get(description='Predecessor Collection 1'))
+        collection.add_predecessor(Collection.objects.get(description='Predecessor Collection 2'))
         with mute_signals(post_save):
-            cls.collection.flyers.add(
+            collection.flyers.add(
                 WasteFlyer.objects.create(abbreviation='Test Flyer', url='https://www.test-flyer.org'))
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.collection.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_template_contains_edit_and_delete_button_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.collection.pk}))
-        self.assertContains(response, reverse('collection-update', kwargs={'pk': self.collection.pk}))
-        self.assertContains(response, reverse('collection-delete-modal', kwargs={'pk': self.collection.pk}))
-
-    def test_template_does_not_contain_edit_and_delete_button_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.collection.pk}))
-        self.assertNotContains(response, reverse('collection-update', kwargs={'pk': self.collection.pk}))
-        self.assertNotContains(response, reverse('collection-delete-modal', kwargs={'pk': self.collection.pk}))
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.collection.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_template_contains_flyer_url(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.collection.pk}))
-        self.assertContains(response, self.collection.flyers.first().url)
+        return collection
 
     def test_template_contains_predecessor_collections(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.collection.pk}))
-        self.assertContains(response, self.predecessor_collection_1.name)
-        self.assertContains(response, self.predecessor_collection_2.name)
+        response = self.client.get(self.get_detail_url(self.published_object.pk))
+        self.assertContains(response, Collection.objects.get(description='Predecessor Collection 1').name)
+        self.assertContains(response, Collection.objects.get(description='Predecessor Collection 2').name)
+
+    def test_template_contains_flyer_url(self):
+        response = self.client.get(self.get_detail_url(self.published_object.pk))
+        self.assertContains(response, 'https://www.test-flyer.org')
 
 
 class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
@@ -2042,76 +2111,6 @@ class CollectionPredecessorsViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.post(reverse(self.url_name, kwargs={'pk': self.collection.pk}), data,
                                     follow=True)
         self.assertRedirects(response, reverse(self.url_name, kwargs={'pk': self.collection.pk}))
-
-
-# ----------- WasteFlyer CRUD ------------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-class WasteFlyerListViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ('view_wasteflyer', 'change_wasteflyer',)
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        with mute_signals(signals.post_save):
-            WasteFlyer.objects.create(
-                abbreviation='Flyer1',
-                url='https://www.test-flyer.org'
-            )
-            WasteFlyer.objects.create(
-                abbreviation='Flyer2',
-                url='https://www.best-flyer.org'
-            )
-            WasteFlyer.objects.create(
-                abbreviation='Flyer3',
-                url='https://www.rest-flyer.org'
-            )
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('wasteflyer-list'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_all_flyers_are_included(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('wasteflyer-list'))
-        self.assertIn('object_list', response.context)
-        self.assertEqual(len(response.context['object_list']), 3)
-
-    def test_contains_check_urls_button_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('wasteflyer-list'))
-        self.assertContains(response, 'check urls')
-
-
-class WasteFlyerDetailViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'change_wasteflyer'
-    url_name = 'wasteflyer-detail'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        with mute_signals(signals.post_save):
-            cls.flyer = WasteFlyer.objects.create(abbreviation='TEST')
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.flyer.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.flyer.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_contains_check_url_button_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.flyer.pk}))
-        self.assertContains(response, 'check url')
-
-    def test_does_not_contain_check_url_button_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.flyer.pk}))
-        self.assertNotContains(response, 'check url')
 
 
 class WasteCollectionMapViewTestCase(ViewWithPermissionsTestCase):

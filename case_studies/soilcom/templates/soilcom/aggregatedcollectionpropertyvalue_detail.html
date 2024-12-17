@@ -10,21 +10,10 @@
     <p class="card-text"><strong>Property:</strong><br>{{ object.property }}</p>
     <p class="card-text"><strong>Year:</strong><br>{{ object.year }}</p>
     {% if object.standard_deviation %}
-        <p class="card-text"><strong>Value:</strong><br>{{ object.average }} ± {{ object.standard_deviation }} {{ object.unit }}</p>
+        <p class="card-text"><strong>Value:</strong><br>
+            {{ object.average }} ± {{ object.standard_deviation }} {{ object.unit }}
+        </p>
     {% else %}
         <p class="card-text"><strong>Value:</strong><br>{{ object.average }} {{ object.unit }}</p>
-    {% endif %}
-{% endblock %}
-
-{% block detail_footer %}
-    {% if perms.soilcom.change_aggregatedcollectionpropertyvalue %}
-        <a href="{% url 'aggregatedcollectionpropertyvalue-update' object.pk %}" class="mr-3">
-            <i class="fas fa-fw fa-edit"></i> edit
-        </a>
-    {% endif %}
-    {% if perms.soilcom.delete_aggregatedcollectionpropertyvalue %}
-        <a href="{% url 'aggregatedcollectionpropertyvalue-delete-modal' object.pk %}" class="mr-3 modal-link">
-            <i class="fas fa-fw fa-trash"></i> delete
-        </a>
     {% endif %}
 {% endblock %}

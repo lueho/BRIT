@@ -11,7 +11,7 @@ from factory.django import mute_signals
 from bibliography.models import Source
 from distributions.models import TemporalDistribution, Timestep
 from users.models import get_default_owner
-from utils.models import NamedUserCreatedObject
+from utils.models import NamedUserCreatedObject, UserCreatedObjectManager
 
 
 class MaterialCategory(NamedUserCreatedObject):
@@ -58,7 +58,7 @@ def get_default_material_pk():
     )[0].pk
 
 
-class MaterialComponentManager(models.Manager):
+class MaterialComponentManager(UserCreatedObjectManager):
     def default(self):
         return self.get_queryset().get(name='Fresh Matter (FM)', owner=get_default_owner())
 
@@ -99,7 +99,7 @@ def get_default_component_pk():
     )[0].pk
 
 
-class MaterialComponentGroupManager(models.Manager):
+class MaterialComponentGroupManager(UserCreatedObjectManager):
     def default(self):
         return self.get_queryset().get(name='Total Material')
 

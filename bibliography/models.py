@@ -8,10 +8,10 @@ from utils.models import CRUDUrlsMixin, NamedUserCreatedObject, UserCreatedObjec
 
 class Author(UserCreatedObject):
     first_names = models.CharField(max_length=1023, null=True, blank=True)
-    middle_names = models.CharField(max_length=1023, null=True, blank=True)  # New field
+    middle_names = models.CharField(max_length=1023, null=True, blank=True)
     last_names = models.CharField(max_length=1023, null=True, blank=True)
-    suffix = models.CharField(max_length=100, null=True, blank=True)  # New field
-    preferred_citation = models.CharField(max_length=2046, null=True, blank=True)  # New field
+    suffix = models.CharField(max_length=100, null=True, blank=True)
+    preferred_citation = models.CharField(max_length=2046, null=True, blank=True)
 
     class Meta:
         ordering = ['last_names', 'first_names']
