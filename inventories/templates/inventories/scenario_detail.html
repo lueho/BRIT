@@ -46,19 +46,21 @@
                 {% endfor %}
             {% endfor %}
 
-            <div class="row">
-                <div class="col">
-                    <div class="card border-left-primary border">
-                        <div class="card-header"></div>
-                        <div class="card-body">
-                            <a href="{% url 'add_scenario_configuration' scenario.id %}">
-                                <i class="fas fa-fw fa-plus"></i> Add inventory
-                            </a>
+            {% if request.user == object.owner %}
+                <div class="row">
+                    <div class="col">
+                        <div class="card border-left-primary border">
+                            <div class="card-header"></div>
+                            <div class="card-body">
+                                <a href="{% url 'add_scenario_configuration' scenario.id %}">
+                                    <i class="fas fa-fw fa-plus"></i> Add inventory
+                                </a>
+                            </div>
+                            <div class="card-footer"></div>
                         </div>
-                        <div class="card-footer"></div>
                     </div>
                 </div>
-            </div>
+            {% endif %}
 
         </div>
     </div>

@@ -26,25 +26,29 @@
                             {% include 'growthcycle_table.html' with table_data=content.table %}
                         </div>
                         <div class="card-footer">
-                            <a href="javascript:void(0);"
-                               class="modal-link"
-                               data-link="{% url 'greenhousegrowthcycle-delete-modal' growth_cycle.id %}?next={{ request.path }}">
-                                <i class="fas fa-fw fa-trash"></i> Remove this cycle
-                            </a>
+                            {% if request.user == growth_cycle.owner %}
+                                <a href="javascript:void(0);"
+                                   class="modal-link"
+                                   data-link="{% url 'greenhousegrowthcycle-delete-modal' growth_cycle.id %}?next={{ request.path }}">
+                                    <i class="fas fa-fw fa-trash"></i> Remove this cycle
+                                </a>
+                            {% endif %}
                         </div>
                     </div>
                 {% endfor %}
-                <div class="card border-left-primary border">
-                    <div class="card-header"></div>
-                    <div class="card-body">
-                        <a href="javascript:void(0);"
-                           class="modal-link"
-                           data-link="{% url 'growthcycle-create-modal' object.id %}?next={{ request.path }}">
-                            <i class="fas fa-fw fa-plus"></i> Add growth cycle
-                        </a>
+                {% if request.user == object.owner %}
+                    <div class="card border-left-primary border">
+                        <div class="card-header"></div>
+                        <div class="card-body">
+                            <a href="javascript:void(0);"
+                               class="modal-link"
+                               data-link="{% url 'growthcycle-create-modal' object.id %}?next={{ request.path }}">
+                                <i class="fas fa-fw fa-plus"></i> Add growth cycle
+                            </a>
+                        </div>
+                        <div class="card-footer"></div>
                     </div>
-                    <div class="card-footer"></div>
-                </div>
+                {% endif %}
             </div>
             <div class="card-footer"></div>
         </div>
