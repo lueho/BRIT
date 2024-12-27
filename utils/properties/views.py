@@ -17,7 +17,7 @@ class PropertyUnitCreateView(OwnedObjectCreateView):
     permission_required = ('properties.add_propertyunit',)
 
 
-class UnitDetailView(UserCreatedObjectDetailView):
+class PropertyUnitDetailView(UserCreatedObjectDetailView):
     model = PropertyUnit
 
 

@@ -63,9 +63,9 @@ class UnitCreateViewTestCase(ViewWithPermissionsTestCase):
 
 class UnitCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = PropertyUnit
-    view_detail_name = 'unit-detail'
-    view_update_name = 'unit-update'
-    view_delete_name = 'unit-delete-modal'
+    view_detail_name = 'propertyunit-detail'
+    view_update_name = 'propertyunit-update'
+    view_delete_name = 'propertyunit-delete-modal'
 
     create_object_data = {'name': 'Test Unit'}
 
