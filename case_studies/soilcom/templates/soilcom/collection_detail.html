@@ -159,7 +159,7 @@
     <a href="{% url 'collection-list' %}" class="nowrap ml-3">
         <i class="fas fa-fw fa-list"></i> see all
     </a>
-    {% if request.user == object.owner %}
+    {% if "soilcom.change_collection" in perms or request.user == object.owner %}
         <a href="{% url 'collection-update' object.id %}" class="nowrap ml-3">
             <i class="fas fa-fw fa-edit"></i> edit</a>
         <a href="{% url 'collection-wastesamples' object.id %}" class="nowrap ml-3">
