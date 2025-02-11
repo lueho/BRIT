@@ -8,7 +8,9 @@ from django.db.models import Max
 from django.forms.models import model_to_dict
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse, reverse_lazy
+from django.utils.decorators import method_decorator
 from django.views import View
+from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.generic import TemplateView
 
 import case_studies.soilcom.tasks
@@ -936,6 +938,15 @@ class WasteCollectionMapView(GeoDataSetFilteredMapView):
     model_name = 'WasteCollection'
     template_name = 'waste_collection_map.html'
     filterset_class = CollectionFilterSet
+    features_layer_api_basename = 'api-waste-collection'
+    map_title = 'Household Waste Collection Europe'
+
+
+@method_decorator(xframe_options_exempt, name='dispatch')
+class WasteCollectionMapIframeView(GeoDataSetFilteredMapView):
+    model_name = 'WasteCollection'
+    template_name = 'waste_collection_map_iframe.html'
+    filterset_class =  CollectionFilterSet
     features_layer_api_basename = 'api-waste-collection'
     map_title = 'Household Waste Collection Europe'
 

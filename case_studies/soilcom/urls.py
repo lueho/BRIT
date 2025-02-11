@@ -109,6 +109,7 @@ urlpatterns = [
     path('collections/<int:pk>/predecessors/', views.CollectionPredecessorsView.as_view(), name='collection-predecessors'),
     path('collections/autocomplete/', views.CollectionAutoCompleteView.as_view(), name='collection-autocomplete'),
     path('collections/map/', views.WasteCollectionMapView.as_view(), name='WasteCollection'),
+    path('collections/map/iframe/', views.WasteCollectionMapIframeView.as_view(), name='WasteCollectionIframe'),
     path('catchment_selection/', views.CatchmentSelectView.as_view(), name='catchment-selection'),
     path('api/', include(router.urls)),
     path('collections/export/', views.CollectionListFileExportView.as_view(), name='collection-export'),
