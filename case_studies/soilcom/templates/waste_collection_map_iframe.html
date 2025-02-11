@@ -4,46 +4,6 @@
 
 {% block map_card_footer %}{% endblock %}
 
-{% block user_actions %}
-    <form method="get">
-        {% crispy filter.form %}
-    </form>
-    <div class="card shadow" id="filter_result_card">
-        <div class="card-header"
-             role="button"
-             data-toggle="collapse"
-             href="#info-card-body"
-             aria-expanded="true"
-             aria-controls="info-card-body">
-            <b>Summary</b>
-        </div>
-        <div class="card-body collapse show" id="info-card-body">
-            <div id="summary-container">
-                <p class="card-text">No data selected, yet.</p>
-            </div>
-            {% if object.sources.first %}
-                <p class="card-text mt-3">
-                    <strong>Sources:</strong><br>
-                    {% for source in object.sources.all %}
-                        <a href="{% url 'source-detail-modal' source.id %}"
-                           class="modal-link">
-                            {{ source.abbreviation }}{% if not forloop.last %},{% endif %}
-                        </a>
-                    {% endfor %}
-                </p>
-            {% endif %}
-            <div class="text-center">
-                <a id="btn-collection-detail"
-                   class="btn btn-primary w-75 d-none"
-                   data-href-template="/waste_collection/collections/__pk__/"
-                   href="javascript:void(0)">
-                    Full Details
-                </a>
-            </div>
-        </div>
-    </div>
-{% endblock user_actions %}
-
 {% block javascript %}
     {{ block.super }}
     <script src="{% static 'lib/turf-inside/inside.min.js' %}"></script>
