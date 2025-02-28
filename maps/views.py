@@ -2,6 +2,7 @@ from dal import autocomplete
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.contrib.gis.geos import MultiPolygon
 from django.core.exceptions import ImproperlyConfigured
+from django.db import transaction
 from django.db.models import Q, Subquery
 from django.forms import formset_factory
 from django.http import JsonResponse
@@ -432,7 +433,6 @@ class CatchmentCreateMergeLauView(LoginRequiredMixin, OwnedObjectCreateView):
     formset_form_class = RegionMergeForm
     formset_helper_class = DynamicTableInlineFormSetHelper
     formset_factory_kwargs = {'extra': 2}
-    relation_field_name = 'seasons'
     permission_required = set()
 
     def get_formset_kwargs(self, **kwargs):
@@ -454,7 +454,11 @@ class CatchmentCreateMergeLauView(LoginRequiredMixin, OwnedObjectCreateView):
             return self.object.name
 
     def create_region_borders(self):
-        geoms = [form['region'].borders.geom for form in self.formset.cleaned_data if 'region' in form]
+        geoms = [
+            form.get('region').borders.geom
+            for form in self.formset.cleaned_data
+            if form.get('region') is not None
+        ]
         new_geom = geoms[0]
         for geom in geoms[1:]:
             new_geom = new_geom.union(geom)
@@ -479,12 +483,12 @@ class CatchmentCreateMergeLauView(LoginRequiredMixin, OwnedObjectCreateView):
         self.formset = self.get_formset()
         if not self.formset.is_valid():
             return self.form_invalid(form)
-        else:
+        with transaction.atomic():
             response = super().form_valid(form)
             self.object.region = self.get_region()
             self.object.type = 'custom'
             self.object.save()
-            return response
+        return response
 
 
 class CatchmentUpdateView(OwnedObjectUpdateView):

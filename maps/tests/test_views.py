@@ -806,10 +806,7 @@ class CatchmentCreateMergeLauViewTestCase(ViewWithPermissionsTestCase):
             borders=GeoPolygon.objects.create(geom=MultiPolygon(Polygon(((1, 1), (1, 3), (3, 3), (3, 1), (1, 1)))))
         )
         cls.region_3 = lau_3.region_ptr
-        cls.parent_catchment = Catchment.objects.create(
-            name='Parent Catchment',
-            region=Region.objects.create()
-        )
+        cls.parent_region = Region.objects.create(name='Parent Region')
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         response = self.client.get(self.url, follow=True)
@@ -838,7 +835,7 @@ class CatchmentCreateMergeLauViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.outsider)
         data = {
             'name': 'Updated Test Catchment',
-            'parent': self.parent_catchment.pk,
+            'parent_region': self.parent_region.pk,
             'form-INITIAL_FORMS': 2,
             'form-TOTAL_FORMS': 3,
             'form-0-region': self.region_1.pk,
@@ -853,7 +850,7 @@ class CatchmentCreateMergeLauViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         data = {
             'name': 'Updated Test Catchment',
-            'parent': self.parent_catchment.pk,
+            'parent_region': self.parent_region.pk,
             'form-INITIAL_FORMS': 2,
             'form-TOTAL_FORMS': 3,
             'form-0-region': self.region_1.pk,
@@ -867,7 +864,7 @@ class CatchmentCreateMergeLauViewTestCase(ViewWithPermissionsTestCase):
     def test_create_region_borders(self):
         data = {
             'name': 'New Catchment Created By Merge',
-            'parent': self.parent_catchment.pk,
+            'parent_region': self.parent_region.pk,
             'form-INITIAL_FORMS': 2,
             'form-TOTAL_FORMS': 3,
             'form-0-region': self.region_1.pk,
@@ -887,7 +884,7 @@ class CatchmentCreateMergeLauViewTestCase(ViewWithPermissionsTestCase):
     def test_get_region_name(self):
         data = {
             'name': 'New Catchment Created By Merge',
-            'parent': self.parent_catchment.pk,
+            'parent_region': self.parent_region.pk,
             'form-INITIAL_FORMS': 2,
             'form-TOTAL_FORMS': 2,
             'form-0-region': self.region_1.pk,
@@ -905,7 +902,7 @@ class CatchmentCreateMergeLauViewTestCase(ViewWithPermissionsTestCase):
     def test_get_region(self):
         data = {
             'name': 'New Catchment Created By Merge',
-            'parent': self.parent_catchment.pk,
+            'parent_region': self.parent_region.pk,
             'form-INITIAL_FORMS': 2,
             'form-TOTAL_FORMS': 3,
             'form-0-region': self.region_1.pk,
@@ -934,7 +931,7 @@ class CatchmentCreateMergeLauViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         data = {
             'name': 'New Catchment Created By Merge',
-            'parent': self.parent_catchment.pk,
+            'parent_region': self.parent_region.pk,
             'form-INITIAL_FORMS': 2,
             'form-TOTAL_FORMS': 3,
             'form-0-region': self.region_1.pk,
@@ -942,9 +939,8 @@ class CatchmentCreateMergeLauViewTestCase(ViewWithPermissionsTestCase):
             'form-2-region': self.region_3.pk,
         }
         response = self.client.post(self.url, data, follow=True)
-        self.assertRedirects(response, reverse('catchment-detail',
-                                               kwargs={'pk': list(response.context.get('messages'))[0].message}))
-        catchment = Catchment.objects.get(pk=list(response.context.get('messages'))[0].message)
+        catchment = Catchment.objects.get(name='New Catchment Created By Merge')
+        self.assertRedirects(response, reverse('catchment-detail', kwargs={'pk': catchment.pk}))
         geom = MultiPolygon(Polygon(((0, 0), (0, 2), (0, 4), (2, 4), (2, 3), (3, 3), (3, 1), (2, 1), (2, 0), (0, 0))))
         geom.normalize()
         expected_region = Region.objects.create(
@@ -954,12 +950,13 @@ class CatchmentCreateMergeLauViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(expected_region.name, catchment.region.name)
         self.assertTrue(catchment.region.borders.geom.equals_exact(geom))
         self.assertTrue(catchment.type == 'custom')
+        self.assertEqual(catchment.parent_region, self.parent_region)
 
     def test_at_least_one_entry_in_formset_is_enforced(self):
         self.client.force_login(self.member)
         data = {
             'name': 'New Catchment Created By Merge',
-            'parent': self.parent_catchment.pk,
+            'parent_region': self.parent_region.pk,
             'form-INITIAL_FORMS': 2,
             'form-TOTAL_FORMS': 2,
             'form-0-region': '',
@@ -973,7 +970,7 @@ class CatchmentCreateMergeLauViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         data = {
             'name': 'New Catchment Created By Merge',
-            'parent': self.parent_catchment.pk,
+            'parent_region': self.parent_region.pk,
             'form-INITIAL_FORMS': 2,
             'form-TOTAL_FORMS': 4,
             'form-0-region': self.region_1.pk,
