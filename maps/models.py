@@ -1,9 +1,10 @@
+from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.gis.db.models import MultiPolygonField, PointField
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models, transaction
-from django.db.models.signals import post_delete, pre_save
+from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 from django.urls import NoReverseMatch, reverse
 from tree_queries.models import TreeNode
@@ -328,6 +329,27 @@ class Region(NamedUserCreatedObject):
             return self.lauregion.__str__()
         except Region.lauregion.RelatedObjectDoesNotExist:
             return self.name
+
+
+@receiver(post_save, sender=Region)
+def set_country(sender, instance, created, **kwargs):
+    if not created:
+        return
+
+    if instance.country_code:
+        instance.country = instance.country_code
+        instance.save(update_fields=['country'])
+    elif instance.borders and instance.borders.geom:
+        # Buffer the region’s geometry by the tolerance.
+        buffered_geom = instance.borders.geom.buffer(-settings.GEO_BORDER_TOLERANCE)
+        # Look for a candidate country (NutsRegion with levl_code=0) whose borders contain the buffered geometry.
+        candidate = NutsRegion.objects.filter(
+            levl_code=0,
+            borders__geom__contains=buffered_geom
+        ).first()
+        if candidate and candidate.cntr_code:
+            instance.country = candidate.cntr_code
+            instance.save(update_fields=['country'])
 
 
 class NutsRegion(Region):

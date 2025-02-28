@@ -213,6 +213,8 @@ CELERY_RESULT_BACKEND = os.environ.get("REDIS_URL")
 CELERY_BROKER_USE_SSL = {'ssl_cert_reqs': ssl.CERT_NONE}
 CELERY_REDIS_BACKEND_USE_SSL = {'ssl_cert_reqs': ssl.CERT_NONE}
 
+GEO_BORDER_TOLERANCE = 0.005 # Tolerance for border detection in degrees for EPSG 4326
+
 LEAFLET_CONFIG = {
     'DEFAULT_CENTER': (50.08178260774763, 14.432086500224534),
     'DEFAULT_ZOOM': 5,
