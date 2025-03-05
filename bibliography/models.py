@@ -41,7 +41,9 @@ class Author(UserCreatedObject):
     def abbreviated_full_name(self):
         """Improved abbreviation handling, respecting middle names and suffix."""
         name = self.last_names if self.last_names else ''
-        initials = [name.strip()[0].upper() for name in f"{self.first_names + ' ' if self.first_names else ''}{self.middle_names + ' ' if self.middle_names else ''}".split(' ') if name]
+        initials = [name.strip()[0].upper() for name in
+                    f"{self.first_names + ' ' if self.first_names else ''}{self.middle_names + ' ' if self.middle_names else ''}".split(
+                        ' ') if name]
         if initials:
             name += f', {". ".join(initials)}.'
         if self.suffix:
@@ -75,7 +77,11 @@ SOURCE_TYPES = (
 
 class Source(UserCreatedObject):
     type = models.CharField(max_length=255, choices=SOURCE_TYPES, default='custom')
-    authors = models.ManyToManyField(Author, related_name='sources')
+    authors = models.ManyToManyField(
+        Author,
+        through='SourceAuthor',
+        related_name='sources'
+    )
     publisher = models.CharField(max_length=127, blank=True, null=True)
     title = models.CharField(max_length=500)
     journal = models.CharField(max_length=500, blank=True, null=True)
@@ -94,6 +100,13 @@ class Source(UserCreatedObject):
     class Meta:
         verbose_name = 'Source'
 
+    def ordered_authors(self):
+        return self.sourceauthors.order_by('position').select_related('author')
+
+    @property
+    def authors_ordered(self):
+        return [sa.author for sa in self.ordered_authors()]
+
     def __str__(self):
         return self.abbreviation
 
@@ -102,3 +115,24 @@ class Source(UserCreatedObject):
 def check_url_valid(sender, instance, created, **kwargs):
     if created:
         celery.current_app.send_task('check_source_url', (instance.pk,))
+
+
+class SourceAuthor(models.Model):
+    source = models.ForeignKey('Source', on_delete=models.CASCADE, related_name='sourceauthors')
+    author = models.ForeignKey('Author', on_delete=models.CASCADE, related_name='sourceauthors')
+    position = models.PositiveIntegerField()
+
+    class Meta:
+        ordering = ['position']
+        constraints = [
+            models.UniqueConstraint(fields=['source', 'position'], name='unique_source_position'),
+            models.UniqueConstraint(fields=['source', 'author'], name='unique_source_author'),
+        ]
+
+    def __str__(self):
+        return f"{self.author} - Position {self.position}"
+
+    def save(self, *args, **kwargs):
+        if self.position < 1:
+            raise ValueError("Position must be a positive integer starting from 1.")
+        super().save(*args, **kwargs)

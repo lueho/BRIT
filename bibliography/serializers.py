@@ -1,9 +1,8 @@
 from collections import OrderedDict
 
-from rest_framework.serializers import (ModelSerializer, HyperlinkedModelSerializer,
-                                        SerializerMethodField)
+from rest_framework.serializers import (HyperlinkedModelSerializer, ModelSerializer, SerializerMethodField)
 
-from .models import Author, Licence, Source
+from .models import Author, Licence, Source, SourceAuthor
 
 
 class AuthorModelSerializer(ModelSerializer):
@@ -36,9 +35,9 @@ class SourceModelSerializer(ModelSerializer):
         licence_data = validated_data.pop('licence')
         licence = Licence.objects.create(**licence_data)
         source = Source.objects.create(licence=licence, **validated_data)
-        for author_data in authors_data:
+        for position, author_data in enumerate(authors_data):
             author, _ = Author.objects.get_or_create(**author_data)
-            source.authors.add(author)
+            SourceAuthor.objects.create(source=source, author=author, position=position + 1)
         return source
 
     def update(self, instance, validated_data):
@@ -52,9 +51,9 @@ class SourceModelSerializer(ModelSerializer):
         instance.save()
 
         instance.authors.clear()
-        for author_data in authors_data:
+        for position, author_data in enumerate(authors_data):
             author, _ = Author.objects.get_or_create(**author_data)
-            instance.authors.add(author)
+            SourceAuthor.objects.create(source=instance, author=author, position=position + 1)
 
         return instance
 
@@ -87,8 +86,8 @@ class HyperlinkedSourceSerializer(HyperlinkedModelSerializer):
     class Meta:
         model = Source
         fields = (
-        'abbreviation', 'authors', 'title', 'type', 'licence', 'publisher', 'journal', 'issue', 'year', 'abstract',
-        'attributions', 'url', 'url_valid', 'url_checked', 'doi', 'last_accessed')
+            'abbreviation', 'authors', 'title', 'type', 'licence', 'publisher', 'journal', 'issue', 'year', 'abstract',
+            'attributions', 'url', 'url_valid', 'url_checked', 'doi', 'last_accessed')
 
     @staticmethod
     def get_url_checked(instance):

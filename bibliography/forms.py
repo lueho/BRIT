@@ -2,7 +2,7 @@ from dal.autocomplete import ModelSelect2, ModelSelect2Multiple
 from django.forms import DateInput, ModelChoiceField, ModelMultipleChoiceField
 
 from utils.forms import AutoCompleteModelForm, ModalModelFormMixin, SimpleModelForm
-from .models import Author, Licence, Source
+from .models import Author, Licence, Source, SourceAuthor
 
 
 class AuthorModelForm(SimpleModelForm):
@@ -41,6 +41,24 @@ class SourceModelForm(SimpleModelForm):
             'url_checked': DateInput(attrs={'type': 'date'}),
             'last_accessed': DateInput(attrs={'type': 'date'})
         }
+
+    def save(self, commit=True):
+        # Pop authors from cleaned_data so they won't be handled automatically
+        authors = self.cleaned_data.pop('authors', [])
+        instance = super().save(commit=False)
+
+        if commit:
+            instance.save()
+            # Clear existing SourceAuthor instances (important for updates)
+            SourceAuthor.objects.filter(source=instance).delete()
+            # Create new through model instances with the ordering from the queryset
+            for position, author in enumerate(authors, start=1):
+                SourceAuthor.objects.create(
+                    source=instance,
+                    author=author,
+                    position=position
+                )
+        return instance
 
 
 class SourceModalModelForm(ModalModelFormMixin, SourceModelForm):

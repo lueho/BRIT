@@ -6,7 +6,7 @@ from django.test import RequestFactory, TestCase
 from django.urls import reverse
 from factory.django import mute_signals
 
-from ..models import Author, Licence, Source
+from ..models import Author, Licence, Source, SourceAuthor
 from ..serializers import (AuthorModelSerializer, HyperlinkedAuthorSerializer, HyperlinkedLicenceSerializer,
                            HyperlinkedSourceSerializer, SourceAbbreviationSerializer, SourceModelSerializer)
 
@@ -177,7 +177,8 @@ class HyperlinkedSourceSerializerTestCase(TestCase):
                 doi='10.1000/282',
                 last_accessed=date.today()
             )
-        source.authors.set([cls.author1, cls.author2])
+        SourceAuthor.objects.create(source=source, author=cls.author1, position=1)
+        SourceAuthor.objects.create(source=source, author=cls.author2, position=2)
         cls.source = source
 
     def test_data_rep(self):
