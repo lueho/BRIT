@@ -725,12 +725,22 @@ class SourceCreateViewTestCase(ViewWithPermissionsTestCase):
 
     def test_post_success_and_http_302_redirect_for_members_with_minimal_data(self):
         self.client.force_login(self.member)
-        data = {'abbreviation': 'TS1', 'type': 'article', 'title': 'Test Source'}
+        author_1 = Author.objects.create(first_names='One', last_names='Author')
+        author_2 = Author.objects.create(first_names='Two', last_names='Author')
+        data = {
+            'abbreviation': 'TS1',
+            'authors': [author_1.pk, author_2.pk],
+            'type': 'article',
+            'title':
+                'Test Source'}
         with mute_signals(post_save):
             response = self.client.post(reverse('source-create'), data=data, follow=True)
+
+        new_source = Source.objects.get(abbreviation='TS1')
+        self.assertEqual(2, new_source.authors.all().count())
         self.assertRedirects(
             response,
-            f"{reverse('source-detail', kwargs={'pk': Source.objects.first().pk})}",
+            f"{reverse('source-detail', kwargs={'pk': new_source.pk})}",
             status_code=302,
             target_status_code=200
         )
@@ -769,12 +779,22 @@ class SourceModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
     def test_post_success_and_http_302_redirect_members_with_minimal_data(self):
         self.client.force_login(self.member)
-        data = {'abbreviation': 'TS1', 'type': 'article', 'title': 'Test Source'}
+        author_1 = Author.objects.create(first_names='One', last_names='Author')
+        author_2 = Author.objects.create(first_names='Two', last_names='Author')
+        data = {
+            'abbreviation': 'TS1',
+            'authors': [author_1.pk, author_2.pk],
+            'type': 'article',
+            'title':
+                'Test Source'}
         with mute_signals(post_save):
-            response = self.client.post(reverse('source-create-modal'), data=data)
+            response = self.client.post(reverse('source-create'), data=data, follow=True)
+
+        new_source = Source.objects.get(abbreviation='TS1')
+        self.assertEqual(2, new_source.authors.all().count())
         self.assertRedirects(
             response,
-            f"{reverse('source-detail', kwargs={'pk': Source.objects.first().pk})}",
+            f"{reverse('source-detail', kwargs={'pk': new_source.pk})}",
             status_code=302,
             target_status_code=200
         )

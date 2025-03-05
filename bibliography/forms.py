@@ -1,7 +1,7 @@
-from dal.autocomplete import ModelSelect2
+from dal.autocomplete import ModelSelect2, ModelSelect2Multiple
 from django.forms import DateInput, ModelChoiceField, ModelMultipleChoiceField
 
-from utils.forms import AutoCompleteModelForm, SimpleModelForm, ModalModelFormMixin
+from utils.forms import AutoCompleteModelForm, ModalModelFormMixin, SimpleModelForm
 from .models import Author, Licence, Source
 
 
@@ -26,14 +26,17 @@ class LicenceModalModelForm(ModalModelFormMixin, LicenceModelForm):
 
 
 class SourceModelForm(SimpleModelForm):
-    authors = ModelMultipleChoiceField(queryset=Author.objects.all(), required=False)
+    authors = ModelMultipleChoiceField(
+        queryset=Author.objects.all(),
+        required=False,
+        widget=ModelSelect2Multiple(url='author-autocomplete')
+    )
 
     class Meta:
         model = Source
         fields = (
             'abbreviation', 'authors', 'publisher', 'title', 'type', 'journal', 'issue', 'year', 'licence',
-            'attributions',
-            'url', 'url_valid', 'url_checked', 'doi', 'last_accessed')
+            'attributions', 'url', 'url_valid', 'url_checked', 'doi', 'last_accessed')
         widgets = {
             'url_checked': DateInput(attrs={'type': 'date'}),
             'last_accessed': DateInput(attrs={'type': 'date'})
