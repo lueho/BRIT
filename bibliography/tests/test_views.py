@@ -322,6 +322,39 @@ class AuthorModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         )
 
 
+# ----------- Author Utils ---------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class AuthorAutoCompleteViewTestCase(ViewWithPermissionsTestCase):
+
+    def test_get_http_200_ok_for_anonymous(self):
+        response = self.client.get(reverse('author-autocomplete'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_get_http_200_ok_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse('author-autocomplete'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_get_http_200_ok_for_members(self):
+        self.client.force_login(self.member)
+        response = self.client.get(reverse('author-autocomplete'))
+        self.assertEqual(response.status_code, 200)
+
+    def test_get_returns_only_authors_with_given_string_in_name(self):
+        test_author = Author.objects.create(first_names='Test', last_names='Author')
+        Author.objects.create(first_names='Another', last_names='Author')
+        response = self.client.get(reverse('author-autocomplete'), {'q': 'Test'})
+        results = [{
+            'id': str(test_author.pk),
+            'text': 'Author, Test',
+            'selected_text': 'Author, Test'
+        }]
+        self.assertEqual(1, len(response.json()['results']))
+        self.assertDictEqual(results[0], response.json()['results'][0])
+
+
 # ----------- Licence CRUD ---------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 

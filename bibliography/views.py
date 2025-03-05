@@ -72,6 +72,20 @@ class AuthorModalDeleteView(views.OwnedObjectModalDeleteView):
     permission_required = 'bibliography.delete_author'
 
 
+# ----------- Author Utils ---------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+class AuthorAutoCompleteView(Select2QuerySetView):
+    def get_queryset(self):
+        qs = Author.objects.all().order_by('last_names')
+        if self.q:
+            qs = qs.filter(
+                Q(last_names__icontains=self.q) |
+                Q(first_names__icontains=self.q)
+            ).distinct()
+        return qs
+
+
 # ----------- Licence CRUD ----------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 

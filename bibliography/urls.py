@@ -12,6 +12,7 @@ urlpatterns = [
     path('authors/<int:pk>/modal/', views.AuthorModalDetailView.as_view(), name='author-detail-modal'),
     path('authors/<int:pk>/update/', views.AuthorUpdateView.as_view(), name='author-update'),
     path('authors/<int:pk>/update/modal/', views.AuthorModalUpdateView.as_view(), name='author-update-modal'),
+    path('authors/autocomplete/', views.AuthorAutoCompleteView.as_view(), name='author-autocomplete'),
     path('authors/<int:pk>/delete/modal/', views.AuthorModalDeleteView.as_view(), name='author-delete-modal'),
     path('licences/', views.LicenceListView.as_view(), name='licence-list'),
     path('licences/create/', views.LicenceCreateView.as_view(), name='licence-create'),
