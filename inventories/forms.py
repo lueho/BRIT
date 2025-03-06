@@ -1,9 +1,9 @@
-from dal.autocomplete import ModelSelect2
 from django.forms import HiddenInput, ModelChoiceField
 
 from distributions.models import TemporalDistribution
 from maps.models import Catchment, GeoDataset, Region
 from utils.forms import AutoCompleteModelForm, ModalModelFormMixin, SimpleModelForm
+from utils.widgets import BSModelSelect2
 from .models import InventoryAlgorithm, Scenario, ScenarioInventoryConfiguration
 
 
@@ -16,12 +16,12 @@ class SeasonalDistributionModelForm(SimpleModelForm):
 class ScenarioModelForm(AutoCompleteModelForm):
     region = ModelChoiceField(
         queryset=Region.objects.all(),
-        widget=ModelSelect2(url='region-autocomplete'),
+        widget=BSModelSelect2(url='region-autocomplete'),
         required=False
     )
     catchment = ModelChoiceField(
         queryset=Catchment.objects.all(),
-        widget=ModelSelect2(url='catchment-autocomplete'),
+        widget=BSModelSelect2(url='catchment-autocomplete'),
         required=False
     )
 
@@ -35,6 +35,7 @@ class ScenarioModelForm(AutoCompleteModelForm):
     class Meta:
         model = Scenario
         fields = ['name', 'description', 'region', 'catchment']
+
 
 class ScenarioModalModelForm(ModalModelFormMixin, ScenarioModelForm):
     pass

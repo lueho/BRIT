@@ -1,9 +1,9 @@
-from dal.autocomplete import ModelSelect2, ModelSelect2Multiple
 from django.core.exceptions import ValidationError
 from django.db import transaction
 from django.forms import BaseInlineFormSet, DateInput, ModelChoiceField, ModelMultipleChoiceField
 
 from utils.forms import AutoCompleteModelForm, ModalModelFormMixin, SimpleModelForm
+from utils.widgets import BSModelSelect2
 from .models import Author, Licence, Source, SourceAuthor
 
 
@@ -137,7 +137,7 @@ class SourceAuthorFormSet(BaseInlineFormSet):
 
 
 class SourceSimpleFilterForm(AutoCompleteModelForm):
-    source = ModelChoiceField(queryset=Source.objects.all(), widget=ModelSelect2(url='source-autocomplete'))
+    source = ModelChoiceField(queryset=Source.objects.all(), widget=BSModelSelect2(url='source-autocomplete'))
 
     class Meta:
         model = Source

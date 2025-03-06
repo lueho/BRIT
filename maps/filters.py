@@ -1,7 +1,8 @@
-from dal import autocomplete, forward
+from dal import forward
 from django_filters import CharFilter, ModelChoiceFilter
 
 from utils.filters import BaseCrispyFilterSet, CrispyAutocompleteFilterSet
+from utils.widgets import BSModelSelect2
 from .models import Catchment, GeoDataset, NutsRegion, Region
 
 
@@ -24,12 +25,12 @@ class RegionFilterSet(CrispyAutocompleteFilterSet):
 class NutsRegionFilterSet(CrispyAutocompleteFilterSet):
     level_0 = ModelChoiceFilter(queryset=NutsRegion.objects.filter(levl_code=0),
                                 field_name='levl_code',
-                                widget=autocomplete.ModelSelect2(url='nutsregion-autocomplete',
-                                                                 forward=(forward.Const(0, 'levl_code'),)),
+                                widget=BSModelSelect2(url='nutsregion-autocomplete',
+                                                      forward=(forward.Const(0, 'levl_code'),)),
                                 label='Level 0')
     level_1 = ModelChoiceFilter(queryset=NutsRegion.objects.filter(levl_code=1),
                                 field_name='levl_code',
-                                widget=autocomplete.ModelSelect2(
+                                widget=BSModelSelect2(
                                     url='nutsregion-autocomplete',
                                     forward=(
                                         forward.Const(1, 'levl_code'),
@@ -39,7 +40,7 @@ class NutsRegionFilterSet(CrispyAutocompleteFilterSet):
                                 label='Level 1')
     level_2 = ModelChoiceFilter(queryset=NutsRegion.objects.filter(levl_code=2),
                                 field_name='levl_code',
-                                widget=autocomplete.ModelSelect2(
+                                widget=BSModelSelect2(
                                     url='nutsregion-autocomplete',
                                     forward=(
                                         forward.Const(2, 'levl_code'),
@@ -50,7 +51,7 @@ class NutsRegionFilterSet(CrispyAutocompleteFilterSet):
                                 label='Level 2')
     level_3 = ModelChoiceFilter(queryset=NutsRegion.objects.filter(levl_code=3),
                                 field_name='levl_code',
-                                widget=autocomplete.ModelSelect2(
+                                widget=BSModelSelect2(
                                     url='nutsregion-autocomplete',
                                     forward=(
                                         forward.Const(3, 'levl_code'),

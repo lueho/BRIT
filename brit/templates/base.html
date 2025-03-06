@@ -200,6 +200,11 @@
     </script>
 {% endblock javascript %}
 
+{% block form_media %}
+    {#    Due to compatibility issues between django-crispy-forms and django-autocomplete-light, this block is needed to #}
+    {#    manage form media AFTER the main javascript block has run.#}
+{% endblock form_media %}
+
 </body>
 
 </html>

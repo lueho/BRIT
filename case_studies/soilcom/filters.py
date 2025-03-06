@@ -1,8 +1,8 @@
 import math
+
 from crispy_forms.bootstrap import Accordion
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Column, Field, Layout, Row, Submit
-from dal import autocomplete
 from django.db.models import Avg, Count, Max, Q, Sum
 from django.forms import CheckboxSelectMultiple, DateInput, RadioSelect
 from django.utils import timezone
@@ -10,7 +10,7 @@ from django_filters import (BooleanFilter, CharFilter, DateFilter, ModelChoiceFi
 
 from utils.crispy_fields import FilterAccordionGroup, RangeSliderField
 from utils.filters import (BaseCrispyFilterSet, CrispyAutocompleteFilterSet, NullableRangeFilter)
-from utils.widgets import NullableRangeSliderWidget
+from utils.widgets import BSModelSelect2, NullableRangeSliderWidget
 from .models import (Collection, CollectionCatchment, CollectionCountOptions, CollectionFrequency,
                      CollectionPropertyValue, Collector, FeeSystem, WasteCategory, WasteComponent, WasteFlyer, )
 
@@ -153,10 +153,10 @@ class SpecWasteCollectedFilter(NullableCollectionPropertyValueRangeFilter):
 
 class CollectionFilterSet(CrispyAutocompleteFilterSet):
     catchment = ModelChoiceFilter(queryset=CollectionCatchment.objects.all(),
-                                  widget=autocomplete.ModelSelect2(url='catchment-autocomplete'),
+                                  widget=BSModelSelect2(url='catchment-autocomplete'),
                                   method='catchment_filter')
     collector = ModelChoiceFilter(queryset=Collector.objects.all(),
-                                  widget=autocomplete.ModelSelect2(url='collector-autocomplete'))
+                                  widget=BSModelSelect2(url='collector-autocomplete'))
     waste_category = ModelMultipleChoiceFilter(queryset=WasteCategory.objects.all(),
                                                field_name='waste_stream__category',
                                                label='Waste categories',
@@ -261,7 +261,7 @@ class WasteFlyerFilter(CrispyAutocompleteFilterSet):
     )
     catchment = ModelChoiceFilter(queryset=CollectionCatchment.objects.all(),
                                   label='Catchment',
-                                  widget=autocomplete.ModelSelect2(url='catchment-autocomplete'),
+                                  widget=BSModelSelect2(url='catchment-autocomplete'),
                                   method='get_catchment')
 
     class Meta:

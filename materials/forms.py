@@ -2,7 +2,6 @@ from decimal import Decimal, ROUND_HALF_UP
 
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Field, Layout, Row
-from dal import autocomplete
 from django.core.exceptions import ValidationError
 from django.forms import (DateTimeInput, DecimalField, HiddenInput, ModelChoiceField, ModelMultipleChoiceField,
                           NumberInput, Widget)
@@ -13,6 +12,7 @@ from extra_views import InlineFormSetFactory
 from bibliography.models import Source
 from distributions.models import TemporalDistribution
 from utils.forms import AutoCompleteModelForm, ModalForm, ModalModelForm, ModalModelFormMixin, SimpleModelForm
+from utils.widgets import BSModelSelect2, BSModelSelect2Multiple
 from .models import (Composition, Material, MaterialCategory, MaterialComponent, MaterialComponentGroup,
                      MaterialProperty, MaterialPropertyValue, Sample, SampleSeries, WeightShare)
 
@@ -105,7 +105,7 @@ class SampleModelForm(AutoCompleteModelForm):
     sources = ModelMultipleChoiceField(
         queryset=Source.objects.all(),
         required=False,
-        widget=autocomplete.ModelSelect2Multiple(url='source-autocomplete'),
+        widget=BSModelSelect2Multiple(url='source-autocomplete'),
         help_text='Optional: Select multiple sources if applicable.'
     )
 
@@ -113,9 +113,9 @@ class SampleModelForm(AutoCompleteModelForm):
         model = Sample
         fields = ('name', 'material', 'image', 'datetime', 'location', 'description', 'series', 'timestep', 'sources')
         widgets = {
-            'series': autocomplete.ModelSelect2(url='sampleseries-autocomplete'),
+            'series': BSModelSelect2(url='sampleseries-autocomplete'),
             'datetime': DateTimeInput(attrs={'type': 'datetime-local'}),
-            'material': autocomplete.ModelSelect2(url='material-autocomplete'),
+            'material': BSModelSelect2(url='material-autocomplete'),
         }
         labels = {
             'datetime': 'Date/Time',
@@ -139,6 +139,7 @@ class CompositionModalModelForm(ModalModelFormMixin, CompositionModelForm):
 
 class SampleAddCompositionForm(AutoCompleteModelForm):
     sample = ModelChoiceField(queryset=Sample.objects.none())
+
     class Meta:
         model = Composition
         fields = ('sample', 'group', 'fractions_of')
@@ -314,7 +315,7 @@ class InlineWeightShare(InlineFormSetFactory):
         'form': WeightShareModelForm,
         'formset': WeightShareInlineFormset,
         'extra': 0,
-        'min_num':1,
+        'min_num': 1,
         'can_delete': True,
         'widgets': {
             'owner': HiddenInput(),

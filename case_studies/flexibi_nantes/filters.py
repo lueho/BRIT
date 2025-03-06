@@ -1,11 +1,11 @@
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Layout, Row, Field
-from dal import autocomplete
+from crispy_forms.layout import Field, Layout, Row
 from django.forms import CheckboxSelectMultiple, RadioSelect
-from django_filters.filters import ModelChoiceFilter, MultipleChoiceFilter, BooleanFilter
+from django_filters.filters import BooleanFilter, ModelChoiceFilter, MultipleChoiceFilter
 
 from maps.models import Catchment
 from utils.filters import BaseCrispyFilterSet, CrispyAutocompleteFilterSet
+from utils.widgets import BSModelSelect2
 from .models import Greenhouse, NantesGreenhouses
 
 HEATING_CHOICES = (
@@ -78,7 +78,7 @@ class NantesGreenhouseFilterSetFormHelper(FormHelper):
 
 class NantesGreenhousesFilterSet(CrispyAutocompleteFilterSet):
     catchment = ModelChoiceFilter(queryset=Catchment.objects.all(),
-                                  widget=autocomplete.ModelSelect2(url='nantesgreenhouses-catchment-autocomplete'),
+                                  widget=BSModelSelect2(url='nantesgreenhouses-catchment-autocomplete'),
                                   method='catchment_filter',
                                   label='Catchment')
     crops = MultipleChoiceFilter(field_name='culture_1', widget=CheckboxSelectMultiple(), choices=CROP_CHOICES)

@@ -2,7 +2,6 @@ from datetime import timedelta
 
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Column, Div, Field, HTML, Layout, Row
-from dal import autocomplete
 from django.core.exceptions import ValidationError
 from django.forms import (CheckboxSelectMultiple, DateInput, HiddenInput, IntegerField, ModelChoiceField,
                           ModelMultipleChoiceField)
@@ -14,6 +13,7 @@ from users.models import get_default_owner
 from utils.crispy_fields import ForeignkeyField
 from utils.forms import (AutoCompleteModelForm, M2MInlineFormSet, ModalModelFormMixin, SimpleForm,
                          SimpleModelForm)
+from utils.widgets import BSModelSelect2, BSModelSelect2Multiple
 from .models import (AggregatedCollectionPropertyValue, Collection, CollectionCatchment, CollectionCountOptions,
                      CollectionFrequency, CollectionPropertyValue, CollectionSeason, CollectionSystem, Collector,
                      FeeSystem, WasteCategory, WasteComponent, WasteFlyer, WasteStream)
@@ -22,7 +22,7 @@ from .models import (AggregatedCollectionPropertyValue, Collection, CollectionCa
 class CollectorModelForm(AutoCompleteModelForm):
     catchment = ModelChoiceField(
         queryset=CollectionCatchment.objects.all(),
-        widget=autocomplete.ModelSelect2(url='catchment-autocomplete'),
+        widget=BSModelSelect2(url='catchment-autocomplete'),
         required=False
     )
 
@@ -234,7 +234,7 @@ class CollectionPropertyValueModelForm(AutoCompleteModelForm):
         model = CollectionPropertyValue
         fields = ('collection', 'property', 'unit', 'year', 'average', 'standard_deviation')
         widgets = {
-            'collection': autocomplete.ModelSelect2(url='collection-autocomplete'),
+            'collection': BSModelSelect2(url='collection-autocomplete'),
         }
 
 
@@ -243,19 +243,19 @@ class AggregatedCollectionPropertyValueModelForm(AutoCompleteModelForm):
         model = AggregatedCollectionPropertyValue
         fields = ('collections', 'property', 'unit', 'year', 'average', 'standard_deviation')
         widgets = {
-            'collections': autocomplete.ModelSelect2Multiple(url='collection-autocomplete')
+            'collections': BSModelSelect2Multiple(url='collection-autocomplete')
         }
 
 
 class CollectionModelForm(AutoCompleteModelForm):
     catchment = ModelChoiceField(
         queryset=CollectionCatchment.objects.all(),
-        widget=autocomplete.ModelSelect2(url='catchment-autocomplete'),
+        widget=BSModelSelect2(url='catchment-autocomplete'),
         required=True
     )
     collector = ModelChoiceField(
         queryset=Collector.objects.all(),
-        widget=autocomplete.ModelSelect2(url='collector-autocomplete'),
+        widget=BSModelSelect2(url='collector-autocomplete'),
         required=True
     )
     collection_system = ModelChoiceField(
@@ -276,7 +276,7 @@ class CollectionModelForm(AutoCompleteModelForm):
     )
     frequency = ModelChoiceField(
         queryset=CollectionFrequency.objects.all(),
-        widget=autocomplete.ModelSelect2(url='collectionfrequency-autocomplete'),
+        widget=BSModelSelect2(url='collectionfrequency-autocomplete'),
         required=False
     )
     fee_system = ModelChoiceField(
@@ -356,7 +356,7 @@ class CollectionModelForm(AutoCompleteModelForm):
 
 class CollectionAddWasteSampleForm(AutoCompleteModelForm):
     sample = ModelChoiceField(queryset=Sample.objects.all(),
-                              widget=autocomplete.ModelSelect2(url='sample-autocomplete'))
+                              widget=BSModelSelect2(url='sample-autocomplete'))
 
     class Meta:
         model = Sample
@@ -389,7 +389,7 @@ class CollectionAddPredecessorForm(AutoCompleteModelForm):
 
     predecessor = ModelChoiceField(
         queryset=Collection.objects.all(),
-        widget=autocomplete.ModelSelect2(url='collection-autocomplete')
+        widget=BSModelSelect2(url='collection-autocomplete')
     )
 
     class Meta:

@@ -1,6 +1,5 @@
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Column, Field, Layout, Row
-from dal.autocomplete import ModelSelect2
 from django.contrib.gis.forms import MultiPolygonField
 from django.db.models import Subquery
 from django.forms import (BaseFormSet, ChoiceField, DateField, DateInput, ModelChoiceField, MultipleChoiceField,
@@ -10,6 +9,7 @@ from django.urls import reverse
 from leaflet.forms.widgets import LeafletWidget
 
 from utils.forms import AutoCompleteForm, AutoCompleteModelForm, ModalModelFormMixin, SimpleForm, SimpleModelForm
+from utils.widgets import BSModelSelect2
 from .models import (Attribute, Catchment, GeoDataset, GeoPolygon, LauRegion, Location, NutsRegion, Region,
                      RegionAttributeValue)
 
@@ -56,7 +56,7 @@ class AttributeModalModelForm(ModalModelFormMixin, AttributeModelForm):
 class RegionAttributeValueModelForm(AutoCompleteModelForm):
     region = ModelChoiceField(
         queryset=Region.objects.all(),
-        widget=ModelSelect2(url='region-autocomplete'),
+        widget=BSModelSelect2(url='region-autocomplete'),
     )
     date = DateField(widget=DateInput(attrs={'type': 'date'}))
 
@@ -76,12 +76,12 @@ class RegionAttributeValueModalModelForm(ModalModelFormMixin, RegionAttributeVal
 class CatchmentModelForm(AutoCompleteModelForm):
     region = ModelChoiceField(
         queryset=Region.objects.all(),
-        widget=ModelSelect2(url='region-autocomplete'),
+        widget=BSModelSelect2(url='region-autocomplete'),
         required=True
     )
     parent_region = ModelChoiceField(
         queryset=Region.objects.all(),
-        widget=ModelSelect2(url='region-autocomplete'),
+        widget=BSModelSelect2(url='region-autocomplete'),
         required=False
     )
 
@@ -94,7 +94,7 @@ class CatchmentCreateDrawCustomForm(AutoCompleteModelForm):
     geom = MultiPolygonField(widget=LeafletWidget())
     parent_region = ModelChoiceField(
         queryset=Region.objects.all(),
-        widget=ModelSelect2(url='region-autocomplete'),
+        widget=BSModelSelect2(url='region-autocomplete'),
         required=False
     )
 
@@ -115,7 +115,7 @@ class CatchmentCreateDrawCustomForm(AutoCompleteModelForm):
 class CatchmentCreateMergeLauForm(AutoCompleteModelForm):
     parent_region = ModelChoiceField(
         queryset=Region.objects.all(),
-        widget=ModelSelect2(url='region-autocomplete'),
+        widget=BSModelSelect2(url='region-autocomplete'),
         label='Parent region',
         required=True
     )
@@ -136,7 +136,7 @@ class RegionMergeFormHelper(FormHelper):
 class RegionMergeForm(AutoCompleteForm):
     region = ModelChoiceField(
         queryset=Region.objects.filter(pk__in=Subquery(LauRegion.objects.all().values('pk'))),
-        widget=ModelSelect2(url='region-of-lau-autocomplete'),
+        widget=BSModelSelect2(url='region-of-lau-autocomplete'),
         label='Regions',
         required=False
     )

@@ -1,6 +1,5 @@
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Field, Layout
-from dal import autocomplete
 from django.db.models import Max, Min
 from django.forms import CheckboxSelectMultiple
 from django_filters.filters import ModelChoiceFilter, MultipleChoiceFilter
@@ -8,7 +7,7 @@ from django_filters.filters import ModelChoiceFilter, MultipleChoiceFilter
 from maps.models import Catchment
 from utils.crispy_fields import RangeSliderField
 from utils.filters import CrispyAutocompleteFilterSet, NullableRangeFilter
-from utils.widgets import NullableRangeSliderWidget
+from utils.widgets import BSModelSelect2, NullableRangeSliderWidget
 from .models import HamburgRoadsideTrees
 
 GATTUNG_CHOICES = (
@@ -70,7 +69,7 @@ class StemCircumferenceFilter(NullableRangeFilter):
 
 class HamburgRoadsideTreesFilterSet(CrispyAutocompleteFilterSet):
     catchment = ModelChoiceFilter(queryset=Catchment.objects.all(),
-                                  widget=autocomplete.ModelSelect2(url='hamburgroadsidetrees-catchment-autocomplete'),
+                                  widget=BSModelSelect2(url='hamburgroadsidetrees-catchment-autocomplete'),
                                   method='catchment_filter',
                                   label='Catchment')
     gattung_deutsch = MultipleChoiceFilter(widget=CheckboxSelectMultiple, choices=GATTUNG_CHOICES, label='Tree genus',

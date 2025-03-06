@@ -1,3 +1,5 @@
+from dal import autocomplete
+from django.forms import Media
 from django.forms.widgets import HiddenInput
 from django_filters.widgets import SuffixedMultiWidget
 
@@ -100,3 +102,33 @@ class NullableRangeSliderWidget(RangeSliderWidget):
 
 class NullablePercentageRangeSliderWidget(NullableRangeSliderWidget):
     unit = '%'
+
+
+class BSModelSelect2(autocomplete.ModelSelect2):
+    @property
+    def media(self):
+        base_media = super().media
+        extra_media = Media(
+            css={'screen': ('lib/select2-bootstrap-theme/select2-bootstrap4.min.css',)}
+        )
+        return base_media + extra_media
+
+
+class BSModelSelect2Multiple(autocomplete.ModelSelect2Multiple):
+    @property
+    def media(self):
+        base_media = super().media
+        extra_media = Media(
+            css={'screen': ('lib/select2-bootstrap-theme/select2-bootstrap4.min.css',)}
+        )
+        return base_media + extra_media
+
+
+class BSListSelect2(autocomplete.ListSelect2):
+    @property
+    def media(self):
+        base_media = super().media
+        extra_media = Media(
+            css={'screen': ('lib/select2-bootstrap-theme/select2-bootstrap4.min.css',)}
+        )
+        return base_media + extra_media

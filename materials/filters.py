@@ -1,7 +1,7 @@
-from dal import autocomplete
 from django_filters import ModelChoiceFilter, rest_framework as rf_filters
 
 from utils.filters import CrispyAutocompleteFilterSet
+from utils.widgets import BSModelSelect2
 from .models import Composition, Material, Sample, SampleSeries
 
 
@@ -25,12 +25,12 @@ class SampleFilter(CrispyAutocompleteFilterSet):
         queryset=Sample.objects.none(),
         field_name='name',
         label='Sample Name',
-        widget=autocomplete.ModelSelect2(url='sample-autocomplete')
+        widget=BSModelSelect2(url='sample-autocomplete')
     )
     material = ModelChoiceFilter(queryset=Material.objects.filter(type='material'),
                                  field_name='material__name',
                                  label='Material',
-                                 widget=autocomplete.ModelSelect2(url='material-autocomplete'))
+                                 widget=BSModelSelect2(url='material-autocomplete'))
 
     class Meta:
         model = Sample
@@ -42,7 +42,7 @@ class PublishedSampleFilter(SampleFilter):
         queryset=Sample.objects.filter(publication_status='published'),
         field_name='name',
         label='Sample Name',
-        widget=autocomplete.ModelSelect2(url='sample-autocomplete-published')
+        widget=BSModelSelect2(url='sample-autocomplete-published')
     )
 
 
@@ -51,7 +51,7 @@ class UserOwnedSampleFilter(SampleFilter):
         queryset=Sample.objects.filter(publication_status='published'),
         field_name='name',
         label='Sample Name',
-        widget=autocomplete.ModelSelect2(url='sample-autocomplete-owned')
+        widget=BSModelSelect2(url='sample-autocomplete-owned')
     )
 
     def __init__(self, *args, **kwargs):
@@ -65,7 +65,7 @@ class SampleSeriesFilter(CrispyAutocompleteFilterSet):
     material = ModelChoiceFilter(queryset=Material.objects.filter(type='material'),
                                  field_name='material__name',
                                  label='Material',
-                                 widget=autocomplete.ModelSelect2(url='material-autocomplete'))
+                                 widget=BSModelSelect2(url='material-autocomplete'))
 
     class Meta:
         model = SampleSeries

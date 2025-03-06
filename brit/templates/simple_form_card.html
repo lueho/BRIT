@@ -26,8 +26,8 @@
     </div>
 {% endblock %}
 
-{% block javascript %}
-    {{ block.super }}
+{% block form_media %}
     {{ form.media }}
-    <link href="{% static 'lib/select2-bootstrap-theme/select2-bootstrap4.min.css' %}" rel="stylesheet">
-{% endblock %}
+{% endblock form_media %}
+
+
