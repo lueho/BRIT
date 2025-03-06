@@ -3,7 +3,7 @@ from urllib.parse import urlencode
 from bootstrap_modal_forms.generic import BSModalCreateView, BSModalDeleteView, BSModalReadView, BSModalUpdateView
 from bootstrap_modal_forms.mixins import is_ajax
 from django.contrib import messages
-from django.contrib.auth.mixins import AccessMixin, LoginRequiredMixin, PermissionRequiredMixin, UserPassesTestMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin, UserPassesTestMixin
 from django.contrib.messages.views import SuccessMessageMixin
 from django.core.exceptions import FieldError, ImproperlyConfigured
 from django.db.models.signals import post_save
@@ -13,8 +13,10 @@ from django.template.loader import render_to_string
 from django.views import View
 from django.views.generic import CreateView, DetailView, ListView, TemplateView, UpdateView
 from django_filters.views import FilterView
+from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 from factory.django import mute_signals
 
+from .forms import DynamicTableInlineFormSetHelper
 from .models import Redirect
 
 
@@ -366,6 +368,48 @@ class OwnedObjectUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin, Upda
         except ImproperlyConfigured:
             template_names = []
         template_names.append('simple_form_card.html')
+        return template_names
+
+
+class OwnedObjectCreateWithInlinesView(CreateOwnedObjectMixin, CreateWithInlinesView):
+    formset_helper_class = DynamicTableInlineFormSetHelper
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'form_title': f'Create New {self.form_class._meta.model._meta.verbose_name}',
+            'submit_button_text': 'Save',
+            'formset_helper': self.formset_helper_class
+        })
+        return context
+
+    def get_template_names(self):
+        try:
+            template_names = super().get_template_names()
+        except ImproperlyConfigured:
+            template_names = []
+        template_names.append('form_with_inlines_card.html')
+        return template_names
+
+
+class OwnedObjectUpdateWithInlinesView(PermissionRequiredMixin, NextOrSuccessUrlMixin, UpdateWithInlinesView):
+    formset_helper_class = DynamicTableInlineFormSetHelper
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'form_title': f'Update {self.object._meta.verbose_name}',
+            'submit_button_text': 'Save',
+            'formset_helper': self.formset_helper_class
+        })
+        return context
+
+    def get_template_names(self):
+        try:
+            template_names = super().get_template_names()
+        except ImproperlyConfigured:
+            template_names = []
+        template_names.append('form_with_inlines_card.html')
         return template_names
 
 
