@@ -2,7 +2,7 @@
 {% load static %}
 {% load crispy_forms_tags %}
 
-{% block extra_form_content %}
+{% block extra_post_form_content %}
     {% if formset %}
         <div id="empty-form" class="d-none">
             {% crispy formset.empty_form formset_helper %}
