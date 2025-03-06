@@ -1799,55 +1799,6 @@ class SampleSeriesCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
         self.assertRedirects(response, reverse('sampleseries-detail', kwargs={'pk': created_pk}))
 
 
-class SampleSeriesModalCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'add_sampleseries'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.material = Material.objects.create(name='Test Material')
-        cls.series = SampleSeries.objects.create(name='Test Series', material=cls.material)
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('sampleseries-duplicate-modal', kwargs={'pk': self.series.pk})
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('sampleseries-duplicate-modal', kwargs={'pk': self.series.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('sampleseries-duplicate-modal', kwargs={'pk': self.series.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('sampleseries-duplicate-modal', kwargs={'pk': self.series.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('sampleseries-duplicate-modal', kwargs={'pk': self.series.pk})
-        response = self.client.post(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('sampleseries-duplicate-modal', kwargs={'pk': self.series.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        data = {'name': 'Test Series Duplicate', 'material': self.material.pk}
-        response = self.client.post(
-            reverse('sampleseries-duplicate-modal', kwargs={'pk': self.series.pk}), data, follow=True
-        )
-        pk = response.context['object'].id
-        self.assertRedirects(response, reverse('sampleseries-detail', kwargs={'pk': pk}))
-
-
 # ----------- Sample CRUD ----------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 

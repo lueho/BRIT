@@ -13,8 +13,7 @@ from distributions.models import TemporalDistribution
 from distributions.plots import DoughnutChart
 from utils.views import (NextOrSuccessUrlMixin, OwnedObjectCreateView, OwnedObjectListView, OwnedObjectModalCreateView,
                          OwnedObjectModalDeleteView, OwnedObjectModalDetailView, OwnedObjectModalUpdateView,
-                         OwnedObjectUpdateView, PublishedObjectFilterView, UserCreatedObjectAccessMixin,
-                         UserCreatedObjectCreateView,
+                         OwnedObjectUpdateView, PublishedObjectFilterView, UserCreatedObjectCreateView,
                          UserCreatedObjectDetailView, UserCreatedObjectModalCreateView,
                          UserCreatedObjectModalDeleteView, UserCreatedObjectUpdateView, UserOwnedObjectFilterView,
                          UserOwnsObjectMixin)
@@ -378,17 +377,6 @@ class SampleSeriesModalDeleteView(OwnedObjectModalDeleteView):
 class SampleSeriesCreateDuplicateView(OwnedObjectUpdateView):
     model = SampleSeries
     form_class = SampleSeriesModelForm
-    permission_required = 'materials.add_sampleseries'
-    object = None
-
-    def form_valid(self, form):
-        self.object = self.object.duplicate(creator=self.request.user, **form.cleaned_data)
-        return super().form_valid(form)
-
-
-class SampleSeriesModalCreateDuplicateView(OwnedObjectModalUpdateView):
-    model = SampleSeries
-    form_class = SampleSeriesModalModelForm
     permission_required = 'materials.add_sampleseries'
     object = None
 

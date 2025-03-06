@@ -30,7 +30,6 @@ urlpatterns = [
     path('sample_series/<int:pk>/add_composition/', views.AddCompositionView.as_view(), name='sampleseries-add-composition'),
     path('sample_series/<int:pk>/add_distribution/modal/', views.SampleSeriesModalAddDistributionView.as_view(), name='sampleseries-add-distribution-modal'),
     path('sample_series/<int:pk>/duplicate/', views.SampleSeriesCreateDuplicateView.as_view(), name='sampleseries-duplicate'),
-    path('sample_series/<int:pk>/duplicate/modal/', views.SampleSeriesModalCreateDuplicateView.as_view(), name='sampleseries-duplicate-modal'),
     path('samples/', views.PublishedSampleListView.as_view(), name='sample-list'),
     path('samples/autocomplete/', views.SampleAutoCompleteView.as_view(), name='sample-autocomplete'),
     path('samples/autocomplete/published/', views.PublishedSampleAutoCompleteView.as_view(), name='sample-autocomplete-published'),
