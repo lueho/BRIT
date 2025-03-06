@@ -5,7 +5,7 @@ from django.urls import reverse
 from factory.django import mute_signals
 
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
-from ..models import Author, Licence, Source
+from ..models import Author, Licence, Source, SourceAuthor
 
 
 # ----------- Author CRUD ---------------------------------------------------------------------------------------------
@@ -729,10 +729,17 @@ class SourceCreateViewTestCase(ViewWithPermissionsTestCase):
         author_2 = Author.objects.create(first_names='Two', last_names='Author')
         data = {
             'abbreviation': 'TS1',
-            'authors': [author_1.pk, author_2.pk],
             'type': 'article',
-            'title':
-                'Test Source'}
+            'title': 'Test Source',
+            'sourceauthors-TOTAL_FORMS': 2,
+            'sourceauthors-INITIAL_FORMS': 0,
+            'sourceauthors-0-id': '',
+            'sourceauthors-0-source': '',
+            'sourceauthors-0-author': author_1.pk,
+            'sourceauthors-1-id': '',
+            'sourceauthors-1-source': '',
+            'sourceauthors-1-author': author_2.pk
+        }
         with mute_signals(post_save):
             response = self.client.post(reverse('source-create'), data=data, follow=True)
 
@@ -785,8 +792,16 @@ class SourceModalCreateViewTestCase(ViewWithPermissionsTestCase):
             'abbreviation': 'TS1',
             'authors': [author_1.pk, author_2.pk],
             'type': 'article',
-            'title':
-                'Test Source'}
+            'title': 'Test Source',
+            'sourceauthors-TOTAL_FORMS': 2,
+            'sourceauthors-INITIAL_FORMS': 0,
+            'sourceauthors-0-id': '',
+            'sourceauthors-0-source': '',
+            'sourceauthors-0-author': author_1.pk,
+            'sourceauthors-1-id': '',
+            'sourceauthors-1-source': '',
+            'sourceauthors-1-author': author_2.pk
+        }
         with mute_signals(post_save):
             response = self.client.post(reverse('source-create'), data=data, follow=True)
 
@@ -869,6 +884,10 @@ class SourceUpdateViewTestCase(ViewWithPermissionsTestCase):
                 title='Test Source',
                 publication_status='published',
             )
+            cls.author_1 = Author.objects.create(first_names='One', last_names='Author')
+            cls.author_2 = Author.objects.create(first_names='Two', last_names='Author')
+            cls.sa1 = SourceAuthor.objects.create(source=cls.source, author=cls.author_1, position=1)
+            cls.sa2 = SourceAuthor.objects.create(source=cls.source, author=cls.author_2, position=2)
 
     def test_get_http_302_redirect_for_anonymous(self):
         response = self.client.get(reverse('source-update', kwargs={'pk': self.source.pk}), follow=True)
@@ -913,10 +932,23 @@ class SourceUpdateViewTestCase(ViewWithPermissionsTestCase):
 
     def test_post_success_and_http_302_redirect_for_members(self):
         self.client.force_login(self.member)
+        another_author = Author.objects.create(last_names='New', first_names='Author')
         data = {
             'abbreviation': self.source.abbreviation,
             'type': self.source.type,
-            'title': 'Updated Test Source'
+            'title': 'Updated Test Source',
+            'sourceauthors-INITIAL_FORMS': '2',
+            'sourceauthors-TOTAL_FORMS': '3',
+            'sourceauthors-0-id': self.sa1.pk,
+            'sourceauthors-0-source': self.source.pk,
+            'sourceauthors-0-author': self.author_2.pk,
+            'sourceauthors-1-id': self.sa2.pk,
+            'sourceauthors-1-source': self.source.pk,
+            'sourceauthors-1-author': '',
+            'sourceauthors-1-DELETE': ['on'],
+            'sourceauthors-2-id': '',
+            'sourceauthors-2-source': self.source.pk,
+            'sourceauthors-2-author': another_author.pk,
         }
         with mute_signals(post_save):
             response = self.client.post(reverse('source-update', kwargs={'pk': self.source.pk}), data=data)
@@ -926,6 +958,10 @@ class SourceUpdateViewTestCase(ViewWithPermissionsTestCase):
             status_code=302,
             target_status_code=200
         )
+        self.assertEqual(self.author_2, SourceAuthor.objects.get(position=1).author)
+        self.assertEqual(another_author, SourceAuthor.objects.get(position=2).author)
+        with self.assertRaises(SourceAuthor.DoesNotExist):
+            SourceAuthor.objects.get(position=3)
 
 
 class SourceModalUpdateViewTestCase(ViewWithPermissionsTestCase):

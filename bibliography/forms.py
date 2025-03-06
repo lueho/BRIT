@@ -1,6 +1,7 @@
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.forms import BaseInlineFormSet, DateInput, ModelChoiceField, ModelMultipleChoiceField
+from django.forms import (BaseInlineFormSet, DateInput, ModelChoiceField)
+from extra_views import InlineFormSetFactory
 
 from utils.forms import AutoCompleteModelForm, ModalModelFormMixin, SimpleModelForm
 from utils.widgets import BSModelSelect2
@@ -28,43 +29,32 @@ class LicenceModalModelForm(ModalModelFormMixin, LicenceModelForm):
 
 
 class SourceModelForm(SimpleModelForm):
-    authors = ModelMultipleChoiceField(
-        queryset=Author.objects.all(),
-        required=False,
-        widget=ModelSelect2Multiple(url='author-autocomplete')
-    )
-
     class Meta:
         model = Source
         fields = (
-            'abbreviation', 'authors', 'publisher', 'title', 'type', 'journal', 'issue', 'year', 'licence',
+            'abbreviation', 'publisher', 'title', 'type', 'journal', 'issue', 'year', 'licence',
             'attributions', 'url', 'url_valid', 'url_checked', 'doi', 'last_accessed')
         widgets = {
             'url_checked': DateInput(attrs={'type': 'date'}),
             'last_accessed': DateInput(attrs={'type': 'date'})
         }
 
-    def save(self, commit=True):
-        # Pop authors from cleaned_data so they won't be handled automatically
-        authors = self.cleaned_data.pop('authors', [])
-        instance = super().save(commit=False)
-
-        if commit:
-            instance.save()
-            # Clear existing SourceAuthor instances (important for updates)
-            SourceAuthor.objects.filter(source=instance).delete()
-            # Create new through model instances with the ordering from the queryset
-            for position, author in enumerate(authors, start=1):
-                SourceAuthor.objects.create(
-                    source=instance,
-                    author=author,
-                    position=position
-                )
-        return instance
-
 
 class SourceModalModelForm(ModalModelFormMixin, SourceModelForm):
     pass
+
+
+class SourceAuthorForm(AutoCompleteModelForm):
+    author = ModelChoiceField(
+        queryset=Author.objects.all(),
+        widget=BSModelSelect2(url='author-autocomplete'),
+        label='Authors',
+        required=False
+    )
+
+    class Meta:
+        model = SourceAuthor
+        fields = ('author',)
 
 
 class SourceAuthorFormSet(BaseInlineFormSet):
@@ -134,6 +124,18 @@ class SourceAuthorFormSet(BaseInlineFormSet):
             if author.position != i:
                 author.position = i
                 author.save(update_fields=['position'])
+
+
+class SourceAuthorInline(InlineFormSetFactory):
+    model = SourceAuthor
+    form_class = SourceAuthorForm
+    formset_class = SourceAuthorFormSet
+    fields = ('author',)
+    factory_kwargs = {
+        'extra': 0,
+        'min_num': 1,
+        'can_delete': True,
+    }
 
 
 class SourceSimpleFilterForm(AutoCompleteModelForm):

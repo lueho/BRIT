@@ -10,9 +10,9 @@ from django.views import View
 from django.views.generic import TemplateView
 
 from utils import views
-from utils.views import UserCreatedObjectDetailView
+from utils.views import OwnedObjectCreateWithInlinesView, OwnedObjectUpdateWithInlinesView, UserCreatedObjectDetailView
 from .filters import SourceFilter
-from .forms import (AuthorModalModelForm, AuthorModelForm, LicenceModalModelForm, LicenceModelForm,
+from .forms import (AuthorModalModelForm, AuthorModelForm, LicenceModalModelForm, LicenceModelForm, SourceAuthorInline,
                     SourceModalModelForm, SourceModelForm)
 from .models import Author, Licence, SOURCE_TYPES, Source
 from .serializers import HyperlinkedSourceSerializer
@@ -155,8 +155,10 @@ class SourceListView(views.OwnedObjectListView):
         return context
 
 
-class SourceCreateView(views.OwnedObjectCreateView):
+class SourceCreateView(OwnedObjectCreateWithInlinesView):
+    model = Source
     form_class = SourceModelForm
+    inlines = [SourceAuthorInline]
     permission_required = 'bibliography.add_source'
 
 
@@ -185,9 +187,10 @@ class SourceModalDetailView(views.OwnedObjectModalDetailView):
         return context
 
 
-class SourceUpdateView(views.OwnedObjectUpdateView):
+class SourceUpdateView(OwnedObjectUpdateWithInlinesView):
     model = Source
     form_class = SourceModelForm
+    inlines = [SourceAuthorInline]
     permission_required = 'bibliography.change_source'
 
 
