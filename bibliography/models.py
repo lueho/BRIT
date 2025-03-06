@@ -17,38 +17,33 @@ class Author(UserCreatedObject):
         ordering = ['last_names', 'first_names']
 
     def __str__(self):
-        parts = [part for part in [self.last_names, self.first_names] if part]
-        return ', '.join(parts)
+        parts = [' '.join(self.last_names.split()), ]
+        if self.first_names:
+            parts.append(' '.join(self.first_names.split()))
+        if self.suffix:
+            parts.append(self.suffix.strip())
+        return ', '.join(filter(None, parts))
 
     @property
     def bibtex_name(self):
         """Formats the author's name according to BibTeX conventions."""
-        name_parts = []
-        if self.last_names:
-            name_parts.append(self.last_names)
-        initials_parts = []
-        if self.first_names:
-            initials_parts += [name.strip()[0].upper() + '.' for name in self.first_names.split(' ')]
-        if self.middle_names:
-            initials_parts += [name.strip()[0].upper() + '.' for name in self.middle_names.split(' ')]
-        if initials_parts:
-            name_parts.append(' '.join(initials_parts))
+        initials = ' '.join([f"{name.strip()[0].upper()}." for name in
+                             (self.first_names or '').split() + (self.middle_names or '').split()])
+        bibtex = f"{' '.join(self.last_names.split())}{', ' + initials if initials else ''}"
         if self.suffix:
-            name_parts.append(self.suffix)
-        return ', '.join(name_parts)
+            bibtex += f", {self.suffix.strip()}"
+        return bibtex
 
     @property
     def abbreviated_full_name(self):
-        """Improved abbreviation handling, respecting middle names and suffix."""
-        name = self.last_names if self.last_names else ''
-        initials = [name.strip()[0].upper() for name in
-                    f"{self.first_names + ' ' if self.first_names else ''}{self.middle_names + ' ' if self.middle_names else ''}".split(
-                        ' ') if name]
-        if initials:
-            name += f', {". ".join(initials)}.'
+        """Returns the abbreviated full name with initials."""
+        initials = ' '.join(
+            [f"{name[0].upper()}." for name in (self.first_names or '').split() + (self.middle_names or '').split() if
+             name])
+        abbreviated = f"{' '.join(self.last_names.split())}{', ' + initials if initials else ''}"
         if self.suffix:
-            name += f', {self.suffix}'
-        return name
+            abbreviated += f", {self.suffix.strip()}"
+        return abbreviated
 
 
 class Licence(NamedUserCreatedObject):
@@ -131,4 +126,12 @@ class SourceAuthor(models.Model):
     def save(self, *args, **kwargs):
         if self.position < 1:
             raise ValueError("Position must be a positive integer starting from 1.")
+            # If this is a new instance (no pk yet), check if one already exists.
+        # if self.pk is None:
+        #     try:
+        #         existing = SourceAuthor.objects.get(source=self.source, author=self.author)
+        #         # If it exists, update the primary key to update instead of creating a new record.
+        #         self.pk = existing.pk
+        #     except SourceAuthor.DoesNotExist:
+        #         pass
         super().save(*args, **kwargs)

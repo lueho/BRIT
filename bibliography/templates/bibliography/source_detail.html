@@ -1,7 +1,8 @@
 {% extends 'simple_detail_card.html' %}
 {% load static %}
 
-{% block style_sheets %}<link rel="stylesheet" href="{% static 'css/sources.min.css' %}">{% endblock style_sheets %}
+{% block style_sheets %}
+    <link rel="stylesheet" href="{% static 'css/sources.min.css' %}">{% endblock style_sheets %}
 
 {% block detail_body %}
     {% if object.abbreviation %}
@@ -9,9 +10,9 @@
             {{ object.abbreviation }}
         </p>
     {% endif %}
-    {% if object.authors.exists %}
+    {% if object.ordered_authors.exists %}
         <p class="card-text"><strong>Authors:</strong><br>
-            {% for author in object.authors.all %}
+            {% for author in object.authors_ordered %}
                 <a href="{% url 'author-detail' author.pk %}">
                     {{ author.abbreviated_full_name }}
                 </a>{% if not forloop.last %};{% endif %}
@@ -77,9 +78,9 @@
         </p>
     {% endif %}
     {% if object.doi %}
-            <p class="card-text"><strong>DOI:</strong><br>
-                <a href="https://doi.org/{{ object.doi }}" target="_blank">{{ object.doi }}</a>
-            </p>
+        <p class="card-text"><strong>DOI:</strong><br>
+            <a href="https://doi.org/{{ object.doi }}" target="_blank">{{ object.doi }}</a>
+        </p>
     {% endif %}
     {% if object.abstract %}
         <p class="card-text"><strong>Abstract:</strong><br>

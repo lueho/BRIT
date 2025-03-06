@@ -20,19 +20,21 @@
             <tr>
                 <td data-label="Abbreviation"><a href="{{ object.get_absolute_url }}">{{ object.abbreviation }}</a></td>
                 <td data-label="Authors/Publisher">
-                {% if object.authors.exists %}
-                    {% if object.authors.count > 2 %}
-                        {% for author in object.authors.all %}
-                        <a href="{{ author.get_absolute_url }}">{{ author.abbreviated_full_name }}</a>{% if not forloop.last %};{% endif %}
-                        {% endfor %}
-                    {% else %}
-                        {% for author in object.authors.all %}
-                        <a href="{{ author.get_absolute_url }}">{{ author }}</a>{% if not forloop.last %};{% endif %}
-                        {% endfor %}
+                    {% if object.ordered_authors.exists %}
+                        {% if object.authors.count > 2 %}
+                            {% for author in object.authors_ordered %}
+                                <a href="{{ author.get_absolute_url }}">{{ author.abbreviated_full_name }}</a>
+                                {% if not forloop.last %};{% endif %}
+                            {% endfor %}
+                        {% else %}
+                            {% for author in object.authors_ordered %}
+                                <a href="{{ author.get_absolute_url }}">{{ author }}</a>{% if not forloop.last %};
+                            {% endif %}
+                            {% endfor %}
+                        {% endif %}
+                    {% elif object.publisher %}
+                        {{ object.publisher }}
                     {% endif %}
-                {% elif object.publisher %}
-                    {{ object.publisher }}
-                {% endif %}
                 </td>
                 <td data-label="Title"><a href="{{ object.get_absolute_url }}">{{ object.title }}</a></td>
                 <td data-label="Type">{{ object.type }}</td>
