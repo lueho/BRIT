@@ -124,10 +124,6 @@ class SourceAuthor(models.Model):
 
     class Meta:
         ordering = ['position']
-        constraints = [
-            models.UniqueConstraint(fields=['source', 'position'], name='unique_source_position'),
-            models.UniqueConstraint(fields=['source', 'author'], name='unique_source_author'),
-        ]
 
     def __str__(self):
         return f"{self.author} - Position {self.position}"
