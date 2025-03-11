@@ -10,7 +10,7 @@ from django.db.models import Q
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse, reverse_lazy
 from django.views import View
-from django.views.generic import DetailView, UpdateView
+from django.views.generic import UpdateView
 from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 
 import case_studies.flexibi_nantes.tasks
@@ -18,10 +18,9 @@ from maps.models import Catchment, GeoDataset
 from maps.views import GeoDataSetFilteredMapView
 from materials.models import MaterialComponentGroup
 from utils.views import (BRITFilterView, NextOrSuccessUrlMixin, OwnedObjectListView, OwnedObjectUpdateView,
-                         UserOwnsObjectMixin, UserCreatedObjectDetailView)
+                         UserCreatedObjectDetailView, UserCreatedObjectUpdateView, UserOwnsObjectMixin)
 from .filters import GreenhouseTypeFilter, NantesGreenhousesFilterSet
-from .forms import (CultureModelForm, GreenhouseGrowthCycle, GreenhouseGrowthCycleModelForm, GrowthCycleModelForm,
-                    GreenhouseModalModelForm,
+from .forms import (CultureModelForm, GreenhouseGrowthCycle, GreenhouseGrowthCycleModelForm, GreenhouseModalModelForm,
                     GrowthCycleCreateForm,
                     GrowthShareFormSetHelper, GrowthTimestepInline, InlineGrowthShare,
                     UpdateGreenhouseGrowthCycleValuesForm)
@@ -68,7 +67,12 @@ class CultureModalDetailView(UserOwnsObjectMixin, BSModalReadView):
         return context
 
 
-class CultureUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
+class CultureUpdateView(UserCreatedObjectUpdateView):
+    model = Culture
+    form_class = CultureModelForm
+
+
+class CultureModalUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
     model = Culture
     form_class = CultureModelForm
     template_name = '../../brit/templates/modal_form.html'
@@ -132,7 +136,12 @@ class GreenhouseDetailView(UserCreatedObjectDetailView):
         return context
 
 
-class GreenhouseUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
+class GreenhouseUpdateView(UserCreatedObjectUpdateView):
+    model = Greenhouse
+    form_class = GreenhouseModalModelForm
+
+
+class GreenhouseModalUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
     model = Greenhouse
     form_class = GreenhouseModalModelForm
     template_name = '../../brit/templates/modal_form.html'
