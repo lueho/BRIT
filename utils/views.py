@@ -172,7 +172,7 @@ class UserCreatedObjectAccessMixin(UserPassesTestMixin):
 
         # Ensure the object has the required fields
         if not hasattr(obj, self.publication_status_field) or not hasattr(obj, self.owner_field):
-            raise AttributeError(
+            raise ImproperlyConfigured(
                 f"The model {obj.__class__.__name__} must have '{self.publication_status_field}' and '{self.owner_field}' fields."
             )
 
