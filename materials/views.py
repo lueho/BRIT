@@ -706,7 +706,7 @@ class AddComponentView(PermissionRequiredMixin, NextOrSuccessUrlMixin, BSModalUp
         return HttpResponseRedirect(self.get_success_url())
 
 
-class CompositionOrderUpView((UserOwnsObjectMixin), SingleObjectMixin, RedirectView):
+class CompositionOrderUpView(UserOwnsObjectMixin, SingleObjectMixin, RedirectView):
     model = Composition
     object = None
     permission_required = 'materials.change_composition'
