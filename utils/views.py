@@ -154,7 +154,7 @@ class OwnedObjectListView(PermissionRequiredMixin, ListView):
         return template_names
 
 
-class UserCreatedObjectAccessMixin(UserPassesTestMixin):
+class UserCreatedObjectReadAccessMixin(UserPassesTestMixin):
     """
     A Mixin to control access to objects based on 'publication_status' and 'owner'.
 
@@ -185,8 +185,8 @@ class UserCreatedObjectAccessMixin(UserPassesTestMixin):
             return True
         else:
             if user.is_authenticated:
-                # Private: accessible only to the owner
-                return owner == user
+                # Private: accessible only to the owner and staff
+                return owner == user or user.is_staff
             else:
                 # Private: not accessible for unauthenticated users
                 return False
@@ -307,7 +307,7 @@ class UserCreatedObjectModalCreateView(CreateUserObjectMixin, BSModalCreateView)
         return HttpResponseRedirect(self.get_success_url())
 
 
-class UserCreatedObjectDetailView(UserCreatedObjectAccessMixin, DetailView):
+class UserCreatedObjectDetailView(UserCreatedObjectReadAccessMixin, DetailView):
     """
     A view to display the details of a user created object only if it is either published or owned by the currently
     logged-in user. Views that inherit from this view must use models that inherit from UserCreatedObject.
