@@ -19,7 +19,6 @@ class FormHelperMixin:
             if hasattr(self, 'Meta'):
                 if hasattr(self.Meta, 'helper_class'):
                     self.helper = self.Meta.helper_class()
-                    return self.helper
             self.helper = FormHelper()
 
 
