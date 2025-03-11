@@ -275,7 +275,7 @@ class WasteStreamCreateView(OwnedObjectCreateView):
 
 class WasteStreamModalCreateView(OwnedObjectModalCreateView):
     form_class = WasteStreamModalModelForm
-    success_url = reverse_lazy('wastecategory-list')
+    success_url = reverse_lazy('wastestream-list')
     permission_required = 'soilcom.add_wastestream'
 
 
