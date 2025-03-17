@@ -1,6 +1,6 @@
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 
-from materials.models import Composition, Material, MaterialComponentGroup, Sample
+from materials.models import Composition, Material, MaterialComponentGroup, Sample, SampleSeries
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 from ..models import Culture, Greenhouse, GreenhouseGrowthCycle
 
@@ -39,6 +39,17 @@ class CultureCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
         'name': 'Test Culture',
         'description': 'Test Description',
     }
+    update_object_data = {
+        'name': 'Updated Test Culture',
+        'description': 'Updated Description',
+    }
+
+    @classmethod
+    def create_related_objects(cls):
+        material = Material.objects.create(name='Test Material')
+        return {
+            'residue': SampleSeries.objects.create(name='Test Residue', material=material),
+        }
 
 
 class GreenhouseCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
@@ -48,6 +59,7 @@ class GreenhouseCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
     view_delete_name = 'greenhouse-delete-modal'
 
     create_object_data = {'name': 'Test Greenhouse'}
+    update_object_data = {'name': 'Updated Test Greenhouse'}
 
 
 class GrowthCycleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
@@ -56,9 +68,8 @@ class GrowthCycleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
     view_update_name = 'greenhousegrowthcycle-update'
     view_delete_name = 'greenhousegrowthcycle-delete-modal'
 
-    create_object_data = {
-        'cycle_number': 1,
-    }
+    create_object_data = {'cycle_number': 1}
+    update_object_data = {'cycle_number': 2}
 
     @classmethod
     def create_related_objects(cls):
@@ -71,6 +82,9 @@ class GrowthCycleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
         group = MaterialComponentGroup.objects.create(name='Test Group')
         return {
             'culture': Culture.objects.create(name='Test Culture'),
-            'greenhouse': Greenhouse.objects.create(name='Test Greenhouse'),
+            'greenhouse': Greenhouse.objects.create(owner=cls.owner_user, name='Test Greenhouse'),
             'group_settings': Composition.objects.create(name='Test Composition', group=group, sample=sample),
         }
+
+    def get_update_success_url(self, pk=None):
+        return reverse('greenhouse-detail', kwargs={'pk': self.related_objects['greenhouse'].pk})

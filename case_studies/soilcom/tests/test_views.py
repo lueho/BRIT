@@ -35,6 +35,7 @@ class CollectorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
     view_delete_name = 'collector-delete-modal'
 
     create_object_data = {'name': 'Test Collector'}
+    update_object_data = {'name': 'Updated Test Collector'}
 
 
 # ----------- Collection System CRUD -----------------------------------------------------------------------------------
@@ -48,6 +49,7 @@ class CollectionSystemCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDV
     view_delete_name = 'collectionsystem-delete-modal'
 
     create_object_data = {'name': 'Test Collection System'}
+    update_object_data = {'name': 'Updated Test Collection System'}
 
 
 # ----------- Waste Category CRUD --------------------------------------------------------------------------------------
@@ -61,6 +63,7 @@ class WasteCategoryCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDView
     view_delete_name = 'wastecategory-delete-modal'
 
     create_object_data = {'name': 'Test Waste Category'}
+    update_object_data = {'name': 'Updated Test Waste Category'}
 
 
 # ----------- Waste Component CRUD -------------------------------------------------------------------------------------
@@ -74,6 +77,7 @@ class WasteComponentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDVie
     view_delete_name = 'wastecomponent-delete-modal'
 
     create_object_data = {'name': 'Test Waste Component'}
+    update_object_data = {'name': 'Updated Test Waste Component'}
 
     @classmethod
     def create_related_objects(cls):
@@ -101,10 +105,19 @@ class WasteStreamCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
     view_delete_name = 'wastestream-delete-modal'
 
     create_object_data = {'name': 'Test Waste Stream'}
+    update_object_data = {'name': 'Updated Test Waste Stream'}
 
     @classmethod
     def create_related_objects(cls):
         return {'category': WasteCategory.objects.create(name='Biowaste')}
+
+    def related_objects_post_data(self):
+        data = super().related_objects_post_data()
+        data.update({
+            'allowed_materials': [],
+            'forbidden_materials': [],
+        })
+        return data
 
 
 # ----------- WasteFlyer CRUD ------------------------------------------------------------------------------------------
@@ -148,12 +161,12 @@ class WasteFlyerListViewTestCase(ViewWithPermissionsTestCase):
 
 
 class WasteFlyerCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    update_view = False
+
     model = WasteFlyer
     view_detail_name = 'wasteflyer-detail'
-    view_update_name = 'wasteflyer-update'
-    view_delete_name = 'wasteflyer-delete-modal'
 
-    create_object_data = {'abbreviation': 'Test Flyer', 'url': 'https://www.test-flyer.org'}
+    create_object_data = {'url': 'https://www.test-flyer.org'}
 
     def test_detail_view_unpublished_contains_check_url_button_for_owner(self):
         self.client.force_login(self.owner_user)
@@ -274,29 +287,7 @@ class CollectionFrequencyCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCR
     view_delete_name = 'collectionfrequency-delete-modal'
 
     create_object_data = {'name': 'Test Frequency'}
-
-
-class CollectionFrequencyModalDetailViewTestCase(ViewWithPermissionsTestCase):
-    url_name = 'collectionfrequency-detail-modal'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.frequency = CollectionFrequency.objects.create(name='Test Frequency')
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.frequency.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.frequency.pk}))
-        self.assertEqual(response.status_code, 200)
-
-
-class CollectionFrequencyUpdateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'change_collectionfrequency'
-    url_name = 'collectionfrequency-update'
+    update_object_data = {'name': 'Updated Test Frequency'}
 
     @classmethod
     def setUpTestData(cls):
@@ -316,44 +307,55 @@ class CollectionFrequencyUpdateViewTestCase(ViewWithPermissionsTestCase):
             first_timestep=cls.june,
             last_timestep=cls.december
         )
-        cls.frequency = CollectionFrequency.objects.create(name='Test Frequency', type='Fixed')
-        cls.options_1 = CollectionCountOptions.objects.create(frequency=cls.frequency, season=season_1, standard=100,
-                                                              option_1=150)
-        cls.options_2 = CollectionCountOptions.objects.create(frequency=cls.frequency, season=season_2, standard=150)
+        cls.options_1 = CollectionCountOptions.objects.create(
+            frequency=cls.unpublished_object,
+            season=season_1,
+            standard=100,
+            option_1=150
+        )
+        cls.options_2 = CollectionCountOptions.objects.create(
+            frequency=cls.unpublished_object,
+            season=season_2,
+            standard=150
+        )
 
-    def test_get_http_302_redirect_for_anonymous(self):
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.frequency.pk}))
-        self.assertEqual(response.status_code, 302)
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.frequency.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.frequency.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.frequency.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
+    def related_objects_post_data(self):
+        data = {
+            'name': 'Test Frequency with Seasons',
+            'type': 'Fixed-Seasonal',
+            'form-INITIAL_FORMS': 1,
+            'form-TOTAL_FORMS': 2,
+            'form-0-distribution': self.distribution.id,
+            'form-0-first_timestep': self.january.id,
+            'form-0-last_timestep': self.may.id,
+            'form-0-standard': 150,
+            'form-0-option_1': '',
+            'form-0-option_2': '',
+            'form-0-option_3': '',
+            'form-1-distribution': self.distribution.id,
+            'form-1-first_timestep': self.june.id,
+            'form-1-last_timestep': self.december.id,
+            'form-1-standard': 200,
+            'form-1-option_1': '',
+            'form-1-option_2': '',
+            'form-1-option_3': ''
+        }
+        return data
 
     def test_form_contains_all_initials(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.frequency.pk}))
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_update_url(self.unpublished_object.pk))
         form = response.context['form']
         expected = {
-            'name': self.frequency.name,
-            'type': self.frequency.type,
-            'description': self.frequency.description
+            'name': self.unpublished_object.name,
+            'type': self.unpublished_object.type,
+            'description': self.unpublished_object.description
         }
         self.assertDictEqual(expected, form.initial)
 
     def test_formset_contains_all_initials(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.frequency.pk}))
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_update_url(self.unpublished_object.pk))
         formset = response.context['formset']
         expected = [
             {
@@ -377,63 +379,11 @@ class CollectionFrequencyUpdateViewTestCase(ViewWithPermissionsTestCase):
         ]
         self.assertListEqual(expected, formset.initial)
 
-    def test_post_http_302_redirect_for_anonymous(self):
-        response = self.client.post(reverse(self.url_name, kwargs={'pk': self.frequency.pk}))
-        self.assertEqual(response.status_code, 302)
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse(self.url_name, kwargs={'pk': self.frequency.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        data = {
-            'name': 'Test Frequency with Seasons',
-            'type': 'Fixed-Seasonal',
-            'form-INITIAL_FORMS': 1,
-            'form-TOTAL_FORMS': 2,
-            'form-0-distribution': self.distribution.id,
-            'form-0-first_timestep': self.january.id,
-            'form-0-last_timestep': self.may.id,
-            'form-0-standard': 150,
-            'form-0-option_1': '',
-            'form-0-option_2': '',
-            'form-0-option_3': '',
-            'form-1-distribution': self.distribution.id,
-            'form-1-first_timestep': self.june.id,
-            'form-1-last_timestep': self.december.id,
-            'form-1-standard': 200,
-            'form-1-option_1': '',
-            'form-1-option_2': '',
-            'form-1-option_3': ''
-        }
-        response = self.client.post(reverse(self.url_name, kwargs={'pk': self.frequency.pk}), data=data)
-        self.assertEqual(response.status_code, 302)
-
     def test_post_http_302_options_are_changed_on_save(self):
-        self.client.force_login(self.member)
-        data = {
-            'name': 'Test Frequency with Seasons',
-            'type': 'Fixed-Seasonal',
-            'form-INITIAL_FORMS': 1,
-            'form-TOTAL_FORMS': 2,
-            'form-0-distribution': self.distribution.id,
-            'form-0-first_timestep': self.january.id,
-            'form-0-last_timestep': self.may.id,
-            'form-0-standard': 150,
-            'form-0-option_1': '',
-            'form-0-option_2': '',
-            'form-0-option_3': '',
-            'form-1-distribution': self.distribution.id,
-            'form-1-first_timestep': self.june.id,
-            'form-1-last_timestep': self.december.id,
-            'form-1-standard': 200,
-            'form-1-option_1': '',
-            'form-1-option_2': '',
-            'form-1-option_3': ''
-        }
-        response = self.client.post(reverse(self.url_name, kwargs={'pk': self.frequency.pk}), data=data)
+        self.client.force_login(self.owner_user)
+        url = self.get_update_url(self.unpublished_object.pk)
+        data = self.related_objects_post_data()
+        response = self.client.post(url, data)
         self.assertEqual(response.status_code, 302)
         self.options_1.refresh_from_db()
         self.options_2.refresh_from_db()
@@ -445,6 +395,24 @@ class CollectionFrequencyUpdateViewTestCase(ViewWithPermissionsTestCase):
         self.assertIsNone(self.options_2.option_1)
         self.assertIsNone(self.options_2.option_2)
         self.assertIsNone(self.options_2.option_3)
+
+
+class CollectionFrequencyModalDetailViewTestCase(ViewWithPermissionsTestCase):
+    url_name = 'collectionfrequency-detail-modal'
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.frequency = CollectionFrequency.objects.create(name='Test Frequency')
+
+    def test_get_http_200_ok_for_anonymous(self):
+        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.frequency.pk}))
+        self.assertEqual(response.status_code, 200)
+
+    def test_get_http_200_ok_for_logged_in_users(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.frequency.pk}))
+        self.assertEqual(response.status_code, 200)
 
 
 class CollectionFrequencyModalUpdateViewTestCase(ViewWithPermissionsTestCase):
@@ -610,7 +578,13 @@ class CollectionPropertyValueCRUDViewsTestCase(AbstractTestCases.UserCreatedObje
 
     create_object_data = {
         'average': 123.5,
-        'standard_deviation': 12.54
+        'standard_deviation': 12.54,
+        'year': 2025
+    }
+    update_object_data = {
+        'average': 456.7,
+        'standard_deviation': 23.45,
+        'year': 2025
     }
 
     @classmethod
@@ -620,67 +594,6 @@ class CollectionPropertyValueCRUDViewsTestCase(AbstractTestCases.UserCreatedObje
             'property': Property.objects.create(name='Test Property'),
             'unit': Unit.objects.create(name='Test Unit'),
         }
-
-
-class CollectionPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'change_collectionpropertyvalue'
-    url_name = 'collectionpropertyvalue-update'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.collection = Collection.objects.create(name='Test Collection')
-        cls.unit = Unit.objects.create(name='Test Unit')
-        cls.prop = Property.objects.create(name='Test Property')
-        cls.prop.allowed_units.add(cls.unit)
-        cls.val = CollectionPropertyValue.objects.create(
-            collection=cls.collection,
-            property=cls.prop,
-            unit=cls.unit,
-            average=123.5,
-            standard_deviation=12.54
-        )
-
-    def test_get_http_302_redirect_for_anonymous(self):
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        self.assertEqual(response.status_code, 302)
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_for_anonymous(self):
-        response = self.client.post(reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        self.assertEqual(response.status_code, 302)
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        data = {
-            'collection': self.collection.pk,
-            'property': self.prop.pk,
-            'unit': self.unit.pk,
-            'year': 2022,
-            'average': 123.5,
-            'standard_deviation': 32.2
-        }
-        response = self.client.post(reverse(self.url_name, kwargs={'pk': self.val.pk}), data=data)
-        self.assertEqual(response.status_code, 302)
 
 
 class CollectionPropertyValueModalDeleteViewTestCase(ViewWithPermissionsTestCase):
@@ -801,8 +714,14 @@ class AggregatedCollectionPropertyValueCRUDViewsTestCase(AbstractTestCases.UserC
     view_delete_name = 'aggregatedcollectionpropertyvalue-delete-modal'
 
     create_object_data = {
+        'year': 2025,
         'average': 123.5,
         'standard_deviation': 12.54
+    }
+    update_object_data = {
+        'year': 2025,
+        'average': 456.7,
+        'standard_deviation': 23.45
     }
 
     @classmethod
@@ -812,67 +731,15 @@ class AggregatedCollectionPropertyValueCRUDViewsTestCase(AbstractTestCases.UserC
             'unit': Unit.objects.create(name='Test Unit'),
         }
 
-
-class AggregatedCollectionPropertyValueUpdateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'change_aggregatedcollectionpropertyvalue'
-    url_name = 'aggregatedcollectionpropertyvalue-update'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.unit = Unit.objects.create(name='Test Unit')
-        cls.prop = Property.objects.create(name='Test Property')
-        cls.prop.allowed_units.add(cls.unit)
-        cls.val = AggregatedCollectionPropertyValue.objects.create(
-            property=cls.prop,
-            unit=cls.unit,
-            average=123.5,
-            standard_deviation=12.54
-        )
-        cls.val.collections.add(Collection.objects.create(name='Test Collection 1'))
-        cls.val.collections.add(Collection.objects.create(name='Test Collection 2'))
-
-    def test_get_http_302_redirect_for_anonymous(self):
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        self.assertEqual(response.status_code, 302)
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_for_anonymous(self):
-        response = self.client.post(reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        self.assertEqual(response.status_code, 302)
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        data = {
-            'collections': [self.val.collections.first().pk],
-            'property': self.prop.pk,
-            'unit': self.unit.pk,
-            'year': 2022,
-            'average': 555,
-            'standard_deviation': 32.2
-        }
-        response = self.client.post(reverse(self.url_name, kwargs={'pk': self.val.pk}),
-                                    data=data)
-        self.assertEqual(response.status_code, 302)
+    def related_objects_post_data(self):
+        data = super().related_objects_post_data()
+        data.update({
+            'collections': [
+                Collection.objects.create(name='Test Collection 1').pk,
+                Collection.objects.create(name='Test Collection 2').pk
+            ]
+        })
+        return data
 
 
 class AggregatedCollectionPropertyValueModalDeleteViewTestCase(ViewWithPermissionsTestCase):
@@ -949,10 +816,15 @@ class AggregatedCollectionPropertyValueModalDeleteViewTestCase(ViewWithPermissio
 class CollectionCatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = CollectionCatchment
     view_detail_name = 'collectioncatchment-detail'
-    view_update_name = 'collectioncatchment-update'  # CollectionCatchment is a proxy model of Catchment
-    view_delete_name = 'collectioncatchment-delete-modal'  # CollectionCatchment is a proxy model of Catchment
+    view_update_name = 'collectioncatchment-update'
+    view_delete_name = 'collectioncatchment-delete-modal'
 
     create_object_data = {'name': 'Test Catchment'}
+    update_object_data = {'name': 'Updated Test Catchment'}
+
+    @classmethod
+    def create_related_objects(cls):
+        return {'region': Region.objects.create(name='Test Region')}
 
     def test_collectioncatchment_template_is_used(self):
         response = self.client.get(self.get_detail_url(self.published_object.pk))
@@ -1165,18 +1037,45 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
     view_update_name = 'collection-update'
     view_delete_name = 'collection-delete-modal'
 
-    create_object_data = {'name': 'Test Collection'}
+    create_object_data = {'name': 'Test Collection', 'description': 'The original collection'}
+    update_object_data = {'name': 'Updated Test Collection', 'description': 'This has been updated'}
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        with mute_signals(signals.post_save):
+            cls.flyer = WasteFlyer.objects.create(
+                abbreviation='WasteFlyer123',
+                url='https://www.test-flyer.org'
+            )
+            cls.flyer2 = WasteFlyer.objects.create(
+                abbreviation='WasteFlyer234',
+                url='https://www.rest-flyer.org'
+            )
+        cls.unpublished_object.flyers.add(cls.flyer)
+        cls.unpublished_object.flyers.add(cls.flyer2)
+        cls.published_object.flyers.add(cls.flyer)
+        cls.published_object.flyers.add(cls.flyer2)
 
     @classmethod
     def create_related_objects(cls):
+        MaterialCategory.objects.create(name='Biowaste component')
         catchment = CollectionCatchment.objects.create(name='Test catchment')
         collector = Collector.objects.create(name='Test collector')
         collection_system = CollectionSystem.objects.create(name='Test system')
         waste_category = WasteCategory.objects.create(name='Test category')
+        cls.allowed_material_1 = WasteComponent.objects.create(name='Allowed material 1')
+        cls.allowed_material_2 = WasteComponent.objects.create(name='Allowed material 2')
+        cls.forbidden_material_1 = WasteComponent.objects.create(name='Forbidden material 1')
+        cls.forbidden_material_2 = WasteComponent.objects.create(name='Forbidden material 2')
         waste_stream = WasteStream.objects.create(
             name='Test waste stream',
             category=waste_category,
         )
+        waste_stream.allowed_materials.add(cls.allowed_material_1)
+        waste_stream.allowed_materials.add(cls.allowed_material_2)
+        waste_stream.forbidden_materials.add(cls.forbidden_material_1)
+        waste_stream.forbidden_materials.add(cls.forbidden_material_2)
         frequency = CollectionFrequency.objects.create(name='Test Frequency')
         Collection.objects.create(
             catchment=catchment,
@@ -1211,10 +1110,17 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
         collection = super().create_published_object()
         collection.add_predecessor(Collection.objects.get(description='Predecessor Collection 1'))
         collection.add_predecessor(Collection.objects.get(description='Predecessor Collection 2'))
-        with mute_signals(post_save):
-            collection.flyers.add(
-                WasteFlyer.objects.create(abbreviation='Test Flyer', url='https://www.test-flyer.org'))
         return collection
+
+    def related_objects_post_data(self):
+        data = super().related_objects_post_data()
+        data.update({
+            'waste_category': WasteCategory.objects.get(name='Test category').pk,
+            'valid_from': date.today(),
+            'form-TOTAL_FORMS': 0,
+            'form-INITIAL_FORMS': 0,
+        })
+        return data
 
     def test_template_contains_predecessor_collections(self):
         response = self.client.get(self.get_detail_url(self.published_object.pk))
@@ -1224,6 +1130,200 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
     def test_template_contains_flyer_url(self):
         response = self.client.get(self.get_detail_url(self.published_object.pk))
         self.assertContains(response, 'https://www.test-flyer.org')
+
+    def test_uses_custom_template(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_update_url(self.unpublished_object.pk))
+        self.assertTemplateUsed(response, 'soilcom/collection_form.html')
+
+    def test_get_get_formset_kwargs(self):
+        request = RequestFactory().get(self.get_update_url(self.unpublished_object.pk))
+        request.user = self.owner_user
+        view = views.CollectionUpdateView()
+        view.setup(request)
+        view.kwargs = {'pk': self.unpublished_object.pk}
+        view.object = self.unpublished_object
+        view.relation_field_name = 'flyers'
+        expected_formset_kwargs = {
+            'initial': [{'url': self.flyer.url}, {'url': self.flyer2.url}],
+            'parent_object': self.unpublished_object,
+            'owner': self.owner_user,
+            'relation_field_name': view.relation_field_name
+        }
+        self.assertDictEqual(expected_formset_kwargs, view.get_formset_kwargs())
+
+    def test_post_get_formset_kwargs(self):
+        kwargs = {'pk': self.unpublished_object.pk}
+        data = {
+            'form-INITIAL_FORMS': '0',
+            'form-TOTAL_FORMS': '2',
+            'form-0-url': 'https://www.test-flyer.org',
+            'form-1-url': 'https://www.best-flyer.org'
+        }
+        request = RequestFactory().post(self.get_update_url(self.unpublished_object.pk), data=data)
+        request.user = self.owner_user
+        view = views.CollectionUpdateView()
+        view.setup(request)
+        view.kwargs = kwargs
+        view.object = self.unpublished_object
+        view.relation_field_name = 'flyers'
+        query_dict = QueryDict('', mutable=True)
+        query_dict.update(data)
+        expected_formset_kwargs = {
+            'parent_object': self.unpublished_object,
+            'owner': self.owner_user,
+            'initial': [{'url': self.flyer.url}, {'url': self.flyer2.url}],
+            'data': query_dict,
+            'relation_field_name': view.relation_field_name
+        }
+        self.assertDictEqual(expected_formset_kwargs, view.get_formset_kwargs())
+
+    def test_get_get_formset(self):
+        request = RequestFactory().get(self.get_update_url(self.unpublished_object.pk))
+        request.user = self.owner_user
+        view = views.CollectionUpdateView()
+        view.setup(request)
+        view.kwargs = {'pk': self.unpublished_object.pk}
+        view.object = self.unpublished_object
+        formset = view.get_formset()
+        self.assertIsInstance(formset, BaseWasteFlyerUrlFormSet)
+        self.assertEqual(2, formset.initial_form_count())
+
+    def test_post_get_formset(self):
+        data = {
+            'form-INITIAL_FORMS': '0',
+            'form-TOTAL_FORMS': '2',
+            'form-0-url': 'https://www.test-flyer.org',
+            'form-1-url': 'https://www.best-flyer.org'
+        }
+        request = RequestFactory().post(self.get_update_url(self.unpublished_object.pk), data=data)
+        request.user = self.owner_user
+        view = views.CollectionUpdateView()
+        view.setup(request)
+        view.kwargs = {'pk': self.unpublished_object.pk}
+        view.object = self.unpublished_object
+        formset = view.get_formset()
+        self.assertIsInstance(formset, BaseWasteFlyerUrlFormSet)
+
+    def test_context_contains_form_and_formset(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_update_url(self.unpublished_object.pk))
+        self.assertIsInstance(response.context['form'], CollectionModelForm)
+        self.assertIsInstance(response.context['formset'], BaseFormSet)
+
+    def test_post_with_missing_data_errors(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.post(
+            self.get_update_url(self.unpublished_object.pk),
+            data={'connection_rate_year': 123}
+        )
+        self.assertEqual(response.status_code, 200)
+
+        error_msg = 'This field is required.'
+        self.assertTrue(error_msg in response.context['form'].errors['catchment'])
+        self.assertTrue(error_msg in response.context['form'].errors['collector'])
+        self.assertTrue(error_msg in response.context['form'].errors['collection_system'])
+        self.assertTrue(error_msg in response.context['form'].errors['waste_category'])
+
+    def test_post_with_valid_form_data(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.post(
+            self.get_update_url(self.unpublished_object.pk),
+            data={
+                'catchment': CollectionCatchment.objects.first().id,
+                'collector': Collector.objects.first().id,
+                'collection_system': CollectionSystem.objects.first().id,
+                'waste_category': WasteCategory.objects.first().id,
+                'allowed_materials': [self.allowed_material_1.id, self.allowed_material_2.id],
+                'forbidden_materials': [self.forbidden_material_1.id, self.forbidden_material_2.id],
+                'frequency': CollectionFrequency.objects.first().id,
+                'valid_from': date(2020, 1, 1),
+                'description': 'This is a test case that should pass!',
+                'form-INITIAL_FORMS': '0',
+                'form-TOTAL_FORMS': '2',
+                'form-0-url': 'https://www.test-flyer.org',
+            }
+        )
+        self.assertEqual(response.status_code, 302)
+
+    def test_post_without_allowed_materials(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.post(
+            self.get_update_url(self.unpublished_object.pk),
+            data={
+                'catchment': CollectionCatchment.objects.first().id,
+                'collector': Collector.objects.first().id,
+                'collection_system': CollectionSystem.objects.first().id,
+                'waste_category': WasteCategory.objects.first().id,
+                'allowed_materials': [self.allowed_material_1.id, self.allowed_material_2.id],
+                'frequency': CollectionFrequency.objects.first().id,
+                'valid_from': date(2020, 1, 1),
+                'description': 'This is a test case that should pass!',
+                'form-INITIAL_FORMS': '2',
+                'form-TOTAL_FORMS': '2',
+                'form-0-url': 'https://www.test-flyer.org',
+            }
+        )
+        self.assertEqual(response.status_code, 302)
+
+    def test_associated_flyers_are_displayed_as_initial_values_in_formset(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_update_url(self.unpublished_object.pk))
+        expected_initial = [flyer.url for flyer in self.unpublished_object.flyers.all()]
+        real_initial = [form.initial['url'] for form in response.context['formset'].initial_forms]
+        self.assertListEqual(expected_initial, real_initial)
+
+    def test_new_flyers_are_created_from_unknown_urls(self):
+        self.client.force_login(self.owner_user)
+        data = {
+            'catchment': self.unpublished_object.catchment.id,
+            'collector': self.unpublished_object.collector.id,
+            'collection_system': self.unpublished_object.collection_system.id,
+            'waste_category': self.unpublished_object.waste_stream.category.id,
+            'allowed_materials': [m.id for m in self.unpublished_object.waste_stream.allowed_materials.all()],
+            'forbidden_materials': [m.id for m in self.unpublished_object.waste_stream.forbidden_materials.all()],
+            'frequency': self.unpublished_object.frequency.id,
+            'valid_from': date(2020, 1, 1),
+            'description': self.unpublished_object.description,
+            'form-INITIAL_FORMS': '1',
+            'form-TOTAL_FORMS': '2',
+            'form-0-url': 'https://www.best-flyer.org',
+            'form-1-url': 'https://www.fest-flyer.org',
+        }
+        with mute_signals(signals.post_save):
+            self.client.post(self.get_update_url(self.unpublished_object.pk), data=data)
+        flyer = WasteFlyer.objects.get(url='https://www.fest-flyer.org')
+        self.assertIsInstance(flyer, WasteFlyer)
+
+    def test_regression_post_with_valid_data_doesnt_delete_unchanged_flyers(self):
+        self.client.force_login(self.owner_user)
+        data = {
+            'catchment': self.unpublished_object.catchment.id,
+            'collector': self.unpublished_object.collector.id,
+            'collection_system': self.unpublished_object.collection_system.id,
+            'waste_category': self.unpublished_object.waste_stream.category.id,
+            'allowed_materials': [m.id for m in self.unpublished_object.waste_stream.allowed_materials.all()],
+            'forbidden_materials': [m.id for m in self.unpublished_object.waste_stream.forbidden_materials.all()],
+            'frequency': self.unpublished_object.frequency.id,
+            'valid_from': self.unpublished_object.valid_from,
+            'description': self.unpublished_object.description,
+            'form-INITIAL_FORMS': '1',
+            'form-TOTAL_FORMS': '2',
+            'form-0-url': self.unpublished_object.flyers.first().url,
+            'form-0-id': self.unpublished_object.flyers.first().id,
+            'form-1-url': 'https://www.fest-flyer.org',
+            'form-1-id': '',
+        }
+        # The flyer with the url rest-flyer.org should be removed from the unpublished collection  by this. Remove it from the
+        # published collection as well before the request so that the process for deleting orphaned flyers is evoked.
+        rest_flyer = WasteFlyer.objects.get(url='https://www.rest-flyer.org')
+        self.published_object.flyers.remove(rest_flyer)
+        with mute_signals(post_save):
+            response = self.client.post(self.get_update_url(self.unpublished_object.pk), data=data)
+        self.assertEqual(response.status_code, 302)
+        self.assertIn(WasteFlyer.objects.get(url='https://www.fest-flyer.org'), self.unpublished_object.flyers.all())
+        self.assertIn(WasteFlyer.objects.get(url='https://www.test-flyer.org'), self.unpublished_object.flyers.all())
+        self.assertEqual(WasteFlyer.objects.count(), 2)
 
 
 class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
@@ -1488,270 +1588,6 @@ class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 302)
 
 
-class CollectionUpdateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'change_collection'
-    url_name = 'collection-update'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        MaterialCategory.objects.create(name='Biowaste component')
-        cls.allowed_material_1 = WasteComponent.objects.create(name='Allowed material 1')
-        cls.allowed_material_2 = WasteComponent.objects.create(name='Allowed material 2')
-        cls.forbidden_material_1 = WasteComponent.objects.create(name='Forbidden material 1')
-        cls.forbidden_material_2 = WasteComponent.objects.create(name='Forbidden material 2')
-        waste_stream = WasteStream.objects.create(
-            name='Test waste stream',
-            category=WasteCategory.objects.create(name='Test category'),
-        )
-        waste_stream.allowed_materials.add(cls.allowed_material_1)
-        waste_stream.allowed_materials.add(cls.allowed_material_2)
-        waste_stream.forbidden_materials.add(cls.forbidden_material_1)
-        waste_stream.forbidden_materials.add(cls.forbidden_material_2)
-        with mute_signals(signals.post_save):
-            cls.flyer = WasteFlyer.objects.create(
-                abbreviation='WasteFlyer123',
-                url='https://www.test-flyer.org'
-            )
-            cls.flyer2 = WasteFlyer.objects.create(
-                abbreviation='WasteFlyer234',
-                url='https://www.rest-flyer.org'
-            )
-        frequency = CollectionFrequency.objects.create(name='Test Frequency')
-        cls.collection = Collection.objects.create(
-            name='collection1',
-            catchment=CollectionCatchment.objects.create(name='Test catchment'),
-            collector=Collector.objects.create(name='Test collector'),
-            collection_system=CollectionSystem.objects.create(name='Test system'),
-            waste_stream=waste_stream,
-            frequency=frequency,
-            description='This is a test case.'
-        )
-        cls.collection.flyers.add(cls.flyer)
-        cls.collection.flyers.add(cls.flyer2)
-
-    def test_get_http_302_redirect_for_anonymous(self):
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.collection.id}))
-        self.assertEqual(response.status_code, 302)
-
-    def test_get_http_403_forbidden_for_non_group_members(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.collection.id}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_group_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.collection.id}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.collection.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_uses_custom_template(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.collection.pk}))
-        self.assertTemplateUsed(response, 'soilcom/collection_form.html')
-
-    def test_get_get_formset_kwargs(self):
-        kwargs = {'pk': self.collection.pk}
-        request = RequestFactory().get(reverse(self.url_name, kwargs=kwargs))
-        request.user = self.member
-        view = views.CollectionUpdateView()
-        view.setup(request)
-        view.kwargs = kwargs
-        view.object = self.collection
-        view.relation_field_name = 'flyers'
-        expected_formset_kwargs = {
-            'initial': [{'url': self.flyer.url}, {'url': self.flyer2.url}],
-            'parent_object': self.collection,
-            'owner': self.member,
-            'relation_field_name': view.relation_field_name
-        }
-        self.assertDictEqual(expected_formset_kwargs, view.get_formset_kwargs())
-
-    def test_post_get_formset_kwargs(self):
-        kwargs = {'pk': self.collection.pk}
-        data = {
-            'form-INITIAL_FORMS': '0',
-            'form-TOTAL_FORMS': '2',
-            'form-0-url': 'https://www.test-flyer.org',
-            'form-1-url': 'https://www.best-flyer.org'
-        }
-        request = RequestFactory().post(reverse(self.url_name, kwargs=kwargs), data=data)
-        request.user = self.member
-        view = views.CollectionUpdateView()
-        view.setup(request)
-        view.kwargs = kwargs
-        view.object = self.collection
-        view.relation_field_name = 'flyers'
-        query_dict = QueryDict('', mutable=True)
-        query_dict.update(data)
-        expected_formset_kwargs = {
-            'parent_object': self.collection,
-            'owner': self.member,
-            'initial': [{'url': self.flyer.url}, {'url': self.flyer2.url}],
-            'data': query_dict,
-            'relation_field_name': view.relation_field_name
-        }
-        self.assertDictEqual(expected_formset_kwargs, view.get_formset_kwargs())
-
-    def test_get_get_formset(self):
-        kwargs = {'pk': self.collection.pk}
-        request = RequestFactory().get(reverse(self.url_name, kwargs=kwargs))
-        request.user = self.member
-        view = views.CollectionUpdateView()
-        view.setup(request)
-        view.kwargs = kwargs
-        view.object = self.collection
-        formset = view.get_formset()
-        self.assertIsInstance(formset, BaseWasteFlyerUrlFormSet)
-        self.assertEqual(2, formset.initial_form_count())
-
-    def test_post_get_formset(self):
-        kwargs = {'pk': self.collection.pk}
-        data = {
-            'form-INITIAL_FORMS': '0',
-            'form-TOTAL_FORMS': '2',
-            'form-0-url': 'https://www.test-flyer.org',
-            'form-1-url': 'https://www.best-flyer.org'
-        }
-        request = RequestFactory().post(reverse(self.url_name, kwargs=kwargs), data=data)
-        request.user = self.member
-        view = views.CollectionUpdateView()
-        view.setup(request)
-        view.kwargs = kwargs
-        view.object = self.collection
-        formset = view.get_formset()
-        self.assertIsInstance(formset, BaseWasteFlyerUrlFormSet)
-
-    def test_post_http_302_redirect_for_anonymous(self):
-        response = self.client.post(reverse(self.url_name, kwargs={'pk': self.collection.id}))
-        self.assertEqual(response.status_code, 302)
-
-    def test_post_http_403_forbidden_for_non_group_members(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse(self.url_name, kwargs={'pk': self.collection.id}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_context_contains_form_and_formset(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.collection.id}))
-        self.assertIsInstance(response.context['form'], CollectionModelForm)
-        self.assertIsInstance(response.context['formset'], BaseFormSet)
-
-    def test_post_with_missing_data_errors(self):
-        self.client.force_login(self.member)
-        response = self.client.post(
-            reverse(self.url_name, kwargs={'pk': self.collection.id}),
-            data={'connection_rate_year': 123}
-        )
-        self.assertEqual(response.status_code, 200)
-
-        error_msg = 'This field is required.'
-        self.assertTrue(error_msg in response.context['form'].errors['catchment'])
-        self.assertTrue(error_msg in response.context['form'].errors['collector'])
-        self.assertTrue(error_msg in response.context['form'].errors['collection_system'])
-        self.assertTrue(error_msg in response.context['form'].errors['waste_category'])
-
-    def test_post_with_valid_form_data(self):
-        self.client.force_login(self.member)
-        response = self.client.post(
-            reverse(self.url_name, kwargs={'pk': self.collection.id}),
-            data={
-                'catchment': CollectionCatchment.objects.first().id,
-                'collector': Collector.objects.first().id,
-                'collection_system': CollectionSystem.objects.first().id,
-                'waste_category': WasteCategory.objects.first().id,
-                'allowed_materials': [self.allowed_material_1.id, self.allowed_material_2.id],
-                'forbidden_materials': [self.forbidden_material_1.id, self.forbidden_material_2.id],
-                'frequency': CollectionFrequency.objects.first().id,
-                'valid_from': date(2020, 1, 1),
-                'description': 'This is a test case that should pass!',
-                'form-INITIAL_FORMS': '0',
-                'form-TOTAL_FORMS': '2',
-                'form-0-url': 'https://www.test-flyer.org',
-            }
-        )
-        self.assertEqual(response.status_code, 302)
-
-    def test_post_without_allowed_materials(self):
-        self.client.force_login(self.member)
-        response = self.client.post(
-            reverse(self.url_name, kwargs={'pk': self.collection.id}),
-            data={
-                'catchment': CollectionCatchment.objects.first().id,
-                'collector': Collector.objects.first().id,
-                'collection_system': CollectionSystem.objects.first().id,
-                'waste_category': WasteCategory.objects.first().id,
-                'allowed_materials': [self.allowed_material_1.id, self.allowed_material_2.id],
-                'frequency': CollectionFrequency.objects.first().id,
-                'valid_from': date(2020, 1, 1),
-                'description': 'This is a test case that should pass!',
-                'form-INITIAL_FORMS': '0',
-                'form-TOTAL_FORMS': '2',
-                'form-0-url': 'https://www.test-flyer.org',
-            }
-        )
-        self.assertEqual(response.status_code, 302)
-
-    def test_associated_flyers_are_displayed_as_initial_values_in_formset(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.collection.pk}))
-        expected_initial = [flyer.url for flyer in self.collection.flyers.all()]
-        real_initial = [form.initial['url'] for form in response.context['formset'].initial_forms]
-        self.assertListEqual(expected_initial, real_initial)
-
-    def test_new_flyers_are_created_from_unknown_urls(self):
-        self.client.force_login(self.member)
-        data = {
-            'catchment': self.collection.catchment.id,
-            'collector': self.collection.collector.id,
-            'collection_system': self.collection.collection_system.id,
-            'waste_category': self.collection.waste_stream.category.id,
-            'allowed_materials': [m.id for m in self.collection.waste_stream.allowed_materials.all()],
-            'forbidden_materials': [m.id for m in self.collection.waste_stream.forbidden_materials.all()],
-            'frequency': self.collection.frequency.id,
-            'valid_from': date(2020, 1, 1),
-            'description': self.collection.description,
-            'form-INITIAL_FORMS': '1',
-            'form-TOTAL_FORMS': '2',
-            'form-0-url': 'https://www.best-flyer.org',
-            'form-1-url': 'https://www.fest-flyer.org',
-        }
-        with mute_signals(signals.post_save):
-            self.client.post(reverse(self.url_name, kwargs={'pk': self.collection.pk}), data=data)
-        flyer = WasteFlyer.objects.get(url='https://www.fest-flyer.org')
-        self.assertIsInstance(flyer, WasteFlyer)
-
-    def test_regression_post_with_valid_data_doesnt_delete_unchanged_flyers(self):
-        self.client.force_login(self.member)
-        data = {
-            'catchment': self.collection.catchment.id,
-            'collector': self.collection.collector.id,
-            'collection_system': self.collection.collection_system.id,
-            'waste_category': self.collection.waste_stream.category.id,
-            'allowed_materials': [m.id for m in self.collection.waste_stream.allowed_materials.all()],
-            'forbidden_materials': [m.id for m in self.collection.waste_stream.forbidden_materials.all()],
-            'frequency': self.collection.frequency.id,
-            'valid_from': self.collection.valid_from,
-            'description': self.collection.description,
-            'form-INITIAL_FORMS': '1',
-            'form-TOTAL_FORMS': '2',
-            'form-0-url': self.collection.flyers.first().url,
-            'form-0-id': self.collection.flyers.first().id,
-            'form-1-url': 'https://www.fest-flyer.org',
-            'form-1-id': '',
-        }
-        with mute_signals(post_save):
-            response = self.client.post(reverse(self.url_name, kwargs={'pk': self.collection.id}), data=data)
-        self.assertEqual(response.status_code, 302)
-        self.assertIn(WasteFlyer.objects.get(url='https://www.fest-flyer.org'), self.collection.flyers.all())
-        self.assertIn(WasteFlyer.objects.get(url='https://www.test-flyer.org'), self.collection.flyers.all())
-        self.assertEqual(WasteFlyer.objects.count(), 2)
-
-
 # ----------- Collection utils -----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -1977,140 +1813,118 @@ class CollectionListFileExportViewTestCase(ViewWithPermissionsTestCase):
         self.assertDictEqual(expected_response, json.loads(response.content))
 
 
-class CollectionWasteSamplesViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'change_collection'
+class CollectionWasteSamplesViewTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    create_view = False
+    list_view = False
+    detail_view = False
+    delete_view = False
+
+    model = Collection
+
+    view_update_name = 'collection-wastesamples'
+    update_success_url_name = 'collection-wastesamples'
+
+    create_object_data = {'name': 'Test Collection'}
 
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.collection = Collection.objects.create(name='Test Collection')
         material = Material.objects.create(name='Test Material')
         series = SampleSeries.objects.create(name='Test Series', material=material)
-        cls.collection.samples.add(Sample.objects.create(name='Test Sample 1', material=material, series=series))
-        Sample.objects.create(name='Test Sample 2', material=material, series=series)
-        cls.url = reverse('collection-wastesamples', kwargs={'pk': cls.collection.pk})
+        cls.unpublished_object.samples.add(
+            Sample.objects.create(name='Test Sample 1', material=material, series=series))
+        cls.sample = Sample.objects.create(name='Test Sample 2', material=material, series=series)
 
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        response = self.client.get(self.url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={self.url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 200)
+    def compile_update_post_data(self):
+        data = {
+            'sample': self.sample.pk,
+            'submit': 'Add'
+        }
+        return data
 
     def test_form_contains_one_submit_button_for_each_form(self):
-        self.client.force_login(self.member)
-        response = self.client.get(self.url)
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_update_url(self.unpublished_object.pk))
         self.assertContains(response, 'type="submit"', count=2, status_code=200)
         self.assertContains(response, 'value="Add"')
         self.assertContains(response, 'value="Remove"')
 
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        response = self.client.post(self.url, {})
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={self.url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(self.url)
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_on_submit_of_add_form(self):
-        self.client.force_login(self.member)
+    def test_unpublished_post_success_and_http_302_redirect_on_submit_of_add_form(self):
+        self.client.force_login(self.owner_user)
         sample = Sample.objects.get(name='Test Sample 2')
         data = {'sample': sample.pk, 'submit': 'Add'}
-        response = self.client.post(self.url, data, follow=True)
-        self.assertRedirects(response, self.url)
+        response = self.client.post(self.get_update_url(self.unpublished_object.pk), data, follow=True)
+        self.assertRedirects(response, self.get_update_url(self.unpublished_object.pk))
 
-    def test_post_success_and_http_302_redirect_on_submit_of_remove_form(self):
-        self.client.force_login(self.member)
+    def test_unpublished_post_success_and_http_302_redirect_on_submit_of_remove_form(self):
+        self.client.force_login(self.owner_user)
         sample = Sample.objects.get(name='Test Sample 1')
         data = {'sample': sample.pk, 'submit': 'Remove'}
-        response = self.client.post(self.url, data, follow=True)
-        self.assertRedirects(response, self.url)
+        response = self.client.post(self.get_update_url(self.unpublished_object.pk), data, follow=True)
+        self.assertRedirects(response, self.get_update_url(self.unpublished_object.pk))
 
 
-class CollectionPredecessorsViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'change_collection'
-    url_name = 'collection-predecessors'
+class CollectionPredecessorsViewTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    create_view = False
+    list_view = False
+    detail_view = False
+    delete_view = False
+
+    model = Collection
+
+    view_update_name = 'collection-predecessors'
+
+    update_success_url_name = 'collection-predecessors'
+
+    create_object_data = {'name': 'Test Collection'}
+    update_object_data = {'name': 'Test Collection'}
 
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        catchment = CollectionCatchment.objects.create(name='Test Catchment')
-        collector = Collector.objects.create(name='Test Collector')
-        collection_system = CollectionSystem.objects.create(name='Test System')
-        waste_category = WasteCategory.objects.create(name='Test Category')
-        waste_stream = WasteStream.objects.create(
-            name='Test Waste Stream',
-            category=waste_category
-        )
         cls.predecessor_collection = Collection.objects.create(
             name='Test Predecessor',
-            catchment=catchment,
-            collector=collector,
-            collection_system=collection_system,
-            waste_stream=waste_stream,
-        )
-        cls.collection = Collection.objects.create(
-            name='Test Collection',
-            catchment=catchment,
-            collector=collector,
-            collection_system=collection_system,
-            waste_stream=waste_stream,
+            catchment=cls.related_objects['catchment'],
+            collector=cls.related_objects['collector'],
+            collection_system=cls.related_objects['collection_system'],
+            waste_stream=cls.related_objects['waste_stream'],
         )
 
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.collection.pk}))
-        self.assertRedirects(response,
-                             f'{reverse("auth_login")}?next={reverse(self.url_name, kwargs={"pk": self.collection.pk})}')
+    @classmethod
+    def create_related_objects(cls):
+        return {
+            'catchment': CollectionCatchment.objects.create(name='Test Catchment'),
+            'collector': Collector.objects.create(name='Test Collector'),
+            'collection_system': CollectionSystem.objects.create(name='Test System'),
+            'waste_stream': WasteStream.objects.create(
+                name='Test Waste Stream',
+                category=WasteCategory.objects.create(name='Test Category')
+            ),
+        }
 
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.collection.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.collection.pk}))
-        self.assertEqual(response.status_code, 200)
+    def compile_update_post_data(self):
+        # This is just for the standard access tests. Both forms function is tested separately in specific functions.
+        return {'predecessor': self.predecessor_collection.pk, 'submit': 'Add'}
 
     def test_form_contains_one_submit_button_for_each_form(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.collection.pk}))
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_update_url(self.unpublished_object.pk))
         self.assertContains(response, 'type="submit"', count=2, status_code=200)
         self.assertContains(response, 'value="Add"')
         self.assertContains(response, 'value="Remove"')
 
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        response = self.client.post(reverse(self.url_name, kwargs={'pk': self.collection.pk}), {})
-        self.assertRedirects(response,
-                             f'{reverse("auth_login")}?next={reverse(self.url_name, kwargs={"pk": self.collection.pk})}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse(self.url_name, kwargs={'pk': self.collection.pk}))
-        self.assertEqual(response.status_code, 403)
-
     def test_post_success_and_http_302_redirect_on_submit_of_add_form(self):
-        self.client.force_login(self.member)
+        self.client.force_login(self.owner_user)
         data = {'predecessor': self.predecessor_collection.pk, 'submit': 'Add'}
-        response = self.client.post(reverse(self.url_name, kwargs={'pk': self.collection.pk}), data,
-                                    follow=True)
-        self.assertRedirects(response, reverse(self.url_name, kwargs={'pk': self.collection.pk}))
+        response = self.client.post(self.get_update_url(self.unpublished_object.pk), data=data, follow=True)
+        self.assertRedirects(response, self.get_update_success_url(pk=self.unpublished_object.pk))
 
     def test_post_success_and_http_302_redirect_on_submit_of_remove_form(self):
-        self.client.force_login(self.member)
-        self.collection.add_predecessor(self.predecessor_collection)
+        self.client.force_login(self.owner_user)
+        self.unpublished_object.add_predecessor(self.predecessor_collection)
         data = {'predecessor': self.predecessor_collection.pk, 'submit': 'Remove'}
-        response = self.client.post(reverse(self.url_name, kwargs={'pk': self.collection.pk}), data,
-                                    follow=True)
-        self.assertRedirects(response, reverse(self.url_name, kwargs={'pk': self.collection.pk}))
+        response = self.client.post(self.get_update_url(self.unpublished_object.pk), data=data, follow=True)
+        self.assertRedirects(response, self.get_update_success_url(pk=self.unpublished_object.pk))
 
 
 class WasteCollectionMapViewTestCase(ViewWithPermissionsTestCase):

@@ -71,10 +71,13 @@ class WasteStreamModelForm(SimpleModelForm):
         super().__init__(*args, **kwargs)
         categories = MaterialCategory.objects.filter(name='Biowaste component')
         self.fields['allowed_materials'].queryset = Material.objects.filter(categories__in=categories)
+        self.fields['allowed_materials'].required = False
+        self.fields['forbidden_materials'].required = False
+        self.fields['composition'].required = False
 
     class Meta:
         model = WasteStream
-        fields = ('name', 'category', 'allowed_materials', 'composition', 'description')
+        fields = ('name', 'category', 'allowed_materials', 'forbidden_materials', 'composition', 'description')
 
 
 class WasteStreamModalModelForm(ModalModelFormMixin, WasteStreamModelForm):

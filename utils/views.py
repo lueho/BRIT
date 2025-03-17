@@ -192,6 +192,50 @@ class UserCreatedObjectReadAccessMixin(UserPassesTestMixin):
                 return False
 
 
+class UserCreatedObjectWriteAccessMixin(UserPassesTestMixin):
+    """
+    A Mixin to control write access to objects based on 'publication_status' and 'owner'.
+
+    - Published objects ('publication_status' == 'published') are accessible to all users.
+    - Unpublished objects are only accessible to their owners.
+    """
+    publication_status_field = 'publication_status'
+    owner_field = 'owner'
+    published_status = 'published'
+    permission_denied_message = "You do not have permission to access this object."
+
+    def test_func(self):
+
+        user = self.request.user
+
+        # Authentication is required for all write operations
+        if not user.is_authenticated:
+            return False
+
+        obj = self.get_object()
+
+        # Ensure the object has the required fields
+        if not hasattr(obj, self.publication_status_field) or not hasattr(obj, self.owner_field):
+            raise ImproperlyConfigured(
+                f"The model {obj.__class__.__name__} must have '{self.publication_status_field}' and '{self.owner_field}' fields."
+            )
+
+        publication_status = getattr(obj, self.publication_status_field)
+        owner = getattr(obj, self.owner_field)
+
+        # staff can change any object
+        if user.is_staff:
+            return True
+
+        # published objects can only be changed by staff
+        if publication_status == self.published_status:
+            return False
+
+        # owners can change their own objects if they are not published
+        if publication_status in ('private', 'review'):
+            return owner == user
+
+
 class CreateOwnedObjectMixin(PermissionRequiredMixin, NextOrSuccessUrlMixin):
     # TODO: EOL
     def form_valid(self, form):
@@ -331,28 +375,8 @@ class OwnedObjectModalDetailView(PermissionRequiredMixin, BSModalReadView):
         return context
 
 
-class UserCreatedObjectUpdateView(UserOwnsObjectMixin, NextOrSuccessUrlMixin, UpdateView):
+class UserCreatedObjectUpdateView(UserCreatedObjectWriteAccessMixin, NextOrSuccessUrlMixin, UpdateView):
     # TODO: Implement permission flow for publication process and moderators.
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({
-            'form_title': f'Update {self.object._meta.verbose_name}',
-            'submit_button_text': 'Save'
-        })
-        return context
-
-    def get_template_names(self):
-        try:
-            template_names = super().get_template_names()
-        except ImproperlyConfigured:
-            template_names = []
-        template_names.append('simple_form_card.html')
-        return template_names
-
-
-class OwnedObjectUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin, UpdateView):
-    # TODO: EOL this in favor of UserCreatedObjectUpdateView
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -392,7 +416,8 @@ class OwnedObjectCreateWithInlinesView(CreateOwnedObjectMixin, CreateWithInlines
         return template_names
 
 
-class OwnedObjectUpdateWithInlinesView(PermissionRequiredMixin, NextOrSuccessUrlMixin, UpdateWithInlinesView):
+class UserCreatedObjectUpdateWithInlinesView(UserCreatedObjectWriteAccessMixin, NextOrSuccessUrlMixin,
+                                             UpdateWithInlinesView):
     formset_helper_class = DynamicTableInlineFormSetHelper
 
     def get_context_data(self, **kwargs):

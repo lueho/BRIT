@@ -1,4 +1,5 @@
 import json
+from datetime import date
 from unittest.mock import patch
 
 from django.conf import settings
@@ -268,60 +269,11 @@ class LocationCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
         'address': 'Test Address',
         'geom': Point(0, 0),
     }
-
-
-class LocationUpdateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'change_location'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        location_data = {
-            'name': 'Test Location',
-            'address': 'Test Address',
-            'geom': Point(0, 0),
-            'publication_status': 'published',
-        }
-        cls.location = Location.objects.create(**location_data)
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('location-update', kwargs={'pk': self.location.pk})
-        response = self.client.get(url, follow=True)
-        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsider(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('location-update', kwargs={'pk': self.location.pk}))
-        self.assertEqual(403, response.status_code)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('location-update', kwargs={'pk': self.location.pk}))
-        self.assertEqual(200, response.status_code)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('location-update', kwargs={'pk': self.location.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('location-update', kwargs={'pk': self.location.pk})
-        response = self.client.post(url, data={}, follow=True)
-        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsider(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('location-update', kwargs={'pk': self.location.pk}), data={})
-        self.assertEqual(403, response.status_code)
-
-    def test_post_success_and_http_302_redirect_to_success_url_for_member(self):
-        self.client.force_login(self.member)
-        data = {
-            'name': 'Updated Test Location',
-            'geom': 'POINT (30 10)'
-        }
-        response = self.client.post(reverse('location-update', kwargs={'pk': self.location.pk}), data, follow=True)
-        self.assertRedirects(response, reverse('location-detail', kwargs={'pk': self.location.pk}))
+    update_object_data = {
+        'name': 'Updated Test Location',
+        'address': 'Updated Test Address',
+        'geom': Point(0, 0).wkt,
+    }
 
 
 class LocationModalDeleteViewTestCase(ViewWithPermissionsTestCase):
@@ -497,55 +449,11 @@ class RegionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         'name': 'Test Region',
         'country': 'DE',
     }
-
-
-class RegionUpdateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'change_region'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.region = Region.objects.create(owner=cls.member, name='Test Region')
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('region-update', kwargs={'pk': self.region.pk})
-        response = self.client.get(url, follow=True)
-        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsider(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('region-update', kwargs={'pk': self.region.pk}))
-        self.assertEqual(403, response.status_code)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('region-update', kwargs={'pk': self.region.pk}))
-        self.assertEqual(200, response.status_code)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('region-update', kwargs={'pk': self.region.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('region-update', kwargs={'pk': self.region.pk})
-        response = self.client.post(url, data={}, follow=True)
-        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsider(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('region-update', kwargs={'pk': self.region.pk}), data={})
-        self.assertEqual(403, response.status_code)
-
-    def test_post_success_and_http_302_redirect_to_success_url_for_owner(self):
-        self.client.force_login(self.member)
-        data = {
-            'name': 'Updated Test Region',
-            'country': 'DE',
-            'geom': 'MULTIPOLYGON (((30 10, 40 40, 20 40, 10 20, 30 10)))'
-        }
-        response = self.client.post(reverse('region-update', kwargs={'pk': self.region.pk}), data, follow=True)
-        self.assertRedirects(response, reverse('region-detail', kwargs={'pk': self.region.pk}))
+    update_object_data = {
+        'name': 'Updated Test Region',
+        'country': 'DE',
+        'geom': 'MULTIPOLYGON(((0 0, 0 100, 100 100, 100 0, 0 0)))'
+    }
 
 
 class RegionModalDeleteViewTestCase(ViewWithPermissionsTestCase):
@@ -988,59 +896,12 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
     view_update_name = 'catchment-update'
     view_delete_name = 'catchment-delete-modal'
 
-    create_object_data = {
-        'name': 'Test Catchment',
-    }
+    create_object_data = {'name': 'Test Catchment'}
+    update_object_data = {'name': 'Updated Test Catchment'}
 
     @classmethod
     def create_related_objects(cls):
         return {'region': Region.objects.create(name='Test Region')}
-
-
-class CatchmentUpdateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'change_catchment'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.region = Region.objects.create()
-        cls.catchment = Catchment.objects.create(name='Test Catchment', publication_status='published')
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('catchment-update', kwargs={'pk': self.catchment.pk})
-        response = self.client.get(url, follow=True)
-        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsider(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('catchment-update', kwargs={'pk': self.catchment.pk}))
-        self.assertEqual(403, response.status_code)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('catchment-update', kwargs={'pk': self.catchment.pk}))
-        self.assertEqual(200, response.status_code)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('catchment-update', kwargs={'pk': self.catchment.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('catchment-update', kwargs={'pk': self.catchment.pk})
-        response = self.client.post(url, data={}, follow=True)
-        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsider(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('catchment-update', kwargs={'pk': self.catchment.pk}), data={})
-        self.assertEqual(403, response.status_code)
-
-    def test_post_success_and_http_302_redirect_to_success_url_for_member(self):
-        self.client.force_login(self.member)
-        data = {'name': 'Updated Test Catchment', 'type': 'custom', 'region': self.region.pk}
-        response = self.client.post(reverse('catchment-update', kwargs={'pk': self.catchment.pk}), data, follow=True)
-        self.assertRedirects(response, reverse('catchment-detail', kwargs={'pk': self.catchment.pk}))
 
 
 class CatchmentModalDeleteViewTestCase(ViewWithPermissionsTestCase):
@@ -1374,6 +1235,11 @@ class AttributeCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
         'name': 'Test Attribute',
         'unit': 'Test Unit',
     }
+    update_object_data = {
+        'name': 'Updated Test Attribute',
+        'unit': 'Updated Test Unit',
+        'description': 'Updated description'
+    }
 
 
 class AttributeModalDetailViewTestCase(ViewWithPermissionsTestCase):
@@ -1395,54 +1261,6 @@ class AttributeModalDetailViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.outsider)
         response = self.client.get(reverse('attribute-detail-modal', kwargs={'pk': self.attribute.pk}))
         self.assertEqual(response.status_code, 200)
-
-
-class AttributeUpdateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'change_attribute'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.attribute = Attribute.objects.create(
-            name='Test Attribute',
-            unit='Test Unit',
-            description='This ist a test element'
-        )
-
-    def test_get_http_302_redirect_for_anonymous(self):
-        response = self.client.get(reverse('attribute-update', kwargs={'pk': self.attribute.pk}))
-        self.assertEqual(response.status_code, 302)
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('attribute-update', kwargs={'pk': self.attribute.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('attribute-update', kwargs={'pk': self.attribute.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('attribute-update', kwargs={'pk': self.attribute.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_for_anonymous(self):
-        response = self.client.post(reverse('attribute-update', kwargs={'pk': self.attribute.pk}), data={})
-        self.assertEqual(response.status_code, 302)
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        data = {'name': 'Updated Attribute', 'unit': self.attribute.unit}
-        response = self.client.post(reverse('attribute-update', kwargs={'pk': self.attribute.pk}), data=data)
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        data = {'name': 'Updated Attribute', 'unit': self.attribute.unit}
-        response = self.client.post(reverse('attribute-update', kwargs={'pk': self.attribute.pk}), data=data)
-        self.assertEqual(response.status_code, 302)
 
 
 class AttributeModalUpdateViewTestCase(ViewWithPermissionsTestCase):
@@ -1666,6 +1484,11 @@ class RegionAttributeValueCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectC
         'name': 'Test Value',
         'value': 123.321
     }
+    update_object_data = {
+        'name': 'Updated Test Value',
+        'value': 456.654,
+        'date': date.today()
+    }
 
     @classmethod
     def create_related_objects(cls):
@@ -1698,71 +1521,6 @@ class RegionAttributeValueModalDetailViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.outsider)
         response = self.client.get(reverse('regionattributevalue-detail-modal', kwargs={'pk': self.value.pk}))
         self.assertEqual(response.status_code, 200)
-
-
-class RegionAttributeValueUpdateViewTestCase(ViewWithPermissionsTestCase):
-    attribute = None
-    region = None
-    value = None
-    member_permissions = 'change_regionattributevalue'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.region = Region.objects.create(name='Test Region')
-        cls.attribute = Attribute.objects.create(name='Test Attribute', unit='Test Unit')
-        cls.value = RegionAttributeValue.objects.create(
-            name='Test Value',
-            region=cls.region,
-            attribute=cls.attribute,
-            value=123.312
-        )
-
-    def test_get_http_302_redirect_for_anonymous(self):
-        response = self.client.get(reverse('regionattributevalue-update', kwargs={'pk': self.value.pk}))
-        self.assertEqual(response.status_code, 302)
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('regionattributevalue-update', kwargs={'pk': self.value.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('regionattributevalue-update', kwargs={'pk': self.value.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('regionattributevalue-update', kwargs={'pk': self.value.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_for_anonymous(self):
-        response = self.client.post(reverse('regionattributevalue-update', kwargs={'pk': self.value.pk}), data={})
-        self.assertEqual(response.status_code, 302)
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        data = {
-            'name': 'Updated Value',
-            'region': self.region.id,
-            'attribute': self.attribute.id,
-            'value': 456.654
-        }
-        response = self.client.post(reverse('regionattributevalue-update', kwargs={'pk': self.value.pk}), data=data)
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        data = {
-            'name': 'Updated Value',
-            'region': self.region.id,
-            'date': '2022-01-01',
-            'attribute': self.attribute.id,
-            'value': 456.654
-        }
-        response = self.client.post(reverse('regionattributevalue-update', kwargs={'pk': self.value.pk}), data=data)
-        self.assertEqual(response.status_code, 302)
 
 
 class RegionAttributeValueModalUpdateViewTestCase(ViewWithPermissionsTestCase):
