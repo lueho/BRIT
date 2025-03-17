@@ -17,8 +17,8 @@ from maps.models import Catchment, GeoDataset
 from maps.serializers import BaseResultMapSerializer
 from maps.views import MapMixin
 from materials.models import SampleSeries
-from utils.views import (OwnedObjectCreateView, OwnedObjectModalDeleteView, OwnedObjectUpdateView,
-                         PublishedObjectFilterView, UserCreatedObjectDetailView, UserOwnedObjectFilterView)
+from utils.views import (OwnedObjectCreateView, OwnedObjectModalDeleteView, PublishedObjectFilterView,
+                         UserCreatedObjectDetailView, UserCreatedObjectUpdateView, UserOwnedObjectFilterView)
 from .evaluations import ScenarioResult
 from .filters import ScenarioFilterSet
 from .forms import (ScenarioInventoryConfigurationAddForm, ScenarioInventoryConfigurationUpdateForm,
@@ -93,10 +93,9 @@ class ScenarioDetailView(MapMixin, UserCreatedObjectDetailView):
         return redirect('scenario-result', scenario.id)
 
 
-class ScenarioUpdateView(OwnedObjectUpdateView):
+class ScenarioUpdateView(UserCreatedObjectUpdateView):
     model = Scenario
     form_class = ScenarioModelForm
-    permission_required = 'inventories.change_scenario'
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()

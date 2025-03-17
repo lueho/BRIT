@@ -13,9 +13,10 @@ from distributions.models import TemporalDistribution
 from distributions.plots import DoughnutChart
 from utils.views import (NextOrSuccessUrlMixin, OwnedObjectCreateView, OwnedObjectListView, OwnedObjectModalCreateView,
                          OwnedObjectModalDeleteView, OwnedObjectModalDetailView, OwnedObjectModalUpdateView,
-                         OwnedObjectUpdateView, PublishedObjectFilterView, UserCreatedObjectCreateView,
+                         PublishedObjectFilterView, UserCreatedObjectCreateView,
                          UserCreatedObjectDetailView, UserCreatedObjectModalCreateView,
-                         UserCreatedObjectModalDeleteView, UserCreatedObjectUpdateView, UserOwnedObjectFilterView,
+                         UserCreatedObjectModalDeleteView, UserCreatedObjectUpdateView,
+                         UserCreatedObjectUpdateWithInlinesView, UserOwnedObjectFilterView,
                          UserOwnsObjectMixin)
 from .filters import PublishedSampleFilter, SampleSeriesFilter, UserOwnedSampleFilter
 from .forms import (AddComponentModalForm, AddCompositionModalForm, AddLiteratureSourceForm, AddSeasonalVariationForm,
@@ -65,10 +66,9 @@ class MaterialCategoryModalDetailView(OwnedObjectModalDetailView):
     permission_required = set()
 
 
-class MaterialCategoryUpdateView(OwnedObjectUpdateView):
+class MaterialCategoryUpdateView(UserCreatedObjectUpdateView):
     model = MaterialCategory
     form_class = MaterialCategoryModelForm
-    permission_required = 'materials.change_materialcategory'
 
 
 class MaterialCategoryModalUpdateView(OwnedObjectModalUpdateView):
@@ -115,10 +115,9 @@ class MaterialModalDetailView(OwnedObjectModalDetailView):
     permission_required = set()
 
 
-class MaterialUpdateView(OwnedObjectUpdateView):
+class MaterialUpdateView(UserCreatedObjectUpdateView):
     model = Material
     form_class = MaterialModelForm
-    permission_required = 'materials.change_material'
 
 
 class MaterialModalUpdateView(OwnedObjectModalUpdateView):
@@ -184,10 +183,9 @@ class ComponentModalDetailView(OwnedObjectModalDetailView):
     permission_required = set()
 
 
-class ComponentUpdateView(OwnedObjectUpdateView):
+class ComponentUpdateView(UserCreatedObjectUpdateView):
     model = MaterialComponent
     form_class = ComponentModelForm
-    permission_required = 'materials.change_materialcomponent'
 
 
 class ComponentModalUpdateView(OwnedObjectModalUpdateView):
@@ -233,10 +231,9 @@ class MaterialComponentGroupModalDetailView(OwnedObjectModalDetailView):
     permission_required = set()
 
 
-class MaterialComponentGroupUpdateView(OwnedObjectUpdateView):
+class MaterialComponentGroupUpdateView(UserCreatedObjectUpdateView):
     model = MaterialComponentGroup
     form_class = ComponentGroupModelForm
-    permission_required = 'materials.change_materialcomponentgroup'
 
 
 class MaterialComponentGroupModalUpdateView(OwnedObjectModalUpdateView):
@@ -281,10 +278,9 @@ class MaterialPropertyModalDetailView(OwnedObjectModalDetailView):
     permission_required = set()
 
 
-class MaterialPropertyUpdateView(OwnedObjectUpdateView):
+class MaterialPropertyUpdateView(UserCreatedObjectUpdateView):
     model = MaterialProperty
     form_class = MaterialPropertyModelForm
-    permission_required = 'materials.change_materialproperty'
 
 
 class MaterialPropertyModalUpdateView(OwnedObjectModalUpdateView):
@@ -350,10 +346,9 @@ class SampleSeriesModalDetailView(OwnedObjectModalDetailView):
     permission_required = set()
 
 
-class SampleSeriesUpdateView(OwnedObjectUpdateView):
+class SampleSeriesUpdateView(UserCreatedObjectUpdateView):
     model = SampleSeries
     form_class = SampleSeriesModelForm
-    permission_required = 'materials.change_sampleseries'
 
 
 class SampleSeriesModalUpdateView(OwnedObjectModalUpdateView):
@@ -374,10 +369,9 @@ class SampleSeriesModalDeleteView(OwnedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class SampleSeriesCreateDuplicateView(OwnedObjectUpdateView):
+class SampleSeriesCreateDuplicateView(UserCreatedObjectUpdateView):
     model = SampleSeries
     form_class = SampleSeriesModelForm
-    permission_required = 'materials.add_sampleseries'
     object = None
 
     def form_valid(self, form):
@@ -625,10 +619,10 @@ class CompositionModalDetailView(OwnedObjectModalDetailView):
     permission_required = set()
 
 
-class CompositionUpdateView(UserPassesTestMixin, NextOrSuccessUrlMixin, UpdateWithInlinesView):
+class CompositionUpdateView(UserCreatedObjectUpdateWithInlinesView):
     model = Composition
+    form_class = CompositionModelForm
     inlines = [InlineWeightShare, ]
-    fields = set()
 
     def get_context_data(self, **kwargs):
         inline_helper = WeightShareUpdateFormSetHelper()
@@ -641,11 +635,6 @@ class CompositionUpdateView(UserPassesTestMixin, NextOrSuccessUrlMixin, UpdateWi
         }
         context.update(kwargs)
         return super().get_context_data(**context)
-
-    def test_func(self):
-        if not self.request.user.is_authenticated:
-            return False
-        return self.request.user == self.get_object().owner
 
 
 class CompositionModalUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin, UpdateWithInlinesView):

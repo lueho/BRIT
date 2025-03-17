@@ -87,26 +87,24 @@
                             </a>
                         </div>
                     </div>
-                    {% if request.user == object.owner %}
+                    {% if user == object.owner or user.is_staff %}
                         <div class="dropdown">
                             <button class="btn btn-secondary dropdown-toggle ml-3" type="button" id="editDropdown"
                                     data-toggle="dropdown" aria-expanded="false">
                                 Options
                             </button>
                             <div class="dropdown-menu" aria-labelledby="editDropdown">
-                                {% if request.user == object.owner %}
-                                    <a class="dropdown-item"
-                                       href="{% url 'sample-update' object.id %}?next={{ request.path }}">
-                                        <i class="fas fa-edit"></i> Edit
-                                    </a>
-                                    <a class="dropdown-item" href="{% url 'sample-duplicate' object.id %}">
-                                        <i class="fas fa-fw fa-copy"></i> Duplicate
-                                    </a>
-                                    <a class="dropdown-item modal-link"
-                                       href="{% url 'sample-delete-modal' object.pk %}">
-                                        <i class="fas fa-fw fa-trash"></i> Delete
-                                    </a>
-                                {% endif %}
+                                <a class="dropdown-item"
+                                   href="{% url 'sample-update' object.id %}?next={{ request.path }}">
+                                    <i class="fas fa-edit"></i> Edit
+                                </a>
+                                <a class="dropdown-item" href="{% url 'sample-duplicate' object.id %}">
+                                    <i class="fas fa-fw fa-copy"></i> Duplicate
+                                </a>
+                                <a class="dropdown-item modal-link"
+                                   href="{% url 'sample-delete-modal' object.pk %}">
+                                    <i class="fas fa-fw fa-trash"></i> Delete
+                                </a>
                             </div>
                         </div>
                     {% endif %}
@@ -234,31 +232,31 @@
                         <b>Shares of:</b> {{ composition.fractions_of_name }}
                     </div>
                     <div class="card-footer d-flex">
-                        {% if request.user == object.owner %}
-                                <a id="move-group-{{ composition.id }}-left"
-                                   href="{% url 'composition-order-down' composition.id %}?next={{ request.path }}"
-                                   class="mr-3 nowrap"
-                                >
-                                    <i class="fas fa-fw fa-arrow-left"></i>
-                                </a>
-                                <a id="edit-group-{{ composition.id }}"
-                                   href="{% url 'composition-update' composition.id %}?next={{ request.path }}"
-                                   class="mr-3 nowrap"
-                                >
-                                    <i class="fas fa-fw fa-edit"></i> Edit
-                                </a>
-                                <a id="remove-group-{{ composition.id }}"
-                                   href="{% url 'composition-delete-modal' composition.id %}?next={{ request.path }}"
-                                   class="mr-3 nowrap modal-link"
-                                >
-                                    <i class="fas fa-fw fa-trash"></i> Delete
-                                </a>
-                                <a id="move-group-{{ composition.id }}-right"
-                                   href="{% url 'composition-order-up' composition.id %}?next={{ request.path }}"
-                                      class="ml-auto nowrap"
-                                >
-                                    <i class="fas fa-fw fa-arrow-right"></i>
-                                </a>
+                        {% if user == object.owner or user.is_staff %}
+                            <a id="move-group-{{ composition.id }}-left"
+                               href="{% url 'composition-order-down' composition.id %}?next={{ request.path }}"
+                               class="mr-3 nowrap"
+                            >
+                                <i class="fas fa-fw fa-arrow-left"></i>
+                            </a>
+                            <a id="edit-group-{{ composition.id }}"
+                               href="{% url 'composition-update' composition.id %}?next={{ request.path }}"
+                               class="mr-3 nowrap"
+                            >
+                                <i class="fas fa-fw fa-edit"></i> Edit
+                            </a>
+                            <a id="remove-group-{{ composition.id }}"
+                               href="{% url 'composition-delete-modal' composition.id %}?next={{ request.path }}"
+                               class="mr-3 nowrap modal-link"
+                            >
+                                <i class="fas fa-fw fa-trash"></i> Delete
+                            </a>
+                            <a id="move-group-{{ composition.id }}-right"
+                               href="{% url 'composition-order-up' composition.id %}?next={{ request.path }}"
+                               class="ml-auto nowrap"
+                            >
+                                <i class="fas fa-fw fa-arrow-right"></i>
+                            </a>
                         {% endif %}
                     </div>
                 </div>

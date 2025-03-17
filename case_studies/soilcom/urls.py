@@ -7,7 +7,7 @@ from .router import router
 urlpatterns = [
     path('', views.CollectionHomeView.as_view(), name='waste-collection-home'),
     path('catchments/<int:pk>/', views.CollectionCatchmentDetailView.as_view(), name='collectioncatchment-detail'),
-    path('catchments/<int:pk>/update/', CatchmentUpdateView.as_view(), name='collectioncatchment-update'),
+    path('catchments/<int:pk>/update/', views.CollectionCatchmentUpdateView.as_view(), name='collectioncatchment-update'),
     path('catchments/<int:pk>/delete/modal/', CatchmentModalDeleteView.as_view(), name='collectioncatchment-delete-modal'),
     path('catchments/<int:pk>/add_aggregated_property/', views.CollectionCatchmentAddAggregatedPropertyView.as_view(), name='collectioncatchment-add-aggregatedpropertyvalue'),
     path('collectors/', views.CollectorListView.as_view(), name='collector-list'),
@@ -89,8 +89,6 @@ urlpatterns = [
     path('flyers/create/modal/', views.WasteFlyerModalCreateView.as_view(), name='wasteflyer-create-modal'),
     path('flyers/<int:pk>/', views.WasteFlyerDetailView.as_view(), name='wasteflyer-detail'),
     path('flyers/<int:pk>/modal/', views.WasteFlyerModalDetailView.as_view(), name='wasteflyer-detail-modal'),
-    path('flyers/<int:pk>/update/', views.WasteFlyerUpdateView.as_view(), name='wasteflyer-update'),
-    path('flyers/<int:pk>/update/modal/', views.WasteFlyerModalUpdateView.as_view(), name='wasteflyer-update-modal'),
     path('flyers/<int:pk>/delete/modal/', views.WasteFlyerModalDeleteView.as_view(), name='wasteflyer-delete-modal'),
     path('flyers/<int:pk>/check_url_in_task/', views.WasteFlyerCheckUrlView.as_view(), name='wasteflyer-check-url'),
     path('flyers/check_url_in_task/<str:task_id>/progress/', views.WasteFlyerCheckUrlProgressView.as_view(), name='wasteflyer-check-url-progress'),

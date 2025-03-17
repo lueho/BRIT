@@ -7,11 +7,17 @@ from extra_views import InlineFormSetFactory
 
 from distributions.models import Timestep
 from materials.models import MaterialComponent
-from utils.forms import SimpleModelForm, ModalModelForm, ModalModelFormMixin
-from .models import Culture, Greenhouse, GreenhouseGrowthCycle, GrowthTimeStepSet, GrowthShare
+from utils.forms import ModalModelForm, ModalModelFormMixin, SimpleModelForm
+from .models import Culture, Greenhouse, GreenhouseGrowthCycle, GrowthShare, GrowthTimeStepSet
 
 
-class CultureModelForm(ModalModelForm):
+class CultureModelForm(SimpleModelForm):
+    class Meta:
+        model = Culture
+        fields = ('name', 'residue', 'description')
+
+
+class CultureModalModelForm(ModalModelForm):
     class Meta:
         model = Culture
         fields = ('name', 'residue')

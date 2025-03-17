@@ -27,6 +27,7 @@ class ViewWithPermissionsTestCase(UserLoginTestCase):
     owner = None
     outsider = None
     member = None
+    staff = None
     member_permissions = None
 
     @classmethod
@@ -34,6 +35,7 @@ class ViewWithPermissionsTestCase(UserLoginTestCase):
         cls.owner = User.objects.create(username='owner')
         cls.outsider = User.objects.create(username='outsider')
         cls.member = User.objects.create(username='member')
+        cls.staff = User.objects.create(username='staff', is_staff=True)
         if cls.member_permissions:
             if isinstance(cls.member_permissions, str):
                 cls.member_permissions = [cls.member_permissions]
@@ -60,6 +62,7 @@ def comparable_model_dict(instance):
     return {k: v for k, v in instance.__dict__.items() if
             k not in ('_state', 'lastmodified_at', '_prefetched_objects_cache')}
 
+
 class AbstractTestCases(object):
     class UserCreatedObjectCRUDViewTestCase(ABC, UserLoginTestCase):
         """
@@ -71,21 +74,27 @@ class AbstractTestCases(object):
         - view_update_name: The name of the UpdateView URL.
         - view_delete_name: The name of the DeleteView URL.
         - create_object_data: A dictionary with data to create an object.
-        - form_update_data: A dictionary with data to update the object.
-        - success_url: The URL to redirect after successful update or delete.
+        - update_object_data: A dictionary with data to update the object.
+        - update_success_url_name: The URL to redirect after successful update or delete.
         - permission_denied_message: Message displayed on permission denied.
         """
 
         # This is an abstract class and should not be run as a test case directly
         __test__ = False
 
+        create_view = False
+        list_view = False
+        detail_view = True
+        update_view = True
+        delete_view = False
+
         model = None
         view_detail_name = None
         view_update_name = None
         view_delete_name = None
         create_object_data = None
-        form_update_data = None
-        success_url = None
+        update_object_data = None
+        update_success_url_name = None
         permission_denied_message = "Sorry, you don't have permission to access this page."
 
         related_objects = None
@@ -95,13 +104,13 @@ class AbstractTestCases(object):
         @classmethod
         def setUpTestData(cls):
             cls.owner_user = User.objects.create(username='owner')
-            cls.non_owner_user = User.objects.create(username='nonowner')
+            cls.non_owner_user = User.objects.create(username='non_owner')
+            cls.staff_user = User.objects.create(username='staff', is_staff=True)
 
             cls.related_objects = cls.create_related_objects()
 
             cls.published_object = cls.create_published_object()
             cls.unpublished_object = cls.create_unpublished_object()
-
 
         @classmethod
         def create_related_objects(cls):
@@ -113,6 +122,9 @@ class AbstractTestCases(object):
                 A dictionary of related objects that can be used in `create_object_data`.
             """
             return {}
+
+        def related_objects_post_data(self):
+            return {key: value.pk for key, value in self.related_objects.items()}
 
         @classmethod
         def create_published_object(cls):
@@ -154,42 +166,71 @@ class AbstractTestCases(object):
         def get_delete_url(self, pk):
             return reverse(self.view_delete_name, kwargs={'pk': pk})
 
+        def get_update_success_url(self, pk=None):
+            # Assume that by convention the success URL is the detail view of the object
+            if not self.update_success_url_name:
+                self.update_success_url_name = self.view_detail_name
+            return reverse(self.update_success_url_name, kwargs={'pk': pk})
+
+        def compile_update_post_data(self):
+            data = self.update_object_data
+            data.update(self.related_objects_post_data())
+            return data
+
         # -----------------------
         # DetailView Test Cases
         # -----------------------
 
         def test_detail_view_published_as_anonymous(self):
+            if not self.detail_view:
+                self.skipTest("Detail view is not enabled for this test case.")
             url = self.get_detail_url(self.published_object.pk)
             response = self.client.get(url)
             self.assertEqual(response.status_code, 200)
-            self.assertNotContains(response, self.get_update_url(self.published_object.pk))
-            self.assertNotContains(response, self.get_delete_url(self.published_object.pk))
+            if self.update_view:
+                self.assertNotContains(response, self.get_update_url(self.published_object.pk))
+            if self.delete_view:
+                self.assertNotContains(response, self.get_delete_url(self.published_object.pk))
 
         def test_detail_view_published_as_authenticated_owner(self):
+            if not self.detail_view:
+                self.skipTest("Detail view is not enabled for this test case.")
             self.client.force_login(self.owner_user)
             url = self.get_detail_url(self.published_object.pk)
             response = self.client.get(url)
             self.assertEqual(response.status_code, 200)
-            self.assertContains(response, self.get_update_url(self.published_object.pk))
-            self.assertContains(response, self.get_delete_url(self.published_object.pk))
+            if self.update_view:
+                self.assertContains(response, self.get_update_url(self.published_object.pk))
+            if self.delete_view:
+                self.assertContains(response, self.get_delete_url(self.published_object.pk))
 
         def test_detail_view_published_as_authenticated_non_owner(self):
+            if not self.detail_view:
+                self.skipTest("Detail view is not enabled for this test case.")
             self.client.force_login(self.non_owner_user)
             url = self.get_detail_url(self.published_object.pk)
             response = self.client.get(url)
             self.assertEqual(response.status_code, 200)
-            self.assertNotContains(response, self.get_update_url(self.published_object.pk))
-            self.assertNotContains(response, self.get_delete_url(self.published_object.pk))
+            if self.update_view:
+                self.assertNotContains(response, self.get_update_url(self.published_object.pk))
+            if self.delete_view:
+                self.assertNotContains(response, self.get_delete_url(self.published_object.pk))
 
         def test_detail_view_unpublished_as_owner(self):
+            if not self.detail_view:
+                self.skipTest("Detail view is not enabled for this test case.")
             self.client.force_login(self.owner_user)
             url = self.get_detail_url(self.unpublished_object.pk)
             response = self.client.get(url)
             self.assertEqual(response.status_code, 200)
-            self.assertContains(response, self.get_update_url(self.unpublished_object.pk))
-            self.assertContains(response, self.get_delete_url(self.unpublished_object.pk))
+            if self.update_view:
+                self.assertContains(response, self.get_update_url(self.unpublished_object.pk))
+            if self.delete_view:
+                self.assertContains(response, self.get_delete_url(self.unpublished_object.pk))
 
         def test_detail_view_unpublished_as_non_owner(self):
+            if not self.detail_view:
+                self.skipTest("Detail view is not enabled for this test case.")
             self.client.force_login(self.non_owner_user)
             url = self.get_detail_url(self.unpublished_object.pk)
             response = self.client.get(url)
@@ -197,6 +238,8 @@ class AbstractTestCases(object):
             self.assertContains(response, self.permission_denied_message, status_code=403)
 
         def test_detail_view_unpublished_as_anonymous(self):
+            if not self.detail_view:
+                self.skipTest("Detail view is not enabled for this test case.")
             url = self.get_detail_url(self.unpublished_object.pk)
             response = self.client.get(url)
             login_url = settings.LOGIN_URL
@@ -204,6 +247,8 @@ class AbstractTestCases(object):
             self.assertRedirects(response, expected_redirect)
 
         def test_detail_view_nonexistent_object(self):
+            if not self.detail_view:
+                self.skipTest("Detail view is not enabled for this test case.")
             url = self.get_detail_url(pk=9999)  # Assuming this PK does not exist
             response = self.client.get(url)
             self.assertEqual(response.status_code, 404)
@@ -211,64 +256,145 @@ class AbstractTestCases(object):
         # -----------------------
         # UpdateView Test Cases
         # -----------------------
-        # TODO: Implement update test functions
-        # def test_update_view_published_as_owner(self):
-        #     self.client.login(username='owner', password='password123')
-        #     url = self.get_update_url(self.published_object.pk)
-        #     response = self.client.get(url)
-        #     self.assertEqual(response.status_code, 200)
-        #     self.assertContains(response, "Edit")
-        #
-        # def test_update_view_published_as_non_owner(self):
-        #     self.client.login(username='nonowner', password='password123')
-        #     url = self.get_update_url(self.published_object.pk)
-        #     response = self.client.get(url)
-        #     self.assertEqual(response.status_code, 403)
-        #     self.assertContains(response, self.permission_denied_message, status_code=403)
-        #
-        # def test_update_view_published_as_anonymous(self):
-        #     url = self.get_update_url(self.published_object.pk)
-        #     response = self.client.get(url)
-        #     login_url = settings.LOGIN_URL
-        #     expected_redirect = f"{login_url}?next={url}"
-        #     self.assertRedirects(response, expected_redirect)
-        #
-        # def test_update_view_unpublished_as_owner(self):
-        #     self.client.login(username='owner', password='password123')
-        #     url = self.get_update_url(self.unpublished_object.pk)
-        #     response = self.client.get(url)
-        #     self.assertEqual(response.status_code, 200)
-        #     self.assertContains(response, "Edit")
-        #
-        # def test_update_view_unpublished_as_non_owner(self):
-        #     self.client.login(username='nonowner', password='password123')
-        #     url = self.get_update_url(self.unpublished_object.pk)
-        #     response = self.client.get(url)
-        #     self.assertEqual(response.status_code, 403)
-        #     self.assertContains(response, self.permission_denied_message, status_code=403)
-        #
-        # def test_update_view_unpublished_as_anonymous(self):
-        #     url = self.get_update_url(self.unpublished_object.pk)
-        #     response = self.client.get(url)
-        #     login_url = settings.LOGIN_URL
-        #     expected_redirect = f"{login_url}?next={url}"
-        #     self.assertRedirects(response, expected_redirect)
-        #
-        # def test_update_view_nonexistent_object(self):
-        #     url = self.get_update_url(pk=9999)
-        #     response = self.client.get(url)
-        #     self.assertEqual(response.status_code, 404)
-        #
-        # def test_update_view_post_as_owner(self):
-        #     self.client.login(username='owner', password='password123')
-        #     url = self.get_update_url(self.published_object.pk)
-        #     data = self.form_update_data
-        #     response = self.client.post(url, data)
-        #     self.assertRedirects(response, self.success_url)
-        #     self.published_object.refresh_from_db()
-        #     # Adjust field names based on your model
-        #     for key, value in data.items():
-        #         self.assertEqual(getattr(self.published_object, key), value)
+
+        def test_update_view_get_published_as_anonymous(self):
+            if not self.update_view:
+                self.skipTest("Update view is not enabled for this test case.")
+            url = self.get_update_url(self.published_object.pk)
+            response = self.client.get(url)
+            self.assertRedirects(response, f"{settings.LOGIN_URL}?next={url}")
+
+        def test_update_view_post_published_as_anonymous(self):
+            if not self.update_view:
+                self.skipTest("Update view is not enabled for this test case.")
+            url = self.get_update_url(self.published_object.pk)
+            response = self.client.post(url)
+            self.assertRedirects(response, f"{settings.LOGIN_URL}?next={url}")
+
+        def test_update_view_get_published_as_owner(self):
+            if not self.update_view:
+                self.skipTest("Update view is not enabled for this test case.")
+            # published objects should not be edited anymore
+            self.client.force_login(self.owner_user)
+            url = self.get_update_url(self.published_object.pk)
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 403)
+            self.assertContains(response, self.permission_denied_message, status_code=403)
+
+        def test_update_view_post_published_as_owner(self):
+            if not self.update_view:
+                self.skipTest("Update view is not enabled for this test case.")
+            # published objects should not be edited anymore
+            self.client.force_login(self.owner_user)
+            url = self.get_update_url(self.published_object.pk)
+            response = self.client.post(url)
+            self.assertEqual(response.status_code, 403)
+            self.assertContains(response, self.permission_denied_message, status_code=403)
+
+        def test_update_view_get_published_as_non_owner(self):
+            if not self.update_view:
+                self.skipTest("Update view is not enabled for this test case.")
+            self.client.force_login(self.non_owner_user)
+            url = self.get_update_url(self.published_object.pk)
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 403)
+            self.assertContains(response, self.permission_denied_message, status_code=403)
+
+        def test_update_view_post_published_as_non_owner(self):
+            if not self.update_view:
+                self.skipTest("Update view is not enabled for this test case.")
+            self.client.force_login(self.non_owner_user)
+            url = self.get_update_url(self.published_object.pk)
+            response = self.client.post(url)
+            self.assertEqual(response.status_code, 403)
+            self.assertContains(response, self.permission_denied_message, status_code=403)
+
+        def test_update_view_get_published_as_staff_user(self):
+            if not self.update_view:
+                self.skipTest("Update view is not enabled for this test case.")
+            # staff can edit any object
+            self.client.force_login(self.staff_user)
+            url = self.get_update_url(self.published_object.pk)
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200)
+
+        def test_update_view_post_published_as_staff_user(self):
+            if not self.update_view:
+                self.skipTest("Update view is not enabled for this test case.")
+            # staff can edit any object
+            self.client.force_login(self.staff_user)
+            url = self.get_update_url(self.published_object.pk)
+            data = self.compile_update_post_data()
+            response = self.client.post(url, data)
+            self.assertRedirects(response, self.get_update_success_url(pk=self.published_object.pk))
+
+        def test_update_view_get_unpublished_as_anonymous(self):
+            if not self.update_view:
+                self.skipTest("Update view is not enabled for this test case.")
+            url = self.get_update_url(self.unpublished_object.pk)
+            response = self.client.get(url)
+            self.assertRedirects(response, f"{settings.LOGIN_URL}?next={url}")
+
+        def test_update_view_post_unpublished_as_anonymous(self):
+            if not self.update_view:
+                self.skipTest("Update view is not enabled for this test case.")
+            url = self.get_update_url(self.unpublished_object.pk)
+            response = self.client.post(url)
+            self.assertRedirects(response, f"{settings.LOGIN_URL}?next={url}")
+
+        def test_update_view_get_unpublished_as_owner(self):
+            if not self.update_view:
+                self.skipTest("Update view is not enabled for this test case.")
+            self.client.force_login(self.owner_user)
+            url = self.get_update_url(self.unpublished_object.pk)
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200)
+
+        def test_update_view_post_unpublished_as_owner(self):
+            if not self.update_view:
+                self.skipTest("Update view is not enabled for this test case.")
+            self.client.force_login(self.owner_user)
+            url = self.get_update_url(self.unpublished_object.pk)
+            data = self.compile_update_post_data()
+            response = self.client.post(url, data)
+            self.assertRedirects(response, self.get_update_success_url(pk=self.unpublished_object.pk))
+
+        def test_update_view_get_unpublished_as_non_owner(self):
+            if not self.update_view:
+                self.skipTest("Update view is not enabled for this test case.")
+            self.client.force_login(self.non_owner_user)
+            url = self.get_update_url(self.unpublished_object.pk)
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 403)
+            self.assertContains(response, self.permission_denied_message, status_code=403)
+
+        def test_update_view_post_unpublished_as_non_owner(self):
+            if not self.update_view:
+                self.skipTest("Update view is not enabled for this test case.")
+            self.client.force_login(self.non_owner_user)
+            url = self.get_update_url(self.unpublished_object.pk)
+            response = self.client.post(url)
+            self.assertEqual(response.status_code, 403)
+            self.assertContains(response, self.permission_denied_message, status_code=403)
+
+        def test_update_view_get_unpublished_as_staff_user(self):
+            if not self.update_view:
+                self.skipTest("Update view is not enabled for this test case.")
+            # staff can edit any object
+            self.client.force_login(self.staff_user)
+            url = self.get_update_url(self.unpublished_object.pk)
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200)
+
+        def test_update_view_post_unpublished_as_staff_user(self):
+            if not self.update_view:
+                self.skipTest("Update view is not enabled for this test case.")
+            # staff can edit any object
+            self.client.force_login(self.staff_user)
+            url = self.get_update_url(self.unpublished_object.pk)
+            data = self.compile_update_post_data()
+            response = self.client.post(url, data)
+            self.assertRedirects(response, self.get_update_success_url(pk=self.unpublished_object.pk))
 
         # -----------------------
         # DeleteView Test Cases
