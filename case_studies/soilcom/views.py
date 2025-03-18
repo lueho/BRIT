@@ -41,7 +41,7 @@ from .tasks import check_wasteflyer_urls
 
 
 class CollectionHomeView(PermissionRequiredMixin, TemplateView):
-    template_name = 'waste_collection_home.html'
+    template_name = 'wastecollection_dashboard.html'
     permission_required = 'soilcom.view_collection'
 
 
