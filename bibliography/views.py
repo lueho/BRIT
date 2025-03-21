@@ -10,7 +10,8 @@ from django.views import View
 from django.views.generic import TemplateView
 
 from utils import views
-from utils.views import (OwnedObjectCreateWithInlinesView, UserCreatedObjectDetailView, UserCreatedObjectUpdateView,
+from utils.views import (OwnedObjectCreateWithInlinesView, PublishedObjectFilterView, PublishedObjectListView,
+                         UserCreatedObjectDetailView, UserCreatedObjectUpdateView,
                          UserCreatedObjectUpdateWithInlinesView)
 from .filters import SourceFilter
 from .forms import (AuthorModalModelForm, AuthorModelForm, LicenceModalModelForm, LicenceModelForm, SourceAuthorInline,
@@ -28,9 +29,8 @@ class BibliographyDashboardView(TemplateView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class AuthorListView(views.OwnedObjectListView):
+class AuthorListView(PublishedObjectListView):
     model = Author
-    permission_required = set()
 
 
 class AuthorCreateView(views.OwnedObjectCreateView):
@@ -89,9 +89,8 @@ class AuthorAutoCompleteView(Select2QuerySetView):
 # ----------- Licence CRUD ----------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class LicenceListView(views.OwnedObjectListView):
+class LicenceListView(PublishedObjectListView):
     model = Licence
-    permission_required = set()
 
 
 class LicenceCreateView(views.OwnedObjectCreateView):
@@ -136,22 +135,10 @@ class LicenceModalDeleteView(views.OwnedObjectModalDeleteView):
 # ----------- Source CRUD ----------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class SourceListView(views.OwnedObjectListView):
+class PublishedSourcesFilterView(PublishedObjectFilterView):
     model = Source
     queryset = Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by('abbreviation')
     filterset_class = SourceFilter
-    filterset = None
-    permission_required = set()
-
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        self.filterset = self.filterset_class(self.request.GET, queryset=queryset)
-        return self.filterset.qs
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['filter'] = self.filterset
-        return context
 
 
 class SourceCreateView(OwnedObjectCreateWithInlinesView):

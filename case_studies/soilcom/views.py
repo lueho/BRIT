@@ -20,9 +20,9 @@ from maps.forms import NutsAndLauCatchmentQueryForm
 from maps.views import (CatchmentDetailView, CatchmentUpdateView, GeoDataSetFilteredMapView, GeoDataSetFormMixin,
                         MapMixin)
 from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineFormSetMixin
-from utils.views import (BRITFilterView, OwnedObjectCreateView, OwnedObjectListView, OwnedObjectModalCreateView,
-                         OwnedObjectModalDeleteView, OwnedObjectModalDetailView, OwnedObjectModalUpdateView,
-                         OwnedObjectModelSelectOptionsView, UserCreatedObjectDetailView,
+from utils.views import (BRITFilterView, OwnedObjectCreateView, OwnedObjectModalCreateView, OwnedObjectModalDeleteView,
+                         OwnedObjectModalDetailView, OwnedObjectModalUpdateView, OwnedObjectModelSelectOptionsView,
+                         PublishedObjectFilterView, PublishedObjectListView, UserCreatedObjectDetailView,
                          UserCreatedObjectUpdateView)
 from .filters import CollectionFilterSet, CollectorFilter, WasteFlyerFilter
 from .forms import (AggregatedCollectionPropertyValueModelForm, BaseWasteFlyerUrlFormSet, CollectionAddPredecessorForm,
@@ -109,9 +109,8 @@ class CollectorAutoCompleteView(Select2QuerySetView):
 # ----------- Collection System CRUD -----------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class CollectionSystemListView(OwnedObjectListView):
+class CollectionSystemListView(PublishedObjectListView):
     model = CollectionSystem
-    permission_required = 'soilcom.view_collectionsystem'
 
 
 class CollectionSystemCreateView(OwnedObjectCreateView):
@@ -159,9 +158,8 @@ class CollectionSystemModalDeleteView(OwnedObjectModalDeleteView):
 # ----------- Waste Stream Category CRUD -------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class WasteCategoryListView(OwnedObjectListView):
+class WasteCategoryListView(PublishedObjectListView):
     model = WasteCategory
-    permission_required = 'soilcom.view_wastecategory'
 
 
 class WasteCategoryCreateView(OwnedObjectCreateView):
@@ -208,9 +206,8 @@ class WasteCategoryModalDeleteView(OwnedObjectModalDeleteView):
 # ----------- Waste Component CRUD -------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class WasteComponentListView(OwnedObjectListView):
+class WasteComponentListView(PublishedObjectListView):
     model = WasteComponent
-    permission_required = 'soilcom.view_wastecomponent'
 
 
 class WasteComponentCreateView(OwnedObjectCreateView):
@@ -356,9 +353,8 @@ class WasteFlyerListCheckUrlsProgressView(LoginRequiredMixin, View):
 # ----------- Frequency CRUD -------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class FrequencyListView(OwnedObjectListView):
+class FrequencyListView(PublishedObjectListView):
     model = CollectionFrequency
-    permission_required = set()
 
 
 class FrequencyCreateView(M2MInlineFormSetMixin, OwnedObjectCreateView):
@@ -543,10 +539,9 @@ class CollectionCatchmentUpdateView(CatchmentUpdateView):
 # ----------- Collection CRUD ------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class CollectionCurrentListView(BRITFilterView):
+class CollectionCurrentListView(PublishedObjectFilterView):
     model = Collection
     filterset_class = CollectionFilterSet
-    ordering = 'name'
 
     def get_queryset(self):
         queryset = super().get_queryset()

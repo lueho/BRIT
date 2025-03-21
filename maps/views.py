@@ -18,9 +18,9 @@ from maps.serializers import (CatchmentGeoFeatureModelSerializer, LauRegionOptio
                               NutsRegionCatchmentOptionSerializer, NutsRegionOptionSerializer,
                               NutsRegionSummarySerializer, RegionGeoFeatureModelSerializer)
 from utils.forms import DynamicTableInlineFormSetHelper
-from utils.views import (BRITFilterView, OwnedObjectCreateView, OwnedObjectListView, OwnedObjectModalCreateView,
-                         OwnedObjectModalDeleteView, OwnedObjectModalDetailView, OwnedObjectModalUpdateView,
-                         OwnedObjectModelSelectOptionsView, PublishedObjectFilterView, UserCreatedObjectDetailView,
+from utils.views import (BRITFilterView, OwnedObjectCreateView, OwnedObjectModalCreateView, OwnedObjectModalDeleteView,
+                         OwnedObjectModalDetailView, OwnedObjectModalUpdateView, OwnedObjectModelSelectOptionsView,
+                         PublishedObjectFilterView, PublishedObjectListView, UserCreatedObjectDetailView,
                          UserCreatedObjectUpdateView, UserOwnedObjectFilterView)
 from .filters import CatchmentFilterSet, GeoDataSetFilterSet, NutsRegionFilterSet, RegionFilterSet
 from .forms import (AttributeModalModelForm, AttributeModelForm, CatchmentCreateDrawCustomForm,
@@ -267,9 +267,8 @@ class GeoDataSetFormMixin(FormMixin):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class GeoDataSetListView(OwnedObjectListView):
+class GeoDataSetListView(PublishedObjectListView):
     model = GeoDataset
-    permission_required = set()
 
 
 class GeoDataSetCreateView(OwnedObjectCreateView):
@@ -318,9 +317,8 @@ class GeoDataSetModalDeleteView(OwnedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class LocationListView(OwnedObjectListView):
+class LocationListView(PublishedObjectListView):
     model = Location
-    permission_required = set()
 
 
 class LocationCreateView(OwnedObjectCreateView):
@@ -800,9 +798,8 @@ class NutsAndLauCatchmentPedigreeAPI(APIView):
 # ----------- Attribute CRUD -------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class AttributeListView(OwnedObjectListView):
+class AttributeListView(PublishedObjectListView):
     model = Attribute
-    permission_required = set()
 
 
 class AttributeCreateView(OwnedObjectCreateView):
@@ -850,9 +847,8 @@ class AttributeModalDeleteView(OwnedObjectModalDeleteView):
 # ----------- Region Attribute Value CRUD ------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class RegionAttributeValueListView(OwnedObjectListView):
+class RegionAttributeValueListView(PublishedObjectListView):
     model = RegionAttributeValue
-    permission_required = set()
 
 
 class RegionAttributeValueCreateView(OwnedObjectCreateView):

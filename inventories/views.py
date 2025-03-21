@@ -55,7 +55,6 @@ class ScenarioNameAutocompleteView(Select2ListView):
 class PublishedScenarioFilterView(PublishedObjectFilterView):
     model = Scenario
     filterset_class = ScenarioFilterSet
-    permission_required = set()
 
 
 class UserOwnedScenarioFilterView(UserOwnedObjectFilterView):

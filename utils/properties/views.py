@@ -2,14 +2,12 @@ from django.urls import reverse_lazy
 
 from .forms import PropertyModelForm, UnitModelForm
 from .models import Property, Unit
-from ..views import (OwnedObjectCreateView, OwnedObjectListView, OwnedObjectModalDeleteView,
-                     OwnedObjectModelSelectOptionsView, UserCreatedObjectDetailView,
-                     UserCreatedObjectUpdateView)
+from ..views import (OwnedObjectCreateView, OwnedObjectModalDeleteView, OwnedObjectModelSelectOptionsView,
+                     PublishedObjectListView, UserCreatedObjectDetailView, UserCreatedObjectUpdateView)
 
 
-class UnitListView(OwnedObjectListView):
+class UnitListView(PublishedObjectListView):
     model = Unit
-    permission_required = set()
 
 
 class UnitCreateView(OwnedObjectCreateView):
@@ -34,9 +32,8 @@ class UnitModalDeleteView(OwnedObjectModalDeleteView):
     success_url = reverse_lazy('unit-list')
 
 
-class PropertyListView(OwnedObjectListView):
+class PropertyListView(PublishedObjectListView):
     model = Property
-    permission_required = set()
 
 
 class PropertyCreateView(OwnedObjectCreateView):

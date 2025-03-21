@@ -30,6 +30,9 @@ from ..models import (AggregatedCollectionPropertyValue, Collection, CollectionC
 
 class CollectorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Collector
+
+    view_published_list_name = 'collector-list'
+    view_private_list_name = 'collector-list-owned'
     view_detail_name = 'collector-detail'
     view_update_name = 'collector-update'
     view_delete_name = 'collector-delete-modal'
@@ -44,6 +47,9 @@ class CollectorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
 
 class CollectionSystemCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = CollectionSystem
+
+    view_published_list_name = 'collectionsystem-list'
+    view_private_list_name = 'collectionsystem-list-owned'
     view_detail_name = 'collectionsystem-detail'
     view_update_name = 'collectionsystem-update'
     view_delete_name = 'collectionsystem-delete-modal'
@@ -58,6 +64,9 @@ class CollectionSystemCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDV
 
 class WasteCategoryCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = WasteCategory
+
+    view_published_list_name = 'wastecategory-list'
+    view_private_list_name = 'wastecategory-list-owned'
     view_detail_name = 'wastecategory-detail'
     view_update_name = 'wastecategory-update'
     view_delete_name = 'wastecategory-delete-modal'
@@ -72,6 +81,9 @@ class WasteCategoryCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDView
 
 class WasteComponentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = WasteComponent
+
+    view_published_list_name = 'wastecomponent-list'
+    view_private_list_name = 'wastecomponent-list-owned'
     view_detail_name = 'wastecomponent-detail'
     view_update_name = 'wastecomponent-update'
     view_delete_name = 'wastecomponent-delete-modal'
@@ -138,6 +150,9 @@ class WasteFlyerCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
     update_view = False
 
     model = WasteFlyer
+
+    view_published_list_name = 'wasteflyer-list'
+    view_private_list_name = 'wasteflyer-list-owned'
     view_detail_name = 'wasteflyer-detail'
 
     create_object_data = {'url': 'https://www.test-flyer.org'}
@@ -256,6 +271,9 @@ class CollectionFrequencyCreateViewTestCase(ViewWithPermissionsTestCase):
 
 class CollectionFrequencyCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = CollectionFrequency
+
+    view_published_list_name = 'collectionfrequency-list'
+    view_private_list_name = 'collectionfrequency-list-owned'
     view_detail_name = 'collectionfrequency-detail'
     view_update_name = 'collectionfrequency-update'
     view_delete_name = 'collectionfrequency-delete-modal'
@@ -545,7 +563,11 @@ class CollectionPropertyValueCreateViewTestCase(ViewWithPermissionsTestCase):
 
 
 class CollectionPropertyValueCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    public_list_view = False
+    private_list_view = False
+
     model = CollectionPropertyValue
+
     view_detail_name = 'collectionpropertyvalue-detail'
     view_update_name = 'collectionpropertyvalue-update'
     view_delete_name = 'collectionpropertyvalue-delete-modal'
@@ -682,7 +704,11 @@ class AggregatedCollectionPropertyValueCreateViewTestCase(ViewWithPermissionsTes
 
 
 class AggregatedCollectionPropertyValueCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    public_list_view = False
+    private_list_view = False
+
     model = AggregatedCollectionPropertyValue
+
     view_detail_name = 'aggregatedcollectionpropertyvalue-detail'
     view_update_name = 'aggregatedcollectionpropertyvalue-update'
     view_delete_name = 'aggregatedcollectionpropertyvalue-delete-modal'
@@ -788,7 +814,11 @@ class AggregatedCollectionPropertyValueModalDeleteViewTestCase(ViewWithPermissio
 
 
 class CollectionCatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    public_list_view = False
+    private_list_view = False
+
     model = CollectionCatchment
+
     view_detail_name = 'collectioncatchment-detail'
     view_update_name = 'collectioncatchment-update'
     view_delete_name = 'collectioncatchment-delete-modal'
@@ -832,25 +862,6 @@ class CollectionCurrentListViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(self.url)
         self.assertRedirects(response, f'{self.url}?valid_on={date.today()}',
                              fetch_redirect_response=True)
-
-    def test_pagination_works_without_further_query_parameters(self):
-        query_params = urlencode({'page': 2})
-        response = self.client.get(f'{self.url}?{query_params}')
-        self.assertEqual(response.status_code, 200)
-
-    def test_initial_queryset_only_contains_current_collections(self):
-        self.client.force_login(self.member)
-        old_collection = Collection.objects.first()
-        old_collection.valid_until = date.today() - timedelta(days=1)
-        old_collection.valid_from = date.today() - timedelta(days=365)
-        old_collection.save()
-        response = self.client.get(self.url, follow=True)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.context['object_list']), 10)
-        self.assertQuerySetEqual(
-            Collection.objects.exclude(pk=old_collection.pk).order_by('id'),
-            response.context['object_list']
-        )
 
 
 class CollectionCreateViewTestCase(ViewWithPermissionsTestCase):
@@ -1007,11 +1018,19 @@ class CollectionCreateViewTestCase(ViewWithPermissionsTestCase):
 
 class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Collection
+
+    view_published_list_name = 'collection-list'
+    view_private_list_name = 'collection-list-owned'
     view_detail_name = 'collection-detail'
     view_update_name = 'collection-update'
     view_delete_name = 'collection-delete-modal'
 
-    create_object_data = {'name': 'Test Collection', 'description': 'The original collection'}
+    create_object_data = {
+        'name': 'Test Collection',
+        'description': 'The original collection',
+        'valid_from': date.today(),
+        'valid_until': date.today() + timedelta(days=365),
+    }
     update_object_data = {'name': 'Updated Test Collection', 'description': 'This has been updated'}
 
     @classmethod
@@ -1095,6 +1114,29 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
             'form-INITIAL_FORMS': 0,
         })
         return data
+
+    def test_list_view_published_as_anonymous(self):
+        response = self.client.get(self.get_list_url())
+        redirect_url = f'{self.get_list_url()}?valid_on={date.today()}'
+        self.assertRedirects(response, redirect_url, status_code=302, target_status_code=200)
+
+    def test_list_view_published_pagination_works_without_further_query_parameters(self):
+        query_params = urlencode({'page': 2})
+        response = self.client.get(f'{self.get_list_url()}?{query_params}')
+        self.assertEqual(response.status_code, 200)
+
+    def test_list_view_published_initial_queryset_only_contains_current_collections(self):
+        old_collection = Collection.objects.first()
+        old_collection.valid_until = date.today() - timedelta(days=1)
+        old_collection.valid_from = date.today() - timedelta(days=365)
+        old_collection.save()
+        response = self.client.get(self.get_list_url(), follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context['object_list']), 1)
+        self.assertQuerySetEqual(
+            Collection.objects.filter(publication_status='published').exclude(pk=old_collection.pk).order_by('id'),
+            response.context['object_list']
+        )
 
     def test_template_contains_predecessor_collections(self):
         response = self.client.get(self.get_detail_url(self.published_object.pk))
@@ -1789,7 +1831,8 @@ class CollectionListFileExportViewTestCase(ViewWithPermissionsTestCase):
 
 class CollectionWasteSamplesViewTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     create_view = False
-    list_view = False
+    public_list_view = False
+    private_list_view = False
     detail_view = False
     delete_view = False
 
@@ -1840,7 +1883,8 @@ class CollectionWasteSamplesViewTestCase(AbstractTestCases.UserCreatedObjectCRUD
 
 class CollectionPredecessorsViewTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     create_view = False
-    list_view = False
+    public_list_view = False
+    private_list_view = False
     detail_view = False
     delete_view = False
 
@@ -1960,8 +2004,8 @@ class WasteCollectionMapViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(self.url)
         self.assertNotContains(response, 'Copy selected collection')
 
-    def test_update_collection_option_visible_for_member(self):
-        self.client.force_login(self.member)
+    def test_update_collection_option_visible_for_staff(self):
+        self.client.force_login(self.staff)
         response = self.client.get(self.url)
         self.assertContains(response, 'Edit selected collection')
 

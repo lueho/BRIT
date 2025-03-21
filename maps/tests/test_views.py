@@ -260,6 +260,9 @@ class LocationCreateViewTestCase(ViewWithPermissionsTestCase):
 
 class LocationCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Location
+
+    view_published_list_name = 'location-list'
+    view_private_list_name = 'location-list-owned'
     view_detail_name = 'location-detail'
     view_update_name = 'location-update'
     view_delete_name = 'location-delete-modal'
@@ -441,6 +444,9 @@ class RegionCreateViewTestCase(ViewWithPermissionsTestCase):
 
 class RegionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Region
+
+    view_published_list_name = 'region-list'
+    view_private_list_name = 'region-list-owned'
     view_detail_name = 'region-detail'
     view_update_name = 'region-update'
     view_delete_name = 'region-delete-modal'
@@ -892,6 +898,9 @@ class CatchmentCreateMergeLauViewTestCase(ViewWithPermissionsTestCase):
 
 class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Catchment
+
+    view_published_list_name = 'catchment-list'
+    view_private_list_name = 'catchment-list-owned'
     view_detail_name = 'catchment-detail'
     view_update_name = 'catchment-update'
     view_delete_name = 'catchment-delete-modal'
@@ -1227,6 +1236,9 @@ class AttributeModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 class AttributeCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Attribute
+
+    view_published_list_name = 'attribute-list'
+    view_private_list_name = 'attribute-list-owned'
     view_detail_name = 'attribute-detail'
     view_update_name = 'attribute-update'
     view_delete_name = 'attribute-delete-modal'
@@ -1476,6 +1488,9 @@ class RegionAttributeValueModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 class RegionAttributeValueCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = RegionAttributeValue
+
+    view_published_list_name = 'regionattributevalue-list'
+    view_private_list_name = 'regionattributevalue-list-owned'
     view_detail_name = 'regionattributevalue-detail'
     view_update_name = 'regionattributevalue-update'
     view_delete_name = 'regionattributevalue-delete-modal'

@@ -128,6 +128,9 @@ class AuthorModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 class AuthorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Author
+
+    view_published_list_name = 'author-list'
+    view_private_list_name = 'author-list-owned'
     view_detail_name = 'author-detail'
     view_update_name = 'author-update'
     view_delete_name = 'author-delete-modal'
@@ -410,6 +413,9 @@ class LicenceModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 class LicenceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Licence
+
+    view_published_list_name = 'licence-list'
+    view_private_list_name = 'licence-list-owned'
     view_detail_name = 'licence-detail'
     view_update_name = 'licence-update'
     view_delete_name = 'licence-delete-modal'
@@ -696,6 +702,9 @@ class SourceModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Source
+
+    view_published_list_name = 'source-list'
+    view_private_list_name = 'source-list-owned'
     view_detail_name = 'source-detail'
     view_update_name = 'source-update'
     view_delete_name = 'source-delete-modal'

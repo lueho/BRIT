@@ -1,7 +1,7 @@
 from django.urls import reverse_lazy
 
 from maps.views import GeoDataSetFilteredMapView, MapMixin
-from utils.views import (OwnedObjectCreateView, OwnedObjectListView, OwnedObjectModalDeleteView,
+from utils.views import (OwnedObjectCreateView, OwnedObjectModalDeleteView, PublishedObjectFilterView,
                          UserCreatedObjectDetailView, UserCreatedObjectUpdateView)
 from .filters import ShowcaseFilterSet
 from .forms import ShowcaseModelForm
@@ -11,11 +11,9 @@ from .models import Showcase
 # ----------- Showcase CRUD --------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-
-class ShowcaseListView(OwnedObjectListView):
+class ShowcaseListView(PublishedObjectFilterView):
     model = Showcase
     filterset_class = ShowcaseFilterSet
-    permission_required = set()
 
 
 class ShowcaseMapView(GeoDataSetFilteredMapView):

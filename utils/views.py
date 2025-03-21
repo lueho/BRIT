@@ -5,7 +5,7 @@ from bootstrap_modal_forms.mixins import is_ajax
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin, UserPassesTestMixin
 from django.contrib.messages.views import SuccessMessageMixin
-from django.core.exceptions import FieldError, ImproperlyConfigured
+from django.core.exceptions import ImproperlyConfigured
 from django.db.models.signals import post_save
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import render
@@ -106,15 +106,28 @@ class BRITFilterView(FilterDefaultsMixin, FilterView):
     ordering = 'id'
 
 
-class PublishedObjectFilterView(FilterDefaultsMixin, FilterView):
+class UserCreatedObjectListMixin:
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        if not hasattr(queryset.model, 'publication_status'):
+            raise ImproperlyConfigured(
+                f"The model {queryset.model.__name__} must have a 'publication_status' field."
+            )
+
+        queryset = queryset.filter(publication_status='published')
+
+        if hasattr(queryset.model, 'name'):
+            return queryset.order_by('name')
+
+        return queryset.order_by('id')
+
+
+class PublishedObjectFilterView(FilterDefaultsMixin, UserCreatedObjectListMixin, FilterView):
     """
     A view to display a list of published objects with default filters applied.
     """
-    paginate_by = 10
-    ordering = 'id'
-
-    def get_queryset(self):
-        return super().get_queryset().filter(publication_status='published')
 
 
 class UserOwnedObjectFilterView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
@@ -129,8 +142,7 @@ class UserOwnedObjectFilterView(LoginRequiredMixin, FilterDefaultsMixin, FilterV
         return super().get_queryset().filter(owner=self.request.user)
 
 
-class OwnedObjectListView(PermissionRequiredMixin, ListView):
-    paginate_by = 10
+class PublishedObjectListView(UserCreatedObjectListMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -141,12 +153,6 @@ class OwnedObjectListView(PermissionRequiredMixin, ListView):
             'create_permission': f'{self.model.__module__.split(".")[-2]}.add_{self.model.__name__.lower()}'
         })
         return context
-
-    def get_queryset(self):
-        try:
-            return super().get_queryset().order_by('name')
-        except FieldError:
-            return super().get_queryset()
 
     def get_template_names(self):
         template_names = super().get_template_names()

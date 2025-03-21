@@ -31,6 +31,9 @@ class CultureListViewTestCase(ViewWithPermissionsTestCase):
 
 class CultureCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Culture
+
+    view_published_list_name = 'culture-list'
+    view_private_list_name = 'culture-list-owned'
     view_detail_name = 'culture-detail'
     view_update_name = 'culture-update'
     view_delete_name = 'culture-delete-modal'
@@ -54,6 +57,9 @@ class CultureCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
 
 class GreenhouseCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Greenhouse
+
+    view_published_list_name = 'greenhouse-list'
+    view_private_list_name = 'greenhouse-list-owned'
     view_detail_name = 'greenhouse-detail'
     view_update_name = 'greenhouse-update'
     view_delete_name = 'greenhouse-delete-modal'
@@ -63,7 +69,11 @@ class GreenhouseCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
 
 
 class GrowthCycleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    public_list_view = False
+    private_list_view = False
+
     model = GreenhouseGrowthCycle
+
     view_detail_name = 'greenhousegrowthcycle-detail'
     view_update_name = 'greenhousegrowthcycle-update'
     view_delete_name = 'greenhousegrowthcycle-delete-modal'

@@ -83,12 +83,16 @@ class AbstractTestCases(object):
         __test__ = False
 
         create_view = False
-        list_view = False
+        public_list_view = True
+        private_list_view = True
         detail_view = True
         update_view = True
         delete_view = False
 
         model = None
+
+        view_published_list_name = None
+        view_private_list_name = None
         view_detail_name = None
         view_update_name = None
         view_delete_name = None
@@ -157,6 +161,12 @@ class AbstractTestCases(object):
         def setUp(self):
             self.client = Client()
 
+        def get_list_url(self, publication_status='published', **kwargs):
+            if publication_status == 'published':
+                return reverse(self.view_published_list_name, kwargs=kwargs)
+            elif publication_status == 'private':
+                return reverse(self.view_private_list_name, kwargs=kwargs)
+
         def get_detail_url(self, pk):
             return reverse(self.view_detail_name, kwargs={'pk': pk})
 
@@ -176,6 +186,16 @@ class AbstractTestCases(object):
             data = self.update_object_data
             data.update(self.related_objects_post_data())
             return data
+
+        # -----------------------
+        # ListView Test Cases
+        # -----------------------
+
+        def test_list_view_published_as_anonymous(self):
+            if not self.public_list_view:
+                self.skipTest("List view is not enabled for this test case.")
+            response = self.client.get(self.get_list_url(publication_status='published'))
+            self.assertEqual(response.status_code, 200)
 
         # -----------------------
         # DetailView Test Cases

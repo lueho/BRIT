@@ -71,6 +71,9 @@ class ScenarioCreateViewTestCase(ViewWithPermissionsTestCase):
 
 class ScenarioCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Scenario
+
+    view_published_list_name = 'scenario-list'
+    view_private_list_name = 'scenario-list-owned'
     view_detail_name = 'scenario-detail'
     view_update_name = 'scenario-update'
     view_delete_name = 'scenario-delete-modal'
@@ -129,6 +132,8 @@ class ScenarioModalDeleteViewTestCase(ViewWithPermissionsTestCase):
 
 
 class ScenarioResultCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    public_list_view = False
+    private_list_view = False
 
     update_view = False
 

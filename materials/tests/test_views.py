@@ -31,6 +31,9 @@ class MaterialDashboardViewTestCase(ViewWithPermissionsTestCase):
 
 class MaterialCategoryCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = MaterialCategory
+
+    view_published_list_name = 'materialcategory-list'
+    view_private_list_name = 'materialcategory-list-owned'
     view_detail_name = 'materialcategory-detail'
     view_update_name = 'materialcategory-update'
     view_delete_name = 'materialcategory-delete-modal'
@@ -303,6 +306,9 @@ class MaterialModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 class MaterialCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Material
+
+    view_published_list_name = 'material-list'
+    view_private_list_name = 'material-list-owned'
     view_detail_name = 'material-detail'
     view_update_name = 'material-update'
     view_delete_name = 'material-delete-modal'
@@ -533,6 +539,9 @@ class ComponentModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 class MaterialComponentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = MaterialComponent
+
+    view_published_list_name = 'materialcomponent-list'
+    view_private_list_name = 'materialcomponent-list-owned'
     view_detail_name = 'materialcomponent-detail'
     view_update_name = 'materialcomponent-update'
     view_delete_name = 'materialcomponent-delete-modal'
@@ -712,6 +721,9 @@ class ComponentGroupModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 class MaterialComponentGroupCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = MaterialComponentGroup
+
+    view_published_list_name = 'materialcomponentgroup-list'
+    view_private_list_name = 'materialcomponentgroup-list-owned'
     view_detail_name = 'materialcomponentgroup-detail'
     view_update_name = 'materialcomponentgroup-update'
     view_delete_name = 'materialcomponentgroup-delete-modal'
@@ -936,6 +948,9 @@ class MaterialPropertyModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 class MaterialPropertyCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = MaterialProperty
+
+    view_published_list_name = 'materialproperty-list'
+    view_private_list_name = 'materialproperty-list-owned'
     view_detail_name = 'materialproperty-detail'
     view_update_name = 'materialproperty-update'
     view_delete_name = 'materialproperty-delete-modal'
@@ -1223,6 +1238,9 @@ class SampleSeriesModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 class SampleSeriesCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = SampleSeries
+
+    view_published_list_name = 'sampleseries-list'
+    view_private_list_name = 'sampleseries-list-owned'
     view_detail_name = 'sampleseries-detail'
     view_update_name = 'sampleseries-update'
     view_delete_name = 'sampleseries-delete-modal'
@@ -1332,7 +1350,8 @@ class SampleSeriesModalDeleteViewTestCase(ViewWithPermissionsTestCase):
 
 class SampleSeriesCreateDuplicateViewTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     create_view = False
-    list_view = False
+    public_list_view = False
+    private_list_view = False
     detail_view = False
     delete_view = False
 
@@ -1421,6 +1440,9 @@ class SampleCreateViewTestCase(ViewWithPermissionsTestCase):
 
 class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Sample
+
+    view_published_list_name = 'sample-list'
+    view_private_list_name = 'sample-list-owned'
     view_detail_name = 'sample-detail'
     view_update_name = 'sample-update'
     view_delete_name = 'sample-delete-modal'
@@ -1908,6 +1930,9 @@ class CompositionModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Composition
+
+    view_published_list_name = 'composition-list'
+    view_private_list_name = 'composition-list-owned'
     view_detail_name = 'composition-detail'
     view_update_name = 'composition-update'
     view_delete_name = 'composition-delete-modal'

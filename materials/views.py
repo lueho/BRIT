@@ -11,13 +11,12 @@ from extra_views import UpdateWithInlinesView
 
 from distributions.models import TemporalDistribution
 from distributions.plots import DoughnutChart
-from utils.views import (NextOrSuccessUrlMixin, OwnedObjectCreateView, OwnedObjectListView, OwnedObjectModalCreateView,
+from utils.views import (NextOrSuccessUrlMixin, OwnedObjectCreateView, OwnedObjectModalCreateView,
                          OwnedObjectModalDeleteView, OwnedObjectModalDetailView, OwnedObjectModalUpdateView,
-                         PublishedObjectFilterView, UserCreatedObjectCreateView,
+                         PublishedObjectFilterView, PublishedObjectListView, UserCreatedObjectCreateView,
                          UserCreatedObjectDetailView, UserCreatedObjectModalCreateView,
                          UserCreatedObjectModalDeleteView, UserCreatedObjectUpdateView,
-                         UserCreatedObjectUpdateWithInlinesView, UserOwnedObjectFilterView,
-                         UserOwnsObjectMixin)
+                         UserCreatedObjectUpdateWithInlinesView, UserOwnedObjectFilterView, UserOwnsObjectMixin)
 from .filters import PublishedSampleFilter, SampleSeriesFilter, UserOwnedSampleFilter
 from .forms import (AddComponentModalForm, AddCompositionModalForm, AddLiteratureSourceForm, AddSeasonalVariationForm,
                     ComponentGroupModalModelForm, ComponentGroupModelForm, ComponentModalModelForm, ComponentModelForm,
@@ -41,9 +40,8 @@ class MaterialsDashboardView(PermissionRequiredMixin, TemplateView):
 # ----------- Material Category CRUD ----------------------------------------------------------------------------------
 # ---------------------------------------------------------------------------------------------------------------------
 
-class MaterialCategoryListView(OwnedObjectListView):
+class MaterialCategoryListView(PublishedObjectListView):
     model = MaterialCategory
-    permission_required = set()
 
 
 class MaterialCategoryCreateView(OwnedObjectCreateView):
@@ -89,10 +87,9 @@ class MaterialCategoryModalDeleteView(OwnedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class MaterialListView(OwnedObjectListView):
+class MaterialListView(PublishedObjectListView):
     model = Material
     queryset = Material.objects.filter(type='material')
-    permission_required = set()
 
 
 class MaterialCreateView(OwnedObjectCreateView):
@@ -158,9 +155,8 @@ class ComponentAutoCompleteView(autocomplete.Select2QuerySetView):
         return qs
 
 
-class ComponentListView(OwnedObjectListView):
+class ComponentListView(PublishedObjectListView):
     model = MaterialComponent
-    permission_required = set()
 
 
 class ComponentCreateView(OwnedObjectCreateView):
@@ -206,9 +202,8 @@ class ComponentModalDeleteView(OwnedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class MaterialComponentGroupListView(OwnedObjectListView):
+class MaterialComponentGroupListView(PublishedObjectListView):
     model = MaterialComponentGroup
-    permission_required = set()
 
 
 class MaterialComponentGroupCreateView(OwnedObjectCreateView):
@@ -253,9 +248,8 @@ class MaterialComponentGroupModalDeleteView(OwnedObjectModalDeleteView):
 # ----------- Material Property CRUD -----------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class MaterialPropertyListView(OwnedObjectListView):
+class MaterialPropertyListView(PublishedObjectListView):
     model = MaterialProperty
-    permission_required = set()
 
 
 class MaterialPropertyCreateView(OwnedObjectCreateView):
@@ -421,11 +415,10 @@ class UserOwnedSampleListView(UserOwnedObjectFilterView):
         return kwargs
 
 
-class FeaturedSampleListView(OwnedObjectListView):
+class FeaturedSampleListView(PublishedObjectListView):
     template_name = 'featured_sample_list.html'
     model = Sample
     queryset = Sample.objects.filter(series__publish=True)
-    permission_required = set()
 
 
 class SampleCreateView(LoginRequiredMixin, OwnedObjectCreateView):
@@ -589,9 +582,8 @@ class SampleCreateDuplicateView(UserCreatedObjectUpdateView):
 # ----------- Composition CRUD -----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class CompositionListView(OwnedObjectListView):
+class CompositionListView(PublishedObjectListView):
     model = Composition
-    permission_required = set()
 
 
 class CompositionCreateView(OwnedObjectCreateView):
