@@ -32,11 +32,10 @@ from .forms import (AggregatedCollectionPropertyValueModelForm, BaseWasteFlyerUr
                     CollectionSeasonFormSet, CollectionSystemModalModelForm, CollectionSystemModelForm,
                     CollectorModalModelForm, CollectorModelForm, WasteCategoryModalModelForm, WasteCategoryModelForm,
                     WasteComponentModalModelForm, WasteComponentModelForm, WasteFlyerModalModelForm,
-                    WasteFlyerModelForm, WasteStreamModalModelForm, WasteStreamModelForm)
+                    WasteFlyerModelForm)
 from .models import (AggregatedCollectionPropertyValue, Collection, CollectionCatchment, CollectionCountOptions,
-                     CollectionFrequency,
-                     CollectionPropertyValue, CollectionSeason,
-                     CollectionSystem, Collector, WasteCategory, WasteComponent, WasteFlyer, WasteStream)
+                     CollectionFrequency, CollectionPropertyValue, CollectionSeason, CollectionSystem, Collector,
+                     WasteCategory, WasteComponent, WasteFlyer)
 from .tasks import check_wasteflyer_urls
 
 
@@ -253,55 +252,6 @@ class WasteComponentModalDeleteView(OwnedObjectModalDeleteView):
     success_message = 'Successfully deleted.'
     success_url = reverse_lazy('wastecomponent-list')
     permission_required = 'soilcom.delete_wastecomponent'
-
-
-# ----------- Waste Stream CRUD ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------------------------
-
-class WasteStreamListView(OwnedObjectListView):
-    model = WasteStream
-    permission_required = 'soilcom.view_wastestream'
-
-
-class WasteStreamCreateView(OwnedObjectCreateView):
-    form_class = WasteStreamModelForm
-    success_url = reverse_lazy('wastestream-list')
-    permission_required = 'soilcom.add_wastestream'
-
-
-class WasteStreamModalCreateView(OwnedObjectModalCreateView):
-    form_class = WasteStreamModalModelForm
-    success_url = reverse_lazy('wastestream-list')
-    permission_required = 'soilcom.add_wastestream'
-
-
-class WasteStreamDetailView(UserCreatedObjectDetailView):
-    model = WasteStream
-
-
-class WasteStreamModalDetailView(OwnedObjectModalDetailView):
-    template_name = 'modal_detail.html'
-    model = WasteStream
-    permission_required = 'soilcom.view_wastestream'
-
-
-class WasteStreamUpdateView(UserCreatedObjectUpdateView):
-    model = WasteStream
-    form_class = WasteStreamModelForm
-
-
-class WasteStreamModalUpdateView(OwnedObjectModalUpdateView):
-    model = WasteStream
-    form_class = WasteStreamModalModelForm
-    permission_required = 'soilcom.change_wastestream'
-
-
-class WasteStreamModalDeleteView(OwnedObjectModalDeleteView):
-    template_name = 'modal_delete.html'
-    model = WasteStream
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('wastestream-list')
-    permission_required = 'soilcom.delete_wastestream'
 
 
 # ----------- Waste Collection Flyer CRUD ------------------------------------------------------------------------------

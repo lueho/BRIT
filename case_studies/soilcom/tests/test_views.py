@@ -94,32 +94,6 @@ class WasteComponentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDVie
         return cls.model.objects.create(owner=cls.owner_user, **data)
 
 
-# ----------- Waste Stream CRUD ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-class WasteStreamCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
-    model = WasteStream
-    view_detail_name = 'wastestream-detail'
-    view_update_name = 'wastestream-update'
-    view_delete_name = 'wastestream-delete-modal'
-
-    create_object_data = {'name': 'Test Waste Stream'}
-    update_object_data = {'name': 'Updated Test Waste Stream'}
-
-    @classmethod
-    def create_related_objects(cls):
-        return {'category': WasteCategory.objects.create(name='Biowaste')}
-
-    def related_objects_post_data(self):
-        data = super().related_objects_post_data()
-        data.update({
-            'allowed_materials': [],
-            'forbidden_materials': [],
-        })
-        return data
-
-
 # ----------- WasteFlyer CRUD ------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
