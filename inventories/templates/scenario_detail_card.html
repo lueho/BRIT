@@ -38,27 +38,25 @@
                 </a>
             </div>
         </div>
-        {% if request.user == object.owner %}
+        {% if user == object.owner or user.is_staff %}
             <div class="dropdown">
                 <button class="btn btn-secondary dropdown-toggle ml-3" type="button" id="editDropdown"
                         data-toggle="dropdown" aria-expanded="false">
                     Options
                 </button>
                 <div class="dropdown-menu" aria-labelledby="editDropdown">
-                    {% if request.user == object.owner %}
-                        <a class="dropdown-item"
-                           href="{% url 'scenario-update' object.id %}?next={{ request.path }}">
-                            <i class="fas fa-fw fa-edit"></i> Edit
-                        </a>
-                        <a class="dropdown-item"
-                           href="{% url 'download_scenario_summary' object.id %}">
-                            <i class="fas fa-fw fa-file-download"></i> Download definition file
-                        </a>
-                        <a class="dropdown-item modal-link"
-                           href="{% url 'scenario-delete-modal' object.pk %}">
-                            <i class="fas fa-fw fa-trash"></i> Delete
-                        </a>
-                    {% endif %}
+                    <a class="dropdown-item"
+                       href="{% url 'scenario-update' object.id %}?next={{ request.path }}">
+                        <i class="fas fa-fw fa-edit"></i> Edit
+                    </a>
+                    <a class="dropdown-item"
+                       href="{% url 'download_scenario_summary' object.id %}">
+                        <i class="fas fa-fw fa-file-download"></i> Download definition file
+                    </a>
+                    <a class="dropdown-item modal-link"
+                       href="{% url 'scenario-delete-modal' object.pk %}">
+                        <i class="fas fa-fw fa-trash"></i> Delete
+                    </a>
                 </div>
             </div>
         {% endif %}

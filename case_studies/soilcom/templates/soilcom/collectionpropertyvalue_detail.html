@@ -30,7 +30,7 @@
             </a>
         {% endif %}
     {% endblock list_link %}
-    {% if "soilcom.change_collectionpropertyvalue" in perms or request.user == object.owner %}
+    {% if request.user == object.owner or user.is_staff %}
         {% block update_link %}
             {% if object.update_url %}
                 <a href="{{ object.update_url }}" class="ml-3">

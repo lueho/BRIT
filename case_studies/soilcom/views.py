@@ -15,15 +15,15 @@ from django.views.generic import TemplateView
 
 import case_studies.soilcom.tasks
 from bibliography.views import (SourceCheckUrlView, SourceCreateView, SourceModalCreateView, SourceModalDeleteView,
-                                SourceModalDetailView, SourceModalUpdateView, SourceUpdateView)
+                                SourceModalDetailView)
 from maps.forms import NutsAndLauCatchmentQueryForm
-from maps.views import CatchmentDetailView, GeoDataSetFilteredMapView, \
-    GeoDataSetFormMixin, \
-    MapMixin
+from maps.views import (CatchmentDetailView, CatchmentUpdateView, GeoDataSetFilteredMapView, GeoDataSetFormMixin,
+                        MapMixin)
 from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineFormSetMixin
 from utils.views import (BRITFilterView, OwnedObjectCreateView, OwnedObjectListView, OwnedObjectModalCreateView,
                          OwnedObjectModalDeleteView, OwnedObjectModalDetailView, OwnedObjectModalUpdateView,
-                         OwnedObjectModelSelectOptionsView, OwnedObjectUpdateView, UserCreatedObjectDetailView)
+                         OwnedObjectModelSelectOptionsView, UserCreatedObjectDetailView,
+                         UserCreatedObjectUpdateView)
 from .filters import CollectionFilterSet, CollectorFilter, WasteFlyerFilter
 from .forms import (AggregatedCollectionPropertyValueModelForm, BaseWasteFlyerUrlFormSet, CollectionAddPredecessorForm,
                     CollectionAddWasteSampleForm, CollectionFrequencyModalModelForm, CollectionFrequencyModelForm,
@@ -41,7 +41,7 @@ from .tasks import check_wasteflyer_urls
 
 
 class CollectionHomeView(PermissionRequiredMixin, TemplateView):
-    template_name = 'waste_collection_home.html'
+    template_name = 'wastecollection_dashboard.html'
     permission_required = 'soilcom.view_collection'
 
 
@@ -77,10 +77,9 @@ class CollectorModalDetailView(OwnedObjectModalDetailView):
     permission_required = 'soilcom.view_collector'
 
 
-class CollectorUpdateView(OwnedObjectUpdateView):
+class CollectorUpdateView(UserCreatedObjectUpdateView):
     model = Collector
     form_class = CollectorModelForm
-    permission_required = 'soilcom.change_collector'
 
 
 class CollectorModalUpdateView(OwnedObjectModalUpdateView):
@@ -139,10 +138,9 @@ class CollectionSystemModalDetailView(OwnedObjectModalDetailView):
     permission_required = 'soilcom.view_collectionsystem'
 
 
-class CollectionSystemUpdateView(OwnedObjectUpdateView):
+class CollectionSystemUpdateView(UserCreatedObjectUpdateView):
     model = CollectionSystem
     form_class = CollectionSystemModelForm
-    permission_required = 'soilcom.change_collectionsystem'
 
 
 class CollectionSystemModalUpdateView(OwnedObjectModalUpdateView):
@@ -189,10 +187,9 @@ class WasteCategoryModalDetailView(OwnedObjectModalDetailView):
     permission_required = 'soilcom.view_wastecategory'
 
 
-class WasteCategoryUpdateView(OwnedObjectUpdateView):
+class WasteCategoryUpdateView(UserCreatedObjectUpdateView):
     model = WasteCategory
     form_class = WasteCategoryModelForm
-    permission_required = 'soilcom.change_wastecategory'
 
 
 class WasteCategoryModalUpdateView(OwnedObjectModalUpdateView):
@@ -239,10 +236,9 @@ class WasteComponentModalDetailView(OwnedObjectModalDetailView):
     permission_required = 'soilcom.view_wastecomponent'
 
 
-class WasteComponentUpdateView(OwnedObjectUpdateView):
+class WasteComponentUpdateView(UserCreatedObjectUpdateView):
     model = WasteComponent
     form_class = WasteComponentModelForm
-    permission_required = 'soilcom.change_wastecomponent'
 
 
 class WasteComponentModalUpdateView(OwnedObjectModalUpdateView):
@@ -289,10 +285,9 @@ class WasteStreamModalDetailView(OwnedObjectModalDetailView):
     permission_required = 'soilcom.view_wastestream'
 
 
-class WasteStreamUpdateView(OwnedObjectUpdateView):
+class WasteStreamUpdateView(UserCreatedObjectUpdateView):
     model = WasteStream
     form_class = WasteStreamModelForm
-    permission_required = 'soilcom.change_wastestream'
 
 
 class WasteStreamModalUpdateView(OwnedObjectModalUpdateView):
@@ -348,16 +343,8 @@ class WasteFlyerModalDetailView(SourceModalDetailView):
     permission_required = 'soilcom.view_wasteflyer'
 
 
-class WasteFlyerUpdateView(SourceUpdateView):
-    model = WasteFlyer
-    form_class = WasteFlyerModelForm
-    permission_required = 'soilcom.change_wasteflyer'
-
-
-class WasteFlyerModalUpdateView(SourceModalUpdateView):
-    model = WasteFlyer
-    form_class = WasteFlyerModalModelForm
-    permission_required = 'soilcom.change_wasteflyer'
+# There is no WasteFlyerUpdateView because wasteflyers are not managed separately only through the collections
+# they are connected to.
 
 
 class WasteFlyerModalDeleteView(SourceModalDeleteView):
@@ -467,7 +454,7 @@ class FrequencyModalDetailView(OwnedObjectModalDetailView):
     permission_required = set()
 
 
-class FrequencyUpdateView(M2MInlineFormSetMixin, OwnedObjectUpdateView):
+class FrequencyUpdateView(M2MInlineFormSetMixin, UserCreatedObjectUpdateView):
     model = CollectionFrequency
     form_class = CollectionFrequencyModelForm
     formset_model = CollectionSeason
@@ -476,7 +463,6 @@ class FrequencyUpdateView(M2MInlineFormSetMixin, OwnedObjectUpdateView):
     formset_helper_class = CollectionSeasonFormHelper
     formset_factory_kwargs = {'extra': 0}
     relation_field_name = 'seasons'
-    permission_required = 'soilcom.change_collectionfrequency'
 
     def get_formset_initial(self):
         initial = []
@@ -547,10 +533,9 @@ class CollectionPropertyValueDetailView(UserCreatedObjectDetailView):
     model = CollectionPropertyValue
 
 
-class CollectionPropertyValueUpdateView(OwnedObjectUpdateView):
+class CollectionPropertyValueUpdateView(UserCreatedObjectUpdateView):
     model = CollectionPropertyValue
     form_class = CollectionPropertyValueModelForm
-    permission_required = 'soilcom.change_collectionpropertyvalue'
 
 
 class CollectionPropertyValueModalDeleteView(OwnedObjectModalDeleteView):
@@ -576,11 +561,10 @@ class AggregatedCollectionPropertyValueDetailView(UserCreatedObjectDetailView):
     model = AggregatedCollectionPropertyValue
 
 
-class AggregatedCollectionPropertyValueUpdateView(OwnedObjectUpdateView):
+class AggregatedCollectionPropertyValueUpdateView(UserCreatedObjectUpdateView):
     template_name = 'soilcom/collectionpropertyvalue_form.html'
     model = AggregatedCollectionPropertyValue
     form_class = AggregatedCollectionPropertyValueModelForm
-    permission_required = 'soilcom.change_aggregatedcollectionpropertyvalue'
 
 
 class AggregatedCollectionPropertyValueModalDeleteView(OwnedObjectModalDeleteView):
@@ -598,6 +582,12 @@ class AggregatedCollectionPropertyValueModalDeleteView(OwnedObjectModalDeleteVie
 
 class CollectionCatchmentDetailView(CatchmentDetailView):
     model = CollectionCatchment
+
+
+class CollectionCatchmentUpdateView(CatchmentUpdateView):
+
+    def get_success_url(self):
+        return reverse('collectioncatchment-detail', kwargs={'pk': self.object.pk})
 
 
 # ----------- Collection CRUD ------------------------------------------------------------------------------------------
@@ -730,7 +720,7 @@ class CollectionModalDetailView(OwnedObjectModalDetailView):
     permission_required = 'soilcom.view_collection'
 
 
-class CollectionUpdateView(M2MInlineFormSetMixin, OwnedObjectUpdateView):
+class CollectionUpdateView(M2MInlineFormSetMixin, UserCreatedObjectUpdateView):
     model = Collection
     form_class = CollectionModelForm
     formset_model = WasteFlyer
@@ -738,7 +728,6 @@ class CollectionUpdateView(M2MInlineFormSetMixin, OwnedObjectUpdateView):
     formset_form_class = WasteFlyerModelForm
     formset_helper_class = DynamicTableInlineFormSetHelper
     relation_field_name = 'flyers'
-    permission_required = 'soilcom.change_collection'
 
     def get_formset_kwargs(self, **kwargs):
         kwargs.update({'owner': self.request.user})
@@ -835,11 +824,10 @@ class WasteCategoryOptions(SelectNewlyCreatedObjectModelSelectOptionsView):
     permission_required = 'soilcom.view_wastecategory'
 
 
-class CollectionWasteSamplesView(OwnedObjectUpdateView):
+class CollectionWasteSamplesView(UserCreatedObjectUpdateView):
     template_name = 'collection_samples.html'
     model = Collection
     form_class = CollectionAddWasteSampleForm
-    permission_required = 'soilcom.change_collection'
 
     def get_success_url(self):
         return reverse('collection-wastesamples', kwargs={'pk': self.object.pk})
@@ -866,11 +854,10 @@ class CollectionWasteSamplesView(OwnedObjectUpdateView):
         return HttpResponseRedirect(self.get_success_url())
 
 
-class CollectionPredecessorsView(OwnedObjectUpdateView):
+class CollectionPredecessorsView(UserCreatedObjectUpdateView):
     template_name = 'collection_predecessors.html'
     model = Collection
     form_class = CollectionAddPredecessorForm
-    permission_required = 'soilcom.change_collection'
 
     def get_success_url(self):
         return reverse('collection-predecessors', kwargs={'pk': self.object.pk})
@@ -946,7 +933,7 @@ class WasteCollectionMapView(GeoDataSetFilteredMapView):
 class WasteCollectionMapIframeView(GeoDataSetFilteredMapView):
     model_name = 'WasteCollection'
     template_name = 'waste_collection_map_iframe.html'
-    filterset_class =  CollectionFilterSet
+    filterset_class = CollectionFilterSet
     features_layer_api_basename = 'api-waste-collection'
     map_title = 'Household Waste Collection Europe'
 

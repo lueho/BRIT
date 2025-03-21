@@ -112,21 +112,6 @@ class Greenhouse(NamedUserCreatedObject):
                 grouped_growth_cycles[cycle_number][component_distribution.material].append(component_distribution)
         return grouped_growth_cycles
 
-    def get_absolute_url(self):
-        return reverse('greenhouse-detail', kwargs={'pk': self.id})
-
-    @property
-    def detail_url(self):
-        return reverse('greenhouse-detail', kwargs={'pk': self.id})
-
-    @property
-    def update_url(self):
-        return reverse('greenhouse-update', kwargs={'pk': self.id})
-
-    @property
-    def delete_url(self):
-        return reverse('greenhouse-delete', kwargs={'pk': self.id})
-
     @property
     def filter_kwargs(self):
         kwargs = {

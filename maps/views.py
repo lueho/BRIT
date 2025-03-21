@@ -20,8 +20,8 @@ from maps.serializers import (CatchmentGeoFeatureModelSerializer, LauRegionOptio
 from utils.forms import DynamicTableInlineFormSetHelper
 from utils.views import (BRITFilterView, OwnedObjectCreateView, OwnedObjectListView, OwnedObjectModalCreateView,
                          OwnedObjectModalDeleteView, OwnedObjectModalDetailView, OwnedObjectModalUpdateView,
-                         OwnedObjectModelSelectOptionsView, OwnedObjectUpdateView, PublishedObjectFilterView,
-                         UserCreatedObjectDetailView, UserOwnedObjectFilterView)
+                         OwnedObjectModelSelectOptionsView, PublishedObjectFilterView, UserCreatedObjectDetailView,
+                         UserCreatedObjectUpdateView, UserOwnedObjectFilterView)
 from .filters import CatchmentFilterSet, GeoDataSetFilterSet, NutsRegionFilterSet, RegionFilterSet
 from .forms import (AttributeModalModelForm, AttributeModelForm, CatchmentCreateDrawCustomForm,
                     CatchmentCreateMergeLauForm, CatchmentModelForm, GeoDataSetModelForm, LocationModelForm,
@@ -302,10 +302,9 @@ class GeoDataSetFilteredMapView(MapMixin, FilterView):
     #     return GeoDataset.objects.get(pk=self.kwargs.get('pk')) # TODO: Implement this functionality
 
 
-class GeoDataSetUpdateView(OwnedObjectUpdateView):
+class GeoDataSetUpdateView(UserCreatedObjectUpdateView):
     model = GeoDataset
     form_class = GeoDataSetModelForm
-    permission_required = 'maps.change_geodataset'
 
 
 class GeoDataSetModalDeleteView(OwnedObjectModalDeleteView):
@@ -334,10 +333,9 @@ class LocationDetailView(MapMixin, UserCreatedObjectDetailView):
     model = Location
 
 
-class LocationUpdateView(OwnedObjectUpdateView):
+class LocationUpdateView(UserCreatedObjectUpdateView):
     model = Location
     form_class = LocationModelForm
-    permission_required = 'maps.change_location'
 
 
 class LocationModalDeleteView(OwnedObjectModalDeleteView):
@@ -374,10 +372,9 @@ class RegionCreateView(OwnedObjectCreateView):
     permission_required = 'maps.add_region'
 
 
-class RegionUpdateView(OwnedObjectUpdateView):
+class RegionUpdateView(UserCreatedObjectUpdateView):
     model = Region
     form_class = RegionModelForm
-    permission_required = 'maps.change_region'
 
 
 class RegionModalDeleteView(OwnedObjectModalDeleteView):
@@ -491,10 +488,9 @@ class CatchmentCreateMergeLauView(LoginRequiredMixin, OwnedObjectCreateView):
         return response
 
 
-class CatchmentUpdateView(OwnedObjectUpdateView):
+class CatchmentUpdateView(UserCreatedObjectUpdateView):
     model = Catchment
     form_class = CatchmentModelForm
-    permission_required = 'maps.change_catchment'
 
 
 class CatchmentModalDeleteView(OwnedObjectModalDeleteView):
@@ -832,10 +828,9 @@ class AttributeModalDetailView(OwnedObjectModalDetailView):
     permission_required = set()
 
 
-class AttributeUpdateView(OwnedObjectUpdateView):
+class AttributeUpdateView(UserCreatedObjectUpdateView):
     model = Attribute
     form_class = AttributeModelForm
-    permission_required = 'maps.change_attribute'
 
 
 class AttributeModalUpdateView(OwnedObjectModalUpdateView):
@@ -882,10 +877,9 @@ class RegionAttributeValueModalDetailView(OwnedObjectModalDetailView):
     permission_required = set()
 
 
-class RegionAttributeValueUpdateView(OwnedObjectUpdateView):
+class RegionAttributeValueUpdateView(UserCreatedObjectUpdateView):
     model = RegionAttributeValue
     form_class = RegionAttributeValueModelForm
-    permission_required = 'maps.change_regionattributevalue'
 
 
 class RegionAttributeValueModalUpdateView(OwnedObjectModalUpdateView):

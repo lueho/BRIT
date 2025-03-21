@@ -127,7 +127,8 @@
                 </div>
             {% endif %}
 
-            {% if 'soilcom.change_collection' in perms %}
+            {# TODO: Enable this link also for owners  #}
+            {% if user.is_staff %}
                 <div class="row mt-3">
                     <div class="col">
                         <div class="text-center">

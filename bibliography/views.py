@@ -10,7 +10,8 @@ from django.views import View
 from django.views.generic import TemplateView
 
 from utils import views
-from utils.views import OwnedObjectCreateWithInlinesView, OwnedObjectUpdateWithInlinesView, UserCreatedObjectDetailView
+from utils.views import (OwnedObjectCreateWithInlinesView, UserCreatedObjectDetailView, UserCreatedObjectUpdateView,
+                         UserCreatedObjectUpdateWithInlinesView)
 from .filters import SourceFilter
 from .forms import (AuthorModalModelForm, AuthorModelForm, LicenceModalModelForm, LicenceModelForm, SourceAuthorInline,
                     SourceModalModelForm, SourceModelForm)
@@ -52,10 +53,9 @@ class AuthorModalDetailView(views.OwnedObjectModalDetailView):
     permission_required = set()
 
 
-class AuthorUpdateView(views.OwnedObjectUpdateView):
+class AuthorUpdateView(UserCreatedObjectUpdateView):
     model = Author
     form_class = AuthorModelForm
-    permission_required = 'bibliography.change_author'
 
 
 class AuthorModalUpdateView(views.OwnedObjectModalUpdateView):
@@ -114,10 +114,9 @@ class LicenceModalDetailView(views.OwnedObjectModalDetailView):
     permission_required = set()
 
 
-class LicenceUpdateView(views.OwnedObjectUpdateView):
+class LicenceUpdateView(UserCreatedObjectUpdateView):
     model = Licence
     form_class = LicenceModelForm
-    permission_required = 'bibliography.change_licence'
 
 
 class LicenceModalUpdateView(views.OwnedObjectModalUpdateView):
@@ -187,11 +186,10 @@ class SourceModalDetailView(views.OwnedObjectModalDetailView):
         return context
 
 
-class SourceUpdateView(OwnedObjectUpdateWithInlinesView):
+class SourceUpdateView(UserCreatedObjectUpdateWithInlinesView):
     model = Source
     form_class = SourceModelForm
     inlines = [SourceAuthorInline]
-    permission_required = 'bibliography.change_source'
 
 
 class SourceModalUpdateView(views.OwnedObjectModalUpdateView):

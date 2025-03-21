@@ -3,7 +3,8 @@ from django.urls import reverse_lazy
 from .forms import PropertyModelForm, UnitModelForm
 from .models import Property, Unit
 from ..views import (OwnedObjectCreateView, OwnedObjectListView, OwnedObjectModalDeleteView,
-                     OwnedObjectModelSelectOptionsView, OwnedObjectUpdateView, UserCreatedObjectDetailView)
+                     OwnedObjectModelSelectOptionsView, UserCreatedObjectDetailView,
+                     UserCreatedObjectUpdateView)
 
 
 class UnitListView(OwnedObjectListView):
@@ -21,10 +22,9 @@ class UnitDetailView(UserCreatedObjectDetailView):
     model = Unit
 
 
-class UnitUpdateView(OwnedObjectUpdateView):
+class UnitUpdateView(UserCreatedObjectUpdateView):
     model = Unit
     form_class = UnitModelForm
-    permission_required = ('properties.change_unit',)
 
 
 class UnitModalDeleteView(OwnedObjectModalDeleteView):
@@ -49,10 +49,9 @@ class PropertyDetailView(UserCreatedObjectDetailView):
     model = Property
 
 
-class PropertyUpdateView(OwnedObjectUpdateView):
+class PropertyUpdateView(UserCreatedObjectUpdateView):
     model = Property
     form_class = PropertyModelForm
-    permission_required = ('properties.change_property',)
 
 
 class PropertyModalDeleteView(OwnedObjectModalDeleteView):
