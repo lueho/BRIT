@@ -72,6 +72,7 @@ class ScenarioCreateViewTestCase(ViewWithPermissionsTestCase):
 class ScenarioCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Scenario
 
+    view_create_name = 'scenario-create'
     view_published_list_name = 'scenario-list'
     view_private_list_name = 'scenario-list-owned'
     view_detail_name = 'scenario-detail'
@@ -132,6 +133,7 @@ class ScenarioModalDeleteViewTestCase(ViewWithPermissionsTestCase):
 
 
 class ScenarioResultCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    create_view = False
     public_list_view = False
     private_list_view = False
 

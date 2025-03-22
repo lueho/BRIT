@@ -7,6 +7,7 @@ from ..models import Showcase
 class ShowCaseCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Showcase
 
+    view_create_name = 'showcase-create'
     view_published_list_name = 'showcase-list'
     view_private_list_name = 'showcase-list-owned'
     view_detail_name = 'showcase-detail'
