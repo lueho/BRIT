@@ -31,6 +31,7 @@ from ..models import (AggregatedCollectionPropertyValue, Collection, CollectionC
 class CollectorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Collector
 
+    view_create_name = 'collector-create'
     view_published_list_name = 'collector-list'
     view_private_list_name = 'collector-list-owned'
     view_detail_name = 'collector-detail'
@@ -48,6 +49,7 @@ class CollectorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
 class CollectionSystemCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = CollectionSystem
 
+    view_create_name = 'collectionsystem-create'
     view_published_list_name = 'collectionsystem-list'
     view_private_list_name = 'collectionsystem-list-owned'
     view_detail_name = 'collectionsystem-detail'
@@ -65,6 +67,7 @@ class CollectionSystemCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDV
 class WasteCategoryCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = WasteCategory
 
+    view_create_name = 'wastecategory-create'
     view_published_list_name = 'wastecategory-list'
     view_private_list_name = 'wastecategory-list-owned'
     view_detail_name = 'wastecategory-detail'
@@ -82,6 +85,7 @@ class WasteCategoryCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDView
 class WasteComponentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = WasteComponent
 
+    view_create_name = 'wastecomponent-create'
     view_published_list_name = 'wastecomponent-list'
     view_private_list_name = 'wastecomponent-list-owned'
     view_detail_name = 'wastecomponent-detail'
@@ -147,6 +151,7 @@ class WasteFlyerListViewTestCase(ViewWithPermissionsTestCase):
 
 
 class WasteFlyerCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    create_view = False
     update_view = False
 
     model = WasteFlyer
@@ -272,6 +277,7 @@ class CollectionFrequencyCreateViewTestCase(ViewWithPermissionsTestCase):
 class CollectionFrequencyCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = CollectionFrequency
 
+    view_create_name = 'collectionfrequency-create'
     view_published_list_name = 'collectionfrequency-list'
     view_private_list_name = 'collectionfrequency-list-owned'
     view_detail_name = 'collectionfrequency-detail'
@@ -568,6 +574,7 @@ class CollectionPropertyValueCRUDViewsTestCase(AbstractTestCases.UserCreatedObje
 
     model = CollectionPropertyValue
 
+    view_create_name = 'collectionpropertyvalue-create'
     view_detail_name = 'collectionpropertyvalue-detail'
     view_update_name = 'collectionpropertyvalue-update'
     view_delete_name = 'collectionpropertyvalue-delete-modal'
@@ -709,6 +716,7 @@ class AggregatedCollectionPropertyValueCRUDViewsTestCase(AbstractTestCases.UserC
 
     model = AggregatedCollectionPropertyValue
 
+    view_create_name = 'aggregatedcollectionpropertyvalue-create'
     view_detail_name = 'aggregatedcollectionpropertyvalue-detail'
     view_update_name = 'aggregatedcollectionpropertyvalue-update'
     view_delete_name = 'aggregatedcollectionpropertyvalue-delete-modal'
@@ -819,6 +827,7 @@ class CollectionCatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCR
 
     model = CollectionCatchment
 
+    view_create_name = 'collectioncatchment-create'
     view_detail_name = 'collectioncatchment-detail'
     view_update_name = 'collectioncatchment-update'
     view_delete_name = 'collectioncatchment-delete-modal'
@@ -1019,6 +1028,7 @@ class CollectionCreateViewTestCase(ViewWithPermissionsTestCase):
 class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Collection
 
+    view_create_name = 'collection-create'
     view_published_list_name = 'collection-list'
     view_private_list_name = 'collection-list-owned'
     view_detail_name = 'collection-detail'

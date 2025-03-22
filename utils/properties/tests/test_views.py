@@ -64,6 +64,7 @@ class UnitCreateViewTestCase(ViewWithPermissionsTestCase):
 class UnitCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Unit
 
+    view_create_name = 'unit-create'
     view_published_list_name = 'unit-list'
     view_private_list_name = 'unit-list-owned'
     view_detail_name = 'unit-detail'
@@ -184,6 +185,7 @@ class PropertyCreateViewTestCase(ViewWithPermissionsTestCase):
 class PropertyCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Property
 
+    view_create_name = 'property-create'
     view_published_list_name = 'property-list'
     view_private_list_name = 'property-list-owned'
     view_detail_name = 'property-detail'

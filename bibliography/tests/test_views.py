@@ -129,6 +129,7 @@ class AuthorModalCreateViewTestCase(ViewWithPermissionsTestCase):
 class AuthorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Author
 
+    view_create_name = 'author-create'
     view_published_list_name = 'author-list'
     view_private_list_name = 'author-list-owned'
     view_detail_name = 'author-detail'
@@ -414,6 +415,7 @@ class LicenceModalCreateViewTestCase(ViewWithPermissionsTestCase):
 class LicenceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Licence
 
+    view_create_name = 'licence-create'
     view_published_list_name = 'licence-list'
     view_private_list_name = 'licence-list-owned'
     view_detail_name = 'licence-detail'
@@ -703,6 +705,7 @@ class SourceModalCreateViewTestCase(ViewWithPermissionsTestCase):
 class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Source
 
+    view_create_name = 'source-create'
     view_published_list_name = 'source-list'
     view_private_list_name = 'source-list-owned'
     view_detail_name = 'source-detail'

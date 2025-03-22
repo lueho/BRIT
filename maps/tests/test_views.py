@@ -261,6 +261,7 @@ class LocationCreateViewTestCase(ViewWithPermissionsTestCase):
 class LocationCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Location
 
+    view_create_name = 'location-create'
     view_published_list_name = 'location-list'
     view_private_list_name = 'location-list-owned'
     view_detail_name = 'location-detail'
@@ -445,6 +446,7 @@ class RegionCreateViewTestCase(ViewWithPermissionsTestCase):
 class RegionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Region
 
+    view_create_name = 'region-create'
     view_published_list_name = 'region-list'
     view_private_list_name = 'region-list-owned'
     view_detail_name = 'region-detail'
@@ -899,6 +901,7 @@ class CatchmentCreateMergeLauViewTestCase(ViewWithPermissionsTestCase):
 class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Catchment
 
+    view_create_name = 'catchment-create'
     view_published_list_name = 'catchment-list'
     view_private_list_name = 'catchment-list-owned'
     view_detail_name = 'catchment-detail'
@@ -1237,6 +1240,7 @@ class AttributeModalCreateViewTestCase(ViewWithPermissionsTestCase):
 class AttributeCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Attribute
 
+    view_create_name = 'attribute-create'
     view_published_list_name = 'attribute-list'
     view_private_list_name = 'attribute-list-owned'
     view_detail_name = 'attribute-detail'
@@ -1489,6 +1493,7 @@ class RegionAttributeValueModalCreateViewTestCase(ViewWithPermissionsTestCase):
 class RegionAttributeValueCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = RegionAttributeValue
 
+    view_create_name = 'regionattributevalue-create'
     view_published_list_name = 'regionattributevalue-list'
     view_private_list_name = 'regionattributevalue-list-owned'
     view_detail_name = 'regionattributevalue-detail'

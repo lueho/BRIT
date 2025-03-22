@@ -91,6 +91,7 @@ class AbstractTestCases(object):
 
         model = None
 
+        view_create_name = None
         view_published_list_name = None
         view_private_list_name = None
         view_detail_name = None
@@ -161,6 +162,9 @@ class AbstractTestCases(object):
         def setUp(self):
             self.client = Client()
 
+        def get_create_url(self):
+            return reverse(self.view_create_name)
+
         def get_list_url(self, publication_status='published', **kwargs):
             if publication_status == 'published':
                 return reverse(self.view_published_list_name, kwargs=kwargs)
@@ -196,6 +200,8 @@ class AbstractTestCases(object):
                 self.skipTest("List view is not enabled for this test case.")
             response = self.client.get(self.get_list_url(publication_status='published'))
             self.assertEqual(response.status_code, 200)
+            if self.create_view:
+                self.assertNotContains(response, self.get_create_url())
 
         # -----------------------
         # DetailView Test Cases

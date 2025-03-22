@@ -32,6 +32,7 @@ class MaterialDashboardViewTestCase(ViewWithPermissionsTestCase):
 class MaterialCategoryCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = MaterialCategory
 
+    view_create_name = 'materialcategory-create'
     view_published_list_name = 'materialcategory-list'
     view_private_list_name = 'materialcategory-list-owned'
     view_detail_name = 'materialcategory-detail'
@@ -307,6 +308,7 @@ class MaterialModalCreateViewTestCase(ViewWithPermissionsTestCase):
 class MaterialCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Material
 
+    view_create_name = 'material-create'
     view_published_list_name = 'material-list'
     view_private_list_name = 'material-list-owned'
     view_detail_name = 'material-detail'
@@ -540,6 +542,7 @@ class ComponentModalCreateViewTestCase(ViewWithPermissionsTestCase):
 class MaterialComponentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = MaterialComponent
 
+    view_create_name = 'materialcomponent-create'
     view_published_list_name = 'materialcomponent-list'
     view_private_list_name = 'materialcomponent-list-owned'
     view_detail_name = 'materialcomponent-detail'
@@ -722,6 +725,7 @@ class ComponentGroupModalCreateViewTestCase(ViewWithPermissionsTestCase):
 class MaterialComponentGroupCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = MaterialComponentGroup
 
+    view_create_name = 'materialcomponentgroup-create'
     view_published_list_name = 'materialcomponentgroup-list'
     view_private_list_name = 'materialcomponentgroup-list-owned'
     view_detail_name = 'materialcomponentgroup-detail'
@@ -949,6 +953,7 @@ class MaterialPropertyModalCreateViewTestCase(ViewWithPermissionsTestCase):
 class MaterialPropertyCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = MaterialProperty
 
+    view_create_name = 'materialproperty-create'
     view_published_list_name = 'materialproperty-list'
     view_private_list_name = 'materialproperty-list-owned'
     view_detail_name = 'materialproperty-detail'
@@ -1239,6 +1244,7 @@ class SampleSeriesModalCreateViewTestCase(ViewWithPermissionsTestCase):
 class SampleSeriesCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = SampleSeries
 
+    view_create_name = 'sampleseries-create'
     view_published_list_name = 'sampleseries-list'
     view_private_list_name = 'sampleseries-list-owned'
     view_detail_name = 'sampleseries-detail'
@@ -1441,6 +1447,7 @@ class SampleCreateViewTestCase(ViewWithPermissionsTestCase):
 class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Sample
 
+    view_create_name = 'sample-create'
     view_published_list_name = 'sample-list'
     view_private_list_name = 'sample-list-owned'
     view_detail_name = 'sample-detail'
@@ -1931,6 +1938,7 @@ class CompositionModalCreateViewTestCase(ViewWithPermissionsTestCase):
 class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Composition
 
+    view_create_name = 'composition-create'
     view_published_list_name = 'composition-list'
     view_private_list_name = 'composition-list-owned'
     view_detail_name = 'composition-detail'
