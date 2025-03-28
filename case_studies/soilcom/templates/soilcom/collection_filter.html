@@ -5,9 +5,9 @@
 
 {% block title %}BRIT | Household waste collections{% endblock %}
 
-{% block list_header %}<strong>Collections</strong>{% endblock %}
+{% block list_card_header %}<strong>Collections</strong>{% endblock %}
 
-{% block list_body %}
+{% block list_table %}
     <table class="table table-responsive-stack">
         <thead>
         <tr>
@@ -16,45 +16,48 @@
             <th>Collector</th>
             <th>Category</th>
             <th>Collection system</th>
+            {% if list_type == 'private' %}
+                <th>Public</th>
+            {% endif %}
         </tr>
         </thead>
         <tbody>
         {% for object in object_list %}
             <tr>
                 <td data-label="Id"><a href="{{ object.get_absolute_url }}">{{ object.id }}</a></td>
-                <td data-label="Catchment"><a href="{{ object.catchment.get_absolute_url }}">{{ object.catchment }}</a>
+                <td data-label="Catchment">
+                    <a href="{{ object.catchment.get_absolute_url }}">{{ object.catchment }}</a>
                 </td>
-                <td data-label="Collector"><a href="{{ object.collector.get_absolute_url }}">{{ object.collector }}</a>
+                <td data-label="Collector">
+                    <a href="{{ object.collector.get_absolute_url }}">{{ object.collector }}</a>
                 </td>
-                <td data-label="Category"><a
-                        href="{{ object.waste_stream.category.get_absolute_url }}">{{ object.waste_stream.category }}</a>
+                <td data-label="Category">
+                    <a href="{{ object.waste_stream.category.get_absolute_url }}">{{ object.waste_stream.category }}</a>
                 </td>
-                <td data-label="Collection system"><a
-                        href="{{ object.collection_system.get_absolute_url }}">{{ object.collection_system }}</a></td>
+                <td data-label="Collection system">
+                    <a href="{{ object.collection_system.get_absolute_url }}">{{ object.collection_system }}</a>
+                </td>
+                {% if list_type == 'private' %}
+                    {% include 'partials/_publication_status_column.html' %}
+                {% endif %}
             </tr>
         {% endfor %}
         </tbody>
         <tfoot>
         </tfoot>
     </table>
-{% endblock list_body %}
+{% endblock list_table %}
 
-{% block list_footer %}
+{% block list_card_footer_additional_links %}
     <a class="mr-2 text-nowrap"
        href="{% url 'WasteCollection' %}?{{ request.GET.urlencode }}&load_catchment=true&load_features=true">
         <i class="fa fa-fw fa-map"></i>
         <span class="text-nowrap">View as map</span>
     </a>
-    {% if 'soilcom.add_collection' in perms %}
-        <a class="mr-2 text-nowrap" href="{% url 'collection-create' %}?next={{ request.get_full_path|urlencode }}">
-            <i class="fa fa-fw fa-plus"></i>
-            <span>Add new collection</span>
-        </a>
-    {% endif %}
     {% if 'soilcom.change_collection' in perms %}
-        <a class="mr-2 text-nowrap" href="{% url 'waste-collection-home' %}">
-            <i class="fas fa-fw fa-cog"></i>
-            <span>Dashboard</span>
+        <a class="mr-2 text-nowrap" href="{% url 'wastecollection-dashboard' %}">
+            <i class="fas fa-fw fa-th-large"></i>
+            <span>Explorer</span>
         </a>
         <a class="mr-2 text-nowrap" href="{% url 'aggregatedcollectionpropertyvalue-create' %}">
             <i class="fas fa-fw fa-plus-circle"></i>
@@ -62,10 +65,10 @@
         </a>
     {% endif %}
     {% if user.is_authenticated %}
-        {% export_link "csv" 'collection-export' 'collection-export-progress' %}
-        {% export_link "xlsx" 'collection-export' 'collection-export-progress' %}
+        {% export_link "csv" 'collection-export' %}
+        {% export_link "xlsx" 'collection-export' %}
     {% endif %}
-{% endblock list_footer %}
+{% endblock list_card_footer_additional_links %}
 
 {% block filter_column %}
     <form method="get">

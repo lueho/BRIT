@@ -4,9 +4,9 @@
 
 {% block title %}BRIT | Bibliography | Sources{% endblock %}
 
-{% block list_header %}<strong><i class="fas fa-fw fa-chart-bar"></i> Bibliography</strong>{% endblock %}
+{% block list_card_header %}<strong><i class="fas fa-fw fa-chart-bar"></i> Bibliography</strong>{% endblock %}
 
-{% block list_body %}
+{% block list_table %}
     <table class="table table-responsive-stack">
         <thead>
         <tr>
@@ -14,6 +14,9 @@
             <th>Authors/Publisher</th>
             <th>Title</th>
             <th>Type</th>
+            {% if list_type == 'private' %}
+                <th>Public</th>
+            {% endif %}
         </tr>
         </thead>
         {% for object in object_list %}
@@ -38,22 +41,13 @@
                 </td>
                 <td data-label="Title"><a href="{{ object.get_absolute_url }}">{{ object.title }}</a></td>
                 <td data-label="Type">{{ object.type }}</td>
+                {% if list_type == 'private' %}
+                    {% include 'partials/_publication_status_column.html' %}
+                {% endif %}
             </tr>
         {% endfor %}
     </table>
-{% endblock list_body %}
-
-{% block list_footer %}
-    <a class="mr-2 text-nowrap" href="{{ create_url }}">
-        <i class="fas fa-fw fa-plus"></i> {{ create_url_text }}
-    </a>
-    {% if 'bibliography.change_source' in perms %}
-        <a class="mr-2 text-nowrap" href="{% url 'bibliography-dashboard' %}">
-            <i class="fas fa-fw fa-cog"></i>
-            <span>Dashboard</span>
-        </a>
-    {% endif %}
-{% endblock list_footer %}
+{% endblock list_table %}
 
 {% block filter_body %}
     <form method="get">

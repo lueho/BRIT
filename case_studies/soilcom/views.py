@@ -19,11 +19,12 @@ from bibliography.views import (SourceCheckUrlView, SourceCreateView, SourceModa
 from maps.forms import NutsAndLauCatchmentQueryForm
 from maps.views import (CatchmentDetailView, CatchmentUpdateView, GeoDataSetFilteredMapView, GeoDataSetFormMixin,
                         MapMixin)
+from utils.file_export.views import FilteredListFileExportView
 from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineFormSetMixin
-from utils.views import (BRITFilterView, OwnedObjectCreateView, OwnedObjectListView, OwnedObjectModalCreateView,
-                         OwnedObjectModalDeleteView, OwnedObjectModalDetailView, OwnedObjectModalUpdateView,
-                         OwnedObjectModelSelectOptionsView, UserCreatedObjectDetailView,
-                         UserCreatedObjectUpdateView)
+from utils.views import (OwnedObjectCreateView, OwnedObjectModalCreateView, OwnedObjectModalDeleteView,
+                         OwnedObjectModalDetailView, OwnedObjectModalUpdateView, OwnedObjectModelSelectOptionsView,
+                         PrivateObjectFilterView, PrivateObjectListView, PublishedObjectFilterView,
+                         PublishedObjectListView, UserCreatedObjectDetailView, UserCreatedObjectUpdateView)
 from .filters import CollectionFilterSet, CollectorFilter, WasteFlyerFilter
 from .forms import (AggregatedCollectionPropertyValueModelForm, BaseWasteFlyerUrlFormSet, CollectionAddPredecessorForm,
                     CollectionAddWasteSampleForm, CollectionFrequencyModalModelForm, CollectionFrequencyModelForm,
@@ -32,11 +33,10 @@ from .forms import (AggregatedCollectionPropertyValueModelForm, BaseWasteFlyerUr
                     CollectionSeasonFormSet, CollectionSystemModalModelForm, CollectionSystemModelForm,
                     CollectorModalModelForm, CollectorModelForm, WasteCategoryModalModelForm, WasteCategoryModelForm,
                     WasteComponentModalModelForm, WasteComponentModelForm, WasteFlyerModalModelForm,
-                    WasteFlyerModelForm, WasteStreamModalModelForm, WasteStreamModelForm)
+                    WasteFlyerModelForm)
 from .models import (AggregatedCollectionPropertyValue, Collection, CollectionCatchment, CollectionCountOptions,
-                     CollectionFrequency,
-                     CollectionPropertyValue, CollectionSeason,
-                     CollectionSystem, Collector, WasteCategory, WasteComponent, WasteFlyer, WasteStream)
+                     CollectionFrequency, CollectionPropertyValue, CollectionSeason, CollectionSystem, Collector,
+                     WasteCategory, WasteComponent, WasteFlyer)
 from .tasks import check_wasteflyer_urls
 
 
@@ -49,10 +49,16 @@ class CollectionHomeView(PermissionRequiredMixin, TemplateView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CollectorListView(BRITFilterView):
+class CollectorPublishedListView(PublishedObjectFilterView):
     model = Collector
     filterset_class = CollectorFilter
-    ordering = 'name'
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
+
+
+class CollectorPrivateListView(PrivateObjectListView):
+    model = Collector
+    filterset_class = CollectorFilter
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
 
 
 class CollectorCreateView(OwnedObjectCreateView):
@@ -110,10 +116,14 @@ class CollectorAutoCompleteView(Select2QuerySetView):
 # ----------- Collection System CRUD -----------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class CollectionSystemListView(OwnedObjectListView):
+class CollectionSystemPublishedListView(PublishedObjectListView):
     model = CollectionSystem
-    permission_required = 'soilcom.view_collectionsystem'
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
 
+
+class CollectionSystemPrivateListView(PrivateObjectListView):
+    model = CollectionSystem
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
 
 class CollectionSystemCreateView(OwnedObjectCreateView):
     form_class = CollectionSystemModelForm
@@ -160,10 +170,14 @@ class CollectionSystemModalDeleteView(OwnedObjectModalDeleteView):
 # ----------- Waste Stream Category CRUD -------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class WasteCategoryListView(OwnedObjectListView):
+class WasteCategoryPublishedListView(PublishedObjectListView):
     model = WasteCategory
-    permission_required = 'soilcom.view_wastecategory'
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
 
+
+class WasteCategoryPrivateListView(PrivateObjectListView):
+    model = WasteCategory
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
 
 class WasteCategoryCreateView(OwnedObjectCreateView):
     form_class = WasteCategoryModelForm
@@ -209,9 +223,14 @@ class WasteCategoryModalDeleteView(OwnedObjectModalDeleteView):
 # ----------- Waste Component CRUD -------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class WasteComponentListView(OwnedObjectListView):
+class WasteComponentPublishedListView(PublishedObjectListView):
     model = WasteComponent
-    permission_required = 'soilcom.view_wastecomponent'
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
+
+
+class WasteComponentPrivateListView(PrivateObjectListView):
+    model = WasteComponent
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
 
 
 class WasteComponentCreateView(OwnedObjectCreateView):
@@ -255,61 +274,20 @@ class WasteComponentModalDeleteView(OwnedObjectModalDeleteView):
     permission_required = 'soilcom.delete_wastecomponent'
 
 
-# ----------- Waste Stream CRUD ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------------------------
-
-class WasteStreamListView(OwnedObjectListView):
-    model = WasteStream
-    permission_required = 'soilcom.view_wastestream'
-
-
-class WasteStreamCreateView(OwnedObjectCreateView):
-    form_class = WasteStreamModelForm
-    success_url = reverse_lazy('wastestream-list')
-    permission_required = 'soilcom.add_wastestream'
-
-
-class WasteStreamModalCreateView(OwnedObjectModalCreateView):
-    form_class = WasteStreamModalModelForm
-    success_url = reverse_lazy('wastestream-list')
-    permission_required = 'soilcom.add_wastestream'
-
-
-class WasteStreamDetailView(UserCreatedObjectDetailView):
-    model = WasteStream
-
-
-class WasteStreamModalDetailView(OwnedObjectModalDetailView):
-    template_name = 'modal_detail.html'
-    model = WasteStream
-    permission_required = 'soilcom.view_wastestream'
-
-
-class WasteStreamUpdateView(UserCreatedObjectUpdateView):
-    model = WasteStream
-    form_class = WasteStreamModelForm
-
-
-class WasteStreamModalUpdateView(OwnedObjectModalUpdateView):
-    model = WasteStream
-    form_class = WasteStreamModalModelForm
-    permission_required = 'soilcom.change_wastestream'
-
-
-class WasteStreamModalDeleteView(OwnedObjectModalDeleteView):
-    template_name = 'modal_delete.html'
-    model = WasteStream
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('wastestream-list')
-    permission_required = 'soilcom.delete_wastestream'
-
-
 # ----------- Waste Collection Flyer CRUD ------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class WasteFlyerListView(BRITFilterView):
+class WasteFlyerPublishedFilterView(PublishedObjectFilterView):
     model = WasteFlyer
     filterset_class = WasteFlyerFilter
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
+    ordering = 'id'
+
+
+class WasteFlyerPrivateFilterView(PrivateObjectFilterView):
+    model = WasteFlyer
+    filterset_class = WasteFlyerFilter
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
     ordering = 'id'
 
 
@@ -406,9 +384,14 @@ class WasteFlyerListCheckUrlsProgressView(LoginRequiredMixin, View):
 # ----------- Frequency CRUD -------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class FrequencyListView(OwnedObjectListView):
+class FrequencyPublishedListView(PublishedObjectListView):
     model = CollectionFrequency
-    permission_required = set()
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
+
+
+class FrequencyPrivateListView(PrivateObjectListView):
+    model = CollectionFrequency
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
 
 
 class FrequencyCreateView(M2MInlineFormSetMixin, OwnedObjectCreateView):
@@ -593,10 +576,26 @@ class CollectionCatchmentUpdateView(CatchmentUpdateView):
 # ----------- Collection CRUD ------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class CollectionCurrentListView(BRITFilterView):
+class CollectionCurrentPublishedListView(PublishedObjectFilterView):
     model = Collection
     filterset_class = CollectionFilterSet
-    ordering = 'name'
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        # Check if it's a GET request and no query parameters are present
+        # This implies that the user has just opened the page and no filtering has been applied yet.
+        if self.request.method == 'GET' and not self.request.GET:
+            queryset = queryset.currently_valid()
+
+        return queryset
+
+
+class CollectionCurrentPrivateListView(PrivateObjectFilterView):
+    model = Collection
+    filterset_class = CollectionFilterSet
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -776,6 +775,10 @@ class CollectionAutoCompleteView(Select2QuerySetView):
         return qs
 
 
+class CollectionListFileExportView(FilteredListFileExportView):
+    task_function = case_studies.soilcom.tasks.export_collections_to_file
+
+
 class CollectionAddPropertyValueView(CollectionPropertyValueCreateView):
 
     def get_initial(self):
@@ -936,33 +939,3 @@ class WasteCollectionMapIframeView(GeoDataSetFilteredMapView):
     filterset_class = CollectionFilterSet
     features_layer_api_basename = 'api-waste-collection'
     map_title = 'Household Waste Collection Europe'
-
-
-# ----------- API ------------------------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-class CollectionListFileExportView(LoginRequiredMixin, View):
-
-    @staticmethod
-    def get(request, *args, **kwargs):
-        params = dict(request.GET)
-        file_format = params.pop('format', 'csv')[0]
-        params.pop('page', None)
-        task = case_studies.soilcom.tasks.export_collections_to_file.delay(file_format, params)
-        response_data = {
-            'task_id': task.task_id
-        }
-        return HttpResponse(json.dumps(response_data), content_type='application/json')
-
-
-class CollectionListFileExportProgressView(LoginRequiredMixin, View):
-
-    @staticmethod
-    def get(request, task_id):
-        result = AsyncResult(task_id)
-        response_data = {
-            'state': result.state,
-            'details': result.info,
-        }
-        return HttpResponse(json.dumps(response_data), content_type='application/json')

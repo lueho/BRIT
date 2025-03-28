@@ -3,19 +3,25 @@
 
 {% block title %}BRIT | Bibliography | Licences{% endblock %}
 
-{% block card_body %}
+{% block list_table %}
     <table class="table">
         <thead>
         <tr>
             <th>Name</th>
             <th>Reference url</th>
+            {% if list_type == 'private' %}
+                <th>Public</th>
+            {% endif %}
         </tr>
         </thead>
         {% for object in object_list %}
             <tr>
                 <td><a href="{{ object.get_absolute_url }}">{{ object }}</a></td>
                 <td><a href="{{ object.reference_url }}" target="_blank">{{ object.reference_url }}</a></td>
+                {% if list_type == 'private' %}
+                    {% include 'partials/_publication_status_column.html' %}
+                {% endif %}
             </tr>
         {% endfor %}
     </table>
-{% endblock card_body %}
+{% endblock list_table %}

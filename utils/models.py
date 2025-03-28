@@ -39,6 +39,14 @@ class CRUDUrlsMixin(models.Model):
         return cls.get_url("list")
 
     @classmethod
+    def public_list_url(cls):
+        return cls.get_url("list")
+
+    @classmethod
+    def private_list_url(cls):
+        return cls.get_url("list", suffix="-owned")
+
+    @classmethod
     def modal_list_url(cls):
         return cls.get_url("list", suffix="-modal")
 
@@ -80,6 +88,14 @@ class CRUDUrlsMixin(models.Model):
     @property
     def modal_delete_url(self):
         return self.get_url("delete", suffix="-modal", pk=self.pk)
+
+    @classmethod
+    def get_verbose_name(cls):
+        return cls._meta.verbose_name
+
+    @classmethod
+    def get_verbose_name_plural(cls):
+        return cls._meta.verbose_name_plural
 
 
 def get_default_owner_pk():

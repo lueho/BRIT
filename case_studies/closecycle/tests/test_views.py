@@ -5,7 +5,13 @@ from ..models import Showcase
 
 
 class ShowCaseCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    dashboard_view = False
+
     model = Showcase
+
+    view_create_name = 'showcase-create'
+    view_published_list_name = 'showcase-list'
+    view_private_list_name = 'showcase-list-owned'
     view_detail_name = 'showcase-detail'
     view_update_name = 'showcase-update'
     view_delete_name = 'showcase-delete-modal'

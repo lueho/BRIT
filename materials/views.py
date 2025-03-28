@@ -11,13 +11,12 @@ from extra_views import UpdateWithInlinesView
 
 from distributions.models import TemporalDistribution
 from distributions.plots import DoughnutChart
-from utils.views import (NextOrSuccessUrlMixin, OwnedObjectCreateView, OwnedObjectListView, OwnedObjectModalCreateView,
+from utils.views import (NextOrSuccessUrlMixin, OwnedObjectCreateView, OwnedObjectModalCreateView,
                          OwnedObjectModalDeleteView, OwnedObjectModalDetailView, OwnedObjectModalUpdateView,
-                         PublishedObjectFilterView, UserCreatedObjectCreateView,
-                         UserCreatedObjectDetailView, UserCreatedObjectModalCreateView,
-                         UserCreatedObjectModalDeleteView, UserCreatedObjectUpdateView,
-                         UserCreatedObjectUpdateWithInlinesView, UserOwnedObjectFilterView,
-                         UserOwnsObjectMixin)
+                         PrivateObjectFilterView, PrivateObjectListView, PublishedObjectFilterView,
+                         PublishedObjectListView, UserCreatedObjectCreateView, UserCreatedObjectDetailView,
+                         UserCreatedObjectModalCreateView, UserCreatedObjectModalDeleteView,
+                         UserCreatedObjectUpdateView, UserCreatedObjectUpdateWithInlinesView, UserOwnsObjectMixin)
 from .filters import PublishedSampleFilter, SampleSeriesFilter, UserOwnedSampleFilter
 from .forms import (AddComponentModalForm, AddCompositionModalForm, AddLiteratureSourceForm, AddSeasonalVariationForm,
                     ComponentGroupModalModelForm, ComponentGroupModelForm, ComponentModalModelForm, ComponentModelForm,
@@ -33,17 +32,21 @@ from .models import (Material, MaterialCategory, MaterialComponent, MaterialComp
 from .serializers import (CompositionDoughnutChartSerializer, SampleModelSerializer, SampleSeriesModelSerializer)
 
 
-class MaterialsDashboardView(PermissionRequiredMixin, TemplateView):
+class MaterialsDashboardView(TemplateView):
     template_name = 'materials_dashboard.html'
-    permission_required = 'materials.change_material'
 
 
 # ----------- Material Category CRUD ----------------------------------------------------------------------------------
 # ---------------------------------------------------------------------------------------------------------------------
 
-class MaterialCategoryListView(OwnedObjectListView):
+class MaterialCategoryPublishedListView(PublishedObjectListView):
     model = MaterialCategory
-    permission_required = set()
+    dashboard_url = reverse_lazy('materials-dashboard')
+
+
+class MaterialCategoryPrivateListView(PrivateObjectListView):
+    model = MaterialCategory
+    dashboard_url = reverse_lazy('materials-dashboard')
 
 
 class MaterialCategoryCreateView(OwnedObjectCreateView):
@@ -89,10 +92,16 @@ class MaterialCategoryModalDeleteView(OwnedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class MaterialListView(OwnedObjectListView):
+class MaterialPublishedListView(PublishedObjectListView):
     model = Material
     queryset = Material.objects.filter(type='material')
-    permission_required = set()
+    dashboard_url = reverse_lazy('materials-dashboard')
+
+
+class MaterialPrivateListView(PrivateObjectListView):
+    model = Material
+    queryset = Material.objects.filter(type='material')
+    dashboard_url = reverse_lazy('materials-dashboard')
 
 
 class MaterialCreateView(OwnedObjectCreateView):
@@ -158,9 +167,14 @@ class ComponentAutoCompleteView(autocomplete.Select2QuerySetView):
         return qs
 
 
-class ComponentListView(OwnedObjectListView):
+class ComponentPublishedListView(PublishedObjectListView):
     model = MaterialComponent
-    permission_required = set()
+    dashboard_url = reverse_lazy('materials-dashboard')
+
+
+class ComponentPrivateListView(PrivateObjectListView):
+    model = MaterialComponent
+    dashboard_url = reverse_lazy('materials-dashboard')
 
 
 class ComponentCreateView(OwnedObjectCreateView):
@@ -206,9 +220,14 @@ class ComponentModalDeleteView(OwnedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class MaterialComponentGroupListView(OwnedObjectListView):
+class MaterialComponentGroupPublishedListView(PublishedObjectListView):
     model = MaterialComponentGroup
-    permission_required = set()
+    dashboard_url = reverse_lazy('materials-dashboard')
+
+
+class MaterialComponentGroupPrivateListView(PrivateObjectListView):
+    model = MaterialComponentGroup
+    dashboard_url = reverse_lazy('materials-dashboard')
 
 
 class MaterialComponentGroupCreateView(OwnedObjectCreateView):
@@ -253,9 +272,14 @@ class MaterialComponentGroupModalDeleteView(OwnedObjectModalDeleteView):
 # ----------- Material Property CRUD -----------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class MaterialPropertyListView(OwnedObjectListView):
+class MaterialPropertyPublishedListView(PublishedObjectListView):
     model = MaterialProperty
-    permission_required = set()
+    dashboard_url = reverse_lazy('materials-dashboard')
+
+
+class MaterialPropertyPrivateListView(PrivateObjectListView):
+    model = MaterialProperty
+    dashboard_url = reverse_lazy('materials-dashboard')
 
 
 class MaterialPropertyCreateView(OwnedObjectCreateView):
@@ -312,14 +336,16 @@ class MaterialPropertyValueModalDeleteView(UserCreatedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class PublishedSampleSeriesListView(PublishedObjectFilterView):
+class SampleSeriesPublishedListView(PublishedObjectFilterView):
     model = SampleSeries
     filterset_class = SampleSeriesFilter
+    dashboard_url = reverse_lazy('materials-dashboard')
 
 
-class UserOwnedSampleSeriesListView(UserOwnedObjectFilterView):
+class SampleSeriesPrivateListView(PrivateObjectFilterView):
     model = SampleSeries
     filterset_class = SampleSeriesFilter
+    dashboard_url = reverse_lazy('materials-dashboard')
 
 
 class SampleSeriesCreateView(OwnedObjectCreateView):
@@ -406,26 +432,22 @@ class SampleSeriesAutoCompleteView(autocomplete.Select2QuerySetView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class PublishedSampleListView(PublishedObjectFilterView):
+class SamplePublishedListView(PublishedObjectFilterView):
     model = Sample
     filterset_class = PublishedSampleFilter
+    dashboard_url = reverse_lazy('materials-dashboard')
 
 
-class UserOwnedSampleListView(UserOwnedObjectFilterView):
+class SamplePrivateListView(PrivateObjectFilterView):
     model = Sample
     filterset_class = UserOwnedSampleFilter
-
-    def get_filterset_kwargs(self, filterset_class):
-        kwargs = super().get_filterset_kwargs(filterset_class)
-        kwargs['user'] = self.request.user
-        return kwargs
+    dashboard_url = reverse_lazy('materials-dashboard')
 
 
-class FeaturedSampleListView(OwnedObjectListView):
+class FeaturedSampleListView(PublishedObjectListView):
     template_name = 'featured_sample_list.html'
     model = Sample
     queryset = Sample.objects.filter(series__publish=True)
-    permission_required = set()
 
 
 class SampleCreateView(LoginRequiredMixin, OwnedObjectCreateView):
@@ -589,9 +611,7 @@ class SampleCreateDuplicateView(UserCreatedObjectUpdateView):
 # ----------- Composition CRUD -----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class CompositionListView(OwnedObjectListView):
-    model = Composition
-    permission_required = set()
+# Not List view because compositions only make sense in the context of their materials
 
 
 class CompositionCreateView(OwnedObjectCreateView):

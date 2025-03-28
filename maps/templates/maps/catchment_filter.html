@@ -3,14 +3,17 @@
 
 {% block title %}BRIT | Maps | Catchments{% endblock %}
 
-{% block list_header %}<strong>Catchments</strong>{% endblock %}
+{% block list_card_header %}<strong>Catchments</strong>{% endblock %}
 
-{% block list_body %}
+{% block list_table %}
     <table class="table table-responsive-stack">
         <thead>
         <tr>
             <th>Name</th>
             <th>Type</th>
+            {% if list_type == 'private' %}
+                <th>Public</th>
+            {% endif %}
         </tr>
         </thead>
         <tbody>
@@ -18,35 +21,24 @@
             <tr>
                 <td data-label="Name"><a href="{{ object.get_absolute_url }}">{{ object.name }}</a></td>
                 <td data-label="Type">{{ object.type }}</td>
+                {% if list_type == 'private' %}
+                    {% include 'partials/_publication_status_column.html' %}
+                {% endif %}
             </tr>
         {% endfor %}
         </tbody>
         <tfoot>
         </tfoot>
     </table>
-{% endblock list_body %}
+{% endblock list_table %}
 
-{% block list_footer %}
-    {#    <a class="nowrap" href="{% url 'catchment-map' %}?{{ request.GET.urlencode }}&load_features=true">#}
-    {#        <i class="fa fa-fw fa-map"></i> View as map#}
-    {#    </a>#}
+{% block list_card_footer_create_link %}
     {% if user.is_authenticated %}
-        <a class="mr-2 text-nowrap" href="{% url 'catchment-list-owned' %}">
-            <i class="fas fa-fw fa-list"></i> My catchments
+        <a class="mr-2 text-nowrap" href="{{ create_url }}">
+            <i class="fas fa-fw fa-plus"></i> {{ create_url_text }}
         </a>
     {% endif %}
-    {% if user.is_authenticated %}
-        <a href="{% url 'catchment-create' %}?next={{ request.get_full_path|urlencode }}" class="nowrap">
-            <i class="fa fa-fw fa-plus"></i>
-            <span>Add new catchment</span>
-        </a>
-    {% endif %}
-    {% if 'maps.change_catchment' in perms %}
-        <a href="{% url 'maps-dashboard' %}" class="ml-3 nowrap">
-            <i class="fas fa-fw fa-cog"></i> Dashboard
-        </a>
-    {% endif %}
-{% endblock list_footer %}
+{% endblock list_card_footer_create_link %}
 
 {% block filter_body %}
     <form method="get">

@@ -30,6 +30,11 @@ from ..models import (AggregatedCollectionPropertyValue, Collection, CollectionC
 
 class CollectorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Collector
+
+    view_dashboard_name = 'wastecollection-dashboard'
+    view_create_name = 'collector-create'
+    view_published_list_name = 'collector-list'
+    view_private_list_name = 'collector-list-owned'
     view_detail_name = 'collector-detail'
     view_update_name = 'collector-update'
     view_delete_name = 'collector-delete-modal'
@@ -44,6 +49,11 @@ class CollectorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
 
 class CollectionSystemCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = CollectionSystem
+
+    view_dashboard_name = 'wastecollection-dashboard'
+    view_create_name = 'collectionsystem-create'
+    view_published_list_name = 'collectionsystem-list'
+    view_private_list_name = 'collectionsystem-list-owned'
     view_detail_name = 'collectionsystem-detail'
     view_update_name = 'collectionsystem-update'
     view_delete_name = 'collectionsystem-delete-modal'
@@ -58,6 +68,11 @@ class CollectionSystemCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDV
 
 class WasteCategoryCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = WasteCategory
+
+    view_dashboard_name = 'wastecollection-dashboard'
+    view_create_name = 'wastecategory-create'
+    view_published_list_name = 'wastecategory-list'
+    view_private_list_name = 'wastecategory-list-owned'
     view_detail_name = 'wastecategory-detail'
     view_update_name = 'wastecategory-update'
     view_delete_name = 'wastecategory-delete-modal'
@@ -72,6 +87,11 @@ class WasteCategoryCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDView
 
 class WasteComponentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = WasteComponent
+
+    view_dashboard_name = 'wastecollection-dashboard'
+    view_create_name = 'wastecomponent-create'
+    view_published_list_name = 'wastecomponent-list'
+    view_private_list_name = 'wastecomponent-list-owned'
     view_detail_name = 'wastecomponent-detail'
     view_update_name = 'wastecomponent-update'
     view_delete_name = 'wastecomponent-delete-modal'
@@ -94,79 +114,32 @@ class WasteComponentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDVie
         return cls.model.objects.create(owner=cls.owner_user, **data)
 
 
-# ----------- Waste Stream CRUD ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-class WasteStreamCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
-    model = WasteStream
-    view_detail_name = 'wastestream-detail'
-    view_update_name = 'wastestream-update'
-    view_delete_name = 'wastestream-delete-modal'
-
-    create_object_data = {'name': 'Test Waste Stream'}
-    update_object_data = {'name': 'Updated Test Waste Stream'}
-
-    @classmethod
-    def create_related_objects(cls):
-        return {'category': WasteCategory.objects.create(name='Biowaste')}
-
-    def related_objects_post_data(self):
-        data = super().related_objects_post_data()
-        data.update({
-            'allowed_materials': [],
-            'forbidden_materials': [],
-        })
-        return data
-
-
 # ----------- WasteFlyer CRUD ------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class WasteFlyerListViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ('view_wasteflyer', 'change_wasteflyer',)
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        with mute_signals(signals.post_save):
-            WasteFlyer.objects.create(
-                abbreviation='Flyer1',
-                url='https://www.test-flyer.org'
-            )
-            WasteFlyer.objects.create(
-                abbreviation='Flyer2',
-                url='https://www.best-flyer.org'
-            )
-            WasteFlyer.objects.create(
-                abbreviation='Flyer3',
-                url='https://www.rest-flyer.org'
-            )
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('wasteflyer-list'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_all_flyers_are_included(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('wasteflyer-list'))
-        self.assertIn('object_list', response.context)
-        self.assertEqual(len(response.context['object_list']), 3)
-
-    def test_contains_check_urls_button_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('wasteflyer-list'))
-        self.assertContains(response, 'check urls')
-
-
 class WasteFlyerCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    create_view = False
     update_view = False
 
     model = WasteFlyer
+
+    view_dashboard_name = 'wastecollection-dashboard'
+    view_published_list_name = 'wasteflyer-list'
+    view_private_list_name = 'wasteflyer-list-owned'
     view_detail_name = 'wasteflyer-detail'
 
     create_object_data = {'url': 'https://www.test-flyer.org'}
+
+    def test_list_unpublished_contains_check_urls_button_for_authenticated_owner(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.get(reverse('wasteflyer-list-owned'))
+        self.assertContains(response, 'check urls')
+
+    def test_list_published_contains_check_urls_button_for_staff_user(self):
+        self.client.force_login(self.staff_user)
+        response = self.client.get(reverse('wasteflyer-list'))
+        self.assertContains(response, 'check urls')
 
     def test_detail_view_unpublished_contains_check_url_button_for_owner(self):
         self.client.force_login(self.owner_user)
@@ -190,18 +163,6 @@ class WasteFlyerCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
 
 # ----------- Collection Frequency CRUD --------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
-
-class CollectionFrequencyListViewTestCase(ViewWithPermissionsTestCase):
-    url = reverse('collectionfrequency-list')
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 200)
 
 
 class CollectionFrequencyCreateViewTestCase(ViewWithPermissionsTestCase):
@@ -282,6 +243,11 @@ class CollectionFrequencyCreateViewTestCase(ViewWithPermissionsTestCase):
 
 class CollectionFrequencyCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = CollectionFrequency
+
+    view_dashboard_name = 'wastecollection-dashboard'
+    view_create_name = 'collectionfrequency-create'
+    view_published_list_name = 'collectionfrequency-list'
+    view_private_list_name = 'collectionfrequency-list-owned'
     view_detail_name = 'collectionfrequency-detail'
     view_update_name = 'collectionfrequency-update'
     view_delete_name = 'collectionfrequency-delete-modal'
@@ -571,7 +537,13 @@ class CollectionPropertyValueCreateViewTestCase(ViewWithPermissionsTestCase):
 
 
 class CollectionPropertyValueCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    public_list_view = False
+    private_list_view = False
+
     model = CollectionPropertyValue
+
+    view_dashboard_name = 'wastecollection-dashboard'
+    view_create_name = 'collectionpropertyvalue-create'
     view_detail_name = 'collectionpropertyvalue-detail'
     view_update_name = 'collectionpropertyvalue-update'
     view_delete_name = 'collectionpropertyvalue-delete-modal'
@@ -708,7 +680,13 @@ class AggregatedCollectionPropertyValueCreateViewTestCase(ViewWithPermissionsTes
 
 
 class AggregatedCollectionPropertyValueCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    public_list_view = False
+    private_list_view = False
+
     model = AggregatedCollectionPropertyValue
+
+    view_dashboard_name = 'wastecollection-dashboard'
+    view_create_name = 'aggregatedcollectionpropertyvalue-create'
     view_detail_name = 'aggregatedcollectionpropertyvalue-detail'
     view_update_name = 'aggregatedcollectionpropertyvalue-update'
     view_delete_name = 'aggregatedcollectionpropertyvalue-delete-modal'
@@ -814,7 +792,13 @@ class AggregatedCollectionPropertyValueModalDeleteViewTestCase(ViewWithPermissio
 
 
 class CollectionCatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    public_list_view = False
+    private_list_view = False
+
     model = CollectionCatchment
+
+    view_dashboard_name = 'wastecollection-dashboard'
+    view_create_name = 'collectioncatchment-create'
     view_detail_name = 'collectioncatchment-detail'
     view_update_name = 'collectioncatchment-update'
     view_delete_name = 'collectioncatchment-delete-modal'
@@ -833,50 +817,6 @@ class CollectionCatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCR
 
 # ----------- Collection CRUD ------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
-
-
-class CollectionCurrentListViewTestCase(ViewWithPermissionsTestCase):
-    url = reverse_lazy('collection-list')
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        for i in range(1, 12):
-            Collection.objects.create(
-                name=f'Test Collection {i}',
-                valid_from=date.today(),
-                valid_until=date.today() + timedelta(days=365),
-            )
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(self.url)
-        self.assertRedirects(response, f'{self.url}?valid_on={date.today()}',
-                             fetch_redirect_response=True)
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(self.url)
-        self.assertRedirects(response, f'{self.url}?valid_on={date.today()}',
-                             fetch_redirect_response=True)
-
-    def test_pagination_works_without_further_query_parameters(self):
-        query_params = urlencode({'page': 2})
-        response = self.client.get(f'{self.url}?{query_params}')
-        self.assertEqual(response.status_code, 200)
-
-    def test_initial_queryset_only_contains_current_collections(self):
-        self.client.force_login(self.member)
-        old_collection = Collection.objects.first()
-        old_collection.valid_until = date.today() - timedelta(days=1)
-        old_collection.valid_from = date.today() - timedelta(days=365)
-        old_collection.save()
-        response = self.client.get(self.url, follow=True)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.context['object_list']), 10)
-        self.assertQuerySetEqual(
-            Collection.objects.exclude(pk=old_collection.pk).order_by('id'),
-            response.context['object_list']
-        )
 
 
 class CollectionCreateViewTestCase(ViewWithPermissionsTestCase):
@@ -1033,11 +973,21 @@ class CollectionCreateViewTestCase(ViewWithPermissionsTestCase):
 
 class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Collection
+
+    view_dashboard_name = 'wastecollection-dashboard'
+    view_create_name = 'collection-create'
+    view_published_list_name = 'collection-list'
+    view_private_list_name = 'collection-list-owned'
     view_detail_name = 'collection-detail'
     view_update_name = 'collection-update'
     view_delete_name = 'collection-delete-modal'
 
-    create_object_data = {'name': 'Test Collection', 'description': 'The original collection'}
+    create_object_data = {
+        'name': 'Test Collection',
+        'description': 'The original collection',
+        'valid_from': date.today(),
+        'valid_until': date.today() + timedelta(days=365),
+    }
     update_object_data = {'name': 'Updated Test Collection', 'description': 'This has been updated'}
 
     @classmethod
@@ -1097,6 +1047,19 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
             valid_until=date.today() - timedelta(days=1),
             description='Predecessor Collection 2'
         )
+        # Create a bunch of unused outdated collections
+        for i in range(12):
+            Collection.objects.create(
+                catchment=catchment,
+                collector=collector,
+                collection_system=collection_system,
+                waste_stream=waste_stream,
+                frequency=frequency,
+                valid_from=date.today() - timedelta(days=365),
+                valid_until=date.today() - timedelta(days=1),
+                description=f'Oudated Collection {i}',
+                publication_status='published'
+            )
         return {
             'catchment': catchment,
             'collector': collector,
@@ -1121,6 +1084,77 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
             'form-INITIAL_FORMS': 0,
         })
         return data
+
+    def test_list_view_published_as_anonymous(self):
+        response = self.client.get(self.get_list_url(), follow=True)
+        redirect_url = f'{self.get_list_url()}?{urlencode({"valid_on": date.today()})}'
+        self.assertRedirects(response, redirect_url, status_code=302, target_status_code=200)
+        self.assertNotContains(response, self.get_create_url(), status_code=200)
+
+    def test_list_view_published_as_authenticated_owner(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_list_url(), follow=True)
+        redirect_url = f'{self.get_list_url()}?{urlencode({"valid_on": date.today()})}'
+        self.assertRedirects(response, redirect_url, status_code=302, target_status_code=200)
+        self.assertNotContains(response, self.get_create_url(), status_code=200)
+
+    def test_list_view_published_as_authenticated_non_owner(self):
+        self.client.force_login(self.non_owner_user)
+        response = self.client.get(self.get_list_url(), follow=True)
+        redirect_url = f'{self.get_list_url()}?{urlencode({"valid_on": date.today()})}'
+        self.assertRedirects(response, redirect_url, status_code=302, target_status_code=200)
+        self.assertNotContains(response, self.get_create_url(), status_code=200)
+
+    def test_list_view_published_as_staff_user(self):
+        self.client.force_login(self.staff_user)
+        response = self.client.get(self.get_list_url(), follow=True)
+        redirect_url = f'{self.get_list_url()}?{urlencode({"valid_on": date.today()})}'
+        self.assertRedirects(response, redirect_url, status_code=302, target_status_code=200)
+        self.assertContains(response, self.get_create_url(), status_code=200)
+
+    def test_list_view_private_as_authenticated_owner(self):
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_list_url(publication_status='private'), follow=True)
+        redirect_url = f'{self.get_list_url(publication_status="private")}?{urlencode({"valid_on": date.today()})}'
+        self.assertRedirects(response, redirect_url, status_code=302, target_status_code=200)
+        self.assertContains(response, self.get_dashboard_url())
+        self.assertNotContains(response, self.get_create_url())
+        self.assertContains(response, self.get_list_url(publication_status='published'))
+
+    def test_list_view_private_as_authenticated_non_owner(self):
+        self.client.force_login(self.non_owner_user)
+        response = self.client.get(self.get_list_url(publication_status='private'), follow=True)
+        redirect_url = f'{self.get_list_url(publication_status="private")}?{urlencode({"valid_on": date.today()})}'
+        self.assertRedirects(response, redirect_url, status_code=302, target_status_code=200)
+        self.assertContains(response, self.get_dashboard_url())
+        self.assertNotContains(response, self.get_create_url())
+        self.assertContains(response, self.get_list_url(publication_status='published'))
+
+    def test_list_view_private_as_authenticated_staff_user(self):
+        self.client.force_login(self.staff_user)
+        response = self.client.get(self.get_list_url(publication_status='private'), follow=True)
+        redirect_url = f'{self.get_list_url(publication_status="private")}?{urlencode({"valid_on": date.today()})}'
+        self.assertRedirects(response, redirect_url, status_code=302, target_status_code=200)
+        self.assertContains(response, self.get_dashboard_url())
+        self.assertContains(response, self.get_create_url())
+        self.assertContains(response, self.get_list_url(publication_status='published'))
+
+    def test_list_view_published_pagination_works_without_further_query_parameters(self):
+        query_params = urlencode({
+            'valid_until': date.today() - timedelta(days=2),
+            'page': 2
+        })
+        response = self.client.get(f'{self.get_list_url()}?{query_params}')
+        self.assertEqual(response.status_code, 200)
+
+    def test_list_view_published_initial_queryset_only_contains_current_collections(self):
+        response = self.client.get(self.get_list_url(), follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context['object_list']), 1)
+        self.assertQuerySetEqual(
+            Collection.objects.filter(publication_status='published').exclude(valid_until__lt=date.today()),
+            response.context['object_list']
+        )
 
     def test_template_contains_predecessor_collections(self):
         response = self.client.get(self.get_detail_url(self.published_object.pk))
@@ -1808,14 +1842,15 @@ class CollectionListFileExportViewTestCase(ViewWithPermissionsTestCase):
         mock_export.return_value = self.mock_task
         self.client.force_login(self.member)
         response = self.client.get(f'{self.url}?format=xlsx&page=1&collector=1')
-        mock_export.assert_called_once_with('xlsx', {'collector': ['1']})
+        mock_export.assert_called_once_with('xlsx', {'collector': ['1'], 'publication_status': ['published']})
         expected_response = {'task_id': '1234'}
         self.assertDictEqual(expected_response, json.loads(response.content))
 
 
 class CollectionWasteSamplesViewTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     create_view = False
-    list_view = False
+    public_list_view = False
+    private_list_view = False
     detail_view = False
     delete_view = False
 
@@ -1866,7 +1901,8 @@ class CollectionWasteSamplesViewTestCase(AbstractTestCases.UserCreatedObjectCRUD
 
 class CollectionPredecessorsViewTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     create_view = False
-    list_view = False
+    public_list_view = False
+    private_list_view = False
     detail_view = False
     delete_view = False
 
@@ -1986,8 +2022,8 @@ class WasteCollectionMapViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(self.url)
         self.assertNotContains(response, 'Copy selected collection')
 
-    def test_update_collection_option_visible_for_member(self):
-        self.client.force_login(self.member)
+    def test_update_collection_option_visible_for_staff(self):
+        self.client.force_login(self.staff)
         response = self.client.get(self.url)
         self.assertContains(response, 'Edit selected collection')
 
@@ -1999,12 +2035,12 @@ class WasteCollectionMapViewTestCase(ViewWithPermissionsTestCase):
     def test_collection_dashboard_option_visible_for_member(self):
         self.client.force_login(self.member)
         response = self.client.get(self.url)
-        self.assertContains(response, 'Waste collection dashboard')
+        self.assertContains(response, 'Waste collection explorer')
 
     def test_collection_dashboard_option_not_available_for_outsider(self):
         self.client.force_login(self.outsider)
         response = self.client.get(self.url)
-        self.assertNotContains(response, 'Waste collection dashboard')
+        self.assertNotContains(response, 'Waste collection explorer')
 
     def test_range_slider_static_files_are_embedded(self):
         self.client.force_login(self.member)

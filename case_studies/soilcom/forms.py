@@ -8,7 +8,7 @@ from django.forms import (CheckboxSelectMultiple, DateInput, HiddenInput, Intege
 from django.utils.translation import gettext as _
 
 from distributions.models import TemporalDistribution, Timestep
-from materials.models import Material, MaterialCategory, Sample
+from materials.models import Material, Sample
 from users.models import get_default_owner
 from utils.crispy_fields import ForeignkeyField
 from utils.forms import (AutoCompleteModelForm, M2MInlineFormSet, ModalModelFormMixin, SimpleForm,
@@ -62,25 +62,6 @@ class WasteComponentModelForm(SimpleModelForm):
 
 
 class WasteComponentModalModelForm(ModalModelFormMixin, WasteComponentModelForm):
-    pass
-
-
-class WasteStreamModelForm(SimpleModelForm):
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        categories = MaterialCategory.objects.filter(name='Biowaste component')
-        self.fields['allowed_materials'].queryset = Material.objects.filter(categories__in=categories)
-        self.fields['allowed_materials'].required = False
-        self.fields['forbidden_materials'].required = False
-        self.fields['composition'].required = False
-
-    class Meta:
-        model = WasteStream
-        fields = ('name', 'category', 'allowed_materials', 'forbidden_materials', 'composition', 'description')
-
-
-class WasteStreamModalModelForm(ModalModelFormMixin, WasteStreamModelForm):
     pass
 
 

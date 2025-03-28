@@ -458,6 +458,7 @@ class GeoDataset(NamedUserCreatedObject):
     def get_absolute_url(self):
         return reverse(f'{self.model_name}')
 
+
 # TODO: Check if this should be moved to utils app
 class Attribute(NamedUserCreatedObject):
     """
@@ -478,6 +479,9 @@ class RegionAttributeValue(NamedUserCreatedObject):
     date = models.DateField(blank=True, null=True)
     value = models.FloatField(default=0.0)
     standard_deviation = models.FloatField(default=0.0, blank=True, null=True)
+
+    def get_absolute_url(self):
+        return reverse('region-detail', args=[self.region.pk])
 
 
 class RegionAttributeTextValue(NamedUserCreatedObject):

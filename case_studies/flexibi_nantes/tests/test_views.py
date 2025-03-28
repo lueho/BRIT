@@ -1,36 +1,18 @@
-from django.urls import reverse, reverse_lazy
+from django.urls import reverse
 
 from materials.models import Composition, Material, MaterialComponentGroup, Sample, SampleSeries
-from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
+from utils.tests.testcases import AbstractTestCases
 from ..models import Culture, Greenhouse, GreenhouseGrowthCycle
 
 
-class CultureListViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ['view_culture']
-    url = reverse_lazy('culture-list')
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.culture = Culture.objects.create(name='Test Culture', description='Test Description')
-
-    def test_get_http_200_ok_for_anonymous_user(self):
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_outsider(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_member(self):
-        self.client.force_login(self.member)
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 200)
-
-
 class CultureCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    dashboard_view = False
+
     model = Culture
+
+    view_create_name = 'culture-create'
+    view_published_list_name = 'culture-list'
+    view_private_list_name = 'culture-list-owned'
     view_detail_name = 'culture-detail'
     view_update_name = 'culture-update'
     view_delete_name = 'culture-delete-modal'
@@ -53,7 +35,14 @@ class CultureCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
 
 
 class GreenhouseCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    dashboard_view = False
+    public_list_view = False
+
     model = Greenhouse
+
+    view_create_name = 'greenhouse-create'
+    view_published_list_name = 'greenhouse-list'
+    view_private_list_name = 'greenhouse-list-owned'
     view_detail_name = 'greenhouse-detail'
     view_update_name = 'greenhouse-update'
     view_delete_name = 'greenhouse-delete-modal'
@@ -63,7 +52,13 @@ class GreenhouseCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
 
 
 class GrowthCycleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    dashboard_view = False
+    public_list_view = False
+    private_list_view = False
+
     model = GreenhouseGrowthCycle
+
+    view_create_name = 'greenhousegrowthcycle-create'
     view_detail_name = 'greenhousegrowthcycle-detail'
     view_update_name = 'greenhousegrowthcycle-update'
     view_delete_name = 'greenhousegrowthcycle-delete-modal'

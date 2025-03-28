@@ -10,9 +10,10 @@ from django.views import View
 from django.views.generic import TemplateView
 
 from utils import views
-from utils.views import (OwnedObjectCreateWithInlinesView, UserCreatedObjectDetailView, UserCreatedObjectUpdateView,
-                         UserCreatedObjectUpdateWithInlinesView)
-from .filters import SourceFilter
+from utils.views import (OwnedObjectCreateWithInlinesView, PrivateObjectFilterView, PrivateObjectListView,
+                         PublishedObjectFilterView, PublishedObjectListView, UserCreatedObjectDetailView,
+                         UserCreatedObjectUpdateView, UserCreatedObjectUpdateWithInlinesView)
+from .filters import AuthorFilterSet, SourceFilter
 from .forms import (AuthorModalModelForm, AuthorModelForm, LicenceModalModelForm, LicenceModelForm, SourceAuthorInline,
                     SourceModalModelForm, SourceModelForm)
 from .models import Author, Licence, SOURCE_TYPES, Source
@@ -28,9 +29,18 @@ class BibliographyDashboardView(TemplateView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class AuthorListView(views.OwnedObjectListView):
+class AuthorPublishedListView(PublishedObjectFilterView):
     model = Author
-    permission_required = set()
+    filterset_class = AuthorFilterSet
+    dashboard_url = reverse_lazy('bibliography-dashboard')
+    ordering = 'last_names'
+
+
+class AuthorPrivateListView(PrivateObjectFilterView):
+    model = Author
+    filterset_class = AuthorFilterSet
+    dashboard_url = reverse_lazy('bibliography-dashboard')
+    ordering = 'last_names'
 
 
 class AuthorCreateView(views.OwnedObjectCreateView):
@@ -86,12 +96,17 @@ class AuthorAutoCompleteView(Select2QuerySetView):
         return qs
 
 
-# ----------- Licence CRUD ----------------------------------------------------------------------------------------------
+# ----------- Licence CRUD ---------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class LicenceListView(views.OwnedObjectListView):
+class LicencePublishedListView(PublishedObjectListView):
     model = Licence
-    permission_required = set()
+    dashboard_url = reverse_lazy('bibliography-dashboard')
+
+
+class LicencePrivateListView(PrivateObjectListView):
+    model = Licence
+    dashboard_url = reverse_lazy('bibliography-dashboard')
 
 
 class LicenceCreateView(views.OwnedObjectCreateView):
@@ -136,22 +151,18 @@ class LicenceModalDeleteView(views.OwnedObjectModalDeleteView):
 # ----------- Source CRUD ----------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class SourceListView(views.OwnedObjectListView):
+class SourcePublishedFilterView(PublishedObjectFilterView):
     model = Source
     queryset = Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by('abbreviation')
     filterset_class = SourceFilter
-    filterset = None
-    permission_required = set()
+    dashboard_url = reverse_lazy('bibliography-dashboard')
 
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        self.filterset = self.filterset_class(self.request.GET, queryset=queryset)
-        return self.filterset.qs
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['filter'] = self.filterset
-        return context
+class SourcePrivateFilterView(PrivateObjectFilterView):
+    model = Source
+    queryset = Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by('abbreviation')
+    filterset_class = SourceFilter
+    dashboard_url = reverse_lazy('bibliography-dashboard')
 
 
 class SourceCreateView(OwnedObjectCreateWithInlinesView):

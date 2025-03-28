@@ -1,15 +1,27 @@
 from django.urls import reverse_lazy
+from django.views.generic import TemplateView
 
 from .forms import PropertyModelForm, UnitModelForm
 from .models import Property, Unit
-from ..views import (OwnedObjectCreateView, OwnedObjectListView, OwnedObjectModalDeleteView,
-                     OwnedObjectModelSelectOptionsView, UserCreatedObjectDetailView,
+from ..views import (OwnedObjectCreateView, OwnedObjectModalDeleteView, OwnedObjectModelSelectOptionsView,
+                     PrivateObjectListView, PublishedObjectListView, UserCreatedObjectDetailView,
                      UserCreatedObjectUpdateView)
 
 
-class UnitListView(OwnedObjectListView):
+class PropertiesDashboardView(TemplateView):
+    template_name = 'properties_dashboard.html'
+
+
+# ----------- Unit CRUD ------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+class UnitPublishedListView(PublishedObjectListView):
     model = Unit
-    permission_required = set()
+    dashboard_url = reverse_lazy('properties-dashboard')
+
+
+class UnitPrivateListView(PrivateObjectListView):
+    model = Unit
+    dashboard_url = reverse_lazy('properties-dashboard')
 
 
 class UnitCreateView(OwnedObjectCreateView):
@@ -34,9 +46,18 @@ class UnitModalDeleteView(OwnedObjectModalDeleteView):
     success_url = reverse_lazy('unit-list')
 
 
-class PropertyListView(OwnedObjectListView):
+# ----------- Property CRUD --------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class PropertyPublishedListView(PublishedObjectListView):
     model = Property
-    permission_required = set()
+    dashboard_url = reverse_lazy('properties-dashboard')
+
+
+class PropertyPrivateListView(PrivateObjectListView):
+    model = Property
+    dashboard_url = reverse_lazy('properties-dashboard')
 
 
 class PropertyCreateView(OwnedObjectCreateView):

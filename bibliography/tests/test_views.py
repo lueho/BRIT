@@ -12,18 +12,6 @@ from ..models import Author, Licence, Source, SourceAuthor
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class AuthorListViewTestCase(ViewWithPermissionsTestCase):
-
-    def test_get_http_200_redirect_for_anonymous(self):
-        response = self.client.get(reverse('author-list'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('author-list'))
-        self.assertEqual(response.status_code, 200)
-
-
 class AuthorCreateViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = ['add_author']
 
@@ -128,6 +116,11 @@ class AuthorModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 class AuthorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Author
+
+    view_dashboard_name = 'bibliography-dashboard'
+    view_create_name = 'author-create'
+    view_published_list_name = 'author-list'
+    view_private_list_name = 'author-list-owned'
     view_detail_name = 'author-detail'
     view_update_name = 'author-update'
     view_delete_name = 'author-delete-modal'
@@ -299,19 +292,6 @@ class AuthorAutoCompleteViewTestCase(ViewWithPermissionsTestCase):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class LicenceListViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ['view_licence']
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('licence-list'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('licence-list'))
-        self.assertEqual(response.status_code, 200)
-
-
 class LicenceCreateViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = ['add_licence']
 
@@ -410,6 +390,11 @@ class LicenceModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 class LicenceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Licence
+
+    view_dashboard_name = 'bibliography-dashboard'
+    view_create_name = 'licence-create'
+    view_published_list_name = 'licence-list'
+    view_private_list_name = 'licence-list-owned'
     view_detail_name = 'licence-detail'
     view_update_name = 'licence-update'
     view_delete_name = 'licence-delete-modal'
@@ -548,19 +533,6 @@ class LicenceModalDeleteViewTestCase(ViewWithPermissionsTestCase):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class SourceListViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ['view_source']
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('source-list'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('source-list'))
-        self.assertEqual(response.status_code, 200)
-
-
 class SourceCreateViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = ['add_source']
 
@@ -696,6 +668,11 @@ class SourceModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Source
+
+    view_dashboard_name = 'bibliography-dashboard'
+    view_create_name = 'source-create'
+    view_published_list_name = 'source-list'
+    view_private_list_name = 'source-list-owned'
     view_detail_name = 'source-detail'
     view_update_name = 'source-update'
     view_delete_name = 'source-delete-modal'

@@ -3,14 +3,17 @@
 
 {% block title %}BRIT | Maps | Regions{% endblock %}
 
-{% block list_header %}<strong>Regions</strong>{% endblock %}
+{% block list_card_header %}<strong>Regions</strong>{% endblock %}
 
-{% block list_body %}
+{% block list_table %}
     <table class="table table-responsive-stack">
         <thead>
         <tr>
             <th>Name</th>
             <th>Type</th>
+            {% if list_type == 'private' %}
+                <th>Public</th>
+            {% endif %}
         </tr>
         </thead>
         <tbody>
@@ -18,32 +21,24 @@
             <tr>
                 <td data-label="Name"><a href="{{ object.get_absolute_url }}">{{ object.name }}</a></td>
                 <td data-label="Country">{{ object.type }}</td>
+                {% if list_type == 'private' %}
+                    {% include 'partials/_publication_status_column.html' %}
+                {% endif %}
             </tr>
         {% endfor %}
         </tbody>
         <tfoot>
         </tfoot>
     </table>
-{% endblock list_body %}
+{% endblock list_table %}
 
-{% block list_footer %}
+{% block list_card_footer_additional_links %}
     {% if user.is_authenticated %}
         <a class="nowrap" href="{% url 'region-map' %}?{{ request.GET.urlencode }}&load_features=true">
             <i class="fa fa-fw fa-map"></i> View as map
         </a>
     {% endif %}
-    {% if 'maps.add_region' in perms %}
-        <a href="{% url 'region-create' %}?next={{ request.get_full_path|urlencode }}" class="nowrap">
-            <i class="fa fa-fw fa-plus"></i>
-            <span>Add new region</span>
-        </a>
-    {% endif %}
-    {% if 'maps.change_region' in perms %}
-        <a href="{% url 'maps-dashboard' %}" class="ml-3 nowrap">
-            <i class="fas fa-fw fa-cog"></i> Dashboard
-        </a>
-    {% endif %}
-{% endblock list_footer %}
+{% endblock %}
 
 {% block filter_body %}
     <form method="get">

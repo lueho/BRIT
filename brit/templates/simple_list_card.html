@@ -7,62 +7,95 @@
         <div class="col">
             <div class="card shadow mb-3">
                 <div class="card-header">
-                    {% block card_header %}
+                    {% block list_card_header %}
                         <strong>{{ header }}</strong>
-                    {% endblock card_header %}
+                    {% endblock list_card_header %}
                 </div>
                 <div class="card-body overflow-auto">
-                    {% block card_body %}
-                        <table class="table">
-                            <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Description</th>
-                            </tr>
-                            </thead>
-                            <tbody>
-                            {% for object in object_list %}
-                                <tr>
-                                    <td>
-                                        <a href="{{ object.get_absolute_url }}">{{ object.name }}</a>
-                                    </td>
-                                    <td>{{ object.description }}</td>
-                                </tr>
-                            {% endfor %}
-                            </tbody>
-                            <tfoot>
-                            </tfoot>
-                        </table>
-                    {% endblock card_body %}
-                    <div class="pagination">
-                        <span class="step-links">
-                            {% if page_obj.has_previous %}
-                                <a href="?page=1">&laquo; first</a>
-                                <a href="?page={{ page_obj.previous_page_number }}">previous</a>
-                            {% endif %}
-
-                            <span class="current">
-                                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.
-                            </span>
-
-                            {% if page_obj.has_next %}
-                                <a href="?page={{ page_obj.next_page_number }}">next</a>
-                                <a href="?page={{ page_obj.paginator.num_pages }}">last &raquo;</a>
-                            {% endif %}
-                        </span>
-                    </div>
+                    {% block list_card_body %}
+                        {% block list_table %}
+                            <table class="table">
+                                {% block list_table_head %}
+                                    <thead>
+                                    <tr>
+                                        <th>Name</th>
+                                        <th>Description</th>
+                                        {% if list_type == 'private' %}
+                                            <th>Public</th>
+                                        {% endif %}
+                                    </tr>
+                                    </thead>
+                                {% endblock list_table_head %}
+                                <tbody>
+                                {% for object in object_list %}
+                                    {% block list_table_row %}
+                                        <tr>
+                                            <td>
+                                                <a href="{{ object.get_absolute_url }}"
+                                                   aria-label="View details of {{ object.name }}">
+                                                    {{ object.name }}
+                                                </a>
+                                            </td>
+                                            <td>{{ object.description }}</td>
+                                            {% if list_type == 'private' %}
+                                                {% include 'partials/_publication_status_column.html' %}
+                                            {% endif %}
+                                        </tr>
+                                    {% endblock list_table_row %}
+                                {% empty %}
+                                    <tr>
+                                        <td colspan="3">No objects available.</td>
+                                    </tr>
+                                {% endfor %}
+                                </tbody>
+                                {% block list_table_footer %}
+                                    <tfoot></tfoot>
+                                {% endblock list_table_footer %}
+                            </table>
+                        {% endblock list_table %}
+                        {% block list_pagination %}
+                            {% include 'partials/_pagination.html' %}
+                        {% endblock list_pagination %}
+                    {% endblock list_card_body %}
                 </div>
 
                 <div class="card-footer">
-                    {% block card_footer %}
-                        {% if create_permission in perms %}
-                            <a href="{{ create_url }}">
-                                <i class="fas fa-fw fa-plus"></i> {{ create_url_text }}
-                            </a>
-                        {% endif %}
-                    {% endblock card_footer %}
+                    {% block list_card_footer %}
+                        {% block list_card_footer_list_link %}
+                            {% if private_list_owner %}
+                                <a class="mr-2 text-nowrap" href="{{ object_list.model.public_list_url }}"
+                                   aria-label="View published {{ object_list.model.get_verbose_name_plural }}">
+                                    <i class="fas fa-fw fa-list"></i>
+                                    Published {{ object_list.model.get_verbose_name_plural }}
+                                </a>
+                            {% elif user.is_authenticated %}
+                                <a class="mr-2 text-nowrap" href="{{ object_list.model.private_list_url }}"
+                                   aria-label="View your {{ object_list.model.get_verbose_name_plural }}">
+                                    <i class="fas fa-fw fa-list"></i>
+                                    My {{ object_list.model.get_verbose_name_plural }}
+                                </a>
+                            {% endif %}
+                        {% endblock list_card_footer_list_link %}
+                        {% block list_card_footer_create_link %}
+                            {% if create_permission in perms or user.is_staff %}
+                                <a class="mr-2 text-nowrap" href="{{ create_url }}"
+                                   aria-label="Create new {{ object_list.model.get_verbose_name }}">
+                                    <i class="fas fa-fw fa-plus"></i> {{ create_url_text }}
+                                </a>
+                            {% endif %}
+                        {% endblock list_card_footer_create_link %}
+                        {% block list_card_footer_dashboard_link %}
+                            {% if dashboard_url %}
+                                <a class="mr-2 text-nowrap" href="{{ dashboard_url }}"
+                                   aria-label="View Explorer Dashboard">
+                                    <i class="fas fa-fw fa-th-large"></i> Explorer
+                                </a>
+                            {% endif %}
+                        {% endblock list_card_footer_dashboard_link %}
+                        {% block list_card_footer_additional_links %}{% endblock %}
+                    {% endblock list_card_footer %}
                 </div>
             </div>
         </div>
     </div>
-{% endblock %}
+{% endblock content %}

@@ -13,8 +13,8 @@
         View as list
     </a>
     {% if user.is_authenticated %}
-        {% export_link "csv" 'collection-export' 'collection-export-progress' %}
-        {% export_link "xlsx" 'collection-export' 'collection-export-progress' %}
+        {% export_link "csv" 'collection-export' %}
+        {% export_link "xlsx" 'collection-export' %}
     {% endif %}
 {% endblock %}
 
@@ -88,8 +88,8 @@
                     <div class="col">
                         <div class="text-center">
                             <a class="btn btn-primary w-75"
-                               href="{% url 'waste-collection-home' %}">
-                                Waste collection dashboard
+                               href="{% url 'wastecollection-dashboard' %}">
+                                Waste collection explorer
                             </a>
                         </div>
                     </div>

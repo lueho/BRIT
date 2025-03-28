@@ -179,40 +179,6 @@ class MapMixinTestCase(TestCase):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class LocationListViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ['add_location', 'change_location']
-    url = reverse('location-list')
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.location = Region.objects.create(name='Test Location')
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(self.url)
-        self.assertEqual(200, response.status_code)
-
-    def test_get_http_200_ok_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(self.url)
-        self.assertEqual(200, response.status_code)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(self.url)
-        self.assertEqual(200, response.status_code)
-
-    def test_add_button_not_available_for_outsider(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(self.url)
-        self.assertNotContains(response, reverse('location-create'))
-
-    def test_add_button_available_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(self.url)
-        self.assertContains(response, reverse('location-create'))
-
-
 class LocationCreateViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = 'add_location'
 
@@ -260,6 +226,11 @@ class LocationCreateViewTestCase(ViewWithPermissionsTestCase):
 
 class LocationCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Location
+
+    view_dashboard_name = 'maps-dashboard'
+    view_create_name = 'location-create'
+    view_published_list_name = 'location-list'
+    view_private_list_name = 'location-list-owned'
     view_detail_name = 'location-detail'
     view_update_name = 'location-update'
     view_delete_name = 'location-delete-modal'
@@ -329,40 +300,6 @@ class LocationModalDeleteViewTestCase(ViewWithPermissionsTestCase):
 
 # ----------- Location CRUD---------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
-
-
-class RegionListViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ['add_region', 'change_region']
-    url = reverse('region-list')
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.region = Region.objects.create(name='Test Region')
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(self.url)
-        self.assertEqual(200, response.status_code)
-
-    def test_get_http_200_ok_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(self.url)
-        self.assertEqual(200, response.status_code)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(self.url)
-        self.assertEqual(200, response.status_code)
-
-    def test_add_button_not_available_for_outsider(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(self.url)
-        self.assertNotContains(response, reverse('region-create'))
-
-    def test_add_button_available_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(self.url)
-        self.assertContains(response, reverse('region-create'))
 
 
 class RegionMapViewTestCase(ViewWithPermissionsTestCase):
@@ -441,6 +378,11 @@ class RegionCreateViewTestCase(ViewWithPermissionsTestCase):
 
 class RegionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Region
+
+    view_dashboard_name = 'maps-dashboard'
+    view_create_name = 'region-create'
+    view_published_list_name = 'region-list'
+    view_private_list_name = 'region-list-owned'
     view_detail_name = 'region-detail'
     view_update_name = 'region-update'
     view_delete_name = 'region-delete-modal'
@@ -506,80 +448,13 @@ class RegionModalDeleteViewTestCase(ViewWithPermissionsTestCase):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class PublishedCatchmentListViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ['add_catchment', 'change_catchment']
-    url = reverse('catchment-list')
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.catchment = Catchment.objects.create(name='Test Catchment')
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(self.url)
-        self.assertEqual(200, response.status_code)
-
-    def test_add_and_dashboard_button_available_for_outsider(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(self.url)
-        self.assertContains(response, reverse('catchment-create'))
-        self.assertNotContains(response, reverse('maps-dashboard'))
-
-    def test_add_and_dashboard_button_available_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(self.url)
-        self.assertContains(response, reverse('catchment-create'))
-        self.assertContains(response, reverse('maps-dashboard'))
-
-    def test_my_catchments_button_available_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(self.url)
-        self.assertContains(response, reverse('catchment-list-owned'))
-
-
-class UserOwnedCatchmentListViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ['add_catchment', 'change_catchment']
-    url = reverse('catchment-list-owned')
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.catchment = Catchment.objects.create(name='Test Catchment', owner=cls.member)
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        response = self.client.get(self.url)
-        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={self.url}')
-
-    def test_get_http_200_ok_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(self.url)
-        self.assertEqual(200, response.status_code)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(self.url)
-        self.assertEqual(200, response.status_code)
-
-    def test_add_and_dashboard_button_available_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(self.url)
-        self.assertContains(response, reverse('catchment-create'))
-        self.assertNotContains(response, reverse('maps-dashboard'))
-
-    def test_add_and_dashboard_button_available_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(self.url)
-        self.assertContains(response, reverse('catchment-create'))
-        self.assertContains(response, reverse('maps-dashboard'))
-
-
 class CatchmentCreateViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = 'add_catchment'
     url = reverse_lazy('catchment-create')
 
-    def test_get_http_200_ok_for_anonymous(self):
+    def test_get_http_302_redirect_to_login_for_anonymous(self):
         response = self.client.get(self.url)
-        self.assertEqual(200, response.status_code)
+        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={self.url}')
 
     def test_get_http_200_ok_for_outsider(self):
         self.client.force_login(self.outsider)
@@ -892,6 +767,11 @@ class CatchmentCreateMergeLauViewTestCase(ViewWithPermissionsTestCase):
 
 class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Catchment
+
+    view_dashboard_name = 'maps-dashboard'
+    view_create_name = 'catchment-create'
+    view_published_list_name = 'catchment-list'
+    view_private_list_name = 'catchment-list-owned'
     view_detail_name = 'catchment-detail'
     view_update_name = 'catchment-update'
     view_delete_name = 'catchment-delete-modal'
@@ -902,6 +782,59 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
     @classmethod
     def create_related_objects(cls):
         return {'region': Region.objects.create(name='Test Region')}
+
+    def test_list_view_published_as_authenticated_owner(self):
+        if not self.public_list_view:
+            self.skipTest("List view is not enabled for this test case.")
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_list_url(publication_status='published'))
+        self.assertEqual(response.status_code, 200)
+        if self.dashboard_view:
+            self.assertContains(response, self.get_dashboard_url())
+        if self.create_view:
+            self.assertContains(response, self.get_create_url()) # This is the difference to the original test function
+        if self.private_list_view:
+            self.assertContains(response, self.get_list_url(publication_status='private'))
+
+    def test_list_view_published_as_authenticated_non_owner(self):
+        if not self.public_list_view:
+            self.skipTest("List view is not enabled for this test case.")
+        self.client.force_login(self.non_owner_user)
+        response = self.client.get(self.get_list_url(publication_status='published'))
+        self.assertEqual(response.status_code, 200)
+        if self.dashboard_view:
+            self.assertContains(response, self.get_dashboard_url())
+        if self.create_view:
+            self.assertContains(response, self.get_create_url()) # This is the difference to the original test function
+        if self.private_list_view:
+            self.assertContains(response, self.get_list_url(publication_status='private'))
+
+    def test_list_view_private_as_authenticated_owner(self):
+        if not self.private_list_view:
+            self.skipTest("List view is not enabled for this test case")
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_list_url(publication_status='private'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<th>Public</th>')
+        if self.dashboard_view:
+            self.assertContains(response, self.get_dashboard_url())
+        if self.create_view:
+            self.assertContains(response, self.get_create_url()) # This is the difference to the original test function
+        if self.public_list_view:
+            self.assertContains(response, self.get_list_url(publication_status='published'))
+
+    def test_list_view_private_as_authenticated_non_owner(self):
+        if not self.private_list_view:
+            self.skipTest("List view is not enabled for this test case")
+        self.client.force_login(self.non_owner_user)
+        response = self.client.get(self.get_list_url(publication_status='private'))
+        self.assertEqual(response.status_code, 200)
+        if self.dashboard_view:
+            self.assertContains(response, self.get_dashboard_url())
+        if self.create_view:
+            self.assertContains(response, self.get_create_url()) # This is the difference to the original test function
+        if self.public_list_view:
+            self.assertContains(response, self.get_list_url(publication_status='published'))
 
 
 class CatchmentModalDeleteViewTestCase(ViewWithPermissionsTestCase):
@@ -1137,17 +1070,6 @@ class NutsRegionSummaryAPIViewTestCase(ViewSetWithPermissionsTestCase):
 # ----------- Attribute CRUD -------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class AttributeListViewTestCase(ViewWithPermissionsTestCase):
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('attribute-list'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('attribute-list'))
-        self.assertEqual(response.status_code, 200)
-
 
 class AttributeCreateViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = 'add_attribute'
@@ -1227,6 +1149,11 @@ class AttributeModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 class AttributeCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Attribute
+
+    view_dashboard_name = 'maps-dashboard'
+    view_create_name = 'attribute-create'
+    view_published_list_name = 'attribute-list'
+    view_private_list_name = 'attribute-list-owned'
     view_detail_name = 'attribute-detail'
     view_update_name = 'attribute-update'
     view_delete_name = 'attribute-delete-modal'
@@ -1362,17 +1289,6 @@ class AttributeModalDeleteViewTestCase(ViewWithPermissionsTestCase):
 # ----------- Region Attribute Value CRUD ------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class RegionAttributeValueListViewTestCase(ViewWithPermissionsTestCase):
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('regionattributevalue-list'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('regionattributevalue-list'))
-        self.assertEqual(response.status_code, 200)
-
 
 class RegionAttributeValueCreateViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = 'add_regionattributevalue'
@@ -1475,7 +1391,13 @@ class RegionAttributeValueModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 
 class RegionAttributeValueCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    public_list_view = False
+    private_list_view = False
+
     model = RegionAttributeValue
+
+    view_dashboard_name = 'maps-dashboard'
+    view_create_name = 'regionattributevalue-create'
     view_detail_name = 'regionattributevalue-detail'
     view_update_name = 'regionattributevalue-update'
     view_delete_name = 'regionattributevalue-delete-modal'
@@ -1493,9 +1415,12 @@ class RegionAttributeValueCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectC
     @classmethod
     def create_related_objects(cls):
         return {
-            'region': Region.objects.create(name='Test Region'),
+            'region': Region.objects.create(owner=cls.owner_user, name='Test Region'),
             'attribute': Attribute.objects.create(name='Test Attribute', unit='Test Unit')
         }
+
+    def get_update_success_url(self, pk=None):
+        return reverse('region-detail', kwargs={'pk': RegionAttributeValue.objects.get(pk=pk).region.pk})
 
 
 class RegionAttributeValueModalDetailViewTestCase(ViewWithPermissionsTestCase):

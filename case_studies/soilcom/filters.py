@@ -1,5 +1,4 @@
 import math
-
 from crispy_forms.bootstrap import Accordion
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Column, Field, Layout, Row, Submit
@@ -194,7 +193,8 @@ class CollectionFilterSet(CrispyAutocompleteFilterSet):
         model = Collection
         fields = ('catchment', 'collector', 'collection_system', 'waste_category', 'allowed_materials',
                   'forbidden_materials', 'connection_rate', 'seasonal_frequency', 'optional_frequency',
-                  'collections_per_year', 'spec_waste_collected', 'fee_system', 'valid_on')
+                  'collections_per_year', 'spec_waste_collected', 'fee_system', 'valid_on', 'publication_status',
+                  'owner')
         # catchment_filter must always be applied first, because it grabs the initial queryset and does not filter any
         # existing queryset.
         order_by = ['catchment_filter']
