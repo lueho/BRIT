@@ -1,17 +1,18 @@
 from django.urls import include, path
 
 from .rounter import router
-from .views import (CultureCreateView, CultureDetailView, CultureListView, CultureModalDeleteView,
-                    CultureModalUpdateView, CultureUpdateView, GreenhouseCreateView, GreenhouseDetailView,
-                    GreenhouseGrowthCycleCreateView, GreenhouseListView, GreenhouseModalDeleteView,
-                    GreenhouseModalUpdateView, GreenhouseUpdateView, GreenhousesMapView, GrowthCycleCreateView,
-                    GrowthCycleDetailView, GrowthCycleModalDeleteView, GrowthCycleUpdateView,
-                    GrowthTimeStepSetModalUpdateView, NantesGreenhousesCatchmentAutocompleteView,
-                    NantesGreenhousesListFileExportProgressView, NantesGreenhousesListFileExportView,
-                    UpdateGreenhouseGrowthCycleValuesView)
+from .views import (CultureCreateView, CultureDetailView, CultureModalDeleteView, CultureModalUpdateView,
+                    CulturePrivateListView, CulturePublishedListView, CultureUpdateView, GreenhouseCreateView,
+                    GreenhouseDetailView, GreenhouseGrowthCycleCreateView, GreenhouseModalDeleteView,
+                    GreenhouseModalUpdateView, GreenhousePrivateFilterView, GreenhousePublishedFilterView,
+                    GreenhouseUpdateView, GreenhousesMapView, GrowthCycleCreateView, GrowthCycleDetailView,
+                    GrowthCycleModalDeleteView, GrowthCycleUpdateView, GrowthTimeStepSetModalUpdateView,
+                    NantesGreenhousesCatchmentAutocompleteView, NantesGreenhousesListFileExportProgressView,
+                    NantesGreenhousesListFileExportView, UpdateGreenhouseGrowthCycleValuesView)
 
 urlpatterns = [
-    path('cultures/', CultureListView.as_view(), name='culture-list'),
+    path('cultures/', CulturePublishedListView.as_view(), name='culture-list'),
+    path('cultures/user/', CulturePrivateListView.as_view(), name='culture-list-owned'),
     path('cultures/create/', CultureCreateView.as_view(), name='culture-create'),
     path('cultures/<int:pk>/', CultureDetailView.as_view(), name='culture-detail'),
     path('cultures/<int:pk>/update/', CultureUpdateView.as_view(), name='culture-update'),
@@ -23,7 +24,8 @@ urlpatterns = [
          name='nantesgreenhouses-export-progress'),
     path('greenhouses/catchment_autocomplete/', NantesGreenhousesCatchmentAutocompleteView.as_view(),
          name='nantesgreenhouses-catchment-autocomplete'),
-    path('greenhouses/', GreenhouseListView.as_view(), name='greenhouse-list'),
+    path('greenhouses/', GreenhousePublishedFilterView.as_view(), name='greenhouse-list'),
+    path('greenhouses/user/', GreenhousePrivateFilterView.as_view(), name='greenhouse-list-owned'),
     path('greenhouses/create/', GreenhouseCreateView.as_view(), name='greenhouse-create'),
     path('greenhouses/<int:pk>/', GreenhouseDetailView.as_view(), name='greenhouse-detail'),
     path('greenhouses/<int:pk>/update/', GreenhouseUpdateView.as_view(), name='greenhouse-update'),

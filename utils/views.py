@@ -107,6 +107,9 @@ class BRITFilterView(FilterDefaultsMixin, FilterView):
 
 
 class UserCreatedObjectListMixin:
+    paginate_by = 10
+    list_type = None
+    dashboard_url = None
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -116,33 +119,66 @@ class UserCreatedObjectListMixin:
                 f"The model {queryset.model.__name__} must have a 'publication_status' field."
             )
 
-        queryset = queryset.filter(publication_status='published')
+        query_params = {}
+        if self.list_type == 'public':
+            query_params['publication_status'] = 'published'
+        elif self.list_type == 'private':
+            query_params['owner'] = self.request.user
+
+        queryset = queryset.filter(**query_params)
 
         if hasattr(queryset.model, 'name'):
             return queryset.order_by('name')
 
         return queryset.order_by('id')
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update({
+            'header': self.model._meta.verbose_name_plural.capitalize(),
+            'create_url': self.model.create_url,
+            'create_url_text': f'New {self.model._meta.verbose_name}',
+            'create_permission': f'{self.model.__module__.split(".")[-2]}.add_{self.model.__name__.lower()}',
+            'list_type': self.list_type,
+        })
+        if self.list_type == 'private':
+            context.update({'private_list_owner': self.request.user, })
+        if self.dashboard_url:
+            context.update({'dashboard_url': self.dashboard_url})
+        return context
 
-class PublishedObjectFilterView(FilterDefaultsMixin, UserCreatedObjectListMixin, FilterView):
+
+class PublishedObjectListMixin(UserCreatedObjectListMixin):
+    list_type = 'public'
+
+
+class PrivateObjectListMixin(LoginRequiredMixin, UserCreatedObjectListMixin):
+    list_type = 'private'
+
+
+class PublishedObjectFilterView(PublishedObjectListMixin, FilterDefaultsMixin, FilterView):
     """
     A view to display a list of published objects with default filters applied.
     """
 
+    def get_template_names(self):
+        template_names = super().get_template_names()
+        template_names.append('filtered_list.html')
+        return template_names
 
-class UserOwnedObjectFilterView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
+
+class PrivateObjectFilterView(PrivateObjectListMixin, FilterDefaultsMixin, FilterView):
     """
     A view to display a list of objects owned by the currently logged-in user with default filters applied.
     """
-    template_name_suffix = '_filter_owned'
-    paginate_by = 10
-    ordering = 'id'
 
-    def get_queryset(self):
-        return super().get_queryset().filter(owner=self.request.user)
+    def get_template_names(self):
+        template_names = super().get_template_names()
+        template_names.append('filtered_list.html')
+        return template_names
 
 
-class PublishedObjectListView(UserCreatedObjectListMixin, ListView):
+class PublishedObjectListView(PublishedObjectListMixin, ListView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -153,6 +189,17 @@ class PublishedObjectListView(UserCreatedObjectListMixin, ListView):
             'create_permission': f'{self.model.__module__.split(".")[-2]}.add_{self.model.__name__.lower()}'
         })
         return context
+
+    def get_template_names(self):
+        template_names = super().get_template_names()
+        template_names.append('simple_list_card.html')
+        return template_names
+
+
+class PrivateObjectListView(PrivateObjectListMixin, ListView):
+    """
+    A view to display a list of objects owned by the currently logged-in user.
+    """
 
     def get_template_names(self):
         template_names = super().get_template_names()
@@ -542,9 +589,8 @@ class OwnedObjectModelSelectOptionsView(PermissionRequiredMixin, ModelSelectOpti
     pass
 
 
-class UtilsDashboardView(PermissionRequiredMixin, TemplateView):
+class UtilsDashboardView(TemplateView):
     template_name = 'utils_dashboard.html'
-    permission_required = ('properties.view_property',)
 
 
 class DynamicRedirectView(View):

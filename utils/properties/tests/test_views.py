@@ -4,29 +4,6 @@ from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 from ..models import Property, Unit
 
 
-class UnitListViewTestCase(ViewWithPermissionsTestCase):
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        Unit.objects.create(name='Test Unit 1')
-        Unit.objects.create(name='Test Unit 2')
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('unit-list'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('unit-list'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_member(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('unit-list'))
-        self.assertEqual(response.status_code, 200)
-
-
 class UnitCreateViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = ['add_unit']
     url = reverse('unit-create')
@@ -64,6 +41,7 @@ class UnitCreateViewTestCase(ViewWithPermissionsTestCase):
 class UnitCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Unit
 
+    view_dashboard_name = 'properties-dashboard'
     view_create_name = 'unit-create'
     view_published_list_name = 'unit-list'
     view_private_list_name = 'unit-list-owned'
@@ -122,29 +100,6 @@ class UnitModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         self.assertRedirects(response, reverse('unit-list'))
 
 
-class PropertyListViewTestCase(ViewWithPermissionsTestCase):
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        Property.objects.create(name='Test Property 1')
-        Property.objects.create(name='Test Property 2')
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('property-list'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('property-list'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_member(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('property-list'))
-        self.assertEqual(response.status_code, 200)
-
-
 class PropertyCreateViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = ['add_property']
     url = reverse('property-create')
@@ -185,6 +140,7 @@ class PropertyCreateViewTestCase(ViewWithPermissionsTestCase):
 class PropertyCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Property
 
+    view_dashboard_name = 'properties-dashboard'
     view_create_name = 'property-create'
     view_published_list_name = 'property-list'
     view_private_list_name = 'property-list-owned'

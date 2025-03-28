@@ -5,6 +5,8 @@ from ..models import Showcase
 
 
 class ShowCaseCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    dashboard_view = False
+
     model = Showcase
 
     view_create_name = 'showcase-create'

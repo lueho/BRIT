@@ -9,10 +9,10 @@
         <p><a class="btn btn-primary" href="{% url 'catchment-create-merge-lau' %}">Merge LAU regions</a></p>
         <p><a class="btn btn-primary" href="{% url 'catchment-create-draw-custom' %}">Draw custom borders</a></p>
     </div>
-{% endblock %}
+{% endblock card_body %}
 
 {% block card_footer %}
     <a href="{% url 'maps-dashboard' %}" class="nowrap mr-3">
-        <nobr><i class="fas fa-fw fa-cog"></i> Dashboard</nobr>
+        <nobr><i class="fas fa-fw fa-th-large"></i> Explorer</nobr>
     </a>
 {% endblock %}

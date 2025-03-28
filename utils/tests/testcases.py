@@ -82,7 +82,8 @@ class AbstractTestCases(object):
         # This is an abstract class and should not be run as a test case directly
         __test__ = False
 
-        create_view = False
+        dashboard_view = True
+        create_view = True
         public_list_view = True
         private_list_view = True
         detail_view = True
@@ -91,6 +92,7 @@ class AbstractTestCases(object):
 
         model = None
 
+        view_dashboard_name = None
         view_create_name = None
         view_published_list_name = None
         view_private_list_name = None
@@ -162,6 +164,9 @@ class AbstractTestCases(object):
         def setUp(self):
             self.client = Client()
 
+        def get_dashboard_url(self):
+            return reverse(self.view_dashboard_name)
+
         def get_create_url(self):
             return reverse(self.view_create_name)
 
@@ -200,8 +205,100 @@ class AbstractTestCases(object):
                 self.skipTest("List view is not enabled for this test case.")
             response = self.client.get(self.get_list_url(publication_status='published'))
             self.assertEqual(response.status_code, 200)
+            if self.dashboard_view:
+                self.assertContains(response, self.get_dashboard_url())
             if self.create_view:
                 self.assertNotContains(response, self.get_create_url())
+            if self.private_list_view:
+                self.assertNotContains(response, self.get_list_url(publication_status='private'))
+
+        def test_list_view_published_as_authenticated_owner(self):
+            if not self.public_list_view:
+                self.skipTest("List view is not enabled for this test case.")
+            self.client.force_login(self.owner_user)
+            response = self.client.get(self.get_list_url(publication_status='published'))
+            self.assertEqual(response.status_code, 200)
+            if self.dashboard_view:
+                self.assertContains(response, self.get_dashboard_url())
+            if self.create_view:
+                self.assertNotContains(response, self.get_create_url())
+            if self.private_list_view:
+                self.assertContains(response, self.get_list_url(publication_status='private'))
+
+        def test_list_view_published_as_authenticated_non_owner(self):
+            if not self.public_list_view:
+                self.skipTest("List view is not enabled for this test case.")
+            self.client.force_login(self.non_owner_user)
+            response = self.client.get(self.get_list_url(publication_status='published'))
+            self.assertEqual(response.status_code, 200)
+            if self.dashboard_view:
+                self.assertContains(response, self.get_dashboard_url())
+            if self.create_view:
+                self.assertNotContains(response, self.get_create_url())
+            if self.private_list_view:
+                self.assertContains(response, self.get_list_url(publication_status='private'))
+
+        def test_list_view_published_as_staff_user(self):
+            if not self.public_list_view:
+                self.skipTest("List view is not enabled for this test case.")
+            self.client.force_login(self.staff_user)
+            response = self.client.get(self.get_list_url(publication_status='published'))
+            self.assertEqual(response.status_code, 200)
+            if self.dashboard_view:
+                self.assertContains(response, self.get_dashboard_url())
+            if self.create_view:
+                self.assertContains(response, self.get_create_url())
+            if self.private_list_view:
+                self.assertContains(response, self.get_list_url(publication_status='private'))
+
+        def test_list_view_private_as_anonymous(self):
+            if not self.private_list_view:
+                self.skipTest("List view is not enabled for this test case.")
+            url = self.get_list_url(publication_status='private')
+            response = self.client.get(url)
+            login_url = settings.LOGIN_URL
+            expected_redirect = f"{login_url}?next={url}"
+            self.assertRedirects(response, expected_redirect)
+
+        def test_list_view_private_as_authenticated_owner(self):
+            if not self.private_list_view:
+                self.skipTest("List view is not enabled for this test case")
+            self.client.force_login(self.owner_user)
+            response = self.client.get(self.get_list_url(publication_status='private'))
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, '<th>Public</th>')
+            if self.dashboard_view:
+                self.assertContains(response, self.get_dashboard_url())
+            if self.create_view:
+                self.assertNotContains(response, self.get_create_url())
+            if self.public_list_view:
+                self.assertContains(response, self.get_list_url(publication_status='published'))
+
+        def test_list_view_private_as_authenticated_non_owner(self):
+            if not self.private_list_view:
+                self.skipTest("List view is not enabled for this test case")
+            self.client.force_login(self.non_owner_user)
+            response = self.client.get(self.get_list_url(publication_status='private'))
+            self.assertEqual(response.status_code, 200)
+            if self.dashboard_view:
+                self.assertContains(response, self.get_dashboard_url())
+            if self.create_view:
+                self.assertNotContains(response, self.get_create_url())
+            if self.public_list_view:
+                self.assertContains(response, self.get_list_url(publication_status='published'))
+
+        def test_list_view_private_as_authenticated_staff_user(self):
+            if not self.private_list_view:
+                self.skipTest("List view is not enabled for this test case")
+            self.client.force_login(self.staff_user)
+            response = self.client.get(self.get_list_url(publication_status='private'))
+            self.assertEqual(response.status_code, 200)
+            if self.dashboard_view:
+                self.assertContains(response, self.get_dashboard_url())
+            if self.create_view:
+                self.assertContains(response, self.get_create_url())
+            if self.public_list_view:
+                self.assertContains(response, self.get_list_url(publication_status='published'))
 
         # -----------------------
         # DetailView Test Cases

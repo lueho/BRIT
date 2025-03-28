@@ -1,17 +1,16 @@
 {% extends 'base.html' %}
 
-{% block title %}BRIT | Utils Explorer{% endblock %}
+{% block title %}BRIT | Properties Explorer{% endblock %}
 
 {% block content %}
 
     <div class="row">
         <div class="col col-12 col-md-6">
             <div class="card shadow h-100">
-                <div class="card-header"><strong>Utils</strong></div>
+                <div class="card-header"><strong>Properties</strong></div>
                 <div class="card-body">
                     <p class="card-text">
-                        This is the utils explorer. Here you can manage database entries that are basic and common to
-                        all other parts of the tool.
+                        This is the properties explorer. All models related to properties can be managed from here.
                     </p>
                 </div>
                 <div class="card-footer">
@@ -29,7 +28,7 @@
                 </div>
                 <div class="card-body">
                     <p class="card-text">
-                        Units for any physical, chemical or other properties.
+                        Manage the available units here.
                     </p>
                 </div>
                 <div class="card-footer">
@@ -38,7 +37,6 @@
             </div>
         </div>
 
-
         <div class="col col-12 col-md-6 col-lg-3 mt-4">
             <div class="card shadow h-100">
                 <div class="card-header">
@@ -46,8 +44,7 @@
                 </div>
                 <div class="card-body">
                     <p class="card-text">
-                        Properties are one of the basic building blocks of the tool. They are used to describe items of
-                        any type and help compare items from different modules of the tool.
+                        Manage all available properties here.
                     </p>
                 </div>
                 <div class="card-footer">
@@ -55,5 +52,7 @@
                 </div>
             </div>
         </div>
+
     </div>
+
 {% endblock content %}

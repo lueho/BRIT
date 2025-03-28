@@ -10,10 +10,10 @@ from django.views import View
 from django.views.generic import TemplateView
 
 from utils import views
-from utils.views import (OwnedObjectCreateWithInlinesView, PublishedObjectFilterView, PublishedObjectListView,
-                         UserCreatedObjectDetailView, UserCreatedObjectUpdateView,
-                         UserCreatedObjectUpdateWithInlinesView)
-from .filters import SourceFilter
+from utils.views import (OwnedObjectCreateWithInlinesView, PrivateObjectFilterView, PrivateObjectListView,
+                         PublishedObjectFilterView, PublishedObjectListView, UserCreatedObjectDetailView,
+                         UserCreatedObjectUpdateView, UserCreatedObjectUpdateWithInlinesView)
+from .filters import AuthorFilterSet, SourceFilter
 from .forms import (AuthorModalModelForm, AuthorModelForm, LicenceModalModelForm, LicenceModelForm, SourceAuthorInline,
                     SourceModalModelForm, SourceModelForm)
 from .models import Author, Licence, SOURCE_TYPES, Source
@@ -29,8 +29,16 @@ class BibliographyDashboardView(TemplateView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class AuthorListView(PublishedObjectListView):
+class AuthorPublishedListView(PublishedObjectFilterView):
     model = Author
+    filterset_class = AuthorFilterSet
+    ordering = 'last_names'
+
+
+class AuthorPrivateListView(PrivateObjectFilterView):
+    model = Author
+    filterset_class = AuthorFilterSet
+    ordering = 'last_names'
 
 
 class AuthorCreateView(views.OwnedObjectCreateView):
@@ -86,11 +94,16 @@ class AuthorAutoCompleteView(Select2QuerySetView):
         return qs
 
 
-# ----------- Licence CRUD ----------------------------------------------------------------------------------------------
+# ----------- Licence CRUD ---------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class LicenceListView(PublishedObjectListView):
+class LicencePublishedListView(PublishedObjectListView):
     model = Licence
+
+
+class LicencePrivateListView(PrivateObjectListView):
+    model = Licence
+    ordering = 'name'
 
 
 class LicenceCreateView(views.OwnedObjectCreateView):
@@ -136,6 +149,12 @@ class LicenceModalDeleteView(views.OwnedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 class PublishedSourcesFilterView(PublishedObjectFilterView):
+    model = Source
+    queryset = Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by('abbreviation')
+    filterset_class = SourceFilter
+
+
+class SourcePrivateFilterView(PrivateObjectFilterView):
     model = Source
     queryset = Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by('abbreviation')
     filterset_class = SourceFilter

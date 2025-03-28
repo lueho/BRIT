@@ -1,14 +1,14 @@
 from urllib.parse import urlencode
 
 from django.http import HttpResponseRedirect
-from django.test import TestCase, RequestFactory
+from django.test import RequestFactory, TestCase
 from django.urls import reverse
 from django_filters import CharFilter, FilterSet
 from django_filters.views import FilterView
 
 from utils.properties.models import Property
 from utils.tests.testcases import ViewWithPermissionsTestCase
-from ..views import FilterDefaultsMixin, BRITFilterView
+from ..views import BRITFilterView, FilterDefaultsMixin
 
 
 class MockFilterSet(FilterSet):
@@ -76,14 +76,14 @@ class UtilsDashboardViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = 'view_property'
     url = reverse('utils-dashboard')
 
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
+    def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(self.url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={self.url}')
+        self.assertEqual(response.status_code, 200)
 
-    def test_get_http_403_ok_for_outsiders(self):
+    def test_get_http_200_ok_for_outsiders(self):
         self.client.force_login(self.outsider)
         response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 403)
+        self.assertEqual(response.status_code, 200)
 
     def test_get_http_200_ok_for_member(self):
         self.client.force_login(self.member)

@@ -9,20 +9,6 @@ from ..models import Scenario
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class ScenarioListViewTestCase(ViewWithPermissionsTestCase):
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        region = Region.objects.create(name='Test Region')
-        catchment = Catchment.objects.create(name='Test Catchment', region=region, parent_region=region)
-        Scenario.objects.create(name='Test Scenario', region=region, catchment=catchment)
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('scenario-list'))
-        self.assertEqual(200, response.status_code)
-
-
 class ScenarioCreateViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = 'add_scenario'
 
@@ -70,6 +56,8 @@ class ScenarioCreateViewTestCase(ViewWithPermissionsTestCase):
 
 
 class ScenarioCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    dashboard_view = False
+
     model = Scenario
 
     view_create_name = 'scenario-create'
@@ -133,6 +121,7 @@ class ScenarioModalDeleteViewTestCase(ViewWithPermissionsTestCase):
 
 
 class ScenarioResultCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    dashboard_view = False
     create_view = False
     public_list_view = False
     private_list_view = False

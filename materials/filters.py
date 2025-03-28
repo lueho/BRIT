@@ -48,17 +48,11 @@ class PublishedSampleFilter(SampleFilter):
 
 class UserOwnedSampleFilter(SampleFilter):
     name = ModelChoiceFilter(
-        queryset=Sample.objects.filter(publication_status='published'),
+        queryset=Sample.objects.all(),
         field_name='name',
         label='Sample Name',
         widget=BSModelSelect2(url='sample-autocomplete-owned')
     )
-
-    def __init__(self, *args, **kwargs):
-        user = kwargs.pop('user', None)
-        super().__init__(*args, **kwargs)
-        if user:
-            self.filters['name'].queryset = Sample.objects.filter(owner=user)
 
 
 class SampleSeriesFilter(CrispyAutocompleteFilterSet):

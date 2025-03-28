@@ -5,7 +5,8 @@ from .router import router
 
 urlpatterns = [
     path('', views.BibliographyDashboardView.as_view(), name='bibliography-dashboard'),
-    path('authors/', views.AuthorListView.as_view(), name='author-list'),
+    path('authors/', views.AuthorPublishedListView.as_view(), name='author-list'),
+    path('authors/user/', views.AuthorPrivateListView.as_view(), name='author-list-owned'),
     path('authors/create/', views.AuthorCreateView.as_view(), name='author-create'),
     path('authors/create/modal/', views.AuthorModalCreateView.as_view(), name='author-create-modal'),
     path('authors/<int:pk>/', views.AuthorDetailView.as_view(), name='author-detail'),
@@ -14,7 +15,8 @@ urlpatterns = [
     path('authors/<int:pk>/update/modal/', views.AuthorModalUpdateView.as_view(), name='author-update-modal'),
     path('authors/autocomplete/', views.AuthorAutoCompleteView.as_view(), name='author-autocomplete'),
     path('authors/<int:pk>/delete/modal/', views.AuthorModalDeleteView.as_view(), name='author-delete-modal'),
-    path('licences/', views.LicenceListView.as_view(), name='licence-list'),
+    path('licences/', views.LicencePublishedListView.as_view(), name='licence-list'),
+    path('licences/user/', views.LicencePrivateListView.as_view(), name='licence-list-owned'),
     path('licences/create/', views.LicenceCreateView.as_view(), name='licence-create'),
     path('licences/create/modal/', views.LicenceModalCreateView.as_view(), name='licence-create-modal'),
     path('licences/<int:pk>/', views.LicenceDetailView.as_view(), name='licence-detail'),
@@ -23,6 +25,7 @@ urlpatterns = [
     path('licences/<int:pk>/update/modal/', views.LicenceModalUpdateView.as_view(), name='licence-update-modal'),
     path('licences/<int:pk>/delete/modal/', views.LicenceModalDeleteView.as_view(), name='licence-delete-modal'),
     path('sources/', views.PublishedSourcesFilterView.as_view(), name='source-list'),
+    path('sources/user/', views.SourcePrivateFilterView.as_view(), name='source-list-owned'),
     path('sources/create/', views.SourceCreateView.as_view(), name='source-create'),
     path('sources/create/modal/', views.SourceModalCreateView.as_view(), name='source-create-modal'),
     path('sources/<int:pk>/', views.SourceDetailView.as_view(), name='source-detail'),

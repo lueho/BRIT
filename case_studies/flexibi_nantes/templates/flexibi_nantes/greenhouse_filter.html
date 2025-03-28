@@ -4,9 +4,9 @@
 
 {% block title %}BRIT | Greenhouse types{% endblock %}
 
-{% block list_header %}<strong>Greenhouse types</strong>{% endblock %}
+{% block list_card_header %}<strong>Greenhouse types</strong>{% endblock %}
 
-{% block list_body %}
+{% block list_table %}
     <table class="table table-responsive-stack">
         <thead>
         <tr>
@@ -17,6 +17,9 @@
             <th>Above ground</th>
             <th>High wire</th>
             <th>Growth cycle list</th>
+            {% if list_type == 'private' %}
+                <th>Public</th>
+            {% endif %}
         </tr>
         </thead>
         <tbody>
@@ -29,13 +32,16 @@
                 <td data-label="Above ground">{{ object.above_ground }}</td>
                 <td data-label="High wire">{{ object.high_wire }}</td>
                 <td data-label="Growth cycle list">{{ object.growth_cycle_list }}</td>
+                {% if list_type == 'private' %}
+                    {% include 'partials/_publication_status_column.html' %}
+                {% endif %}
             </tr>
         {% endfor %}
         </tbody>
         <tfoot>
         </tfoot>
     </table>
-{% endblock list_body %}
+{% endblock list_table %}
 
 {% block filter_footer %}{% endblock %}
 

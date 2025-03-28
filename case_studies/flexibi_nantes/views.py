@@ -17,7 +17,8 @@ import case_studies.flexibi_nantes.tasks
 from maps.models import Catchment, GeoDataset
 from maps.views import GeoDataSetFilteredMapView
 from materials.models import MaterialComponentGroup
-from utils.views import (BRITFilterView, NextOrSuccessUrlMixin, PublishedObjectListView, UserCreatedObjectDetailView,
+from utils.views import (NextOrSuccessUrlMixin, PrivateObjectFilterView, PrivateObjectListView,
+                         PublishedObjectFilterView, PublishedObjectListView, UserCreatedObjectDetailView,
                          UserCreatedObjectUpdateView, UserOwnsObjectMixin)
 from .filters import GreenhouseTypeFilter, NantesGreenhousesFilterSet
 from .forms import (CultureModalModelForm, CultureModelForm, GreenhouseGrowthCycle, GreenhouseGrowthCycleModelForm,
@@ -29,8 +30,13 @@ from .models import Culture, Greenhouse, GrowthTimeStepSet
 
 
 # ----------- Culture CRUD ---------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
 
-class CultureListView(PublishedObjectListView):
+class CulturePublishedListView(PublishedObjectListView):
+    model = Culture
+
+
+class CulturePrivateListView(PrivateObjectListView):
     model = Culture
 
 
@@ -102,8 +108,14 @@ class CultureModalDeleteView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSucc
 
 
 # ----------- Greenhouse CRUD ------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
 
-class GreenhouseListView(BRITFilterView):
+class GreenhousePublishedFilterView(PublishedObjectFilterView):
+    model = Greenhouse
+    filterset_class = GreenhouseTypeFilter
+
+
+class GreenhousePrivateFilterView(PrivateObjectFilterView):
     model = Greenhouse
     filterset_class = GreenhouseTypeFilter
 

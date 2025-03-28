@@ -20,10 +20,10 @@ from maps.forms import NutsAndLauCatchmentQueryForm
 from maps.views import (CatchmentDetailView, CatchmentUpdateView, GeoDataSetFilteredMapView, GeoDataSetFormMixin,
                         MapMixin)
 from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineFormSetMixin
-from utils.views import (BRITFilterView, OwnedObjectCreateView, OwnedObjectModalCreateView, OwnedObjectModalDeleteView,
+from utils.views import (OwnedObjectCreateView, OwnedObjectModalCreateView, OwnedObjectModalDeleteView,
                          OwnedObjectModalDetailView, OwnedObjectModalUpdateView, OwnedObjectModelSelectOptionsView,
-                         PublishedObjectFilterView, PublishedObjectListView, UserCreatedObjectDetailView,
-                         UserCreatedObjectUpdateView)
+                         PrivateObjectFilterView, PrivateObjectListView, PublishedObjectFilterView,
+                         PublishedObjectListView, UserCreatedObjectDetailView, UserCreatedObjectUpdateView)
 from .filters import CollectionFilterSet, CollectorFilter, WasteFlyerFilter
 from .forms import (AggregatedCollectionPropertyValueModelForm, BaseWasteFlyerUrlFormSet, CollectionAddPredecessorForm,
                     CollectionAddWasteSampleForm, CollectionFrequencyModalModelForm, CollectionFrequencyModelForm,
@@ -48,10 +48,14 @@ class CollectionHomeView(PermissionRequiredMixin, TemplateView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CollectorListView(BRITFilterView):
+class CollectorPublishedListView(PublishedObjectFilterView):
     model = Collector
     filterset_class = CollectorFilter
-    ordering = 'name'
+
+
+class CollectorPrivateListView(PrivateObjectListView):
+    model = Collector
+    filterset_class = CollectorFilter
 
 
 class CollectorCreateView(OwnedObjectCreateView):
@@ -109,7 +113,11 @@ class CollectorAutoCompleteView(Select2QuerySetView):
 # ----------- Collection System CRUD -----------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class CollectionSystemListView(PublishedObjectListView):
+class CollectionSystemPublishedListView(PublishedObjectListView):
+    model = CollectionSystem
+
+
+class CollectionSystemPrivateListView(PrivateObjectListView):
     model = CollectionSystem
 
 
@@ -158,7 +166,11 @@ class CollectionSystemModalDeleteView(OwnedObjectModalDeleteView):
 # ----------- Waste Stream Category CRUD -------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class WasteCategoryListView(PublishedObjectListView):
+class WasteCategoryPublishedListView(PublishedObjectListView):
+    model = WasteCategory
+
+
+class WasteCategoryPrivateListView(PrivateObjectListView):
     model = WasteCategory
 
 
@@ -206,7 +218,11 @@ class WasteCategoryModalDeleteView(OwnedObjectModalDeleteView):
 # ----------- Waste Component CRUD -------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class WasteComponentListView(PublishedObjectListView):
+class WasteComponentPublishedListView(PublishedObjectListView):
+    model = WasteComponent
+
+
+class WasteComponentPrivateListView(PrivateObjectListView):
     model = WasteComponent
 
 
@@ -254,7 +270,13 @@ class WasteComponentModalDeleteView(OwnedObjectModalDeleteView):
 # ----------- Waste Collection Flyer CRUD ------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class WasteFlyerListView(BRITFilterView):
+class WasteFlyerPublishedFilterView(PublishedObjectFilterView):
+    model = WasteFlyer
+    filterset_class = WasteFlyerFilter
+    ordering = 'id'
+
+
+class WasteFlyerPrivateFilterView(PrivateObjectFilterView):
     model = WasteFlyer
     filterset_class = WasteFlyerFilter
     ordering = 'id'
@@ -353,7 +375,11 @@ class WasteFlyerListCheckUrlsProgressView(LoginRequiredMixin, View):
 # ----------- Frequency CRUD -------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class FrequencyListView(PublishedObjectListView):
+class FrequencyPublishedListView(PublishedObjectListView):
+    model = CollectionFrequency
+
+
+class FrequencyPrivateListView(PrivateObjectListView):
     model = CollectionFrequency
 
 
@@ -539,7 +565,22 @@ class CollectionCatchmentUpdateView(CatchmentUpdateView):
 # ----------- Collection CRUD ------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class CollectionCurrentListView(PublishedObjectFilterView):
+class CollectionCurrentPublishedListView(PublishedObjectFilterView):
+    model = Collection
+    filterset_class = CollectionFilterSet
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+
+        # Check if it's a GET request and no query parameters are present
+        # This implies that the user has just opened the page and no filtering has been applied yet.
+        if self.request.method == 'GET' and not self.request.GET:
+            queryset = queryset.currently_valid()
+
+        return queryset
+
+
+class CollectionCurrentPrivateListView(PrivateObjectFilterView):
     model = Collection
     filterset_class = CollectionFilterSet
 

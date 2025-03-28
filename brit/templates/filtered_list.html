@@ -7,60 +7,128 @@
 
 {% block content %}
     <div class="container-fluid">
-    <div class="row">
-        <div class="col-lg-8 order-2 order-lg-1">
-            <div class="card shadow">
-                <div class="card-header">
-                    {% block list_header %}<b>{{ header }}</b>{% endblock %}
-                </div>
-                <div class="card-body">
-                    {% block list_body %}{% endblock %}
-                    <div class="pagination">
-                        <span class="step-links">
-                            {% if page_obj.has_previous %}
-                                <a href="?{% param_replace page=1 %}">&laquo; first</a>
-                                <a href="?{% param_replace page=page_obj.previous_page_number %}">previous</a>
-                            {% endif %}
+        <div class="row">
+            <div class="col-lg-8 order-2 order-lg-1">
+                <div class="card shadow">
+                    <div class="card-header">
+                        {% block list_card_header %}<b>{{ header }}</b>{% endblock %}
+                    </div>
+                    <div class="card-body">
+                        {% block list_card_body %}
+                            {% block list_table %}
+                                <table class="table">
+                                    {% block list_table_head %}
+                                        <thead>
+                                        <tr>
+                                            <th>Name</th>
+                                            <th>Description</th>
+                                            {% if list_type == 'private' %}
+                                                <th>Public</th>
+                                            {% endif %}
+                                        </tr>
+                                        </thead>
+                                    {% endblock list_table_head %}
+                                    <tbody>
+                                    {% for object in object_list %}
+                                        {% block list_table_row %}
+                                            <tr>
+                                                <td><a href="{{ object.get_absolute_url }}">{{ object.name }}</a></td>
+                                                <td>{{ object.description }}</td>
+                                                {% if list_type == 'private' %}
+                                                    {% include 'partials/_publication_status_column.html' %}
+                                                {% endif %}
+                                            </tr>
+                                        {% endblock list_table_row %}
+                                    {% endfor %}
+                                    </tbody>
+                                    {% block list_table_footer %}
+                                        <tfoot></tfoot>
+                                    {% endblock list_table_footer %}
+                                </table>
+                            {% endblock list_table %}
+                            {% block list_pagination %}
+                                <div class="pagination">
+                                    <span class="step-links">
+                                        {% if page_obj.has_previous %}
+                                            <a href="?{% param_replace page=1 %}">&laquo; first</a>
+                                            <a href="?{% param_replace page=page_obj.previous_page_number %}">previous</a>
+                                        {% endif %}
 
-                            <span class="current">
-                                Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.
-                            </span>
+                                        <span class="current">
+                                            Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.
+                                        </span>
 
-                            {% if page_obj.has_next %}
-                                <a href="?{% param_replace page=page_obj.next_page_number %}">next</a>
-                                <a href="?{% param_replace page=page_obj.paginator.num_pages %}">last &raquo;</a>
-                            {% endif %}
-                        </span>
+                                        {% if page_obj.has_next %}
+                                            <a href="?{% param_replace page=page_obj.next_page_number %}">next</a>
+                                            <a href="?{% param_replace page=page_obj.paginator.num_pages %}">last &raquo;</a>
+                                        {% endif %}
+                                    </span>
+                                </div>
+                            {% endblock list_pagination %}
+                        {% endblock list_card_body %}
+                    </div>
+                    <div class="card-footer">
+                        {% block list_card_footer %}
+                            {% block list_card_footer_list_link %}
+                                {% if private_list_owner %}
+                                    <a class="mr-2 text-nowrap" href="{{ object_list.model.public_list_url }}">
+                                        <i class="fas fa-fw fa-list"></i>
+                                        Published {{ object_list.model.get_verbose_name_plural }}
+                                    </a>
+                                {% elif user.is_authenticated %}
+                                    <a class="mr-2 text-nowrap" href="{{ object_list.model.private_list_url }}">
+                                        <i class="fas fa-fw fa-list"></i>
+                                        My {{ object_list.model.get_verbose_name_plural }}
+                                    </a>
+                                {% endif %}
+                            {% endblock list_card_footer_list_link %}
+                            {% block list_card_footer_create_link %}
+                                {% if create_permission in perms or user.is_staff %}
+                                    <a class="mr-2 text-nowrap" href="{{ create_url }}">
+                                        <i class="fas fa-fw fa-plus"></i> {{ create_url_text }}
+                                    </a>
+                                {% endif %}
+                            {% endblock list_card_footer_create_link %}
+                            {% block list_card_footer_dashboard_link %}
+                                {% if dashboard_url %}
+                                    <a class="mr-2 text-nowrap" href="{{ dashboard_url }}">
+                                        <i class="fas fa-fw fa-th-large"></i> Explorer
+                                    </a>
+                                {% endif %}
+                            {% endblock list_card_footer_dashboard_link %}
+                            {% block list_card_footer_additional_links %}{% endblock %}
+                        {% endblock list_card_footer %}
                     </div>
                 </div>
-                <div class="card-footer">
-                    {% block list_footer %}{% endblock %}
-                </div>
+            </div>
+            <div class="col-lg-4 order-1 order-lg-2">
+                {% block filter_column %}
+                    <div class="card shadow">
+                        <div class="card-header" id="filterFormHeading" data-toggle="collapse" data-target="#filterForm"
+                             aria-expanded="true" aria-controls="filterForm">
+                            {% block filter_header %}<strong>Filter</strong>{% endblock %}
+                            <span class="arrow" aria-hidden="true"></span>
+                        </div>
+                        <div id="filterForm" class="collapse show" aria-labelledby="filterFormHeading">
+                            <div class="card-body">
+                                {% block filter_body %}
+                                    <form method="get">
+                                        {% crispy filter.form %}
+                                        <button id="btn-filter" class="btn btn-primary submit-filter" type="submit">
+                                            Filter
+                                        </button>
+                                    </form>
+                                {% endblock %}
+                            </div>
+                        </div>
+                        {% block filter_footer %}
+                            <div class="card-footer"></div>
+                        {% endblock %}
+                    </div>
+                    {% block extra_options %}{% endblock extra_options %}
+                {% endblock filter_column %}
             </div>
         </div>
-        <div class="col-lg-4 order-1 order-lg-2">
-        {% block filter_column %}
-            <div class="card shadow">
-                <div class="card-header" id="filterFormHeading" data-toggle="collapse" data-target="#filterForm" aria-expanded="true" aria-controls="filterForm">
-                    {% block filter_header %}<strong>Filter</strong>{% endblock %}
-                <span class="arrow" aria-hidden="true"></span>
-                </div>
-            <div id="filterForm" class="collapse show" aria-labelledby="filterFormHeading">
-                <div class="card-body">
-                    {% block filter_body %}
-                        <form method="get">
-                            {% crispy filter.form %}
-                            <button id="btn-filter" class="btn btn-primary submit-filter" type="submit">Filter</button>
-                        </form>
-                    {% endblock %}
-                </div>
-            </div>
-                {% block filter_footer %}<div class="card-footer"></div>{% endblock %}
-            </div>
-        {% block extra_options %}{% endblock extra_options %}
-            {% endblock filter_column %}
-        </div>
-    </div>
     </div>
 {% endblock %}
 

@@ -17,8 +17,8 @@ from maps.models import Catchment, GeoDataset
 from maps.serializers import BaseResultMapSerializer
 from maps.views import MapMixin
 from materials.models import SampleSeries
-from utils.views import (OwnedObjectCreateView, OwnedObjectModalDeleteView, PublishedObjectFilterView,
-                         UserCreatedObjectDetailView, UserCreatedObjectUpdateView, UserOwnedObjectFilterView)
+from utils.views import (OwnedObjectCreateView, OwnedObjectModalDeleteView, PrivateObjectFilterView,
+                         PublishedObjectFilterView, UserCreatedObjectDetailView, UserCreatedObjectUpdateView)
 from .evaluations import ScenarioResult
 from .filters import ScenarioFilterSet
 from .forms import (ScenarioInventoryConfigurationAddForm, ScenarioInventoryConfigurationUpdateForm,
@@ -57,7 +57,7 @@ class PublishedScenarioFilterView(PublishedObjectFilterView):
     filterset_class = ScenarioFilterSet
 
 
-class UserOwnedScenarioFilterView(UserOwnedObjectFilterView):
+class PrivateScenarioFilterView(PrivateObjectFilterView):
     model = Scenario
     filterset_class = ScenarioFilterSet
 

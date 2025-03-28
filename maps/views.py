@@ -1,5 +1,5 @@
 from dal import autocomplete
-from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.gis.geos import MultiPolygon
 from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
@@ -18,10 +18,10 @@ from maps.serializers import (CatchmentGeoFeatureModelSerializer, LauRegionOptio
                               NutsRegionCatchmentOptionSerializer, NutsRegionOptionSerializer,
                               NutsRegionSummarySerializer, RegionGeoFeatureModelSerializer)
 from utils.forms import DynamicTableInlineFormSetHelper
-from utils.views import (BRITFilterView, OwnedObjectCreateView, OwnedObjectModalCreateView, OwnedObjectModalDeleteView,
+from utils.views import (OwnedObjectCreateView, OwnedObjectModalCreateView, OwnedObjectModalDeleteView,
                          OwnedObjectModalDetailView, OwnedObjectModalUpdateView, OwnedObjectModelSelectOptionsView,
-                         PublishedObjectFilterView, PublishedObjectListView, UserCreatedObjectDetailView,
-                         UserCreatedObjectUpdateView, UserOwnedObjectFilterView)
+                         PrivateObjectFilterView, PrivateObjectListView, PublishedObjectFilterView,
+                         PublishedObjectListView, UserCreatedObjectDetailView, UserCreatedObjectUpdateView)
 from .filters import CatchmentFilterSet, GeoDataSetFilterSet, NutsRegionFilterSet, RegionFilterSet
 from .forms import (AttributeModalModelForm, AttributeModelForm, CatchmentCreateDrawCustomForm,
                     CatchmentCreateMergeLauForm, CatchmentModelForm, GeoDataSetModelForm, LocationModelForm,
@@ -230,19 +230,24 @@ class MapMixin:
         return context
 
 
-class MapsDashboardView(PermissionRequiredMixin, TemplateView):
+class MapsDashboardView(TemplateView):
     template_name = 'maps_dashboard.html'
-    permission_required = set()
 
 
-# ----------- Geodataset -----------------------------------------------------------------------------------------------
+# ----------- GeoDataSet CRUD ------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class PublishedGeoDatasetFilterView(PublishedObjectFilterView):
+class GeoDataSetPublishedFilterView(PublishedObjectFilterView):
     model = GeoDataset
     filterset_class = GeoDataSetFilterSet
-    template_name = 'maps_list.html'
+    dashboard_url = reverse_lazy('maps-dashboard')
+
+
+class GeoDataSetPrivateFilterView(PrivateObjectFilterView):
+    model = GeoDataset
+    filterset_class = GeoDataSetFilterSet
+    dashboard_url = reverse_lazy('maps-dashboard')
 
 
 class GeoDataSetFormMixin(FormMixin):
@@ -261,14 +266,6 @@ class GeoDataSetFormMixin(FormMixin):
             return self.form_class(**self.get_form_kwargs())
         if self.filterset_class is not None:
             return self.filterset_class(self.request.GET).form
-
-
-# ----------- GeoDataSet CRUD---------------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-class GeoDataSetListView(PublishedObjectListView):
-    model = GeoDataset
 
 
 class GeoDataSetCreateView(OwnedObjectCreateView):
@@ -317,8 +314,14 @@ class GeoDataSetModalDeleteView(OwnedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class LocationListView(PublishedObjectListView):
+class LocationPublishedListView(PublishedObjectListView):
     model = Location
+    dashboard_url = reverse_lazy('maps-dashboard')
+
+
+class LocationPrivateListView(PrivateObjectListView):
+    model = Location
+    dashboard_url = reverse_lazy('maps-dashboard')
 
 
 class LocationCreateView(OwnedObjectCreateView):
@@ -347,10 +350,16 @@ class LocationModalDeleteView(OwnedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class RegionListView(BRITFilterView):
+class RegionPublishedFilterView(PublishedObjectFilterView):
     model = Region
     filterset_class = RegionFilterSet
-    ordering = 'name'
+    dashboard_url = reverse_lazy('maps-dashboard')
+
+
+class RegionPrivateFilterView(PrivateObjectFilterView):
+    model = Region
+    filterset_class = RegionFilterSet
+    dashboard_url = reverse_lazy('maps-dashboard')
 
 
 class RegionMapView(LoginRequiredMixin, MapMixin, FilterView):
@@ -386,16 +395,16 @@ class RegionModalDeleteView(OwnedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class PublishedCatchmentListView(PublishedObjectFilterView):
+class CatchmentPublishedFilterView(PublishedObjectFilterView):
     model = Catchment
     filterset_class = CatchmentFilterSet
-    ordering = 'name'
+    dashboard_url = reverse_lazy('maps-dashboard')
 
 
-class UserOwnedCatchmentListView(UserOwnedObjectFilterView):
+class CatchmentPrivateFilterView(PrivateObjectFilterView):
     model = Catchment
     filterset_class = CatchmentFilterSet
-    ordering = 'name'
+    dashboard_url = reverse_lazy('maps-dashboard')
 
 
 class CatchmentDetailView(MapMixin, UserCreatedObjectDetailView):
@@ -798,8 +807,14 @@ class NutsAndLauCatchmentPedigreeAPI(APIView):
 # ----------- Attribute CRUD -------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class AttributeListView(PublishedObjectListView):
+class AttributePublishedListView(PublishedObjectListView):
     model = Attribute
+    dashboard_url = reverse_lazy('maps-dashboard')
+
+
+class AttributePrivateListView(PrivateObjectListView):
+    model = Attribute
+    dashboard_url = reverse_lazy('maps-dashboard')
 
 
 class AttributeCreateView(OwnedObjectCreateView):
@@ -847,19 +862,14 @@ class AttributeModalDeleteView(OwnedObjectModalDeleteView):
 # ----------- Region Attribute Value CRUD ------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class RegionAttributeValueListView(PublishedObjectListView):
-    model = RegionAttributeValue
-
 
 class RegionAttributeValueCreateView(OwnedObjectCreateView):
     form_class = RegionAttributeValueModelForm
-    success_url = reverse_lazy('regionattributevalue-list')
     permission_required = 'maps.add_regionattributevalue'
 
 
 class RegionAttributeValueModalCreateView(OwnedObjectModalCreateView):
     form_class = RegionAttributeValueModalModelForm
-    success_url = reverse_lazy('regionattributevalue-list')
     permission_required = 'maps.add_regionattributevalue'
 
 
@@ -885,11 +895,14 @@ class RegionAttributeValueModalUpdateView(OwnedObjectModalUpdateView):
 
 
 class RegionAttributeValueModalDeleteView(OwnedObjectModalDeleteView):
-    template_name = 'modal_delete.html'
     model = RegionAttributeValue
     success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('regionattributevalue-list')
     permission_required = 'maps.delete_regionattributevalue'
+
+    def get_success_url(self):
+        # Redirect to the parent region detail view that the deleted region attribute value belonged to
+        if hasattr(self.object, 'region'):
+            return reverse_lazy('region-detail', kwargs={'pk': self.object.region.pk})
 
 
 class RegionChildCatchmentOptions(OwnedObjectModelSelectOptionsView):

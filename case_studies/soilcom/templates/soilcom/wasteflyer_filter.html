@@ -3,9 +3,9 @@
 
 {% block title %}BRIT | Waste Collection Flyers{% endblock %}
 
-{% block list_header %}<strong>Flyers</strong>{% endblock %}
+{% block list_card_header %}<strong>Flyers</strong>{% endblock %}
 
-{% block list_body %}
+{% block list_table %}
     <div class="table-responsive">
         <table class="table table-hover table-responsive-stack">
             <thead>
@@ -14,16 +14,23 @@
                 <th scope="col" class="col-9">URL</th>
                 <th scope="col">Valid</th>
                 <th scope="col">Checked</th>
+                {% if list_type == 'private' %}
+                    <th>Public</th>
+                {% endif %}
             </tr>
             </thead>
             <tbody>
             {% for object in object_list %}
                 <tr>
                     <td data-label="Id"><a href="{{ object.get_absolute_url }}">{{ object.id }}</a></td>
-                    <td data-label="URL" class="url-cell"><span><a href="{{ object.url }}" target="_blank">{{ object.url }}</a></span>
+                    <td data-label="URL" class="url-cell"><span><a href="{{ object.url }}"
+                                                                   target="_blank">{{ object.url }}</a></span>
                     </td>
                     <td data-label="Valid">{{ object.url_valid }}</td>
                     <td data-label="Checked">{{ object.url_checked|date:'d.m.Y' }}</td>
+                    {% if list_type == 'private' %}
+                        {% include 'partials/_publication_status_column.html' %}
+                    {% endif %}
                 </tr>
             {% endfor %}
             </tbody>
@@ -31,18 +38,18 @@
             </tfoot>
         </table>
     </div>
-{% endblock list_body %}
+{% endblock list_table %}
 
-{% block list_footer %}
-    {% if perms.soilcom.change_wasteflyer %}
+{% block list_card_footer_additional_links %}
+    {% if private_list_owner == user or user.is_staff %}
         <span id="check_url" class="text-nowrap" style="display: inline-block; width: 7em">
-            <a href="javascript:void(0)" onclick="check_url()" class="mr-3">
-                <i class="fas fa-fw fa-check-circle"></i>
-                <span>check urls</span>
-            </a>
-        </span>
+                <a href="javascript:void(0)" onclick="check_url()" class="mr-3">
+                    <i class="fas fa-fw fa-check-circle"></i>
+                    <span>check urls</span>
+                </a>
+            </span>
     {% endif %}
-{% endblock list_footer %}
+{% endblock list_card_footer_additional_links %}
 
 {% block filter_body %}
     <form method="get">

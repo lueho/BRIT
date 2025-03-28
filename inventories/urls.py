@@ -3,7 +3,7 @@ from django.urls import path
 from .views import (ResultMapAPI, ScenarioAddInventoryAlgorithmView, ScenarioAlgorithmConfigurationUpdateView,
                     ScenarioCreateView, ScenarioDetailView, ScenarioEvaluationProgressView,
                     ScenarioModalDeleteView, ScenarioRemoveInventoryAlgorithmView, ScenarioResultDetailMapView,
-                    ScenarioResultView, ScenarioUpdateView, SeasonalDistributionCreateView, UserOwnedScenarioFilterView,
+                    ScenarioResultView, ScenarioUpdateView, SeasonalDistributionCreateView, PrivateScenarioFilterView,
                     download_scenario_result_summary, download_scenario_summary, get_evaluation_status,
                     load_algorithm_options, load_catchment_options, load_geodataset_options, load_parameter_options,
                     PublishedScenarioFilterView, ScenarioNameAutocompleteView)
@@ -14,7 +14,7 @@ urlpatterns = [
          SeasonalDistributionCreateView.as_view(),
          name='seasonal_distribution_create'),
     path('scenarios/', PublishedScenarioFilterView.as_view(), name='scenario-list'),
-    path('scenarios/user/', UserOwnedScenarioFilterView.as_view(), name='scenario-list-owned'),
+    path('scenarios/user/', PrivateScenarioFilterView.as_view(), name='scenario-list-owned'),
     path('scenarios/autocomplete/name/', ScenarioNameAutocompleteView.as_view(), name='scenario-name-autocomplete'),
     path('scenarios/create/', ScenarioCreateView.as_view(), name='scenario-create'),
     path('scenarios/<int:pk>/', ScenarioDetailView.as_view(), name='scenario-detail'),

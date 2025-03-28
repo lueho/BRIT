@@ -2,13 +2,16 @@
 
 {% block title %}BRIT | CLOSECYCLE Showcases{% endblock %}
 
-{% block card_body %}
+{% block list_table %}
     <table class="table">
         <thead>
         <tr>
             <th>Name</th>
             <th>Region</th>
             <th>Description</th>
+            {% if list_type == 'private' %}
+                <th>Public</th>
+            {% endif %}
         </tr>
         </thead>
         <tbody>
@@ -21,22 +24,19 @@
                     <a href="{{ object.region.get_absolute_url }}">{{ object.region.name }}</a>
                 </td>
                 <td>{{ object.description }}</td>
+                {% if list_type == 'private' %}
+                    {% include 'partials/_publication_status_column.html' %}
+                {% endif %}
             </tr>
         {% endfor %}
         </tbody>
         <tfoot>
         </tfoot>
     </table>
-{% endblock card_body %}
+{% endblock list_table %}
 
-{% block card_footer %}
-    {% if 'closecycle.add_showcase' in perms %}
-        <a href="{% url 'showcase-create' %}" class="mr-3">
-            <i class="fas fa-fw fa-plus"></i> Add Showcase
-        </a>
-    {% endif %}
-
+{% block list_card_footer_additional_links %}
     <a href="{% url 'Showcase' %}">
         <i class="fas fa-fw fa-map-marked-alt"></i> View as map
     </a>
-{% endblock %}
+{% endblock list_card_footer_additional_links %}

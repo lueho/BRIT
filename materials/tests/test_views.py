@@ -9,15 +9,14 @@ from ..models import (Composition, Material, MaterialCategory, MaterialComponent
 class MaterialDashboardViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = 'change_material'
 
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('materials-dashboard')
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
+    def test_get_http_200_ok_for_anonymous(self):
+        response = self.client.get(reverse('materials-dashboard'))
+        self.assertEqual(200, response.status_code)
 
-    def test_get_http_403_ok_for_outsiders(self):
+    def test_get_http_200_ok_for_outsiders(self):
         self.client.force_login(self.outsider)
         response = self.client.get(reverse('materials-dashboard'))
-        self.assertEqual(403, response.status_code)
+        self.assertEqual(200, response.status_code)
 
     def test_get_http_200_ok_for_members(self):
         self.client.force_login(self.member)
@@ -32,6 +31,7 @@ class MaterialDashboardViewTestCase(ViewWithPermissionsTestCase):
 class MaterialCategoryCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = MaterialCategory
 
+    view_dashboard_name = 'materials-dashboard'
     view_create_name = 'materialcategory-create'
     view_published_list_name = 'materialcategory-list'
     view_private_list_name = 'materialcategory-list-owned'
@@ -41,18 +41,6 @@ class MaterialCategoryCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDV
 
     create_object_data = {'name': 'Test Category'}
     update_object_data = {'name': 'Updated Test Category'}
-
-
-class MaterialCategoryListViewTestCase(ViewWithPermissionsTestCase):
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('materialcategory-list'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('materialcategory-list'))
-        self.assertEqual(response.status_code, 200)
 
 
 class MaterialCategoryCreateViewTestCase(ViewWithPermissionsTestCase):
@@ -205,29 +193,6 @@ class MaterialCategoryModalDeleteViewTestCase(ViewWithPermissionsTestCase):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class MaterialListViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'add_material'
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('material-list'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('material-list'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_create_button_available_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('material-list'))
-        self.assertContains(response, reverse('material-create'))
-
-    def test_create_button_not_available_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('material-list'))
-        self.assertNotContains(response, reverse('material-create'))
-
-
 class MaterialCreateViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = 'add_material'
 
@@ -308,6 +273,7 @@ class MaterialModalCreateViewTestCase(ViewWithPermissionsTestCase):
 class MaterialCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Material
 
+    view_dashboard_name = 'materials-dashboard'
     view_create_name = 'material-create'
     view_published_list_name = 'material-list'
     view_private_list_name = 'material-list-owned'
@@ -440,18 +406,6 @@ class MaterialModalDeleteViewTestCase(ViewWithPermissionsTestCase):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class ComponentListViewTestCase(ViewWithPermissionsTestCase):
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('materialcomponent-list'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('materialcomponent-list'))
-        self.assertEqual(response.status_code, 200)
-
-
 class ComponentCreateViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = 'add_materialcomponent'
 
@@ -542,6 +496,7 @@ class ComponentModalCreateViewTestCase(ViewWithPermissionsTestCase):
 class MaterialComponentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = MaterialComponent
 
+    view_dashboard_name = 'materials-dashboard'
     view_create_name = 'materialcomponent-create'
     view_published_list_name = 'materialcomponent-list'
     view_private_list_name = 'materialcomponent-list-owned'
@@ -626,18 +581,6 @@ class ComponentModalDeleteViewTestCase(ViewWithPermissionsTestCase):
 
 # ----------- Material Component Group CRUD ----------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
-
-
-class ComponentGroupListViewTestCase(ViewWithPermissionsTestCase):
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('materialcomponentgroup-list'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('materialcomponentgroup-list'))
-        self.assertEqual(response.status_code, 200)
 
 
 class ComponentGroupCreateViewTestCase(ViewWithPermissionsTestCase):
@@ -725,6 +668,7 @@ class ComponentGroupModalCreateViewTestCase(ViewWithPermissionsTestCase):
 class MaterialComponentGroupCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = MaterialComponentGroup
 
+    view_dashboard_name = 'materials-dashboard'
     view_create_name = 'materialcomponentgroup-create'
     view_published_list_name = 'materialcomponentgroup-list'
     view_private_list_name = 'materialcomponentgroup-list-owned'
@@ -856,18 +800,6 @@ class ComponentGroupModalDeleteViewTestCase(ViewWithPermissionsTestCase):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class MaterialPropertyListViewTestCase(ViewWithPermissionsTestCase):
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('materialproperty-list'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('materialproperty-list'))
-        self.assertEqual(response.status_code, 200)
-
-
 class MaterialPropertyCreateViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = 'add_materialproperty'
 
@@ -953,6 +885,7 @@ class MaterialPropertyModalCreateViewTestCase(ViewWithPermissionsTestCase):
 class MaterialPropertyCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = MaterialProperty
 
+    view_dashboard_name = 'materials-dashboard'
     view_create_name = 'materialproperty-create'
     view_published_list_name = 'materialproperty-list'
     view_private_list_name = 'materialproperty-list-owned'
@@ -1137,18 +1070,6 @@ class MaterialPropertyValueModalDeleteViewTestCase(ViewWithPermissionsTestCase):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class SampleSeriesListViewTestCase(ViewWithPermissionsTestCase):
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('sampleseries-list'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('sampleseries-list'))
-        self.assertEqual(response.status_code, 200)
-
-
 class SampleSeriesCreateViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = 'add_sampleseries'
 
@@ -1244,6 +1165,7 @@ class SampleSeriesModalCreateViewTestCase(ViewWithPermissionsTestCase):
 class SampleSeriesCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = SampleSeries
 
+    view_dashboard_name = 'materials-dashboard'
     view_create_name = 'sampleseries-create'
     view_published_list_name = 'sampleseries-list'
     view_private_list_name = 'sampleseries-list-owned'
@@ -1378,18 +1300,6 @@ class SampleSeriesCreateDuplicateViewTestCase(AbstractTestCases.UserCreatedObjec
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class SampleListViewTestCase(ViewWithPermissionsTestCase):
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('sample-list'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('sample-list'))
-        self.assertEqual(response.status_code, 200)
-
-
 class FeaturedSampleListViewTestCase(ViewWithPermissionsTestCase):
 
     def test_get_http_200_ok_for_anonymous(self):
@@ -1447,6 +1357,7 @@ class SampleCreateViewTestCase(ViewWithPermissionsTestCase):
 class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Sample
 
+    view_dashboard_name = 'materials-dashboard'
     view_create_name = 'sample-create'
     view_published_list_name = 'sample-list'
     view_private_list_name = 'sample-list-owned'
@@ -1812,18 +1723,6 @@ class SampleCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CompositionListViewTestCase(ViewWithPermissionsTestCase):
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('composition-list'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('composition-list'))
-        self.assertEqual(response.status_code, 200)
-
-
 class CompositionCreateViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = 'add_composition'
 
@@ -1936,11 +1835,13 @@ class CompositionModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 
 class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    public_list_view = False
+    private_list_view = False
+
     model = Composition
 
+    view_dashboard_name = 'materials-dashboard'
     view_create_name = 'composition-create'
-    view_published_list_name = 'composition-list'
-    view_private_list_name = 'composition-list-owned'
     view_detail_name = 'composition-detail'
     view_update_name = 'composition-update'
     view_delete_name = 'composition-delete-modal'
