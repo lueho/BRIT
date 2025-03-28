@@ -186,13 +186,11 @@ class AbstractTestCases(object):
             return reverse(self.view_delete_name, kwargs={'pk': pk})
 
         def get_update_success_url(self, pk=None):
-            # Assume that by convention the success URL is the detail view of the object
-            if not self.update_success_url_name:
-                self.update_success_url_name = self.view_detail_name
-            return reverse(self.update_success_url_name, kwargs={'pk': pk})
+            url_name = self.update_success_url_name or self.view_detail_name
+            return reverse(url_name, kwargs={'pk': pk})
 
         def compile_update_post_data(self):
-            data = self.update_object_data
+            data = self.update_object_data.copy()
             data.update(self.related_objects_post_data())
             return data
 
