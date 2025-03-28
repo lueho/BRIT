@@ -57,7 +57,6 @@ urlpatterns = [
     path('catchments/create/draw_custom/', CatchmentCreateDrawCustomView.as_view(),
          name='catchment-create-draw-custom'),
     path('catchments/create/merge_lau/', CatchmentCreateMergeLauView.as_view(), name='catchment-create-merge-lau'),
-    path('catchments/create/modal/', CatchmentCreateSelectRegionView.as_view(), name='catchment-create-modal'),
     path('catchments/<int:pk>/', CatchmentDetailView.as_view(), name='catchment-detail'),
     path('catchments/<int:pk>/update/', CatchmentUpdateView.as_view(), name='catchment-update'),
     path('catchments/<int:pk>/delete/modal/', CatchmentModalDeleteView.as_view(), name='catchment-delete-modal'),
