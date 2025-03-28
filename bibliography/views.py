@@ -32,12 +32,14 @@ class BibliographyDashboardView(TemplateView):
 class AuthorPublishedListView(PublishedObjectFilterView):
     model = Author
     filterset_class = AuthorFilterSet
+    dashboard_url = reverse_lazy('bibliography-dashboard')
     ordering = 'last_names'
 
 
 class AuthorPrivateListView(PrivateObjectFilterView):
     model = Author
     filterset_class = AuthorFilterSet
+    dashboard_url = reverse_lazy('bibliography-dashboard')
     ordering = 'last_names'
 
 
@@ -99,11 +101,12 @@ class AuthorAutoCompleteView(Select2QuerySetView):
 
 class LicencePublishedListView(PublishedObjectListView):
     model = Licence
+    dashboard_url = reverse_lazy('bibliography-dashboard')
 
 
 class LicencePrivateListView(PrivateObjectListView):
     model = Licence
-    ordering = 'name'
+    dashboard_url = reverse_lazy('bibliography-dashboard')
 
 
 class LicenceCreateView(views.OwnedObjectCreateView):
@@ -148,16 +151,18 @@ class LicenceModalDeleteView(views.OwnedObjectModalDeleteView):
 # ----------- Source CRUD ----------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class PublishedSourcesFilterView(PublishedObjectFilterView):
+class SourcePublishedFilterView(PublishedObjectFilterView):
     model = Source
     queryset = Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by('abbreviation')
     filterset_class = SourceFilter
+    dashboard_url = reverse_lazy('bibliography-dashboard')
 
 
 class SourcePrivateFilterView(PrivateObjectFilterView):
     model = Source
     queryset = Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by('abbreviation')
     filterset_class = SourceFilter
+    dashboard_url = reverse_lazy('bibliography-dashboard')
 
 
 class SourceCreateView(OwnedObjectCreateWithInlinesView):

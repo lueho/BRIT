@@ -7,7 +7,7 @@ from .views import (PropertiesDashboardView, PropertyCreateView, PropertyDetailV
                     UnitUpdateView)
 
 urlpatterns = [
-    path('', PropertiesDashboardView.as_view(), name='properties-dashboard'),
+    path('explorer/', PropertiesDashboardView.as_view(), name='properties-dashboard'),
     path('properties/', PropertyPublishedListView.as_view(), name='property-list'),
     path('properties/user/', PropertyPrivateListView.as_view(), name='property-list-owned'),
     path('properties/create/', PropertyCreateView.as_view(), name='property-create'),

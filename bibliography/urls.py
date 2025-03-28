@@ -4,7 +4,7 @@ from . import views
 from .router import router
 
 urlpatterns = [
-    path('', views.BibliographyDashboardView.as_view(), name='bibliography-dashboard'),
+    path('explorer/', views.BibliographyDashboardView.as_view(), name='bibliography-dashboard'),
     path('authors/', views.AuthorPublishedListView.as_view(), name='author-list'),
     path('authors/user/', views.AuthorPrivateListView.as_view(), name='author-list-owned'),
     path('authors/create/', views.AuthorCreateView.as_view(), name='author-create'),
@@ -24,7 +24,7 @@ urlpatterns = [
     path('licences/<int:pk>/update/', views.LicenceUpdateView.as_view(), name='licence-update'),
     path('licences/<int:pk>/update/modal/', views.LicenceModalUpdateView.as_view(), name='licence-update-modal'),
     path('licences/<int:pk>/delete/modal/', views.LicenceModalDeleteView.as_view(), name='licence-delete-modal'),
-    path('sources/', views.PublishedSourcesFilterView.as_view(), name='source-list'),
+    path('sources/', views.SourcePublishedFilterView.as_view(), name='source-list'),
     path('sources/user/', views.SourcePrivateFilterView.as_view(), name='source-list-owned'),
     path('sources/create/', views.SourceCreateView.as_view(), name='source-create'),
     path('sources/create/modal/', views.SourceModalCreateView.as_view(), name='source-create-modal'),

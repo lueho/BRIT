@@ -21,13 +21,13 @@ from .views import (AttributeCreateView, AttributeDetailView, AttributeModalCrea
                     RegionOfLauAutocompleteView, RegionPrivateFilterView, RegionPublishedFilterView, RegionUpdateView)
 
 urlpatterns = [
+    path('explorer/', MapsDashboardView.as_view(), name='maps-dashboard'),
     path('list/', GeoDataSetPublishedFilterView.as_view(), name='maps_list'),
     path('geodatasets/', GeoDataSetPublishedFilterView.as_view(), name='geodataset-list'),
     path('geodatasets/user/', GeoDataSetPrivateFilterView.as_view(), name='geodataset-list-owned'),
     path('geodatasets/create/', GeoDataSetCreateView.as_view(), name='geodataset-create'),
     path('geodatasets/<int:pk>/update/', GeoDataSetUpdateView.as_view(), name='geodataset-update'),
     path('geodatasets/<int:pk>/delete/', GeoDataSetModalDeleteView.as_view(), name='geodataset-delete-modal'),
-    path('dashboard/', MapsDashboardView.as_view(), name='maps-dashboard'),
     path('attributes/', AttributePublishedListView.as_view(), name='attribute-list'),
     path('attributes/user/', AttributePrivateListView.as_view(), name='attribute-list-owned'),
     path('attributes/create/', AttributeCreateView.as_view(), name='attribute-create'),

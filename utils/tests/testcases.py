@@ -230,6 +230,7 @@ class AbstractTestCases(object):
             response = self.client.get(self.get_list_url(publication_status='published'))
             self.assertEqual(response.status_code, 200)
             if self.dashboard_view:
+                print(self.get_dashboard_url())
                 self.assertContains(response, self.get_dashboard_url())
             if self.create_view:
                 self.assertNotContains(response, self.get_create_url())

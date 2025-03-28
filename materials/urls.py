@@ -6,7 +6,7 @@ from .router import router
 
 urlpatterns = [
     path('', RedirectView.as_view(url='/materials/samples/featured/'), name='materials-home'),
-    path('dashboard/', views.MaterialsDashboardView.as_view(), name='materials-dashboard'),
+    path('explorer/', views.MaterialsDashboardView.as_view(), name='materials-dashboard'),
     path('materials/', views.MaterialPublishedListView.as_view(), name='material-list'),
     path('materials/user/', views.MaterialPrivateListView.as_view(), name='material-list-owned'),
     path('materials/create/', views.MaterialCreateView.as_view(), name='material-create'),

@@ -52,11 +52,13 @@ class CollectionHomeView(PermissionRequiredMixin, TemplateView):
 class CollectorPublishedListView(PublishedObjectFilterView):
     model = Collector
     filterset_class = CollectorFilter
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
 
 
 class CollectorPrivateListView(PrivateObjectListView):
     model = Collector
     filterset_class = CollectorFilter
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
 
 
 class CollectorCreateView(OwnedObjectCreateView):
@@ -116,11 +118,12 @@ class CollectorAutoCompleteView(Select2QuerySetView):
 
 class CollectionSystemPublishedListView(PublishedObjectListView):
     model = CollectionSystem
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
 
 
 class CollectionSystemPrivateListView(PrivateObjectListView):
     model = CollectionSystem
-
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
 
 class CollectionSystemCreateView(OwnedObjectCreateView):
     form_class = CollectionSystemModelForm
@@ -169,11 +172,12 @@ class CollectionSystemModalDeleteView(OwnedObjectModalDeleteView):
 
 class WasteCategoryPublishedListView(PublishedObjectListView):
     model = WasteCategory
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
 
 
 class WasteCategoryPrivateListView(PrivateObjectListView):
     model = WasteCategory
-
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
 
 class WasteCategoryCreateView(OwnedObjectCreateView):
     form_class = WasteCategoryModelForm
@@ -221,10 +225,12 @@ class WasteCategoryModalDeleteView(OwnedObjectModalDeleteView):
 
 class WasteComponentPublishedListView(PublishedObjectListView):
     model = WasteComponent
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
 
 
 class WasteComponentPrivateListView(PrivateObjectListView):
     model = WasteComponent
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
 
 
 class WasteComponentCreateView(OwnedObjectCreateView):
@@ -274,12 +280,14 @@ class WasteComponentModalDeleteView(OwnedObjectModalDeleteView):
 class WasteFlyerPublishedFilterView(PublishedObjectFilterView):
     model = WasteFlyer
     filterset_class = WasteFlyerFilter
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
     ordering = 'id'
 
 
 class WasteFlyerPrivateFilterView(PrivateObjectFilterView):
     model = WasteFlyer
     filterset_class = WasteFlyerFilter
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
     ordering = 'id'
 
 
@@ -378,10 +386,12 @@ class WasteFlyerListCheckUrlsProgressView(LoginRequiredMixin, View):
 
 class FrequencyPublishedListView(PublishedObjectListView):
     model = CollectionFrequency
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
 
 
 class FrequencyPrivateListView(PrivateObjectListView):
     model = CollectionFrequency
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
 
 
 class FrequencyCreateView(M2MInlineFormSetMixin, OwnedObjectCreateView):
@@ -569,6 +579,7 @@ class CollectionCatchmentUpdateView(CatchmentUpdateView):
 class CollectionCurrentPublishedListView(PublishedObjectFilterView):
     model = Collection
     filterset_class = CollectionFilterSet
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -584,6 +595,7 @@ class CollectionCurrentPublishedListView(PublishedObjectFilterView):
 class CollectionCurrentPrivateListView(PrivateObjectFilterView):
     model = Collection
     filterset_class = CollectionFilterSet
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
 
     def get_queryset(self):
         queryset = super().get_queryset()

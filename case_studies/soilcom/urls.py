@@ -5,7 +5,7 @@ from . import views
 from .router import router
 
 urlpatterns = [
-    path('', views.CollectionHomeView.as_view(), name='wastecollection-dashboard'),
+    path('explorer/', views.CollectionHomeView.as_view(), name='wastecollection-dashboard'),
     path('catchments/<int:pk>/', views.CollectionCatchmentDetailView.as_view(), name='collectioncatchment-detail'),
     path('catchments/<int:pk>/update/', views.CollectionCatchmentUpdateView.as_view(), name='collectioncatchment-update'),
     path('catchments/<int:pk>/delete/modal/', CatchmentModalDeleteView.as_view(), name='collectioncatchment-delete-modal'),
