@@ -19,6 +19,7 @@ from bibliography.views import (SourceCheckUrlView, SourceCreateView, SourceModa
 from maps.forms import NutsAndLauCatchmentQueryForm
 from maps.views import (CatchmentDetailView, CatchmentUpdateView, GeoDataSetFilteredMapView, GeoDataSetFormMixin,
                         MapMixin)
+from utils.file_export.views import FilteredListFileExportView
 from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineFormSetMixin
 from utils.views import (OwnedObjectCreateView, OwnedObjectModalCreateView, OwnedObjectModalDeleteView,
                          OwnedObjectModalDetailView, OwnedObjectModalUpdateView, OwnedObjectModelSelectOptionsView,
@@ -762,6 +763,10 @@ class CollectionAutoCompleteView(Select2QuerySetView):
         return qs
 
 
+class CollectionListFileExportView(FilteredListFileExportView):
+    task_function = case_studies.soilcom.tasks.export_collections_to_file
+
+
 class CollectionAddPropertyValueView(CollectionPropertyValueCreateView):
 
     def get_initial(self):
@@ -922,33 +927,3 @@ class WasteCollectionMapIframeView(GeoDataSetFilteredMapView):
     filterset_class = CollectionFilterSet
     features_layer_api_basename = 'api-waste-collection'
     map_title = 'Household Waste Collection Europe'
-
-
-# ----------- API ------------------------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------------------------
-
-
-class CollectionListFileExportView(LoginRequiredMixin, View):
-
-    @staticmethod
-    def get(request, *args, **kwargs):
-        params = dict(request.GET)
-        file_format = params.pop('format', 'csv')[0]
-        params.pop('page', None)
-        task = case_studies.soilcom.tasks.export_collections_to_file.delay(file_format, params)
-        response_data = {
-            'task_id': task.task_id
-        }
-        return HttpResponse(json.dumps(response_data), content_type='application/json')
-
-
-class CollectionListFileExportProgressView(LoginRequiredMixin, View):
-
-    @staticmethod
-    def get(request, task_id):
-        result = AsyncResult(task_id)
-        response_data = {
-            'state': result.state,
-            'details': result.info,
-        }
-        return HttpResponse(json.dumps(response_data), content_type='application/json')

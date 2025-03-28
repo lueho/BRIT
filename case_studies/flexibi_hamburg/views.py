@@ -1,17 +1,14 @@
 import json
 
-from celery.result import AsyncResult
 from dal import autocomplete
-from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Q
-from django.http import HttpResponse
 from django.utils.decorators import method_decorator
-from django.views import View
 from django.views.decorators.clickjacking import xframe_options_exempt
 
 import case_studies.flexibi_hamburg.tasks
 from maps.models import Catchment, GeoDataset
 from maps.views import GeoDataSetFilteredMapView
+from utils.file_export.views import FilteredListFileExportView
 from .filters import HamburgRoadsideTreesFilterSet
 
 
@@ -32,30 +29,8 @@ class RoadsideTreesMapIframeView(GeoDataSetFilteredMapView):
     map_title = 'Roadside Trees'
 
 
-class HamburgRoadsideTreesListFileExportView(LoginRequiredMixin, View):
-
-    @staticmethod
-    def get(request, *args, **kwargs):
-        params = dict(request.GET)
-        file_format = params.pop('format', 'csv')[0]
-        params.pop('page', None)
-        task = case_studies.flexibi_hamburg.tasks.export_hamburg_roadside_trees_to_file.delay(file_format, params)
-        response_data = {
-            'task_id': task.task_id
-        }
-        return HttpResponse(json.dumps(response_data), content_type='application/json')
-
-
-class HamburgRoadsideTreesListFileExportProgressView(LoginRequiredMixin, View):
-
-    @staticmethod
-    def get(request, task_id):
-        result = AsyncResult(task_id)
-        response_data = {
-            'state': result.state,
-            'details': result.info,
-        }
-        return HttpResponse(json.dumps(response_data), content_type='application/json')
+class HamburgRoadsideTreesListFileExportView(FilteredListFileExportView):
+    task_function = case_studies.flexibi_hamburg.tasks.export_hamburg_roadside_trees_to_file
 
 
 class HamburgRoadsideTreeCatchmentAutocompleteView(autocomplete.Select2QuerySetView):

@@ -5,8 +5,8 @@
 
 {% block map_card_footer %}
     {% if user.is_authenticated %}
-        {% export_link "csv" 'hamburgroadsidetrees-export' 'hamburgroadsidetrees-export-progress' %}
-        {% export_link "xlsx" 'hamburgroadsidetrees-export' 'hamburgroadsidetrees-export-progress' %}
+        {% export_link "csv" 'hamburgroadsidetrees-export' %}
+        {% export_link "xlsx" 'hamburgroadsidetrees-export' %}
     {% endif %}
 {% endblock %}
 

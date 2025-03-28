@@ -65,8 +65,8 @@
         </a>
     {% endif %}
     {% if user.is_authenticated %}
-        {% export_link "csv" 'collection-export' 'collection-export-progress' %}
-        {% export_link "xlsx" 'collection-export' 'collection-export-progress' %}
+        {% export_link "csv" 'collection-export' %}
+        {% export_link "xlsx" 'collection-export' %}
     {% endif %}
 {% endblock list_card_footer_additional_links %}
 

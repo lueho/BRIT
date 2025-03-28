@@ -1,15 +1,13 @@
 import json
 
 from bootstrap_modal_forms.generic import BSModalCreateView, BSModalDeleteView, BSModalReadView, BSModalUpdateView
-from celery.result import AsyncResult
 from crispy_forms.helper import FormHelper
 from dal import autocomplete
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
-from django.http import HttpResponse, HttpResponseRedirect
+from django.http import HttpResponseRedirect
 from django.urls import reverse, reverse_lazy
-from django.views import View
 from django.views.generic import UpdateView
 from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 
@@ -17,6 +15,7 @@ import case_studies.flexibi_nantes.tasks
 from maps.models import Catchment, GeoDataset
 from maps.views import GeoDataSetFilteredMapView
 from materials.models import MaterialComponentGroup
+from utils.file_export.views import FilteredListFileExportView
 from utils.views import (NextOrSuccessUrlMixin, PrivateObjectFilterView, PrivateObjectListView,
                          PublishedObjectFilterView, PublishedObjectListView, UserCreatedObjectDetailView,
                          UserCreatedObjectUpdateView, UserOwnsObjectMixin)
@@ -183,7 +182,7 @@ class GreenhouseModalDeleteView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrS
 
 
 # ----------- Growthcycle CRUD -----------------------------------------------------------------------------------------
-
+# ----------------------------------------------------------------------------------------------------------------------
 
 class GreenhouseGrowthCycleCreateView(LoginRequiredMixin, CreateWithInlinesView):
     model = GreenhouseGrowthCycle
@@ -305,6 +304,10 @@ class UpdateGreenhouseGrowthCycleValuesView(LoginRequiredMixin, UpdateView):
         }
 
 
+# ----------- Nantes Greenhouses GeoDataSet ----------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
 class NantesGreenhousesCatchmentAutocompleteView(autocomplete.Select2QuerySetView):
     def get_queryset(self):
         if self.request.user.is_authenticated:
@@ -326,27 +329,5 @@ class GreenhousesMapView(GeoDataSetFilteredMapView):
     map_title = 'Nantes Greenhouses'
 
 
-class NantesGreenhousesListFileExportView(LoginRequiredMixin, View):
-
-    @staticmethod
-    def get(request, *args, **kwargs):
-        params = dict(request.GET)
-        file_format = params.pop('format', 'csv')[0]
-        params.pop('page', None)
-        task = case_studies.flexibi_nantes.tasks.export_nantes_greenhouses_to_file.delay(file_format, params)
-        response_data = {
-            'task_id': task.task_id
-        }
-        return HttpResponse(json.dumps(response_data), content_type='application/json')
-
-
-class NantesGreenhousesListFileExportProgressView(LoginRequiredMixin, View):
-
-    @staticmethod
-    def get(request, task_id):
-        result = AsyncResult(task_id)
-        response_data = {
-            'state': result.state,
-            'details': result.info,
-        }
-        return HttpResponse(json.dumps(response_data), content_type='application/json')
+class NantesGreenhousesListFileExportView(FilteredListFileExportView):
+    task_function = case_studies.flexibi_nantes.tasks.export_nantes_greenhouses_to_file

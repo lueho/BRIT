@@ -1842,7 +1842,7 @@ class CollectionListFileExportViewTestCase(ViewWithPermissionsTestCase):
         mock_export.return_value = self.mock_task
         self.client.force_login(self.member)
         response = self.client.get(f'{self.url}?format=xlsx&page=1&collector=1')
-        mock_export.assert_called_once_with('xlsx', {'collector': ['1']})
+        mock_export.assert_called_once_with('xlsx', {'collector': ['1'], 'publication_status': ['published']})
         expected_response = {'task_id': '1234'}
         self.assertDictEqual(expected_response, json.loads(response.content))
 

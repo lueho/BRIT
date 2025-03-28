@@ -7,8 +7,8 @@ from .views import (CultureCreateView, CultureDetailView, CultureModalDeleteView
                     GreenhouseModalUpdateView, GreenhousePrivateFilterView, GreenhousePublishedFilterView,
                     GreenhouseUpdateView, GreenhousesMapView, GrowthCycleCreateView, GrowthCycleDetailView,
                     GrowthCycleModalDeleteView, GrowthCycleUpdateView, GrowthTimeStepSetModalUpdateView,
-                    NantesGreenhousesCatchmentAutocompleteView, NantesGreenhousesListFileExportProgressView,
-                    NantesGreenhousesListFileExportView, UpdateGreenhouseGrowthCycleValuesView)
+                    NantesGreenhousesCatchmentAutocompleteView, NantesGreenhousesListFileExportView,
+                    UpdateGreenhouseGrowthCycleValuesView)
 
 urlpatterns = [
     path('cultures/', CulturePublishedListView.as_view(), name='culture-list'),
@@ -20,8 +20,6 @@ urlpatterns = [
     path('cultures/<int:pk>/delete/modal/', CultureModalDeleteView.as_view(), name='culture-delete-modal'),
     path('greenhouses/map/', GreenhousesMapView.as_view(), name='NantesGreenhouses'),
     path('roadside_trees/export/', NantesGreenhousesListFileExportView.as_view(), name='nantesgreenhouses-export'),
-    path('roadside_trees/export/<str:task_id>/progress/', NantesGreenhousesListFileExportProgressView.as_view(),
-         name='nantesgreenhouses-export-progress'),
     path('greenhouses/catchment_autocomplete/', NantesGreenhousesCatchmentAutocompleteView.as_view(),
          name='nantesgreenhouses-catchment-autocomplete'),
     path('greenhouses/', GreenhousePublishedFilterView.as_view(), name='greenhouse-list'),

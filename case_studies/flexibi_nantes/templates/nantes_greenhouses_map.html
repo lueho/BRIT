@@ -5,8 +5,8 @@
 
 {% block map_card_footer %}
     {% if user.is_authenticated %}
-        {% export_link "csv" 'nantesgreenhouses-export' 'nantesgreenhouses-export-progress' %}
-        {% export_link "xlsx" 'nantesgreenhouses-export' 'nantesgreenhouses-export-progress' %}
+        {% export_link "csv" 'nantesgreenhouses-export' %}
+        {% export_link "xlsx" 'nantesgreenhouses-export' %}
     {% endif %}
 {% endblock %}
 
