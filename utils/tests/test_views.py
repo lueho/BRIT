@@ -8,7 +8,7 @@ from django_filters.views import FilterView
 
 from utils.properties.models import Property
 from utils.tests.testcases import ViewWithPermissionsTestCase
-from ..views import BRITFilterView, FilterDefaultsMixin
+from ..views import FilterDefaultsMixin, PublishedObjectFilterView
 
 
 class MockFilterSet(FilterSet):
@@ -41,12 +41,13 @@ class FilterDefaultsMixinTest(TestCase):
         self.assertTrue(expected_query in response.url)
 
 
-class BRITFilterViewTestCase(TestCase):
+class PublishedObjectsFilterViewTestCase(TestCase):
 
     def setUp(self):
         self.factory = RequestFactory()
-        self.view = BRITFilterView()
+        self.view = PublishedObjectFilterView()
         self.view.filterset_class = MockFilterSet
+        self.view.model = self.view.filterset_class.Meta.model
 
     def test_initial_filter_values_extraction(self):
         expected_initial_values = {'name': 'Initial name'}

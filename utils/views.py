@@ -101,11 +101,6 @@ class FilterDefaultsMixin:
         return response
 
 
-class BRITFilterView(FilterDefaultsMixin, FilterView):
-    paginate_by = 10
-    ordering = 'id'
-
-
 class UserCreatedObjectListMixin:
     paginate_by = 10
     list_type = None
