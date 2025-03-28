@@ -452,9 +452,9 @@ class CatchmentCreateViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = 'add_catchment'
     url = reverse_lazy('catchment-create')
 
-    def test_get_http_200_ok_for_anonymous(self):
+    def test_get_http_302_redirect_to_login_for_anonymous(self):
         response = self.client.get(self.url)
-        self.assertEqual(200, response.status_code)
+        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={self.url}')
 
     def test_get_http_200_ok_for_outsider(self):
         self.client.force_login(self.outsider)
@@ -782,6 +782,59 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
     @classmethod
     def create_related_objects(cls):
         return {'region': Region.objects.create(name='Test Region')}
+
+    def test_list_view_published_as_authenticated_owner(self):
+        if not self.public_list_view:
+            self.skipTest("List view is not enabled for this test case.")
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_list_url(publication_status='published'))
+        self.assertEqual(response.status_code, 200)
+        if self.dashboard_view:
+            self.assertContains(response, self.get_dashboard_url())
+        if self.create_view:
+            self.assertContains(response, self.get_create_url()) # This is the difference to the original test function
+        if self.private_list_view:
+            self.assertContains(response, self.get_list_url(publication_status='private'))
+
+    def test_list_view_published_as_authenticated_non_owner(self):
+        if not self.public_list_view:
+            self.skipTest("List view is not enabled for this test case.")
+        self.client.force_login(self.non_owner_user)
+        response = self.client.get(self.get_list_url(publication_status='published'))
+        self.assertEqual(response.status_code, 200)
+        if self.dashboard_view:
+            self.assertContains(response, self.get_dashboard_url())
+        if self.create_view:
+            self.assertContains(response, self.get_create_url()) # This is the difference to the original test function
+        if self.private_list_view:
+            self.assertContains(response, self.get_list_url(publication_status='private'))
+
+    def test_list_view_private_as_authenticated_owner(self):
+        if not self.private_list_view:
+            self.skipTest("List view is not enabled for this test case")
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_list_url(publication_status='private'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<th>Public</th>')
+        if self.dashboard_view:
+            self.assertContains(response, self.get_dashboard_url())
+        if self.create_view:
+            self.assertContains(response, self.get_create_url()) # This is the difference to the original test function
+        if self.public_list_view:
+            self.assertContains(response, self.get_list_url(publication_status='published'))
+
+    def test_list_view_private_as_authenticated_non_owner(self):
+        if not self.private_list_view:
+            self.skipTest("List view is not enabled for this test case")
+        self.client.force_login(self.non_owner_user)
+        response = self.client.get(self.get_list_url(publication_status='private'))
+        self.assertEqual(response.status_code, 200)
+        if self.dashboard_view:
+            self.assertContains(response, self.get_dashboard_url())
+        if self.create_view:
+            self.assertContains(response, self.get_create_url()) # This is the difference to the original test function
+        if self.public_list_view:
+            self.assertContains(response, self.get_list_url(publication_status='published'))
 
 
 class CatchmentModalDeleteViewTestCase(ViewWithPermissionsTestCase):

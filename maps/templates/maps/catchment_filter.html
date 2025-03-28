@@ -32,6 +32,14 @@
     </table>
 {% endblock list_table %}
 
+{% block list_card_footer_create_link %}
+    {% if user.is_authenticated %}
+        <a class="mr-2 text-nowrap" href="{{ create_url }}">
+            <i class="fas fa-fw fa-plus"></i> {{ create_url_text }}
+        </a>
+    {% endif %}
+{% endblock list_card_footer_create_link %}
+
 {% block filter_body %}
     <form method="get">
         {% crispy filter.form %}

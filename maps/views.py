@@ -411,7 +411,7 @@ class CatchmentDetailView(MapMixin, UserCreatedObjectDetailView):
     model = Catchment
 
 
-class CatchmentCreateView(TemplateView):
+class CatchmentCreateView(LoginRequiredMixin, TemplateView):
     template_name = 'catchment_create_method_select.html'
 
 
