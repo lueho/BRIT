@@ -5,3 +5,5 @@ from .local import *
 STORAGES["staticfiles"] = {
     "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
 }
+
+COOKIE_CONSENT_ENABLED = False
