@@ -248,57 +248,6 @@ class LocationCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
     }
 
 
-class LocationModalDeleteViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'delete_location'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        location_data = {
-            'name': 'Test Location',
-            'address': 'Test Address',
-            'geom': Point(0, 0)
-        }
-        cls.location = Location.objects.create(**location_data)
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('location-delete-modal', kwargs={'pk': self.location.pk})
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsider(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('location-delete-modal', kwargs={'pk': self.location.pk}))
-        self.assertEqual(403, response.status_code)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('location-delete-modal', kwargs={'pk': self.location.pk}))
-        self.assertEqual(200, response.status_code)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('location-delete-modal', kwargs={'pk': self.location.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('location-delete-modal', kwargs={'pk': self.location.pk})
-        response = self.client.post(url, data={})
-        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsider(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('location-delete-modal', kwargs={'pk': self.location.pk}), data={})
-        self.assertEqual(403, response.status_code)
-
-    def test_post_success_and_http_302_redirect_to_success_url_for_member(self):
-        self.client.force_login(self.member)
-        response = self.client.post(reverse('location-delete-modal', kwargs={'pk': self.location.pk}), {})
-        self.assertRedirects(response, reverse('location-list'))
-        with self.assertRaises(Region.DoesNotExist):
-            Region.objects.get(pk=self.location.pk)
-
-
 # ----------- Location CRUD---------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -397,52 +346,6 @@ class RegionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         'country': 'DE',
         'geom': 'MULTIPOLYGON(((0 0, 0 100, 100 100, 100 0, 0 0)))'
     }
-
-
-class RegionModalDeleteViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'delete_region'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.region = Region.objects.create(name='Test Region')
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('region-delete-modal', kwargs={'pk': self.region.pk})
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsider(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('region-delete-modal', kwargs={'pk': self.region.pk}))
-        self.assertEqual(403, response.status_code)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('region-delete-modal', kwargs={'pk': self.region.pk}))
-        self.assertEqual(200, response.status_code)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('region-delete-modal', kwargs={'pk': self.region.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('region-delete-modal', kwargs={'pk': self.region.pk})
-        response = self.client.post(url, data={})
-        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsider(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('region-delete-modal', kwargs={'pk': self.region.pk}), data={})
-        self.assertEqual(403, response.status_code)
-
-    def test_post_success_and_http_302_redirect_to_success_url_for_member(self):
-        self.client.force_login(self.member)
-        response = self.client.post(reverse('region-delete-modal', kwargs={'pk': self.region.pk}), {})
-        self.assertRedirects(response, reverse('region-list'))
-        with self.assertRaises(Region.DoesNotExist):
-            Region.objects.get(pk=self.region.pk)
 
 
 # ----------- Catchment CRUD--------------------------------------------------------------------------------------------
@@ -838,52 +741,6 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
             self.assertContains(response, self.get_list_url(publication_status='published'))
 
 
-class CatchmentModalDeleteViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'delete_catchment'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.catchment = Catchment.objects.create(name='Test Catchment', region=Region.objects.create())
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('catchment-delete-modal', kwargs={'pk': self.catchment.pk})
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsider(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('catchment-delete-modal', kwargs={'pk': self.catchment.pk}))
-        self.assertEqual(403, response.status_code)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('catchment-delete-modal', kwargs={'pk': self.catchment.pk}))
-        self.assertEqual(200, response.status_code)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('catchment-delete-modal', kwargs={'pk': self.catchment.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('catchment-delete-modal', kwargs={'pk': self.catchment.pk})
-        response = self.client.post(url, data={})
-        self.assertRedirects(response, f'{settings.LOGIN_URL}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsider(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('catchment-delete-modal', kwargs={'pk': self.catchment.pk}), data={})
-        self.assertEqual(403, response.status_code)
-
-    def test_post_success_and_http_302_redirect_to_success_url_for_member(self):
-        self.client.force_login(self.member)
-        response = self.client.post(reverse('catchment-delete-modal', kwargs={'pk': self.catchment.pk}), {})
-        self.assertRedirects(response, reverse('catchment-list'))
-        with self.assertRaises(Catchment.DoesNotExist):
-            Catchment.objects.get(pk=self.catchment.pk)
-
-
 # ----------- Catchment API---------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -1239,54 +1096,6 @@ class AttributeModalUpdateViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 302)
 
 
-class AttributeModalDeleteViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'delete_attribute'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.attribute = Attribute.objects.create(
-            name='Test Attribute',
-            unit='Test Unit',
-            description='This ist a test element'
-        )
-
-    def test_get_http_302_redirect_for_anonymous(self):
-        response = self.client.get(reverse('attribute-delete-modal', kwargs={'pk': self.attribute.pk}))
-        self.assertEqual(response.status_code, 302)
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('attribute-delete-modal', kwargs={'pk': self.attribute.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('attribute-delete-modal', kwargs={'pk': self.attribute.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('attribute-delete-modal', kwargs={'pk': self.attribute.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_for_anonymous(self):
-        response = self.client.post(reverse('attribute-delete-modal', kwargs={'pk': self.attribute.pk}))
-        self.assertEqual(response.status_code, 302)
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('attribute-delete-modal', kwargs={'pk': self.attribute.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_successful_delete_and_http_302_and_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.post(reverse('attribute-delete-modal', kwargs={'pk': self.attribute.pk}))
-        with self.assertRaises(Attribute.DoesNotExist):
-            Attribute.objects.get(pk=self.attribute.pk)
-        self.assertEqual(response.status_code, 302)
-
-
 # ----------- Region Attribute Value CRUD ------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -1421,7 +1230,10 @@ class RegionAttributeValueCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectC
         }
 
     def get_update_success_url(self, pk=None):
-        return reverse('region-detail', kwargs={'pk': RegionAttributeValue.objects.get(pk=pk).region.pk})
+        return reverse('region-detail', kwargs={'pk': self.related_objects['region'].pk})
+
+    def get_delete_success_url(self, publication_status=None):
+        return reverse('region-detail', kwargs={'pk': self.related_objects['region'].pk})
 
 
 class RegionAttributeValueModalDetailViewTestCase(ViewWithPermissionsTestCase):
@@ -1517,56 +1329,6 @@ class RegionAttributeValueModalUpdateViewTestCase(ViewWithPermissionsTestCase):
             reverse('regionattributevalue-update-modal', kwargs={'pk': self.value.pk}),
             data=data
         )
-        self.assertEqual(response.status_code, 302)
-
-
-class RegionAttributeValueModalDeleteViewTestCase(ViewWithPermissionsTestCase):
-    value = None
-    member_permissions = 'delete_regionattributevalue'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.value = RegionAttributeValue.objects.create(
-            name='Test Value',
-            region=Region.objects.create(name='Test Region'),
-            attribute=Attribute.objects.create(name='Test Attribute', unit='Test Unit'),
-            value=123.312
-        )
-
-    def test_get_http_302_redirect_for_anonymous(self):
-        response = self.client.get(reverse('regionattributevalue-delete-modal', kwargs={'pk': self.value.pk}))
-        self.assertEqual(response.status_code, 302)
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('regionattributevalue-delete-modal', kwargs={'pk': self.value.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('regionattributevalue-delete-modal', kwargs={'pk': self.value.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('regionattributevalue-delete-modal', kwargs={'pk': self.value.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_for_anonymous(self):
-        response = self.client.post(reverse('regionattributevalue-delete-modal', kwargs={'pk': self.value.pk}))
-        self.assertEqual(response.status_code, 302)
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('regionattributevalue-delete-modal', kwargs={'pk': self.value.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_successful_delete_and_http_302_and_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.post(reverse('regionattributevalue-delete-modal', kwargs={'pk': self.value.pk}))
-        with self.assertRaises(RegionAttributeValue.DoesNotExist):
-            RegionAttributeValue.objects.get(pk=self.value.pk)
         self.assertEqual(response.status_code, 302)
 
 

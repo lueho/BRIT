@@ -502,8 +502,9 @@ class OwnedObjectModalUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin,
         return str(self.object.pk)
 
 
-class UserCreatedObjectModalDeleteView(UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalDeleteView):
+class UserCreatedObjectModalDeleteView(UserCreatedObjectWriteAccessMixin, NextOrSuccessUrlMixin, BSModalDeleteView):
     template_name = 'modal_delete.html'
+    success_message = 'Successfully deleted.'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -513,17 +514,8 @@ class UserCreatedObjectModalDeleteView(UserOwnsObjectMixin, NextOrSuccessUrlMixi
         })
         return context
 
-
-class OwnedObjectModalDeleteView(PermissionRequiredMixin, NextOrSuccessUrlMixin, BSModalDeleteView):
-    template_name = 'modal_delete.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({
-            'form_title': f'Delete {self.object._meta.verbose_name}',
-            'submit_button_text': 'Delete'
-        })
-        return context
+    def get_success_url(self):
+        return self.success_url or self.model.public_list_url()
 
 
 class ModelSelectOptionsView(ListView):

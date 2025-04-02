@@ -79,52 +79,12 @@ class ScenarioCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
         }
 
 
-class ScenarioModalDeleteViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'delete_scenario'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.scenario = Scenario.objects.create(name='Test Scenario')
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('scenario-delete-modal', kwargs={'pk': self.scenario.pk})
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('scenario-delete-modal', kwargs={'pk': self.scenario.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('scenario-delete-modal', kwargs={'pk': self.scenario.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('scenario-delete-modal', kwargs={'pk': self.scenario.pk})
-        response = self.client.post(url, {})
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('scenario-delete-modal', kwargs={'pk': self.scenario.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_successful_delete_and_http_302_and_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.post(reverse('scenario-delete-modal', kwargs={'pk': self.scenario.pk}))
-        self.assertRedirects(response, reverse('scenario-list'))
-        with self.assertRaises(Scenario.DoesNotExist):
-            Scenario.objects.get(pk=self.scenario.pk)
-
-
 class ScenarioResultCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     dashboard_view = False
     create_view = False
     public_list_view = False
     private_list_view = False
+    delete_view = False
 
     update_view = False
 

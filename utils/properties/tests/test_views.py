@@ -4,40 +4,6 @@ from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 from ..models import Property, Unit
 
 
-class UnitCreateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ['add_unit']
-    url = reverse('unit-create')
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        response = self.client.get(self.url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={self.url}')
-
-    def test_get_http_403_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_member(self):
-        self.client.force_login(self.member)
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        response = self.client.post(self.url, data={'name': 'Test Unit'})
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={self.url}')
-
-    def test_post_http_403_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(self.url, data={'name': 'Test Unit'})
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_http_302_redirect_to_detail_view_for_member(self):
-        self.client.force_login(self.member)
-        response = self.client.post(self.url, data={'name': 'Test Unit'})
-        unit = Unit.objects.get(name='Test Unit')
-        self.assertRedirects(response, reverse('unit-detail', kwargs={'pk': unit.pk}))
-
-
 class UnitCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Unit
 
@@ -59,45 +25,6 @@ class UnitCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase)
         unit.name = 'Test Unit 2'
         unit.save()
         return unit
-
-
-class UnitModalDeleteViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ['delete_unit']
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.unit = Unit.objects.create(name='Test Unit')
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('unit-delete-modal', kwargs={'pk': self.unit.pk})
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_403_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('unit-delete-modal', kwargs={'pk': self.unit.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_member(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('unit-delete-modal', kwargs={'pk': self.unit.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('unit-delete-modal', kwargs={'pk': self.unit.pk})
-        response = self.client.post(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_http_403_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('unit-delete-modal', kwargs={'pk': self.unit.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_http_302_redirect_to_list_view_for_member(self):
-        self.client.force_login(self.member)
-        response = self.client.post(reverse('unit-delete-modal', kwargs={'pk': self.unit.pk}))
-        self.assertRedirects(response, reverse('unit-list'))
 
 
 class PropertyCreateViewTestCase(ViewWithPermissionsTestCase):
@@ -159,46 +86,6 @@ class PropertyCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
         data = super().related_objects_post_data()
         data['allowed_units'] = [self.related_objects['unit'].pk]
         return data
-
-
-class PropertyModalDeleteViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ['delete_property']
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.prop = Property.objects.create(name='Test Property')
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        response = self.client.get(reverse('property-delete-modal', kwargs={'pk': self.prop.pk}))
-        self.assertRedirects(response,
-                             f'{reverse("auth_login")}?next={reverse("property-delete-modal", kwargs={"pk": self.prop.pk})}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('property-delete-modal', kwargs={'pk': self.prop.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_member(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('property-delete-modal', kwargs={'pk': self.prop.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        response = self.client.post(reverse('property-delete-modal', kwargs={'pk': self.prop.pk}))
-        self.assertRedirects(response,
-                             f'{reverse("auth_login")}?next={reverse("property-delete-modal", kwargs={"pk": self.prop.pk})}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('property-delete-modal', kwargs={'pk': self.prop.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_http_302_redirect_to_list_for_member(self):
-        self.client.force_login(self.member)
-        response = self.client.post(reverse('property-delete-modal', kwargs={'pk': self.prop.pk}))
-        self.assertRedirects(response, reverse('property-list'))
-        self.assertEqual(Property.objects.count(), 0)
 
 
 class PropertyUnitOptionsViewTestCase(ViewWithPermissionsTestCase):

@@ -1,8 +1,9 @@
 from django.urls import reverse
 
+from distributions.models import TemporalDistribution, Timestep
 from materials.models import Composition, Material, MaterialComponentGroup, Sample, SampleSeries
 from utils.tests.testcases import AbstractTestCases
-from ..models import Culture, Greenhouse, GreenhouseGrowthCycle
+from ..models import Culture, Greenhouse, GreenhouseGrowthCycle, GrowthTimeStepSet
 
 
 class CultureCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
@@ -67,6 +68,22 @@ class GrowthCycleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
     update_object_data = {'cycle_number': 2}
 
     @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        distribution = TemporalDistribution.objects.create(name='Test Distribution')
+        timestep = Timestep.objects.create(name='Test Timestep', distribution=distribution)
+        GrowthTimeStepSet.objects.create(
+            owner=cls.owner_user,
+            growth_cycle=cls.published_object,
+            timestep=timestep
+        )
+        GrowthTimeStepSet.objects.create(
+            owner=cls.owner_user,
+            growth_cycle=cls.unpublished_object,
+            timestep=timestep
+        )
+
+    @classmethod
     def create_related_objects(cls):
         material = Material.objects.create(name='Test Material')
         sample = Sample.objects.create(
@@ -82,4 +99,7 @@ class GrowthCycleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
         }
 
     def get_update_success_url(self, pk=None):
+        return reverse('greenhouse-detail', kwargs={'pk': self.related_objects['greenhouse'].pk})
+
+    def get_delete_success_url(self, publication_status=None):
         return reverse('greenhouse-detail', kwargs={'pk': self.related_objects['greenhouse'].pk})
