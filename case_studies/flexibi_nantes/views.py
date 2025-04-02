@@ -1,6 +1,6 @@
 import json
 
-from bootstrap_modal_forms.generic import BSModalCreateView, BSModalDeleteView, BSModalReadView, BSModalUpdateView
+from bootstrap_modal_forms.generic import BSModalCreateView, BSModalReadView, BSModalUpdateView
 from crispy_forms.helper import FormHelper
 from dal import autocomplete
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -18,7 +18,7 @@ from materials.models import MaterialComponentGroup
 from utils.file_export.views import FilteredListFileExportView
 from utils.views import (NextOrSuccessUrlMixin, PrivateObjectFilterView, PrivateObjectListView,
                          PublishedObjectFilterView, PublishedObjectListView, UserCreatedObjectDetailView,
-                         UserCreatedObjectUpdateView, UserOwnsObjectMixin)
+                         UserCreatedObjectModalDeleteView, UserCreatedObjectUpdateView, UserOwnsObjectMixin)
 from .filters import GreenhouseTypeFilter, NantesGreenhousesFilterSet
 from .forms import (CultureModalModelForm, CultureModelForm, GreenhouseGrowthCycle, GreenhouseGrowthCycleModelForm,
                     GreenhouseModalModelForm,
@@ -91,19 +91,8 @@ class CultureModalUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSucc
         return context
 
 
-class CultureModalDeleteView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalDeleteView):
+class CultureModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Culture
-    template_name = 'modal_delete.html'
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('culture-list')
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({
-            'form_title': 'Delete culture',
-            'submit_button_text': 'Delete'
-        })
-        return context
 
 
 # ----------- Greenhouse CRUD ------------------------------------------------------------------------------------------
@@ -166,19 +155,8 @@ class GreenhouseModalUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrS
         return context
 
 
-class GreenhouseModalDeleteView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalDeleteView):
+class GreenhouseModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Greenhouse
-    template_name = 'modal_delete.html'
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('greenhouse-list')
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({
-            'form_title': 'Delete greenhouse',
-            'submit_button_text': 'Delete'
-        })
-        return context
 
 
 # ----------- Growthcycle CRUD -----------------------------------------------------------------------------------------
@@ -243,19 +221,11 @@ class GrowthCycleUpdateView(UserCreatedObjectUpdateView):
     form_class = GreenhouseGrowthCycleModelForm
 
 
-class GrowthCycleModalDeleteView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalDeleteView):
+class GrowthCycleModalDeleteView(UserCreatedObjectModalDeleteView):
     model = GreenhouseGrowthCycle
-    template_name = 'modal_delete.html'
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('greenhouse-list')
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({
-            'form_title': 'Remove growth cycle',
-            'submit_button_text': 'Remove'
-        })
-        return context
+    def get_success_url(self):
+        return reverse('greenhouse-detail', kwargs={'pk': self.object.greenhouse.pk})
 
 
 class GrowthTimeStepSetModalUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin,

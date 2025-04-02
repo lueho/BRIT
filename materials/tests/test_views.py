@@ -143,52 +143,6 @@ class MaterialCategoryModalDetailViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 200)
 
 
-class MaterialCategoryModalDeleteViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'delete_materialcategory'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.category = MaterialCategory.objects.create(name='Test Category')
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('materialcategory-delete-modal', kwargs={'pk': self.category.pk})
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('materialcategory-delete-modal', kwargs={'pk': self.category.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('materialcategory-delete-modal', kwargs={'pk': self.category.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('materialcategory-delete-modal', kwargs={'pk': self.category.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('materialcategory-delete-modal', kwargs={'pk': self.category.pk})
-        response = self.client.post(url, {})
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('materialcategory-delete-modal', kwargs={'pk': self.category.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_successful_delete_and_http_302_and_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.post(reverse('materialcategory-delete-modal', kwargs={'pk': self.category.pk}))
-        self.assertRedirects(response, reverse('materialcategory-list'))
-        with self.assertRaises(MaterialCategory.DoesNotExist):
-            MaterialCategory.objects.get(pk=self.category.pk)
-
-
 # ----------- Material CRUD --------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -356,52 +310,6 @@ class MaterialModalUpdateViewTestCase(ViewWithPermissionsTestCase):
         self.assertRedirects(response, reverse('material-detail', kwargs={'pk': self.material.pk}))
 
 
-class MaterialModalDeleteViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'delete_material'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.material = Material.objects.create(name='Test Material')
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('material-delete-modal', kwargs={'pk': self.material.pk})
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('material-delete-modal', kwargs={'pk': self.material.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('material-delete-modal', kwargs={'pk': self.material.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('material-delete-modal', kwargs={'pk': self.material.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('material-delete-modal', kwargs={'pk': self.material.pk})
-        response = self.client.post(url, {})
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('material-delete-modal', kwargs={'pk': self.material.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.post(reverse('material-delete-modal', kwargs={'pk': self.material.pk}))
-        with self.assertRaises(Material.DoesNotExist):
-            Material.objects.get(pk=self.material.pk)
-        self.assertRedirects(response, reverse('material-list'))
-
-
 # ----------- Material Component CRUD ----------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -531,52 +439,6 @@ class ComponentModalDetailViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.outsider)
         response = self.client.get(reverse('materialcomponent-detail-modal', kwargs={'pk': self.component.pk}))
         self.assertEqual(response.status_code, 200)
-
-
-class ComponentModalDeleteViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'delete_materialcomponent'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.component = MaterialComponent.objects.create(name='Test Component')
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('materialcomponent-delete-modal', kwargs={'pk': self.component.pk})
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('materialcomponent-delete-modal', kwargs={'pk': self.component.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('materialcomponent-delete-modal', kwargs={'pk': self.component.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('materialcomponent-delete-modal', kwargs={'pk': self.component.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('materialcomponent-delete-modal', kwargs={'pk': self.component.pk})
-        response = self.client.post(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('materialcomponent-delete-modal', kwargs={'pk': self.component.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.post(reverse('materialcomponent-delete-modal', kwargs={'pk': self.component.pk}))
-        with self.assertRaises(MaterialComponent.DoesNotExist):
-            MaterialComponent.objects.get(pk=self.component.pk)
-        self.assertRedirects(response, reverse('materialcomponent-list'))
 
 
 # ----------- Material Component Group CRUD ----------------------------------------------------------------------------
@@ -750,52 +612,6 @@ class ComponentGroupModalUpdateViewTestCase(ViewWithPermissionsTestCase):
         self.assertRedirects(response, reverse('materialcomponentgroup-detail', kwargs={'pk': self.group.pk}))
 
 
-class ComponentGroupModalDeleteViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'delete_materialcomponentgroup'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.group = MaterialComponentGroup.objects.create(name='Test Group')
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('materialcomponentgroup-delete-modal', kwargs={'pk': self.group.pk})
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('materialcomponentgroup-delete-modal', kwargs={'pk': self.group.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('materialcomponentgroup-delete-modal', kwargs={'pk': self.group.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('materialcomponentgroup-delete-modal', kwargs={'pk': self.group.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('materialcomponentgroup-delete-modal', kwargs={'pk': self.group.pk})
-        response = self.client.post(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('materialcomponentgroup-delete-modal', kwargs={'pk': self.group.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.post(reverse('materialcomponentgroup-delete-modal', kwargs={'pk': self.group.pk}))
-        with self.assertRaises(MaterialComponentGroup.DoesNotExist):
-            MaterialComponentGroup.objects.get(pk=self.group.pk)
-        self.assertRedirects(response, reverse('materialcomponentgroup-list'))
-
-
 # ----------- Material Property CRUD ----------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -959,52 +775,6 @@ class MaterialPropertyModalUpdateViewTestCase(ViewWithPermissionsTestCase):
         self.assertRedirects(response, reverse('materialproperty-detail', kwargs={'pk': self.property.pk}))
 
 
-class MaterialPropertyModalDeleteViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'delete_materialproperty'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.property = MaterialProperty.objects.create(name='Test Property', unit='Test Unit')
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('materialproperty-delete-modal', kwargs={'pk': self.property.pk})
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('materialproperty-delete-modal', kwargs={'pk': self.property.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('materialproperty-delete-modal', kwargs={'pk': self.property.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('materialproperty-delete-modal', kwargs={'pk': self.property.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('materialproperty-delete-modal', kwargs={'pk': self.property.pk})
-        response = self.client.post(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('materialproperty-delete-modal', kwargs={'pk': self.property.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.post(reverse('materialproperty-delete-modal', kwargs={'pk': self.property.pk}))
-        with self.assertRaises(MaterialProperty.DoesNotExist):
-            MaterialProperty.objects.get(pk=self.property.pk)
-        self.assertRedirects(response, reverse('materialproperty-list'))
-
-
 # ----------- Material Property Value CRUD -----------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -1021,12 +791,17 @@ class MaterialPropertyValueModalDeleteViewTestCase(ViewWithPermissionsTestCase):
             name='Test Property',
             unit='Test Unit'
         )
+        sample = Sample.objects.create(
+            owner=cls.member,
+            name='Test Sample',
+        )
         cls.value = MaterialPropertyValue.objects.create(
             owner=cls.member,
             property=prop,
             average=123.312,
             standard_deviation=0.1337
         )
+        sample.properties.add(cls.value)
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse(self.url_name, kwargs={'pk': self.value.pk})
@@ -1060,10 +835,11 @@ class MaterialPropertyValueModalDeleteViewTestCase(ViewWithPermissionsTestCase):
 
     def test_post_success_and_http_302_redirect_for_members(self):
         self.client.force_login(self.member)
+        sample = self.value.sample_set.first()
         response = self.client.post(reverse(self.url_name, kwargs={'pk': self.value.pk}))
+        self.assertRedirects(response, reverse('sample-detail', kwargs={'pk': sample.pk}))
         with self.assertRaises(MaterialPropertyValue.DoesNotExist):
             MaterialPropertyValue.objects.get(pk=self.value.pk)
-        self.assertRedirects(response, reverse('home'))
 
 
 # ----------- Sample Series CRUD ---------------------------------------------------------------------------------------
@@ -1225,53 +1001,6 @@ class SampleSeriesModalDetailViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 200)
 
 
-class SampleSeriesModalDeleteViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'delete_sampleseries'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        material = Material.objects.create(name='Test Material')
-        cls.series = SampleSeries.objects.create(name='Test Series', material=material)
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('sampleseries-delete-modal', kwargs={'pk': self.series.pk})
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('sampleseries-delete-modal', kwargs={'pk': self.series.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('sampleseries-delete-modal', kwargs={'pk': self.series.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('sampleseries-delete-modal', kwargs={'pk': self.series.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('sampleseries-delete-modal', kwargs={'pk': self.series.pk})
-        response = self.client.post(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('sampleseries-delete-modal', kwargs={'pk': self.series.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.post(reverse('sampleseries-delete-modal', kwargs={'pk': self.series.pk}))
-        with self.assertRaises(SampleSeries.DoesNotExist):
-            SampleSeries.objects.get(pk=self.series.pk)
-        self.assertRedirects(response, reverse('sampleseries-list'))
-
-
 # ----------- Sample Series Utilities ----------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -1403,7 +1132,7 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         if self.dashboard_view:
             self.assertContains(response, self.get_dashboard_url())
         if self.create_view:
-            self.assertContains(response, self.get_create_url()) # This is the difference to the original test function
+            self.assertContains(response, self.get_create_url())  # This is the difference to the original test function
         if self.private_list_view:
             self.assertContains(response, self.get_list_url(publication_status='private'))
 
@@ -1416,7 +1145,7 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         if self.dashboard_view:
             self.assertContains(response, self.get_dashboard_url())
         if self.create_view:
-            self.assertContains(response, self.get_create_url()) # This is the difference to the original test function
+            self.assertContains(response, self.get_create_url())  # This is the difference to the original test function
         if self.private_list_view:
             self.assertContains(response, self.get_list_url(publication_status='private'))
 
@@ -1430,7 +1159,7 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         if self.dashboard_view:
             self.assertContains(response, self.get_dashboard_url())
         if self.create_view:
-            self.assertContains(response, self.get_create_url()) # This is the difference to the original test function
+            self.assertContains(response, self.get_create_url())  # This is the difference to the original test function
         if self.public_list_view:
             self.assertContains(response, self.get_list_url(publication_status='published'))
 
@@ -1443,7 +1172,7 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         if self.dashboard_view:
             self.assertContains(response, self.get_dashboard_url())
         if self.create_view:
-            self.assertContains(response, self.get_create_url()) # This is the difference to the original test function
+            self.assertContains(response, self.get_create_url())  # This is the difference to the original test function
         if self.public_list_view:
             self.assertContains(response, self.get_list_url(publication_status='published'))
 
@@ -1534,54 +1263,6 @@ class SampleUpdateViewTestCase(ViewWithPermissionsTestCase):
         }
         response = self.client.post(reverse('sample-update', kwargs={'pk': self.sample.pk}), data)
         self.assertRedirects(response, reverse('sample-detail', kwargs={'pk': self.sample.pk}))
-
-
-class SampleModalDeleteViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'delete_sample'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        material = Material.objects.create(name='Test Material')
-        cls.series = SampleSeries.objects.create(name='Test Series', material=material)
-        cls.sample = Sample.objects.create(name='Test Sample', material=material, series=cls.series)
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('sample-delete-modal', kwargs={'pk': self.sample.pk})
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('sample-delete-modal', kwargs={'pk': self.sample.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_owners(self):
-        self.client.force_login(self.sample.owner)
-        response = self.client.get(reverse('sample-delete-modal', kwargs={'pk': self.sample.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.sample.owner)
-        response = self.client.get(reverse('sample-delete-modal', kwargs={'pk': self.sample.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('sample-delete-modal', kwargs={'pk': self.sample.pk})
-        response = self.client.post(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('sample-delete-modal', kwargs={'pk': self.sample.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_for_owners(self):
-        self.client.force_login(self.sample.owner)
-        response = self.client.post(reverse('sample-delete-modal', kwargs={'pk': self.sample.pk}))
-        with self.assertRaises(Sample.DoesNotExist):
-            Sample.objects.get(pk=self.sample.pk)
-        self.assertRedirects(response, reverse('sample-list'))
 
 
 # ----------- Sample utilities -----------------------------------------------------------------------------------------
@@ -2008,6 +1689,11 @@ class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
     def get_update_success_url(self, pk=None):
         return reverse('sample-detail', kwargs={'pk': self.related_objects['unpublished_sample'].pk})
 
+    def get_delete_success_url(self, publication_status=None):
+        if publication_status == 'private':
+            return reverse('sample-detail', kwargs={'pk': self.related_objects['unpublished_sample'].pk})
+        return reverse('sample-detail', kwargs={'pk': self.related_objects['published_sample'].pk})
+
     def test_detail_view_published_as_anonymous(self):
         url = self.get_detail_url(self.published_object.pk)
         response = self.client.get(url, follow=True)
@@ -2267,67 +1953,6 @@ class CompositionModalUpdateViewTestCase(ViewWithPermissionsTestCase):
             WeightShare.objects.get(pk=share.pk)
 
 
-class CompositionModalDeleteViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ('delete_composition', 'delete_weightshare')
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        material = Material.objects.create(owner=cls.member, name='Test Material')
-        cls.component_group = MaterialComponentGroup.objects.create(owner=cls.member, name='Test Group')
-        cls.series = SampleSeries.objects.create(owner=cls.member, name='Test Series', material=material)
-        cls.default_component = MaterialComponent.objects.default()
-        cls.sample = Sample.objects.get(series=cls.series, timestep=Timestep.objects.default())
-
-    def setUp(self):
-        self.composition = Composition.objects.create(owner=self.member, sample=self.sample, group=self.component_group)
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('composition-delete-modal', kwargs={'pk': self.composition.pk})
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('composition-delete-modal', kwargs={'pk': self.composition.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('composition-delete-modal', kwargs={'pk': self.composition.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('composition-delete-modal', kwargs={'pk': self.composition.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('composition-delete-modal', kwargs={'pk': self.composition.pk})
-        response = self.client.post(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        data = {'group': self.component_group.pk}
-        response = self.client.post(reverse('composition-delete-modal', kwargs={'pk': self.composition.pk}), data)
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_http_302_redirect_for_member(self):
-        self.client.force_login(self.member)
-        response = self.client.post(
-            reverse('composition-delete-modal', kwargs={'pk': self.composition.pk}))
-        self.assertEqual(response.status_code, 302)
-
-    def test_post_deletes_correct_composition(self):
-        self.client.force_login(self.member)
-        response = self.client.post(
-            reverse('composition-delete-modal', kwargs={'pk': self.composition.pk}))
-        with self.assertRaises(Composition.DoesNotExist):
-            Composition.objects.get(pk=self.composition.pk)
-        self.assertRedirects(response, reverse('sample-detail', kwargs={'pk': self.sample.pk}))
-
-
 # ----------- Composition utilities ------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -2476,63 +2101,6 @@ class ComponentOrderDownViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 302)
         self.assertRedirects(response, reverse('sample-detail', kwargs={'pk': self.sample.pk}))
         self.assertTemplateUsed('sample-detail.html')
-
-
-# ----------- Weight Share CRUD ----------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------------------------
-
-class WeightShareModalDeleteViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'delete_weightshare'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        material = Material.objects.create(name='Test Material')
-        component_group = MaterialComponentGroup.objects.create(name='Test Group')
-        SampleSeries.objects.create(owner=cls.member, name='Test Series', material=material)
-        cls.sample = Sample.objects.get(series__name='Test Series')
-        cls.component = MaterialComponent.objects.create(name='Test Component')
-        cls.composition = Composition.objects.create(sample=cls.sample, group=component_group)
-
-    def setUp(self):
-        self.share = WeightShare.objects.create(composition=self.composition, component=self.component)
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('weightshare-delete-modal', kwargs={'pk': self.share.pk})
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('weightshare-delete-modal', kwargs={'pk': self.share.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('weightshare-delete-modal', kwargs={'pk': self.share.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('weightshare-delete-modal', kwargs={'pk': self.share.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('weightshare-delete-modal', kwargs={'pk': self.share.pk})
-        response = self.client.post(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('weightshare-delete-modal', kwargs={'pk': self.share.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.post(reverse('weightshare-delete-modal', kwargs={'pk': self.share.pk}))
-        with self.assertRaises(WeightShare.DoesNotExist):
-            WeightShare.objects.get(composition=self.composition, component=self.component)
-        self.assertRedirects(response, reverse('sample-detail', kwargs={'pk': self.sample.pk}))
 
 
 # ----------- Materials/Components/Groups Relations --------------------------------------------------------------------

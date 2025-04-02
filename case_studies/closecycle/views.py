@@ -1,8 +1,8 @@
 from django.urls import reverse_lazy
 
 from maps.views import GeoDataSetFilteredMapView, MapMixin
-from utils.views import (OwnedObjectCreateView, OwnedObjectModalDeleteView, PrivateObjectFilterView,
-                         PublishedObjectFilterView, UserCreatedObjectDetailView, UserCreatedObjectUpdateView)
+from utils.views import (OwnedObjectCreateView, PrivateObjectFilterView, PublishedObjectFilterView,
+                         UserCreatedObjectDetailView, UserCreatedObjectModalDeleteView, UserCreatedObjectUpdateView)
 from .filters import ShowcaseFilterSet
 from .forms import ShowcaseModelForm
 from .models import Showcase
@@ -45,8 +45,5 @@ class ShowcaseUpdateView(UserCreatedObjectUpdateView):
     form_class = ShowcaseModelForm
 
 
-class ShowcaseModalDeleteView(OwnedObjectModalDeleteView):
+class ShowcaseModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Showcase
-    success_url = reverse_lazy('showcase-list')
-    success_message = 'The showcase was successfully deleted.'
-    permission_required = 'closecycle.delete_showcase'

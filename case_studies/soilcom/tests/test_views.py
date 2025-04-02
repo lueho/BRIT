@@ -121,6 +121,7 @@ class WasteComponentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDVie
 class WasteFlyerCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     create_view = False
     update_view = False
+    delete_view = False
 
     model = WasteFlyer
 
@@ -433,51 +434,6 @@ class CollectionFrequencyModalUpdateViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 302)
 
 
-class CollectionFrequencyModalDeleteViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'delete_collectionfrequency'
-    url_name = 'collectionfrequency-delete-modal'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.frequency = CollectionFrequency.objects.create(name='Test Frequency')
-
-    def test_get_http_302_redirect_for_anonymous(self):
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.frequency.pk}))
-        self.assertEqual(response.status_code, 302)
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.frequency.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.frequency.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.frequency.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_for_anonymous(self):
-        response = self.client.post(reverse(self.url_name, kwargs={'pk': self.frequency.pk}))
-        self.assertEqual(response.status_code, 302)
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse(self.url_name, kwargs={'pk': self.frequency.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_successful_delete_and_http_302_and_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.post(reverse(self.url_name, kwargs={'pk': self.frequency.pk}))
-        with self.assertRaises(CollectionFrequency.DoesNotExist):
-            CollectionFrequency.objects.get(pk=self.frequency.pk)
-        self.assertEqual(response.status_code, 302)
-
-
 # ----------- CollectionPropertyValue CRUD -----------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -562,62 +518,13 @@ class CollectionPropertyValueCRUDViewsTestCase(AbstractTestCases.UserCreatedObje
     @classmethod
     def create_related_objects(cls):
         return {
-            'collection': Collection.objects.create(name='Test Collection'),
+            'collection': Collection.objects.create(owner=cls.owner_user, name='Test Collection'),
             'property': Property.objects.create(name='Test Property'),
             'unit': Unit.objects.create(name='Test Unit'),
         }
 
-
-class CollectionPropertyValueModalDeleteViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'delete_collectionpropertyvalue'
-    url_name = 'collectionpropertyvalue-delete-modal'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        collection = Collection.objects.create(name='Test Collection')
-        prop = Property.objects.create(name='Test Property', unit='Test Unit')
-        cls.val = CollectionPropertyValue.objects.create(
-            collection=collection,
-            property=prop,
-            average=123.5,
-            standard_deviation=12.54
-        )
-
-    def test_get_http_302_redirect_for_anonymous(self):
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        self.assertEqual(response.status_code, 302)
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_for_anonymous(self):
-        response = self.client.post(reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        self.assertEqual(response.status_code, 302)
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_successful_delete_and_http_302_and_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.post(reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        with self.assertRaises(CollectionPropertyValue.DoesNotExist):
-            CollectionPropertyValue.objects.get(pk=self.val.pk)
-        self.assertEqual(response.status_code, 302)
+    def get_delete_success_url(self, publication_status=None):
+        return reverse('collection-detail', kwargs={'pk': self.related_objects['collection'].pk})
 
 
 # ----------- AggregatedCollectionPropertyValue CRUD -------------------------------------------------------------------
@@ -703,6 +610,16 @@ class AggregatedCollectionPropertyValueCRUDViewsTestCase(AbstractTestCases.UserC
     }
 
     @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+        cls.related_collections = [
+            Collection.objects.create(name='Test Collection 1'),
+            Collection.objects.create(name='Test Collection 2')
+        ]
+        cls.published_object.collections.set(cls.related_collections)
+        cls.unpublished_object.collections.set(cls.related_collections)
+
+    @classmethod
     def create_related_objects(cls):
         return {
             'property': Property.objects.create(name='Test Property'),
@@ -713,78 +630,17 @@ class AggregatedCollectionPropertyValueCRUDViewsTestCase(AbstractTestCases.UserC
         data = super().related_objects_post_data()
         data.update({
             'collections': [
-                Collection.objects.create(name='Test Collection 1').pk,
-                Collection.objects.create(name='Test Collection 2').pk
+                Collection.objects.create(name='Test Collection 3').pk,
+                Collection.objects.create(name='Test Collection 4').pk
             ]
         })
         return data
 
-
-class AggregatedCollectionPropertyValueModalDeleteViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'delete_aggregatedcollectionpropertyvalue'
-    url_name = 'aggregatedcollectionpropertyvalue-delete-modal'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        prop = Property.objects.create(name='Test Property', unit='Test Unit')
-        cls.val = AggregatedCollectionPropertyValue.objects.create(
-            property=prop,
-            average=123.5,
-            standard_deviation=12.54
-        )
-        cls.val.collections.add(Collection.objects.create())
-        cls.val.collections.add(Collection.objects.create())
-
-    def test_get_http_302_redirect_for_anonymous(self):
-        response = self.client.get(
-            reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        self.assertEqual(response.status_code, 302)
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(
-            reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(
-            reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(
-            reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_for_anonymous(self):
-        response = self.client.post(
-            reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        self.assertEqual(response.status_code, 302)
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(
-            reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_successful_delete_and_http_302_and_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.post(
-            reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        with self.assertRaises(AggregatedCollectionPropertyValue.DoesNotExist):
-            AggregatedCollectionPropertyValue.objects.get(pk=self.val.pk)
-        self.assertEqual(response.status_code, 302)
-
-    def test_collections_are_not_deleted(self):
-        self.client.force_login(self.member)
-        self.assertEqual(Collection.objects.count(), 2)
-        response = self.client.post(
-            reverse(self.url_name, kwargs={'pk': self.val.pk}))
-        self.assertEqual(Collection.objects.count(), 2)
-        self.assertEqual(response.status_code, 302)
+    def get_delete_success_url(self, publication_status=None):
+        related_ids = [collection.id for collection in self.related_collections]
+        base_url = reverse('collection-list')
+        query_string = urlencode([('id', rid) for rid in related_ids])
+        return f"{base_url}?{query_string}"
 
 
 # ----------- Collection Catchment CRUD --------------------------------------------------------------------------------
@@ -802,6 +658,8 @@ class CollectionCatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCR
     view_detail_name = 'collectioncatchment-detail'
     view_update_name = 'collectioncatchment-update'
     view_delete_name = 'collectioncatchment-delete-modal'
+
+    delete_success_url_name = 'catchment-list'
 
     create_object_data = {'name': 'Test Catchment'}
     update_object_data = {'name': 'Updated Test Catchment'}
@@ -1084,6 +942,9 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
             'form-INITIAL_FORMS': 0,
         })
         return data
+
+    def get_delete_success_url(self, publication_status=None):
+        return f"{reverse('collection-list-owned')}?valid_on={date.today()}"
 
     def test_list_view_published_as_anonymous(self):
         response = self.client.get(self.get_list_url(), follow=True)

@@ -88,7 +88,7 @@ class AbstractTestCases(object):
         private_list_view = True
         detail_view = True
         update_view = True
-        delete_view = False
+        delete_view = True
 
         model = None
 
@@ -102,6 +102,7 @@ class AbstractTestCases(object):
         create_object_data = None
         update_object_data = None
         update_success_url_name = None
+        delete_success_url_name = None
         permission_denied_message = "Sorry, you don't have permission to access this page."
 
         related_objects = None
@@ -188,6 +189,10 @@ class AbstractTestCases(object):
         def get_update_success_url(self, pk=None):
             url_name = self.update_success_url_name or self.view_detail_name
             return reverse(url_name, kwargs={'pk': pk})
+
+        def get_delete_success_url(self, publication_status=None):
+            url_name = self.delete_success_url_name or self.view_published_list_name
+            return reverse(url_name)
 
         def compile_update_post_data(self):
             data = self.update_object_data.copy()
@@ -520,58 +525,133 @@ class AbstractTestCases(object):
         # -----------------------
         # DeleteView Test Cases
         # -----------------------
-        # TODO: Implement delete test functions
-        # def test_delete_view_published_as_owner(self):
-        #     self.client.login(username='owner', password='password123')
-        #     url = self.get_delete_url(self.published_object.pk)
-        #     response = self.client.get(url)
-        #     self.assertEqual(response.status_code, 200)
-        #     self.assertContains(response, "Delete")
-        #
-        # def test_delete_view_published_as_non_owner(self):
-        #     self.client.login(username='nonowner', password='password123')
-        #     url = self.get_delete_url(self.published_object.pk)
-        #     response = self.client.get(url)
-        #     self.assertEqual(response.status_code, 403)
-        #     self.assertContains(response, self.permission_denied_message, status_code=403)
-        #
-        # def test_delete_view_published_as_anonymous(self):
-        #     url = self.get_delete_url(self.published_object.pk)
-        #     response = self.client.get(url)
-        #     login_url = settings.LOGIN_URL
-        #     expected_redirect = f"{login_url}?next={url}"
-        #     self.assertRedirects(response, expected_redirect)
-        #
-        # def test_delete_view_unpublished_as_owner(self):
-        #     self.client.login(username='owner', password='password123')
-        #     url = self.get_delete_url(self.unpublished_object.pk)
-        #     response = self.client.get(url)
-        #     self.assertEqual(response.status_code, 200)
-        #     self.assertContains(response, "Delete")
-        #
-        # def test_delete_view_unpublished_as_non_owner(self):
-        #     self.client.login(username='nonowner', password='password123')
-        #     url = self.get_delete_url(self.unpublished_object.pk)
-        #     response = self.client.get(url)
-        #     self.assertEqual(response.status_code, 403)
-        #     self.assertContains(response, self.permission_denied_message, status_code=403)
-        #
-        # def test_delete_view_unpublished_as_anonymous(self):
-        #     url = self.get_delete_url(self.unpublished_object.pk)
-        #     response = self.client.get(url)
-        #     login_url = settings.LOGIN_URL
-        #     expected_redirect = f"{login_url}?next={url}"
-        #     self.assertRedirects(response, expected_redirect)
-        #
-        # def test_delete_view_nonexistent_object(self):
-        #     url = self.get_delete_url(pk=9999)
-        #     response = self.client.get(url)
-        #     self.assertEqual(response.status_code, 404)
-        #
-        # def test_delete_view_post_as_owner(self):
-        #     self.client.login(username='owner', password='password123')
-        #     url = self.get_delete_url(self.published_object.pk)
-        #     response = self.client.post(url)
-        #     self.assertRedirects(response, self.success_url)
-        #     with self.assertRaises(self.model.DoesNotExist):
-        #         self.model.objects.get(pk=self.published_object.pk)
+
+        def tes_delete_view_get_published_as_anonymous(self):
+            if not self.delete_view:
+                self.skipTest("Delete view is not enabled for this test case.")
+            url = self.get_delete_url(self.published_object.pk)
+            response = self.client.get(url)
+            self.assertRedirects(response, f"{settings.LOGIN_URL}?next={url}")
+
+        def tes_delete_view_post_published_as_anonymous(self):
+            if not self.delete_view:
+                self.skipTest("Delete view is not enabled for this test case.")
+            url = self.get_delete_url(self.published_object.pk)
+            response = self.client.post(url)
+            self.assertRedirects(response, f"{settings.LOGIN_URL}?next={url}")
+
+        def test_delete_view_get_published_as_owner(self):
+            if not self.delete_view:
+                self.skipTest("Delete view is not enabled for this test case.")
+            # published objects should not be deleted because other objects might depend on them
+            self.client.force_login(self.owner_user)
+            response = self.client.get(self.get_delete_url(self.published_object.pk))
+            self.assertEqual(response.status_code, 403)
+            self.assertContains(response, self.permission_denied_message, status_code=403)
+
+        def test_delete_view_post_published_as_owner(self):
+            if not self.delete_view:
+                self.skipTest("Delete view is not enabled for this test case.")
+            # published objects should not be deleted because other objects might depend on them
+            self.client.force_login(self.owner_user)
+            response = self.client.post(self.get_delete_url(self.published_object.pk))
+            self.assertEqual(response.status_code, 403)
+            self.assertContains(response, self.permission_denied_message, status_code=403)
+
+        def test_delete_view_get_published_as_non_owner(self):
+            if not self.delete_view:
+                self.skipTest("Delete view is not enabled for this test case.")
+            self.client.force_login(self.non_owner_user)
+            response = self.client.get(self.get_delete_url(self.published_object.pk))
+            self.assertEqual(response.status_code, 403)
+            self.assertContains(response, self.permission_denied_message, status_code=403)
+
+        def test_delete_view_post_published_as_non_owner(self):
+            if not self.delete_view:
+                self.skipTest("Delete view is not enabled for this test case.")
+            self.client.force_login(self.non_owner_user)
+            response = self.client.post(self.get_delete_url(self.published_object.pk))
+            self.assertEqual(response.status_code, 403)
+            self.assertContains(response, self.permission_denied_message, status_code=403)
+
+        def test_delete_view_get_published_as_staff_user(self):
+            if not self.delete_view:
+                self.skipTest("Delete view is not enabled for this test case.")
+            # Staff users can delete any object
+            self.client.force_login(self.staff_user)
+            response = self.client.get(self.get_delete_url(self.published_object.pk))
+            self.assertEqual(response.status_code, 200)
+
+        def test_delete_view_post_published_as_staff_user(self):
+            if not self.delete_view:
+                self.skipTest("Delete view is not enabled for this test case.")
+            # Staff users can delete any object
+            self.client.force_login(self.staff_user)
+            response = self.client.post(self.get_delete_url(self.published_object.pk), follow=True)
+            with self.assertRaises(self.model.DoesNotExist):
+                self.model.objects.get(pk=self.published_object.pk)
+            self.assertRedirects(response, self.get_delete_success_url(publication_status='published'))
+
+        def test_delete_view_get_unpublished_as_anonymous(self):
+            if not self.delete_view:
+                self.skipTest("Delete view is not enabled for this test case.")
+            url = self.get_delete_url(self.unpublished_object.pk)
+            response = self.client.get(url)
+            self.assertRedirects(response, f"{settings.LOGIN_URL}?next={url}")
+
+        def test_delete_view_post_unpublished_as_anonymous(self):
+            if not self.delete_view:
+                self.skipTest("Delete view is not enabled for this test case.")
+            url = self.get_delete_url(self.unpublished_object.pk)
+            response = self.client.post(url)
+            self.assertRedirects(response, f"{settings.LOGIN_URL}?next={url}")
+
+        def test_delete_view_get_unpublished_as_owner(self):
+            if not self.delete_view:
+                self.skipTest("Delete view is not enabled for this test case.")
+            self.client.force_login(self.owner_user)
+            response = self.client.get(self.get_delete_url(self.unpublished_object.pk))
+            self.assertEqual(response.status_code, 200)
+
+        def test_delete_view_post_unpublished_as_owner(self):
+            if not self.delete_view:
+                self.skipTest("Delete view is not enabled for this test case.")
+            self.client.force_login(self.owner_user)
+            response = self.client.post(self.get_delete_url(self.unpublished_object.pk), follow=True)
+            with self.assertRaises(self.model.DoesNotExist):
+                self.model.objects.get(pk=self.unpublished_object.pk)
+            self.assertRedirects(response, self.get_delete_success_url(publication_status='private'))
+
+        def test_delete_view_get_unpublished_as_non_owner(self):
+            if not self.delete_view:
+                self.skipTest("Delete view is not enabled for this test case.")
+            self.client.force_login(self.non_owner_user)
+            response = self.client.get(self.get_delete_url(self.unpublished_object.pk))
+            self.assertEqual(response.status_code, 403)
+            self.assertContains(response, self.permission_denied_message, status_code=403)
+
+        def test_delete_view_post_unpublished_as_non_owner(self):
+            if not self.delete_view:
+                self.skipTest("Delete view is not enabled for this test case.")
+            self.client.force_login(self.non_owner_user)
+            response = self.client.post(self.get_delete_url(self.unpublished_object.pk))
+            self.assertEqual(response.status_code, 403)
+            self.assertContains(response, self.permission_denied_message, status_code=403)
+
+        def test_delete_view_get_unpublished_as_staff_user(self):
+            if not self.delete_view:
+                self.skipTest("Delete view is not enabled for this test case.")
+            # Staff users can delete any object
+            self.client.force_login(self.staff_user)
+            response = self.client.get(self.get_delete_url(self.unpublished_object.pk))
+            self.assertEqual(response.status_code, 200)
+
+        def test_delete_view_post_unpublished_as_staff_user(self):
+            if not self.delete_view:
+                self.skipTest("Delete view is not enabled for this test case.")
+            # Staff users can delete any object
+            self.client.force_login(self.staff_user)
+            response = self.client.post(self.get_delete_url(self.unpublished_object.pk), follow=True)
+            with self.assertRaises(self.model.DoesNotExist):
+                self.model.objects.get(pk=self.unpublished_object.pk)
+            self.assertRedirects(response, self.get_delete_success_url(publication_status='private'))

@@ -1,5 +1,6 @@
 import json
 from datetime import date
+from urllib.parse import urlencode
 
 from celery.result import AsyncResult
 from dal.autocomplete import Select2QuerySetView
@@ -16,15 +17,16 @@ from django.views.generic import TemplateView
 import case_studies.soilcom.tasks
 from bibliography.views import (SourceCheckUrlView, SourceCreateView, SourceModalCreateView, SourceModalDeleteView,
                                 SourceModalDetailView)
+from maps.filters import CatchmentFilterSet
 from maps.forms import NutsAndLauCatchmentQueryForm
 from maps.views import (CatchmentDetailView, CatchmentUpdateView, GeoDataSetFilteredMapView, GeoDataSetFormMixin,
                         MapMixin)
 from utils.file_export.views import FilteredListFileExportView
 from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineFormSetMixin
-from utils.views import (OwnedObjectCreateView, OwnedObjectModalCreateView, OwnedObjectModalDeleteView,
-                         OwnedObjectModalDetailView, OwnedObjectModalUpdateView, OwnedObjectModelSelectOptionsView,
-                         PrivateObjectFilterView, PrivateObjectListView, PublishedObjectFilterView,
-                         PublishedObjectListView, UserCreatedObjectDetailView, UserCreatedObjectUpdateView)
+from utils.views import (OwnedObjectCreateView, OwnedObjectModalCreateView, OwnedObjectModalDetailView,
+                         OwnedObjectModalUpdateView, OwnedObjectModelSelectOptionsView, PrivateObjectFilterView,
+                         PrivateObjectListView, PublishedObjectFilterView, PublishedObjectListView,
+                         UserCreatedObjectDetailView, UserCreatedObjectModalDeleteView, UserCreatedObjectUpdateView)
 from .filters import CollectionFilterSet, CollectorFilter, WasteFlyerFilter
 from .forms import (AggregatedCollectionPropertyValueModelForm, BaseWasteFlyerUrlFormSet, CollectionAddPredecessorForm,
                     CollectionAddWasteSampleForm, CollectionFrequencyModalModelForm, CollectionFrequencyModelForm,
@@ -94,12 +96,8 @@ class CollectorModalUpdateView(OwnedObjectModalUpdateView):
     permission_required = 'soilcom.change_collector'
 
 
-class CollectorModalDeleteView(OwnedObjectModalDeleteView):
-    template_name = 'modal_delete.html'
+class CollectorModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Collector
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('collector-list')
-    permission_required = 'soilcom.delete_collector'
 
 
 # ----------- Collector utilities --------------------------------------------------------------------------------------
@@ -124,6 +122,7 @@ class CollectionSystemPublishedListView(PublishedObjectListView):
 class CollectionSystemPrivateListView(PrivateObjectListView):
     model = CollectionSystem
     dashboard_url = reverse_lazy('wastecollection-dashboard')
+
 
 class CollectionSystemCreateView(OwnedObjectCreateView):
     form_class = CollectionSystemModelForm
@@ -159,12 +158,8 @@ class CollectionSystemModalUpdateView(OwnedObjectModalUpdateView):
     permission_required = 'soilcom.change_collectionsystem'
 
 
-class CollectionSystemModalDeleteView(OwnedObjectModalDeleteView):
-    template_name = 'modal_delete.html'
+class CollectionSystemModalDeleteView(UserCreatedObjectModalDeleteView):
     model = CollectionSystem
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('collectionsystem-list')
-    permission_required = 'soilcom.delete_collectionsystem'
 
 
 # ----------- Waste Stream Category CRUD -------------------------------------------------------------------------------
@@ -178,6 +173,7 @@ class WasteCategoryPublishedListView(PublishedObjectListView):
 class WasteCategoryPrivateListView(PrivateObjectListView):
     model = WasteCategory
     dashboard_url = reverse_lazy('wastecollection-dashboard')
+
 
 class WasteCategoryCreateView(OwnedObjectCreateView):
     form_class = WasteCategoryModelForm
@@ -212,12 +208,8 @@ class WasteCategoryModalUpdateView(OwnedObjectModalUpdateView):
     permission_required = 'soilcom.change_wastecategory'
 
 
-class WasteCategoryModalDeleteView(OwnedObjectModalDeleteView):
-    template_name = 'modal_delete.html'
+class WasteCategoryModalDeleteView(UserCreatedObjectModalDeleteView):
     model = WasteCategory
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('wastecategory-list')
-    permission_required = 'soilcom.delete_wastecategory'
 
 
 # ----------- Waste Component CRUD -------------------------------------------------------------------------------------
@@ -266,12 +258,8 @@ class WasteComponentModalUpdateView(OwnedObjectModalUpdateView):
     permission_required = 'soilcom.change_wastecomponent'
 
 
-class WasteComponentModalDeleteView(OwnedObjectModalDeleteView):
-    template_name = 'modal_delete.html'
+class WasteComponentModalDeleteView(UserCreatedObjectModalDeleteView):
     model = WasteComponent
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('wastecomponent-list')
-    permission_required = 'soilcom.delete_wastecomponent'
 
 
 # ----------- Waste Collection Flyer CRUD ------------------------------------------------------------------------------
@@ -482,12 +470,8 @@ class FrequencyModalUpdateView(OwnedObjectModalUpdateView):
     permission_required = 'soilcom.change_collectionfrequency'
 
 
-class FrequencyModalDeleteView(OwnedObjectModalDeleteView):
-    template_name = 'modal_delete.html'
+class FrequencyModalDeleteView(UserCreatedObjectModalDeleteView):
     model = CollectionFrequency
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('collectionfrequency-list')
-    permission_required = 'soilcom.delete_collectionfrequency'
 
 
 # ----------- Frequency Utils ------------------------------------------------------------------------------------------
@@ -521,10 +505,8 @@ class CollectionPropertyValueUpdateView(UserCreatedObjectUpdateView):
     form_class = CollectionPropertyValueModelForm
 
 
-class CollectionPropertyValueModalDeleteView(OwnedObjectModalDeleteView):
+class CollectionPropertyValueModalDeleteView(UserCreatedObjectModalDeleteView):
     model = CollectionPropertyValue
-    success_message = 'Successfully deleted.'
-    permission_required = 'soilcom.delete_collectionpropertyvalue'
 
     def get_success_url(self):
         return reverse('collection-detail', kwargs={'pk': self.object.collection.pk})
@@ -550,17 +532,27 @@ class AggregatedCollectionPropertyValueUpdateView(UserCreatedObjectUpdateView):
     form_class = AggregatedCollectionPropertyValueModelForm
 
 
-class AggregatedCollectionPropertyValueModalDeleteView(OwnedObjectModalDeleteView):
+class AggregatedCollectionPropertyValueModalDeleteView(UserCreatedObjectModalDeleteView):
     model = AggregatedCollectionPropertyValue
-    success_message = 'Successfully deleted.'
-    permission_required = 'soilcom.delete_aggregatedcollectionpropertyvalue'
 
     def get_success_url(self):
-        return reverse('collection-list')
+        related_ids = list(self.object.collections.values_list('id', flat=True))
+        base_url = reverse('collection-list')
+        query_string = urlencode([('id', rid) for rid in related_ids])
+        return f"{base_url}?{query_string}"
 
 
 # ----------- CollectionCatchment CRUD ---------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
+
+class CollectionCatchmentPublishedFilterView(PublishedObjectFilterView):
+    model = CollectionCatchment
+    filterset_class = CatchmentFilterSet
+
+
+class CollectionCatchmentPrivateFilterView(PrivateObjectFilterView):
+    model = CollectionCatchment
+    filterset_class = CatchmentFilterSet
 
 
 class CollectionCatchmentDetailView(CatchmentDetailView):
@@ -755,12 +747,9 @@ class CollectionUpdateView(M2MInlineFormSetMixin, UserCreatedObjectUpdateView):
             return self.render_to_response(context)
 
 
-class CollectionModalDeleteView(OwnedObjectModalDeleteView):
-    template_name = 'modal_delete.html'
+class CollectionModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Collection
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('collection-list')
-    permission_required = 'soilcom.delete_collection'
+    success_url = reverse_lazy('collection-list-owned')
 
 
 # ----------- Collection utils -----------------------------------------------------------------------------------------

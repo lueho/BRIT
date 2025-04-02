@@ -3,8 +3,8 @@ from django.views.generic import TemplateView
 
 from .forms import PropertyModelForm, UnitModelForm
 from .models import Property, Unit
-from ..views import (OwnedObjectCreateView, OwnedObjectModalDeleteView, OwnedObjectModelSelectOptionsView,
-                     PrivateObjectListView, PublishedObjectListView, UserCreatedObjectDetailView,
+from ..views import (OwnedObjectCreateView, OwnedObjectModelSelectOptionsView, PrivateObjectListView,
+                     PublishedObjectListView, UserCreatedObjectDetailView, UserCreatedObjectModalDeleteView,
                      UserCreatedObjectUpdateView)
 
 
@@ -39,11 +39,8 @@ class UnitUpdateView(UserCreatedObjectUpdateView):
     form_class = UnitModelForm
 
 
-class UnitModalDeleteView(OwnedObjectModalDeleteView):
+class UnitModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Unit
-    permission_required = ('properties.delete_unit',)
-    success_message = 'Unit deleted successfully.'
-    success_url = reverse_lazy('unit-list')
 
 
 # ----------- Property CRUD --------------------------------------------------------------------------------------------
@@ -75,11 +72,8 @@ class PropertyUpdateView(UserCreatedObjectUpdateView):
     form_class = PropertyModelForm
 
 
-class PropertyModalDeleteView(OwnedObjectModalDeleteView):
+class PropertyModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Property
-    permission_required = ('properties.delete_property',)
-    success_message = 'Property deleted successfully.'
-    success_url = reverse_lazy('property-list')
 
 
 class PropertyUnitOptionsView(OwnedObjectModelSelectOptionsView):

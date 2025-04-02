@@ -1,0 +1,52 @@
+{% extends 'filtered_list.html' %}
+{% load crispy_forms_tags %}
+
+{% block title %}BRIT | Maps | Collection Catchments{% endblock %}
+
+{% block list_card_header %}<strong>Collection Catchments</strong>{% endblock %}
+
+{% block list_table %}
+    <table class="table table-responsive-stack">
+        <thead>
+        <tr>
+            <th>Name</th>
+            <th>Type</th>
+            {% if list_type == 'private' %}
+                <th>Public</th>
+            {% endif %}
+        </tr>
+        </thead>
+        <tbody>
+        {% for object in object_list %}
+            <tr>
+                <td data-label="Name"><a href="{{ object.get_absolute_url }}">{{ object.name }}</a></td>
+                <td data-label="Type">{{ object.type }}</td>
+                {% if list_type == 'private' %}
+                    {% include 'partials/_publication_status_column.html' %}
+                {% endif %}
+            </tr>
+        {% endfor %}
+        </tbody>
+        <tfoot>
+        </tfoot>
+    </table>
+{% endblock list_table %}
+
+{% block list_card_footer_create_link %}
+    {% if user.is_authenticated %}
+        <a class="mr-2 text-nowrap" href="{{ create_url }}">
+            <i class="fas fa-fw fa-plus"></i> {{ create_url_text }}
+        </a>
+    {% endif %}
+{% endblock list_card_footer_create_link %}
+
+{% block filter_body %}
+    <form method="get">
+        {% crispy filter.form %}
+        <button id="btn-filter" class="btn btn-primary" type="submit">Filter</button>
+    </form>
+{% endblock filter_body %}
+
+{% block javascript %}
+    {{ block.super }}
+{% endblock javascript %}

@@ -1,4 +1,4 @@
-from bootstrap_modal_forms.generic import BSModalDeleteView, BSModalFormView, BSModalReadView, BSModalUpdateView
+from bootstrap_modal_forms.generic import BSModalFormView, BSModalReadView, BSModalUpdateView
 from crispy_forms.helper import FormHelper
 from dal import autocomplete
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin, UserPassesTestMixin
@@ -12,11 +12,11 @@ from extra_views import UpdateWithInlinesView
 from distributions.models import TemporalDistribution
 from distributions.plots import DoughnutChart
 from utils.views import (NextOrSuccessUrlMixin, OwnedObjectCreateView, OwnedObjectModalCreateView,
-                         OwnedObjectModalDeleteView, OwnedObjectModalDetailView, OwnedObjectModalUpdateView,
-                         PrivateObjectFilterView, PrivateObjectListView, PublishedObjectFilterView,
-                         PublishedObjectListView, UserCreatedObjectCreateView, UserCreatedObjectDetailView,
-                         UserCreatedObjectModalCreateView, UserCreatedObjectModalDeleteView,
-                         UserCreatedObjectUpdateView, UserCreatedObjectUpdateWithInlinesView, UserOwnsObjectMixin)
+                         OwnedObjectModalDetailView, OwnedObjectModalUpdateView, PrivateObjectFilterView,
+                         PrivateObjectListView, PublishedObjectFilterView, PublishedObjectListView,
+                         UserCreatedObjectCreateView, UserCreatedObjectDetailView, UserCreatedObjectModalCreateView,
+                         UserCreatedObjectModalDeleteView, UserCreatedObjectUpdateView,
+                         UserCreatedObjectUpdateWithInlinesView, UserOwnsObjectMixin)
 from .filters import PublishedSampleFilter, SampleSeriesFilter, UserOwnedSampleFilter
 from .forms import (AddComponentModalForm, AddCompositionModalForm, AddLiteratureSourceForm, AddSeasonalVariationForm,
                     ComponentGroupModalModelForm, ComponentGroupModelForm, ComponentModalModelForm, ComponentModelForm,
@@ -80,12 +80,8 @@ class MaterialCategoryModalUpdateView(OwnedObjectModalUpdateView):
     permission_required = 'materials.change_materialcategory'
 
 
-class MaterialCategoryModalDeleteView(OwnedObjectModalDeleteView):
-    template_name = 'modal_delete.html'
+class MaterialCategoryModalDeleteView(UserCreatedObjectModalDeleteView):
     model = MaterialCategory
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('materialcategory-list')
-    permission_required = 'materials.delete_materialcategory'
 
 
 # ----------- Material CRUD --------------------------------------------------------------------------------------------
@@ -135,12 +131,8 @@ class MaterialModalUpdateView(OwnedObjectModalUpdateView):
     permission_required = 'materials.change_material'
 
 
-class MaterialModalDeleteView(OwnedObjectModalDeleteView):
-    template_name = 'modal_delete.html'
+class MaterialModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Material
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('material-list')
-    permission_required = 'materials.delete_material'
 
 
 # ----------- Material Utils -------------------------------------------------------------------------------------------
@@ -208,12 +200,8 @@ class ComponentModalUpdateView(OwnedObjectModalUpdateView):
     permission_required = 'materials.change_materialcomponent'
 
 
-class ComponentModalDeleteView(OwnedObjectModalDeleteView):
-    template_name = 'modal_delete.html'
+class ComponentModalDeleteView(UserCreatedObjectModalDeleteView):
     model = MaterialComponent
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('materialcomponent-list')
-    permission_required = 'materials.delete_materialcomponent'
 
 
 # ----------- Material Component Groups CRUD----------------------------------------------------------------------------
@@ -261,12 +249,8 @@ class MaterialComponentGroupModalUpdateView(OwnedObjectModalUpdateView):
     permission_required = 'materials.change_materialcomponentgroup'
 
 
-class MaterialComponentGroupModalDeleteView(OwnedObjectModalDeleteView):
-    template_name = 'modal_delete.html'
+class MaterialComponentGroupModalDeleteView(UserCreatedObjectModalDeleteView):
     model = MaterialComponentGroup
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('materialcomponentgroup-list')
-    permission_required = 'materials.delete_materialcomponentgroup'
 
 
 # ----------- Material Property CRUD -----------------------------------------------------------------------------------
@@ -313,12 +297,8 @@ class MaterialPropertyModalUpdateView(OwnedObjectModalUpdateView):
     permission_required = 'materials.change_materialproperty'
 
 
-class MaterialPropertyModalDeleteView(OwnedObjectModalDeleteView):
-    template_name = 'modal_delete.html'
+class MaterialPropertyModalDeleteView(UserCreatedObjectModalDeleteView):
     model = MaterialProperty
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('materialproperty-list')
-    permission_required = 'materials.delete_materialproperty'
 
 
 # ----------- Material Property Value CRUD -----------------------------------------------------------------------------
@@ -326,10 +306,10 @@ class MaterialPropertyModalDeleteView(OwnedObjectModalDeleteView):
 
 
 class MaterialPropertyValueModalDeleteView(UserCreatedObjectModalDeleteView):
-    template_name = 'modal_delete.html'
     model = MaterialPropertyValue
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('home')
+
+    def get_success_url(self):
+        return reverse('sample-detail', kwargs={'pk': self.object.sample_set.first().pk})
 
 
 # ----------- Sample Series CRUD ---------------------------------------------------------------------------------------
@@ -383,12 +363,8 @@ class SampleSeriesModalUpdateView(OwnedObjectModalUpdateView):
     permission_required = 'materials.change_sampleseries'
 
 
-class SampleSeriesModalDeleteView(OwnedObjectModalDeleteView):
-    template_name = 'modal_delete.html'
+class SampleSeriesModalDeleteView(UserCreatedObjectModalDeleteView):
     model = SampleSeries
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('sampleseries-list')
-    permission_required = 'materials.delete_sampleseries'
 
 
 # ----------- Sample Series Utilities ----------------------------------------------------------------------------------
@@ -684,9 +660,6 @@ class CompositionModalUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin,
 
 class CompositionModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Composition
-    template_name = 'modal_delete.html'
-    success_message = 'Successfully removed'
-    success_url = reverse_lazy('composition-list')
 
     def get_success_url(self):
         return reverse('sample-detail', kwargs={'pk': self.object.sample.pk})
@@ -747,11 +720,8 @@ class CompositionOrderDownView(UserOwnsObjectMixin, SingleObjectMixin, RedirectV
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class WeightShareModalDeleteView(OwnedObjectModalDeleteView):
-    template_name = 'modal_delete.html'
+class WeightShareModalDeleteView(UserCreatedObjectModalDeleteView):
     model = WeightShare
-    success_message = 'Successfully deleted.'
-    permission_required = 'materials.delete_weightshare'
 
     def get_success_url(self):
         return reverse('sample-detail', kwargs={'pk': self.object.composition.sample.pk})
@@ -860,31 +830,6 @@ class RemoveSeasonalVariationView(LoginRequiredMixin, UserOwnsObjectMixin, NextO
         success_url = self.get_success_url()
         self.get_object().remove_temporal_distribution(self.get_distribution())
         return HttpResponseRedirect(success_url)
-
-
-class RemoveSeasonalVariationViewILD(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalDeleteView):
-    model = Composition
-    template_name = 'modal_delete.html'
-    success_message = 'Successfully deleted.'
-
-    def delete(self, request, *args, **kwargs):
-        success_url = self.get_success_url()
-        self.get_object().remove_temporal_distribution(self.get_distribution())
-        return HttpResponseRedirect(success_url)
-
-    def get_distribution(self):
-        return TemporalDistribution.objects.get(id=self.kwargs.get('distribution_pk'))
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({
-            'form_title': 'Remove seasonal variation',
-            'submit_button_text': 'Remove'
-        })
-        return context
-
-    def get_success_url(self):
-        return self.get_object().get_absolute_url()
 
 
 class FeaturedMaterialListView(ListView):

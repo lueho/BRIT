@@ -6,7 +6,6 @@ from dal_select2.views import Select2ListView
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
-from django.urls import reverse_lazy
 from django.views.generic import CreateView, DetailView, View
 from django.views.generic.base import TemplateResponseMixin
 from django.views.generic.edit import ModelFormMixin
@@ -17,8 +16,8 @@ from maps.models import Catchment, GeoDataset
 from maps.serializers import BaseResultMapSerializer
 from maps.views import MapMixin
 from materials.models import SampleSeries
-from utils.views import (OwnedObjectCreateView, OwnedObjectModalDeleteView, PrivateObjectFilterView,
-                         PublishedObjectFilterView, UserCreatedObjectDetailView, UserCreatedObjectUpdateView)
+from utils.views import (OwnedObjectCreateView, PrivateObjectFilterView, PublishedObjectFilterView,
+                         UserCreatedObjectDetailView, UserCreatedObjectModalDeleteView, UserCreatedObjectUpdateView)
 from .evaluations import ScenarioResult
 from .filters import ScenarioFilterSet
 from .forms import (ScenarioInventoryConfigurationAddForm, ScenarioInventoryConfigurationUpdateForm,
@@ -102,11 +101,8 @@ class ScenarioUpdateView(UserCreatedObjectUpdateView):
         return kwargs
 
 
-class ScenarioModalDeleteView(OwnedObjectModalDeleteView):
+class ScenarioModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Scenario
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('scenario-list')
-    permission_required = 'inventories.delete_scenario'
 
 
 def get_evaluation_status(request, task_id=None):

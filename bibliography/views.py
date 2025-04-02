@@ -74,12 +74,8 @@ class AuthorModalUpdateView(views.OwnedObjectModalUpdateView):
     permission_required = 'bibliography.change_author'
 
 
-class AuthorModalDeleteView(views.OwnedObjectModalDeleteView):
-    template_name = 'modal_delete.html'
+class AuthorModalDeleteView(views.UserCreatedObjectModalDeleteView):
     model = Author
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('author-list')
-    permission_required = 'bibliography.delete_author'
 
 
 # ----------- Author Utils ---------------------------------------------------------------------------------------------
@@ -140,12 +136,8 @@ class LicenceModalUpdateView(views.OwnedObjectModalUpdateView):
     permission_required = 'bibliography.change_licence'
 
 
-class LicenceModalDeleteView(views.OwnedObjectModalDeleteView):
-    template_name = 'modal_delete.html'
+class LicenceModalDeleteView(views.UserCreatedObjectModalDeleteView):
     model = Licence
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('licence-list')
-    permission_required = 'bibliography.delete_licence'
 
 
 # ----------- Source CRUD ----------------------------------------------------------------------------------------------
@@ -209,12 +201,8 @@ class SourceModalUpdateView(views.OwnedObjectModalUpdateView):
     permission_required = 'bibliography.change_source'
 
 
-class SourceModalDeleteView(views.OwnedObjectModalDeleteView):
-    template_name = 'modal_delete.html'
+class SourceModalDeleteView(views.UserCreatedObjectModalDeleteView):
     model = Source
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('source-list')
-    permission_required = 'bibliography.delete_source'
 
 
 # ----------- Source utils ---------------------------------------------------------------------------------------------

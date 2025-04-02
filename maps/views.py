@@ -18,10 +18,10 @@ from maps.serializers import (CatchmentGeoFeatureModelSerializer, LauRegionOptio
                               NutsRegionCatchmentOptionSerializer, NutsRegionOptionSerializer,
                               NutsRegionSummarySerializer, RegionGeoFeatureModelSerializer)
 from utils.forms import DynamicTableInlineFormSetHelper
-from utils.views import (OwnedObjectCreateView, OwnedObjectModalCreateView, OwnedObjectModalDeleteView,
-                         OwnedObjectModalDetailView, OwnedObjectModalUpdateView, OwnedObjectModelSelectOptionsView,
-                         PrivateObjectFilterView, PrivateObjectListView, PublishedObjectFilterView,
-                         PublishedObjectListView, UserCreatedObjectDetailView, UserCreatedObjectUpdateView)
+from utils.views import (OwnedObjectCreateView, OwnedObjectModalCreateView, OwnedObjectModalDetailView,
+                         OwnedObjectModalUpdateView, OwnedObjectModelSelectOptionsView, PrivateObjectFilterView,
+                         PrivateObjectListView, PublishedObjectFilterView, PublishedObjectListView,
+                         UserCreatedObjectDetailView, UserCreatedObjectModalDeleteView, UserCreatedObjectUpdateView)
 from .filters import CatchmentFilterSet, GeoDataSetFilterSet, NutsRegionFilterSet, RegionFilterSet
 from .forms import (AttributeModalModelForm, AttributeModelForm, CatchmentCreateDrawCustomForm,
                     CatchmentCreateMergeLauForm, CatchmentModelForm, GeoDataSetModelForm, LocationModelForm,
@@ -303,11 +303,8 @@ class GeoDataSetUpdateView(UserCreatedObjectUpdateView):
     form_class = GeoDataSetModelForm
 
 
-class GeoDataSetModalDeleteView(OwnedObjectModalDeleteView):
+class GeoDataSetModalDeleteView(UserCreatedObjectModalDeleteView):
     model = GeoDataset
-    success_url = reverse_lazy('geodataset-list')
-    success_message = 'deletion successful'
-    permission_required = 'maps.delete_geodataset'
 
 
 # ----------- Location CRUD---------------------------------------------------------------------------------------------
@@ -339,11 +336,8 @@ class LocationUpdateView(UserCreatedObjectUpdateView):
     form_class = LocationModelForm
 
 
-class LocationModalDeleteView(OwnedObjectModalDeleteView):
+class LocationModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Location
-    success_url = reverse_lazy('location-list')
-    success_message = 'deletion successful'
-    permission_required = 'maps.delete_location'
 
 
 # ----------- Region CRUD-----------------------------------------------------------------------------------------------
@@ -384,11 +378,8 @@ class RegionUpdateView(UserCreatedObjectUpdateView):
     form_class = RegionModelForm
 
 
-class RegionModalDeleteView(OwnedObjectModalDeleteView):
+class RegionModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Region
-    success_url = reverse_lazy('region-list')
-    success_message = 'deletion successful'
-    permission_required = 'maps.delete_region'
 
 
 # ----------- Catchment CRUD--------------------------------------------------------------------------------------------
@@ -500,11 +491,8 @@ class CatchmentUpdateView(UserCreatedObjectUpdateView):
     form_class = CatchmentModelForm
 
 
-class CatchmentModalDeleteView(OwnedObjectModalDeleteView):
+class CatchmentModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Catchment
-    success_url = reverse_lazy('catchment-list')
-    success_message = 'deletion successful'
-    permission_required = 'maps.delete_catchment'
 
 
 # ----------- Catchment utilities---------------------------------------------------------------------------------------
@@ -851,12 +839,8 @@ class AttributeModalUpdateView(OwnedObjectModalUpdateView):
     permission_required = 'maps.change_attribute'
 
 
-class AttributeModalDeleteView(OwnedObjectModalDeleteView):
-    template_name = 'modal_delete.html'
+class AttributeModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Attribute
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('attribute-list')
-    permission_required = 'maps.delete_attribute'
 
 
 # ----------- Region Attribute Value CRUD ------------------------------------------------------------------------------
@@ -894,15 +878,11 @@ class RegionAttributeValueModalUpdateView(OwnedObjectModalUpdateView):
     permission_required = 'maps.change_regionattributevalue'
 
 
-class RegionAttributeValueModalDeleteView(OwnedObjectModalDeleteView):
+class RegionAttributeValueModalDeleteView(UserCreatedObjectModalDeleteView):
     model = RegionAttributeValue
-    success_message = 'Successfully deleted.'
-    permission_required = 'maps.delete_regionattributevalue'
 
     def get_success_url(self):
-        # Redirect to the parent region detail view that the deleted region attribute value belonged to
-        if hasattr(self.object, 'region'):
-            return reverse_lazy('region-detail', kwargs={'pk': self.object.region.pk})
+        return reverse('region-detail', kwargs={'pk': self.object.region.pk})
 
 
 class RegionChildCatchmentOptions(OwnedObjectModelSelectOptionsView):

@@ -23,6 +23,14 @@ class CollectorFilter(BaseCrispyFilterSet):
         fields = ('name', 'catchment')
 
 
+class CollectionCatchmentFilterSet(CrispyAutocompleteFilterSet):
+    name = CharFilter(lookup_expr='icontains')
+
+    class Meta:
+        model = CollectionCatchment
+        fields = ('id', 'name', 'type',)
+
+
 SEASONAL_FREQUENCY_CHOICES = (
     ('', 'All'),
     (True, 'Seasonal'),
@@ -151,6 +159,8 @@ class SpecWasteCollectedFilter(NullableCollectionPropertyValueRangeFilter):
 
 
 class CollectionFilterSet(CrispyAutocompleteFilterSet):
+    id = ModelMultipleChoiceFilter(queryset=Collection.objects.all(),
+                                   to_field_name='id')
     catchment = ModelChoiceFilter(queryset=CollectionCatchment.objects.all(),
                                   widget=BSModelSelect2(url='catchment-autocomplete'),
                                   method='catchment_filter')
@@ -191,7 +201,7 @@ class CollectionFilterSet(CrispyAutocompleteFilterSet):
 
     class Meta:
         model = Collection
-        fields = ('catchment', 'collector', 'collection_system', 'waste_category', 'allowed_materials',
+        fields = ('id', 'catchment', 'collector', 'collection_system', 'waste_category', 'allowed_materials',
                   'forbidden_materials', 'connection_rate', 'seasonal_frequency', 'optional_frequency',
                   'collections_per_year', 'spec_waste_collected', 'fee_system', 'valid_on', 'publication_status',
                   'owner')
