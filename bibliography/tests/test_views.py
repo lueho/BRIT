@@ -115,6 +115,8 @@ class AuthorModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 
 class AuthorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    modal_update_view = True
+
     model = Author
 
     view_dashboard_name = 'bibliography-dashboard'
@@ -123,6 +125,7 @@ class AuthorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
     view_private_list_name = 'author-list-owned'
     view_detail_name = 'author-detail'
     view_update_name = 'author-update'
+    view_modal_update_name = 'author-update-modal'
     view_delete_name = 'author-delete-modal'
 
     create_object_data = {'last_names': 'Test Author'}
@@ -148,59 +151,6 @@ class AuthorModalDetailViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.outsider)
         response = self.client.get(reverse('author-detail-modal', kwargs={'pk': self.author.pk}))
         self.assertEqual(response.status_code, 200)
-
-
-class AuthorModalUpdateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ['change_author']
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.author = Author.objects.create(
-            first_names='Test',
-            last_names='Author',
-            publication_status='published'
-        )
-
-    def test_get_http_302_redirect_for_anonymous(self):
-        response = self.client.get(reverse('author-update-modal', kwargs={'pk': self.author.pk}))
-        self.assertEqual(response.status_code, 302)
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('author-update-modal', kwargs={'pk': self.author.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('author-update-modal', kwargs={'pk': self.author.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('author-update-modal', kwargs={'pk': self.author.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_for_anonymous(self):
-        response = self.client.post(reverse('author-update-modal', kwargs={'pk': self.author.pk}), data={})
-        self.assertEqual(response.status_code, 302)
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('author-update-modal', kwargs={'pk': self.author.pk}), data={})
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        data = {'last_names': 'Updated Author'}
-        response = self.client.post(reverse('author-update-modal', kwargs={'pk': self.author.pk}), data=data,
-                                    follow=True)
-        self.assertRedirects(
-            response,
-            f"{reverse('author-detail', kwargs={'pk': self.author.pk})}",
-            status_code=302,
-            target_status_code=200
-        )
 
 
 # ----------- Author Utils ---------------------------------------------------------------------------------------------
@@ -337,6 +287,8 @@ class LicenceModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 
 class LicenceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    modal_update_view = True
+
     model = Licence
 
     view_dashboard_name = 'bibliography-dashboard'
@@ -345,6 +297,7 @@ class LicenceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
     view_private_list_name = 'licence-list-owned'
     view_detail_name = 'licence-detail'
     view_update_name = 'licence-update'
+    view_modal_update_name = 'licence-update-modal'
     view_delete_name = 'licence-delete-modal'
 
     create_object_data = {'name': 'Test Licence'}
@@ -370,59 +323,6 @@ class LicenceModalDetailViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.outsider)
         response = self.client.get(reverse('licence-detail-modal', kwargs={'pk': self.licence.pk}))
         self.assertEqual(response.status_code, 200)
-
-
-class LicenceModalUpdateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ['change_licence']
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.licence = Licence.objects.create(
-            name='Test Licence',
-            reference_url='https://www.reference-url.org',
-            publication_status='published',
-        )
-
-    def test_get_http_302_redirect_for_anonymous(self):
-        response = self.client.get(reverse('licence-update-modal', kwargs={'pk': self.licence.pk}))
-        self.assertEqual(response.status_code, 302)
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('licence-update-modal', kwargs={'pk': self.licence.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('licence-update-modal', kwargs={'pk': self.licence.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('licence-update-modal', kwargs={'pk': self.licence.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_for_anonymous(self):
-        response = self.client.post(reverse('licence-update-modal', kwargs={'pk': self.licence.pk}), data={})
-        self.assertEqual(response.status_code, 302)
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('licence-update-modal', kwargs={'pk': self.licence.pk}), data={})
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        data = {'name': 'Updated Test Licence'}
-        response = self.client.post(reverse('licence-update-modal', kwargs={'pk': self.licence.pk}), data=data,
-                                    follow=True)
-        self.assertRedirects(
-            response,
-            f"{reverse('licence-detail', kwargs={'pk': self.licence.pk})}",
-            status_code=302,
-            target_status_code=200
-        )
 
 
 # ----------- Source CRUD ----------------------------------------------------------------------------------------------
@@ -666,65 +566,6 @@ class SourceModalDetailViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.outsider)
         response = self.client.get(reverse('source-detail-modal', kwargs={'pk': self.source.pk}))
         self.assertEqual(response.status_code, 200)
-
-
-class SourceModalUpdateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ['change_source']
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        with mute_signals(post_save):
-            cls.source = Source.objects.create(
-                abbreviation='TS1',
-                type='article',
-                title='Test Source',
-                publication_status='published',
-            )
-
-    def test_get_http_302_redirect_for_anonymous(self):
-        response = self.client.get(reverse('source-update-modal', kwargs={'pk': self.source.pk}))
-        self.assertEqual(response.status_code, 302)
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('source-update-modal', kwargs={'pk': self.source.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('source-update-modal', kwargs={'pk': self.source.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('source-update-modal', kwargs={'pk': self.source.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_for_anonymous(self):
-        response = self.client.post(reverse('source-update-modal', kwargs={'pk': self.source.pk}), data={})
-        self.assertEqual(response.status_code, 302)
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('source-update-modal', kwargs={'pk': self.source.pk}), data={})
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        data = {
-            'abbreviation': self.source.abbreviation,
-            'type': self.source.type,
-            'title': 'Updated Test Source'
-        }
-        with mute_signals(post_save):
-            response = self.client.post(reverse('source-update-modal', kwargs={'pk': self.source.pk}), data=data)
-        self.assertRedirects(
-            response,
-            f"{reverse('source-detail', kwargs={'pk': self.source.pk})}",
-            status_code=302,
-            target_status_code=200
-        )
 
 
 @patch('bibliography.views.check_source_url.delay')

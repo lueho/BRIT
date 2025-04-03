@@ -20,9 +20,10 @@ from maps.serializers import (CatchmentGeoFeatureModelSerializer, LauRegionOptio
                               NutsRegionSummarySerializer, RegionGeoFeatureModelSerializer)
 from utils.forms import DynamicTableInlineFormSetHelper
 from utils.views import (OwnedObjectCreateView, OwnedObjectModalCreateView, OwnedObjectModalDetailView,
-                         OwnedObjectModalUpdateView, OwnedObjectModelSelectOptionsView, PrivateObjectFilterView,
-                         PrivateObjectListView, PublishedObjectFilterView, PublishedObjectListView,
-                         UserCreatedObjectDetailView, UserCreatedObjectModalDeleteView, UserCreatedObjectUpdateView)
+                         OwnedObjectModelSelectOptionsView, PrivateObjectFilterView, PrivateObjectListView,
+                         PublishedObjectFilterView, PublishedObjectListView, UserCreatedObjectDetailView,
+                         UserCreatedObjectModalDeleteView, UserCreatedObjectModalUpdateView,
+                         UserCreatedObjectUpdateView)
 from .filters import CatchmentFilterSet, GeoDataSetFilterSet, NutsRegionFilterSet, RegionFilterSet
 from .forms import (AttributeModalModelForm, AttributeModelForm, CatchmentCreateDrawCustomForm,
                     CatchmentCreateMergeLauForm, CatchmentModelForm, GeoDataSetModelForm, LocationModelForm,
@@ -835,10 +836,9 @@ class AttributeUpdateView(UserCreatedObjectUpdateView):
     form_class = AttributeModelForm
 
 
-class AttributeModalUpdateView(OwnedObjectModalUpdateView):
+class AttributeModalUpdateView(UserCreatedObjectModalUpdateView):
     model = Attribute
     form_class = AttributeModalModelForm
-    permission_required = 'maps.change_attribute'
 
 
 class AttributeModalDeleteView(UserCreatedObjectModalDeleteView):
@@ -874,10 +874,9 @@ class RegionAttributeValueUpdateView(UserCreatedObjectUpdateView):
     form_class = RegionAttributeValueModelForm
 
 
-class RegionAttributeValueModalUpdateView(OwnedObjectModalUpdateView):
+class RegionAttributeValueModalUpdateView(UserCreatedObjectModalUpdateView):
     model = RegionAttributeValue
     form_class = RegionAttributeValueModalModelForm
-    permission_required = 'maps.change_regionattributevalue'
 
 
 class RegionAttributeValueModalDeleteView(UserCreatedObjectModalDeleteView):
