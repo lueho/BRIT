@@ -88,7 +88,6 @@ urlpatterns = [
     path('compositions/<int:pk>/', views.CompositionDetailView.as_view(), name='composition-detail'),
     path('compositions/<int:pk>/modal/', views.CompositionModalDetailView.as_view(), name='composition-detail-modal'),
     path('compositions/<int:pk>/update/', views.CompositionUpdateView.as_view(), name='composition-update'),
-    path('compositions/<int:pk>/update/modal', views.CompositionModalUpdateView.as_view(), name='composition-update-modal'),
     path('compositions/<int:pk>/delete/', views.CompositionModalDeleteView.as_view(), name='composition-delete-modal'),
     path('compositions/<int:pk>/add_component/', views.AddComponentView.as_view(), name='composition-add-component'),
     path('compositions/<int:pk>/order_up/', views.CompositionOrderUpView.as_view(), name='composition-order-up'),

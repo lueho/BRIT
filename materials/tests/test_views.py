@@ -29,6 +29,8 @@ class MaterialDashboardViewTestCase(ViewWithPermissionsTestCase):
 
 
 class MaterialCategoryCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    modal_update_view = True
+
     model = MaterialCategory
 
     view_dashboard_name = 'materials-dashboard'
@@ -37,6 +39,7 @@ class MaterialCategoryCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDV
     view_private_list_name = 'materialcategory-list-owned'
     view_detail_name = 'materialcategory-detail'
     view_update_name = 'materialcategory-update'
+    view_modal_update_name = 'materialcategory-update-modal'
     view_delete_name = 'materialcategory-delete-modal'
 
     create_object_data = {'name': 'Test Category'}
@@ -225,6 +228,8 @@ class MaterialModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 
 class MaterialCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    modal_update_view = True
+
     model = Material
 
     view_dashboard_name = 'materials-dashboard'
@@ -233,6 +238,7 @@ class MaterialCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
     view_private_list_name = 'material-list-owned'
     view_detail_name = 'material-detail'
     view_update_name = 'material-update'
+    view_modal_update_name = 'material-update-modal'
     view_delete_name = 'material-delete-modal'
 
     create_object_data = {'name': 'Test Material'}
@@ -247,7 +253,7 @@ class MaterialCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
         return published_material
 
 
-class SourceModalDetailViewTestCase(ViewWithPermissionsTestCase):
+class MaterialModalDetailViewTestCase(ViewWithPermissionsTestCase):
 
     @classmethod
     def setUpTestData(cls):
@@ -262,52 +268,6 @@ class SourceModalDetailViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.outsider)
         response = self.client.get(reverse('material-detail-modal', kwargs={'pk': self.material.pk}))
         self.assertEqual(response.status_code, 200)
-
-
-class MaterialModalUpdateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'change_material'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.material = Material.objects.create(name='Test Material', publication_status='published')
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('material-update-modal', kwargs={'pk': self.material.pk})
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('material-update-modal', kwargs={'pk': self.material.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('material-update-modal', kwargs={'pk': self.material.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('material-update-modal', kwargs={'pk': self.material.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('material-update-modal', kwargs={'pk': self.material.pk})
-        response = self.client.post(url, {})
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        data = {'name': 'Updated Test Material'}
-        response = self.client.post(reverse('material-update-modal', kwargs={'pk': self.material.pk}), data)
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        data = {'name': 'Update Test Material'}
-        response = self.client.post(reverse('material-update-modal', kwargs={'pk': self.material.pk}), data)
-        self.assertRedirects(response, reverse('material-detail', kwargs={'pk': self.material.pk}))
 
 
 # ----------- Material Component CRUD ----------------------------------------------------------------------------------
@@ -402,6 +362,8 @@ class ComponentModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 
 class MaterialComponentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    modal_update_view = True
+
     model = MaterialComponent
 
     view_dashboard_name = 'materials-dashboard'
@@ -410,6 +372,7 @@ class MaterialComponentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUD
     view_private_list_name = 'materialcomponent-list-owned'
     view_detail_name = 'materialcomponent-detail'
     view_update_name = 'materialcomponent-update'
+    view_modal_update_name = 'materialcomponent-update-modal'
     view_delete_name = 'materialcomponent-delete-modal'
 
     create_object_data = {'name': 'Test Component'}
@@ -528,6 +491,8 @@ class ComponentGroupModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 
 class MaterialComponentGroupCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    modal_update_view = True
+
     model = MaterialComponentGroup
 
     view_dashboard_name = 'materials-dashboard'
@@ -536,6 +501,7 @@ class MaterialComponentGroupCRUDViewsTestCase(AbstractTestCases.UserCreatedObjec
     view_private_list_name = 'materialcomponentgroup-list-owned'
     view_detail_name = 'materialcomponentgroup-detail'
     view_update_name = 'materialcomponentgroup-update'
+    view_modal_update_name = 'materialcomponentgroup-update-modal'
     view_delete_name = 'materialcomponentgroup-delete-modal'
 
     create_object_data = {'name': 'Test Group'}
@@ -565,51 +531,6 @@ class ComponentGroupModalDetailViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.outsider)
         response = self.client.get(reverse('materialcomponentgroup-detail-modal', kwargs={'pk': self.group.pk}))
         self.assertEqual(response.status_code, 200)
-
-
-class ComponentGroupModalUpdateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'change_materialcomponentgroup'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.group = MaterialComponentGroup.objects.create(name='Test Group', publication_status='published', )
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('materialcomponentgroup-update-modal', kwargs={'pk': self.group.pk})
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('materialcomponentgroup-update-modal', kwargs={'pk': self.group.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('materialcomponentgroup-update-modal', kwargs={'pk': self.group.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('materialcomponentgroup-update-modal', kwargs={'pk': self.group.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('materialcomponentgroup-update-modal', kwargs={'pk': self.group.pk})
-        response = self.client.post(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('materialcomponentgroup-update-modal', kwargs={'pk': self.group.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        data = {'name': 'Updated Test Group'}
-        response = self.client.post(reverse('materialcomponentgroup-update-modal', kwargs={'pk': self.group.pk}), data)
-        self.assertRedirects(response, reverse('materialcomponentgroup-detail', kwargs={'pk': self.group.pk}))
 
 
 # ----------- Material Property CRUD ----------------------------------------------------------------------------
@@ -699,6 +620,8 @@ class MaterialPropertyModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 
 class MaterialPropertyCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    modal_update_view = True
+
     model = MaterialProperty
 
     view_dashboard_name = 'materials-dashboard'
@@ -707,6 +630,7 @@ class MaterialPropertyCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDV
     view_private_list_name = 'materialproperty-list-owned'
     view_detail_name = 'materialproperty-detail'
     view_update_name = 'materialproperty-update'
+    view_modal_update_name = 'materialproperty-update-modal'
     view_delete_name = 'materialproperty-delete-modal'
 
     create_object_data = {'name': 'Test Property', 'unit': 'Test Unit'}
@@ -728,51 +652,6 @@ class MaterialPropertyModalDetailViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.outsider)
         response = self.client.get(reverse('materialproperty-detail-modal', kwargs={'pk': self.property.pk}))
         self.assertEqual(response.status_code, 200)
-
-
-class MaterialPropertyModalUpdateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'change_materialproperty'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.property = MaterialProperty.objects.create(owner=cls.member, name='Test Property', unit='Test Unit')
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('materialproperty-update-modal', kwargs={'pk': self.property.pk})
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('materialproperty-update-modal', kwargs={'pk': self.property.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('materialproperty-update-modal', kwargs={'pk': self.property.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('materialproperty-update-modal', kwargs={'pk': self.property.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('materialproperty-update-modal', kwargs={'pk': self.property.pk})
-        response = self.client.post(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('materialproperty-update-modal', kwargs={'pk': self.property.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        data = {'name': 'Updated Test Property', 'unit': 'Test Unit'}
-        response = self.client.post(reverse('materialproperty-update-modal', kwargs={'pk': self.property.pk}), data)
-        self.assertRedirects(response, reverse('materialproperty-detail', kwargs={'pk': self.property.pk}))
 
 
 # ----------- Material Property Value CRUD -----------------------------------------------------------------------------
@@ -1221,48 +1100,6 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
             reverse('materialpropertyvalue-delete-modal', kwargs={'pk': property_value.pk}))
         self.assertNotContains(response, 'edit-group-')
         self.assertContains(response, reverse('materials-dashboard'))
-
-
-class SampleUpdateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'change_sample'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.material = Material.objects.create(name='Test Material')
-        cls.series = SampleSeries.objects.create(name='Test Series', material=cls.material)
-        cls.sample = Sample.objects.create(name='Test Sample', material=cls.material, series=cls.series)
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('sample-update', kwargs={'pk': self.series.pk})
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_200_ok_for_owner(self):
-        self.client.force_login(self.sample.owner)
-        response = self.client.get(reverse('sample-update', kwargs={'pk': self.sample.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.sample.owner)
-        response = self.client.get(reverse('sample-update', kwargs={'pk': self.sample.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('sample-update', kwargs={'pk': self.series.pk})
-        response = self.client.post(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_success_and_http_302_redirect_for_owner(self):
-        self.client.force_login(self.sample.owner)
-        data = {
-            'name': 'Updated Test Sample',
-            'material': self.material.pk,
-            'series': self.series.pk,
-            'timestep': Timestep.objects.default().pk,
-        }
-        response = self.client.post(reverse('sample-update', kwargs={'pk': self.sample.pk}), data)
-        self.assertRedirects(response, reverse('sample-detail', kwargs={'pk': self.sample.pk}))
 
 
 # ----------- Sample utilities -----------------------------------------------------------------------------------------
@@ -1818,139 +1655,6 @@ class CompositionModalDetailViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.outsider)
         response = self.client.get(reverse('composition-detail-modal', kwargs={'pk': self.composition.pk}))
         self.assertEqual(response.status_code, 200)
-
-
-class CompositionModalUpdateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ('change_composition', 'change_weightshare')
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        material = Material.objects.create(name='Test Material')
-        group = MaterialComponentGroup.objects.create(name='Test Group')
-        SampleSeries.objects.create(owner=cls.member, name='Test Series', material=material)
-        cls.sample = Sample.objects.get(series__name='Test Series')
-        cls.composition = Composition.objects.create(
-            group=group,
-            sample=Sample.objects.get(series__name='Test Series'),
-            fractions_of=MaterialComponent.objects.default()
-        )
-
-        for i in range(2):
-            component = MaterialComponent.objects.create(name=f'Test Component {i}')
-            WeightShare.objects.create(
-                component=component,
-                composition=cls.composition,
-                average=0.2,
-                standard_deviation=0.01
-            )
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('composition-update-modal', kwargs={'pk': self.composition.pk})
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('composition-update-modal', kwargs={'pk': self.composition.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('composition-update-modal', kwargs={'pk': self.composition.pk}))
-        self.assertEqual(response.status_code, 200)
-        self.assertIn('form', response.context)
-        self.assertIn('formset', response.context)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('composition-update-modal', kwargs={'pk': self.composition.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('composition-update-modal', kwargs={'pk': self.composition.pk})
-        response = self.client.post(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('composition-update-modal', kwargs={'pk': self.composition.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        components = [c.pk for c in MaterialComponent.objects.exclude(name='Fresh Matter (FM)')]
-        shares = [s.pk for s in WeightShare.objects.exclude(component__name='Fresh Matter (FM)')]
-        data = {
-            'shares-INITIAL_FORMS': '2',
-            'shares-TOTAL_FORMS': '2',
-            'shares-0-id': f'{shares[0]}',
-            'shares-0-owner': f'{self.member.pk}',
-            'shares-0-component': f'{components[0]}',
-            'shares-0-average': '45.5',
-            'shares-0-standard_deviation': '1.5',
-            'shares-1-id': f'{shares[1]}',
-            'shares-1-owner': f'{self.member.pk}',
-            'shares-1-component': f'{components[1]}',
-            'shares-1-average': '54.5',
-            'shares-1-standard_deviation': '1.5',
-        }
-        response = self.client.post(reverse('composition-update-modal', kwargs={'pk': self.composition.pk}), data)
-        self.assertRedirects(response, reverse('sample-detail', kwargs={'pk': self.sample.pk}))
-        self.assertEqual(len(WeightShare.objects.all()), 3)
-
-    def test_deleted_forms_are_not_included_in_total_sum_validation(self):
-        self.client.force_login(self.member)
-        components = [c.pk for c in MaterialComponent.objects.exclude(name='Fresh Matter (FM)')]
-        shares = [s.pk for s in WeightShare.objects.exclude(component__name='Fresh Matter (FM)')]
-        new_component = MaterialComponent.objects.create(name='New Component')
-        data = {
-            'shares-INITIAL_FORMS': '2',
-            'shares-TOTAL_FORMS': '3',
-            'shares-0-id': f'{shares[0]}',
-            'shares-0-owner': f'{self.member.pk}',
-            'shares-0-component': f'{components[0]}',
-            'shares-0-average': '45.5',
-            'shares-0-standard_deviation': '1.5',
-            'shares-1-id': f'{shares[1]}',
-            'shares-1-owner': f'{self.member.pk}',
-            'shares-1-component': f'{components[1]}',
-            'shares-1-average': '54.5',
-            'shares-1-standard_deviation': '1.5',
-            'shares-1-DELETE': True,
-            'shares-2-id': '',
-            'shares-2-owner': f'{self.member.pk}',
-            'shares-2-component': f'{new_component.pk}',
-            'shares-2-average': '54.5',
-            'shares-2-standard_deviation': '1.5',
-        }
-        response = self.client.post(reverse('composition-update-modal', kwargs={'pk': self.composition.pk}), data)
-        self.assertEqual(response.status_code, 302)
-
-    def test_deleted_forms_delete_correct_weight_share_record(self):
-        self.client.force_login(self.member)
-        component = MaterialComponent.objects.get(name='Test Component 1')
-        share = WeightShare.objects.create(component=component, composition=self.composition)
-        data = {
-            'shares-INITIAL_FORMS': '1',
-            'shares-TOTAL_FORMS': '2',
-            'shares-0-id': f'{share.pk}',
-            'shares-0-owner': f'{self.member.pk}',
-            'shares-0-component': f'{component.pk}',
-            'shares-0-average': '45.5',
-            'shares-0-standard_deviation': '1.5',
-            'shares-0-DELETE': True,
-            'shares-1-id': f'{share.pk}',
-            'shares-1-owner': f'{self.member.pk}',
-            'shares-1-component': f'{component.pk}',
-            'shares-1-average': '100.0',
-            'shares-1-standard_deviation': '1.5',
-            'shares-1-DELETE': False,
-        }
-        response = self.client.post(reverse('composition-update-modal', kwargs={'pk': self.composition.pk}), data)
-        self.assertEqual(response.status_code, 302)
-        with self.assertRaises(WeightShare.DoesNotExist):
-            WeightShare.objects.get(pk=share.pk)
 
 
 # ----------- Composition utilities ------------------------------------------------------------------------------------

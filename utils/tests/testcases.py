@@ -88,6 +88,7 @@ class AbstractTestCases(object):
         private_list_view = True
         detail_view = True
         update_view = True
+        modal_update_view = False
         delete_view = True
 
         model = None
@@ -98,6 +99,7 @@ class AbstractTestCases(object):
         view_private_list_name = None
         view_detail_name = None
         view_update_name = None
+        view_modal_update_name = None
         view_delete_name = None
         create_object_data = None
         update_object_data = None
@@ -182,6 +184,9 @@ class AbstractTestCases(object):
 
         def get_update_url(self, pk):
             return reverse(self.view_update_name, kwargs={'pk': pk})
+
+        def get_modal_update_url(self, pk):
+            return reverse(self.view_modal_update_name, kwargs={'pk': pk})
 
         def get_delete_url(self, pk):
             return reverse(self.view_delete_name, kwargs={'pk': pk})
@@ -518,6 +523,149 @@ class AbstractTestCases(object):
             # staff can edit any object
             self.client.force_login(self.staff_user)
             url = self.get_update_url(self.unpublished_object.pk)
+            data = self.compile_update_post_data()
+            response = self.client.post(url, data)
+            self.assertRedirects(response, self.get_update_success_url(pk=self.unpublished_object.pk))
+
+        # -----------------------
+        # ModalUpdateView Test Cases
+        # -----------------------
+
+        def test_modal_update_view_get_published_as_anonymous(self):
+            if not self.modal_update_view:
+                self.skipTest("ModalUpdate view is not enabled for this test case.")
+            url = self.get_modal_update_url(self.published_object.pk)
+            response = self.client.get(url)
+            self.assertRedirects(response, f"{settings.LOGIN_URL}?next={url}")
+
+        def test_modal_update_view_post_published_as_anonymous(self):
+            if not self.modal_update_view:
+                self.skipTest("ModalUpdate view is not enabled for this test case.")
+            url = self.get_modal_update_url(self.published_object.pk)
+            response = self.client.post(url)
+            self.assertRedirects(response, f"{settings.LOGIN_URL}?next={url}")
+
+        def test_modal_update_view_get_published_as_owner(self):
+            if not self.modal_update_view:
+                self.skipTest("ModalUpdate view is not enabled for this test case.")
+            # published objects should not be edited anymore
+            self.client.force_login(self.owner_user)
+            url = self.get_modal_update_url(self.published_object.pk)
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 403)
+            self.assertContains(response, self.permission_denied_message, status_code=403)
+
+        def test_modal_update_view_post_published_as_owner(self):
+            if not self.modal_update_view:
+                self.skipTest("ModalUpdate view is not enabled for this test case.")
+            # published objects should not be edited anymore
+            self.client.force_login(self.owner_user)
+            url = self.get_modal_update_url(self.published_object.pk)
+            response = self.client.post(url)
+            self.assertEqual(response.status_code, 403)
+            self.assertContains(response, self.permission_denied_message, status_code=403)
+
+        def test_modal_update_view_get_published_as_non_owner(self):
+            if not self.modal_update_view:
+                self.skipTest("ModalUpdate view is not enabled for this test case.")
+            self.client.force_login(self.non_owner_user)
+            url = self.get_modal_update_url(self.published_object.pk)
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 403)
+            self.assertContains(response, self.permission_denied_message, status_code=403)
+
+        def test_modal_update_view_post_published_as_non_owner(self):
+            if not self.modal_update_view:
+                self.skipTest("ModalUpdate view is not enabled for this test case.")
+            self.client.force_login(self.non_owner_user)
+            url = self.get_modal_update_url(self.published_object.pk)
+            response = self.client.post(url)
+            self.assertEqual(response.status_code, 403)
+            self.assertContains(response, self.permission_denied_message, status_code=403)
+
+        def test_modal_update_view_get_published_as_staff_user(self):
+            if not self.modal_update_view:
+                self.skipTest("ModalUpdate view is not enabled for this test case.")
+            # staff can edit any object
+            self.client.force_login(self.staff_user)
+            url = self.get_modal_update_url(self.published_object.pk)
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200)
+
+        def test_modal_update_view_post_published_as_staff_user(self):
+            if not self.modal_update_view:
+                self.skipTest("ModalUpdate view is not enabled for this test case.")
+            # staff can edit any object
+            self.client.force_login(self.staff_user)
+            url = self.get_modal_update_url(self.published_object.pk)
+            data = self.compile_update_post_data()
+            response = self.client.post(url, data)
+            self.assertRedirects(response, self.get_update_success_url(pk=self.published_object.pk))
+
+        def test_modal_update_view_get_unpublished_as_anonymous(self):
+            if not self.modal_update_view:
+                self.skipTest("ModalUpdate view is not enabled for this test case.")
+            url = self.get_modal_update_url(self.unpublished_object.pk)
+            response = self.client.get(url)
+            self.assertRedirects(response, f"{settings.LOGIN_URL}?next={url}")
+
+        def test_modal_update_view_post_unpublished_as_anonymous(self):
+            if not self.modal_update_view:
+                self.skipTest("ModalUpdate view is not enabled for this test case.")
+            url = self.get_modal_update_url(self.unpublished_object.pk)
+            response = self.client.post(url)
+            self.assertRedirects(response, f"{settings.LOGIN_URL}?next={url}")
+
+        def test_modal_update_view_get_unpublished_as_owner(self):
+            if not self.modal_update_view:
+                self.skipTest("ModalUpdate view is not enabled for this test case.")
+            self.client.force_login(self.owner_user)
+            url = self.get_modal_update_url(self.unpublished_object.pk)
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200)
+
+        def test_modal_update_view_post_unpublished_as_owner(self):
+            if not self.modal_update_view:
+                self.skipTest("ModalUpdate view is not enabled for this test case.")
+            self.client.force_login(self.owner_user)
+            url = self.get_modal_update_url(self.unpublished_object.pk)
+            data = self.compile_update_post_data()
+            response = self.client.post(url, data)
+            self.assertRedirects(response, self.get_update_success_url(pk=self.unpublished_object.pk))
+
+        def test_modal_update_view_get_unpublished_as_non_owner(self):
+            if not self.modal_update_view:
+                self.skipTest("ModalUpdate view is not enabled for this test case.")
+            self.client.force_login(self.non_owner_user)
+            url = self.get_modal_update_url(self.unpublished_object.pk)
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 403)
+            self.assertContains(response, self.permission_denied_message, status_code=403)
+
+        def test_modal_update_view_post_unpublished_as_non_owner(self):
+            if not self.modal_update_view:
+                self.skipTest("ModalUpdate view is not enabled for this test case.")
+            self.client.force_login(self.non_owner_user)
+            url = self.get_modal_update_url(self.unpublished_object.pk)
+            response = self.client.post(url)
+            self.assertEqual(response.status_code, 403)
+            self.assertContains(response, self.permission_denied_message, status_code=403)
+
+        def test_modal_update_view_get_unpublished_as_staff_user(self):
+            if not self.modal_update_view:
+                self.skipTest("ModalUpdate view is not enabled for this test case.")
+            # staff can edit any object
+            self.client.force_login(self.staff_user)
+            url = self.get_modal_update_url(self.unpublished_object.pk)
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200)
+
+        def test_modal_update_view_post_unpublished_as_staff_user(self):
+            if not self.modal_update_view:
+                self.skipTest("ModalUpdate view is not enabled for this test case.")
+            # staff can edit any object
+            self.client.force_login(self.staff_user)
+            url = self.get_modal_update_url(self.unpublished_object.pk)
             data = self.compile_update_post_data()
             response = self.client.post(url, data)
             self.assertRedirects(response, self.get_update_success_url(pk=self.unpublished_object.pk))

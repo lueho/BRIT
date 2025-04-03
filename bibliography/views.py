@@ -68,10 +68,9 @@ class AuthorUpdateView(UserCreatedObjectUpdateView):
     form_class = AuthorModelForm
 
 
-class AuthorModalUpdateView(views.OwnedObjectModalUpdateView):
+class AuthorModalUpdateView(views.UserCreatedObjectModalUpdateView):
     model = Author
     form_class = AuthorModalModelForm
-    permission_required = 'bibliography.change_author'
 
 
 class AuthorModalDeleteView(views.UserCreatedObjectModalDeleteView):
@@ -130,10 +129,9 @@ class LicenceUpdateView(UserCreatedObjectUpdateView):
     form_class = LicenceModelForm
 
 
-class LicenceModalUpdateView(views.OwnedObjectModalUpdateView):
+class LicenceModalUpdateView(views.UserCreatedObjectModalUpdateView):
     model = Licence
     form_class = LicenceModalModelForm
-    permission_required = 'bibliography.change_licence'
 
 
 class LicenceModalDeleteView(views.UserCreatedObjectModalDeleteView):
@@ -193,12 +191,6 @@ class SourceUpdateView(UserCreatedObjectUpdateWithInlinesView):
     model = Source
     form_class = SourceModelForm
     inlines = [SourceAuthorInline]
-
-
-class SourceModalUpdateView(views.OwnedObjectModalUpdateView):
-    model = Source
-    form_class = SourceModalModelForm
-    permission_required = 'bibliography.change_source'
 
 
 class SourceModalDeleteView(views.UserCreatedObjectModalDeleteView):

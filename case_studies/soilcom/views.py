@@ -24,9 +24,10 @@ from maps.views import (CatchmentDetailView, CatchmentUpdateView, GeoDataSetFilt
 from utils.file_export.views import FilteredListFileExportView
 from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineFormSetMixin
 from utils.views import (OwnedObjectCreateView, OwnedObjectModalCreateView, OwnedObjectModalDetailView,
-                         OwnedObjectModalUpdateView, OwnedObjectModelSelectOptionsView, PrivateObjectFilterView,
-                         PrivateObjectListView, PublishedObjectFilterView, PublishedObjectListView,
-                         UserCreatedObjectDetailView, UserCreatedObjectModalDeleteView, UserCreatedObjectUpdateView)
+                         OwnedObjectModelSelectOptionsView, PrivateObjectFilterView, PrivateObjectListView,
+                         PublishedObjectFilterView, PublishedObjectListView, UserCreatedObjectDetailView,
+                         UserCreatedObjectModalDeleteView, UserCreatedObjectModalUpdateView,
+                         UserCreatedObjectUpdateView)
 from .filters import CollectionFilterSet, CollectorFilter, WasteFlyerFilter
 from .forms import (AggregatedCollectionPropertyValueModelForm, BaseWasteFlyerUrlFormSet, CollectionAddPredecessorForm,
                     CollectionAddWasteSampleForm, CollectionFrequencyModalModelForm, CollectionFrequencyModelForm,
@@ -90,10 +91,9 @@ class CollectorUpdateView(UserCreatedObjectUpdateView):
     form_class = CollectorModelForm
 
 
-class CollectorModalUpdateView(OwnedObjectModalUpdateView):
+class CollectorModalUpdateView(UserCreatedObjectModalUpdateView):
     model = Collector
     form_class = CollectorModalModelForm
-    permission_required = 'soilcom.change_collector'
 
 
 class CollectorModalDeleteView(UserCreatedObjectModalDeleteView):
@@ -152,10 +152,9 @@ class CollectionSystemUpdateView(UserCreatedObjectUpdateView):
     form_class = CollectionSystemModelForm
 
 
-class CollectionSystemModalUpdateView(OwnedObjectModalUpdateView):
+class CollectionSystemModalUpdateView(UserCreatedObjectModalUpdateView):
     model = CollectionSystem
     form_class = CollectionSystemModalModelForm
-    permission_required = 'soilcom.change_collectionsystem'
 
 
 class CollectionSystemModalDeleteView(UserCreatedObjectModalDeleteView):
@@ -202,10 +201,9 @@ class WasteCategoryUpdateView(UserCreatedObjectUpdateView):
     form_class = WasteCategoryModelForm
 
 
-class WasteCategoryModalUpdateView(OwnedObjectModalUpdateView):
+class WasteCategoryModalUpdateView(UserCreatedObjectModalUpdateView):
     model = WasteCategory
     form_class = WasteCategoryModalModelForm
-    permission_required = 'soilcom.change_wastecategory'
 
 
 class WasteCategoryModalDeleteView(UserCreatedObjectModalDeleteView):
@@ -252,10 +250,9 @@ class WasteComponentUpdateView(UserCreatedObjectUpdateView):
     form_class = WasteComponentModelForm
 
 
-class WasteComponentModalUpdateView(OwnedObjectModalUpdateView):
+class WasteComponentModalUpdateView(UserCreatedObjectModalUpdateView):
     model = WasteComponent
     form_class = WasteComponentModalModelForm
-    permission_required = 'soilcom.change_wastecomponent'
 
 
 class WasteComponentModalDeleteView(UserCreatedObjectModalDeleteView):
@@ -464,10 +461,9 @@ class FrequencyUpdateView(M2MInlineFormSetMixin, UserCreatedObjectUpdateView):
             return self.render_to_response(context)
 
 
-class FrequencyModalUpdateView(OwnedObjectModalUpdateView):
+class FrequencyModalUpdateView(UserCreatedObjectModalUpdateView):
     model = CollectionFrequency
     form_class = CollectionFrequencyModalModelForm
-    permission_required = 'soilcom.change_collectionfrequency'
 
 
 class FrequencyModalDeleteView(UserCreatedObjectModalDeleteView):

@@ -486,9 +486,9 @@ class UserCreatedObjectUpdateWithInlinesView(UserCreatedObjectWriteAccessMixin, 
         return template_names
 
 
-class OwnedObjectModalUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
+class UserCreatedObjectModalUpdateView(UserCreatedObjectWriteAccessMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
     template_name = 'modal_form.html'
-    success_message = 'Object updated successfully.'
+    success_message = 'Successfully updated.'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -497,9 +497,6 @@ class OwnedObjectModalUpdateView(PermissionRequiredMixin, NextOrSuccessUrlMixin,
             'submit_button_text': 'Save'
         })
         return context
-
-    def get_success_message(self):
-        return str(self.object.pk)
 
 
 class UserCreatedObjectModalDeleteView(UserCreatedObjectWriteAccessMixin, NextOrSuccessUrlMixin, BSModalDeleteView):

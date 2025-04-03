@@ -29,6 +29,8 @@ from ..models import (AggregatedCollectionPropertyValue, Collection, CollectionC
 
 
 class CollectorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    modal_update_view = True
+
     model = Collector
 
     view_dashboard_name = 'wastecollection-dashboard'
@@ -37,6 +39,7 @@ class CollectorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
     view_private_list_name = 'collector-list-owned'
     view_detail_name = 'collector-detail'
     view_update_name = 'collector-update'
+    view_modal_update_name = 'collector-update-modal'
     view_delete_name = 'collector-delete-modal'
 
     create_object_data = {'name': 'Test Collector'}
@@ -48,6 +51,8 @@ class CollectorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
 
 
 class CollectionSystemCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    modal_update_view = True
+
     model = CollectionSystem
 
     view_dashboard_name = 'wastecollection-dashboard'
@@ -56,6 +61,7 @@ class CollectionSystemCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDV
     view_private_list_name = 'collectionsystem-list-owned'
     view_detail_name = 'collectionsystem-detail'
     view_update_name = 'collectionsystem-update'
+    view_modal_update_name = 'collectionsystem-update-modal'
     view_delete_name = 'collectionsystem-delete-modal'
 
     create_object_data = {'name': 'Test Collection System'}
@@ -67,6 +73,8 @@ class CollectionSystemCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDV
 
 
 class WasteCategoryCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    modal_update_view = True
+
     model = WasteCategory
 
     view_dashboard_name = 'wastecollection-dashboard'
@@ -75,6 +83,7 @@ class WasteCategoryCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDView
     view_private_list_name = 'wastecategory-list-owned'
     view_detail_name = 'wastecategory-detail'
     view_update_name = 'wastecategory-update'
+    view_modal_update_name = 'wastecategory-update-modal'
     view_delete_name = 'wastecategory-delete-modal'
 
     create_object_data = {'name': 'Test Waste Category'}
@@ -86,6 +95,8 @@ class WasteCategoryCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDView
 
 
 class WasteComponentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    modal_update_view = True
+
     model = WasteComponent
 
     view_dashboard_name = 'wastecollection-dashboard'
@@ -94,6 +105,7 @@ class WasteComponentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDVie
     view_private_list_name = 'wastecomponent-list-owned'
     view_detail_name = 'wastecomponent-detail'
     view_update_name = 'wastecomponent-update'
+    view_modal_update_name = 'wastecomponent-update-modal'
     view_delete_name = 'wastecomponent-delete-modal'
 
     create_object_data = {'name': 'Test Waste Component'}
@@ -243,6 +255,8 @@ class CollectionFrequencyCreateViewTestCase(ViewWithPermissionsTestCase):
 
 
 class CollectionFrequencyCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    modal_update_view = True
+
     model = CollectionFrequency
 
     view_dashboard_name = 'wastecollection-dashboard'
@@ -251,6 +265,7 @@ class CollectionFrequencyCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCR
     view_private_list_name = 'collectionfrequency-list-owned'
     view_detail_name = 'collectionfrequency-detail'
     view_update_name = 'collectionfrequency-update'
+    view_modal_update_name = 'collectionfrequency-update-modal'
     view_delete_name = 'collectionfrequency-delete-modal'
 
     create_object_data = {'name': 'Test Frequency'}
@@ -380,58 +395,6 @@ class CollectionFrequencyModalDetailViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.outsider)
         response = self.client.get(reverse(self.url_name, kwargs={'pk': self.frequency.pk}))
         self.assertEqual(response.status_code, 200)
-
-
-class CollectionFrequencyModalUpdateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'change_collectionfrequency'
-    url_name = 'collectionfrequency-update-modal'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.frequency = CollectionFrequency.objects.create(name='Test Frequency')
-
-    def test_get_http_302_redirect_for_anonymous(self):
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.frequency.pk}))
-        self.assertEqual(response.status_code, 302)
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.frequency.pk}))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.frequency.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.frequency.pk}))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_for_anonymous(self):
-        response = self.client.post(reverse(self.url_name, kwargs={'pk': self.frequency.pk}),
-                                    data={})
-        self.assertEqual(response.status_code, 302)
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        data = {'name': 'Updated Test Frequency'}
-        response = self.client.post(
-            reverse(self.url_name, kwargs={'pk': self.frequency.pk}),
-            data=data
-        )
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        data = {'name': 'Updated Test Frequency', 'type': 'Fixed-Seasonal'}
-        response = self.client.post(
-            reverse(self.url_name, kwargs={'pk': self.frequency.pk}),
-            data=data
-        )
-        self.assertEqual(response.status_code, 302)
 
 
 # ----------- CollectionPropertyValue CRUD -----------------------------------------------------------------------------
