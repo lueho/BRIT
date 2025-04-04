@@ -1,6 +1,6 @@
 import json
 
-from bootstrap_modal_forms.generic import BSModalCreateView, BSModalReadView, BSModalUpdateView
+from bootstrap_modal_forms.generic import BSModalCreateView, BSModalUpdateView
 from crispy_forms.helper import FormHelper
 from dal import autocomplete
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -58,18 +58,6 @@ class CultureCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, BSModalCreate
 
 class CultureDetailView(UserCreatedObjectDetailView):
     model = Culture
-
-
-class CultureModalDetailView(UserOwnsObjectMixin, BSModalReadView):
-    model = Culture
-    template_name = 'modal_detail.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({
-            'modal_title': 'Culture details',
-        })
-        return context
 
 
 class CultureUpdateView(UserCreatedObjectUpdateView):

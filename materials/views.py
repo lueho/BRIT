@@ -1,4 +1,4 @@
-from bootstrap_modal_forms.generic import BSModalFormView, BSModalReadView, BSModalUpdateView
+from bootstrap_modal_forms.generic import BSModalFormView, BSModalUpdateView
 from crispy_forms.helper import FormHelper
 from dal import autocomplete
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin, UserPassesTestMixin
@@ -12,10 +12,10 @@ from extra_views import UpdateWithInlinesView
 from distributions.models import TemporalDistribution
 from distributions.plots import DoughnutChart
 from utils.views import (NextOrSuccessUrlMixin, OwnedObjectCreateView, OwnedObjectModalCreateView,
-                         OwnedObjectModalDetailView, PrivateObjectFilterView, PrivateObjectListView,
-                         PublishedObjectFilterView, PublishedObjectListView, UserCreatedObjectCreateView,
-                         UserCreatedObjectDetailView, UserCreatedObjectModalCreateView,
-                         UserCreatedObjectModalDeleteView, UserCreatedObjectModalUpdateView,
+                         PrivateObjectFilterView, PrivateObjectListView, PublishedObjectFilterView,
+                         PublishedObjectListView, UserCreatedObjectCreateView, UserCreatedObjectDetailView,
+                         UserCreatedObjectModalCreateView, UserCreatedObjectModalDeleteView,
+                         UserCreatedObjectModalDetailView, UserCreatedObjectModalUpdateView,
                          UserCreatedObjectUpdateView, UserCreatedObjectUpdateWithInlinesView, UserOwnsObjectMixin)
 from .filters import PublishedSampleFilter, SampleSeriesFilter, UserOwnedSampleFilter
 from .forms import (AddComponentModalForm, AddCompositionModalForm, AddLiteratureSourceForm, AddSeasonalVariationForm,
@@ -63,7 +63,7 @@ class MaterialCategoryDetailView(UserCreatedObjectDetailView):
     model = MaterialCategory
 
 
-class MaterialCategoryModalDetailView(OwnedObjectModalDetailView):
+class MaterialCategoryModalDetailView(UserCreatedObjectModalDetailView):
     template_name = 'modal_detail.html'
     model = MaterialCategory
     permission_required = set()
@@ -113,10 +113,8 @@ class MaterialDetailView(UserCreatedObjectDetailView):
     model = Material
 
 
-class MaterialModalDetailView(OwnedObjectModalDetailView):
-    template_name = 'modal_detail.html'
+class MaterialModalDetailView(UserCreatedObjectModalDetailView):
     model = Material
-    permission_required = set()
 
 
 class MaterialUpdateView(UserCreatedObjectUpdateView):
@@ -145,7 +143,7 @@ class MaterialAutocompleteView(autocomplete.Select2QuerySetView):
         return qs
 
 
-# ----------- Material Components CRUD ---------------------------------------------------------------------------------
+# ----------- Material Component CRUD ----------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 
@@ -181,10 +179,8 @@ class ComponentDetailView(UserCreatedObjectDetailView):
     model = MaterialComponent
 
 
-class ComponentModalDetailView(OwnedObjectModalDetailView):
-    template_name = 'modal_detail.html'
+class ComponentModalDetailView(UserCreatedObjectModalDetailView):
     model = MaterialComponent
-    permission_required = set()
 
 
 class ComponentUpdateView(UserCreatedObjectUpdateView):
@@ -220,19 +216,17 @@ class MaterialComponentGroupCreateView(OwnedObjectCreateView):
     permission_required = 'materials.add_materialcomponentgroup'
 
 
-class MaterialComponentGroupDetailView(UserCreatedObjectDetailView):
-    model = MaterialComponentGroup
-
-
 class MaterialComponentGroupModalCreateView(OwnedObjectModalCreateView):
     form_class = ComponentGroupModalModelForm
     permission_required = 'materials.add_materialcomponentgroup'
 
 
-class MaterialComponentGroupModalDetailView(OwnedObjectModalDetailView):
-    template_name = 'modal_detail.html'
+class MaterialComponentGroupDetailView(UserCreatedObjectDetailView):
     model = MaterialComponentGroup
-    permission_required = set()
+
+
+class MaterialComponentGroupModalDetailView(UserCreatedObjectModalDetailView):
+    model = MaterialComponentGroup
 
 
 class MaterialComponentGroupUpdateView(UserCreatedObjectUpdateView):
@@ -276,10 +270,8 @@ class MaterialPropertyDetailView(UserCreatedObjectDetailView):
     model = MaterialProperty
 
 
-class MaterialPropertyModalDetailView(OwnedObjectModalDetailView):
-    template_name = 'modal_detail.html'
+class MaterialPropertyModalDetailView(UserCreatedObjectModalDetailView):
     model = MaterialProperty
-    permission_required = set()
 
 
 class MaterialPropertyUpdateView(UserCreatedObjectUpdateView):
@@ -341,10 +333,8 @@ class SampleSeriesDetailView(UserCreatedObjectDetailView):
         return super().get_context_data(**kwargs)
 
 
-class SampleSeriesModalDetailView(OwnedObjectModalDetailView):
-    template_name = 'modal_detail.html'
+class SampleSeriesModalDetailView(UserCreatedObjectModalDetailView):
     model = SampleSeries
-    permission_required = set()
 
 
 class SampleSeriesUpdateView(UserCreatedObjectUpdateView):
@@ -602,10 +592,8 @@ class CompositionDetailView(UserCreatedObjectDetailView):
         return HttpResponseRedirect(composition.sample.get_absolute_url())
 
 
-class CompositionModalDetailView(OwnedObjectModalDetailView):
-    template_name = 'modal_detail.html'
+class CompositionModalDetailView(UserCreatedObjectModalDetailView):
     model = Composition
-    permission_required = set()
 
 
 class CompositionUpdateView(UserCreatedObjectUpdateWithInlinesView):
@@ -802,7 +790,7 @@ class AddSeasonalVariationView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSu
         return self.get_object().get_absolute_url()
 
 
-class RemoveSeasonalVariationView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalReadView):
+class RemoveSeasonalVariationView(UserCreatedObjectDetailView):
     template_name = 'modal_delete.html'
     model = Composition
 

@@ -29,6 +29,7 @@ from ..models import (AggregatedCollectionPropertyValue, Collection, CollectionC
 
 
 class CollectorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    modal_detail_view = True
     modal_update_view = True
 
     model = Collector
@@ -38,6 +39,7 @@ class CollectorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
     view_published_list_name = 'collector-list'
     view_private_list_name = 'collector-list-owned'
     view_detail_name = 'collector-detail'
+    view_modal_detail_name = 'collector-detail-modal'
     view_update_name = 'collector-update'
     view_modal_update_name = 'collector-update-modal'
     view_delete_name = 'collector-delete-modal'
@@ -51,6 +53,7 @@ class CollectorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
 
 
 class CollectionSystemCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    modal_detail_view = True
     modal_update_view = True
 
     model = CollectionSystem
@@ -60,6 +63,7 @@ class CollectionSystemCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDV
     view_published_list_name = 'collectionsystem-list'
     view_private_list_name = 'collectionsystem-list-owned'
     view_detail_name = 'collectionsystem-detail'
+    view_modal_detail_name = 'collectionsystem-detail-modal'
     view_update_name = 'collectionsystem-update'
     view_modal_update_name = 'collectionsystem-update-modal'
     view_delete_name = 'collectionsystem-delete-modal'
@@ -73,6 +77,7 @@ class CollectionSystemCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDV
 
 
 class WasteCategoryCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    modal_detail_view = True
     modal_update_view = True
 
     model = WasteCategory
@@ -82,6 +87,7 @@ class WasteCategoryCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDView
     view_published_list_name = 'wastecategory-list'
     view_private_list_name = 'wastecategory-list-owned'
     view_detail_name = 'wastecategory-detail'
+    view_modal_detail_name = 'wastecategory-detail-modal'
     view_update_name = 'wastecategory-update'
     view_modal_update_name = 'wastecategory-update-modal'
     view_delete_name = 'wastecategory-delete-modal'
@@ -95,6 +101,7 @@ class WasteCategoryCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDView
 
 
 class WasteComponentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    modal_detail_view = True
     modal_update_view = True
 
     model = WasteComponent
@@ -104,6 +111,7 @@ class WasteComponentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDVie
     view_published_list_name = 'wastecomponent-list'
     view_private_list_name = 'wastecomponent-list-owned'
     view_detail_name = 'wastecomponent-detail'
+    view_modal_detail_name = 'wastecomponent-detail-modal'
     view_update_name = 'wastecomponent-update'
     view_modal_update_name = 'wastecomponent-update-modal'
     view_delete_name = 'wastecomponent-delete-modal'
@@ -132,6 +140,7 @@ class WasteComponentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDVie
 
 class WasteFlyerCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     create_view = False
+    modal_detail_view = True
     update_view = False
     delete_view = False
 
@@ -141,6 +150,7 @@ class WasteFlyerCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
     view_published_list_name = 'wasteflyer-list'
     view_private_list_name = 'wasteflyer-list-owned'
     view_detail_name = 'wasteflyer-detail'
+    view_modal_detail_name = 'wasteflyer-detail-modal'
 
     create_object_data = {'url': 'https://www.test-flyer.org'}
 
@@ -255,6 +265,7 @@ class CollectionFrequencyCreateViewTestCase(ViewWithPermissionsTestCase):
 
 
 class CollectionFrequencyCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    modal_detail_view = True
     modal_update_view = True
 
     model = CollectionFrequency
@@ -264,6 +275,7 @@ class CollectionFrequencyCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCR
     view_published_list_name = 'collectionfrequency-list'
     view_private_list_name = 'collectionfrequency-list-owned'
     view_detail_name = 'collectionfrequency-detail'
+    view_modal_detail_name = 'collectionfrequency-detail-modal'
     view_update_name = 'collectionfrequency-update'
     view_modal_update_name = 'collectionfrequency-update-modal'
     view_delete_name = 'collectionfrequency-delete-modal'
@@ -377,24 +389,6 @@ class CollectionFrequencyCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCR
         self.assertIsNone(self.options_2.option_1)
         self.assertIsNone(self.options_2.option_2)
         self.assertIsNone(self.options_2.option_3)
-
-
-class CollectionFrequencyModalDetailViewTestCase(ViewWithPermissionsTestCase):
-    url_name = 'collectionfrequency-detail-modal'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.frequency = CollectionFrequency.objects.create(name='Test Frequency')
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.frequency.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse(self.url_name, kwargs={'pk': self.frequency.pk}))
-        self.assertEqual(response.status_code, 200)
 
 
 # ----------- CollectionPropertyValue CRUD -----------------------------------------------------------------------------
@@ -793,6 +787,8 @@ class CollectionCreateViewTestCase(ViewWithPermissionsTestCase):
 
 
 class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    modal_detail_view = True
+
     model = Collection
 
     view_dashboard_name = 'wastecollection-dashboard'
@@ -800,6 +796,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
     view_published_list_name = 'collection-list'
     view_private_list_name = 'collection-list-owned'
     view_detail_name = 'collection-detail'
+    view_modal_detail_name = 'collection-detail-modal'
     view_update_name = 'collection-update'
     view_delete_name = 'collection-delete-modal'
 

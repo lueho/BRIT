@@ -12,7 +12,10 @@ from django.views.generic import TemplateView
 from utils import views
 from utils.views import (OwnedObjectCreateWithInlinesView, PrivateObjectFilterView, PrivateObjectListView,
                          PublishedObjectFilterView, PublishedObjectListView, UserCreatedObjectDetailView,
-                         UserCreatedObjectUpdateView, UserCreatedObjectUpdateWithInlinesView)
+                         UserCreatedObjectModalDeleteView, UserCreatedObjectModalDetailView,
+                         UserCreatedObjectModalUpdateView,
+                         UserCreatedObjectUpdateView,
+                         UserCreatedObjectUpdateWithInlinesView)
 from .filters import AuthorFilterSet, SourceFilter
 from .forms import (AuthorModalModelForm, AuthorModelForm, LicenceModalModelForm, LicenceModelForm, SourceAuthorInline,
                     SourceModalModelForm, SourceModelForm)
@@ -57,10 +60,9 @@ class AuthorDetailView(UserCreatedObjectDetailView):
     model = Author
 
 
-class AuthorModalDetailView(views.OwnedObjectModalDetailView):
+class AuthorModalDetailView(UserCreatedObjectModalDetailView):
     template_name = 'author_detail_modal.html'
     model = Author
-    permission_required = set()
 
 
 class AuthorUpdateView(UserCreatedObjectUpdateView):
@@ -68,12 +70,12 @@ class AuthorUpdateView(UserCreatedObjectUpdateView):
     form_class = AuthorModelForm
 
 
-class AuthorModalUpdateView(views.UserCreatedObjectModalUpdateView):
+class AuthorModalUpdateView(UserCreatedObjectModalUpdateView):
     model = Author
     form_class = AuthorModalModelForm
 
 
-class AuthorModalDeleteView(views.UserCreatedObjectModalDeleteView):
+class AuthorModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Author
 
 
@@ -118,10 +120,9 @@ class LicenceDetailView(UserCreatedObjectDetailView):
     model = Licence
 
 
-class LicenceModalDetailView(views.OwnedObjectModalDetailView):
+class LicenceModalDetailView(UserCreatedObjectModalDetailView):
     template_name = 'licence_detail_modal.html'
     model = Licence
-    permission_required = set()
 
 
 class LicenceUpdateView(UserCreatedObjectUpdateView):
@@ -129,12 +130,12 @@ class LicenceUpdateView(UserCreatedObjectUpdateView):
     form_class = LicenceModelForm
 
 
-class LicenceModalUpdateView(views.UserCreatedObjectModalUpdateView):
+class LicenceModalUpdateView(UserCreatedObjectModalUpdateView):
     model = Licence
     form_class = LicenceModalModelForm
 
 
-class LicenceModalDeleteView(views.UserCreatedObjectModalDeleteView):
+class LicenceModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Licence
 
 
@@ -171,10 +172,9 @@ class SourceDetailView(UserCreatedObjectDetailView):
     model = Source
 
 
-class SourceModalDetailView(views.OwnedObjectModalDetailView):
+class SourceModalDetailView(UserCreatedObjectModalDetailView):
     template_name = 'source_detail_modal.html'
     model = Source
-    permission_required = set()
 
     def get_context_data(self, **kwargs):
         # TODO: Documentation
@@ -193,7 +193,7 @@ class SourceUpdateView(UserCreatedObjectUpdateWithInlinesView):
     inlines = [SourceAuthorInline]
 
 
-class SourceModalDeleteView(views.UserCreatedObjectModalDeleteView):
+class SourceModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Source
 
 

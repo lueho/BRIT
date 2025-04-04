@@ -87,6 +87,7 @@ class AbstractTestCases(object):
         public_list_view = True
         private_list_view = True
         detail_view = True
+        modal_detail_view = False
         update_view = True
         modal_update_view = False
         delete_view = True
@@ -98,6 +99,7 @@ class AbstractTestCases(object):
         view_published_list_name = None
         view_private_list_name = None
         view_detail_name = None
+        view_modal_detail_name = None
         view_update_name = None
         view_modal_update_name = None
         view_delete_name = None
@@ -181,6 +183,9 @@ class AbstractTestCases(object):
 
         def get_detail_url(self, pk):
             return reverse(self.view_detail_name, kwargs={'pk': pk})
+
+        def get_modal_detail_url(self, pk):
+            return reverse(self.view_modal_detail_name, kwargs={'pk': pk})
 
         def get_update_url(self, pk):
             return reverse(self.view_update_name, kwargs={'pk': pk})
@@ -381,6 +386,82 @@ class AbstractTestCases(object):
             if not self.detail_view:
                 self.skipTest("Detail view is not enabled for this test case.")
             url = self.get_detail_url(pk=9999)  # Assuming this PK does not exist
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 404)
+
+        # -----------------------
+        # ModalDetailView Test Cases
+        # -----------------------
+
+        def test_modal_detail_view_published_as_anonymous(self):
+            if not self.modal_detail_view:
+                self.skipTest("Modal detail view is not enabled for this test case.")
+            url = self.get_modal_detail_url(self.published_object.pk)
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200)
+            if self.update_view:
+                self.assertNotContains(response, self.get_update_url(self.published_object.pk))
+            if self.delete_view:
+                self.assertNotContains(response, self.get_delete_url(self.published_object.pk))
+
+        def test_modal_detail_view_published_as_authenticated_owner(self):
+            if not self.modal_detail_view:
+                self.skipTest("Modal detail view is not enabled for this test case.")
+            self.client.force_login(self.owner_user)
+            url = self.get_modal_detail_url(self.published_object.pk)
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200)
+            if self.update_view:
+                self.assertNotContains(response, self.get_update_url(self.published_object.pk))
+            if self.delete_view:
+                self.assertNotContains(response, self.get_delete_url(self.published_object.pk))
+
+        def test_modal_detail_view_published_as_authenticated_non_owner(self):
+            if not self.modal_detail_view:
+                self.skipTest("Modal detail view is not enabled for this test case.")
+            self.client.force_login(self.non_owner_user)
+            url = self.get_modal_detail_url(self.published_object.pk)
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200)
+            if self.update_view:
+                self.assertNotContains(response, self.get_update_url(self.published_object.pk))
+            if self.delete_view:
+                self.assertNotContains(response, self.get_delete_url(self.published_object.pk))
+
+        def test_modal_detail_view_unpublished_as_owner(self):
+            if not self.modal_detail_view:
+                self.skipTest("Modal detail view is not enabled for this test case.")
+            self.client.force_login(self.owner_user)
+            url = self.get_modal_detail_url(self.unpublished_object.pk)
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200)
+            if self.update_view:
+                self.assertNotContains(response, self.get_update_url(self.unpublished_object.pk))
+            if self.delete_view:
+                self.assertNotContains(response, self.get_delete_url(self.unpublished_object.pk))
+
+        def test_modal_detail_view_unpublished_as_non_owner(self):
+            if not self.modal_detail_view:
+                self.skipTest("Modal detail view is not enabled for this test case.")
+            self.client.force_login(self.non_owner_user)
+            url = self.get_modal_detail_url(self.unpublished_object.pk)
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 403)
+            self.assertContains(response, self.permission_denied_message, status_code=403)
+
+        def test_modal_detail_view_unpublished_as_anonymous(self):
+            if not self.modal_detail_view:
+                self.skipTest("Modal detail view is not enabled for this test case.")
+            url = self.get_modal_detail_url(self.unpublished_object.pk)
+            response = self.client.get(url)
+            login_url = settings.LOGIN_URL
+            expected_redirect = f"{login_url}?next={url}"
+            self.assertRedirects(response, expected_redirect)
+
+        def test_modal_detail_view_nonexistent_object(self):
+            if not self.modal_detail_view:
+                self.skipTest("Modal detail view is not enabled for this test case.")
+            url = self.get_modal_detail_url(pk=9999)  # Assuming this PK does not exist
             response = self.client.get(url)
             self.assertEqual(response.status_code, 404)
 

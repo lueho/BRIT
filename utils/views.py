@@ -1,6 +1,6 @@
 from urllib.parse import urlencode
 
-from bootstrap_modal_forms.generic import BSModalCreateView, BSModalDeleteView, BSModalReadView, BSModalUpdateView
+from bootstrap_modal_forms.generic import BSModalCreateView, BSModalDeleteView, BSModalUpdateView
 from bootstrap_modal_forms.mixins import is_ajax
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin, UserPassesTestMixin
@@ -414,13 +414,23 @@ class UserCreatedObjectDetailView(UserCreatedObjectReadAccessMixin, DetailView):
         return template_names
 
 
-class OwnedObjectModalDetailView(PermissionRequiredMixin, BSModalReadView):
+class UserCreatedObjectModalDetailView(UserCreatedObjectReadAccessMixin, DetailView):
+    template_name_suffix = "_detail_modal"
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update({
             'modal_title': f'Details of {self.object._meta.verbose_name}',
         })
         return context
+
+    def get_template_names(self):
+        try:
+            template_names = super().get_template_names()
+        except ImproperlyConfigured:
+            template_names = []
+        template_names.append('modal_detail.html')
+        return template_names
 
 
 class UserCreatedObjectUpdateView(UserCreatedObjectWriteAccessMixin, NextOrSuccessUrlMixin, UpdateView):

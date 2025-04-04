@@ -1,8 +1,7 @@
-from bootstrap_modal_forms.generic import BSModalReadView
-
+from utils.views import UserCreatedObjectModalDetailView
 from .models import Timestep
 
 
-class TimestepModalDetailView(BSModalReadView):
+class TimestepModalDetailView(UserCreatedObjectModalDetailView):
     model = Timestep
     template_name = 'timestep_detail_modal.html'

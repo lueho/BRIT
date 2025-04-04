@@ -1005,6 +1005,7 @@ class AttributeModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 
 class AttributeCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    modal_detail_view = True
     modal_update_view = True
 
     model = Attribute
@@ -1014,6 +1015,7 @@ class AttributeCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
     view_published_list_name = 'attribute-list'
     view_private_list_name = 'attribute-list-owned'
     view_detail_name = 'attribute-detail'
+    view_modal_detail_name = 'attribute-detail-modal'
     view_update_name = 'attribute-update'
     view_modal_update_name = 'attribute-update-modal'
     view_delete_name = 'attribute-delete-modal'
@@ -1027,27 +1029,6 @@ class AttributeCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
         'unit': 'Updated Test Unit',
         'description': 'Updated description'
     }
-
-
-class AttributeModalDetailViewTestCase(ViewWithPermissionsTestCase):
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.attribute = Attribute.objects.create(
-            name='Test Attribute',
-            unit='Test Unit',
-            description='This ist a test element'
-        )
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('attribute-detail-modal', kwargs={'pk': self.attribute.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('attribute-detail-modal', kwargs={'pk': self.attribute.pk}))
-        self.assertEqual(response.status_code, 200)
 
 
 # ----------- Region Attribute Value CRUD ------------------------------------------------------------------------------
@@ -1155,6 +1136,7 @@ class RegionAttributeValueModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 
 class RegionAttributeValueCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    modal_detail_view = True
     modal_update_view = True
     public_list_view = False
     private_list_view = False
@@ -1164,6 +1146,7 @@ class RegionAttributeValueCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectC
     view_dashboard_name = 'maps-dashboard'
     view_create_name = 'regionattributevalue-create'
     view_detail_name = 'regionattributevalue-detail'
+    view_modal_detail_name = 'regionattributevalue-detail-modal'
     view_update_name = 'regionattributevalue-update'
     view_modal_update_name = 'regionattributevalue-update-modal'
     view_delete_name = 'regionattributevalue-delete-modal'
@@ -1190,31 +1173,6 @@ class RegionAttributeValueCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectC
 
     def get_delete_success_url(self, publication_status=None):
         return reverse('region-detail', kwargs={'pk': self.related_objects['region'].pk})
-
-
-class RegionAttributeValueModalDetailViewTestCase(ViewWithPermissionsTestCase):
-    value = None
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        region = Region.objects.create(name='Test Region')
-        attribute = Attribute.objects.create(name='Test Attribute', unit='Test Unit')
-        cls.value = RegionAttributeValue.objects.create(
-            name='Test Value',
-            region=region,
-            attribute=attribute,
-            value=123.312
-        )
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('regionattributevalue-detail-modal', kwargs={'pk': self.value.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('regionattributevalue-detail-modal', kwargs={'pk': self.value.pk}))
-        self.assertEqual(response.status_code, 200)
 
 
 # ----------- Region Utils ---------------------------------------------------------------------------------------------
