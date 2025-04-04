@@ -50,9 +50,12 @@ function cleanup_export(export_successful, data, format) {
 }
 
 function addClickEventHandler(format) {
-    document.getElementById('export_' + format).addEventListener('click', function() {
-        export_to_file(this, format);
-    }, false);
+    const element = document.getElementById('export_' + format);
+    if (element) {
+        element.addEventListener('click', function() {
+            export_to_file(this, format);
+        }, false);
+    }
 }
 
 function getLinkElements(format) {
