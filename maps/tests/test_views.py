@@ -3,6 +3,7 @@ from datetime import date
 from unittest.mock import patch
 
 from django.conf import settings
+from django.contrib.auth.models import User
 from django.contrib.gis.geos import MultiPolygon, Point, Polygon
 from django.test import RequestFactory, TestCase
 from django.urls import reverse, reverse_lazy
@@ -792,7 +793,7 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
         if self.dashboard_view:
             self.assertContains(response, self.get_dashboard_url())
         if self.create_view:
-            self.assertContains(response, self.get_create_url()) # This is the difference to the original test function
+            self.assertContains(response, self.get_create_url())  # This is the difference to the original test function
         if self.private_list_view:
             self.assertContains(response, self.get_list_url(publication_status='private'))
 
@@ -805,7 +806,7 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
         if self.dashboard_view:
             self.assertContains(response, self.get_dashboard_url())
         if self.create_view:
-            self.assertContains(response, self.get_create_url()) # This is the difference to the original test function
+            self.assertContains(response, self.get_create_url())  # This is the difference to the original test function
         if self.private_list_view:
             self.assertContains(response, self.get_list_url(publication_status='private'))
 
@@ -819,7 +820,7 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
         if self.dashboard_view:
             self.assertContains(response, self.get_dashboard_url())
         if self.create_view:
-            self.assertContains(response, self.get_create_url()) # This is the difference to the original test function
+            self.assertContains(response, self.get_create_url())  # This is the difference to the original test function
         if self.public_list_view:
             self.assertContains(response, self.get_list_url(publication_status='published'))
 
@@ -832,7 +833,7 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
         if self.dashboard_view:
             self.assertContains(response, self.get_dashboard_url())
         if self.create_view:
-            self.assertContains(response, self.get_create_url()) # This is the difference to the original test function
+            self.assertContains(response, self.get_create_url())  # This is the difference to the original test function
         if self.public_list_view:
             self.assertContains(response, self.get_list_url(publication_status='published'))
 
@@ -1600,3 +1601,33 @@ class RegionOfLauAutocompleteViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(200, response.status_code)
         ids = [region['id'] for region in json.loads(response.content)['results']]
         self.assertListEqual([str(lau.id) for lau in LauRegion.objects.all()], ids)
+
+
+class ClearGeojsonCacheViewTest(TestCase):
+    def setUp(self):
+        self.staff_user = User.objects.create_user(username='staff', password='pass')
+        self.staff_user.is_staff = True
+        self.staff_user.save()
+
+        self.non_staff_user = User.objects.create_user(username='nonstaff', password='pass')
+
+    @patch('maps.views.clear_geojson_cache_pattern')
+    def test_clear_geojson_cache_as_staff(self, mock_clear):
+        self.client.login(username='staff', password='pass')
+        url = reverse('clear-geojson-cache') + '?pattern=testpattern'
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(
+            response.json(),
+            {'status': 'success', 'message': 'Cache cleared with pattern: testpattern'}
+        )
+
+        mock_clear.assert_called_once_with('testpattern')
+
+    def test_clear_geojson_cache_as_non_staff(self):
+        self.client.login(username='nonstaff', password='pass')
+        url = reverse('clear-geojson-cache')
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 403)

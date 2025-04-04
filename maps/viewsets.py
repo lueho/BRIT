@@ -4,10 +4,12 @@ from rest_framework.response import Response
 
 from utils.viewsets import AutoPermModelViewSet
 from .filters import CatchmentFilterSet, RegionFilterSet
+from .mixins import CachedGeoJSONMixin
 from .models import Catchment, Location, NutsRegion, Region
 from .serializers import (CatchmentGeoFeatureModelSerializer, CatchmentModelSerializer,
                           LocationGeoFeatureModelSerializer, LocationModelSerializer, NutsRegionGeometrySerializer,
                           NutsRegionSummarySerializer, RegionGeoFeatureModelSerializer, RegionModelSerializer)
+from .utils import get_catchment_cache_key, get_nuts_region_cache_key, get_region_cache_key
 
 
 class LocationViewSet(AutoPermModelViewSet):
@@ -27,7 +29,7 @@ class LocationViewSet(AutoPermModelViewSet):
         return Response(serializer.data)
 
 
-class RegionViewSet(AutoPermModelViewSet):
+class RegionViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
     queryset = Region.objects.all()
     serializer_class = RegionModelSerializer
     filterset_class = RegionFilterSet
@@ -38,11 +40,15 @@ class RegionViewSet(AutoPermModelViewSet):
         'summaries': None,
     }
 
-    @action(detail=False, methods=['get'])
-    def geojson(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        serializer = RegionGeoFeatureModelSerializer(queryset, many=True, context={'request': request})
-        return Response(serializer.data)
+    def get_cache_key(self, request):
+        filters = request.query_params.dict()
+        region_id = filters.get('id')
+        return get_region_cache_key(region_id, filters)
+
+    def get_serializer_class(self):
+        if self.action == 'geojson':
+            return RegionGeoFeatureModelSerializer
+        return RegionModelSerializer
 
     @action(detail=False, methods=['get'])
     def summaries(self, request, *args, **kwargs):
@@ -53,7 +59,7 @@ class RegionViewSet(AutoPermModelViewSet):
         return Response(summary_data)
 
 
-class CatchmentViewSet(AutoPermModelViewSet):
+class CatchmentViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
     queryset = Catchment.objects.all()
     serializer_class = CatchmentModelSerializer
     filterset_class = CatchmentFilterSet
@@ -63,14 +69,18 @@ class CatchmentViewSet(AutoPermModelViewSet):
         'geojson': None
     }
 
-    @action(detail=False, methods=['get'])
-    def geojson(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        serializer = CatchmentGeoFeatureModelSerializer(queryset, many=True, context={'request': request})
-        return Response(serializer.data)
+    def get_cache_key(self, request):
+        filters = request.query_params.dict()
+        catchment_id = filters.get('id')
+        return get_catchment_cache_key(catchment_id, filters)
+
+    def get_serializer_class(self):
+        if self.action == 'geojson':
+            return CatchmentGeoFeatureModelSerializer
+        return CatchmentModelSerializer
 
 
-class NutsRegionViewSet(AutoPermModelViewSet):
+class NutsRegionViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
     queryset = NutsRegion.objects.all()
     serializer_class = NutsRegionSummarySerializer
     filterset_fields = ('id', 'levl_code', 'cntr_code', 'parent_id')
@@ -80,8 +90,13 @@ class NutsRegionViewSet(AutoPermModelViewSet):
         'geojson': None
     }
 
-    @action(detail=False, methods=['get'])
-    def geojson(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        serializer = NutsRegionGeometrySerializer(queryset, many=True, context={'request': request})
-        return Response(serializer.data)
+    def get_cache_key(self, request):
+        filters = request.query_params.dict()
+        level = filters.get('levl_code')
+        parent_id = filters.get('parent_id')
+        return get_nuts_region_cache_key(level, parent_id, filters)
+
+    def get_serializer_class(self):
+        if self.action == 'geojson':
+            return NutsRegionGeometrySerializer
+        return NutsRegionSummarySerializer

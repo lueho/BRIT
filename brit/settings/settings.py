@@ -71,6 +71,7 @@ MIDDLEWARE = [
     'ambient_toolbox.middleware.current_user.CurrentUserMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    'maps.middleware.CacheMonitoringMiddleware',
 ]
 
 ROOT_URLCONF = 'brit.urls'
@@ -140,10 +141,28 @@ CACHES = {
         "LOCATION": os.environ.get('REDIS_URL'),
         "OPTIONS": {
             "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            "COMPRESSOR": "django_redis.compressors.zlib.ZlibCompressor",
+            "IGNORE_EXCEPTIONS": True,
             "CONNECTION_POOL_KWARGS": {"ssl_cert_reqs": None},
+        }
+    },
+    "geojson": {
+        "BACKEND": "django_redis.cache.RedisCache",
+        "LOCATION": os.environ.get('REDIS_URL'),
+        "TIMEOUT": 86400,  # 24 hours
+        "OPTIONS": {
+            "CLIENT_CLASS": "django_redis.client.DefaultClient",
+            "COMPRESSOR": "django_redis.compressors.zlib.ZlibCompressor",
+            "IGNORE_EXCEPTIONS": True,
+            "CONNECTION_POOL_KWARGS": {"ssl_cert_reqs": None},
+            "KEY_PREFIX": "geojson",  # Differentiate keys for the geojson cache
         }
     }
 }
+
+# Use the geojson cache for all geojson-related operations
+GEOJSON_CACHE = "geojson"
+
 
 SESSION_ENGINE = "django.contrib.sessions.backends.cache"
 SESSION_CACHE_ALIAS = "default"

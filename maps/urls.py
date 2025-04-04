@@ -8,7 +8,7 @@ from .views import (AttributeCreateView, AttributeDetailView, AttributeModalCrea
                     CatchmentCreateSelectRegionView, CatchmentCreateView, CatchmentDetailView, CatchmentModalDeleteView,
                     CatchmentOptionGeometryAPI, CatchmentPrivateFilterView, CatchmentPublishedFilterView,
                     CatchmentRegionGeometryAPI, CatchmentRegionSummaryAPIView, CatchmentUpdateView,
-                    GeoDataSetCreateView, GeoDataSetModalDeleteView, GeoDataSetPrivateFilterView,
+                    ClearGeojsonCacheView, GeoDataSetCreateView, GeoDataSetModalDeleteView, GeoDataSetPrivateFilterView,
                     GeoDataSetPublishedFilterView, GeoDataSetUpdateView, LauRegionOptionsAPI, LocationCreateView,
                     LocationDetailView, LocationModalDeleteView, LocationPrivateListView, LocationPublishedListView,
                     LocationUpdateView,
@@ -91,5 +91,6 @@ urlpatterns = [
     path('locations/<int:pk>/', LocationDetailView.as_view(), name='location-detail'),
     path('locations/<int:pk>/update/', LocationUpdateView.as_view(), name='location-update'),
     path('locations/<int:pk>/delete/', LocationModalDeleteView.as_view(), name='location-delete-modal'),
+    path('clear-geojson-cache/', ClearGeojsonCacheView.as_view(), name='clear-geojson-cache'),
     path('api/', include(router.urls)),
 ]

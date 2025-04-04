@@ -1,5 +1,5 @@
 from dal import autocomplete
-from django.contrib.auth.mixins import LoginRequiredMixin
+from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.gis.geos import MultiPolygon
 from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
@@ -7,6 +7,7 @@ from django.db.models import Q, Subquery
 from django.forms import formset_factory
 from django.http import JsonResponse
 from django.urls import NoReverseMatch, reverse, reverse_lazy
+from django.views import View
 from django.views.generic import TemplateView
 from django.views.generic.edit import FormMixin
 from django_filters.views import FilterView
@@ -29,6 +30,7 @@ from .forms import (AttributeModalModelForm, AttributeModelForm, CatchmentCreate
                     RegionMergeFormSet, RegionModelForm)
 from .models import (Attribute, Catchment, GeoDataset, GeoPolygon, LauRegion, Location, MapConfiguration,
                      ModelMapConfiguration, NutsRegion, Region, RegionAttributeValue)
+from .signals import clear_geojson_cache_pattern
 
 
 class MapMixin:
@@ -907,3 +909,13 @@ class RegionAttributeValueModalDeleteView(OwnedObjectModalDeleteView):
 
 class RegionChildCatchmentOptions(OwnedObjectModelSelectOptionsView):
     model = Catchment
+
+
+class ClearGeojsonCacheView(UserPassesTestMixin, View):
+    def test_func(self):
+        return self.request.user.is_staff
+
+    def get(self, request, *args, **kwargs):
+        pattern = request.GET.get('pattern', '*')
+        clear_geojson_cache_pattern(pattern)
+        return JsonResponse({'status': 'success', 'message': f'Cache cleared with pattern: {pattern}'})
