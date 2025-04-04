@@ -19,10 +19,10 @@ from maps.serializers import (CatchmentGeoFeatureModelSerializer, LauRegionOptio
                               NutsRegionCatchmentOptionSerializer, NutsRegionOptionSerializer,
                               NutsRegionSummarySerializer, RegionGeoFeatureModelSerializer)
 from utils.forms import DynamicTableInlineFormSetHelper
-from utils.views import (OwnedObjectCreateView, OwnedObjectModalCreateView, OwnedObjectModalDetailView,
-                         OwnedObjectModelSelectOptionsView, PrivateObjectFilterView, PrivateObjectListView,
-                         PublishedObjectFilterView, PublishedObjectListView, UserCreatedObjectDetailView,
-                         UserCreatedObjectModalDeleteView, UserCreatedObjectModalUpdateView,
+from utils.views import (OwnedObjectCreateView, OwnedObjectModalCreateView, OwnedObjectModelSelectOptionsView,
+                         PrivateObjectFilterView, PrivateObjectListView, PublishedObjectFilterView,
+                         PublishedObjectListView, UserCreatedObjectDetailView, UserCreatedObjectModalDeleteView,
+                         UserCreatedObjectModalDetailView, UserCreatedObjectModalUpdateView,
                          UserCreatedObjectUpdateView)
 from .filters import CatchmentFilterSet, GeoDataSetFilterSet, NutsRegionFilterSet, RegionFilterSet
 from .forms import (AttributeModalModelForm, AttributeModelForm, CatchmentCreateDrawCustomForm,
@@ -825,10 +825,8 @@ class AttributeDetailView(UserCreatedObjectDetailView):
     model = Attribute
 
 
-class AttributeModalDetailView(OwnedObjectModalDetailView):
-    template_name = 'modal_detail.html'
+class AttributeModalDetailView(UserCreatedObjectModalDetailView):
     model = Attribute
-    permission_required = set()
 
 
 class AttributeUpdateView(UserCreatedObjectUpdateView):
@@ -863,10 +861,8 @@ class RegionAttributeValueDetailView(UserCreatedObjectDetailView):
     model = RegionAttributeValue
 
 
-class RegionAttributeValueModalDetailView(OwnedObjectModalDetailView):
-    template_name = 'modal_detail.html'
+class RegionAttributeValueModalDetailView(UserCreatedObjectModalDetailView):
     model = RegionAttributeValue
-    permission_required = set()
 
 
 class RegionAttributeValueUpdateView(UserCreatedObjectUpdateView):

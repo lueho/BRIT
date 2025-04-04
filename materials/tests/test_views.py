@@ -29,6 +29,7 @@ class MaterialDashboardViewTestCase(ViewWithPermissionsTestCase):
 
 
 class MaterialCategoryCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    modal_detail_view = True
     modal_update_view = True
 
     model = MaterialCategory
@@ -38,6 +39,7 @@ class MaterialCategoryCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDV
     view_published_list_name = 'materialcategory-list'
     view_private_list_name = 'materialcategory-list-owned'
     view_detail_name = 'materialcategory-detail'
+    view_modal_detail_name = 'materialcategory-detail-modal'
     view_update_name = 'materialcategory-update'
     view_modal_update_name = 'materialcategory-update-modal'
     view_delete_name = 'materialcategory-delete-modal'
@@ -129,23 +131,6 @@ class MaterialCategoryModalCreateViewTestCase(ViewWithPermissionsTestCase):
         )
 
 
-class MaterialCategoryModalDetailViewTestCase(ViewWithPermissionsTestCase):
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.category = MaterialCategory.objects.create(name='Test Category')
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('materialcategory-detail-modal', kwargs={'pk': self.category.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('materialcategory-detail-modal', kwargs={'pk': self.category.pk}))
-        self.assertEqual(response.status_code, 200)
-
-
 # ----------- Material CRUD --------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -228,6 +213,7 @@ class MaterialModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 
 class MaterialCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    modal_detail_view = True
     modal_update_view = True
 
     model = Material
@@ -237,6 +223,7 @@ class MaterialCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
     view_published_list_name = 'material-list'
     view_private_list_name = 'material-list-owned'
     view_detail_name = 'material-detail'
+    view_modal_detail_name = 'material-detail-modal'
     view_update_name = 'material-update'
     view_modal_update_name = 'material-update-modal'
     view_delete_name = 'material-delete-modal'
@@ -251,23 +238,6 @@ class MaterialCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
         published_material.name = 'Published Test Material'
         published_material.save()
         return published_material
-
-
-class MaterialModalDetailViewTestCase(ViewWithPermissionsTestCase):
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.material = Material.objects.create(name='Test Material')
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('material-detail-modal', kwargs={'pk': self.material.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('material-detail-modal', kwargs={'pk': self.material.pk}))
-        self.assertEqual(response.status_code, 200)
 
 
 # ----------- Material Component CRUD ----------------------------------------------------------------------------------
@@ -362,6 +332,7 @@ class ComponentModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 
 class MaterialComponentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    modal_detail_view = True
     modal_update_view = True
 
     model = MaterialComponent
@@ -371,6 +342,7 @@ class MaterialComponentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUD
     view_published_list_name = 'materialcomponent-list'
     view_private_list_name = 'materialcomponent-list-owned'
     view_detail_name = 'materialcomponent-detail'
+    view_modal_detail_name = 'materialcomponent-detail-modal'
     view_update_name = 'materialcomponent-update'
     view_modal_update_name = 'materialcomponent-update-modal'
     view_delete_name = 'materialcomponent-delete-modal'
@@ -385,23 +357,6 @@ class MaterialComponentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUD
         published_component.name = 'Published Test Component'
         published_component.save()
         return published_component
-
-
-class ComponentModalDetailViewTestCase(ViewWithPermissionsTestCase):
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.component = MaterialComponent.objects.create(name='Test Component')
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('materialcomponent-detail-modal', kwargs={'pk': self.component.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('materialcomponent-detail-modal', kwargs={'pk': self.component.pk}))
-        self.assertEqual(response.status_code, 200)
 
 
 # ----------- Material Component Group CRUD ----------------------------------------------------------------------------
@@ -491,6 +446,7 @@ class ComponentGroupModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 
 class MaterialComponentGroupCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    modal_detail_view = True
     modal_update_view = True
 
     model = MaterialComponentGroup
@@ -500,6 +456,7 @@ class MaterialComponentGroupCRUDViewsTestCase(AbstractTestCases.UserCreatedObjec
     view_published_list_name = 'materialcomponentgroup-list'
     view_private_list_name = 'materialcomponentgroup-list-owned'
     view_detail_name = 'materialcomponentgroup-detail'
+    view_modal_detail_name = 'materialcomponentgroup-detail-modal'
     view_update_name = 'materialcomponentgroup-update'
     view_modal_update_name = 'materialcomponentgroup-update-modal'
     view_delete_name = 'materialcomponentgroup-delete-modal'
@@ -514,23 +471,6 @@ class MaterialComponentGroupCRUDViewsTestCase(AbstractTestCases.UserCreatedObjec
         published_group.name = 'Published Test Group'
         published_group.save()
         return published_group
-
-
-class ComponentGroupModalDetailViewTestCase(ViewWithPermissionsTestCase):
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.group = MaterialComponentGroup.objects.create(name='Test Group')
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('materialcomponentgroup-detail-modal', kwargs={'pk': self.group.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('materialcomponentgroup-detail-modal', kwargs={'pk': self.group.pk}))
-        self.assertEqual(response.status_code, 200)
 
 
 # ----------- Material Property CRUD ----------------------------------------------------------------------------
@@ -620,6 +560,7 @@ class MaterialPropertyModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 
 class MaterialPropertyCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    modal_detail_view = True
     modal_update_view = True
 
     model = MaterialProperty
@@ -629,29 +570,13 @@ class MaterialPropertyCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDV
     view_published_list_name = 'materialproperty-list'
     view_private_list_name = 'materialproperty-list-owned'
     view_detail_name = 'materialproperty-detail'
+    view_modal_detail_name = 'materialproperty-detail-modal'
     view_update_name = 'materialproperty-update'
     view_modal_update_name = 'materialproperty-update-modal'
     view_delete_name = 'materialproperty-delete-modal'
 
     create_object_data = {'name': 'Test Property', 'unit': 'Test Unit'}
     update_object_data = {'name': 'Updated Test Property', 'unit': 'Test Unit'}
-
-
-class MaterialPropertyModalDetailViewTestCase(ViewWithPermissionsTestCase):
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.property = MaterialProperty.objects.create(name='Test Property', unit='Test Unit')
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('materialproperty-detail-modal', kwargs={'pk': self.property.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('materialproperty-detail-modal', kwargs={'pk': self.property.pk}))
-        self.assertEqual(response.status_code, 200)
 
 
 # ----------- Material Property Value CRUD -----------------------------------------------------------------------------
@@ -818,6 +743,8 @@ class SampleSeriesModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 
 class SampleSeriesCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    modal_detail_view = True
+
     model = SampleSeries
 
     view_dashboard_name = 'materials-dashboard'
@@ -825,6 +752,7 @@ class SampleSeriesCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewT
     view_published_list_name = 'sampleseries-list'
     view_private_list_name = 'sampleseries-list-owned'
     view_detail_name = 'sampleseries-detail'
+    view_modal_detail_name = 'sampleseries-detail-modal'
     view_update_name = 'sampleseries-update'
     view_delete_name = 'sampleseries-delete-modal'
 
@@ -835,49 +763,6 @@ class SampleSeriesCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewT
     def create_related_objects(cls):
         material = Material.objects.create(name='Test Material')
         return {'material': material}
-
-
-class SampleSeriesModalDetailViewTestCase(ViewWithPermissionsTestCase):
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-
-        material = Material.objects.create(name='Test Material')
-        cls.series = SampleSeries.objects.create(name='Test Series', material=material)
-        composition = Composition.objects.create(
-            group=MaterialComponentGroup.objects.create(name='Test Group'),
-            sample=Sample.objects.get(series__name='Test Series'),
-            fractions_of=MaterialComponent.objects.default()
-        )
-
-        temporal_distribution = TemporalDistribution.objects.create(name='Test Distribution')
-        Timestep.objects.create(name='Test Timestep', distribution=temporal_distribution)
-
-        for i in range(2):
-            component = MaterialComponent.objects.create(
-                name=f'Test Component {i}'
-            )
-            WeightShare.objects.create(
-                component=component,
-                composition=composition,
-                average=0.2,
-                standard_deviation=0.01
-            )
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('sampleseries-detail-modal', kwargs={'pk': self.series.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('sampleseries-detail-modal', kwargs={'pk': self.series.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('sampleseries-detail-modal', kwargs={'pk': self.series.pk}))
-        self.assertEqual(response.status_code, 200)
 
 
 # ----------- Sample Series Utilities ----------------------------------------------------------------------------------
@@ -1406,6 +1291,7 @@ class CompositionModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 
 class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    modal_detail_view = True
     public_list_view = False
     private_list_view = False
 
@@ -1414,6 +1300,7 @@ class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
     view_dashboard_name = 'materials-dashboard'
     view_create_name = 'composition-create'
     view_detail_name = 'composition-detail'
+    view_modal_detail_name = 'composition-detail-modal'
     view_update_name = 'composition-update'
     view_delete_name = 'composition-delete-modal'
 
@@ -1634,27 +1521,6 @@ class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
         self.assertEqual(response.status_code, 302)
         with self.assertRaises(WeightShare.DoesNotExist):
             WeightShare.objects.get(id=self.m2m_objects['weight_shares']['unpublished_weight_share_1'].pk)
-
-
-class CompositionModalDetailViewTestCase(ViewWithPermissionsTestCase):
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        material = Material.objects.create(name='Test Material')
-        series = SampleSeries.objects.create(name='Test Series', material=material)
-        sample = Sample.objects.create(name='Test Sample', material=material, series=series)
-        group = MaterialComponentGroup.objects.create(name='Test Group')
-        cls.composition = Composition.objects.create(name='Test Composition', group=group, sample=sample)
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('composition-detail-modal', kwargs={'pk': self.composition.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_logged_in_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('composition-detail-modal', kwargs={'pk': self.composition.pk}))
-        self.assertEqual(response.status_code, 200)
 
 
 # ----------- Composition utilities ------------------------------------------------------------------------------------

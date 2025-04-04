@@ -115,6 +115,7 @@ class AuthorModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 
 class AuthorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    modal_detail_view = True
     modal_update_view = True
 
     model = Author
@@ -124,33 +125,13 @@ class AuthorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
     view_published_list_name = 'author-list'
     view_private_list_name = 'author-list-owned'
     view_detail_name = 'author-detail'
+    view_modal_detail_name = 'author-detail-modal'
     view_update_name = 'author-update'
     view_modal_update_name = 'author-update-modal'
     view_delete_name = 'author-delete-modal'
 
     create_object_data = {'last_names': 'Test Author'}
     update_object_data = {'last_names': 'Updated Author'}
-
-
-class AuthorModalDetailViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ['view_author']
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.author = Author.objects.create(
-            first_names='Test',
-            last_names='Author',
-        )
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('author-detail-modal', kwargs={'pk': self.author.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('author-detail-modal', kwargs={'pk': self.author.pk}))
-        self.assertEqual(response.status_code, 200)
 
 
 # ----------- Author Utils ---------------------------------------------------------------------------------------------
@@ -287,6 +268,7 @@ class LicenceModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 
 class LicenceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    modal_detail_view = True
     modal_update_view = True
 
     model = Licence
@@ -296,33 +278,13 @@ class LicenceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
     view_published_list_name = 'licence-list'
     view_private_list_name = 'licence-list-owned'
     view_detail_name = 'licence-detail'
+    view_modal_detail_name = 'licence-detail-modal'
     view_update_name = 'licence-update'
     view_modal_update_name = 'licence-update-modal'
     view_delete_name = 'licence-delete-modal'
 
     create_object_data = {'name': 'Test Licence'}
     update_object_data = {'name': 'Updated Test Licence'}
-
-
-class LicenceModalDetailViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ['view_licence']
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.licence = Licence.objects.create(
-            name='Test Licence',
-            reference_url='https://www.reference-url.org',
-        )
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('licence-detail-modal', kwargs={'pk': self.licence.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('licence-detail-modal', kwargs={'pk': self.licence.pk}))
-        self.assertEqual(response.status_code, 200)
 
 
 # ----------- Source CRUD ----------------------------------------------------------------------------------------------
@@ -463,6 +425,8 @@ class SourceModalCreateViewTestCase(ViewWithPermissionsTestCase):
 
 
 class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    modal_detail_view = True
+
     model = Source
 
     view_dashboard_name = 'bibliography-dashboard'
@@ -470,6 +434,7 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
     view_published_list_name = 'source-list'
     view_private_list_name = 'source-list-owned'
     view_detail_name = 'source-detail'
+    view_modal_detail_name = 'source-detail-modal'
     view_update_name = 'source-update'
     view_delete_name = 'source-delete-modal'
 
@@ -543,29 +508,6 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         self.client.force_login(self.non_owner_user)
         response = self.client.get(self.get_detail_url(self.published_object.pk))
         self.assertNotContains(response, 'check url')
-
-
-class SourceModalDetailViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ['view_source']
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        with mute_signals(post_save):
-            cls.source = Source.objects.create(
-                abbreviation='TS1',
-                type='article',
-                title='Test Source'
-            )
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse('source-detail-modal', kwargs={'pk': self.source.pk}))
-        self.assertEqual(response.status_code, 200)
-
-    def test_get_http_200_ok_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('source-detail-modal', kwargs={'pk': self.source.pk}))
-        self.assertEqual(response.status_code, 200)
 
 
 @patch('bibliography.views.check_source_url.delay')

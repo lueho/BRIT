@@ -23,10 +23,10 @@ from maps.views import (CatchmentDetailView, CatchmentUpdateView, GeoDataSetFilt
                         MapMixin)
 from utils.file_export.views import FilteredListFileExportView
 from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineFormSetMixin
-from utils.views import (OwnedObjectCreateView, OwnedObjectModalCreateView, OwnedObjectModalDetailView,
-                         OwnedObjectModelSelectOptionsView, PrivateObjectFilterView, PrivateObjectListView,
-                         PublishedObjectFilterView, PublishedObjectListView, UserCreatedObjectDetailView,
-                         UserCreatedObjectModalDeleteView, UserCreatedObjectModalUpdateView,
+from utils.views import (OwnedObjectCreateView, OwnedObjectModalCreateView, OwnedObjectModelSelectOptionsView,
+                         PrivateObjectFilterView, PrivateObjectListView, PublishedObjectFilterView,
+                         PublishedObjectListView, UserCreatedObjectDetailView, UserCreatedObjectModalDeleteView,
+                         UserCreatedObjectModalDetailView, UserCreatedObjectModalUpdateView,
                          UserCreatedObjectUpdateView)
 from .filters import CollectionFilterSet, CollectorFilter, WasteFlyerFilter
 from .forms import (AggregatedCollectionPropertyValueModelForm, BaseWasteFlyerUrlFormSet, CollectionAddPredecessorForm,
@@ -80,10 +80,8 @@ class CollectorDetailView(UserCreatedObjectDetailView):
     model = Collector
 
 
-class CollectorModalDetailView(OwnedObjectModalDetailView):
-    template_name = 'modal_detail.html'
+class CollectorModalDetailView(UserCreatedObjectModalDetailView):
     model = Collector
-    permission_required = 'soilcom.view_collector'
 
 
 class CollectorUpdateView(UserCreatedObjectUpdateView):
@@ -141,10 +139,8 @@ class CollectionSystemDetailView(UserCreatedObjectDetailView):
     model = CollectionSystem
 
 
-class CollectionSystemModalDetailView(OwnedObjectModalDetailView):
-    template_name = 'modal_detail.html'
+class CollectionSystemModalDetailView(UserCreatedObjectModalDetailView):
     model = CollectionSystem
-    permission_required = 'soilcom.view_collectionsystem'
 
 
 class CollectionSystemUpdateView(UserCreatedObjectUpdateView):
@@ -190,10 +186,8 @@ class WasteCategoryDetailView(UserCreatedObjectDetailView):
     model = WasteCategory
 
 
-class WasteCategoryModalDetailView(OwnedObjectModalDetailView):
-    template_name = 'modal_detail.html'
+class WasteCategoryModalDetailView(UserCreatedObjectModalDetailView):
     model = WasteCategory
-    permission_required = 'soilcom.view_wastecategory'
 
 
 class WasteCategoryUpdateView(UserCreatedObjectUpdateView):
@@ -239,10 +233,8 @@ class WasteComponentDetailView(UserCreatedObjectDetailView):
     model = WasteComponent
 
 
-class WasteComponentModalDetailView(OwnedObjectModalDetailView):
-    template_name = 'modal_detail.html'
+class WasteComponentModalDetailView(UserCreatedObjectModalDetailView):
     model = WasteComponent
-    permission_required = 'soilcom.view_wastecomponent'
 
 
 class WasteComponentUpdateView(UserCreatedObjectUpdateView):
@@ -303,7 +295,6 @@ class WasteFlyerDetailView(UserCreatedObjectDetailView):
 class WasteFlyerModalDetailView(SourceModalDetailView):
     template_name = 'modal_waste_flyer_detail.html'
     model = WasteFlyer
-    permission_required = 'soilcom.view_wasteflyer'
 
 
 # There is no WasteFlyerUpdateView because wasteflyers are not managed separately only through the collections
@@ -312,7 +303,6 @@ class WasteFlyerModalDetailView(SourceModalDetailView):
 
 class WasteFlyerModalDeleteView(SourceModalDeleteView):
     success_url = reverse_lazy('wasteflyer-list')
-    permission_required = 'soilcom.delete_wasteflyer'
 
 
 # ----------- Waste Collection Flyer utils -----------------------------------------------------------------------------
@@ -416,10 +406,8 @@ class FrequencyDetailView(UserCreatedObjectDetailView):
     model = CollectionFrequency
 
 
-class FrequencyModalDetailView(OwnedObjectModalDetailView):
-    template_name = 'modal_detail.html'
+class FrequencyModalDetailView(UserCreatedObjectModalDetailView):
     model = CollectionFrequency
-    permission_required = set()
 
 
 class FrequencyUpdateView(M2MInlineFormSetMixin, UserCreatedObjectUpdateView):
@@ -701,10 +689,8 @@ class CollectionDetailView(UserCreatedObjectDetailView):
     model = Collection
 
 
-class CollectionModalDetailView(OwnedObjectModalDetailView):
-    template_name = 'modal_detail.html'
+class CollectionModalDetailView(UserCreatedObjectModalDetailView):
     model = Collection
-    permission_required = 'soilcom.view_collection'
 
 
 class CollectionUpdateView(M2MInlineFormSetMixin, UserCreatedObjectUpdateView):
