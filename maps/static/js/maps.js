@@ -44,6 +44,149 @@ let catchmentLayerStyle;
 let featuresLayerStyle;
 const defaultLayerOrder = ['region', 'catchment', 'features'];
 
+// --- Cache Configuration ---
+const clientCacheConfig = {
+    maxAge: 3600000, // 1 hour in milliseconds
+    maxEntries: 500, // Maximum number of entries to keep in the cache
+    cacheName: 'britMapsCache',
+    cacheVersion: 2 // Increment to force cache invalidation on schema changes
+};
+
+function initializeDB() {
+    return new Promise((resolve, reject) => {
+        const request = indexedDB.open(clientCacheConfig.cacheName, clientCacheConfig.cacheVersion);
+
+        request.onerror = event => {
+            console.error('IndexedDB error:', event);
+            reject('IndexedDB error');
+        };
+
+        request.onupgradeneeded = event => {
+            const db = event.target.result;
+            if (!db.objectStoreNames.contains('geojson')) {
+                const geojsonStore = db.createObjectStore('geojson', {keyPath: 'url'});
+                geojsonStore.createIndex('timestamp', 'timestamp'); // Add index for efficient cleanup
+            }
+        };
+
+        request.onsuccess = event => {
+            resolve(event.target.result);
+        };
+    });
+}
+
+async function storeInIndexedDB(url, data) {
+    try {
+        const db = await initializeDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(['geojson'], 'readwrite');
+            const store = transaction.objectStore('geojson');
+
+            const entry = {
+                url: url,
+                data: data,
+                timestamp: Date.now()
+            };
+
+            const request = store.put(entry);
+
+            request.onsuccess = () => resolve();
+            request.onerror = event => {
+                console.error('Error storing in IndexedDB:', event);
+                reject(event);
+            };
+        });
+    } catch (error) {
+        console.warn('Error accessing IndexedDB:', error);
+    }
+}
+
+async function getFromIndexedDB(url) {
+    try {
+        const db = await initializeDB();
+        return new Promise((resolve, reject) => {
+            const transaction = db.transaction(['geojson'], 'readonly');
+            const store = transaction.objectStore('geojson');
+            const request = store.get(url);
+
+            request.onsuccess = event => {
+                const entry = event.target.result;
+                if (entry && (Date.now() - entry.timestamp) < clientCacheConfig.maxAge) {
+                    console.log(`Cache hit for: ${url}`);
+                    resolve(entry.data);
+                } else {
+                    console.log(`Cache miss for: ${url}`);
+                    resolve(null);
+                }
+            };
+
+            request.onerror = event => {
+                console.error('Error retrieving from IndexedDB:', event);
+                reject(event);
+            };
+        });
+    } catch (error) {
+        console.warn('Error accessing IndexedDB:', error);
+        return null;
+    }
+}
+
+function normalizeUrl(url) {
+    try {
+        const urlObj = new URL(url);
+        urlObj.searchParams.delete("csrfmiddlewaretoken");
+
+        // Remove any parameters with empty string values
+        for (const [key, value] of Array.from(urlObj.searchParams.entries())) {
+            if (value.trim() === "") {
+                urlObj.searchParams.delete(key);
+            }
+        }
+        // Sort query parameters for consistent cache keys
+        urlObj.searchParams.sort();
+        return urlObj.toString();
+    } catch (e) {
+        console.error("Error normalizing URL:", e);
+        return url; // Fallback if URL parsing fails.
+    }
+}
+
+// Function to clean up the cache if it exceeds the maximum number of entries (LRU)
+async function cleanupCache() {
+    try {
+        const db = await initializeDB();
+        const transaction = db.transaction(['geojson'], 'readwrite');
+        const store = transaction.objectStore('geojson');
+        const index = store.index('timestamp');
+        const request = index.openCursor(null, 'prev'); // Get entries ordered by timestamp (oldest first)
+        let count = 0;
+        const keysToDelete = [];
+
+        request.onsuccess = event => {
+            const cursor = event.target.result;
+            if (cursor) {
+                count++;
+                if (count > clientCacheConfig.maxEntries) {
+                    keysToDelete.push(cursor.primaryKey);
+                }
+                cursor.continue();
+            } else {
+                // Delete the extra entries
+                keysToDelete.forEach(key => store.delete(key));
+                if (keysToDelete.length > 0) {
+                    console.log(`Cleaned up ${keysToDelete.length} old cache entries.`);
+                }
+            }
+        };
+
+        request.onerror = event => {
+            console.error('Error cleaning up cache:', event);
+        };
+
+    } catch (error) {
+        console.warn('Error accessing IndexedDB for cache cleanup:', error);
+    }
+}
 
 function showLoadingIndicator() {
     map.spin(true);
@@ -249,23 +392,75 @@ function buildUrl(base, params) {
 async function fetchRegionGeometry(params) {
     validateParams(params, ['id']);
     const url = buildUrl(mapConfig.regionLayerGeometriesUrl, {id: params.id});
-    const geoJson = await fetchData(url);
-    renderRegion(geoJson);
+    const normalizedUrl = normalizeUrl(url);
+
+    try {
+        const cachedData = await getFromIndexedDB(normalizedUrl);
+        if (cachedData) {
+            renderRegion(cachedData);
+            return;
+        }
+        const geoJson = await fetchData(url);
+        await storeInIndexedDB(normalizedUrl, geoJson);
+        await cleanupCache();
+        renderRegion(geoJson);
+    } catch (error) {
+        console.error('Error fetching region geometry:', error);
+        displayErrorMessage(error);
+    }
 }
 
 async function fetchCatchmentGeometry(params) {
     validateParams(params, ['id']);
     const url = buildUrl(mapConfig.catchmentLayerGeometriesUrl, {id: params.id});
-    const geoJson = await fetchData(url);
-    renderCatchment(geoJson);
+    const normalizedUrl = normalizeUrl(url);
+
+    try {
+        const cachedData = await getFromIndexedDB(normalizedUrl);
+        if (cachedData) {
+            renderCatchment(cachedData);
+            return;
+        }
+        const geoJson = await fetchData(url);
+        await storeInIndexedDB(normalizedUrl, geoJson);
+        await cleanupCache();
+        renderCatchment(geoJson);
+    } catch (error) {
+        console.error('Error fetching catchment geometry:', error);
+        displayErrorMessage(error);
+    }
 }
 
 async function fetchFeatureGeometries(params) {
     hideMapOverlay();
+    // Use featuresId if set; otherwise, use provided params.
     const finalParams = mapConfig.featuresId ? {id: mapConfig.featuresId} : params;
     const url = buildUrl(mapConfig.featuresLayerGeometriesUrl, finalParams);
-    const geoJson = await fetchData(url);
-    renderFeatures(geoJson);
+
+    // Generate a normalized key to use for caching
+    const cacheKey = normalizeUrl(url);
+
+    console.log('Fetching features for URL:', url, 'with finalParams:', finalParams);
+    console.log('Normalized cache key:', cacheKey);
+
+    try {
+        const cachedData = await getFromIndexedDB(cacheKey);
+        if (cachedData) {
+            console.log('Cache hit for feature data:', cachedData);
+            renderFeatures(cachedData);
+            return;
+        } else {
+            console.log('No valid cache found for features. Proceeding to fetch from network.');
+        }
+        const geoJson = await fetchData(url);
+        console.log('Fetched features from network:', geoJson);
+        await storeInIndexedDB(cacheKey, geoJson);
+        await cleanupCache();
+        renderFeatures(geoJson);
+    } catch (error) {
+        console.error('Error fetching feature geometries:', error);
+        displayErrorMessage(error);
+    }
 }
 
 /**
@@ -654,8 +849,28 @@ function renderFeatureDetails(data) {
 
     container.appendChild(fragment);
     document.querySelector('#info-card-body').classList.add('show');
-
 }
+
+// This function needs to be defined elsewhere in your code
+// async function clickedFeature(event) { ... }
+
+// This function needs to be defined elsewhere in your code
+// function scrollToSummaries() { ... }
+
+// This function needs to be defined elsewhere in your code
+// function updateUrls(fid) { ... }
+
+// This object needs to be defined elsewhere in your code
+// const fieldConfig = { ... };
+
+// This function needs to be defined elsewhere in your code
+// function parseFilterParameters() { ... }
+
+// This function needs to be defined elsewhere in your code
+// function lockCustomElements() { ... }
+
+// This function needs to be defined elsewhere in your code
+// function unlockCustomElements() { ... }
 
 function scrollToSummaries() {
     // This is a hook for implementing behaviour when a feature details are rendered.
