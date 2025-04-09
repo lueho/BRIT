@@ -5,7 +5,10 @@ from . import views
 from .router import router
 
 urlpatterns = [
-    path('explorer/', views.CollectionHomeView.as_view(), name='wastecollection-dashboard'),
+    path('explorer/', views.CollectionDashboardView.as_view(), name='wastecollection-dashboard'),
+    path('catchments/', views.CollectionCatchmentPublishedFilterView.as_view(), name='collectioncatchment-list'),
+    path('catchments/user/', views.CollectionCatchmentPrivateFilterView.as_view(), name='collectioncatchment-list-owned'),
+    path('catchments/create/', views.CollectionCatchmentCreateView.as_view(), name='collectioncatchment-create'),
     path('catchments/<int:pk>/', views.CollectionCatchmentDetailView.as_view(), name='collectioncatchment-detail'),
     path('catchments/<int:pk>/update/', views.CollectionCatchmentUpdateView.as_view(), name='collectioncatchment-update'),
     path('catchments/<int:pk>/delete/modal/', CatchmentModalDeleteView.as_view(), name='collectioncatchment-delete-modal'),
@@ -128,7 +131,6 @@ urlpatterns = [
     path('collections/autocomplete/', views.CollectionAutoCompleteView.as_view(), name='collection-autocomplete'),
     path('collections/map/', views.WasteCollectionMapView.as_view(), name='WasteCollection'),
     path('collections/map/iframe/', views.WasteCollectionMapIframeView.as_view(), name='WasteCollectionIframe'),
-    path('catchment_selection/', views.CatchmentSelectView.as_view(), name='catchment-selection'),
     path('api/', include(router.urls)),
     path('collections/export/', views.CollectionListFileExportView.as_view(), name='collection-export'),
 ]

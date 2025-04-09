@@ -48,22 +48,22 @@
     </table>
 {% endblock list_table %}
 
+{% block list_card_footer_create_link %}
+    <a class="mr-2 text-nowrap" href="{{ create_url }}">
+        <i class="fas fa-fw fa-plus"></i> {{ create_url_text }}
+    </a>
+{% endblock list_card_footer_create_link %}
+
 {% block list_card_footer_additional_links %}
     <a class="mr-2 text-nowrap"
        href="{% url 'WasteCollection' %}?{{ request.GET.urlencode }}&load_catchment=true&load_features=true">
         <i class="fa fa-fw fa-map"></i>
         <span class="text-nowrap">View as map</span>
     </a>
-    {% if 'soilcom.change_collection' in perms %}
-        <a class="mr-2 text-nowrap" href="{% url 'wastecollection-dashboard' %}">
-            <i class="fas fa-fw fa-th-large"></i>
-            <span>Explorer</span>
-        </a>
-        <a class="mr-2 text-nowrap" href="{% url 'aggregatedcollectionpropertyvalue-create' %}">
-            <i class="fas fa-fw fa-plus-circle"></i>
-            <span>Add property to collection group</span>
-        </a>
-    {% endif %}
+    <a class="mr-2 text-nowrap" href="{% url 'aggregatedcollectionpropertyvalue-create' %}">
+        <i class="fas fa-fw fa-plus-circle"></i>
+        <span>Add property to collection group</span>
+    </a>
     {% if user.is_authenticated %}
         {% export_link "csv" 'collection-export' %}
         {% export_link "xlsx" 'collection-export' %}

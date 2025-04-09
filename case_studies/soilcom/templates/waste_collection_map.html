@@ -7,16 +7,26 @@
     <a class="mr-2 text-nowrap"
        href="javascript:void(0)"
        id="link-collections-as-list"
-       data-href-template="/waste_collection/collections/"
+       data-href-template="{{ object_list.model.public_list_url }}"
        onclick="clickedListLink()">
         <i class="fa fa-fw fa-list"></i>
         View as list
     </a>
+    <a class="mr-2 text-nowrap" href="{% url 'wastecollection-dashboard' %}">
+        <i class="fas fa-fw fa-th-large"></i>
+        <span>Explorer</span>
+    </a>
+    {% if create_permission in perms or user.is_staff %}
+        <a class="mr-2 text-nowrap" href="{% url 'collection-create' %}">
+            <i class="fas fa-fw fa-plus"></i> Create new collection
+        </a>
+    {% endif %}
     {% if user.is_authenticated %}
         {% export_link "csv" 'collection-export' %}
         {% export_link "xlsx" 'collection-export' %}
     {% endif %}
-{% endblock %}
+
+{% endblock map_card_footer %}
 
 {% block user_actions %}
     <form method="get">
@@ -83,18 +93,16 @@
                 </div>
             </div>
 
-            {% if 'soilcom.change_collection' in perms %}
-                <div class="row mt-3">
-                    <div class="col">
-                        <div class="text-center">
-                            <a class="btn btn-primary w-75"
-                               href="{% url 'wastecollection-dashboard' %}">
-                                Waste collection explorer
-                            </a>
-                        </div>
+            <div class="row mt-3">
+                <div class="col">
+                    <div class="text-center">
+                        <a class="btn btn-primary w-75"
+                           href="{% url 'wastecollection-dashboard' %}">
+                            Waste collection explorer
+                        </a>
                     </div>
                 </div>
-            {% endif %}
+            </div>
 
             {% if 'soilcom.add_collection' in perms %}
                 <div class="row mt-3">
@@ -102,9 +110,7 @@
                         <div class="text-center">
                             <a id="btn-collection-create"
                                class="btn btn-primary w-75"
-                               data-href-template="{% url 'catchment-selection' %}"
-                               href="javascript:void(0)"
-                               onclick="clickedCreateButton()">
+                               href="{% url 'collection-create' %}">
                                 Add new collection
                             </a>
                         </div>
@@ -127,7 +133,7 @@
                 </div>
             {% endif %}
 
-            {# TODO: Enable this link also for owners  #}
+            {# TODO: Make these links available to the owner #}
             {% if user.is_staff %}
                 <div class="row mt-3">
                     <div class="col">
@@ -143,7 +149,7 @@
                 </div>
             {% endif %}
 
-            {% if 'soilcom.delete_collection' in perms %}
+            {% if user.is_staff %}
                 <div class="row mt-3">
                     <div class="col">
                         <div class="text-center">
@@ -200,8 +206,6 @@
                     </a>
                 </li>
             </ul>
-
-
         </div>
     </div>
 {% endblock user_actions %}
@@ -212,5 +216,4 @@
     <script src="{% static 'lib/turf-inside/inside.min.js' %}"></script>
     <script src="{% static 'js/waste_collection_map.min.js' %}"></script>
     <script src="{% static 'js/file_export.min.js' %}"></script>
-
 {% endblock javascript %}

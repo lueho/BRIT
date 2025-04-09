@@ -19,8 +19,8 @@ from bibliography.views import (SourceCheckUrlView, SourceCreateView, SourceModa
                                 SourceModalDetailView)
 from maps.filters import CatchmentFilterSet
 from maps.forms import NutsAndLauCatchmentQueryForm
-from maps.views import (CatchmentDetailView, CatchmentUpdateView, GeoDataSetFilteredMapView, GeoDataSetFormMixin,
-                        MapMixin)
+from maps.views import (CatchmentCreateView, CatchmentDetailView, CatchmentUpdateView, GeoDataSetFilteredMapView,
+                        GeoDataSetFormMixin, MapMixin)
 from utils.file_export.views import FilteredListFileExportView
 from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineFormSetMixin
 from utils.views import (OwnedObjectCreateView, OwnedObjectModalCreateView, OwnedObjectModelSelectOptionsView,
@@ -43,9 +43,8 @@ from .models import (AggregatedCollectionPropertyValue, Collection, CollectionCa
 from .tasks import check_wasteflyer_urls
 
 
-class CollectionHomeView(PermissionRequiredMixin, TemplateView):
+class CollectionDashboardView(TemplateView):
     template_name = 'wastecollection_dashboard.html'
-    permission_required = 'soilcom.view_collection'
 
 
 # ----------- Collector CRUD -------------------------------------------------------------------------------------------
@@ -532,11 +531,17 @@ class AggregatedCollectionPropertyValueModalDeleteView(UserCreatedObjectModalDel
 class CollectionCatchmentPublishedFilterView(PublishedObjectFilterView):
     model = CollectionCatchment
     filterset_class = CatchmentFilterSet
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
 
 
 class CollectionCatchmentPrivateFilterView(PrivateObjectFilterView):
     model = CollectionCatchment
     filterset_class = CatchmentFilterSet
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
+
+
+class CollectionCatchmentCreateView(CatchmentCreateView):
+    pass
 
 
 class CollectionCatchmentDetailView(CatchmentDetailView):
@@ -861,7 +866,7 @@ class CollectionPredecessorsView(UserCreatedObjectUpdateView):
 # ----------- Maps -----------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-
+# TODO: This is out of use - Decide to fix or remove
 class CatchmentSelectView(GeoDataSetFormMixin, MapMixin, TemplateView):
     template_name = 'waste_collection_catchment_list.html'
     form_class = NutsAndLauCatchmentQueryForm

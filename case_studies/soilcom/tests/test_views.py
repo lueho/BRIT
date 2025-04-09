@@ -605,12 +605,11 @@ class AggregatedCollectionPropertyValueCRUDViewsTestCase(AbstractTestCases.UserC
 
 
 class CollectionCatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
-    public_list_view = False
-    private_list_view = False
-
     model = CollectionCatchment
 
     view_dashboard_name = 'wastecollection-dashboard'
+    view_published_list_name = 'collectioncatchment-list'
+    view_private_list_name = 'collectioncatchment-list-owned'
     view_create_name = 'collectioncatchment-create'
     view_detail_name = 'collectioncatchment-detail'
     view_update_name = 'collectioncatchment-update'
@@ -628,6 +627,59 @@ class CollectionCatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCR
     def test_collectioncatchment_template_is_used(self):
         response = self.client.get(self.get_detail_url(self.published_object.pk))
         self.assertTemplateUsed(response, 'soilcom/collectioncatchment_detail.html')
+
+    def test_list_view_published_as_authenticated_owner(self):
+        if not self.public_list_view:
+            self.skipTest("List view is not enabled for this test case.")
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_list_url(publication_status='published'))
+        self.assertEqual(response.status_code, 200)
+        if self.dashboard_view:
+            self.assertContains(response, self.get_dashboard_url())
+        if self.create_view:
+            self.assertContains(response, self.get_create_url())  # This is the custom line
+        if self.private_list_view:
+            self.assertContains(response, self.get_list_url(publication_status='private'))
+
+    def test_list_view_published_as_authenticated_non_owner(self):
+        if not self.public_list_view:
+            self.skipTest("List view is not enabled for this test case.")
+        self.client.force_login(self.non_owner_user)
+        response = self.client.get(self.get_list_url(publication_status='published'))
+        self.assertEqual(response.status_code, 200)
+        if self.dashboard_view:
+            self.assertContains(response, self.get_dashboard_url())
+        if self.create_view:
+            self.assertContains(response, self.get_create_url())  # This is the custom line
+        if self.private_list_view:
+            self.assertContains(response, self.get_list_url(publication_status='private'))
+
+    def test_list_view_private_as_authenticated_owner(self):
+        if not self.private_list_view:
+            self.skipTest("List view is not enabled for this test case")
+        self.client.force_login(self.owner_user)
+        response = self.client.get(self.get_list_url(publication_status='private'))
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, '<th>Public</th>')
+        if self.dashboard_view:
+            self.assertContains(response, self.get_dashboard_url())
+        if self.create_view:
+            self.assertContains(response, self.get_create_url())  # This is the custom line
+        if self.public_list_view:
+            self.assertContains(response, self.get_list_url(publication_status='published'))
+
+    def test_list_view_private_as_authenticated_non_owner(self):
+        if not self.private_list_view:
+            self.skipTest("List view is not enabled for this test case")
+        self.client.force_login(self.non_owner_user)
+        response = self.client.get(self.get_list_url(publication_status='private'))
+        self.assertEqual(response.status_code, 200)
+        if self.dashboard_view:
+            self.assertContains(response, self.get_dashboard_url())
+        if self.create_view:
+            self.assertContains(response, self.get_create_url())  # This is the custom line
+        if self.public_list_view:
+            self.assertContains(response, self.get_list_url(publication_status='published'))
 
 
 # ----------- Collection CRUD ------------------------------------------------------------------------------------------
@@ -1861,7 +1913,7 @@ class WasteCollectionMapViewTestCase(ViewWithPermissionsTestCase):
     def test_collection_dashboard_option_not_available_for_outsider(self):
         self.client.force_login(self.outsider)
         response = self.client.get(self.url)
-        self.assertNotContains(response, 'Waste collection explorer')
+        self.assertContains(response, 'Waste collection explorer')
 
     def test_range_slider_static_files_are_embedded(self):
         self.client.force_login(self.member)

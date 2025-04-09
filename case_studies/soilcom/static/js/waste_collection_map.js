@@ -163,14 +163,6 @@ function updateUrls(feature_id) {
     }
 }
 
-function clickedCreateButton() {
-    const filter_params = parseFilterParameters();
-    filter_params.append('load_features', 'true');
-    const params = new URLSearchParams();
-    params.append('next', window.location.href + '?' + filter_params.toString());
-    window.location.href = "{% url 'catchment-selection' %}" + '?' + params.toString();
-}
-
 function addDetailViewButton() {
 
 }
