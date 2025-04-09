@@ -1,5 +1,6 @@
 from dal import forward
-from django_filters import CharFilter, ModelChoiceFilter
+from django.forms import HiddenInput
+from django_filters import CharFilter, ModelChoiceFilter, NumberFilter
 
 from utils.filters import BaseCrispyFilterSet, CrispyAutocompleteFilterSet
 from utils.widgets import BSModelSelect2
@@ -7,6 +8,7 @@ from .models import Catchment, GeoDataset, NutsRegion, Region
 
 
 class CatchmentFilterSet(CrispyAutocompleteFilterSet):
+    id = NumberFilter(widget=HiddenInput())
     name = CharFilter(lookup_expr='icontains')
 
     class Meta:
