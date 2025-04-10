@@ -4,135 +4,30 @@
 
 {% block content %}
 
+    <!-- General Household Waste Card -->
     <div class="row">
         <div class="col col-12 col-md-6">
             <div class="card shadow h-100">
-                <div class="card-header"><strong>Soilcom Waste Collections</strong></div>
+                <div class="card-header"><strong>Household Waste Collection</strong></div>
                 <div class="card-body">
                     <p class="card-text">
-                        This project aims at building an interactive map of the biowaste collection in Europe.
-                        The waste streams are characterised based on the collection system and the materials that
-                        are allowed to be given into the collection. The main source are information given by the
-                        responsible waste collectors to the local citizens in their respective catchment.
+                        Household waste contains a large amount of organic matter that can serve as a valuable
+                        bioresource if properly separated from other waste streams. This module describes the waste
+                        collection systems currently in place. Since a significant portion of the organic matter ends up
+                        in residual waste, the effectiveness of the separation system must always be evaluated against
+                        the residual waste collection. The following models are used to describe these systems.
                     </p>
                 </div>
                 <div class="card-footer">
-                    <a href="{% url 'WasteCollection' %}" class="btn btn-primary">View map</a>
+                    <a href="{% url 'WasteCollection' %}" class="btn btn-primary">Collection Map</a>
                 </div>
             </div>
         </div>
     </div>
 
+    <!-- Secondary cards -->
     <div class="row">
-        <div class="col col-12 col-md-6 col-lg-3 mt-4">
-            <div class="card shadow h-100">
-                <div class="card-header">
-                    <a href="{% url 'collector-list' %}" class="stretched-link"><strong>Collectors</strong></a>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        The collector is the organisation that is responsible for providing the means of biowaste
-                        collection, collecting the waste and managing its utilisation.
-                    </p>
-                </div>
-                <div class="card-footer">
-                    <a href="{% url 'collector-list' %}" class="btn btn-primary">View collectors</a>
-                </div>
-            </div>
-        </div>
-        <div class="col col-12 col-md-6 col-lg-3 mt-4">
-            <div class="card shadow h-100">
-                <div class="card-header">
-                    <a href="{% url 'collectioncatchment-list' %}" class="stretched-link">
-                        <strong>Catchments</strong>
-                    </a>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        A catchment is the area that a collection is dedicated to. Usually they are administrative
-                        regions, such as counties.
-                    </p>
-                </div>
-                <div class="card-footer">
-                    <a href="{% url 'collectioncatchment-list' %}" class="btn btn-primary">View catchments</a>
-                </div>
-            </div>
-        </div>
-        <div class="col col-12 col-md-6 col-lg-3 mt-4">
-            <div class="card shadow h-100">
-                <div class="card-header">
-                    <strong>
-                        <a href="{% url 'collectionsystem-list' %}" class="stretched-link">Collection systems</a>
-                    </strong>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        The collection systems describe the means by which the collectors organise the collection. It
-                        is determined by how and when and where the collector is active and provides space and
-                        containers for the biowaste.
-                    </p>
-                </div>
-                <div class="card-footer">
-                    <a href="{% url 'collectionsystem-list' %}" class="btn btn-primary">View collection systems</a>
-                </div>
-            </div>
-        </div>
-        <div class="col col-12 col-md-6 col-lg-3 mt-4">
-            <div class="card shadow h-100">
-                <div class="card-header">
-                    <strong>
-                        <a href="{% url 'wastecategory-list' %}" class="stretched-link">Waste categories</a>
-                    </strong>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        Categories allow to order waste streams into similar groups.
-                    </p>
-
-                </div>
-                <div class="card-footer">
-                    <a href="{% url 'wastecategory-list' %}" class="btn btn-primary">View waste categories</a>
-                </div>
-            </div>
-        </div>
-        <div class="col col-12 col-md-6 col-lg-3 mt-4">
-            <div class="card shadow h-100">
-                <div class="card-header">
-                    <strong>
-                        <a href="{% url 'collectionfrequency-list' %}" class="stretched-link">Collection frequencies</a>
-                    </strong>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        The frequencies of the collections can be grouped into categories. These can be created or
-                        edited here.
-                    </p>
-
-                </div>
-                <div class="card-footer">
-                    <a href="{% url 'collectionfrequency-list' %}" class="btn btn-primary">
-                        View collection frequencies
-                    </a>
-                </div>
-            </div>
-        </div>
-        <div class="col col-12 col-md-6 col-lg-3 mt-4">
-            <div class="card shadow h-100">
-                <div class="card-header">
-                    <strong>
-                        <a href="{% url 'wastecomponent-list' %}" class="stretched-link">Waste components</a>
-                    </strong>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        Waste components are materials that are present in the waste.
-                    </p>
-                </div>
-                <div class="card-footer">
-                    <a href="{% url 'wastecomponent-list' %}" class="btn btn-primary">View waste components</a>
-                </div>
-            </div>
-        </div>
+        <!-- Collections Card -->
         <div class="col col-12 col-md-6 col-lg-3 mt-4">
             <div class="card shadow h-100">
                 <div class="card-header">
@@ -142,8 +37,8 @@
                 </div>
                 <div class="card-body">
                     <p class="card-text">
-                        Each waste collection is conducted by a specific collector in a specific catchment and for only
-                        one waste stream. More than one collection per collector or catchment is possible.
+                        The Collections model is where all the information comes together. Here you find all the
+                        assembled data, including the other models below.
                     </p>
                 </div>
                 <div class="card-footer">
@@ -151,6 +46,121 @@
                 </div>
             </div>
         </div>
+        <!-- Collectors Card -->
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header">
+                    <a href="{% url 'collector-list' %}" class="stretched-link"><strong>Collectors</strong></a>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Collectors are organizations responsible for managing waste collection services. They provide
+                        the necessary infrastructure, handle waste retrieval, and ensure proper treatment to maintain
+                        efficient operations.
+                    </p>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'collector-list' %}" class="btn btn-primary">View collectors</a>
+                </div>
+            </div>
+        </div>
+        <!-- Catchments Card -->
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header">
+                    <a href="{% url 'collectioncatchment-list' %}" class="stretched-link">
+                        <strong>Catchments</strong>
+                    </a>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Catchments define the geographical areas served by waste collection services, often aligning
+                        with administrative regions to ensure a consistent system.
+                    </p>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'collectioncatchment-list' %}" class="btn btn-primary">View catchments</a>
+                </div>
+            </div>
+        </div>
+        <!-- Collection Systems Card -->
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header">
+                    <strong>
+                        <a href="{% url 'collectionsystem-list' %}" class="stretched-link">Collection systems</a>
+                    </strong>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Collection systems outline the logistical methods behind waste gathering. They define how
+                        citizens collect waste and how it is transferred to the collectors.
+                    </p>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'collectionsystem-list' %}" class="btn btn-primary">View collection systems</a>
+                </div>
+            </div>
+        </div>
+        <!-- Waste Categories Card -->
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header">
+                    <strong>
+                        <a href="{% url 'wastecategory-list' %}" class="stretched-link">Waste categories</a>
+                    </strong>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Waste categories organize similar waste streams into defined groups. This classification is
+                        essential for effective recycling and process chain management.
+                    </p>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'wastecategory-list' %}" class="btn btn-primary">View waste categories</a>
+                </div>
+            </div>
+        </div>
+        <!-- Collection Frequencies Card -->
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header">
+                    <strong>
+                        <a href="{% url 'collectionfrequency-list' %}" class="stretched-link">Collection frequencies</a>
+                    </strong>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Collection frequencies define the regularity of waste pick-up services, with the main unit of
+                        measurement being collections per year. Additional options account for seasonal variations.
+                    </p>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'collectionfrequency-list' %}" class="btn btn-primary">View collection
+                        frequencies</a>
+                </div>
+            </div>
+        </div>
+        <!-- Waste Components Card -->
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header">
+                    <strong>
+                        <a href="{% url 'wastecomponent-list' %}" class="stretched-link">Waste components</a>
+                    </strong>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Waste components refer to the individual materials found within waste streams. They serve to
+                        specify which materials are allowed or forbidden in each waste stream.
+                    </p>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'wastecomponent-list' %}" class="btn btn-primary">View waste components</a>
+                </div>
+            </div>
+        </div>
+        <!-- Flyers Card -->
         <div class="col col-12 col-md-6 col-lg-3 mt-4">
             <div class="card shadow h-100">
                 <div class="card-header">
@@ -160,8 +170,8 @@
                 </div>
                 <div class="card-body">
                     <p class="card-text">
-                        Flyers are the sources of information for all the collections. All flyers that are available
-                        online are regarded for the database. Here, flyers can be checked for actuality.
+                        Flyers serve as key sources of information for the collection systems. They detail collection
+                        schedules and guidelines, ensuring that data remains current through online updates.
                     </p>
                 </div>
                 <div class="card-footer">
@@ -169,6 +179,7 @@
                 </div>
             </div>
         </div>
+        <!-- Properties Card -->
         <div class="col col-12 col-md-6 col-lg-3 mt-4">
             <div class="card shadow h-100">
                 <div class="card-header">
@@ -178,7 +189,8 @@
                 </div>
                 <div class="card-body">
                     <p class="card-text">
-                        Properties can be attached to waste collections.
+                        Properties add extra attributes to waste collections, such as annual statistics on collected
+                        amounts.
                     </p>
                 </div>
                 <div class="card-footer">
