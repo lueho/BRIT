@@ -8,13 +8,13 @@ django-autocomplete-light==3.12.1
 django-bootstrap-modal-forms==3.0.5
 django-cookie-consent==0.6.0
 django-crispy-forms==2.3
-django-debug-toolbar==5.0.1
+django-debug-toolbar==5.1.0
 django-extra-views==0.15.0
-django-geojson==4.1.0
+django-geojson==4.2.0
 django-leaflet==0.31.0
 django-redis==5.4.0
 django-registration-redux==2.13
-django-storages==1.14.5
+django-storages==1.14.6
 django-tree-queries==0.19.0
 djangorestframework==3.15.2
 djangorestframework-csv==3.0.2
