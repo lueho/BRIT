@@ -181,6 +181,8 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
 
     objects = UserCreatedObjectManager()
 
+    user_created = True
+
     class Meta:
         abstract = True
 
