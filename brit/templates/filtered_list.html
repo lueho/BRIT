@@ -3,7 +3,7 @@
 {% load custom_tags %}
 {% load crispy_forms_tags %}
 
-{% block title %}BRIT | Sources{% endblock %}
+{% block title %}BRIT | {{ header }}{% endblock %}
 
 {% block content %}
     <div class="container-fluid">
@@ -11,7 +11,7 @@
             <div class="col-lg-8 order-2 order-lg-1">
                 <div class="card shadow">
                     <div class="card-header">
-                        {% block list_card_header %}<b>{{ header }}</b>{% endblock %}
+                        {% block list_card_header %}<strong>{{ header }}</strong>{% endblock %}
                     </div>
                     <div class="card-body">
                         {% block list_card_body %}
@@ -29,11 +29,11 @@
                                         </thead>
                                     {% endblock list_table_head %}
                                     <tbody>
-                                    {% for object in object_list %}
+                                    {% for item in object_list %}
                                         {% block list_table_row %}
                                             <tr>
-                                                <td><a href="{{ object.get_absolute_url }}">{{ object.name }}</a></td>
-                                                <td>{{ object.description }}</td>
+                                                <td><a href="{{ item.get_absolute_url }}">{{ item.name }}</a></td>
+                                                <td>{{ item.description }}</td>
                                                 {% if list_type == 'private' %}
                                                     {% include 'partials/_publication_status_column.html' %}
                                                 {% endif %}
@@ -104,8 +104,8 @@
                                     </div>
                                 </div>
                             {% endblock list_card_navigation_dropdown %}
-                            {% if user.is_authenticated %}
-                                {% block list_card_options_dropdown %}
+                            {% block list_card_options_dropdown %}
+                                {% if user.is_authenticated %}
                                     <div class="dropdown">
                                         <button class="btn btn-secondary dropdown-toggle mr-3" type="button"
                                                 id="optionsDropdown"
@@ -126,8 +126,8 @@
                                             {% block list_card_options_dropdown_additional_links %}{% endblock %}
                                         </div>
                                     </div>
-                                {% endblock list_card_options_dropdown %}
-                            {% endif %}
+                                {% endif %}
+                            {% endblock list_card_options_dropdown %}
                             {% block list_card_footer_additional_links %}{% endblock %}
                         {% endblock list_card_footer %}
                     </div>

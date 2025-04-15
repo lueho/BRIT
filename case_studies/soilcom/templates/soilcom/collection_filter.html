@@ -60,14 +60,13 @@
        href="{% url 'aggregatedcollectionpropertyvalue-create' %}">
         <i class="fas fa-fw fa-plus-circle"></i> Add property to collection group
     </a>
-{% endblock list_card_options_dropdown_additional_links %}
-
-{% block list_card_footer_additional_links %}
     {% if user.is_authenticated %}
-        {% export_link "csv" 'collection-export' %}
-        {% export_link "xlsx" 'collection-export' %}
+        <a class="dropdown-item modal-link"
+           href="{% export_link_modal 'collection-export' %}">
+            <i class="fas fa-fw fa-file-export"></i> Export data
+        </a>
     {% endif %}
-{% endblock list_card_footer_additional_links %}
+{% endblock list_card_options_dropdown_additional_links %}
 
 {% block filter_column %}
     <form method="get">

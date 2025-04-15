@@ -2,10 +2,11 @@
 {% load static %}
 {% load crispy_forms_tags %}
 
-{% block filter_form_buttons %}{% endblock filter_form_buttons %}
+{% block map_card_footer %}{% endblock %}
 
+{% block filter_form_buttons %}{% endblock filter_form_buttons %}
 
 {% block javascript %}
     {{ block.super }}
-     <script src="{% static 'js/nuts_region_map.min.js' %}"></script>
+    <script src="{% static 'js/nuts_region_map.min.js' %}"></script>
 {% endblock javascript %}

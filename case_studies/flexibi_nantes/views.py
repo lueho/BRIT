@@ -13,7 +13,7 @@ from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 
 import case_studies.flexibi_nantes.tasks
 from maps.models import Catchment, GeoDataset
-from maps.views import GeoDataSetFilteredMapView
+from maps.views import GeoDataSetPublishedFilteredMapView
 from materials.models import MaterialComponentGroup
 from utils.file_export.views import FilteredListFileExportView
 from utils.views import (NextOrSuccessUrlMixin, PrivateObjectFilterView, PrivateObjectListView,
@@ -279,7 +279,7 @@ class NantesGreenhousesCatchmentAutocompleteView(autocomplete.Select2QuerySetVie
         return qs
 
 
-class GreenhousesMapView(GeoDataSetFilteredMapView):
+class GreenhousesPublishedMapView(GeoDataSetPublishedFilteredMapView):
     model_name = 'NantesGreenhouses'
     template_name = 'nantes_greenhouses_map.html'
     filterset_class = NantesGreenhousesFilterSet

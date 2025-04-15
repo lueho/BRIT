@@ -7,12 +7,12 @@ from django.views.decorators.clickjacking import xframe_options_exempt
 
 import case_studies.flexibi_hamburg.tasks
 from maps.models import Catchment, GeoDataset
-from maps.views import GeoDataSetFilteredMapView
+from maps.views import GeoDataSetPublishedFilteredMapView
 from utils.file_export.views import FilteredListFileExportView
 from .filters import HamburgRoadsideTreesFilterSet
 
 
-class RoadsideTreesMapView(GeoDataSetFilteredMapView):
+class RoadsideTreesPublishedMapView(GeoDataSetPublishedFilteredMapView):
     model_name = 'HamburgRoadsideTrees'
     template_name = 'hamburg_roadside_trees_map.html'
     filterset_class = HamburgRoadsideTreesFilterSet
@@ -21,7 +21,7 @@ class RoadsideTreesMapView(GeoDataSetFilteredMapView):
 
 
 @method_decorator(xframe_options_exempt, name='dispatch')
-class RoadsideTreesMapIframeView(GeoDataSetFilteredMapView):
+class RoadsideTreesPublishedMapIframeView(GeoDataSetPublishedFilteredMapView):
     model_name = 'HamburgRoadsideTrees'
     template_name = 'hamburg_roadside_trees_map_iframe.html'
     filterset_class = HamburgRoadsideTreesFilterSet

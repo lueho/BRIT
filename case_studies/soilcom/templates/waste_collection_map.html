@@ -3,8 +3,8 @@
 {% load crispy_forms_tags %}
 {% load file_export_tags %}
 
-{% block map_card_footer %}
-    <a class="mr-2 text-nowrap"
+{% block map_card_navigation_dropdown_additional_links %}
+    <a class="dropdown-item"
        href="javascript:void(0)"
        id="link-collections-as-list"
        data-href-template="{{ object_list.model.public_list_url }}"
@@ -12,21 +12,20 @@
         <i class="fa fa-fw fa-list"></i>
         View as list
     </a>
-    <a class="mr-2 text-nowrap" href="{% url 'wastecollection-dashboard' %}">
-        <i class="fas fa-fw fa-th-large"></i>
-        <span>Explorer</span>
+{% endblock map_card_navigation_dropdown_additional_links %}
+
+{% block map_card_options_dropdown_additional_links %}
+    <a class="dropdown-item"
+       href="{% url 'aggregatedcollectionpropertyvalue-create' %}">
+        <i class="fas fa-fw fa-plus-circle"></i> Add property to collection group
     </a>
-    {% if create_permission in perms or user.is_staff %}
-        <a class="mr-2 text-nowrap" href="{% url 'collection-create' %}">
-            <i class="fas fa-fw fa-plus"></i> Create new collection
+    {% if user.is_authenticated %}
+        <a class="dropdown-item modal-link"
+           href="{% export_link_modal 'collection-export' %}">
+            <i class="fas fa-fw fa-file-export"></i> Export data
         </a>
     {% endif %}
-    {% if user.is_authenticated %}
-        {% export_link "csv" 'collection-export' %}
-        {% export_link "xlsx" 'collection-export' %}
-    {% endif %}
-
-{% endblock map_card_footer %}
+{% endblock map_card_options_dropdown_additional_links %}
 
 {% block user_actions %}
     <form method="get">

@@ -51,6 +51,19 @@ class GreenhouseCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
     create_object_data = {'name': 'Test Greenhouse'}
     update_object_data = {'name': 'Updated Test Greenhouse'}
 
+    def test_list_view_private_as_authenticated_staff_user(self):
+        if not self.private_list_view:
+            self.skipTest("List view is not enabled for this test case")
+        self.client.force_login(self.staff_user)
+        response = self.client.get(self.get_list_url(publication_status='private'))
+        self.assertEqual(response.status_code, 200)
+        if self.dashboard_view:
+            self.assertContains(response, self.get_dashboard_url())
+        if self.create_view:
+            self.assertNotContains(response, self.get_create_url())  # This is the changed assert
+        if self.public_list_view:
+            self.assertContains(response, self.get_list_url(publication_status='published'))
+
 
 class GrowthCycleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     dashboard_view = False

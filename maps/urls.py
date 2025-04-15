@@ -11,14 +11,14 @@ from .views import (AttributeCreateView, AttributeDetailView, AttributeModalCrea
                     ClearGeojsonCacheView, GeoDataSetCreateView, GeoDataSetModalDeleteView, GeoDataSetPrivateFilterView,
                     GeoDataSetPublishedFilterView, GeoDataSetUpdateView, LauRegionOptionsAPI, LocationCreateView,
                     LocationDetailView, LocationModalDeleteView, LocationPrivateListView, LocationPublishedListView,
-                    LocationUpdateView,
-                    MapsDashboardView, NutsAndLauCatchmentPedigreeAPI, NutsRegionAutocompleteView, NutsRegionMapView,
-                    NutsRegionParentsDetailAPI, NutsRegionPedigreeAPI, NutsRegionSummaryAPIView,
-                    RegionAttributeValueCreateView, RegionAttributeValueDetailView, RegionAttributeValueModalCreateView,
-                    RegionAttributeValueModalDeleteView, RegionAttributeValueModalDetailView,
-                    RegionAttributeValueModalUpdateView, RegionAttributeValueUpdateView, RegionAutocompleteView,
-                    RegionCreateView, RegionDetailView, RegionMapView, RegionModalDeleteView,
-                    RegionOfLauAutocompleteView, RegionPrivateFilterView, RegionPublishedFilterView, RegionUpdateView)
+                    LocationUpdateView, MapsDashboardView, NutsAndLauCatchmentPedigreeAPI, NutsRegionAutocompleteView,
+                    NutsRegionPublishedMapView, NutsRegionParentsDetailAPI, NutsRegionPedigreeAPI,
+                    NutsRegionSummaryAPIView, RegionAttributeValueCreateView, RegionAttributeValueDetailView,
+                    RegionAttributeValueModalCreateView, RegionAttributeValueModalDeleteView,
+                    RegionAttributeValueModalDetailView, RegionAttributeValueModalUpdateView,
+                    RegionAttributeValueUpdateView, RegionAutocompleteView, RegionCreateView, RegionDetailView,
+                    RegionMapView, RegionModalDeleteView, RegionOfLauAutocompleteView, RegionPrivateFilterView,
+                    RegionPublishedFilterView, RegionUpdateView)
 
 urlpatterns = [
     path('explorer/', MapsDashboardView.as_view(), name='maps-dashboard'),
@@ -72,7 +72,7 @@ urlpatterns = [
     path('regions/autocomplete/lau/', RegionOfLauAutocompleteView.as_view(), name='region-of-lau-autocomplete'),
     path('regions/map/', RegionMapView.as_view(), name='region-map'),
     path('api/nutsregion/<int:pk>/parents/', NutsRegionParentsDetailAPI.as_view(), name='nutsregion-parents-detail'),
-    path('nutsregions/map/', NutsRegionMapView.as_view(), name='NutsRegion'),
+    path('nutsregions/map/', NutsRegionPublishedMapView.as_view(), name='NutsRegion'),
     path('nutsregions/summary/', NutsRegionSummaryAPIView.as_view(), name='data.nutsregion-summary'),
     path('nutsregions/options/data/', NutsRegionPedigreeAPI.as_view(), name='data.nuts_region_options'),
     path('nutsregions/autocomplete/', NutsRegionAutocompleteView.as_view(), name='nutsregion-autocomplete'),

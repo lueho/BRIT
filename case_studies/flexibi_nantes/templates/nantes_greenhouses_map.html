@@ -1,17 +1,20 @@
 {% extends 'filtered_map.html' %}
+{% load file_export_tags %}
 {% load static %}
 {% load crispy_forms_tags %}
-{% load file_export_tags %}
 
-{% block map_card_footer %}
+{% block map_card_navigation_dropdown %}{% endblock %}
+
+{% block map_card_options_dropdown_additional_links %}
     {% if user.is_authenticated %}
-        {% export_link "csv" 'nantesgreenhouses-export' %}
-        {% export_link "xlsx" 'nantesgreenhouses-export' %}
+        <a class="dropdown-item modal-link"
+           href="{% export_link_modal 'nantesgreenhouses-export' %}">
+            <i class="fas fa-fw fa-file-export"></i> Export data
+        </a>
     {% endif %}
-{% endblock %}
+{% endblock map_card_options_dropdown_additional_links %}
 
 {% block extra_cards %}
-
     <div class="card shadow">
         <div class="card-header"
              role="button"

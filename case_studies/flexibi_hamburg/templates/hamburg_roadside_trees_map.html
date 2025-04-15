@@ -3,15 +3,19 @@
 {% load crispy_forms_tags %}
 {% load file_export_tags %}
 
-{% block map_card_footer %}
+
+{% block map_card_navigation_dropdown %}{% endblock %}
+
+{% block map_card_options_dropdown_additional_links %}
     {% if user.is_authenticated %}
-        {% export_link "csv" 'hamburgroadsidetrees-export' %}
-        {% export_link "xlsx" 'hamburgroadsidetrees-export' %}
+        <a class="dropdown-item modal-link"
+           href="{% export_link_modal 'hamburgroadsidetrees-export' %}">
+            <i class="fas fa-fw fa-file-export"></i> Export data
+        </a>
     {% endif %}
-{% endblock %}
+{% endblock map_card_options_dropdown_additional_links %}
 
 {% block extra_cards %}
-
     <div class="card shadow">
         <div class="card-header"
              role="button"
@@ -32,7 +36,6 @@
             </p>
         </div>
     </div>
-
 {% endblock %}
 
 {% block javascript %}
@@ -40,5 +43,4 @@
     <script src="{% static 'lib/turf-inside/inside.min.js' %}"></script>
     <script src="{% static 'js/file_export.min.js' %}"></script>
     <script src="{% static 'js/hamburg_roadsidetree_map.min.js' %}"></script>
-
 {% endblock javascript %}

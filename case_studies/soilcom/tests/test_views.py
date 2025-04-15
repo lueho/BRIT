@@ -1863,61 +1863,83 @@ class WasteCollectionMapViewTestCase(ViewWithPermissionsTestCase):
 
     def test_http_200_ok_for_anonymous(self):
         response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 200)
+        redirect_url = f'{reverse("WasteCollection")}?{urlencode({"valid_on": date.today()})}'
+        self.assertRedirects(response, redirect_url, status_code=302, target_status_code=200)
 
     def test_http_200_ok_for_member(self):
         self.client.force_login(self.member)
         response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 200)
+        redirect_url = f'{reverse("WasteCollection")}?{urlencode({"valid_on": date.today()})}'
+        self.assertRedirects(response, redirect_url, status_code=302, target_status_code=200)
 
     def test_uses_correct_template(self):
         self.client.force_login(self.member)
-        response = self.client.get(self.url)
+        response = self.client.get(self.url, follow=True)
+        redirect_url = f'{self.url}?{urlencode({"valid_on": date.today()})}'
+        self.assertRedirects(response, redirect_url, status_code=302, target_status_code=200)
         self.assertTemplateUsed(response, 'waste_collection_map.html')
 
     def test_create_collection_option_visible_for_member(self):
         self.client.force_login(self.member)
-        response = self.client.get(self.url)
+        response = self.client.get(self.url, follow=True)
+        redirect_url = f'{self.url}?{urlencode({"valid_on": date.today()})}'
+        self.assertRedirects(response, redirect_url, status_code=302, target_status_code=200)
         self.assertContains(response, 'Add new collection')
 
     def test_create_collection_option_not_available_for_outsider(self):
         self.client.force_login(self.outsider)
-        response = self.client.get(self.url)
+        response = self.client.get(self.url, follow=True)
+        redirect_url = f'{self.url}?{urlencode({"valid_on": date.today()})}'
+        self.assertRedirects(response, redirect_url, status_code=302, target_status_code=200)
         self.assertNotContains(response, 'Add new collection')
 
     def test_copy_collection_option_visible_for_member(self):
         self.client.force_login(self.member)
-        response = self.client.get(self.url)
+        response = self.client.get(self.url, follow=True)
+        redirect_url = f'{self.url}?{urlencode({"valid_on": date.today()})}'
+        self.assertRedirects(response, redirect_url, status_code=302, target_status_code=200)
         self.assertContains(response, 'Copy selected collection')
 
     def test_copy_collection_option_not_available_for_outsider(self):
         self.client.force_login(self.outsider)
-        response = self.client.get(self.url)
+        response = self.client.get(self.url, follow=True)
+        redirect_url = f'{self.url}?{urlencode({"valid_on": date.today()})}'
+        self.assertRedirects(response, redirect_url, status_code=302, target_status_code=200)
         self.assertNotContains(response, 'Copy selected collection')
 
     def test_update_collection_option_visible_for_staff(self):
         self.client.force_login(self.staff)
-        response = self.client.get(self.url)
+        response = self.client.get(self.url, follow=True)
+        redirect_url = f'{self.url}?{urlencode({"valid_on": date.today()})}'
+        self.assertRedirects(response, redirect_url, status_code=302, target_status_code=200)
         self.assertContains(response, 'Edit selected collection')
 
     def test_update_collection_option_not_available_for_outsider(self):
         self.client.force_login(self.outsider)
-        response = self.client.get(self.url)
+        response = self.client.get(self.url, follow=True)
+        redirect_url = f'{self.url}?{urlencode({"valid_on": date.today()})}'
+        self.assertRedirects(response, redirect_url, status_code=302, target_status_code=200)
         self.assertNotContains(response, 'Edit selected collection')
 
     def test_collection_dashboard_option_visible_for_member(self):
         self.client.force_login(self.member)
-        response = self.client.get(self.url)
+        response = self.client.get(self.url, follow=True)
+        redirect_url = f'{self.url}?{urlencode({"valid_on": date.today()})}'
+        self.assertRedirects(response, redirect_url, status_code=302, target_status_code=200)
         self.assertContains(response, 'Waste collection explorer')
 
     def test_collection_dashboard_option_not_available_for_outsider(self):
         self.client.force_login(self.outsider)
-        response = self.client.get(self.url)
+        response = self.client.get(self.url, follow=True)
+        redirect_url = f'{self.url}?{urlencode({"valid_on": date.today()})}'
+        self.assertRedirects(response, redirect_url, status_code=302, target_status_code=200)
         self.assertContains(response, 'Waste collection explorer')
 
     def test_range_slider_static_files_are_embedded(self):
         self.client.force_login(self.member)
-        response = self.client.get(self.url)
+        response = self.client.get(self.url, follow=True)
+        redirect_url = f'{self.url}?{urlencode({"valid_on": date.today()})}'
+        self.assertRedirects(response, redirect_url, status_code=302, target_status_code=200)
         self.assertContains(response, 'range_slider.min.js')
         self.assertContains(response, 'range_slider.min.css')
 

@@ -277,7 +277,7 @@ class GeoDataSetCreateView(OwnedObjectCreateView):
     permission_required = 'maps.add_geodataset'
 
 
-class GeoDataSetFilteredMapView(MapMixin, FilterView):
+class FilteredMapMixin(MapMixin):
     model_name = None  # TODO: Remove this for pk
     template_name = 'filtered_map.html'
 
@@ -299,6 +299,20 @@ class GeoDataSetFilteredMapView(MapMixin, FilterView):
 
     # def get_dataset(self):
     #     return GeoDataset.objects.get(pk=self.kwargs.get('pk')) # TODO: Implement this functionality
+
+
+class GeoDataSetPublishedFilteredMapView(FilteredMapMixin, PublishedObjectFilterView):
+
+    # TODO: Implement method to get the model, so that the create_url can be retrieved from the CRUDUrlsMixin
+    def get_create_url(self):
+        return None
+
+
+class GeoDataSetPrivateFilteredMapView(FilteredMapMixin, PrivateObjectFilterView):
+
+    # TODO: Implement method to get the model, so that the create_url can be retrieved from the CRUDUrlsMixin
+    def get_create_url(self):
+        return None
 
 
 class GeoDataSetUpdateView(UserCreatedObjectUpdateView):
@@ -651,7 +665,7 @@ class CatchmentRegionSummaryAPIView(APIView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class NutsRegionMapView(GeoDataSetFilteredMapView):
+class NutsRegionPublishedMapView(GeoDataSetPublishedFilteredMapView):
     model_name = 'NutsRegion'
     template_name = 'nuts_region_map.html'
     filterset_class = NutsRegionFilterSet

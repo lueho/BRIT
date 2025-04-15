@@ -19,8 +19,8 @@ from bibliography.views import (SourceCheckUrlView, SourceCreateView, SourceModa
                                 SourceModalDetailView)
 from maps.filters import CatchmentFilterSet
 from maps.forms import NutsAndLauCatchmentQueryForm
-from maps.views import (CatchmentCreateView, CatchmentDetailView, CatchmentUpdateView, GeoDataSetFilteredMapView,
-                        GeoDataSetFormMixin, MapMixin)
+from maps.views import (CatchmentCreateView, CatchmentDetailView, CatchmentUpdateView, GeoDataSetFormMixin,
+                        GeoDataSetPrivateFilteredMapView, GeoDataSetPublishedFilteredMapView, MapMixin)
 from utils.file_export.views import FilteredListFileExportView
 from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineFormSetMixin
 from utils.views import (OwnedObjectCreateView, OwnedObjectModalCreateView, OwnedObjectModelSelectOptionsView,
@@ -900,16 +900,26 @@ class CatchmentSelectView(GeoDataSetFormMixin, MapMixin, TemplateView):
         return self.request.GET.get('region')
 
 
-class WasteCollectionMapView(GeoDataSetFilteredMapView):
+class WasteCollectionPublishedMapView(GeoDataSetPublishedFilteredMapView):
     model_name = 'WasteCollection'
     template_name = 'waste_collection_map.html'
     filterset_class = CollectionFilterSet
     features_layer_api_basename = 'api-waste-collection'
-    map_title = 'Household Waste Collection Europe'
+    map_title = 'Household Waste Collections'
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
+
+
+class WasteCollectionPrivateMapView(GeoDataSetPrivateFilteredMapView):
+    model_name = 'WasteCollection'
+    template_name = 'waste_collection_map.html'
+    filterset_class = CollectionFilterSet
+    features_layer_api_basename = 'api-waste-collection'
+    map_title = 'My Household Waste Collections'
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
 
 
 @method_decorator(xframe_options_exempt, name='dispatch')
-class WasteCollectionMapIframeView(GeoDataSetFilteredMapView):
+class WasteCollectionPublishedMapIframeView(GeoDataSetPublishedFilteredMapView):
     model_name = 'WasteCollection'
     template_name = 'waste_collection_map_iframe.html'
     filterset_class = CollectionFilterSet

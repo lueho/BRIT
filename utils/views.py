@@ -103,8 +103,10 @@ class FilterDefaultsMixin:
 
 class UserCreatedObjectListMixin:
     paginate_by = 10
+    header = None
     list_type = None
     dashboard_url = None
+    model = None
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -127,19 +129,44 @@ class UserCreatedObjectListMixin:
 
         return queryset.order_by('id')
 
+    def get_header(self):
+        if self.header:
+            return self.header
+        if self.model:
+            return self.model._meta.verbose_name_plural.capitalize()
+
+    def get_dashboard_url(self):
+        return self.dashboard_url
+
+    def get_create_url(self):
+        return self.model.create_url
+
+    def get_create_url_text(self):
+        if self.model:
+            return f'New {self.model._meta.verbose_name}'
+
+    def get_create_permission(self):
+        if self.model:
+            return f'{self.model.__module__.split(".")[-2]}.add_{self.model.__name__.lower()}'
+
+    def get_list_type(self):
+        return self.list_type
+
+    def get_private_list_owner(self):
+        if self.list_type == 'private':
+            return self.request.user
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update({
-            'header': self.model._meta.verbose_name_plural.capitalize(),
-            'create_url': self.model.create_url,
-            'create_url_text': f'New {self.model._meta.verbose_name}',
-            'create_permission': f'{self.model.__module__.split(".")[-2]}.add_{self.model.__name__.lower()}',
-            'list_type': self.list_type,
+            'header': self.get_header(),
+            'create_url': self.get_create_url(),
+            'create_url_text': self.get_create_url_text(),
+            'create_permission': self.get_create_permission(),
+            'list_type': self.get_list_type(),
+            'private_list_owner': self.get_private_list_owner(),
+            'dashboard_url': self.get_dashboard_url(),
         })
-        if self.list_type == 'private':
-            context.update({'private_list_owner': self.request.user, })
-        if self.dashboard_url:
-            context.update({'dashboard_url': self.dashboard_url})
         return context
 
 
