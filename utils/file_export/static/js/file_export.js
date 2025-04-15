@@ -1,126 +1,267 @@
 "use strict";
 
-// load filter_utils.js before this if combined with filter forms
+const POLLING_INTERVAL_MS = 500; // Polling interval in milliseconds
 
+/**
+ * Initiates the export process when a user clicks an export element.
+ *
+ * @param {HTMLElement} element - The clickable export element.
+ * @param {string} format - The export file format (e.g., 'xlsx', 'csv').
+ */
 function export_to_file(element, format) {
     if (element.dataset.exportStatus === "READY") {
-        element.setAttribute('data-export-status', "PENDING");
+        element.dataset.exportStatus = "PENDING";
 
         prepare_export(format)
-            .then(export_url => start_export(export_url, format))
-            .then(monitoring_url => monitor_export_progress(monitoring_url, format));
+            .then(exportUrl => start_export(exportUrl, format))
+            .then(monitorUrl => monitor_export_progress(monitorUrl, format))
+            .catch(error => {
+                console.error("Export process failed:", error);
+                resetExportLink(format);
+            });
     }
 }
 
+/**
+ * Prepares the export URL by appending the format and current query parameters.
+ *
+ * @param {string} format - The export format.
+ * @returns {Promise<string>} The complete export URL.
+ */
 async function prepare_export(format) {
     const elements = getLinkElements(format);
+    if (!elements) {
+        throw new Error(`Export elements for format "${format}" not found.`);
+    }
     elements.link.classList.add("disabled");
-    const base_export_url = document.getElementById('export_xlsx').dataset.exportUrl;
+
+    const element = document.getElementById('export_' + format);
+    const baseExportUrl = element.dataset.exportUrl;
     const urlParams = new URLSearchParams(window.location.search);
     urlParams.append('format', format);
-    return base_export_url + "?" + urlParams.toString();
+    return `${baseExportUrl}?${urlParams.toString()}`;
 }
 
-async function start_export(export_url) {
-    const response = await fetch(export_url);
-    const data = await response.json();
-    return document.getElementById('export_xlsx').dataset.exportProgressUrl.replace('0', data.task_id);
-}
-
-async function monitor_export_progress(url, format, count = 0) {
-    const response = await fetch(url);
-    const data = await response.json();
-    if (data.state === "PENDING") {
-        count++;
-        updateProcessingLink(format, count);
-        setTimeout(monitor_export_progress, 500, url, format, count);
-    } else if (data.state === "SUCCESS") {
-        cleanup_export(true, data, format);
-    } else if (data.state === "FAILURE") {
-        cleanup_export(false, data, format);
+/**
+ * Starts the export task on the server.
+ *
+ * @param {string} exportUrl - The export URL prepared by prepare_export.
+ * @param {string} format - The export format.
+ * @returns {Promise<string>} The URL to be used for monitoring export progress.
+ */
+async function start_export(exportUrl, format) {
+    try {
+        const response = await fetch(exportUrl);
+        if (!response.ok) {
+            throw new Error(`Network response was not ok: ${response.status}`);
+        }
+        const data = await response.json();
+        if (!data.task_id) {
+            throw new Error("Task ID missing in export response.");
+        }
+        const element = document.getElementById('export_' + format);
+        // Dynamically replace a placeholder ('0') in the progress URL with the actual task_id
+        return element.dataset.exportProgressUrl.replace('0', data.task_id);
+    } catch (error) {
+        console.error("Error starting export:", error);
+        throw error;
     }
 }
 
-function cleanup_export(export_successful, data, format) {
-    if (export_successful === true) {
-        formatDownloadLink(data.details, format);
+/**
+ * Monitors the export progress by polling the server.
+ *
+ * @param {string} url - The monitoring URL.
+ * @param {string} format - The export format.
+ * @param {number} count - The current poll count (used for UI animation).
+ */
+async function monitor_export_progress(url, format, count = 0) {
+    try {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Monitoring response was not ok: ${response.status}`);
+        }
+        const data = await response.json();
+        if (data.state === "PENDING") {
+            updateProcessingLink(format, count + 1);
+            setTimeout(() => monitor_export_progress(url, format, count + 1), POLLING_INTERVAL_MS);
+        } else if (data.state === "SUCCESS") {
+            cleanup_export(true, data, format);
+        } else if (data.state === "FAILURE") {
+            cleanup_export(false, data, format);
+        } else {
+            console.warn("Unexpected export state:", data.state);
+        }
+    } catch (error) {
+        console.error("Error monitoring export progress:", error);
+        resetExportLink(format);
+    }
+}
+
+/**
+ * Finalizes the export process.
+ * On success, formats the download link; on failure, resets the export link.
+ *
+ * @param {boolean} exportSuccessful - Indicates if export succeeded.
+ * @param {object} data - The response data from the export process.
+ * @param {string} format - The export format.
+ */
+function cleanup_export(exportSuccessful, data, format) {
+    if (exportSuccessful === true) {
+        if (data.details) {
+            formatDownloadLink(data.details, format);
+        } else {
+            console.error("Missing download details in export response.");
+            resetExportLink(format);
+        }
     } else {
         resetExportLink(format);
     }
 }
 
-function addClickEventHandler(format) {
-    const element = document.getElementById('export_' + format);
-    if (element) {
-        element.addEventListener('click', function() {
-            export_to_file(this, format);
-        }, false);
+/**
+ * Attaches click event handlers to all export format items.
+ * This function is intended to be called when new modal content is loaded.
+ */
+function initExportHandlers() {
+    const formatItems = document.querySelectorAll('.export-format-item');
+    if (formatItems) {
+        formatItems.forEach(item => {
+            item.addEventListener('click', function() {
+                const format = this.dataset.format;
+                export_to_file(this, format);
+            });
+        });
     }
 }
 
+/**
+ * Retrieves the relevant export link elements based on the format.
+ *
+ * @param {string} format - The export format.
+ * @returns {object|null} An object containing wrapper, linkText, and statusElement, or null if not found.
+ */
 function getLinkElements(format) {
+    const wrapper = document.getElementById('export_' + format);
+    if (!wrapper) {
+        return null;
+    }
+    const linkText = wrapper.querySelector('.export-text');
+    const statusElement = wrapper.querySelector('.export-status');
+
     return {
-        wrapper: document.getElementById('export_' + format),
-        link: document.getElementById('export_' + format).children[0],
-        linkText: document.getElementById('export_' + format).children[0].children[1]
+        wrapper: wrapper,
+        link: wrapper, // Assumes the wrapper itself is clickable
+        linkText: linkText,
+        statusElement: statusElement
     };
 }
 
+/**
+ * Updates the UI to indicate the export is in progress.
+ *
+ * @param {string} format - The export format.
+ * @param {number} count - The current poll count (used to animate the loading dots).
+ */
 function updateProcessingLink(format, count) {
     const elements = getLinkElements(format);
-    elements.linkText.innerText = "Exporting to " + format + ".".repeat(count % 4);
+    if (!elements) {
+        return;
+    }
+    elements.linkText.innerText = `Exporting to ${format.toUpperCase()}${'.'.repeat(count % 4)}`;
+
+    // Add a spinner if one is not already present
+    if (elements.statusElement && !elements.statusElement.querySelector('.spinner-border')) {
+        elements.statusElement.innerHTML = '<div class="spinner-border spinner-border-sm text-primary" role="status"><span class="sr-only">Loading...</span></div>';
+    }
 }
 
-function formatDownloadLink(download_url, format) {
+/**
+ * Updates the UI to display the download link after a successful export.
+ *
+ * @param {string} downloadUrl - The URL from which the exported file can be downloaded.
+ * @param {string} format - The export format.
+ */
+function formatDownloadLink(downloadUrl, format) {
     const elements = getLinkElements(format);
-    elements.wrapper.setAttribute("data-export-status", "SUCCESS");
-    elements.linkText.innerText = "Download " + format;
-    elements.link.href = download_url;
-    elements.link.removeAttribute("onclick");
+    if (!elements) {
+        return;
+    }
+    elements.wrapper.dataset.exportStatus = "SUCCESS";
+    elements.linkText.innerText = `Download ${format.toUpperCase()}`;
+
+    if (elements.statusElement) {
+        elements.statusElement.innerHTML = `<a href="${downloadUrl}" class="btn btn-sm btn-outline-primary"><i class="fas fa-download"></i></a>`;
+    }
+
     elements.link.classList.remove("disabled");
+    elements.wrapper.onclick = function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        window.location.href = downloadUrl;
+    };
 }
 
+/**
+ * Resets the export link UI to its initial "ready" state.
+ *
+ * @param {string} format - The export format.
+ */
 function resetExportLink(format) {
     const elements = getLinkElements(format);
-    elements.wrapper.setAttribute("data-export-status", "READY");
-    // elements.link.setAttribute("href", "javascript:void(0)");
-    elements.link.removeAttribute("href");
-    elements.linkText.innerText = "Export to " + format;
-    addClickEventHandler(format);
+    if (!elements) {
+        return;
+    }
+    elements.wrapper.dataset.exportStatus = "READY";
+    elements.linkText.innerText = `Export to ${format}`;
+
+    if (elements.statusElement) {
+        elements.statusElement.innerHTML = '';
+    }
+
     elements.link.classList.remove("disabled");
+
+    elements.wrapper.onclick = function(e) {
+        e.preventDefault();
+        e.stopPropagation();
+        export_to_file(elements.wrapper, format);
+    };
 }
 
+/**
+ * Locks all export format elements to disable user interactions.
+ */
 function lockCustomElements() {
-    // This function overrides a hook from filter_utils.js
     try {
-        const elementsCSV = getLinkElements('csv');
-        elementsCSV.link.classList.add("disabled");
-
-        const elementsXLSX = getLinkElements('xlsx');
-        elementsXLSX.link.classList.add("disabled");
+        const formatItems = document.querySelectorAll('.export-format-item');
+        formatItems.forEach(item => {
+            item.classList.add("disabled");
+        });
     } catch (error) {
         console.warn(`Failed to lock export links: ${error.message}`);
     }
-
 }
 
+/**
+ * Unlocks export format elements that are ready for interaction.
+ */
 function unlockCustomElements() {
-    // This function overrides a hook from filter_utils.js
     try {
-        resetExportLink('csv');
-        resetExportLink('xlsx');
-
-        const elementsCSV = getLinkElements('csv');
-        elementsCSV.link.classList.remove("disabled");
-
-        const elementsXLSX = getLinkElements('xlsx');
-        elementsXLSX.link.classList.remove("disabled");
+        const formatItems = document.querySelectorAll('.export-format-item');
+        formatItems.forEach(item => {
+            if (item.dataset.exportStatus === "READY") {
+                item.classList.remove("disabled");
+            }
+        });
     } catch (error) {
         console.warn(`Failed to unlock export links: ${error.message}`);
     }
 }
 
+// Attach event handler to initialize export handlers when the modal is shown.
+// Assumes that jQuery is loaded and Bootstrap's modal events are in use.
 document.addEventListener('DOMContentLoaded', function() {
-    addClickEventHandler('csv');
-    addClickEventHandler('xlsx');
+    $(document).on('shown.bs.modal', '#modal', function() {
+        initExportHandlers();
+    });
 });

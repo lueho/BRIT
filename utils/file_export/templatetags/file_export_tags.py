@@ -26,3 +26,12 @@ def export_link(file_format, export_url_name, progress_url_name=None):
         'icon_class': icon_class,
         'text': text,
     }
+
+
+@register.simple_tag
+def export_link_modal(export_url_name):
+    """
+    Return a link that opens the export modal using the existing modal framework.
+    """
+    export_url = reverse(export_url_name)
+    return f'{reverse("export-modal")}?export_url={export_url}'

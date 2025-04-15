@@ -4,6 +4,7 @@ from celery.result import AsyncResult
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import HttpResponse
 from django.views import View
+from django.views.generic import TemplateView
 
 
 class FilteredListFileExportView(LoginRequiredMixin, View):
@@ -61,6 +62,19 @@ class FilteredListFileExportView(LoginRequiredMixin, View):
             'task_id': task.task_id
         }
         return HttpResponse(json.dumps(response_data), content_type='application/json')
+
+
+class ExportModalView(LoginRequiredMixin, TemplateView):
+    """
+    View to render the export modal content for dynamic loading.
+    """
+    template_name = 'export_modal_content.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        export_url = self.request.GET.get('export_url', '')
+        context['export_url'] = export_url
+        return context
 
 
 class FilteredListFileExportProgressView(LoginRequiredMixin, View):
