@@ -1,0 +1,48 @@
+{% extends 'simple_detail_card.html' %}
+
+{% block detail_body %}
+    <p class="card-text">
+        <strong>Name:</strong><br>
+        {{ object.name }}
+    </p>
+    <p class="card-text">
+        <strong>Technique:</strong><br>
+        {% if object.technique %}
+            {{ object.technique }}
+        {% else %}
+            No entry
+        {% endif %}
+    </p>
+    <p class="card-text">
+        <strong>Standard:</strong><br>
+        {% if object.standard %}
+            {{ object.standard }}
+        {% else %}
+            No entry
+        {% endif %}
+    </p>
+    <p class="card-text">
+        <strong>Detection limit:</strong><br>
+        {% if object.lower_detection_limit %}
+            {{ object.lower_detection_limit }}
+        {% else %}
+            No entry
+        {% endif %}
+    </p>
+    {% if object.description %}
+        <p class="card-text">
+            <strong>Description:</strong><br>
+            {{ object.description }}
+        </p>
+    {% endif %}
+    {% if object.sources.exists %}
+        <p class="card-text">
+            <strong>Sources:</strong>
+        </p>
+        <ul>
+            {% for source in object.sources.all %}
+                <li><a href="{% url 'source-detail' source.pk %}">{{ source.abbreviation }}</a></li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+{% endblock detail_body %}

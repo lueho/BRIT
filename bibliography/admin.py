@@ -17,6 +17,7 @@ class SourceAuthorInline(admin.TabularInline):
 class SourceAdmin(admin.ModelAdmin):
     inlines = [SourceAuthorInline]
     list_display = ('abbreviation', 'title', 'year')
+    search_fields = ('abbreviation', 'title')
 
 
 admin.site.register(Author)

@@ -19,16 +19,16 @@ from utils.views import (NextOrSuccessUrlMixin, OwnedObjectCreateView, OwnedObje
                          UserCreatedObjectUpdateView, UserCreatedObjectUpdateWithInlinesView, UserOwnsObjectMixin)
 from .filters import PublishedSampleFilter, SampleSeriesFilter, UserOwnedSampleFilter
 from .forms import (AddComponentModalForm, AddCompositionModalForm, AddLiteratureSourceForm, AddSeasonalVariationForm,
-                    ComponentGroupModalModelForm, ComponentGroupModelForm, ComponentModalModelForm, ComponentModelForm,
-                    ComponentShareDistributionFormSetHelper, Composition, CompositionModalModelForm,
-                    CompositionModelForm, InlineWeightShare, MaterialCategoryModalModelForm, MaterialCategoryModelForm,
-                    MaterialModalModelForm, MaterialModelForm, MaterialPropertyModalModelForm,
-                    MaterialPropertyModelForm, MaterialPropertyValueModalModelForm, MaterialPropertyValueModelForm,
-                    ModalInlineComponentShare, SampleAddCompositionForm, SampleModalModelForm, SampleModelForm,
-                    SampleSeriesAddTemporalDistributionModalModelForm, SampleSeriesModalModelForm,
-                    SampleSeriesModelForm, WeightShareUpdateFormSetHelper)
-from .models import (Material, MaterialCategory, MaterialComponent, MaterialComponentGroup, MaterialProperty,
-                     MaterialPropertyValue, Sample, SampleSeries, WeightShare)
+                    AnalyticalMethodModelForm, ComponentGroupModalModelForm, ComponentGroupModelForm,
+                    ComponentModalModelForm, ComponentModelForm, ComponentShareDistributionFormSetHelper, Composition,
+                    CompositionModalModelForm, CompositionModelForm, InlineWeightShare, MaterialCategoryModalModelForm,
+                    MaterialCategoryModelForm, MaterialModalModelForm, MaterialModelForm,
+                    MaterialPropertyModalModelForm, MaterialPropertyModelForm, MaterialPropertyValueModalModelForm,
+                    MaterialPropertyValueModelForm, ModalInlineComponentShare, SampleAddCompositionForm,
+                    SampleModalModelForm, SampleModelForm, SampleSeriesAddTemporalDistributionModalModelForm,
+                    SampleSeriesModalModelForm, SampleSeriesModelForm, WeightShareUpdateFormSetHelper)
+from .models import (AnalyticalMethod, Material, MaterialCategory, MaterialComponent, MaterialComponentGroup,
+                     MaterialProperty, MaterialPropertyValue, Sample, SampleSeries, WeightShare)
 from .serializers import (CompositionDoughnutChartSerializer, SampleModelSerializer, SampleSeriesModelSerializer)
 
 
@@ -297,6 +297,42 @@ class MaterialPropertyValueModalDeleteView(UserCreatedObjectModalDeleteView):
 
     def get_success_url(self):
         return reverse('sample-detail', kwargs={'pk': self.object.sample_set.first().pk})
+
+
+# ----------- Analytical Method CRUD -----------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class AnalyticalMethodPublishedListView(PublishedObjectListView):
+    model = AnalyticalMethod
+    dashboard_url = reverse_lazy('materials-dashboard')
+
+
+class AnalyticalMethodPrivateListView(PrivateObjectListView):
+    model = AnalyticalMethod
+    dashboard_url = reverse_lazy('materials-dashboard')
+
+
+class AnalyticalMethodCreateView(OwnedObjectCreateView):
+    form_class = AnalyticalMethodModelForm
+    permission_required = 'materials.add_analyticalmethod'
+
+
+class AnalyticalMethodDetailView(UserCreatedObjectDetailView):
+    model = AnalyticalMethod
+
+
+class AnalyticalMethodModalDetailView(UserCreatedObjectModalDetailView):
+    model = AnalyticalMethod
+
+
+class AnalyticalMethodUpdateView(UserCreatedObjectUpdateView):
+    model = AnalyticalMethod
+    form_class = AnalyticalMethodModelForm
+
+
+class AnalyticalMethodModalDeleteView(UserCreatedObjectModalDeleteView):
+    model = AnalyticalMethod
 
 
 # ----------- Sample Series CRUD ---------------------------------------------------------------------------------------

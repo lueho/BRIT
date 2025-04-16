@@ -2,8 +2,9 @@ from django.urls import reverse
 
 from distributions.models import TemporalDistribution, Timestep
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
-from ..models import (Composition, Material, MaterialCategory, MaterialComponent, MaterialComponentGroup,
-                      MaterialProperty, MaterialPropertyValue, Sample, SampleSeries, WeightShare)
+from ..models import (AnalyticalMethod, Composition, Material, MaterialCategory, MaterialComponent,
+                      MaterialComponentGroup, MaterialProperty, MaterialPropertyValue, Sample, SampleSeries,
+                      WeightShare)
 
 
 class MaterialDashboardViewTestCase(ViewWithPermissionsTestCase):
@@ -644,6 +645,28 @@ class MaterialPropertyValueModalDeleteViewTestCase(ViewWithPermissionsTestCase):
         self.assertRedirects(response, reverse('sample-detail', kwargs={'pk': sample.pk}))
         with self.assertRaises(MaterialPropertyValue.DoesNotExist):
             MaterialPropertyValue.objects.get(pk=self.value.pk)
+
+
+# ----------- Analytical Method CRUD -----------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class AnalyticalMethodCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    modal_detail_view = True
+
+    model = AnalyticalMethod
+
+    view_dashboard_name = 'materials-dashboard'
+    view_create_name = 'analyticalmethod-create'
+    view_published_list_name = 'analyticalmethod-list'
+    view_private_list_name = 'analyticalmethod-list-owned'
+    view_detail_name = 'analyticalmethod-detail'
+    view_modal_detail_name = 'analyticalmethod-detail-modal'
+    view_update_name = 'analyticalmethod-update'
+    view_delete_name = 'analyticalmethod-delete-modal'
+
+    create_object_data = {'name': 'Test Method'}
+    update_object_data = {'name': 'Updated Test Method'}
 
 
 # ----------- Sample Series CRUD ---------------------------------------------------------------------------------------

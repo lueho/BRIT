@@ -1,0 +1,30 @@
+{% extends 'simple_list_card.html' %}
+
+{% block list_table_head %}
+    <thead>
+    <tr>
+        <th>Name</th>
+        <th>Technique</th>
+        <th>standard</th>
+        {% if list_type == 'private' %}
+            <th>Public</th>
+        {% endif %}
+    </tr>
+    </thead>
+{% endblock list_table_head %}
+
+{% block list_table_row %}
+    <tr>
+        <td>
+            <a href="{{ object.get_absolute_url }}"
+               aria-label="View details of {{ object.name }}">
+                {{ object.name }}
+            </a>
+        </td>
+        <td>{{ object.technique }}</td>
+        <td>{{ object.standard }}</td>
+        {% if list_type == 'private' %}
+            {% include 'partials/_publication_status_column.html' %}
+        {% endif %}
+    </tr>
+{% endblock %}

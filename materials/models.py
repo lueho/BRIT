@@ -123,6 +123,66 @@ def get_default_group():
     )[0]
 
 
+class AnalyticalMethod(NamedUserCreatedObject):
+    """
+    Represents an analytical method or laboratory procedure.
+
+    - ontology_uri: if provided, points to an external ontology (e.g. CHMO/OBI) where method details are maintained.
+    - technique, standard, instrument_type, and lower_detection_limit are available as local overrides.
+
+    In a more elaborate workflow, you can add helper functions to dynamically fetch
+    and cache external metadata based on the provided ontology URI.
+    """
+    ontology_uri = models.URLField(
+        blank=True,
+        null=True,
+        help_text="External ontology URI (e.g., CHMO term) for this analytical method."
+    )
+    technique = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Analytical technique (e.g., ICP-OES, Gravimetry)."
+    )
+    standard = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Standard or protocol (e.g., DIN EN 15936)."
+    )
+    instrument_type = models.CharField(
+        max_length=100,
+        blank=True,
+        help_text="Type of instrument used (local override if not fetched externally)."
+    )
+    lower_detection_limit = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="Lower detection limit (e.g., '0.5 mg/kg')."
+    )
+    sources = models.ManyToManyField(
+        Source,
+        blank=True,
+        help_text="Sources or references for this analytical method."
+    )
+
+    class Meta:
+        verbose_name = "Analytical Method"
+        verbose_name_plural = "Analytical Methods"
+
+    def __str__(self):
+        if self.ontology_uri:
+            return f"{self.name} (Ont: {self.ontology_uri})"
+        return self.name
+
+    @property
+    def external_metadata(self):
+        """
+        Placeholder for a method to retrieve external metadata from the linked ontology.
+        In a later workflow, implement an API call (e.g., via OLS or BioPortal) to fetch
+        metadata based on self.ontology_uri. You might cache the results locally.
+        """
+        return {}  # TODO: Implement external metadata retrieval
+
+
 class SampleSeries(NamedUserCreatedObject):
     """
     Sample series are used to add concrete experimental data to the abstract semantic definition of materials. A sample

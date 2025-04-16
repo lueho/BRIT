@@ -48,7 +48,9 @@
         <div class="col col-12 col-md-6 col-lg-3 mt-4">
             <div class="card shadow h-100">
                 <div class="card-header">
-                    <a href="{% url 'materialcategory-list' %}" class="stretched-link"><strong>Material Categories</strong></a>
+                    <a href="{% url 'materialcategory-list' %}" class="stretched-link">
+                        <strong>Material Categories</strong>
+                    </a>
                 </div>
                 <div class="card-body">
                     <p class="card-text">
@@ -58,6 +60,27 @@
                 </div>
                 <div class="card-footer">
                     <a href="{% url 'materialcategory-list' %}" class="btn btn-primary">View categories</a>
+                </div>
+            </div>
+        </div>
+
+
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header">
+                    <a href="{% url 'analyticalmethod-list' %}" class="stretched-link">
+                        <strong>Analytical Methods</strong>
+                    </a>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Defines the procedures used to analyze samples, including standard and custom methods.
+                        Links methods to material components, relevant publications, standards, techniques, detection
+                        limits, descriptions, and data sources.
+                    </p>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'analyticalmethod-list' %}" class="btn btn-primary">View methods</a>
                 </div>
             </div>
         </div>
@@ -105,7 +128,8 @@
         <div class="col col-12 col-md-6 col-lg-3 mt-4">
             <div class="card shadow h-100">
                 <div class="card-header">
-                    <a href="{% url 'materialcomponentgroup-list' %}" class="stretched-link"><strong>Component Group</strong></a>
+                    <a href="{% url 'materialcomponentgroup-list' %}" class="stretched-link"><strong>Component
+                        Group</strong></a>
                 </div>
                 <div class="card-body">
                     <p class="card-text">
@@ -124,7 +148,8 @@
         <div class="col col-12 col-md-6 col-lg-3 mt-4">
             <div class="card shadow h-100">
                 <div class="card-header">
-                    <a href="{% url 'materialcomponent-list' %}" class="stretched-link"><strong>Material Component</strong></a>
+                    <a href="{% url 'materialcomponent-list' %}" class="stretched-link"><strong>Material
+                        Component</strong></a>
                 </div>
                 <div class="card-body">
                     <p class="card-text">
@@ -144,7 +169,8 @@
         <div class="col col-12 col-md-6 col-lg-3 mt-4">
             <div class="card shadow h-100">
                 <div class="card-header">
-                    <a href="{% url 'materialproperty-list' %}" class="stretched-link"><strong>Material Properties</strong></a>
+                    <a href="{% url 'materialproperty-list' %}" class="stretched-link"><strong>Material
+                        Properties</strong></a>
                 </div>
                 <div class="card-body">
                     <p class="card-text">

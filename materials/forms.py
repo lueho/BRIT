@@ -13,8 +13,8 @@ from bibliography.models import Source
 from distributions.models import TemporalDistribution
 from utils.forms import AutoCompleteModelForm, ModalForm, ModalModelForm, ModalModelFormMixin, SimpleModelForm
 from utils.widgets import BSModelSelect2, BSModelSelect2Multiple
-from .models import (Composition, Material, MaterialCategory, MaterialComponent, MaterialComponentGroup,
-                     MaterialProperty, MaterialPropertyValue, Sample, SampleSeries, WeightShare)
+from .models import (AnalyticalMethod, Composition, Material, MaterialCategory, MaterialComponent,
+                     MaterialComponentGroup, MaterialProperty, MaterialPropertyValue, Sample, SampleSeries, WeightShare)
 
 
 class MaterialCategoryModelForm(SimpleModelForm):
@@ -75,6 +75,19 @@ class MaterialPropertyValueModelForm(SimpleModelForm):
 
 class MaterialPropertyValueModalModelForm(ModalModelFormMixin, MaterialPropertyValueModelForm):
     pass
+
+
+class AnalyticalMethodModelForm(AutoCompleteModelForm):
+    sources = ModelMultipleChoiceField(
+        queryset=Source.objects.all(),
+        required=False,
+        widget=BSModelSelect2Multiple(url='source-autocomplete'),
+        help_text='Optional: Select multiple sources if applicable.'
+    )
+
+    class Meta:
+        model = AnalyticalMethod
+        fields = ('name', 'technique', 'standard', 'lower_detection_limit', 'description', 'sources')
 
 
 class SampleSeriesModelForm(SimpleModelForm):
