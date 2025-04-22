@@ -11,7 +11,7 @@ from distributions.models import TemporalDistribution, Timestep
 from materials.models import Material, Sample
 from users.models import get_default_owner
 from utils.crispy_fields import ForeignkeyField
-from utils.forms import (AutoCompleteModelForm, M2MInlineFormSet, ModalModelFormMixin, SimpleForm,
+from utils.forms import (AutoCompleteModelForm, CreateInlineMixin, M2MInlineFormSet, ModalModelFormMixin, SimpleForm,
                          SimpleModelForm)
 from utils.widgets import BSModelSelect2, BSModelSelect2Multiple
 from .models import (AggregatedCollectionPropertyValue, Collection, CollectionCatchment, CollectionCountOptions,
@@ -231,7 +231,24 @@ class AggregatedCollectionPropertyValueModelForm(AutoCompleteModelForm):
         }
 
 
-class CollectionModelForm(AutoCompleteModelForm):
+class CollectionModelFormHelper(FormHelper):
+    form_tag = False
+    layout = Layout(
+        Field('catchment'),
+        ForeignkeyField('collector'),
+        ForeignkeyField('collection_system'),
+        ForeignkeyField('waste_category'),
+        Field('allowed_materials'),
+        Field('forbidden_materials'),
+        Field('fee_system'),
+        Field('frequency'),
+        Field('valid_from'),
+        Field('valid_until'),
+        Field('description')
+    )
+
+
+class CollectionModelForm(CreateInlineMixin, AutoCompleteModelForm):
     catchment = ModelChoiceField(
         queryset=CollectionCatchment.objects.all(),
         widget=BSModelSelect2(url='catchment-autocomplete'),
@@ -279,25 +296,7 @@ class CollectionModelForm(AutoCompleteModelForm):
             'valid_from': DateInput(attrs={'type': 'date'}),
             'valid_until': DateInput(attrs={'type': 'date'}),
         }
-
-    @property
-    def helper(self):
-        helper = FormHelper()
-        helper.form_tag = False
-        helper.layout = Layout(
-            Field('catchment'),
-            ForeignkeyField('collector'),
-            ForeignkeyField('collection_system'),
-            ForeignkeyField('waste_category'),
-            Field('allowed_materials'),
-            Field('forbidden_materials'),
-            Field('fee_system'),
-            Field('frequency'),
-            Field('valid_from'),
-            Field('valid_until'),
-            Field('description')
-        )
-        return helper
+        form_helper_class = CollectionModelFormHelper
 
     def save(self, commit=True):
         instance = super().save(commit=False)
