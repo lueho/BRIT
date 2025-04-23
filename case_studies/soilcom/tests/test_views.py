@@ -21,7 +21,7 @@ from .. import views
 from ..forms import BaseWasteFlyerUrlFormSet, CollectionModelForm
 from ..models import (AggregatedCollectionPropertyValue, Collection, CollectionCatchment, CollectionCountOptions,
                       CollectionFrequency, CollectionPropertyValue, CollectionSeason, CollectionSystem, Collector,
-                      WasteCategory, WasteComponent, WasteFlyer, WasteStream)
+                      FeeSystem, WasteCategory, WasteComponent, WasteFlyer, WasteStream)
 
 
 # ----------- Collector CRUD -------------------------------------------------------------------------------------------
@@ -132,6 +132,25 @@ class WasteComponentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDVie
         data['publication_status'] = 'published'
         data.update(cls.related_objects)
         return cls.model.objects.create(owner=cls.owner_user, **data)
+
+
+# ----------- Fee System CRUD ------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class FeeSystemCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model = FeeSystem
+
+    view_dashboard_name = 'wastecollection-dashboard'
+    view_create_name = 'feesystem-create'
+    view_published_list_name = 'feesystem-list'
+    view_private_list_name = 'feesystem-list-owned'
+    view_detail_name = 'feesystem-detail'
+    view_update_name = 'feesystem-update'
+    view_delete_name = 'feesystem-delete-modal'
+
+    create_object_data = {'name': 'Test Fee System'}
+    update_object_data = {'name': 'Updated Test Fee System'}
 
 
 # ----------- WasteFlyer CRUD ------------------------------------------------------------------------------------------

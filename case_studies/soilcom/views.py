@@ -39,7 +39,7 @@ from .forms import (AggregatedCollectionPropertyValueModelForm, BaseWasteFlyerUr
                     WasteFlyerModelForm)
 from .models import (AggregatedCollectionPropertyValue, Collection, CollectionCatchment, CollectionCountOptions,
                      CollectionFrequency, CollectionPropertyValue, CollectionSeason, CollectionSystem, Collector,
-                     WasteCategory, WasteComponent, WasteFlyer)
+                     FeeSystem, WasteCategory, WasteComponent, WasteFlyer)
 from .tasks import check_wasteflyer_urls
 
 
@@ -170,6 +170,8 @@ class WasteCategoryPrivateListView(PrivateObjectListView):
 
 
 class WasteCategoryCreateView(OwnedObjectCreateView):
+    model = WasteCategory
+    fields = ('name', 'description')
     form_class = WasteCategoryModelForm
     success_url = reverse_lazy('wastecategory-list')
     permission_required = 'soilcom.add_wastecategory'
@@ -248,6 +250,38 @@ class WasteComponentModalUpdateView(UserCreatedObjectModalUpdateView):
 
 class WasteComponentModalDeleteView(UserCreatedObjectModalDeleteView):
     model = WasteComponent
+
+
+# ----------- Fee System CRUD ------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class FeeSystemPublishedListView(PublishedObjectListView):
+    model = FeeSystem
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
+
+
+class FeeSystemPrivateListView(PrivateObjectListView):
+    model = FeeSystem
+    dashboard_url = reverse_lazy('wastecollection-dashboard')
+
+
+class FeeSystemCreateView(OwnedObjectCreateView):
+    model = FeeSystem
+    fields = ('name', 'description')
+
+
+class FeeSystemDetailView(UserCreatedObjectDetailView):
+    model = FeeSystem
+
+
+class FeeSystemUpdateView(UserCreatedObjectUpdateView):
+    model = FeeSystem
+    fields = ('name', 'description')
+
+
+class FeeSystemModalDeleteView(UserCreatedObjectModalDeleteView):
+    model = FeeSystem
 
 
 # ----------- Waste Collection Flyer CRUD ------------------------------------------------------------------------------
