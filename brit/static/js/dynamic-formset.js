@@ -24,31 +24,4 @@ function loadAddFormButton() {
     }
 }
 
-function data_url(element) {
-    if (element.dataUrl) {
-        return element.dataUrl;
-    } else {
-        return element.data('options');
-    }
-}
-
-function setupModalForeignkeyCreateForm() {
-    $('.modal-fk-create').each(function() {
-        $(this).modalForm({
-            formURL: $(this).data('href'),
-            errorClass: '.is-invalid',
-            asyncUpdate: true,
-            asyncSettings: {
-                closeOnSubmit: true,
-                successMessage: '<div class="success d-none">Success</div>',
-                dataUrl: data_url($(this)),
-                dataElementId: $(this).data('forField'),
-                dataKey: 'options',
-                addModalFormFunction: setupModalForeignkeyCreateForm
-            }
-        });
-    });
-}
-
 loadAddFormButton();
-setupModalForeignkeyCreateForm();

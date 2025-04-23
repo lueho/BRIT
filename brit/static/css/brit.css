@@ -1,6 +1,41 @@
+/* =============================================================================
+   BRIT | Custom styles
+   ============================================================================= */
+
+/* -----------------------------------------------------------------------------
+   Select2 / autocomplete sizing
+   -----------------------------------------------------------------------------
+   - Standalone selects fill 100% of their parent
+   - When inside an .input-group, they flex to take just the leftover space
+   -----------------------------------------------------------------------------
+*/
+
+/* 1) Global: override inline width so Select2 always spans its parent */
 .select2-container {
-    min-width: 10em !important;
+    width: 100% !important; /* force full‑width */
+    min-width: 0 !important; /* allow flex/blocks to shrink */
+    box-sizing: border-box; /* include padding/border */
 }
+
+/* 2) In an input‑group: switch to auto‑width + flex so the “+” button stays inline */
+.input-group .select2-container {
+    width: auto !important; /* don’t force 100% here */
+    flex: 1 1 auto !important; /* let it grow/shrink to fit */
+    min-width: 0 !important;
+}
+
+/* 3) Cap the dropdown menu so it never overflows the card */
+.select2-container .select2-dropdown {
+    max-width: 100% !important;
+    box-sizing: border-box;
+    overflow-x: auto; /* scroll if option text is absurdly long */
+}
+
+
+/* -----------------------------------------------------------------------------
+   Other custom tweaks
+   -----------------------------------------------------------------------------
+*/
 
 .nowrap {
     white-space: nowrap;
@@ -25,25 +60,27 @@
 }
 
 .svg-icon-header svg {
-    /*width: 1em; !* Adjust size to match font-size *!*/
-    height: 1em; /* Adjust size to match font-size */
-    fill: currentColor; /* Use the current font color */
-    vertical-align: middle; /* Align inline with the text */
+    height: 1em; /* match font-size */
+    fill: currentColor; /* current text color */
+    vertical-align: middle; /* align with text */
 }
 
+
+/* -----------------------------------------------------------------------------
+   Responsive table stacking for small screens
+   -----------------------------------------------------------------------------
+*/
 
 @media screen and (max-width: 768px) {
     .table-responsive-stack tr {
         display: block;
         margin-bottom: .625em;
         border: 1px solid #858796;
-
     }
 
-    /*.table-responsive-stack tr:nth-child(odd) {*/
-    /*    background-color: #f2f2f2;*/
-    /*}*/
-
+    /*.table-responsive-stack tr:nth-child(odd) {
+      background-color: #f2f2f2;
+    }*/
     .table-responsive-stack td {
         display: block;
         text-align: left;
@@ -60,5 +97,3 @@
         display: none;
     }
 }
-
-

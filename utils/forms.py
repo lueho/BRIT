@@ -15,10 +15,13 @@ class FormHelperMixin:
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        if not isinstance(self.helper, FormHelper):
-            if hasattr(self, 'Meta'):
-                if hasattr(self.Meta, 'helper_class'):
-                    self.helper = self.Meta.helper_class()
+
+        if isinstance(self.helper, FormHelper):
+            return  # helper already set elsewhere
+
+        if hasattr(self, 'Meta') and hasattr(self.Meta, 'form_helper_class'):
+            self.helper = self.Meta.form_helper_class()
+        else:
             self.helper = FormHelper()
 
 
@@ -32,6 +35,16 @@ class NoFormTagMixin(FormHelperMixin):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.helper.form_tag = False
+
+
+class CreateInlineMixin:
+    """
+    Form mixin that causes create-inline.js to be automatically
+    included whenever this form is rendered with crispy-forms.
+    """
+
+    class Media:
+        js = ('js/create_inline.min.js',)
 
 
 class ModalFormMixin(NoFormTagMixin, PopRequestMixin):

@@ -427,12 +427,13 @@ def delete_unused_waste_streams(sender, instance, created, **kwargs):
 @receiver(post_save, sender=Catchment)
 @receiver(post_save, sender=CollectionCatchment)
 def update_collection_names(sender, instance, created, **kwargs):
-    if sender == WasteCategory:
-        collections = Collection.objects.filter(waste_stream__category=instance)
-    else:
-        collections = instance.collections.all()
-    for collection in collections:
-        collection.save()
+    if not created:
+        if sender == WasteCategory:
+            collections = Collection.objects.filter(waste_stream__category=instance)
+        else:
+            collections = instance.collections.all()
+        for collection in collections:
+            collection.save()
 
 
 class CollectionPropertyValue(PropertyValue):

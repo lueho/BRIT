@@ -2,6 +2,7 @@ from urllib.parse import urlencode
 
 from bootstrap_modal_forms.generic import BSModalCreateView, BSModalDeleteView, BSModalUpdateView
 from bootstrap_modal_forms.mixins import is_ajax
+from crispy_forms.helper import FormHelper
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin, UserPassesTestMixin
 from django.contrib.messages.views import SuccessMessageMixin
@@ -30,6 +31,26 @@ class NextOrSuccessUrlMixin:
     def get_success_url(self):
         next_url = self.request.GET.get('next')
         return next_url if next_url else super().get_success_url()
+
+
+class NoFormTagMixin:
+    """
+    Mixin for generic *model form* views (CreateView, UpdateView, etc.)
+    that asks crispy‑forms **not** to emit a surrounding <form> … </form>.
+
+    • Set ``form_tag = True`` in a subclass if a particular view *does*
+      need the tag back.
+    """
+    form_tag = False  # default for every view that uses the mixin
+
+    def get_form(self, form_class=None):
+        form = super().get_form(form_class)
+
+        if self.form_tag is False:
+            helper = getattr(form, "helper", FormHelper())
+            helper.form_tag = False
+            form.helper = helper
+        return form
 
 
 class UserOwnsObjectMixin(UserPassesTestMixin):
@@ -345,7 +366,7 @@ class OwnedObjectCreateView(CreateOwnedObjectMixin, SuccessMessageMixin, CreateV
         return template_names
 
 
-class UserCreatedObjectCreateView(CreateUserObjectMixin, SuccessMessageMixin, CreateView):
+class UserCreatedObjectCreateView(CreateUserObjectMixin, NoFormTagMixin, SuccessMessageMixin, CreateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -366,33 +387,41 @@ class UserCreatedObjectCreateView(CreateUserObjectMixin, SuccessMessageMixin, Cr
         return template_names
 
 
-class OwnedObjectModalCreateView(CreateOwnedObjectMixin, BSModalCreateView):
+class OwnedObjectModalCreateView(BSModalCreateView):
     template_name = 'modal_form.html'
-    success_message = 'Object created successfully.'
     object = None
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+
+        model_name = "Object"
+        model = None
+
+        if hasattr(self, 'model') and self.model:
+            model = self.model
+
+        elif hasattr(self, 'form_class') and self.form_class:
+            form_meta = getattr(self.form_class, '_meta', None)
+            if form_meta and hasattr(form_meta, 'model'):
+                model = form_meta.model
+
+        if model and hasattr(model._meta, 'verbose_name'):
+            model_name = model._meta.verbose_name.capitalize()
+
         context.update({
-            'modal_title': f'Create New {self.form_class._meta.model._meta.verbose_name}',
+            'modal_title': f'Create New {model_name}',
             'submit_button_text': 'Save'
         })
         return context
 
     def get_success_message(self):
-        return str(self.object.pk)
+        if hasattr(self, 'object') and self.object:
+            model_name = self.object._meta.verbose_name.capitalize()
+            return f"{model_name} created successfully."
+        return 'Object created successfully.'
 
     def form_valid(self, form):
-        isAjaxRequest = is_ajax(self.request.META)
-        asyncUpdate = self.request.POST.get('asyncUpdate') == 'True'
-
-        if isAjaxRequest:
-            if asyncUpdate:
-                self.object = form.save()
-            return HttpResponse(status=204)
-        with mute_signals(post_save):
-            self.object = form.save()
-        messages.success(self.request, self.get_success_message())
+        form.instance.owner = self.request.user
         return super().form_valid(form)
 
 
