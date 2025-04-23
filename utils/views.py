@@ -387,7 +387,7 @@ class UserCreatedObjectCreateView(CreateUserObjectMixin, NoFormTagMixin, Success
         return template_names
 
 
-class OwnedObjectModalCreateView(BSModalCreateView):
+class OwnedObjectModalCreateView(PermissionRequiredMixin, BSModalCreateView):
     template_name = 'modal_form.html'
     object = None
 
