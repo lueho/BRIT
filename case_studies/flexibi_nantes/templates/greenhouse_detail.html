@@ -36,13 +36,11 @@
                         </div>
                     </div>
                 {% endfor %}
-                {% if request.user == object.owner %}
+                {% if 'flexibi_nantes.add_greenhousegrowthcycle' in perms %}
                     <div class="card border-left-primary border">
                         <div class="card-header"></div>
                         <div class="card-body">
-                            <a href="javascript:void(0);"
-                               class="modal-link"
-                               data-link="{% url 'growthcycle-create-modal' object.id %}?next={{ request.path }}">
+                            <a href="{% url 'greenhousegrowthcycle-create' object.id %}?next={{ request.path }}">
                                 <i class="fas fa-fw fa-plus"></i> Add growth cycle
                             </a>
                         </div>

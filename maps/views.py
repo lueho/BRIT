@@ -19,11 +19,11 @@ from maps.serializers import (CatchmentGeoFeatureModelSerializer, LauRegionOptio
                               NutsRegionCatchmentOptionSerializer, NutsRegionOptionSerializer,
                               NutsRegionSummarySerializer, RegionGeoFeatureModelSerializer)
 from utils.forms import DynamicTableInlineFormSetHelper
-from utils.views import (OwnedObjectCreateView, OwnedObjectModalCreateView, OwnedObjectModelSelectOptionsView,
-                         PrivateObjectFilterView, PrivateObjectListView, PublishedObjectFilterView,
-                         PublishedObjectListView, UserCreatedObjectDetailView, UserCreatedObjectModalDeleteView,
-                         UserCreatedObjectModalDetailView, UserCreatedObjectModalUpdateView,
-                         UserCreatedObjectUpdateView)
+from utils.views import (CreateUserObjectMixin, OwnedObjectModelSelectOptionsView, PrivateObjectFilterView,
+                         PrivateObjectListView, PublishedObjectFilterView, PublishedObjectListView,
+                         UserCreatedObjectCreateView, UserCreatedObjectDetailView, UserCreatedObjectModalCreateView,
+                         UserCreatedObjectModalDeleteView, UserCreatedObjectModalDetailView,
+                         UserCreatedObjectModalUpdateView, UserCreatedObjectUpdateView)
 from .filters import CatchmentFilterSet, GeoDataSetFilterSet, NutsRegionFilterSet, RegionFilterSet
 from .forms import (AttributeModalModelForm, AttributeModelForm, CatchmentCreateDrawCustomForm,
                     CatchmentCreateMergeLauForm, CatchmentModelForm, GeoDataSetModelForm, LocationModelForm,
@@ -271,8 +271,7 @@ class GeoDataSetFormMixin(FormMixin):
             return self.filterset_class(self.request.GET).form
 
 
-class GeoDataSetCreateView(OwnedObjectCreateView):
-    model = GeoDataset
+class GeoDataSetCreateView(UserCreatedObjectCreateView):
     form_class = GeoDataSetModelForm
     permission_required = 'maps.add_geodataset'
 
@@ -338,8 +337,7 @@ class LocationPrivateListView(PrivateObjectListView):
     dashboard_url = reverse_lazy('maps-dashboard')
 
 
-class LocationCreateView(OwnedObjectCreateView):
-    model = Location
+class LocationCreateView(UserCreatedObjectCreateView):
     form_class = LocationModelForm
     permission_required = 'maps.add_location'
 
@@ -384,8 +382,7 @@ class RegionDetailView(MapMixin, UserCreatedObjectDetailView):
     features_layer_api_basename = 'api-region'
 
 
-class RegionCreateView(OwnedObjectCreateView):
-    model = Region
+class RegionCreateView(UserCreatedObjectCreateView):
     form_class = RegionModelForm
     permission_required = 'maps.add_region'
 
@@ -419,23 +416,24 @@ class CatchmentDetailView(MapMixin, UserCreatedObjectDetailView):
     model = Catchment
 
 
-class CatchmentCreateView(LoginRequiredMixin, TemplateView):
+class CatchmentCreateView(CreateUserObjectMixin, TemplateView):
     template_name = 'catchment_create_method_select.html'
+    permission_required = 'maps.add_catchment'
 
 
-class CatchmentCreateSelectRegionView(LoginRequiredMixin, OwnedObjectCreateView):
+class CatchmentCreateSelectRegionView(UserCreatedObjectCreateView):
     template_name = 'maps/catchment_form.html'
     form_class = CatchmentModelForm
-    permission_required = set()
+    permission_required = 'maps.add_catchment'
 
 
-class CatchmentCreateDrawCustomView(LoginRequiredMixin, OwnedObjectCreateView):
+class CatchmentCreateDrawCustomView(UserCreatedObjectCreateView):
     template_name = 'catchment_draw_form.html'
     form_class = CatchmentCreateDrawCustomForm
-    permission_required = set()
+    permission_required = 'maps.add_catchment'
 
 
-class CatchmentCreateMergeLauView(LoginRequiredMixin, OwnedObjectCreateView):
+class CatchmentCreateMergeLauView(UserCreatedObjectCreateView):
     template_name = 'catchment_merge_formset.html'
     form = None
     form_class = CatchmentCreateMergeLauForm
@@ -445,7 +443,7 @@ class CatchmentCreateMergeLauView(LoginRequiredMixin, OwnedObjectCreateView):
     formset_form_class = RegionMergeForm
     formset_helper_class = DynamicTableInlineFormSetHelper
     formset_factory_kwargs = {'extra': 2}
-    permission_required = set()
+    permission_required = 'maps.add_catchment'
 
     def get_formset_kwargs(self, **kwargs):
         if self.request.method in ("POST", "PUT"):
@@ -464,6 +462,7 @@ class CatchmentCreateMergeLauView(LoginRequiredMixin, OwnedObjectCreateView):
         # The region will get the same custom name as the catchment
         if self.object:
             return self.object.name
+        return None
 
     def create_region_borders(self):
         geoms = [
@@ -822,13 +821,13 @@ class AttributePrivateListView(PrivateObjectListView):
     dashboard_url = reverse_lazy('maps-dashboard')
 
 
-class AttributeCreateView(OwnedObjectCreateView):
+class AttributeCreateView(UserCreatedObjectCreateView):
     form_class = AttributeModelForm
     success_url = reverse_lazy('attribute-list')
     permission_required = 'maps.add_attribute'
 
 
-class AttributeModalCreateView(OwnedObjectModalCreateView):
+class AttributeModalCreateView(UserCreatedObjectModalCreateView):
     form_class = AttributeModalModelForm
     success_url = reverse_lazy('attribute-list')
     permission_required = 'maps.add_attribute'
@@ -861,12 +860,12 @@ class AttributeModalDeleteView(UserCreatedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class RegionAttributeValueCreateView(OwnedObjectCreateView):
+class RegionAttributeValueCreateView(UserCreatedObjectCreateView):
     form_class = RegionAttributeValueModelForm
     permission_required = 'maps.add_regionattributevalue'
 
 
-class RegionAttributeValueModalCreateView(OwnedObjectModalCreateView):
+class RegionAttributeValueModalCreateView(UserCreatedObjectModalCreateView):
     form_class = RegionAttributeValueModalModelForm
     permission_required = 'maps.add_regionattributevalue'
 

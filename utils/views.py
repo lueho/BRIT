@@ -1,13 +1,10 @@
 from urllib.parse import urlencode
 
 from bootstrap_modal_forms.generic import BSModalCreateView, BSModalDeleteView, BSModalUpdateView
-from bootstrap_modal_forms.mixins import is_ajax
 from crispy_forms.helper import FormHelper
-from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin, UserPassesTestMixin
 from django.contrib.messages.views import SuccessMessageMixin
 from django.core.exceptions import ImproperlyConfigured
-from django.db.models.signals import post_save
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
 from django.shortcuts import render
 from django.template.loader import render_to_string
@@ -15,7 +12,6 @@ from django.views import View
 from django.views.generic import CreateView, DetailView, ListView, TemplateView, UpdateView
 from django_filters.views import FilterView
 from extra_views import CreateWithInlinesView, UpdateWithInlinesView
-from factory.django import mute_signals
 
 from .forms import DynamicTableInlineFormSetHelper
 from .models import Redirect
@@ -155,6 +151,8 @@ class UserCreatedObjectListMixin:
             return self.header
         if self.model:
             return self.model._meta.verbose_name_plural.capitalize()
+        else:
+            return None
 
     def get_dashboard_url(self):
         return self.dashboard_url
@@ -165,10 +163,12 @@ class UserCreatedObjectListMixin:
     def get_create_url_text(self):
         if self.model:
             return f'New {self.model._meta.verbose_name}'
+        return None
 
     def get_create_permission(self):
         if self.model:
             return f'{self.model.__module__.split(".")[-2]}.add_{self.model.__name__.lower()}'
+        return None
 
     def get_list_type(self):
         return self.list_type
@@ -176,6 +176,7 @@ class UserCreatedObjectListMixin:
     def get_private_list_owner(self):
         if self.list_type == 'private':
             return self.request.user
+        return None
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -332,51 +333,48 @@ class UserCreatedObjectWriteAccessMixin(UserPassesTestMixin):
             return owner == user
 
 
-class CreateOwnedObjectMixin(PermissionRequiredMixin, NextOrSuccessUrlMixin):
-    # TODO: EOL
+class CreateUserObjectMixin(PermissionRequiredMixin, NextOrSuccessUrlMixin):
+
+    def has_permission(self):
+        # Staff users can always create objects
+        if self.request.user.is_staff:
+            return True
+        # For non-staff users, use the default permission check
+        return super().has_permission()
+
     def form_valid(self, form):
         form.instance.owner = self.request.user
         return super().form_valid(form)
-
-
-class CreateUserObjectMixin(LoginRequiredMixin, NextOrSuccessUrlMixin):
-    def form_valid(self, form):
-        form.instance.owner = self.request.user
-        return super().form_valid(form)
-
-
-class OwnedObjectCreateView(CreateOwnedObjectMixin, SuccessMessageMixin, CreateView):
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({
-            'form_title': f'Create New {self.form_class._meta.model._meta.verbose_name}',
-        })
-        return context
-
-    def get_success_message(self, cleaned_data):
-        return str(self.object.pk)
-
-    def get_template_names(self):
-        try:
-            template_names = super().get_template_names()
-        except ImproperlyConfigured:
-            template_names = []
-        template_names.append('simple_form_card.html')
-        return template_names
 
 
 class UserCreatedObjectCreateView(CreateUserObjectMixin, NoFormTagMixin, SuccessMessageMixin, CreateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        model_name = "Object"
+
+        if hasattr(self, 'model') and self.model:
+            model = self.model
+            if hasattr(model._meta, 'verbose_name'):
+                model_name = model._meta.verbose_name.capitalize()
+        elif hasattr(self, 'form_class') and self.form_class:
+            form_meta = getattr(self.form_class, '_meta', None)
+            if form_meta and hasattr(form_meta, 'model'):
+                model = form_meta.model
+                if hasattr(model._meta, 'verbose_name'):
+                    model_name = model._meta.verbose_name.capitalize()
+
         context.update({
-            'form_title': f'Create New {self.form_class._meta.model._meta.verbose_name}',
+            'form_title': f'Create New {model_name}',
+            'submit_button_text': 'Save'
         })
         return context
 
     def get_success_message(self, cleaned_data):
-        return str(self.object.pk)
+        if hasattr(self, 'object') and self.object:
+            model_name = self.object._meta.verbose_name.capitalize()
+            return f"{model_name} created successfully."
+        return 'Object created successfully.'
 
     def get_template_names(self):
         try:
@@ -387,9 +385,16 @@ class UserCreatedObjectCreateView(CreateUserObjectMixin, NoFormTagMixin, Success
         return template_names
 
 
-class OwnedObjectModalCreateView(PermissionRequiredMixin, BSModalCreateView):
+class UserCreatedObjectModalCreateView(PermissionRequiredMixin, BSModalCreateView):
     template_name = 'modal_form.html'
     object = None
+
+    def has_permission(self):
+        # Staff users can always create objects
+        if self.request.user.is_staff:
+            return True
+        # For non-staff users, use the default permission check
+        return super().has_permission()
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -423,36 +428,6 @@ class OwnedObjectModalCreateView(PermissionRequiredMixin, BSModalCreateView):
     def form_valid(self, form):
         form.instance.owner = self.request.user
         return super().form_valid(form)
-
-
-class UserCreatedObjectModalCreateView(CreateUserObjectMixin, BSModalCreateView):
-    template_name = 'modal_form.html'
-    success_message = 'Object created successfully.'
-    object = None
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({
-            'modal_title': f'Create New {self.form_class._meta.model._meta.verbose_name}',
-            'submit_button_text': 'Save'
-        })
-        return context
-
-    def get_success_message(self):
-        return str(self.object.pk)
-
-    def form_valid(self, form):
-        isAjaxRequest = is_ajax(self.request.META)
-        asyncUpdate = self.request.POST.get('asyncUpdate') == 'True'
-
-        if isAjaxRequest:
-            if asyncUpdate:
-                self.object = form.save()
-            return HttpResponse(status=204)
-        with mute_signals(post_save):
-            self.object = form.save()
-        messages.success(self.request, self.get_success_message())
-        return HttpResponseRedirect(self.get_success_url())
 
 
 class UserCreatedObjectDetailView(UserCreatedObjectReadAccessMixin, DetailView):
@@ -509,7 +484,7 @@ class UserCreatedObjectUpdateView(UserCreatedObjectWriteAccessMixin, NextOrSucce
         return template_names
 
 
-class OwnedObjectCreateWithInlinesView(CreateOwnedObjectMixin, CreateWithInlinesView):
+class UserCreatedObjectCreateWithInlinesView(CreateUserObjectMixin, CreateWithInlinesView):
     formset_helper_class = DynamicTableInlineFormSetHelper
 
     def get_context_data(self, **kwargs):

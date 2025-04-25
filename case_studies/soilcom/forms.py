@@ -65,6 +65,16 @@ class WasteComponentModalModelForm(ModalModelFormMixin, WasteComponentModelForm)
     pass
 
 
+class FeeSystemModelForm(SimpleModelForm):
+    class Meta:
+        model = FeeSystem
+        fields = ('name', 'description')
+
+
+class FeeSystemModalModelForm(ModalModelFormMixin, FeeSystemModelForm):
+    pass
+
+
 class CollectionFrequencyModelForm(SimpleModelForm):
     class Meta:
         model = CollectionFrequency

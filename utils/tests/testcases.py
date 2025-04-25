@@ -66,17 +66,66 @@ def comparable_model_dict(instance):
 class AbstractTestCases(object):
     class UserCreatedObjectCRUDViewTestCase(ABC, UserLoginTestCase):
         """
-        Abstract base test case for testing UserCreatedObjectAccessMixin across different models.
-        Subclasses must define the following class attributes:
+        Abstract base class for testing standard Django CRUD views, particularly
+        for models featuring an 'owner' field and often a 'publication_status'.
 
-        - model: The Django model to test.
-        - view_detail_name: The name of the DetailView URL.
-        - view_update_name: The name of the UpdateView URL.
-        - view_delete_name: The name of the DeleteView URL.
-        - create_object_data: A dictionary with data to create an object.
-        - update_object_data: A dictionary with data to update the object.
-        - update_success_url_name: The URL to redirect after successful update or delete.
-        - permission_denied_message: Message displayed on permission denied.
+        This class provides a comprehensive suite of tests covering various access
+        scenarios based on user authentication, ownership, staff status, specific
+        permissions, and object publication state. It supports testing both
+        standard page views and modal dialog views (e.g., for HTMX).
+
+        Subclasses **must** define the following class attributes:
+        - `model`: The Django model class being tested.
+        - `create_object_data`: Dict with data needed to create a valid model instance.
+        - `update_object_data`: Dict with data needed to update an existing instance.
+
+        Subclasses **must** also define the relevant URL names for the views
+        they intend to test (set the corresponding boolean flag to True):
+        - `view_dashboard_name`: URL name for the dashboard/overview view.
+        - `view_create_name`: URL name for the standard CreateView.
+        - `view_modal_create_name`: URL name for the modal CreateView.
+        - `view_published_list_name`: URL name for the public ListView.
+        - `view_private_list_name`: URL name for the private/owned ListView.
+        - `view_detail_name`: URL name for the standard DetailView.
+        - `view_modal_detail_name`: URL name for the modal DetailView.
+        - `view_update_name`: URL name for the standard UpdateView.
+        - `view_modal_update_name`: URL name for the modal UpdateView.
+        - `view_delete_name`: URL name for the standard DeleteView.
+
+        Optional attributes for customization:
+        - `update_success_url_name`: Override redirect URL after successful update.
+                                      (Defaults to `view_detail_name`).
+        - `delete_success_url_name`: Override redirect URL after successful delete.
+                                      (Defaults to `view_published_list_name`).
+        - `permission_denied_message`: Expected message for 403 Forbidden responses.
+        - `model_add_permission`: Specific codename for the 'add' permission if
+                                  it differs from the default 'add_<model_name>'.
+
+        Test Execution Control:
+        Set the following boolean flags to True/False to enable/disable tests
+        for specific view types:
+        - `dashboard_view`
+        - `create_view`
+        - `modal_create_view`
+        - `public_list_view`
+        - `private_list_view`
+        - `detail_view`
+        - `modal_detail_view`
+        - `update_view`
+        - `modal_update_view`
+        - `delete_view`
+
+        Setup:
+        - `setUpTestData` creates standard users: 'owner', 'non_owner', 'staff',
+          and 'user_with_add_perm'.
+        - It creates initial 'published' and 'unpublished' instances of the `model`.
+        - Subclasses can override `create_related_objects` to provide necessary
+          ForeignKey dependencies for `create_object_data`.
+        - Subclasses can override `create_util_objects` for other test setup needs.
+
+        Note: This is an abstract class (`__test__ = False`) and should not be
+        run directly by the test runner. Concrete subclasses inheriting from it
+        will be discovered and run.
         """
 
         # This is an abstract class and should not be run as a test case directly
@@ -84,6 +133,7 @@ class AbstractTestCases(object):
 
         dashboard_view = True
         create_view = True
+        modal_create_view = False
         public_list_view = True
         private_list_view = True
         detail_view = True
@@ -93,9 +143,11 @@ class AbstractTestCases(object):
         delete_view = True
 
         model = None
+        model_add_permission = None
 
         view_dashboard_name = None
         view_create_name = None
+        view_modal_create_name = None
         view_published_list_name = None
         view_private_list_name = None
         view_detail_name = None
@@ -110,6 +162,7 @@ class AbstractTestCases(object):
         permission_denied_message = "Sorry, you don't have permission to access this page."
 
         related_objects = None
+        util_objects = None
         published_object = None
         unpublished_object = None
 
@@ -119,7 +172,16 @@ class AbstractTestCases(object):
             cls.non_owner_user = User.objects.create(username='non_owner')
             cls.staff_user = User.objects.create(username='staff', is_staff=True)
 
+            # Create a user with add permission for the model
+            cls.user_with_add_perm = User.objects.create(username='user_with_add_perm')
+            if cls.model:
+                add_perm_codename = cls.model_add_permission or f'add_{cls.model._meta.model_name}'
+                cls.user_with_add_perm.user_permissions.add(
+                    Permission.objects.get(codename=add_perm_codename)
+                )
+
             cls.related_objects = cls.create_related_objects()
+            cls.util_objects = cls.create_util_objects()
 
             cls.published_object = cls.create_published_object()
             cls.unpublished_object = cls.create_unpublished_object()
@@ -132,6 +194,17 @@ class AbstractTestCases(object):
 
             Returns:
                 A dictionary of related objects that can be used in `create_object_data`.
+            """
+            return {}
+
+        @classmethod
+        def create_util_objects(cls):
+            """
+            Create any util related objects required for the test that are not directly related to the model
+            by ForeignKeyField.
+
+            Returns:
+                A dictionary of objects that can be used in test functions.
             """
             return {}
 
@@ -175,11 +248,16 @@ class AbstractTestCases(object):
         def get_create_url(self):
             return reverse(self.view_create_name)
 
+        def get_modal_create_url(self):
+            return reverse(self.view_modal_create_name)
+
         def get_list_url(self, publication_status='published', **kwargs):
             if publication_status == 'published':
                 return reverse(self.view_published_list_name, kwargs=kwargs)
             elif publication_status == 'private':
                 return reverse(self.view_private_list_name, kwargs=kwargs)
+            else:
+                return None
 
         def get_detail_url(self, pk):
             return reverse(self.view_detail_name, kwargs={'pk': pk})
@@ -312,6 +390,174 @@ class AbstractTestCases(object):
                 self.assertContains(response, self.get_create_url())
             if self.public_list_view:
                 self.assertContains(response, self.get_list_url(publication_status='published'))
+
+        # -----------------------
+        # ModalCreateView Test Cases
+        # -----------------------
+
+        def test_modal_create_view_get_as_anonymous(self):
+            if not self.modal_create_view:
+                self.skipTest("Modal create view is not enabled for this test case.")
+            url = self.get_modal_create_url()
+            response = self.client.get(url)
+            login_url = settings.LOGIN_URL
+            expected_redirect = f"{login_url}?next={url}"
+            self.assertRedirects(response, expected_redirect)
+
+        def test_modal_create_view_post_as_anonymous(self):
+            if not self.modal_create_view:
+                self.skipTest("Modal create view is not enabled for this test case.")
+            url = self.get_modal_create_url()
+            response = self.client.post(url)
+            login_url = settings.LOGIN_URL
+            expected_redirect = f"{login_url}?next={url}"
+            self.assertRedirects(response, expected_redirect)
+
+        def test_modal_create_view_get_as_authenticated_without_permission(self):
+            if not self.modal_create_view:
+                self.skipTest("Modal create view is not enabled for this test case.")
+            self.client.force_login(self.non_owner_user)
+            url = self.get_modal_create_url()
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 403)
+            self.assertContains(response, self.permission_denied_message, status_code=403)
+
+        def test_modal_create_view_post_as_authenticated_without_permission(self):
+            if not self.modal_create_view:
+                self.skipTest("Modal create view is not enabled for this test case.")
+            self.client.force_login(self.non_owner_user)
+            url = self.get_modal_create_url()
+            response = self.client.post(url)
+            self.assertEqual(response.status_code, 403)
+            self.assertContains(response, self.permission_denied_message, status_code=403)
+
+        def test_modal_create_view_get_as_authenticated_with_permission(self):
+            if not self.modal_create_view:
+                self.skipTest("Modal create view is not enabled for this test case.")
+            self.client.force_login(self.user_with_add_perm)
+            url = self.get_modal_create_url()
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200)
+
+        def test_modal_create_view_post_as_authenticated_with_permission(self):
+            if not self.modal_create_view:
+                self.skipTest("Modal create view is not enabled for this test case.")
+            self.client.force_login(self.user_with_add_perm)
+            url = self.get_modal_create_url()
+            data = self.create_object_data.copy()
+            data.update(self.related_objects_post_data())
+            initial_count = self.model.objects.count()
+            response = self.client.post(url, data)
+            self.assertEqual(self.model.objects.count(), initial_count + 1)
+            new_object = self.model.objects.latest('pk')
+            self.assertEqual(new_object.owner, self.user_with_add_perm)
+            self.assertEqual(response.status_code, 302)
+
+        def test_modal_create_view_get_as_staff_user(self):
+            if not self.modal_create_view:
+                self.skipTest("Modal create view is not enabled for this test case.")
+            self.client.force_login(self.staff_user)
+            url = self.get_modal_create_url()
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200)
+
+        def test_modal_create_view_post_as_staff_user(self):
+            if not self.modal_create_view:
+                self.skipTest("Modal create view is not enabled for this test case.")
+            self.client.force_login(self.staff_user)
+            url = self.get_modal_create_url()
+            data = self.create_object_data.copy()
+            data.update(self.related_objects_post_data())
+            initial_count = self.model.objects.count()
+            response = self.client.post(url, data)
+            self.assertEqual(self.model.objects.count(), initial_count + 1)
+            new_object = self.model.objects.latest('pk')
+            self.assertEqual(new_object.owner, self.staff_user)
+            self.assertEqual(response.status_code, 302)
+
+        # -----------------------
+        # CreateView Test Cases
+        # -----------------------
+
+        def test_create_view_get_as_anonymous(self):
+            if not self.create_view:
+                self.skipTest("Create view is not enabled for this test case.")
+            url = self.get_create_url()
+            response = self.client.get(url)
+            login_url = settings.LOGIN_URL
+            expected_redirect = f"{login_url}?next={url}"
+            self.assertRedirects(response, expected_redirect)
+
+        def test_create_view_post_as_anonymous(self):
+            if not self.create_view:
+                self.skipTest("Create view is not enabled for this test case.")
+            url = self.get_create_url()
+            response = self.client.post(url)
+            login_url = settings.LOGIN_URL
+            expected_redirect = f"{login_url}?next={url}"
+            self.assertRedirects(response, expected_redirect)
+
+        def test_create_view_get_as_authenticated_without_permission(self):
+            if not self.create_view:
+                self.skipTest("Create view is not enabled for this test case.")
+            self.client.force_login(self.non_owner_user)
+            url = self.get_create_url()
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 403)
+            self.assertContains(response, self.permission_denied_message, status_code=403)
+
+        def test_create_view_post_as_authenticated_without_permission(self):
+            if not self.create_view:
+                self.skipTest("Create view is not enabled for this test case.")
+            self.client.force_login(self.non_owner_user)
+            url = self.get_create_url()
+            response = self.client.post(url)
+            self.assertEqual(response.status_code, 403)
+            self.assertContains(response, self.permission_denied_message, status_code=403)
+
+        def test_create_view_get_as_authenticated_with_permission(self):
+            if not self.create_view:
+                self.skipTest("Create view is not enabled for this test case.")
+            self.client.force_login(self.user_with_add_perm)
+            url = self.get_create_url()
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200)
+
+        def test_create_view_post_as_authenticated_with_permission(self):
+            if not self.create_view:
+                self.skipTest("Create view is not enabled for this test case.")
+            self.client.force_login(self.user_with_add_perm)
+            url = self.get_create_url()
+            data = self.create_object_data.copy()
+            data.update(self.related_objects_post_data())
+            initial_count = self.model.objects.count()
+            response = self.client.post(url, data)
+            self.assertEqual(self.model.objects.count(), initial_count + 1)
+            new_object = self.model.objects.latest('pk')
+            self.assertEqual(new_object.owner, self.user_with_add_perm)
+            self.assertEqual(response.status_code, 302)
+
+        def test_create_view_get_as_staff_user(self):
+            if not self.create_view:
+                self.skipTest("Create view is not enabled for this test case.")
+            self.client.force_login(self.staff_user)
+            url = self.get_create_url()
+            response = self.client.get(url)
+            self.assertEqual(response.status_code, 200)
+
+        def test_create_view_post_as_staff_user(self):
+            if not self.create_view:
+                self.skipTest("Create view is not enabled for this test case.")
+            self.client.force_login(self.staff_user)
+            url = self.get_create_url()
+            data = self.create_object_data.copy()
+            data.update(self.related_objects_post_data())
+            initial_count = self.model.objects.count()
+            response = self.client.post(url, data)
+            self.assertEqual(self.model.objects.count(), initial_count + 1)
+            new_object = self.model.objects.latest('pk')
+            self.assertEqual(new_object.owner, self.staff_user)
+            self.assertEqual(response.status_code, 302)
 
         # -----------------------
         # DetailView Test Cases

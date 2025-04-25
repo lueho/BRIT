@@ -4,6 +4,9 @@ from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 from ..models import Property, Unit
 
 
+# ----------- Unit CRUD ------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
 class UnitCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Unit
 
@@ -27,42 +30,8 @@ class UnitCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase)
         return unit
 
 
-class PropertyCreateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ['add_property']
-    url = reverse('property-create')
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        response = self.client.get(self.url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={self.url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_member(self):
-        self.client.force_login(self.member)
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        response = self.client.post(self.url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={self.url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(self.url)
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_http_302_redirect_to_detail_for_member(self):
-        self.client.force_login(self.member)
-        unit = Unit.objects.create(name='Test Unit')
-        response = self.client.post(self.url, data={'name': 'Test Property', 'allowed_units': [unit.pk]})
-        prop = Property.objects.get(name='Test Property')
-        self.assertRedirects(response, reverse('property-detail', kwargs={'pk': prop.pk}))
-        self.assertEqual(Property.objects.count(), 1)
-        self.assertEqual(Property.objects.first().name, 'Test Property')
-
+# ----------- Property CRUD --------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
 
 class PropertyCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Property
@@ -86,6 +55,10 @@ class PropertyCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
         data = super().related_objects_post_data()
         data['allowed_units'] = [self.related_objects['unit'].pk]
         return data
+
+
+# ----------- Property Utils -------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
 
 
 class PropertyUnitOptionsViewTestCase(ViewWithPermissionsTestCase):

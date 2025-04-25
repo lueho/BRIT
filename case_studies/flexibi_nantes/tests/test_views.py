@@ -69,6 +69,7 @@ class GrowthCycleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
     dashboard_view = False
     public_list_view = False
     private_list_view = False
+    create_view = False # TODO: Check whether a create view is necessary
 
     model = GreenhouseGrowthCycle
 
