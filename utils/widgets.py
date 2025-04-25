@@ -5,7 +5,26 @@ from django_filters.widgets import SuffixedMultiWidget
 
 
 class RangeSliderWidget(SuffixedMultiWidget):
-    """A range slider widget that is compatible with django-crispy-forms and jQuery UI range slider."""
+    """
+    A range slider widget that is compatible with django-crispy-forms and jQuery UI range slider.
+
+    This widget allows users to select a range of values using a slider interface.
+    It renders as two hidden inputs for the minimum and maximum values, with a
+    visual slider representation.
+
+    Attributes:
+        template_name (str): The template used to render the widget.
+        widgets (list): List of widget instances for each subfield.
+        suffixes (list): List of suffixes for the subfield names.
+        unit (str): The unit to display after the values (e.g., '%', 'kg').
+        range_min (float): The minimum value for the slider.
+        range_max (float): The maximum value for the slider.
+        range_step (float): The step size for the slider.
+        default_range_min (float): Default minimum value if not specified.
+        default_range_max (float): Default maximum value if not specified.
+        default_range_step (float): Default step size if not specified.
+        default_include_null (bool): Whether to include null values by default.
+    """
     template_name = 'widgets/range_slider_widget.html'
     widgets = [HiddenInput(), HiddenInput()]
     suffixes = ['min', 'max']
@@ -25,6 +44,21 @@ class RangeSliderWidget(SuffixedMultiWidget):
         js = ('js/range_slider.min.js',)
 
     def __init__(self, attrs=None, **kwargs):
+        """
+        Initialize the RangeSliderWidget.
+
+        Args:
+            attrs (dict, optional): HTML attributes for the widget.
+                Special data attributes:
+                - data-unit: The unit to display after values
+                - data-range_min: Minimum value for the slider
+                - data-range_max: Maximum value for the slider
+                - data-range_step: Step size for the slider
+                - data-default_range_min: Default minimum if not specified
+                - data-default_range_max: Default maximum if not specified
+                - data-default_include_null: Whether to include null values
+            **kwargs: Additional keyword arguments passed to the parent class.
+        """
         super().__init__(self.widgets, attrs)
         if attrs is not None:
             self.unit = attrs.get('data-unit', self.unit)
@@ -36,11 +70,35 @@ class RangeSliderWidget(SuffixedMultiWidget):
             self.default_include_null = attrs.get('data-default_include_null', self.default_include_null)
 
     def decompress(self, value):
+        """
+        Decompress the value into a list of values for the individual subwidgets.
+
+        Args:
+            value: A slice object representing the range, or None.
+
+        Returns:
+            list: A list containing the start and stop values of the range.
+        """
         if not value:
             return [None, None]
         return [value.start, value.stop]
 
     def get_context(self, name, value, attrs):
+        """
+        Get the context for rendering the widget.
+
+        This method prepares the context dictionary used by the template to render
+        the range slider widget. It processes the current values, sets appropriate
+        data attributes, and formats the display text.
+
+        Args:
+            name (str): The name of the field.
+            value: The current value of the field.
+            attrs (dict): Additional attributes for the widget.
+
+        Returns:
+            dict: The context dictionary for the template.
+        """
         if not isinstance(value, list):
             value = self.decompress(value)
         context = super().get_context(name, value, attrs)
@@ -65,8 +123,16 @@ class RangeSliderWidget(SuffixedMultiWidget):
 
 class NullableRangeSliderWidget(RangeSliderWidget):
     """
-    A range slider widget that is compatible with django-crispy-forms and jQuery UI range slider.
-    accepts an additional boolean value to indicate if null values should be included.
+    A range slider widget that extends RangeSliderWidget to include null values.
+
+    This widget adds a checkbox to the range slider that allows users to include
+    null values in the range. When the checkbox is checked, the range slider is
+    disabled and null values are included in the filter.
+
+    Attributes:
+        template_name (str): The template used to render the widget.
+        widgets (list): List of widget classes for each subfield.
+        suffixes (list): List of suffixes for the subfield names.
     """
     template_name = 'widgets/nullable_range_slider.html'
     widgets = [HiddenInput, HiddenInput, HiddenInput]
@@ -79,12 +145,37 @@ class NullableRangeSliderWidget(RangeSliderWidget):
         js = ('js/range_slider.min.js', 'js/nullable_range_slider.min.js',)
 
     def decompress(self, range_with_null_flag):
+        """
+        Decompress the value into a list of values for the individual subwidgets.
+
+        Args:
+            range_with_null_flag: A tuple containing a slice object representing 
+                the range and a boolean indicating whether to include null values,
+                or None.
+
+        Returns:
+            list: A list containing the start value, stop value, and null flag.
+        """
         if not range_with_null_flag:
             return [None, None, 'true']
         value, is_null = range_with_null_flag
         return [value.start, value.stop, is_null]
 
     def get_context(self, name, value, attrs):
+        """
+        Get the context for rendering the widget.
+
+        This method extends the parent's get_context method to add the null flag
+        to the context.
+
+        Args:
+            name (str): The name of the field.
+            value: The current value of the field.
+            attrs (dict): Additional attributes for the widget.
+
+        Returns:
+            dict: The context dictionary for the template.
+        """
         context = super().get_context(name, value, attrs)
 
         if not isinstance(value, list):
@@ -101,12 +192,36 @@ class NullableRangeSliderWidget(RangeSliderWidget):
 
 
 class NullablePercentageRangeSliderWidget(NullableRangeSliderWidget):
+    """
+    A specialized version of NullableRangeSliderWidget for percentage values.
+
+    This widget displays values as percentages with a '%' symbol.
+    It inherits all functionality from NullableRangeSliderWidget but
+    sets the unit to '%' by default.
+
+    Attributes:
+        unit (str): The unit to display after the values, set to '%'.
+    """
     unit = '%'
 
 
 class BSModelSelect2(autocomplete.ModelSelect2):
+    """
+    Bootstrap-styled ModelSelect2 widget.
+
+    This widget extends django-autocomplete-light's ModelSelect2 widget
+    to use Bootstrap 4 styling for the Select2 dropdown.
+    """
     @property
     def media(self):
+        """
+        Return the media required by the widget.
+
+        This method adds the Bootstrap 4 theme CSS to the base Select2 media.
+
+        Returns:
+            Media: The combined media for the widget.
+        """
         base_media = super().media
         extra_media = Media(
             css={'screen': ('lib/select2-bootstrap-theme/select2-bootstrap4.min.css',)}
@@ -115,8 +230,22 @@ class BSModelSelect2(autocomplete.ModelSelect2):
 
 
 class BSModelSelect2Multiple(autocomplete.ModelSelect2Multiple):
+    """
+    Bootstrap-styled ModelSelect2Multiple widget.
+
+    This widget extends django-autocomplete-light's ModelSelect2Multiple widget
+    to use Bootstrap 4 styling for the Select2 dropdown.
+    """
     @property
     def media(self):
+        """
+        Return the media required by the widget.
+
+        This method adds the Bootstrap 4 theme CSS to the base Select2 media.
+
+        Returns:
+            Media: The combined media for the widget.
+        """
         base_media = super().media
         extra_media = Media(
             css={'screen': ('lib/select2-bootstrap-theme/select2-bootstrap4.min.css',)}
@@ -125,8 +254,22 @@ class BSModelSelect2Multiple(autocomplete.ModelSelect2Multiple):
 
 
 class BSListSelect2(autocomplete.ListSelect2):
+    """
+    Bootstrap-styled ListSelect2 widget.
+
+    This widget extends django-autocomplete-light's ListSelect2 widget
+    to use Bootstrap 4 styling for the Select2 dropdown.
+    """
     @property
     def media(self):
+        """
+        Return the media required by the widget.
+
+        This method adds the Bootstrap 4 theme CSS to the base Select2 media.
+
+        Returns:
+            Media: The combined media for the widget.
+        """
         base_media = super().media
         extra_media = Media(
             css={'screen': ('lib/select2-bootstrap-theme/select2-bootstrap4.min.css',)}
