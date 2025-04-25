@@ -3,3 +3,4 @@
 /.idea/
 /brit/settings/.env
 *.pyc
+settings.json
