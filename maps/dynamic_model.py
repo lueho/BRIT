@@ -1,6 +1,7 @@
 from functools import lru_cache
 from django.db import connection, models as dj_models
 from django.core.exceptions import ImproperlyConfigured
+import django_filters
 
 
 def get_dynamic_model(dataset):
@@ -38,6 +39,23 @@ def get_dynamic_model(dataset):
     fields['id'] = dj_models.AutoField(primary_key=True)
     model_name = f'DynModel_{dataset.pk}_{table_name}'
     return type(model_name, (dj_models.Model,), fields)
+
+
+def get_dynamic_filterset(dataset):
+    """
+    Given a GeoDataset instance, return a django_filters.FilterSet class for its dynamic model,
+    exposing only the filter_fields.
+    """
+    model = get_dynamic_model(dataset)
+    allowed_fields = [f.strip() for f in (dataset.filter_fields or '').split(',') if f.strip()]
+    if not allowed_fields:
+        # Defensive: don't expose all fields if filter_fields is empty
+        allowed_fields = ['id']
+    Meta = type('Meta', (), {})
+    Meta.model = model
+    Meta.fields = allowed_fields
+    attrs = {'Meta': Meta}
+    return type(f'DynamicFilterSet{dataset.pk}', (django_filters.FilterSet,), attrs)
 
 
 @lru_cache(maxsize=256)
