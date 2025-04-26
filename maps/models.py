@@ -549,7 +549,8 @@ class GeoDataset(NamedUserCreatedObject):
     filter_fields = models.CharField(max_length=256, blank=True, default="")
 
     def get_absolute_url(self):
-        return reverse(f"{self.model_name}")
+        # Use PK-based URL for generic dataset map view
+        return reverse("geodataset-map", args=[self.pk])
 
 
 # TODO: Check if this should be moved to utils app

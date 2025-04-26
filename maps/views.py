@@ -381,11 +381,18 @@ class FilteredMapMixin(MapMixin):
     template_name = "filtered_map.html"
 
     def get_dataset(self):
+        from django.conf import settings
+
         try:
+            if getattr(settings, "ENABLE_GENERIC_DATASET", False):
+                # New generic PK-based lookup
+                return GeoDataset.objects.get(pk=self.kwargs.get("pk"))
+
+            # Legacy model_name-based lookup for backward compatibility
             return GeoDataset.objects.get(model_name=self.model_name)
         except GeoDataset.DoesNotExist as err:
             raise ImproperlyConfigured(
-                f"No GeoDataset with model_name {self.model_name} found."
+                f"No GeoDataset found (model_name={self.model_name}, pk={self.kwargs.get('pk')})."
             ) from err
 
     def get_region_feature_id(self):
@@ -397,9 +404,6 @@ class FilteredMapMixin(MapMixin):
             return dataset.map_configuration
         else:
             return MapConfiguration.objects.get(name="Default Map Configuration")
-
-    # def get_dataset(self):
-    #     return GeoDataset.objects.get(pk=self.kwargs.get('pk')) # TODO: Implement this functionality
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

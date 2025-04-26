@@ -29,6 +29,7 @@ from .views import (
     GeoDataSetCreateView,
     GeoDataSetModalDeleteView,
     GeoDataSetPrivateFilterView,
+    GeoDataSetPublishedFilteredMapView,
     GeoDataSetPublishedFilterView,
     GeoDataSetUpdateView,
     LocationCreateView,
@@ -87,6 +88,11 @@ urlpatterns = [
         "geodatasets/<int:pk>/delete/",
         GeoDataSetModalDeleteView.as_view(),
         name="geodataset-delete-modal",
+    ),
+    path(
+        "geodatasets/<int:pk>/map/",
+        GeoDataSetPublishedFilteredMapView.as_view(),
+        name="geodataset-map",
     ),
     path(
         "geodatasets/autocomplete/",
