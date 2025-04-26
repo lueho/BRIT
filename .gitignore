@@ -4,3 +4,8 @@
 /brit/settings/.env
 *.pyc
 settings.json
+/.vscode/
+*/__pycache__/
+
+# windsurf rules
+.windsurfrules
