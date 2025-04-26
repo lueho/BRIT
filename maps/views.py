@@ -278,14 +278,16 @@ class GeoDataSetCreateView(OwnedObjectCreateView):
 
 
 class FilteredMapMixin(MapMixin):
-    model_name = None  # TODO: Remove this for pk
     template_name = 'filtered_map.html'
 
     def get_dataset(self):
-        try:
+        from django.conf import settings
+        if getattr(settings, 'ENABLE_GENERIC_DATASET', False):
+            # New generic PK-based lookup
+            return GeoDataset.objects.get(pk=self.kwargs.get('pk'))
+        else:
+            # Legacy model_name-based lookup for backward compatibility
             return GeoDataset.objects.get(model_name=self.model_name)
-        except GeoDataset.DoesNotExist:
-            raise ImproperlyConfigured(f'No GeoDataset with model_name {self.model_name} found.')
 
     def get_region_feature_id(self):
         return self.get_dataset().region_id
@@ -296,9 +298,6 @@ class FilteredMapMixin(MapMixin):
             return dataset.map_configuration
         else:
             return MapConfiguration.objects.get(name='Default Map Configuration')
-
-    # def get_dataset(self):
-    #     return GeoDataset.objects.get(pk=self.kwargs.get('pk')) # TODO: Implement this functionality
 
 
 class GeoDataSetPublishedFilteredMapView(FilteredMapMixin, PublishedObjectFilterView):
