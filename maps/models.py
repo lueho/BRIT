@@ -543,6 +543,10 @@ class GeoDataset(NamedUserCreatedObject):
         null=True,
         related_name="geodatasets",
     )
+    table_name = models.CharField(max_length=128, blank=True, default="")
+    geometry_field = models.CharField(max_length=64, blank=True, default="")
+    display_fields = models.CharField(max_length=256, blank=True, default="")
+    filter_fields = models.CharField(max_length=256, blank=True, default="")
 
     def get_absolute_url(self):
         return reverse(f"{self.model_name}")
