@@ -4,3 +4,6 @@
 .windsurfrules
 /brit/settings/.env
 pyproject.toml
+*code-workspace*
+/.vscode/
+*.pyc
