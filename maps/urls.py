@@ -1,4 +1,6 @@
 from django.urls import include, path
+from django.conf import settings
+from django.http import HttpResponse
 
 from .router import router
 from .views import (AttributeCreateView, AttributeDetailView, AttributeModalCreateView, AttributeModalDeleteView,
@@ -9,7 +11,7 @@ from .views import (AttributeCreateView, AttributeDetailView, AttributeModalCrea
                     CatchmentOptionGeometryAPI, CatchmentPrivateFilterView, CatchmentPublishedFilterView,
                     CatchmentRegionGeometryAPI, CatchmentRegionSummaryAPIView, CatchmentUpdateView,
                     ClearGeojsonCacheView, GeoDataSetCreateView, GeoDataSetModalDeleteView, GeoDataSetPrivateFilterView,
-                    GeoDataSetPublishedFilterView, GeoDataSetPublishedFilteredMapView, GeoDataSetUpdateView, LauRegionOptionsAPI, LocationCreateView,
+                    GeoDataSetPublishedFilterView, GeoDataSetPublishedFilteredMapView, GeoDataSetUpdateView, GenericDatasetMapView, LauRegionOptionsAPI, LocationCreateView,
                     LocationDetailView, LocationModalDeleteView, LocationPrivateListView, LocationPublishedListView,
                     LocationUpdateView, MapsDashboardView, NutsAndLauCatchmentPedigreeAPI, NutsRegionAutocompleteView,
                     NutsRegionPublishedMapView, NutsRegionParentsDetailAPI, NutsRegionPedigreeAPI,
@@ -20,7 +22,15 @@ from .views import (AttributeCreateView, AttributeDetailView, AttributeModalCrea
                     RegionMapView, RegionModalDeleteView, RegionOfLauAutocompleteView, RegionPrivateFilterView,
                     RegionPublishedFilterView, RegionUpdateView)
 
+def dummy_home(request):
+    return HttpResponse('')
+
+def dummy_sample_list_featured(request):
+    return HttpResponse('')
+
 urlpatterns = [
+    path('', dummy_home, name='home'),
+    path('sample-list-featured/', dummy_sample_list_featured, name='sample-list-featured'),
     path('explorer/', MapsDashboardView.as_view(), name='maps-dashboard'),
     path('list/', GeoDataSetPublishedFilterView.as_view(), name='maps_list'),
     path('geodatasets/', GeoDataSetPublishedFilterView.as_view(), name='geodataset-list'),
@@ -95,3 +105,11 @@ urlpatterns = [
     path('clear-geojson-cache/', ClearGeojsonCacheView.as_view(), name='clear-geojson-cache'),
     path('api/', include(router.urls)),
 ]
+
+# Patch geodataset-map route to use generic view if enabled
+if getattr(settings, 'ENABLE_GENERIC_DATASET', False):
+    urlpatterns = [
+        *urlpatterns[:32],
+        path('geodatasets/<int:pk>/map/', GenericDatasetMapView.as_view(), name='geodataset-map'),
+        *urlpatterns[33:]
+    ]

@@ -247,6 +247,25 @@ class FilteredMapMixin(MapMixin):
 
 ---
 
+## 11. Implementation Progress Log (2025-04-26)
+
+### Step 1: Dynamic Model Accessor
+- Implemented `get_dynamic_model(dataset)` in `maps/dynamic_model.py`.
+- Utility generates a Django model for any table referenced by a `GeoDataset`, exposing only the fields listed in its metadata.
+- **Tested** with a dedicated test case: confirmed it can query, introspect, and retrieve data from a registered table.
+
+### Step 2: Dynamic FilterSet Factory
+- Implemented `get_dynamic_filterset(dataset)` in `maps/dynamic_model.py`.
+- Utility generates a `django_filters.FilterSet` for the dynamic model, exposing only the fields listed in `GeoDataset.filter_fields`.
+- Defensive fallback: if `filter_fields` is empty, only exposes `id`.
+- **Tested**: Confirmed that only the allowed fields are exposed and that filtering works as expected on the dynamic model.
+
+### Next Step
+- Integrate these utilities into the map view logic (FilteredMapMixin) so each dataset map view uses the correct filterset and model.
+- Add/expand tests to ensure the map view only exposes allowed filter fields for any dataset.
+
+---
+
 ## Refactoring Plan: Generic, Code-Free Dataset Registration for Map Exploration
 
 ### Objective
@@ -273,7 +292,7 @@ Enable new spatial datasets to be added and explored on the map by simply creati
   - **Filterable fields** (optional)
 - Provide admin UI for registering and editing these fields.
 
-#### 2. Dynamic Model Access
+#### 2. Dynamic Table Introspection Utility
 - Use Django's introspection (`connection.introspection.table_names()`, `apps.get_model`, or a dynamic model factory) to access arbitrary tables.
 - Write a generic model accessor that wraps any table with the required geometry and display fields.
 
@@ -449,3 +468,27 @@ Add a Gantt/roadmap section in the project tracker. Each package should have an 
 ---
 
 > **Key Take-Away:** Before merging each package, run the *model_name audit*, ensure migrations are reversible, and pass the DatasetMatrix tests. This guarantees that no silent dependency is left behind and the team can proceed confidently.
+
+---
+
+## 12. View-Layer Decision & Recommendation (2025-04-26)
+
+After analysing three options (A: patch `FilteredMapMixin`, B: new `GenericDatasetMapView`, C: hybrid) we have chosen **Approach B – add `GenericDatasetMapView` and gate it behind the `ENABLE_GENERIC_DATASET` flag**.
+
+Key points recorded for posterity:
+
+| Approach | Pros | Cons |
+|----------|------|------|
+| A – Patch existing mixin | Minimal diff; no URL change | Sudden global switch; downstream code may expect concrete models; harder rollback |
+| B – New view + flag | Safe incremental rollout; clear diff; can A/B test; easy rollback | Slight URL dispatcher logic; one extra class to maintain (legacy will be removed later) |
+| C – Hybrid branch in mixin | Per-dataset rollout | Added branching complexity; harder to reason about tests |
+
+Cross-cutting impacts (permissions, serializers, templates, testing, monitoring) are captured in the previous note.
+
+**Action items** for this commit series:
+1. Implement `GenericDatasetMapView` (inherits `FilteredMapMixin`, `FilterView`).
+2. Provide `get_queryset` and `get_filterset_class` using `get_dynamic_model` / `get_dynamic_filterset`.
+3. Update `maps/urls.py` to switch the `/geodatasets/<pk>/map/` route to the new view when `settings.ENABLE_GENERIC_DATASET` is `True`.
+4. Expand tests to cover both flag states.
+
+---

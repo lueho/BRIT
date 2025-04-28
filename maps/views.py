@@ -300,6 +300,25 @@ class FilteredMapMixin(MapMixin):
             return MapConfiguration.objects.get(name='Default Map Configuration')
 
 
+class GenericDatasetMapView(FilteredMapMixin, FilterView):
+    """
+    Generic map view for GeoDataset using dynamic model and filterset.
+    Only enabled when ENABLE_GENERIC_DATASET is True.
+    """
+    template_name = 'filtered_map.html'
+
+    def get_queryset(self):
+        dataset = self.get_dataset()
+        model = get_dynamic_model(dataset)
+        return model.objects.all()
+
+    def get_filterset_class(self):
+        dataset = self.get_dataset()
+        return get_dynamic_filterset(dataset)
+
+    # Optionally override get_serializer_class in the future
+
+
 class GeoDataSetPublishedFilteredMapView(FilteredMapMixin, PublishedObjectFilterView):
 
     # TODO: Implement method to get the model, so that the create_url can be retrieved from the CRUDUrlsMixin

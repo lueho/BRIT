@@ -35,8 +35,9 @@ def get_dynamic_model(dataset):
                 fields[col.name] = dj_models.TextField()
             else:
                 fields[col.name] = dj_models.TextField()
-    # Always add a primary key
-    fields['id'] = dj_models.AutoField(primary_key=True)
+    # Always add a primary key if not present
+    if 'id' not in fields:
+        fields['id'] = dj_models.AutoField(primary_key=True)
     model_name = f'DynModel_{dataset.pk}_{table_name}'
     return type(model_name, (dj_models.Model,), fields)
 
