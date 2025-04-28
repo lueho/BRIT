@@ -1,3 +1,5 @@
+from django.conf import settings
+from django.http import HttpResponse
 from django.urls import include, path
 
 from .router import router
@@ -25,6 +27,7 @@ from .views import (
     CatchmentRegionSummaryAPIView,
     CatchmentUpdateView,
     ClearGeojsonCacheView,
+    GenericDatasetMapView,
     GeoDataSetAutocompleteView,
     GeoDataSetCreateView,
     GeoDataSetModalDeleteView,
@@ -65,7 +68,28 @@ from .views import (
     RegionUpdateView,
 )
 
+
+def dummy_home(request):
+    return HttpResponse("")
+
+
+def dummy_sample_list_featured(request):
+    return HttpResponse("")
+
+
+DATASET_MAP_VIEW = (
+    GenericDatasetMapView
+    if getattr(settings, "ENABLE_GENERIC_DATASET", False)
+    else GeoDataSetPublishedFilteredMapView
+)
+
 urlpatterns = [
+    path("", dummy_home, name="home"),
+    path(
+        "sample-list-featured/",
+        dummy_sample_list_featured,
+        name="sample-list-featured",
+    ),
     path("explorer/", MapsDashboardView.as_view(), name="maps-dashboard"),
     path("list/", GeoDataSetPublishedFilterView.as_view(), name="maps_list"),
     path(
@@ -91,7 +115,7 @@ urlpatterns = [
     ),
     path(
         "geodatasets/<int:pk>/map/",
-        GeoDataSetPublishedFilteredMapView.as_view(),
+        DATASET_MAP_VIEW.as_view(),
         name="geodataset-map",
     ),
     path(

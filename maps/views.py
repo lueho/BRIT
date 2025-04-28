@@ -42,6 +42,7 @@ from utils.object_management.views import (
     UserCreatedObjectUpdateView,
 )
 
+from .dynamic_model import get_dynamic_filterset, get_dynamic_model
 from .filters import (
     CatchmentFilterSet,
     GeoDataSetFilterSet,
@@ -418,6 +419,26 @@ class FilteredMapMixin(MapMixin):
             }
         )
         return context
+
+
+class GenericDatasetMapView(FilteredMapMixin, FilterView):
+    """
+    Generic map view for GeoDataset using dynamic model and filterset.
+    Only enabled when ENABLE_GENERIC_DATASET is True.
+    """
+
+    template_name = "filtered_map.html"
+
+    def get_queryset(self):
+        dataset = self.get_dataset()
+        model = get_dynamic_model(dataset)
+        return model.objects.all()
+
+    def get_filterset_class(self):
+        dataset = self.get_dataset()
+        return get_dynamic_filterset(dataset)
+
+    # Optionally override get_serializer_class in the future
 
 
 class GeoDataSetPublishedFilteredMapView(FilteredMapMixin, PublishedObjectFilterView):
