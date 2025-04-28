@@ -1,0 +1,17 @@
+{% extends "simple_detail_card.html" %}
+
+{% block title %}BRIT | Material: {{ material.name }} (Mock){% endblock %}
+
+{% block detail_header %}{{ material.name }} (Mock){% endblock detail_header %}
+
+{% block detail_body %}
+<p><strong>Name:</strong> {{ material.name }}</p>
+<p><strong>Category:</strong> {{ material.category }}</p>
+<p><strong>Description:</strong> {{ material.description }}</p>
+<ul>
+  <li><strong>Typical composition:</strong> {{ material.composition }}</li>
+  <li><strong>Common uses:</strong> {{ material.uses }}</li>
+  <li><strong>Related processes:</strong> {{ material.related_processes }}</li>
+</ul>
+<a href="/materials/" class="btn btn-outline-primary">Back to Materials</a>
+{% endblock detail_body %}

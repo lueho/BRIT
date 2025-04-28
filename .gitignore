@@ -1,4 +1,6 @@
 /logs/
 /db_dump/
 /.idea/
+.windsurfrules
 /brit/settings/.env
+pyproject.toml

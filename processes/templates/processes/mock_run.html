@@ -1,0 +1,16 @@
+{% extends "simple_detail_card.html" %}
+
+{% block title %}BRIT | Run {{ process_type.name }} (Mock){% endblock %}
+
+{% block detail_header %}Run {{ process_type.name }}{% endblock detail_header %}
+
+{% block detail_body %}
+<p>This is a mock interface to start a run for <strong>{{ process_type.name }}</strong>.</p>
+<form>
+  <div class="form-group">
+    <label for="param1">Parameter 1 (mock):</label>
+    <input type="text" id="param1" class="form-control" value="" placeholder="Enter value">
+  </div>
+  <button type="submit" class="btn btn-primary">Run</button>
+</form>
+{% endblock detail_body %}

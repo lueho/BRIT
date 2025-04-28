@@ -1,0 +1,50 @@
+{% extends "simple_detail_card.html" %}
+
+{% block title %}BRIT | {{ process.name }} details (Mock){% endblock %}
+
+{% block detail_header %}{{ process.name }} (Mock){% endblock detail_header %}
+
+{% block detail_body %}
+<p><strong>Name:</strong> {{ process.name }}</p>
+<p><strong>Category:</strong> {{ process.category }}</p>
+<p><strong>Mechanism:</strong> {{ process.mechanism }}</p>
+<p><strong>Temperature range:</strong> {{ process.temperature_min }} – {{ process.temperature_max }} °C</p>
+<p><strong>Yield:</strong> {{ process.yield_percentage }}%</p>
+<p><strong>Description:</strong><br>{{ process.description|safe }}</p>
+{% if process.name == "Anaerobic Digestion" %}
+  <p><a href="https://www.tech4biowaste.eu/wiki/Anaerobic_digestion" target="_blank">Tech4Biowaste: Anaerobic Digestion</a></p>
+{% elif process.name == "Gasification" %}
+  <p><a href="https://www.tech4biowaste.eu/wiki/Gasification" target="_blank">Tech4Biowaste: Gasification</a></p>
+{% elif process.name == "Pyrolysis" %}
+  <p><a href="https://www.tech4biowaste.eu/wiki/Pyrolysis" target="_blank">Tech4Biowaste: Pyrolysis</a></p>
+{% endif %}
+<p><strong>Input Materials:</strong>
+  <ul>
+    {% for m in process.input %}
+      <li><a href="{% url 'processes:mock_material_detail' m.id %}">{{ m.name }}</a></li>
+    {% endfor %}
+  </ul>
+</p>
+<p><strong>Output Materials:</strong>
+  <ul>
+    {% for m in process.output %}
+      <li><a href="{% url 'processes:mock_material_detail' m.id %}">{{ m.name }}</a></li>
+    {% endfor %}
+  </ul>
+</p>
+{% endblock detail_body %}
+
+{% block detail_footer %}
+  <div class="dropdown">
+    <button class="btn btn-secondary dropdown-toggle mr-3" type="button" id="navDropdownDetail" data-toggle="dropdown" aria-expanded="false">
+      Navigate
+    </button>
+    <div class="dropdown-menu" aria-labelledby="navDropdownDetail">
+      {% if process.links %}
+        {% for link in process.links %}
+          <a class="dropdown-item" href="{{ link.url }}" target="_blank">{{ link.label }}</a>
+        {% endfor %}
+      {% endif %}
+    </div>
+  </div>
+{% endblock detail_footer %}

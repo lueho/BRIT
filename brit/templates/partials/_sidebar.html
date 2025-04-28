@@ -33,6 +33,14 @@
         </a>
     </li>
 
+    <!-- Processes Dashboard -->
+    <li class="nav-item {% if '/processes/' in request.path %}active{% endif %}">
+        <a class="nav-link" href="{% url 'processes:dashboard' %}">
+            <i class="fas fa-fw fa-flask"></i>
+            <span>Processes</span>
+        </a>
+    </li>
+
     <!-- Materials -->
     <li class="nav-item {% if '/materials/' in request.path %}active{% endif %}">
         <a class="nav-link" href="{% url 'sample-list-featured' %}">
