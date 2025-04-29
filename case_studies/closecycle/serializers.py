@@ -10,11 +10,7 @@ from .models import BiogasPlantsSweden
 from django.conf import settings
 from processes.views import MOCK_PROCESS_TYPES
 
-# Hybrid mock: Showcase name to involved process names (keep in sync with view)
-SHOWCASE_PROCESS_MAP = {
-    "Municipality & farms 1": ["Anaerobic Digestion", "Composting"],
-    "Agricultural Education": ["Anaerobic Digestion", "Pyrolysis", "Composting"],
-}
+
 
 
 class ShowcaseModelSerializer(ModelSerializer):
@@ -34,8 +30,12 @@ class ShowcaseFlatSerializer(ModelSerializer):
         fields = ['id', 'name', 'region', 'description', 'involved_processes']
 
     def get_involved_processes(self, obj):
-        # Use the global SHOWCASE_PROCESS_MAP and MOCK_PROCESS_TYPES already imported at the top
-        if getattr(settings, "ENVIRONMENT", "dev") == "prod":
+        # Hybrid mock: Showcase name to involved process names (keep in sync with view)
+        SHOWCASE_PROCESS_MAP = {
+            "Municipality & farms 1": ["Anaerobic Digestion", "Composting"],
+            "Agricultural Education": ["Anaerobic Digestion", "Pyrolysis", "Composting"],
+        }
+        if not self.request.user.has_perm('processes.access_app_feature'):
             return []
         showcase_name = getattr(obj, "name", None)
         involved_processes = []
@@ -68,37 +68,15 @@ class ShowcaseSummaryListSerializer(ModelSerializer):
         return {'summaries': [ShowcaseFlatSerializer(data).data]}
 
 
-
-
-
 class ShowcaseGeoFeatureModelSerializer(BaseGeoFeatureModelSerializer):
     region = CharField(source='region.name')
-    involved_processes = serializers.SerializerMethodField()
 
     class Meta:
         model = Showcase
         geo_field = 'geom'
         attr_path = 'region.borders'
         geo_serializer_class = PolygonSerializer
-        fields = ['id', 'name', 'region', 'involved_processes']
-
-    def get_involved_processes(self, obj):
-        # Use the global SHOWCASE_PROCESS_MAP and MOCK_PROCESS_TYPES already imported at the top
-        if getattr(settings, "ENVIRONMENT", "dev") == "prod":
-            return []
-        showcase_name = getattr(obj, "name", None)
-        involved_processes = []
-        if showcase_name in SHOWCASE_PROCESS_MAP:
-            process_names = SHOWCASE_PROCESS_MAP[showcase_name]
-            for pname in process_names:
-                proc = next((p for p in MOCK_PROCESS_TYPES if p["name"] == pname), None)
-                if proc:
-                    involved_processes.append({
-                        "name": proc["name"],
-                        "id": proc["id"],
-                        "url": f"/processes/types/{proc['id']}/"
-                    })
-        return involved_processes
+        fields = ['id', 'name', 'region',]
 
 
 class BiogasPlantsSwedenSimpleModelSerializer(serializers.ModelSerializer):

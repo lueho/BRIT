@@ -1,10 +1,11 @@
 {% extends "simple_detail_card.html" %}
 
-{% block title %}BRIT | {{ process.name }} details (Mock){% endblock %}
+{% block title %}{% if perms.processes.access_app_feature %}BRIT | {{ process.name }} details (Mock){% endif %}{% endblock %}
 
-{% block detail_header %}{{ process.name }} (Mock){% endblock detail_header %}
+{% block detail_header %}{% if perms.processes.access_app_feature %}{{ process.name }} (Mock){% endif %}{% endblock detail_header %}
 
 {% block detail_body %}
+{% if perms.processes.access_app_feature %}
 <p><strong>Name:</strong> {{ process.name }}</p>
 <p><strong>Category:</strong> {{ process.category }}</p>
 <p><strong>Mechanism:</strong> {{ process.mechanism }}</p>
@@ -41,9 +42,11 @@
       </ul>
     </p>
 {% endif %}
+{% endif %}
 {% endblock detail_body %}
 
 {% block detail_footer %}
+{% if perms.processes.access_app_feature %}
   <div class="dropdown mb-3">
     <button class="btn btn-secondary dropdown-toggle mr-3" type="button" id="navDropdownDetail" data-toggle="dropdown" aria-expanded="false">
       Navigate
@@ -53,4 +56,5 @@
       <a class="dropdown-item" href="{% url 'processes:dashboard' %}">Dashboard</a>
     </div>
   </div>
+{% endif %}
 {% endblock detail_footer %}

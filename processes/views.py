@@ -1,5 +1,6 @@
 from django.shortcuts import render
 from django.views.generic import TemplateView
+from django.contrib.auth.mixins import PermissionRequiredMixin
 
 # Create your views here.
 
@@ -243,7 +244,8 @@ MOCK_PROCESS_TYPES = [
 ]
 
 
-class ProcessMockDashboard(TemplateView):
+class ProcessMockDashboard(PermissionRequiredMixin, TemplateView):
+    permission_required = "processes.access_app_feature"
     template_name = "processes/mock_dashboard.html"
 
     def get_context_data(self, **kwargs):
@@ -252,7 +254,8 @@ class ProcessMockDashboard(TemplateView):
         }
 
 
-class ProcessTypeListMock(TemplateView):
+class ProcessTypeListMock(PermissionRequiredMixin, TemplateView):
+    permission_required = "processes.access_app_feature"
     template_name = "processes/mock_type_list.html"
 
     def get_context_data(self, **kwargs):
@@ -316,7 +319,8 @@ class ProcessTypeListMock(TemplateView):
         }
 
 
-class ProcessTypeDetailMock(TemplateView):
+class ProcessTypeDetailMock(PermissionRequiredMixin, TemplateView):
+    permission_required = "processes.access_app_feature"
     template_name = "processes/mock_type_detail.html"
 
     def get_context_data(self, **kwargs):
@@ -325,7 +329,8 @@ class ProcessTypeDetailMock(TemplateView):
         return {"process": process}
 
 
-class ProcessMockMaterialDetail(TemplateView):
+class ProcessMockMaterialDetail(PermissionRequiredMixin, TemplateView):
+    permission_required = "processes.access_app_feature"
     template_name = "processes/mock_material_detail.html"
 
     def get_context_data(self, **kwargs):
@@ -423,7 +428,8 @@ class ProcessMockMaterialDetail(TemplateView):
         return {"material": data.get(material_id)}
 
 
-class ProcessRunMock(TemplateView):
+class ProcessRunMock(PermissionRequiredMixin, TemplateView):
+    permission_required = "processes.access_app_feature"
     template_name = "processes/mock_run.html"
 
     def get_context_data(self, **kwargs):

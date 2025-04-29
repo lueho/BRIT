@@ -3,6 +3,7 @@
 {% block title %}BRIT | Processes Dashboard (Mock){% endblock %}
 
 {% block content %}
+{% if perms.processes.access_app_feature %}
 <div class="row">
   <div class="col-12 mb-4">
     <div class="card shadow h-100">
@@ -63,4 +64,5 @@
     </div>
   {% endfor %}
 </div>
+{% endif %}
 {% endblock content %}
