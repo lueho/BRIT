@@ -8,7 +8,7 @@ from django.forms.formsets import BaseFormSet
 from django.http import JsonResponse
 from django.http.request import MultiValueDict, QueryDict
 from django.test import RequestFactory
-from django.urls import reverse, reverse_lazy
+from django.urls import reverse
 from factory.django import mute_signals
 from mock import Mock, patch
 
@@ -31,11 +31,13 @@ from ..models import (AggregatedCollectionPropertyValue, Collection, CollectionC
 class CollectorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     modal_detail_view = True
     modal_update_view = True
+    modal_create_view = True
 
     model = Collector
 
     view_dashboard_name = 'wastecollection-dashboard'
     view_create_name = 'collector-create'
+    view_modal_create_name = 'collector-create-modal'
     view_published_list_name = 'collector-list'
     view_private_list_name = 'collector-list-owned'
     view_detail_name = 'collector-detail'
@@ -55,11 +57,13 @@ class CollectorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
 class CollectionSystemCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     modal_detail_view = True
     modal_update_view = True
+    modal_create_view = True
 
     model = CollectionSystem
 
     view_dashboard_name = 'wastecollection-dashboard'
     view_create_name = 'collectionsystem-create'
+    view_modal_create_name = 'collectionsystem-create-modal'
     view_published_list_name = 'collectionsystem-list'
     view_private_list_name = 'collectionsystem-list-owned'
     view_detail_name = 'collectionsystem-detail'
@@ -79,11 +83,13 @@ class CollectionSystemCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDV
 class WasteCategoryCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     modal_detail_view = True
     modal_update_view = True
+    modal_create_view = True
 
     model = WasteCategory
 
     view_dashboard_name = 'wastecollection-dashboard'
     view_create_name = 'wastecategory-create'
+    view_modal_create_name = 'wastecategory-create-modal'
     view_published_list_name = 'wastecategory-list'
     view_private_list_name = 'wastecategory-list-owned'
     view_detail_name = 'wastecategory-detail'
@@ -103,11 +109,13 @@ class WasteCategoryCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDView
 class WasteComponentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     modal_detail_view = True
     modal_update_view = True
+    modal_create_view = True
 
     model = WasteComponent
 
     view_dashboard_name = 'wastecollection-dashboard'
     view_create_name = 'wastecomponent-create'
+    view_modal_create_name = 'wastecomponent-create-modal'
     view_published_list_name = 'wastecomponent-list'
     view_private_list_name = 'wastecomponent-list-owned'
     view_detail_name = 'wastecomponent-detail'
@@ -207,82 +215,6 @@ class WasteFlyerCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CollectionFrequencyCreateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'add_collectionfrequency'
-    url = reverse_lazy('collectionfrequency-create')
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.distribution = TemporalDistribution.objects.get(name='Months of the year')
-
-    def test_get_http_302_redirect_for_anonymous(self):
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 302)
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(self.url)
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_get_formset_queryset_returns_whole_year_season(self):
-        request = RequestFactory().get(self.url)
-        request.user = self.member
-        view = views.FrequencyCreateView()
-        view.setup(request)
-        months = TemporalDistribution.objects.get(name='Months of the year')
-        first = months.timestep_set.get(name='January')
-        last = months.timestep_set.get(name='December')
-        initial = list(CollectionSeason.objects.filter(
-            distribution=months,
-            first_timestep=first,
-            last_timestep=last
-        ).values('distribution', 'first_timestep', 'last_timestep'))
-        self.assertListEqual(initial, view.get_formset_initial())
-
-    def test_post_http_302_redirect_for_anonymous(self):
-        response = self.client.post(self.url)
-        self.assertEqual(response.status_code, 302)
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(self.url)
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_with_valid_data_creates_and_relates_seasons(self):
-        self.client.force_login(self.member)
-        data = {
-            'name': 'Test Frequency with Seasons',
-            'type': 'Fixed-Seasonal',
-            'form-INITIAL_FORMS': 1,
-            'form-TOTAL_FORMS': 2,
-            'form-0-distribution': self.distribution.id,
-            'form-0-first_timestep': Timestep.objects.get(distribution=self.distribution, name='January').id,
-            'form-0-last_timestep': Timestep.objects.get(distribution=self.distribution, name='April').id,
-            'form-1-distribution': self.distribution.id,
-            'form-1-first_timestep': Timestep.objects.get(distribution=self.distribution, name='May').id,
-            'form-1-last_timestep': Timestep.objects.get(distribution=self.distribution, name='December').id
-        }
-        response = self.client.post(self.url, data)
-        self.assertEqual(response.status_code, 302)
-        frequency = CollectionFrequency.objects.get(name='Test Frequency with Seasons')
-        seasons = [
-            CollectionSeason.objects.get(first_timestep__name='January', last_timestep__name='April'),
-            CollectionSeason.objects.get(first_timestep__name='May', last_timestep__name='December')
-        ]
-        self.assertListEqual(seasons, list(frequency.seasons.order_by('first_timestep__order')))
-
-
 class CollectionFrequencyCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     modal_detail_view = True
     modal_update_view = True
@@ -355,6 +287,44 @@ class CollectionFrequencyCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCR
         }
         return data
 
+    def test_get_formset_queryset_returns_whole_year_season(self):
+        request = RequestFactory().get(self.get_create_url())
+        request.user = self.staff_user
+        view = views.FrequencyCreateView()
+        view.setup(request)
+        months = TemporalDistribution.objects.get(name='Months of the year')
+        first = months.timestep_set.get(name='January')
+        last = months.timestep_set.get(name='December')
+        initial = list(CollectionSeason.objects.filter(
+            distribution=months,
+            first_timestep=first,
+            last_timestep=last
+        ).values('distribution', 'first_timestep', 'last_timestep'))
+        self.assertListEqual(initial, view.get_formset_initial())
+
+    def test_post_with_valid_data_creates_and_relates_seasons(self):
+        self.client.force_login(self.staff_user)
+        data = {
+            'name': 'Test Frequency with Seasons',
+            'type': 'Fixed-Seasonal',
+            'form-INITIAL_FORMS': 1,
+            'form-TOTAL_FORMS': 2,
+            'form-0-distribution': self.distribution.id,
+            'form-0-first_timestep': Timestep.objects.get(distribution=self.distribution, name='January').id,
+            'form-0-last_timestep': Timestep.objects.get(distribution=self.distribution, name='April').id,
+            'form-1-distribution': self.distribution.id,
+            'form-1-first_timestep': Timestep.objects.get(distribution=self.distribution, name='May').id,
+            'form-1-last_timestep': Timestep.objects.get(distribution=self.distribution, name='December').id
+        }
+        response = self.client.post(self.get_create_url(), data)
+        self.assertEqual(response.status_code, 302)
+        frequency = CollectionFrequency.objects.get(name='Test Frequency with Seasons')
+        seasons = [
+            CollectionSeason.objects.get(first_timestep__name='January', last_timestep__name='April'),
+            CollectionSeason.objects.get(first_timestep__name='May', last_timestep__name='December')
+        ]
+        self.assertListEqual(seasons, list(frequency.seasons.order_by('first_timestep__order')))
+
     def test_form_contains_all_initials(self):
         self.client.force_login(self.owner_user)
         response = self.client.get(self.get_update_url(self.unpublished_object.pk))
@@ -414,60 +384,6 @@ class CollectionFrequencyCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCR
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CollectionPropertyValueCreateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'add_collectionpropertyvalue'
-    url = reverse_lazy('collectionpropertyvalue-create')
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.collection = Collection.objects.create(name='Test Collection')
-        cls.unit = Unit.objects.create(name='Test Unit')
-        cls.prop = Property.objects.create(name='Test Property')
-        cls.prop.allowed_units.add(cls.unit)
-
-    def test_get_http_302_redirect_for_anonymous(self):
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 302)
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(self.url)
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_for_anonymous(self):
-        response = self.client.post(self.url)
-        self.assertEqual(response.status_code, 302)
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(self.url)
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_http_302_redirect_for_members_with_minimal_data(self):
-        self.client.force_login(self.member)
-        data = {
-            'collection': self.collection.pk,
-            'property': self.prop.pk,
-            'unit': self.unit.pk,
-            'year': 2022,
-            'average': 123.5,
-            'standard_deviation': 12.6
-        }
-        response = self.client.post(self.url, data=data)
-        self.assertEqual(response.status_code, 302)
-
-
 class CollectionPropertyValueCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     public_list_view = False
     private_list_view = False
@@ -505,61 +421,6 @@ class CollectionPropertyValueCRUDViewsTestCase(AbstractTestCases.UserCreatedObje
 
 # ----------- AggregatedCollectionPropertyValue CRUD -------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
-
-
-class AggregatedCollectionPropertyValueCreateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'add_aggregatedcollectionpropertyvalue'
-    url = reverse_lazy('aggregatedcollectionpropertyvalue-create')
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        Collection.objects.create(name='Test Collection 1')
-        Collection.objects.create(name='Test Collection 2')
-        cls.unit = Unit.objects.create(name='Test Unit')
-        cls.prop = Property.objects.create(name='Test Property')
-        cls.prop.allowed_units.add(cls.unit)
-
-    def test_get_http_302_redirect_for_anonymous(self):
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 302)
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(self.url)
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_for_anonymous(self):
-        response = self.client.post(self.url)
-        self.assertEqual(response.status_code, 302)
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(self.url)
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_http_302_redirect_for_members_with_minimal_data(self):
-        self.client.force_login(self.member)
-        data = {
-            'collections': [collection.pk for collection in Collection.objects.all()],
-            'property': self.prop.pk,
-            'unit': self.unit.pk,
-            'year': 2022,
-            'average': 123.5,
-            'standard_deviation': 12.6
-        }
-        response = self.client.post(self.url, data=data)
-        self.assertEqual(response.status_code, 302)
 
 
 class AggregatedCollectionPropertyValueCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
@@ -625,6 +486,7 @@ class AggregatedCollectionPropertyValueCRUDViewsTestCase(AbstractTestCases.UserC
 
 class CollectionCatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = CollectionCatchment
+    model_add_permission = 'add_catchment'
 
     view_dashboard_name = 'wastecollection-dashboard'
     view_published_list_name = 'collectioncatchment-list'
@@ -700,161 +562,19 @@ class CollectionCatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCR
         if self.public_list_view:
             self.assertContains(response, self.get_list_url(publication_status='published'))
 
+    # -----------------------
+    # CreateView Test Cases
+    # -----------------------
+
+    def test_create_view_post_as_authenticated_with_permission(self):
+        self.skipTest("Post method is not implemented for this view.")
+
+    def test_create_view_post_as_staff_user(self):
+        self.skipTest("Post method is not implemented for this view.")
+
 
 # ----------- Collection CRUD ------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
-
-
-class CollectionCreateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ['add_collection', 'view_collection']
-    url = reverse_lazy('collection-create')
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-
-        MaterialCategory.objects.create(name='Biowaste component')
-        cls.allowed_material_1 = WasteComponent.objects.create(name='Allowed material 1')
-        cls.allowed_material_2 = WasteComponent.objects.create(name='Allowed material 2')
-        cls.forbidden_material_1 = WasteComponent.objects.create(name='Forbidden material 1')
-        cls.forbidden_material_2 = WasteComponent.objects.create(name='Forbidden material 2')
-        waste_stream = WasteStream.objects.create(
-            name='Test waste stream',
-            category=WasteCategory.objects.create(name='Test category'),
-        )
-        waste_stream.allowed_materials.add(cls.allowed_material_1)
-        waste_stream.allowed_materials.add(cls.allowed_material_2)
-        waste_stream.forbidden_materials.add(cls.forbidden_material_1)
-        waste_stream.forbidden_materials.add(cls.forbidden_material_2)
-        with mute_signals(signals.post_save):
-            waste_flyer = WasteFlyer.objects.create(
-                abbreviation='WasteFlyer123',
-                url='https://www.test-flyer.org'
-            )
-        frequency = CollectionFrequency.objects.create(name='Test Frequency')
-        cls.collection = Collection.objects.create(
-            name='collection1',
-            catchment=CollectionCatchment.objects.create(name='Test catchment'),
-            collector=Collector.objects.create(name='Test collector'),
-            collection_system=CollectionSystem.objects.create(name='Test system'),
-            waste_stream=waste_stream,
-            frequency=frequency,
-            description='This is a test case.'
-        )
-        cls.collection.flyers.add(waste_flyer)
-
-    def test_get_http_302_redirect_for_anonymous(self):
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 302)
-
-    def test_get_http_403_forbidden_for_non_group_members(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_group_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(self.url)
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_for_anonymous(self):
-        response = self.client.post(self.url, kwargs={})
-        self.assertEqual(response.status_code, 302)
-
-    def test_post_get_formset_kwargs_fetches_correct_parent_object(self):
-        request = RequestFactory().post(self.url)
-        request.user = self.member
-        view = views.CollectionCreateView()
-        view.setup(request)
-        view.object = self.collection
-        formset_kwargs = view.get_formset_kwargs()
-        self.assertEqual(formset_kwargs['parent_object'], self.collection)
-
-    def test_get_formset_has_correct_queryset(self):
-        self.client.force_login(self.member)
-        response = self.client.get(self.url)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.context['formset'].forms), 1)
-
-    def test_post_http_403_forbidden_for_non_group_members(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(self.url, kwargs={})
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_with_missing_data_errors(self):
-        self.client.force_login(self.member)
-        response = self.client.post(
-            self.url,
-            data={'connection_rate_year': 123}
-        )
-        self.assertEqual(response.status_code, 200)
-
-        error_msg = 'This field is required.'
-        self.assertTrue(error_msg in response.context['form'].errors['catchment'])
-        self.assertTrue(error_msg in response.context['form'].errors['collector'])
-        self.assertTrue(error_msg in response.context['form'].errors['collection_system'])
-        self.assertTrue(error_msg in response.context['form'].errors['waste_category'])
-
-    def test_post_with_valid_form_data(self):
-        self.assertEqual(Collection.objects.count(), 1)
-        self.client.force_login(self.member)
-        response = self.client.post(
-            self.url,
-            data={
-                'catchment': CollectionCatchment.objects.first().id,
-                'collector': Collector.objects.first().id,
-                'collection_system': CollectionSystem.objects.first().id,
-                'waste_category': WasteCategory.objects.first().id,
-                'allowed_materials': [self.allowed_material_1.id, self.allowed_material_2.id],
-                'forbidden_materials': [self.forbidden_material_1.id, self.forbidden_material_2.id],
-                'frequency': CollectionFrequency.objects.first().id,
-                'valid_from': date(2020, 1, 1),
-                'description': 'This is a test case that should pass!',
-                'form-INITIAL_FORMS': '0',
-                'form-TOTAL_FORMS': '2',
-                'form-0-url': 'https://www.test-flyer.org',
-                'form-0-id': '',
-                'form-1-url': '',
-                'form-1-id': ''
-            }
-        )
-        self.assertEqual(response.status_code, 302)
-        self.assertEqual(Collection.objects.count(), 2)
-
-    def test_post_with_unspecified_allowed_materials_creates_generic_waste_stream(self):
-        self.assertEqual(Collection.objects.count(), 1)
-        self.client.force_login(self.member)
-        data = {
-            'catchment': CollectionCatchment.objects.first().id,
-            'collector': Collector.objects.first().id,
-            'collection_system': CollectionSystem.objects.first().id,
-            'waste_category': WasteCategory.objects.first().id,
-            'allowed_materials': [],
-            'forbidden_materials': [self.forbidden_material_1.id, self.forbidden_material_2.id],
-            'frequency': CollectionFrequency.objects.first().id,
-            'valid_from': date(2020, 1, 1),
-            'description': 'This is a test case that should pass!',
-            'form-INITIAL_FORMS': '0',
-            'form-TOTAL_FORMS': '2',
-            'form-0-url': 'https://www.test-flyer.org',
-            'form-0-id': '',
-            'form-1-url': '',
-            'form-1-id': ''
-        }
-        response = self.client.post(
-            self.url,
-            data=data,
-            follow=True
-        )
-        self.assertEqual(Collection.objects.count(), 2)
-        new_collection = Collection.objects.get(description=data['description'])
-        self.assertRedirects(response, reverse('collection-detail', kwargs={'pk': new_collection.pk}))
-        self.assertFalse(new_collection.waste_stream.allowed_materials.exists())
 
 
 class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
@@ -976,6 +696,91 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
 
     def get_delete_success_url(self, publication_status=None):
         return f"{reverse('collection-list-owned')}?valid_on={date.today()}"
+
+    def test_post_get_formset_kwargs_fetches_correct_parent_object(self):
+        request = RequestFactory().post(self.get_create_url())
+        request.user = self.staff_user
+        view = views.CollectionCreateView()
+        view.setup(request)
+        view.object = self.unpublished_object
+        formset_kwargs = view.get_formset_kwargs()
+        self.assertEqual(formset_kwargs['parent_object'], self.unpublished_object)
+
+    def test_get_formset_has_correct_queryset(self):
+        self.client.force_login(self.staff_user)
+        response = self.client.get(self.get_create_url())
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(response.context['formset'].forms), 1)
+
+    def test_post_with_missing_data_errors(self):
+        self.client.force_login(self.staff_user)
+        response = self.client.post(
+            self.get_create_url(),
+            data={'connection_rate_year': 123}
+        )
+        self.assertEqual(response.status_code, 200)
+
+        error_msg = 'This field is required.'
+        self.assertTrue(error_msg in response.context['form'].errors['catchment'])
+        self.assertTrue(error_msg in response.context['form'].errors['collector'])
+        self.assertTrue(error_msg in response.context['form'].errors['collection_system'])
+        self.assertTrue(error_msg in response.context['form'].errors['waste_category'])
+
+    def test_post_with_valid_form_data(self):
+        self.assertEqual(Collection.objects.count(), 1)
+        self.client.force_login(self.staff_user)
+        response = self.client.post(
+            self.get_create_url(),
+            data={
+                'catchment': CollectionCatchment.objects.first().id,
+                'collector': Collector.objects.first().id,
+                'collection_system': CollectionSystem.objects.first().id,
+                'waste_category': WasteCategory.objects.first().id,
+                'allowed_materials': [self.allowed_material_1.id, self.allowed_material_2.id],
+                'forbidden_materials': [self.forbidden_material_1.id, self.forbidden_material_2.id],
+                'frequency': CollectionFrequency.objects.first().id,
+                'valid_from': date(2020, 1, 1),
+                'description': 'This is a test case that should pass!',
+                'form-INITIAL_FORMS': '0',
+                'form-TOTAL_FORMS': '2',
+                'form-0-url': 'https://www.test-flyer.org',
+                'form-0-id': '',
+                'form-1-url': '',
+                'form-1-id': ''
+            }
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertEqual(Collection.objects.count(), 2)
+
+    def test_post_with_unspecified_allowed_materials_creates_generic_waste_stream(self):
+        self.client.force_login(self.staff_user)
+        data = {
+            'catchment': CollectionCatchment.objects.first().id,
+            'collector': Collector.objects.first().id,
+            'collection_system': CollectionSystem.objects.first().id,
+            'waste_category': WasteCategory.objects.first().id,
+            'allowed_materials': [],
+            'forbidden_materials': [self.forbidden_material_1.id, self.forbidden_material_2.id],
+            'frequency': CollectionFrequency.objects.first().id,
+            'valid_from': date(2020, 1, 1),
+            'description': 'This is a test case that should pass!',
+            'form-INITIAL_FORMS': '0',
+            'form-TOTAL_FORMS': '2',
+            'form-0-url': 'https://www.test-flyer.org',
+            'form-0-id': '',
+            'form-1-url': '',
+            'form-1-id': ''
+        }
+        initial_count = Collection.objects.count()
+        response = self.client.post(
+            self.get_create_url(),
+            data=data,
+            follow=True
+        )
+        self.assertEqual(Collection.objects.count(), initial_count + 1)
+        new_collection = Collection.objects.get(description=data['description'])
+        self.assertRedirects(response, reverse('collection-detail', kwargs={'pk': new_collection.pk}))
+        self.assertFalse(new_collection.waste_stream.allowed_materials.exists())
 
     def test_list_view_published_as_anonymous(self):
         response = self.client.get(self.get_list_url(), follow=True)

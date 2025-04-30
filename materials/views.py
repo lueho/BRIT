@@ -11,12 +11,12 @@ from extra_views import UpdateWithInlinesView
 
 from distributions.models import TemporalDistribution
 from distributions.plots import DoughnutChart
-from utils.views import (NextOrSuccessUrlMixin, OwnedObjectCreateView, OwnedObjectModalCreateView,
-                         PrivateObjectFilterView, PrivateObjectListView, PublishedObjectFilterView,
-                         PublishedObjectListView, UserCreatedObjectCreateView, UserCreatedObjectDetailView,
-                         UserCreatedObjectModalCreateView, UserCreatedObjectModalDeleteView,
-                         UserCreatedObjectModalDetailView, UserCreatedObjectModalUpdateView,
-                         UserCreatedObjectUpdateView, UserCreatedObjectUpdateWithInlinesView, UserOwnsObjectMixin)
+from utils.views import (NextOrSuccessUrlMixin, PrivateObjectFilterView, PrivateObjectListView,
+                         PublishedObjectFilterView, PublishedObjectListView, UserCreatedObjectCreateView,
+                         UserCreatedObjectDetailView, UserCreatedObjectModalCreateView,
+                         UserCreatedObjectModalDeleteView, UserCreatedObjectModalDetailView,
+                         UserCreatedObjectModalUpdateView, UserCreatedObjectUpdateView,
+                         UserCreatedObjectUpdateWithInlinesView, UserOwnsObjectMixin)
 from .filters import PublishedSampleFilter, SampleSeriesFilter, UserOwnedSampleFilter
 from .forms import (AddComponentModalForm, AddCompositionModalForm, AddLiteratureSourceForm, AddSeasonalVariationForm,
                     AnalyticalMethodModelForm, ComponentGroupModalModelForm, ComponentGroupModelForm,
@@ -49,12 +49,12 @@ class MaterialCategoryPrivateListView(PrivateObjectListView):
     dashboard_url = reverse_lazy('materials-dashboard')
 
 
-class MaterialCategoryCreateView(OwnedObjectCreateView):
+class MaterialCategoryCreateView(UserCreatedObjectCreateView):
     form_class = MaterialCategoryModelForm
     permission_required = 'materials.add_materialcategory'
 
 
-class MaterialCategoryModalCreateView(OwnedObjectModalCreateView):
+class MaterialCategoryModalCreateView(UserCreatedObjectModalCreateView):
     form_class = MaterialCategoryModalModelForm
     permission_required = 'materials.add_materialcategory'
 
@@ -99,12 +99,12 @@ class MaterialPrivateListView(PrivateObjectListView):
     dashboard_url = reverse_lazy('materials-dashboard')
 
 
-class MaterialCreateView(OwnedObjectCreateView):
+class MaterialCreateView(UserCreatedObjectCreateView):
     form_class = MaterialModelForm
     permission_required = 'materials.add_material'
 
 
-class MaterialModalCreateView(OwnedObjectModalCreateView):
+class MaterialModalCreateView(UserCreatedObjectModalCreateView):
     form_class = MaterialModalModelForm
     permission_required = 'materials.add_material'
 
@@ -165,12 +165,12 @@ class ComponentPrivateListView(PrivateObjectListView):
     dashboard_url = reverse_lazy('materials-dashboard')
 
 
-class ComponentCreateView(OwnedObjectCreateView):
+class ComponentCreateView(UserCreatedObjectCreateView):
     form_class = ComponentModelForm
     permission_required = 'materials.add_materialcomponent'
 
 
-class ComponentModalCreateView(OwnedObjectModalCreateView):
+class ComponentModalCreateView(UserCreatedObjectModalCreateView):
     form_class = ComponentModalModelForm
     permission_required = 'materials.add_materialcomponent'
 
@@ -211,12 +211,12 @@ class MaterialComponentGroupPrivateListView(PrivateObjectListView):
     dashboard_url = reverse_lazy('materials-dashboard')
 
 
-class MaterialComponentGroupCreateView(OwnedObjectCreateView):
+class MaterialComponentGroupCreateView(UserCreatedObjectCreateView):
     form_class = ComponentGroupModelForm
     permission_required = 'materials.add_materialcomponentgroup'
 
 
-class MaterialComponentGroupModalCreateView(OwnedObjectModalCreateView):
+class MaterialComponentGroupModalCreateView(UserCreatedObjectModalCreateView):
     form_class = ComponentGroupModalModelForm
     permission_required = 'materials.add_materialcomponentgroup'
 
@@ -256,12 +256,12 @@ class MaterialPropertyPrivateListView(PrivateObjectListView):
     dashboard_url = reverse_lazy('materials-dashboard')
 
 
-class MaterialPropertyCreateView(OwnedObjectCreateView):
+class MaterialPropertyCreateView(UserCreatedObjectCreateView):
     form_class = MaterialPropertyModelForm
     permission_required = 'materials.add_materialproperty'
 
 
-class MaterialPropertyModalCreateView(OwnedObjectModalCreateView):
+class MaterialPropertyModalCreateView(UserCreatedObjectModalCreateView):
     form_class = MaterialPropertyModalModelForm
     permission_required = 'materials.add_materialproperty'
 
@@ -313,7 +313,7 @@ class AnalyticalMethodPrivateListView(PrivateObjectListView):
     dashboard_url = reverse_lazy('materials-dashboard')
 
 
-class AnalyticalMethodCreateView(OwnedObjectCreateView):
+class AnalyticalMethodCreateView(UserCreatedObjectCreateView):
     form_class = AnalyticalMethodModelForm
     permission_required = 'materials.add_analyticalmethod'
 
@@ -351,12 +351,12 @@ class SampleSeriesPrivateListView(PrivateObjectFilterView):
     dashboard_url = reverse_lazy('materials-dashboard')
 
 
-class SampleSeriesCreateView(OwnedObjectCreateView):
+class SampleSeriesCreateView(UserCreatedObjectCreateView):
     form_class = SampleSeriesModelForm
     permission_required = 'materials.add_sampleseries'
 
 
-class SampleSeriesModalCreateView(OwnedObjectModalCreateView):
+class SampleSeriesModalCreateView(UserCreatedObjectModalCreateView):
     form_class = SampleSeriesModalModelForm
     permission_required = 'materials.add_sampleseries'
 
@@ -445,12 +445,12 @@ class FeaturedSampleListView(PublishedObjectListView):
     queryset = Sample.objects.filter(series__publish=True)
 
 
-class SampleCreateView(LoginRequiredMixin, OwnedObjectCreateView):
+class SampleCreateView(UserCreatedObjectCreateView):
     form_class = SampleModelForm
-    permission_required = set()
+    permission_required = 'materials.add_sample'
 
 
-class SampleModalCreateView(OwnedObjectModalCreateView):
+class SampleModalCreateView(UserCreatedObjectModalCreateView):
     form_class = SampleModalModelForm
     permission_required = 'materials.add_sample'
 
@@ -507,7 +507,7 @@ class UserOwnedSampleAutoCompleteView(SampleAutoCompleteView):
         return super().get_queryset().filter(owner=self.request.user)
 
 
-class SampleAddCompositionView(UserPassesTestMixin, UserCreatedObjectCreateView):
+class SampleAddCompositionView(UserCreatedObjectCreateView):
     sample = None
     form_class = SampleAddCompositionForm
 
@@ -525,12 +525,7 @@ class SampleAddCompositionView(UserPassesTestMixin, UserCreatedObjectCreateView)
         if not self.sample:
             self.sample = Sample.objects.get(pk=self.kwargs.get('pk'))
             return self.sample
-
-    def test_func(self):
-        if not self.request.user.is_authenticated:
-            return False
-        self.sample = self.get_sample()
-        return self.request.user == self.sample.owner
+        return None
 
     def get_success_url(self):
         return reverse('sample-detail', kwargs={'pk': self.kwargs.get('pk')})
@@ -544,21 +539,15 @@ class SampleAddCompositionView(UserPassesTestMixin, UserCreatedObjectCreateView)
         return super().post(request, *args, **kwargs)
 
 
-class SampleAddPropertyView(UserPassesTestMixin, UserCreatedObjectCreateView):
+class SampleAddPropertyView(UserCreatedObjectCreateView):
     form_class = MaterialPropertyValueModelForm
+    permission_required = 'materials.add_materialpropertyvalue'
 
     def form_valid(self, form):
-        form.instance.owner = self.request.user
         property_value = form.save()
         sample = Sample.objects.get(pk=self.kwargs.get('pk'))
         sample.properties.add(property_value)
         return HttpResponseRedirect(self.get_success_url())
-
-    def test_func(self):
-        if not self.request.user.is_authenticated:
-            return False
-        sample = Sample.objects.get(pk=self.kwargs.get('pk'))
-        return self.request.user == sample.owner
 
     def get_success_url(self):
         return reverse('sample-detail', kwargs={'pk': self.kwargs.get('pk')})
@@ -566,6 +555,7 @@ class SampleAddPropertyView(UserPassesTestMixin, UserCreatedObjectCreateView):
 
 class SampleModalAddPropertyView(UserPassesTestMixin, UserCreatedObjectModalCreateView):
     form_class = MaterialPropertyValueModalModelForm
+    permission_required = 'materials.add_materialpropertyvalue'
 
     def form_valid(self, form):
         form.instance.owner = self.request.user
@@ -609,12 +599,12 @@ class SampleCreateDuplicateView(UserCreatedObjectUpdateView):
 # Not List view because compositions only make sense in the context of their materials
 
 
-class CompositionCreateView(OwnedObjectCreateView):
+class CompositionCreateView(UserCreatedObjectCreateView):
     form_class = CompositionModelForm
     permission_required = 'materials.add_composition'
 
 
-class CompositionModalCreateView(OwnedObjectModalCreateView):
+class CompositionModalCreateView(UserCreatedObjectModalCreateView):
     form_class = CompositionModalModelForm
     permission_required = 'materials.add_composition'
 

@@ -2,6 +2,7 @@ from django.conf import settings
 from django.contrib.contenttypes.fields import GenericForeignKey
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.gis.db.models import MultiPolygonField, PointField
+from django.contrib.gis.geos import GEOSGeometry
 from django.core.validators import MaxValueValidator, MinValueValidator, RegexValidator
 from django.db import models, transaction
 from django.db.models.signals import post_delete, post_save, pre_save
@@ -296,7 +297,36 @@ class Region(NamedUserCreatedObject):
 
     @property
     def geom(self):
-        return self.borders.geom
+        """Gets the geometry from the associated GeoPolygon."""
+        if self.borders:
+            return self.borders.geom
+        return None  # Return None if no borders are associated
+
+    @geom.setter
+    def geom(self, value):
+        """
+        Sets the geometry.
+
+        If a GeoPolygon is already associated via 'borders', its geometry is updated.
+        If no GeoPolygon is associated, a new one is created and linked.
+        The associated GeoPolygon instance (new or existing) is saved.
+        Note: Saving the Region instance itself might be required afterwards
+              by the caller to persist the foreign key link if it was newly created.
+        """
+        if self.borders is None:
+            # Create a new GeoPolygon if one doesn't exist for this Region
+            new_geo_poly = GeoPolygon.objects.create(geom=value)
+            self.borders = new_geo_poly
+            # Important: The caller might need to call region_instance.save()
+            # after setting the geom property if the region instance wasn't
+            # already saved or if the 'borders' FK needs to be persisted.
+        else:
+            # Update the geometry of the existing GeoPolygon
+            self.borders.geom = value
+            self.borders.save()  # Save the changes to the GeoPolygon instance
+
+    def __str__(self):
+        return f"{self.name or 'Unnamed Region'} ({self.country})"
 
     @property
     def country_code(self):
@@ -419,8 +449,37 @@ class Catchment(NamedUserCreatedObject, TreeNode):
     objects = CatchmentManager()
 
     @property
-    def geom(self):
-        return self.region.geom
+    def geom(self) -> GEOSGeometry | None:
+        if self.region:
+            return self.region.geom
+        return None
+
+    @geom.setter
+    def geom(self, value: GEOSGeometry | None):  # Added type hint
+        """
+        Sets the geometry on the associated Region.
+
+        This acts as a shortcut to set the geometry of the Region instance
+        linked via the 'region' field.
+
+        Raises:
+            AttributeError: If this Catchment instance is not associated
+                            with a Region (self.region is None).
+        """
+        if self.region is None:
+            raise AttributeError(
+                "Cannot set geometry: Catchment must be associated with a Region first."
+            )
+        else:
+            # Delegate to the Region's geom property setter.
+            # The Region's setter handles creating/updating the GeoPolygon
+            # and saving the GeoPolygon instance.
+            self.region.geom = value
+            # Note: Saving the Catchment instance itself is not necessary, as no fields from Catchment are changed.
+            # However, if the Region's setter modified the Region instance
+            # (e.g., setting 'borders' FK for the first time), the *Region*
+            # instance might need saving by the caller if the setter doesn't do it.
+            # (The current Region setter only saves the GeoPolygon, not the Region itself).
 
     @property
     def level(self):

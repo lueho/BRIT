@@ -1,3 +1,4 @@
+from django.contrib.auth.models import Permission
 from django.urls import reverse
 
 from distributions.models import TemporalDistribution, Timestep
@@ -32,11 +33,13 @@ class MaterialDashboardViewTestCase(ViewWithPermissionsTestCase):
 class MaterialCategoryCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     modal_detail_view = True
     modal_update_view = True
+    modal_create_view = True
 
     model = MaterialCategory
 
     view_dashboard_name = 'materials-dashboard'
     view_create_name = 'materialcategory-create'
+    view_modal_create_name = 'materialcategory-create-modal'
     view_published_list_name = 'materialcategory-list'
     view_private_list_name = 'materialcategory-list-owned'
     view_detail_name = 'materialcategory-detail'
@@ -49,178 +52,20 @@ class MaterialCategoryCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDV
     update_object_data = {'name': 'Updated Test Category'}
 
 
-class MaterialCategoryCreateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'add_materialcategory'
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('materialcategory-create')
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('materialcategory-create'))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('materialcategory-create'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('materialcategory-create'))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('materialcategory-create')
-        response = self.client.post(url, {})
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('materialcategory-create'))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_for_members_with_minimal_data(self):
-        self.client.force_login(self.member)
-        data = {'name': 'Test Category'}
-        response = self.client.post(reverse('materialcategory-create'), data, follow=True)
-        created_pk = list(response.context.get('messages'))[0].message
-        self.assertRedirects(response, reverse('materialcategory-detail', kwargs={'pk': created_pk}))
-
-
-class MaterialCategoryModalCreateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'add_materialcategory'
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('materialcategory-create-modal')
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('materialcategory-create-modal'))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('materialcategory-create-modal'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('materialcategory-create-modal'))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('materialcategory-create-modal')
-        response = self.client.post(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('materialcategory-create-modal'))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_to_success_url_for_member(self):
-        self.client.force_login(self.member)
-        data = {'name': 'Test Category'}
-        response = self.client.post(reverse('materialcategory-create-modal'), data)
-        self.assertRedirects(
-            response, reverse('materialcategory-detail', kwargs={'pk': MaterialCategory.objects.first().pk})
-        )
-
-
 # ----------- Material CRUD --------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
-
-
-class MaterialCreateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'add_material'
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('material-create')
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('material-create'))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('material-create'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('material-create'))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('material-create')
-        response = self.client.post(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('material-create'))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        data = {'name': 'Test Material'}
-        response = self.client.post(reverse('material-create'), data, follow=True)
-        created_pk = list(response.context.get('messages'))[0].message
-        self.assertRedirects(response, reverse('material-detail', kwargs={'pk': created_pk}))
-
-
-class MaterialModalCreateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'add_material'
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('material-create-modal')
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('material-create-modal'))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('material-create'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('material-create-modal')
-        response = self.client.post(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('material-create-modal'))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        data = {'name': 'Test Material'}
-        response = self.client.post(reverse('material-create-modal'), data, follow=True)
-        pk = response.context['object'].id
-        self.assertRedirects(response, reverse('material-detail', kwargs={'pk': pk}))
 
 
 class MaterialCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     modal_detail_view = True
     modal_update_view = True
+    modal_create_view = True
 
     model = Material
 
     view_dashboard_name = 'materials-dashboard'
     view_create_name = 'material-create'
+    view_modal_create_name = 'material-create-modal'
     view_published_list_name = 'material-list'
     view_private_list_name = 'material-list-owned'
     view_detail_name = 'material-detail'
@@ -245,101 +90,16 @@ class MaterialCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class ComponentCreateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'add_materialcomponent'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.component = MaterialComponent.objects.create(name='Test Component')
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('materialcomponent-create')
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('materialcomponent-create'))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('materialcomponent-create'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('materialcomponent-create'))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('materialcomponent-create')
-        response = self.client.post(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('materialcomponent-create'))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        data = {'name': 'Test Component'}
-        response = self.client.post(reverse('materialcomponent-create'), data, follow=True)
-        created_pk = list(response.context.get('messages'))[0].message
-        self.assertRedirects(response, reverse('materialcomponent-detail', kwargs={'pk': created_pk}))
-
-
-class ComponentModalCreateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'add_materialcomponent'
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('materialcomponent-create-modal')
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('materialcomponent-create-modal'))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('materialcomponent-create-modal'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('materialcomponent-create-modal'))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('materialcomponent-create-modal')
-        response = self.client.get(url, {})
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('materialcomponent-create-modal'))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        data = {'name': 'Test Component'}
-        response = self.client.post(reverse('materialcomponent-create-modal'), data, follow=True)
-        pk = response.context['object'].id
-        self.assertRedirects(response, reverse('materialcomponent-detail', kwargs={'pk': pk}))
-
-
 class MaterialComponentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     modal_detail_view = True
     modal_update_view = True
+    modal_create_view = True
 
     model = MaterialComponent
 
     view_dashboard_name = 'materials-dashboard'
     view_create_name = 'materialcomponent-create'
+    view_modal_create_name = 'materialcomponent-create-modal'
     view_published_list_name = 'materialcomponent-list'
     view_private_list_name = 'materialcomponent-list-owned'
     view_detail_name = 'materialcomponent-detail'
@@ -364,96 +124,16 @@ class MaterialComponentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUD
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class ComponentGroupCreateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'add_materialcomponentgroup'
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('materialcomponentgroup-create')
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('materialcomponentgroup-create'))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('materialcomponentgroup-create'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('materialcomponentgroup-create'))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('materialcomponentgroup-create')
-        response = self.client.post(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('materialcomponentgroup-create'))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        data = {'name': 'Test Group'}
-        response = self.client.post(reverse('materialcomponentgroup-create'), data, follow=True)
-        created_pk = list(response.context.get('messages'))[0].message
-        self.assertRedirects(response, reverse('materialcomponentgroup-detail', kwargs={'pk': created_pk}))
-
-
-class ComponentGroupModalCreateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'add_materialcomponentgroup'
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('materialcomponentgroup-create-modal')
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('materialcomponentgroup-create-modal'))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('materialcomponentgroup-create-modal'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('materialcomponentgroup-create-modal'))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('materialcomponentgroup-create-modal')
-        response = self.client.post(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('materialcomponentgroup-create-modal'))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        data = {'name': 'Test Group'}
-        response = self.client.post(reverse('materialcomponentgroup-create-modal'), data, follow=True)
-        pk = response.context['object'].id
-        self.assertRedirects(response, reverse('materialcomponentgroup-detail', kwargs={'pk': pk}))
-
-
 class MaterialComponentGroupCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     modal_detail_view = True
     modal_update_view = True
+    modal_create_view = True
 
     model = MaterialComponentGroup
 
     view_dashboard_name = 'materials-dashboard'
     view_create_name = 'materialcomponentgroup-create'
+    view_modal_create_name = 'materialcomponentgroup-create-modal'
     view_published_list_name = 'materialcomponentgroup-list'
     view_private_list_name = 'materialcomponentgroup-list-owned'
     view_detail_name = 'materialcomponentgroup-detail'
@@ -478,96 +158,16 @@ class MaterialComponentGroupCRUDViewsTestCase(AbstractTestCases.UserCreatedObjec
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class MaterialPropertyCreateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'add_materialproperty'
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('materialproperty-create')
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('materialproperty-create'))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('materialproperty-create'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('materialproperty-create'))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('materialproperty-create')
-        response = self.client.post(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('materialcomponentgroup-create'))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        data = {'name': 'Test Property', 'unit': 'Test Unit'}
-        response = self.client.post(reverse('materialproperty-create'), data, follow=True)
-        created_pk = list(response.context.get('messages'))[0].message
-        self.assertRedirects(response, reverse('materialproperty-detail', kwargs={'pk': created_pk}))
-
-
-class MaterialPropertyModalCreateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'add_materialproperty'
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('materialproperty-create-modal')
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('materialproperty-create-modal'))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('materialproperty-create-modal'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('materialproperty-create-modal'))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('materialproperty-create-modal')
-        response = self.client.post(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('materialproperty-create-modal'))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        data = {'name': 'Test Property', 'unit': 'Test Unit'}
-        response = self.client.post(reverse('materialproperty-create'), data, follow=True)
-        created_pk = list(response.context.get('messages'))[0].message
-        self.assertRedirects(response, reverse('materialproperty-detail', kwargs={'pk': created_pk}))
-
-
 class MaterialPropertyCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     modal_detail_view = True
     modal_update_view = True
+    modal_create_view = True
 
     model = MaterialProperty
 
     view_dashboard_name = 'materials-dashboard'
     view_create_name = 'materialproperty-create'
+    view_modal_create_name = 'materialproperty-create-modal'
     view_published_list_name = 'materialproperty-list'
     view_private_list_name = 'materialproperty-list-owned'
     view_detail_name = 'materialproperty-detail'
@@ -673,105 +273,15 @@ class AnalyticalMethodCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDV
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class SampleSeriesCreateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'add_sampleseries'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.material = Material.objects.create(name='Test Material')
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('sampleseries-create')
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('sampleseries-create'))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('sampleseries-create'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('sampleseries-create'))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('sampleseries-create')
-        response = self.client.post(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('sampleseries-create'))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        data = {'name': 'Test Series', 'material': self.material.pk}
-        response = self.client.post(reverse('sampleseries-create'), data, follow=True)
-        created_pk = list(response.context.get('messages'))[0].message
-        self.assertRedirects(response, reverse('sampleseries-detail', kwargs={'pk': created_pk}))
-
-
-class SampleSeriesModalCreateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'add_sampleseries'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.material = Material.objects.create(name='Test Material')
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('sampleseries-create-modal')
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('sampleseries-create-modal'))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('sampleseries-create-modal'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('sampleseries-create-modal'))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('sampleseries-create-modal')
-        response = self.client.post(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('sampleseries-create-modal'))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        data = {'name': 'Test Series', 'material': self.material.pk}
-        response = self.client.post(reverse('sampleseries-create-modal'), data, follow=True)
-        pk = response.context['object'].id
-        self.assertRedirects(response, reverse('sampleseries-detail', kwargs={'pk': pk}))
-
-
 class SampleSeriesCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     modal_detail_view = True
+    modal_create_view = True
 
     model = SampleSeries
 
     view_dashboard_name = 'materials-dashboard'
     view_create_name = 'sampleseries-create'
+    view_modal_create_name = 'sampleseries-create-modal'
     view_published_list_name = 'sampleseries-list'
     view_private_list_name = 'sampleseries-list-owned'
     view_detail_name = 'sampleseries-detail'
@@ -828,53 +338,14 @@ class FeaturedSampleListViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 200)
 
 
-class SampleCreateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'add_sample'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        cls.material = Material.objects.create(name='Test Material')
-        cls.series = SampleSeries.objects.create(name='Test Series', material=cls.material)
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('sample-create')
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_200_ok_for_authenticated_users(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('sample-create'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('sample-create'))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('sample-create')
-        response = self.client.post(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_success_and_http_302_redirect_for_authenticated_users(self):
-        self.client.force_login(self.outsider)
-        data = {
-            'name': 'Test Sample',
-            'material': self.material.pk,
-            'series': self.series.pk,
-            'timestep': Timestep.objects.default().pk,
-        }
-        response = self.client.post(reverse('sample-create'), data, follow=True)
-        created_pk = Sample.objects.get(name='Test Sample').pk
-        self.assertRedirects(response, reverse('sample-detail', kwargs={'pk': created_pk}))
-
-
 class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    modal_create_view = True
+
     model = Sample
 
     view_dashboard_name = 'materials-dashboard'
     view_create_name = 'sample-create'
+    view_modal_create_name = 'sample-create-modal'
     view_published_list_name = 'sample-list'
     view_private_list_name = 'sample-list-owned'
     view_detail_name = 'sample-detail'
@@ -1083,6 +554,7 @@ class SampleModalAddPropertyViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
+        cls.owner.user_permissions.add(Permission.objects.get(codename='add_materialpropertyvalue'))
         material = Material.objects.create(name='Test Material')
         series = SampleSeries.objects.create(owner=cls.owner, name='Test Series', material=material)
         cls.sample = Sample.objects.create(owner=cls.owner, name='Test Sample', material=material, series=series)
@@ -1202,119 +674,9 @@ class SampleCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CompositionCreateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'add_composition'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        material = Material.objects.create(name='Test Material')
-        series = SampleSeries.objects.create(name='Test Series', material=material)
-        cls.sample = Sample.objects.create(
-            name='Test Sample',
-            material=material,
-            series=series,
-            publication_status='published',
-        )
-        cls.custom_group = MaterialComponentGroup.objects.create(name='Test Group')
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('composition-create')
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('composition-create'))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('composition-create'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('composition-create'))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('composition-create')
-        response = self.client.post(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('composition-create'))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        data = {
-            'name': 'Test Composition',
-            'sample': self.sample.pk,
-            'group': self.custom_group.pk,
-            'fractions_of': MaterialComponent.objects.default().pk,
-        }
-        response = self.client.post(reverse('composition-create'), data)
-        self.assertRedirects(response, reverse('sample-detail', kwargs={'pk': self.sample.pk}))
-
-
-class CompositionModalCreateViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = 'add_composition'
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        material = Material.objects.create(name='Test Material')
-        series = SampleSeries.objects.create(name='Test Series', material=material)
-        cls.sample = Sample.objects.create(owner=cls.member, name='Test Sample', material=material, series=series)
-        cls.custom_group = MaterialComponentGroup.objects.create(name='Test Group')
-
-    def test_get_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('composition-create-modal')
-        response = self.client.get(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_get_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.get(reverse('composition-create-modal'))
-        self.assertEqual(response.status_code, 403)
-
-    def test_get_http_200_ok_for_members(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('composition-create-modal'))
-        self.assertEqual(response.status_code, 200)
-
-    def test_form_contains_exactly_one_submit_button(self):
-        self.client.force_login(self.member)
-        response = self.client.get(reverse('composition-create-modal'))
-        self.assertContains(response, 'type="submit"', count=1, status_code=200)
-
-    def test_post_http_302_redirect_to_login_for_anonymous(self):
-        url = reverse('composition-create-modal')
-        response = self.client.post(url)
-        self.assertRedirects(response, f'{reverse("auth_login")}?next={url}')
-
-    def test_post_http_403_forbidden_for_outsiders(self):
-        self.client.force_login(self.outsider)
-        response = self.client.post(reverse('composition-create-modal'))
-        self.assertEqual(response.status_code, 403)
-
-    def test_post_success_and_http_302_redirect_for_members(self):
-        self.client.force_login(self.member)
-        data = {
-            'name': 'Test Composition',
-            'sample': self.sample.pk,
-            'group': self.custom_group.pk,
-            'fractions_of': MaterialComponent.objects.default().pk,
-        }
-        response = self.client.post(reverse('composition-create-modal'), data)
-        self.assertRedirects(response, reverse('sample-detail', kwargs={'pk': self.sample.pk}))
-
-
 class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     modal_detail_view = True
+    modal_create_view = True
     public_list_view = False
     private_list_view = False
 
@@ -1322,6 +684,7 @@ class CompositionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
 
     view_dashboard_name = 'materials-dashboard'
     view_create_name = 'composition-create'
+    view_modal_create_name = 'composition-create-modal'
     view_detail_name = 'composition-detail'
     view_modal_detail_name = 'composition-detail-modal'
     view_update_name = 'composition-update'

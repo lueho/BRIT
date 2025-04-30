@@ -1,5 +1,5 @@
 from maps.views import GeoDataSetPublishedFilteredMapView, MapMixin
-from utils.views import (OwnedObjectCreateView, PrivateObjectFilterView, PublishedObjectFilterView,
+from utils.views import (PrivateObjectFilterView, PublishedObjectFilterView, UserCreatedObjectCreateView,
                          UserCreatedObjectDetailView, UserCreatedObjectModalDeleteView, UserCreatedObjectUpdateView)
 from .filters import ShowcaseFilterSet
 from .forms import ShowcaseModelForm
@@ -28,7 +28,7 @@ class ShowcasePublishedMapView(GeoDataSetPublishedFilteredMapView):
     features_layer_api_basename = 'api-showcase'
 
 
-class ShowcaseCreateView(OwnedObjectCreateView):
+class ShowcaseCreateView(UserCreatedObjectCreateView):
     model = Showcase
     form_class = ShowcaseModelForm
     permission_required = 'closecycle.add_showcase'

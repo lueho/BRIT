@@ -3,8 +3,8 @@ from django.views.generic import TemplateView
 
 from .forms import PropertyModelForm, UnitModelForm
 from .models import Property, Unit
-from ..views import (OwnedObjectCreateView, OwnedObjectModelSelectOptionsView, PrivateObjectListView,
-                     PublishedObjectListView, UserCreatedObjectDetailView, UserCreatedObjectModalDeleteView,
+from ..views import (OwnedObjectModelSelectOptionsView, PrivateObjectListView, PublishedObjectListView,
+                     UserCreatedObjectCreateView, UserCreatedObjectDetailView, UserCreatedObjectModalDeleteView,
                      UserCreatedObjectUpdateView)
 
 
@@ -24,7 +24,7 @@ class UnitPrivateListView(PrivateObjectListView):
     dashboard_url = reverse_lazy('properties-dashboard')
 
 
-class UnitCreateView(OwnedObjectCreateView):
+class UnitCreateView(UserCreatedObjectCreateView):
     model = Unit
     form_class = UnitModelForm
     permission_required = ('properties.add_unit',)
@@ -57,7 +57,7 @@ class PropertyPrivateListView(PrivateObjectListView):
     dashboard_url = reverse_lazy('properties-dashboard')
 
 
-class PropertyCreateView(OwnedObjectCreateView):
+class PropertyCreateView(UserCreatedObjectCreateView):
     model = Property
     form_class = PropertyModelForm
     permission_required = ('properties.add_property',)

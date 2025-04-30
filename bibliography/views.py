@@ -9,12 +9,11 @@ from django.urls import reverse_lazy
 from django.views import View
 from django.views.generic import TemplateView
 
-from utils import views
-from utils.views import (OwnedObjectCreateWithInlinesView, PrivateObjectFilterView, PrivateObjectListView,
-                         PublishedObjectFilterView, PublishedObjectListView, UserCreatedObjectDetailView,
+from utils.views import (PrivateObjectFilterView, PrivateObjectListView, PublishedObjectFilterView,
+                         PublishedObjectListView, UserCreatedObjectCreateView, UserCreatedObjectCreateWithInlinesView,
+                         UserCreatedObjectDetailView, UserCreatedObjectModalCreateView,
                          UserCreatedObjectModalDeleteView, UserCreatedObjectModalDetailView,
-                         UserCreatedObjectModalUpdateView,
-                         UserCreatedObjectUpdateView,
+                         UserCreatedObjectModalUpdateView, UserCreatedObjectUpdateView,
                          UserCreatedObjectUpdateWithInlinesView)
 from .filters import AuthorFilterSet, SourceFilter
 from .forms import (AuthorModalModelForm, AuthorModelForm, LicenceModalModelForm, LicenceModelForm, SourceAuthorInline,
@@ -46,12 +45,12 @@ class AuthorPrivateListView(PrivateObjectFilterView):
     ordering = 'last_names'
 
 
-class AuthorCreateView(views.OwnedObjectCreateView):
+class AuthorCreateView(UserCreatedObjectCreateView):
     form_class = AuthorModelForm
     permission_required = 'bibliography.add_author'
 
 
-class AuthorModalCreateView(views.OwnedObjectModalCreateView):
+class AuthorModalCreateView(UserCreatedObjectModalCreateView):
     form_class = AuthorModalModelForm
     permission_required = 'bibliography.add_author'
 
@@ -106,12 +105,12 @@ class LicencePrivateListView(PrivateObjectListView):
     dashboard_url = reverse_lazy('bibliography-dashboard')
 
 
-class LicenceCreateView(views.OwnedObjectCreateView):
+class LicenceCreateView(UserCreatedObjectCreateView):
     form_class = LicenceModelForm
     permission_required = 'bibliography.add_licence'
 
 
-class LicenceModalCreateView(views.OwnedObjectModalCreateView):
+class LicenceModalCreateView(UserCreatedObjectModalCreateView):
     form_class = LicenceModalModelForm
     permission_required = 'bibliography.add_licence'
 
@@ -156,14 +155,14 @@ class SourcePrivateFilterView(PrivateObjectFilterView):
     dashboard_url = reverse_lazy('bibliography-dashboard')
 
 
-class SourceCreateView(OwnedObjectCreateWithInlinesView):
+class SourceCreateView(UserCreatedObjectCreateWithInlinesView):
     model = Source
     form_class = SourceModelForm
     inlines = [SourceAuthorInline]
     permission_required = 'bibliography.add_source'
 
 
-class SourceModalCreateView(views.OwnedObjectModalCreateView):
+class SourceModalCreateView(UserCreatedObjectModalCreateView):
     form_class = SourceModalModelForm
     permission_required = 'bibliography.add_source'
 

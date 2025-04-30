@@ -23,20 +23,20 @@ from maps.views import (CatchmentCreateView, CatchmentDetailView, CatchmentUpdat
                         GeoDataSetPrivateFilteredMapView, GeoDataSetPublishedFilteredMapView, MapMixin)
 from utils.file_export.views import FilteredListFileExportView
 from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineFormSetMixin
-from utils.views import (OwnedObjectCreateView, OwnedObjectModalCreateView, OwnedObjectModelSelectOptionsView,
-                         PrivateObjectFilterView, PrivateObjectListView, PublishedObjectFilterView,
-                         PublishedObjectListView, UserCreatedObjectDetailView, UserCreatedObjectModalDeleteView,
-                         UserCreatedObjectModalDetailView, UserCreatedObjectModalUpdateView,
-                         UserCreatedObjectUpdateView)
+from utils.views import (OwnedObjectModelSelectOptionsView, PrivateObjectFilterView, PrivateObjectListView,
+                         PublishedObjectFilterView, PublishedObjectListView, UserCreatedObjectCreateView,
+                         UserCreatedObjectDetailView, UserCreatedObjectModalCreateView,
+                         UserCreatedObjectModalDeleteView, UserCreatedObjectModalDetailView,
+                         UserCreatedObjectModalUpdateView, UserCreatedObjectUpdateView)
 from .filters import CollectionFilterSet, CollectorFilter, WasteFlyerFilter
 from .forms import (AggregatedCollectionPropertyValueModelForm, BaseWasteFlyerUrlFormSet, CollectionAddPredecessorForm,
                     CollectionAddWasteSampleForm, CollectionFrequencyModalModelForm, CollectionFrequencyModelForm,
                     CollectionModelForm, CollectionPropertyValueModelForm, CollectionRemovePredecessorForm,
                     CollectionRemoveWasteSampleForm, CollectionSeasonForm, CollectionSeasonFormHelper,
                     CollectionSeasonFormSet, CollectionSystemModalModelForm, CollectionSystemModelForm,
-                    CollectorModalModelForm, CollectorModelForm, WasteCategoryModalModelForm, WasteCategoryModelForm,
-                    WasteComponentModalModelForm, WasteComponentModelForm, WasteFlyerModalModelForm,
-                    WasteFlyerModelForm)
+                    CollectorModalModelForm, CollectorModelForm, FeeSystemModelForm, WasteCategoryModalModelForm,
+                    WasteCategoryModelForm, WasteComponentModalModelForm,
+                    WasteComponentModelForm, WasteFlyerModalModelForm, WasteFlyerModelForm)
 from .models import (AggregatedCollectionPropertyValue, Collection, CollectionCatchment, CollectionCountOptions,
                      CollectionFrequency, CollectionPropertyValue, CollectionSeason, CollectionSystem, Collector,
                      FeeSystem, WasteCategory, WasteComponent, WasteFlyer)
@@ -63,15 +63,13 @@ class CollectorPrivateListView(PrivateObjectListView):
     dashboard_url = reverse_lazy('wastecollection-dashboard')
 
 
-class CollectorCreateView(OwnedObjectCreateView):
+class CollectorCreateView(UserCreatedObjectCreateView):
     form_class = CollectorModelForm
-    success_url = reverse_lazy('collector-list')
     permission_required = 'soilcom.add_collector'
 
 
-class CollectorModalCreateView(OwnedObjectModalCreateView):
+class CollectorModalCreateView(UserCreatedObjectModalCreateView):
     form_class = CollectorModalModelForm
-    success_url = reverse_lazy('collector-list')
     permission_required = 'soilcom.add_collector'
 
 
@@ -121,15 +119,13 @@ class CollectionSystemPrivateListView(PrivateObjectListView):
     dashboard_url = reverse_lazy('wastecollection-dashboard')
 
 
-class CollectionSystemCreateView(OwnedObjectCreateView):
+class CollectionSystemCreateView(UserCreatedObjectCreateView):
     form_class = CollectionSystemModelForm
-    success_url = reverse_lazy('collectionsystem-list')
     permission_required = 'soilcom.add_collectionsystem'
 
 
-class CollectionSystemModalCreateView(OwnedObjectModalCreateView):
+class CollectionSystemModalCreateView(UserCreatedObjectModalCreateView):
     form_class = CollectionSystemModalModelForm
-    success_url = reverse_lazy('collectionsystem-list')
     permission_required = 'soilcom.add_collectionsystem'
 
 
@@ -169,17 +165,13 @@ class WasteCategoryPrivateListView(PrivateObjectListView):
     dashboard_url = reverse_lazy('wastecollection-dashboard')
 
 
-class WasteCategoryCreateView(OwnedObjectCreateView):
-    model = WasteCategory
-    fields = ('name', 'description')
+class WasteCategoryCreateView(UserCreatedObjectCreateView):
     form_class = WasteCategoryModelForm
-    success_url = reverse_lazy('wastecategory-list')
     permission_required = 'soilcom.add_wastecategory'
 
 
-class WasteCategoryModalCreateView(OwnedObjectModalCreateView):
+class WasteCategoryModalCreateView(UserCreatedObjectModalCreateView):
     form_class = WasteCategoryModalModelForm
-    success_url = reverse_lazy('wastecategory-list')
     permission_required = 'soilcom.add_wastecategory'
 
 
@@ -218,15 +210,13 @@ class WasteComponentPrivateListView(PrivateObjectListView):
     dashboard_url = reverse_lazy('wastecollection-dashboard')
 
 
-class WasteComponentCreateView(OwnedObjectCreateView):
+class WasteComponentCreateView(UserCreatedObjectCreateView):
     form_class = WasteComponentModelForm
-    success_url = reverse_lazy('wastecomponent-list')
     permission_required = 'soilcom.add_wastecomponent'
 
 
-class WasteComponentModalCreateView(OwnedObjectModalCreateView):
+class WasteComponentModalCreateView(UserCreatedObjectModalCreateView):
     form_class = WasteComponentModalModelForm
-    success_url = reverse_lazy('wastecomponent-list')
     permission_required = 'soilcom.add_wastecomponent'
 
 
@@ -266,9 +256,9 @@ class FeeSystemPrivateListView(PrivateObjectListView):
     dashboard_url = reverse_lazy('wastecollection-dashboard')
 
 
-class FeeSystemCreateView(OwnedObjectCreateView):
-    model = FeeSystem
-    fields = ('name', 'description')
+class FeeSystemCreateView(UserCreatedObjectCreateView):
+    form_class = FeeSystemModelForm
+    permission_required = 'soilcom.add_feesystem'
 
 
 class FeeSystemDetailView(UserCreatedObjectDetailView):
@@ -277,7 +267,7 @@ class FeeSystemDetailView(UserCreatedObjectDetailView):
 
 class FeeSystemUpdateView(UserCreatedObjectUpdateView):
     model = FeeSystem
-    fields = ('name', 'description')
+    form_class = FeeSystemModelForm
 
 
 class FeeSystemModalDeleteView(UserCreatedObjectModalDeleteView):
@@ -402,7 +392,7 @@ class FrequencyPrivateListView(PrivateObjectListView):
     dashboard_url = reverse_lazy('wastecollection-dashboard')
 
 
-class FrequencyCreateView(M2MInlineFormSetMixin, OwnedObjectCreateView):
+class FrequencyCreateView(M2MInlineFormSetMixin, UserCreatedObjectCreateView):
     form_class = CollectionFrequencyModelForm
     formset_model = CollectionSeason
     formset_class = CollectionSeasonFormSet
@@ -507,8 +497,7 @@ class FrequencyAutoCompleteView(Select2QuerySetView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CollectionPropertyValueCreateView(OwnedObjectCreateView):
-    model = CollectionPropertyValue
+class CollectionPropertyValueCreateView(UserCreatedObjectCreateView):
     form_class = CollectionPropertyValueModelForm
     permission_required = 'soilcom.add_collectionpropertyvalue'
 
@@ -533,7 +522,7 @@ class CollectionPropertyValueModalDeleteView(UserCreatedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class AggregatedCollectionPropertyValueCreateView(OwnedObjectCreateView):
+class AggregatedCollectionPropertyValueCreateView(UserCreatedObjectCreateView):
     template_name = 'soilcom/collectionpropertyvalue_form.html'
     form_class = AggregatedCollectionPropertyValueModelForm
     permission_required = 'soilcom.add_aggregatedcollectionpropertyvalue'
@@ -623,7 +612,7 @@ class CollectionCurrentPrivateListView(PrivateObjectFilterView):
         return queryset
 
 
-class CollectionCreateView(M2MInlineFormSetMixin, OwnedObjectCreateView):
+class CollectionCreateView(M2MInlineFormSetMixin, UserCreatedObjectCreateView):
     model = Collection
     form_class = CollectionModelForm
     formset_model = WasteFlyer
