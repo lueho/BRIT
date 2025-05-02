@@ -652,11 +652,15 @@ function renderSummaryContainer(summary, summary_container) {
             const summaryElement = document.createElement('div');
             const labelElement = document.createElement('P');
             const boldLabelElement = document.createElement('B');
-            boldLabelElement.innerText = capitalizeFirstLetter(key);
+            boldLabelElement.innerText = key
+                .replace(/_/g, ' ')
+                .replace(/\b\w/g, c => c.toUpperCase());
             let value = summary[key];
             if (typeof summary[key] === 'object') {
                 if ('label' in summary[key]) {
-                    boldLabelElement.innerText = capitalizeFirstLetter(summary[key].label);
+                    boldLabelElement.innerText = summary[key].label
+                        .replace(/_/g, ' ')
+                        .replace(/\b\w/g, c => c.toUpperCase());
                 }
                 if ('value' in summary[key]) {
                     value = summary[key].value;
@@ -672,7 +676,13 @@ function renderSummaryContainer(summary, summary_container) {
                 summaryValueElement.appendChild(ul);
                 value.forEach(function(item) {
                     const li = document.createElement('li');
-                    if (isValidHttpUrl(item.toString())) {
+                    if (item && typeof item === 'object' && 'url' in item && 'name' in item) {
+                        const a = document.createElement('a');
+                        a.href = item.url;
+                        a.innerText = item.name;
+                        a.setAttribute('target', '_blank');
+                        li.appendChild(a);
+                    } else if (isValidHttpUrl(item.toString())) {
                         const a = document.createElement('a');
                         a.href = item.toString();
                         a.innerText = item.toString();

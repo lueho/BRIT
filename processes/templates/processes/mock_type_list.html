@@ -1,0 +1,28 @@
+{% extends "simple_list_card.html" %}
+
+{% block title %}BRIT | Process Types (Mock){% endblock %}
+
+{% block list_card_header %}
+  <strong>Process Types (Mock)</strong>
+{% endblock list_card_header %}
+
+{% block list_table %}
+{% if perms.processes.access_app_feature %}
+<table class="table">
+  <thead>
+    <tr>
+      <th>Name</th>
+      <th>Category</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for p in process_types %}
+      <tr>
+        <td><a href="{% url 'processes:type_detail' p.id %}">{{ p.name }}</a></td>
+        <td>{{ p.category }}</td>
+      </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endif %}
+{% endblock list_table %}

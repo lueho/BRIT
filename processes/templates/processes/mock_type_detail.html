@@ -1,0 +1,60 @@
+{% extends "simple_detail_card.html" %}
+
+{% block title %}{% if perms.processes.access_app_feature %}BRIT | {{ process.name }} details (Mock){% endif %}{% endblock %}
+
+{% block detail_header %}{% if perms.processes.access_app_feature %}{{ process.name }} (Mock){% endif %}{% endblock detail_header %}
+
+{% block detail_body %}
+{% if perms.processes.access_app_feature %}
+<p><strong>Name:</strong> {{ process.name }}</p>
+<p><strong>Category:</strong> {{ process.category }}</p>
+<p><strong>Mechanism:</strong> {{ process.mechanism }}</p>
+<p><strong>Temperature range:</strong> {{ process.temperature_min }} – {{ process.temperature_max }} °C</p>
+<p><strong>Yield:</strong> {{ process.yield_percentage }}%</p>
+<p><strong>Description:</strong><br>{{ process.description|safe }}</p>
+<p><strong>Input Materials:</strong>
+  <ul>
+    {% for m in process.input %}
+      <li><a href="{% url 'processes:mock_material_detail' m.id %}">{{ m.name }}</a></li>
+    {% endfor %}
+  </ul>
+</p>
+<p><strong>Output Materials:</strong>
+  <ul>
+    {% for m in process.output %}
+      <li><a href="{% url 'processes:mock_material_detail' m.id %}">{{ m.name }}</a></li>
+    {% endfor %}
+  </ul>
+</p>
+{% if process.sources %}
+    <p>
+      <strong>Sources:</strong>
+      <ul class="mb-0">
+        {% for source in process.sources %}
+          <li>
+            {% if source.url %}
+              <a href="{{ source.url }}" target="_blank">{{ source.title|default:source.url }}</a>
+            {% else %}
+              {{ source.title|default:source }}
+            {% endif %}
+          </li>
+        {% endfor %}
+      </ul>
+    </p>
+{% endif %}
+{% endif %}
+{% endblock detail_body %}
+
+{% block detail_footer %}
+{% if perms.processes.access_app_feature %}
+  <div class="dropdown mb-3">
+    <button class="btn btn-secondary dropdown-toggle mr-3" type="button" id="navDropdownDetail" data-toggle="dropdown" aria-expanded="false">
+      Navigate
+    </button>
+    <div class="dropdown-menu" aria-labelledby="navDropdownDetail">
+      <a class="dropdown-item" href="{% url 'processes:type_list' %}">Process List</a>
+      <a class="dropdown-item" href="{% url 'processes:dashboard' %}">Dashboard</a>
+    </div>
+  </div>
+{% endif %}
+{% endblock detail_footer %}

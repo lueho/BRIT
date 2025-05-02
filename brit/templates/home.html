@@ -132,7 +132,7 @@
                         <strong><i class="fas fa-fw fa-chart-bar"></i> Inventories</strong>
                     </a>
                 </div>
-                <div class="card-img">
+                <div class="card-img-top">
                     <a class="d-flex align-items-center justify-content-center stretched-link"
                        href="{% url 'scenario-list' %}">
                         <img class="w-100 m-0 p-1" src="{% static 'img/cover_card_inventories.png' %}"
@@ -148,6 +148,8 @@
                 </div>
             </div>
         </div>
+    </div>
+    <div class="row">
         <div class="col col-12 col-md-6 col-lg-3 mb-4">
             <div class="card shadow h-100">
                 <div class="card-header">
@@ -170,6 +172,29 @@
                     </p>
                 </div>
             </div>
+        </div>
+        <div class="col col-12 col-md-6 col-lg-3 mb-4">
+            {% if perms.processes.access_app_feature %}
+            <div class="card shadow h-100">
+                <div class="card-header">
+                    <a href="{% url 'processes:dashboard' %}">
+                        <strong><i class="fas fa-fw fa-flask"></i> Processes</strong>
+                    </a>
+                </div>
+                <div class="card-img">
+                    <a class="d-flex align-items-center justify-content-center stretched-link"
+                       href="{% url 'processes:dashboard' %}">
+                        <img class="w-100 m-0" src="{% static 'img/processes_cover_card.png' %}"
+                             alt="Processes Module Cover Image">
+                    </a>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Explore and model process types and steps as part of the process integration module. This is a mock interface for stakeholder review.
+                    </p>
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
 

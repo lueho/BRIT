@@ -12,5 +12,17 @@
     {% if object.description %}
         <p class="card-text"><strong>Description:</strong><br>{{ object.description }}</p>
     {% endif %}
-    {% block additional_details %}{% endblock %}
+    {% block additional_details %}
+        {% if involved_processes %}
+            <hr>
+            <h5>Involved Processes</h5>
+            <ul>
+                {% for proc in involved_processes %}
+                    <li>
+                        <a href="/processes/types/{{ proc.id }}/">{{ proc.name }}</a>
+                    </li>
+                {% endfor %}
+            </ul>
+        {% endif %}
+    {% endblock %}
 {% endblock %}

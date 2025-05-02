@@ -31,6 +31,7 @@ urlpatterns = [
     path('distributions/', include('distributions.urls')),
     path('maps/', include('maps.urls')),
     path('materials/', include('materials.urls')),
+    path('processes/', include('processes.urls')),
     path('sources/', include('sources.urls')),
     path('inventories/', include('inventories.urls')),
     path('interfaces/simucf/', include('interfaces.simucf.urls')),

@@ -1,6 +1,7 @@
 /logs/
 /db_dump/
 /.idea/
+/.vscode/
 /brit/settings/.env
 *.pyc
 settings.json
@@ -9,6 +10,9 @@ settings.json
 
 # windsurf rules
 .windsurfrules
+.isort.cfg
 *code-workspace*
 
 /test-results/
+/.venv/
+/site/
