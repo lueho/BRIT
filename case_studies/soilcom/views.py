@@ -21,7 +21,7 @@ from maps.filters import CatchmentFilterSet
 from maps.forms import NutsAndLauCatchmentQueryForm
 from maps.views import (CatchmentCreateView, CatchmentDetailView, CatchmentUpdateView, GeoDataSetFormMixin,
                         GeoDataSetPrivateFilteredMapView, GeoDataSetPublishedFilteredMapView, MapMixin)
-from utils.file_export.views import FilteredListFileExportView
+from utils.file_export.views import GenericUserCreatedObjectExportView
 from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineFormSetMixin
 from utils.views import (OwnedObjectModelSelectOptionsView, PrivateObjectFilterView, PrivateObjectListView,
                          PublishedObjectFilterView, PublishedObjectListView, UserCreatedObjectCreateView,
@@ -609,6 +609,9 @@ class CollectionCurrentPrivateListView(PrivateObjectFilterView):
         if self.request.method == 'GET' and not self.request.GET:
             queryset = queryset.currently_valid()
 
+        # DEBUG: Print PKs for comparison with export
+        print("LIST VIEW PKS:", list(queryset.values_list('pk', flat=True)))
+
         return queryset
 
 
@@ -774,7 +777,8 @@ class CollectionAutoCompleteView(Select2QuerySetView):
         return qs
 
 
-class CollectionListFileExportView(FilteredListFileExportView):
+class CollectionListFileExportView(GenericUserCreatedObjectExportView):
+    model_label = 'soilcom.Collection'
     task_function = case_studies.soilcom.tasks.export_collections_to_file
 
 

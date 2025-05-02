@@ -16,6 +16,7 @@
              data-export-status="READY"
              data-export-progress-url="{% url 'file-export-progress' task_id=0 %}"
              data-format="csv"
+             data-list-type="{{ list_type|default:'' }}"
              role="button">
             <div class="d-flex w-100 justify-content-between align-items-center">
                 <div>
@@ -30,6 +31,7 @@
              data-export-status="READY"
              data-export-progress-url="{% url 'file-export-progress' task_id=0 %}"
              data-format="xlsx"
+             data-list-type="{{ list_type|default:'' }}"
              role="button">
             <div class="d-flex w-100 justify-content-between align-items-center">
                 <div>

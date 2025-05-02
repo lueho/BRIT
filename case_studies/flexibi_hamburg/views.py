@@ -32,6 +32,17 @@ class RoadsideTreesPublishedMapIframeView(GeoDataSetPublishedFilteredMapView):
 class HamburgRoadsideTreesListFileExportView(FilteredListFileExportView):
     task_function = case_studies.flexibi_hamburg.tasks.export_hamburg_roadside_trees_to_file
 
+    def get_allowed_ids(self, request, params):
+        params = params.copy()
+        params.pop('page', None)
+        list_type = params.pop('list_type', ['public'])[0]
+        from .models import HamburgRoadsideTrees
+        if list_type == 'private':
+            base_qs = HamburgRoadsideTrees.objects.filter(owner=request.user)
+        else:
+            base_qs = HamburgRoadsideTrees.objects.filter(publication_status='published')
+        return list(base_qs.values_list('pk', flat=True))
+
 
 class HamburgRoadsideTreeCatchmentAutocompleteView(autocomplete.Select2QuerySetView):
     def get_queryset(self):

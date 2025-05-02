@@ -1,5 +1,6 @@
 from django import template
 from django.urls import reverse
+from urllib.parse import urlencode
 
 register = template.Library()
 
@@ -29,9 +30,12 @@ def export_link(file_format, export_url_name, progress_url_name=None):
 
 
 @register.simple_tag
-def export_link_modal(export_url_name):
+def export_link_modal(export_url_name, **extra_params):
     """
     Return a link that opens the export modal using the existing modal framework.
     """
     export_url = reverse(export_url_name)
-    return f'{reverse("export-modal")}?export_url={export_url}'
+    modal_url = reverse('export-modal')
+    params = {'export_url': export_url}
+    params.update(extra_params)
+    return f'{modal_url}?{urlencode(params)}'

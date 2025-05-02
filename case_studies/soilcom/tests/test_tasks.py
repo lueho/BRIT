@@ -43,15 +43,18 @@ class ExportCollectionToFileTestCase(TestCase):
         frequency = CollectionFrequency.objects.create(name='Test Frequency')
         region = Region.objects.create(name='Test Region')
         catchment = CollectionCatchment.objects.create(name='Test catchment', region=region)
-        for i in range(1, 3):
+        # Existing test data for other tests: create both compulsory and voluntary collections
+        for i in range(1, 5):
+            connection_type = 'COMPULSORY' if i % 2 == 0 else 'VOLUNTARY'
             collection = Collection.objects.create(
                 name=f'collection{i}',
                 catchment=catchment,
                 collector=Collector.objects.create(name=f'collector{i}'),
-                collection_system=CollectionSystem.objects.create(name='Test system'),
+                collection_system=CollectionSystem.objects.create(name=f'Test system {i}'),
                 waste_stream=waste_stream,
                 frequency=frequency,
-                description='This is a test case.'
+                description='This is a test case.',
+                connection_type=connection_type,
             )
             collection.flyers.add(waste_flyer)
 
@@ -60,24 +63,52 @@ class ExportCollectionToFileTestCase(TestCase):
         self.mock_task = Mock()
         self.mock_task.request.id = 1234
         self.wrapped_export_collections_to_file = export_collections_to_file.__wrapped__.__func__
+        self.all_collection_ids = list(Collection.objects.values_list('pk', flat=True))
         qs = Collection.objects.filter(collector__pk=self.collector.pk)
         self.data = CollectionFlatSerializer(qs, many=True).data
 
     def test_url_is_passed_through(self, mock_write):
         mock_write.return_value = 'https://download.file'
-        url = self.wrapped_export_collections_to_file(self.mock_task, 'xlsx', {'collector': [str(self.collector.pk)]})
+        url = self.wrapped_export_collections_to_file(self.mock_task, 'xlsx', {'collector': [str(self.collector.pk)]}, self.all_collection_ids)
         self.assertEqual(url, 'https://download.file')
 
     def test_write_function_is_called_once_with_correct_data(self, mock_write):
         mock_write.return_value = 'https://download.file'
-        self.wrapped_export_collections_to_file(self.mock_task, 'xlsx', {'collector': [str(self.collector.pk)]})
+        self.wrapped_export_collections_to_file(self.mock_task, 'xlsx', {'collector': [str(self.collector.pk)]}, self.all_collection_ids)
         mock_write.assert_called_once_with('collections_1234.xlsx', self.data, CollectionXLSXRenderer)
 
     def test_integration(self, mock_write):
-        task = export_collections_to_file.apply(args=['xlsx', {'collector': [str(self.collector.pk)]}])
+        task = export_collections_to_file.apply(args=['xlsx', {'collector': [str(self.collector.pk)]}, self.all_collection_ids])
         while task.status == 'PENDING':
             self.assertEqual('PENDING', task.status)
         self.assertEqual('SUCCESS', task.status)
+
+    def test_connection_type_filter_is_respected(self, mock_write):
+        """
+        Export should only include collections matching the connection_type filter.
+        This test now uses only the collections created in setUpTestData via the loop.
+        """
+        mock_write.return_value = 'https://download.file'
+        # There should be 2 compulsory and 2 voluntary collections
+        # Export only compulsory
+        url = self.wrapped_export_collections_to_file(self.mock_task, 'xlsx', {'connection_type': ['COMPULSORY']}, self.all_collection_ids)
+        args, kwargs = mock_write.call_args
+        exported_data = args[1]
+        self.assertEqual(len(exported_data), 2)
+        self.assertTrue(all(row['connection_type'] == 'Compulsory' for row in exported_data))
+        # Export only voluntary
+        url = self.wrapped_export_collections_to_file(self.mock_task, 'xlsx', {'connection_type': ['VOLUNTARY']}, self.all_collection_ids)
+        args, kwargs = mock_write.call_args
+        exported_data = args[1]
+        self.assertEqual(len(exported_data), 2)
+        self.assertTrue(all(row['connection_type'] == 'Voluntary' for row in exported_data))
+        # Export with no filter: both types should be present
+        url = self.wrapped_export_collections_to_file(self.mock_task, 'xlsx', {}, self.all_collection_ids)
+        args, kwargs = mock_write.call_args
+        exported_data = args[1]
+        exported_types = set(row['connection_type'] for row in exported_data)
+        self.assertIn('Compulsory', exported_types)
+        self.assertIn('Voluntary', exported_types)
 
 
 @patch('case_studies.soilcom.tests.test_tasks.check_wasteflyer_urls.apply')

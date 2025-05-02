@@ -37,9 +37,21 @@ async function prepare_export(format) {
 
     const element = document.getElementById('export_' + format);
     const baseExportUrl = element.dataset.exportUrl;
-    const urlParams = new URLSearchParams(window.location.search);
-    urlParams.append('format', format);
-    return `${baseExportUrl}?${urlParams.toString()}`;
+    // Get all current query params from the URL, preserving all filters
+    const currentParams = window.location.search;
+    let exportUrl = baseExportUrl;
+    if (currentParams) {
+        exportUrl += (baseExportUrl.includes('?') ? '&' : '?') + currentParams.slice(1);
+    }
+    // Always ensure format param is present/overridden
+    const urlObj = new URL(exportUrl, window.location.origin);
+    urlObj.searchParams.set('format', format);
+    // Add list_type from data attribute if present
+    const listType = element.dataset.listType;
+    if (listType) {
+        urlObj.searchParams.set('list_type', listType);
+    }
+    return urlObj.pathname + '?' + urlObj.searchParams.toString();
 }
 
 /**

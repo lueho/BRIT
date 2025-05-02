@@ -2,9 +2,10 @@ site_name: BRIT Documentation
 
 nav:
   - Home: 01_user_guide/README.md
-  - User Guide:
-      - Overview: 01_user_guide/README.md
-      - How-Tos: 01_user_guide/howtos.md
+  - 01_user_guide:
+      - User Guide: 01_user_guide/README.md
+      - How-tos: 01_user_guide/howtos.md
+      - Exporting User-Created Objects: 01_user_guide/file_export.md
   - Developer Guide:
       - Overview: 02_developer_guide/README.md
       - Guidelines: 02_developer_guide/guidelines.md
