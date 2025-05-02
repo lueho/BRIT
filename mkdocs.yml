@@ -1,0 +1,30 @@
+site_name: BRIT Documentation
+
+nav:
+  - Home: index.md
+  - Architecture:
+      - Overview: architecture.md
+      - Data Flow: architecture/data_flow.md
+      - Models: architecture/models.md
+      - Deployment: architecture/deployment.md
+  - Applications: applications.md
+  - API: api.md
+  - Operations: operations.md
+  - How-Tos: howtos.md
+  - References: references.md
+
+theme:
+  name: material
+  features:
+    - navigation.sections
+    - content.code.copy
+
+markdown_extensions:
+  - admonition
+  - pymdownx.superfences
+
+plugins:
+  - search
+
+# Development server settings
+dev_addr: localhost:8001

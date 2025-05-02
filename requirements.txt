@@ -31,3 +31,6 @@ redis==5.2.1
 requests==2.32.3
 whitenoise==6.9.0
 XlsxWriter==3.2.2
+mkdocs>=1.6
+mkdocs-material>=9.5
+mkdocstrings[python]>=0.25
