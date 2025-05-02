@@ -10,6 +10,7 @@ settings.json
 
 # windsurf rules
 .windsurfrules
+.isort.cfg
 *code-workspace*
 
 /test-results/
