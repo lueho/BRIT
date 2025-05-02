@@ -5,13 +5,13 @@ from crispy_forms.layout import Column, Field, Layout, Row, Submit
 from django.db.models import Avg, Count, Max, Q, Sum
 from django.forms import CheckboxSelectMultiple, DateInput, RadioSelect
 from django.utils import timezone
-from django_filters import (BooleanFilter, CharFilter, DateFilter, ModelChoiceFilter, ModelMultipleChoiceFilter)
+from django_filters import (BooleanFilter, CharFilter, ChoiceFilter, DateFilter, ModelChoiceFilter, ModelMultipleChoiceFilter)
 
 from utils.crispy_fields import FilterAccordionGroup, RangeSliderField
 from utils.filters import (BaseCrispyFilterSet, CrispyAutocompleteFilterSet, NullableRangeFilter)
 from utils.widgets import BSModelSelect2, NullableRangeSliderWidget
 from .models import (Collection, CollectionCatchment, CollectionCountOptions, CollectionFrequency,
-                     CollectionPropertyValue, Collector, FeeSystem, WasteCategory, WasteComponent, WasteFlyer, )
+                     CollectionPropertyValue, Collector, FeeSystem, WasteCategory, WasteComponent, WasteFlyer, CONNECTION_TYPE_CHOICES)
 
 
 class CollectorFilter(BaseCrispyFilterSet):
@@ -198,13 +198,21 @@ class CollectionFilterSet(CrispyAutocompleteFilterSet):
     )
     valid_on = DateFilter(method='filter_valid_on', widget=DateInput(attrs={'type': 'date'}),
                           initial=timezone.now().date(), label='Valid on')
+    connection_type = ChoiceFilter(
+        choices=CONNECTION_TYPE_CHOICES,
+        label='Connection type',
+        widget=RadioSelect
+    )
 
     class Meta:
         model = Collection
-        fields = ('id', 'catchment', 'collector', 'collection_system', 'waste_category', 'allowed_materials',
-                  'forbidden_materials', 'connection_rate', 'seasonal_frequency', 'optional_frequency',
-                  'collections_per_year', 'spec_waste_collected', 'fee_system', 'valid_on', 'publication_status',
-                  'owner')
+        fields = (
+            'id', 'catchment', 'collector', 'collection_system', 'waste_category',
+            'allowed_materials', 'forbidden_materials', 'connection_rate',
+            'seasonal_frequency', 'optional_frequency', 'collections_per_year',
+            'spec_waste_collected', 'fee_system', 'valid_on', 'publication_status',
+            'owner', 'connection_type'
+        )
         # catchment_filter must always be applied first, because it grabs the initial queryset and does not filter any
         # existing queryset.
         order_by = ['catchment_filter']

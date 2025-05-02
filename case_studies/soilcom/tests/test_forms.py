@@ -256,7 +256,8 @@ class CollectionModelFormTestCase(TestCase):
             'forbidden_materials': [self.forbidden_material_1.id, self.forbidden_material_2.id],
             'frequency': self.frequency.id,
             'valid_from': date(2023, 1, 1),
-            'description': 'This is a test case'
+            'description': 'This is a test case',
+            'connection_type': 'VOLUNTARY'
         })
         self.assertTrue(form.is_valid())
         form.instance.owner = self.collection.owner
@@ -277,7 +278,8 @@ class CollectionModelFormTestCase(TestCase):
             'frequency': self.frequency.id,
             'valid_from': date(2023, 1, 1),
             'flyer_url': 'https://www.great-test-flyers.com',
-            'description': 'This is a test case'
+            'description': 'This is a test case',
+            'connection_type': 'VOLUNTARY'
         })
         self.assertTrue(equal_form.is_valid())
         equal_form.instance.owner = self.collection.owner
@@ -298,7 +300,8 @@ class CollectionModelFormTestCase(TestCase):
             'frequency': self.frequency.id,
             'valid_from': date(2023, 1, 1),
             'valid_until': date(2023, 12, 31),
-            'description': 'This is a test case'
+            'description': 'This is a test case',
+            'connection_type': 'VOLUNTARY'
         })
         self.assertTrue(form.is_valid())
         form.save()

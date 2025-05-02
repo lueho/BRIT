@@ -13,6 +13,7 @@ class CollectionXLSXRenderer(BaseXLSXRenderer):
         'forbidden_materials': 'Forbidden Materials',
         'fee_system': 'Fee System',
         'frequency': 'Frequency',
+        'connection_type': 'Connection type',
         'population': 'Population',
         'population_density': 'Population Density',
         'connection_rate_2019': 'Connection Rate 2019 [%]',
@@ -43,14 +44,16 @@ class CollectionCSVRenderer(BaseCSVRenderer):
     writer_opts = {
         'delimiter': '\t'
     }
-    header = ['catchment', 'country', 'nuts_or_lau_id', 'collector', 'collection_system', 'waste_category',
-              'allowed_materials', 'forbidden_materials', 'fee_system', 'frequency', 'population',
-              'population_density',
-              'connection_rate_2019', 'connection_rate_2020', 'connection_rate_2021',
-              'specific_waste_collected_2015', 'specific_waste_collected_2016', 'specific_waste_collected_2017',
-              'specific_waste_collected_2018', 'specific_waste_collected_2019', 'specific_waste_collected_2020',
-              'specific_waste_collected_2021',
-              'comments', 'sources', 'valid_from', 'valid_until', 'created_at', 'lastmodified_at']
+    header = [
+        'catchment', 'country', 'nuts_or_lau_id', 'collector', 'collection_system', 'waste_category',
+        'allowed_materials', 'forbidden_materials', 'fee_system', 'frequency', 'connection_type', 'population',
+        'population_density',
+        'connection_rate_2019', 'connection_rate_2020', 'connection_rate_2021',
+        'specific_waste_collected_2015', 'specific_waste_collected_2016', 'specific_waste_collected_2017',
+        'specific_waste_collected_2018', 'specific_waste_collected_2019', 'specific_waste_collected_2020',
+        'specific_waste_collected_2021',
+        'comments', 'sources', 'valid_from', 'valid_until', 'created_at', 'lastmodified_at'
+    ]
 
     labels = {
         'catchment': 'Catchment',
@@ -63,6 +66,7 @@ class CollectionCSVRenderer(BaseCSVRenderer):
         'forbidden_materials': 'Forbidden Materials',
         'fee_system': 'Fee System',
         'frequency': 'Frequency',
+        'connection_type': 'Connection type',
         'population': 'Population',
         'population_density': 'Population Density',
         'connection_rate_2019': 'Connection Rate 2019 [%]',

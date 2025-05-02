@@ -93,6 +93,7 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
     forbidden_materials = serializers.SerializerMethodField(label='Forbidden Materials')
     fee_system = serializers.StringRelatedField(source='fee_system.name', label='Fee system')
     frequency = serializers.StringRelatedField(label='Frequency')
+    connection_type = serializers.SerializerMethodField(label='Connection type')
     population = serializers.SerializerMethodField()
     population_density = serializers.SerializerMethodField()
     comments = serializers.SerializerMethodField(source='description', label='Comments')
@@ -102,7 +103,7 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
     class Meta:
         model = models.Collection
         fields = ('catchment', 'nuts_or_lau_id', 'country', 'collector', 'collection_system', 'waste_category',
-                  'allowed_materials', 'forbidden_materials', 'fee_system', 'frequency', 'population',
+                  'connection_type', 'allowed_materials', 'forbidden_materials', 'fee_system', 'frequency', 'population',
                   'population_density', 'comments', 'sources', 'valid_from', 'valid_until', 'created_at',
                   'lastmodified_at')
 
@@ -149,6 +150,10 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
             return comments
         else:
             return ''
+
+    @staticmethod
+    def get_connection_type(obj):
+        return obj.get_connection_type_display() if hasattr(obj, 'get_connection_type_display') else obj.connection_type
 
     def to_representation(self, instance):
         # Call the superclass's to_representation method to get the default ordering

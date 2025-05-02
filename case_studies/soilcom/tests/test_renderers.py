@@ -68,6 +68,20 @@ class CollectionCSVRendererTestCase(TestCase):
         fieldnames = [renderer.labels[key] for key in renderer.header]
         self.assertListEqual(fieldnames, list(reader.fieldnames))
         self.assertEqual(2, sum(1 for _ in reader))
+        # Ensure 'Connection type' is present and in the correct order
+        self.assertIn('Connection type', reader.fieldnames)
+        self.assertEqual(
+            renderer.header.index('connection_type'),
+            reader.fieldnames.index('Connection type')
+        )
+
+    def test_connection_type_field_exported(self):
+        renderer = CollectionCSVRenderer()
+        renderer.render(self.file, self.content)
+        self.file.seek(0)
+        reader = csv.DictReader(codecs.getreader('utf-8')(self.file), delimiter='\t')
+        for row in reader:
+            self.assertIn(row['Connection type'], ['Compulsory', 'Voluntary'])
 
     def test_allowed_materials_formatted_as_comma_separated_list_in_one_field(self):
         renderer = CollectionCSVRenderer()
