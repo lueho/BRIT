@@ -1,3 +1,8 @@
+# ------------------------------------------------------------
+# db_admin Docker image
+# PostGIS 15 + admin CLIs (Heroku & AWS) with minimal footprint
+# ------------------------------------------------------------
+
 FROM postgis/postgis:15-3.4
 
 ENV DEBIAN_FRONTEND=noninteractive
