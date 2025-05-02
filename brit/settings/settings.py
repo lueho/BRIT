@@ -44,6 +44,7 @@ INSTALLED_APPS = [
     'distributions.apps.DistributionsConfig',
     'bibliography.apps.BibliographyConfig',
     'materials.apps.MaterialsConfig',
+    'processes',
     'inventories.apps.InventoriesConfig',
     'sources.apps.SourcesConfig',
     'layer_manager.apps.LayerManagerConfig',
