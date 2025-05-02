@@ -52,6 +52,7 @@ class CollectionFilterFormHelper(FormHelper):
                 'collector',
                 'collection_system',
                 'waste_category',
+                'connection_type',
                 Submit('filter', 'Filter', css_id='submit-id-basic-filter', css_class='submit-filter')
             ),
             FilterAccordionGroup(
@@ -201,7 +202,8 @@ class CollectionFilterSet(CrispyAutocompleteFilterSet):
     connection_type = ChoiceFilter(
         choices=CONNECTION_TYPE_CHOICES,
         label='Connection type',
-        widget=RadioSelect
+        widget=RadioSelect,
+        empty_label='All',
     )
 
     class Meta:
