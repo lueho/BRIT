@@ -3,7 +3,9 @@
 Welcome to the BRIT User Guide. This section contains all user-facing documentation, including getting started, how-tos, and troubleshooting.
 
 ## Recommended Reading Order
-- [How-Tos](01_user_guide/howtos.md)
+- [How-Tos](howtos.md)
+
+## Other Resources
 
 ---
 
@@ -11,4 +13,4 @@ Welcome to the BRIT User Guide. This section contains all user-facing documentat
 
 ---
 
-_Last updated: 2025-05-02_
+*Last updated: 2025-05-02*

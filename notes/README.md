@@ -1,62 +1,46 @@
 # Notes Directory
 
-This directory contains working notes, plans, and guides for the BRIT project. Subfolders should be created as needed to organize planning, research, and design documents. Example convention:
+This directory contains all working notes, plans, and guides for the BRIT project. Use this space for:
+- Planning and tracking features/tasks
+- Design decisions (ADRs)
+- Research, PoCs, and technical experiments
+- Retrospectives, troubleshooting, and internal guides
 
-- `00_backlog/` — feature/task backlog
-- `01_planning/` — step-by-step guides, plans, and RFCs
-- `02_design_decisions/` — architecture and decision records
-- `03_research/` — research, PoCs, and references
+## Organization
 
-Create subdirectories as needed for organization. All files should be Markdown (`.md`).
+Recommended subfolder structure:
+- `backlog/` — feature/task backlog and priorities
+- `planning/` — step-by-step guides, plans, RFCs
+- `design_decisions/` — architecture and decision records (ADRs)
+- `research/` — research, PoCs, references
+- Additional folders as needed for clarity
 
----
-
-*This file is safe to edit or expand as conventions evolve.*
+All files should be Markdown (`.md`). Use clear, dated filenames (e.g., `2025-05-02-feature-x-plan.md`).
 
 ---
 
 # Guidelines: Docs vs. Notes
 
-## 1. `docs/` — Project Documentation (User/Developer-Facing)
-- **Purpose:**
-  - Contains all polished, publishable documentation for users and developers.
-  - Examples: architecture overviews, API references, deployment guides, how-tos, changelogs.
-- **Structure:**
-  - Organized by topic (architecture, apps, API, operations, references, howtos).
-  - Each page should be concise (<200 lines); split large topics into subpages.
-  - Use MkDocs for navigation and auto-generation from code/docstrings where possible.
-- **Workflow:**
-  - Only move files to `docs/` when they are finalized, accurate, and reviewed.
-  - Remove or archive outdated docs to prevent confusion.
-  - Avoid duplication: if a doc exists in both `docs/` and `notes/`, keep only the latest/most complete in the correct place.
-- **Formatting:**
-  - Use Markdown with clear headings, tables, and diagrams (e.g., Mermaid).
-  - Document differences for dev, test, and prod environments when relevant.
+## `docs/` — Project Documentation (User/Developer-Facing)
+- Contains only finalized, publishable documentation for users and developers.
+- Examples: architecture overviews, API references, deployment guides, how-tos.
+- Organized by topic, concise, and maintained via MkDocs.
+- Only move files here when reviewed and complete.
 
-## 2. `notes/` — Working Notes (AI/Team-Only)
-- **Purpose:**
-  - Contains all transient, planning, and internal documents for the team and AI.
-  - Examples: feature backlogs, planning guides, research, design decisions, spike results, troubleshooting logs.
-- **Structure:**
-  - Use numbered subfolders to keep notes organized and ordered:
-    - `00_backlog/` — feature/task backlog
-    - `01_planning/` — step-by-step guides, plans, RFCs
-    - `02_design_decisions/` — architecture and decision records
-    - `03_research/` — research, PoCs, references
-  - Name files with date + short slug (e.g., `2025-05-02-git-merge-conflict-guide.md`).
-- **Workflow:**
-  - Use `notes/` for all drafts, scratch work, and in-progress materials.
-  - Move finalized, user-facing docs to `docs/` when ready.
-  - Delete or archive obsolete notes regularly to keep the directory clean.
-- **Formatting:**
-  - Markdown only. Keep files short and focused; split if over 200 lines.
-  - No fake/mocked data for dev/prod—use only for tests.
+## `notes/` — Working Notes (Team/AI-Only)
+- Contains all drafts, planning, research, and internal records.
+- Use for all in-progress work, troubleshooting, and retrospectives.
+- Regularly clean up obsolete notes and move polished docs to `docs/`.
 
-## 3. General Principles
-- Never duplicate docs between `docs/` and `notes/`. Move or archive as needed.
-- Keep all documentation and notes under version control.
-- Always update or remove outdated docs/notes after refactoring or major changes.
-- Use README.md files in both `docs/` and `notes/` to explain structure and conventions.
+## Principles
+- Never duplicate docs between `docs/` and `notes/`.
+- Keep everything under version control.
+- Update or remove outdated docs/notes after major changes.
+- README.md in each directory should explain its structure and conventions.
+
+---
+
+*This file is safe to edit or expand as conventions evolve.*
 
 ---
 

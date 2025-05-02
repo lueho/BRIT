@@ -1,18 +1,18 @@
 # How-Tos
 
-Step-by-step guides for common development and operational tasks in BRIT.
+This guide provides step-by-step instructions for common development and operational tasks in BRIT.
 
 ---
 
 ## Running Tests
-- Run all tests (with persistent DB, no prompts):
+- To run all tests (using a persistent DB and no prompts):
   ```sh
   docker compose exec web python manage.py test --keepdb --noinput > test_output.txt
   ```
 - Review `test_output.txt` for results and troubleshooting.
 
 ## Database Migrations
-- Create new migration:
+- Create new migrations:
   ```sh
   docker compose exec web python manage.py makemigrations
   ```
@@ -23,7 +23,10 @@ Step-by-step guides for common development and operational tasks in BRIT.
 
 ## Troubleshooting
 - Check logs in `/logs/`
-- Use `docker compose logs web` for service output
+- View service output with:
+  ```sh
+  docker compose logs web
+  ```
 
 ---
 

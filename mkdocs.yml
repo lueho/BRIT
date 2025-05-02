@@ -1,17 +1,25 @@
 site_name: BRIT Documentation
 
 nav:
-  - Home: index.md
-  - Architecture:
-      - Overview: architecture.md
-      - Data Flow: architecture/data_flow.md
-      - Models: architecture/models.md
-      - Deployment: architecture/deployment.md
-  - Applications: applications.md
-  - API: api.md
-  - Operations: operations.md
-  - How-Tos: howtos.md
-  - References: references.md
+  - Home: 01_user_guide/README.md
+  - User Guide:
+      - Overview: 01_user_guide/README.md
+      - How-Tos: 01_user_guide/howtos.md
+  - Developer Guide:
+      - Overview: 02_developer_guide/README.md
+      - Guidelines: 02_developer_guide/guidelines.md
+      - Style Guide: 02_developer_guide/style_guide.md
+      - Applications: 02_developer_guide/applications.md
+      - API: 02_developer_guide/api.md
+      - Architecture:
+          - Overview: 02_developer_guide/architecture.md
+          - Data Flow: 02_developer_guide/architecture/data_flow.md
+          - Deployment: 02_developer_guide/architecture/deployment.md
+  - Operations:
+      - Overview: 03_operations/README.md
+      - Operations Guide: 03_operations/operations.md
+  - Design Decisions:
+      - Overview: 04_design_decisions/README.md
 
 theme:
   name: material
