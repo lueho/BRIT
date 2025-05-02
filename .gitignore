@@ -1,4 +1,7 @@
 /logs/
 /db_dump/
 /.idea/
+/.vscode/
 /brit/settings/.env
+.windsurfrules
+.isort.cfg
