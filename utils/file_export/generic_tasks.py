@@ -13,11 +13,7 @@ def export_user_created_object_to_file(self, model_label, file_format, query_par
     qdict = QueryDict('', mutable=True)
     qdict.update(MultiValueDict(query_params))
     base_qs = spec.model.objects.filter(pk__in=allowed_ids)
-    # DEBUG: Log the allowed_ids and resulting queryset PKs
-    logger.info(f"[EXPORT TASK DEBUG] allowed_ids count: {len(allowed_ids)}; allowed_ids: {allowed_ids}")
-    logger.info(f"[EXPORT TASK DEBUG] base_qs count: {base_qs.count()}; base_qs PKs: {list(base_qs.values_list('pk', flat=True))}")
     qs = spec.filterset(qdict, queryset=base_qs).qs
-    logger.info(f"[EXPORT TASK DEBUG] filtered qs count: {qs.count()}; filtered qs PKs: {list(qs.values_list('pk', flat=True))}")
     data = spec.serializer(qs, many=True).data
     renderer = spec.renderers[file_format]
     file_name = f'{spec.model._meta.model_name}_{self.request.id}.{file_format}'

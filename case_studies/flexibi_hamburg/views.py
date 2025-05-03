@@ -8,8 +8,8 @@ from django.views.decorators.clickjacking import xframe_options_exempt
 import case_studies.flexibi_hamburg.tasks
 from maps.models import Catchment, GeoDataset
 from maps.views import GeoDataSetPublishedFilteredMapView
-from utils.file_export.views import FilteredListFileExportView
 from .filters import HamburgRoadsideTreesFilterSet
+from utils.file_export.views import GenericUserCreatedObjectExportView
 
 
 class RoadsideTreesPublishedMapView(GeoDataSetPublishedFilteredMapView):
@@ -29,19 +29,11 @@ class RoadsideTreesPublishedMapIframeView(GeoDataSetPublishedFilteredMapView):
     map_title = 'Roadside Trees'
 
 
-class HamburgRoadsideTreesListFileExportView(FilteredListFileExportView):
-    task_function = case_studies.flexibi_hamburg.tasks.export_hamburg_roadside_trees_to_file
+class HamburgRoadsideTreesListFileExportView(GenericUserCreatedObjectExportView):
+    model_label = 'flexibi_hamburg.HamburgRoadsideTrees'
 
-    def get_allowed_ids(self, request, params):
-        params = params.copy()
-        params.pop('page', None)
-        list_type = params.pop('list_type', ['public'])[0]
-        from .models import HamburgRoadsideTrees
-        if list_type == 'private':
-            base_qs = HamburgRoadsideTrees.objects.filter(owner=request.user)
-        else:
-            base_qs = HamburgRoadsideTrees.objects.filter(publication_status='published')
-        return list(base_qs.values_list('pk', flat=True))
+
+# Removed HamburgRoadsideTreesListFileExportView; use generic export view instead
 
 
 class HamburgRoadsideTreeCatchmentAutocompleteView(autocomplete.Select2QuerySetView):

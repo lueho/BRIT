@@ -11,7 +11,7 @@ from ..views import FilteredListFileExportView
 
 class DummyTask:
     @staticmethod
-    def delay(file_format, filter_params):
+    def delay(file_format, filter_params, allowed_ids=None):
         class DummyTaskResult:
             task_id = "dummy-task-id"
 
@@ -115,8 +115,14 @@ class FilteredListFileExportViewTests(TestCase):
                 'some_filter': ['value'],
                 'owner': [self.user.pk]
             }
-            # Check that the task was called with the expected file format and filter params.
-            mock_delay.assert_called_once_with('csv', expected_filter_params)
+            # Check that the task was called with the expected file format and filter params and allowed_ids (which may be None in dummy test)
+            mock_delay.assert_called_once()
+            called_args, called_kwargs = mock_delay.call_args
+            self.assertEqual(called_args[0], 'csv')
+            self.assertEqual(called_args[1], expected_filter_params)
+            # allowed_ids is optional and may be None in this dummy context
+            self.assertEqual(len(called_args), 3)
+            self.assertTrue(called_args[2] is None or isinstance(called_args[2], list))
             self.assertEqual(response.status_code, 200)
             response_data = json.loads(response.content)
             self.assertIn('task_id', response_data)

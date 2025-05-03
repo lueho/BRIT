@@ -15,24 +15,6 @@ from .renderers import CollectionXLSXRenderer, CollectionCSVRenderer
 from .serializers import CollectionFlatSerializer
 
 
-@app.task(bind=True)
-def export_collections_to_file(self, file_format, query_params, allowed_ids):
-    qdict = QueryDict('', mutable=True)
-    qdict.update(MultiValueDict(query_params))
-    base_qs = Collection.objects.filter(pk__in=allowed_ids)
-    # DEBUG: Print allowed IDs for comparison
-    print("ALLOWED IDS:", allowed_ids)
-    qs = CollectionFilterSet(qdict, base_qs).qs
-    # DEBUG: Print PKs of filtered queryset for comparison
-    print("EXPORT PKS:", list(qs.values_list('pk', flat=True)))
-    data = CollectionFlatSerializer(qs, many=True).data
-    file_name = f'collections_{self.request.id}.{file_format}'
-    if file_format == 'xlsx':
-        return utils.file_export.storages.write_file_for_download(file_name, data, CollectionXLSXRenderer)
-    else:
-        return utils.file_export.storages.write_file_for_download(file_name, data, CollectionCSVRenderer)
-
-
 @app.task(name='check_wasteflyer_url', trail=True)
 def check_wasteflyer_url(pk):
     flyer = WasteFlyer.objects.get(pk=pk)

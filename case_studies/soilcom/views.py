@@ -609,9 +609,6 @@ class CollectionCurrentPrivateListView(PrivateObjectFilterView):
         if self.request.method == 'GET' and not self.request.GET:
             queryset = queryset.currently_valid()
 
-        # DEBUG: Print PKs for comparison with export
-        print("LIST VIEW PKS:", list(queryset.values_list('pk', flat=True)))
-
         return queryset
 
 
@@ -779,7 +776,6 @@ class CollectionAutoCompleteView(Select2QuerySetView):
 
 class CollectionListFileExportView(GenericUserCreatedObjectExportView):
     model_label = 'soilcom.Collection'
-    task_function = case_studies.soilcom.tasks.export_collections_to_file
 
 
 class CollectionAddPropertyValueView(CollectionPropertyValueCreateView):

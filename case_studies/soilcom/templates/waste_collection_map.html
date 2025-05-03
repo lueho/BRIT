@@ -21,7 +21,7 @@
     </a>
     {% if user.is_authenticated %}
         <a class="dropdown-item modal-link"
-           href="{% export_link_modal 'collection-export' %}">
+           href="{% export_link_modal 'collection-export' list_type=list_type %}">
             <i class="fas fa-fw fa-file-export"></i> Export data
         </a>
     {% endif %}

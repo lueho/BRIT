@@ -79,8 +79,19 @@ The export process must always respect the base queryset restrictions of the ori
 - The new export flow for Collection was implemented and tested:
     - Export views now resolve and pass allowed IDs to the Celery export task.
     - The export task restricts the queryset to these IDs before applying filters.
-    - All relevant tests were updated and now pass, confirming correct and secure behavior.
-- Next: Generalize this pattern for all UserCreatedObject-derived models and refactor the export task and view logic to be generic.
+- Legacy export code and old task functions have been removed.
+- Export modal links and all relevant templates now always pass the correct list_type, ensuring private/public context is preserved for exports.
+- All debug logging and print statements have been cleaned up from production code.
+- Codebase and templates have been tidied and are ready for release.
+
+## Next Steps
+- Monitor for any edge cases or new model integrations.
+- Ensure all new UserCreatedObject-derived models follow the same export registration and workflow pattern.
+- Review and update documentation as new requirements arise.
+
+---
+
+**Release ready: All code and templates for the file export workflow are now production-ready.**
 
 ## Updated Implementation Steps
 
@@ -105,12 +116,14 @@ The export process must always respect the base queryset restrictions of the ori
 
 ## Legacy Code to Refactor/Remove After Manual Testing
 
-- Remove obsolete `task_function = ...` lines from export views now using the generic system (e.g., CollectionListFileExportView, HamburgRoadsideTreesListFileExportView).
-- Remove model-specific export Celery tasks (e.g., `export_collections_to_file`, `export_hamburg_roadside_trees_to_file`) once all consumers are migrated.
-- Remove model-specific export view classes that are now replaced by the generic export view.
-- Remove any model-specific test code that only tests old, non-generic export logic.
-- Update or remove documentation and comments referencing the old export flow.
-- Ensure all URLs and client code are updated to use the new generic export endpoints.
+- [x] Remove obsolete `task_function = ...` lines from export views now using the generic system (e.g., CollectionListFileExportView, HamburgRoadsideTreesListFileExportView).
+- [x] Remove model-specific export Celery tasks (e.g., `export_collections_to_file`, `export_hamburg_roadside_trees_to_file`) once all consumers are migrated.
+- [x] Remove model-specific export view classes that are now replaced by the generic export view.
+- [x] Remove any model-specific test code that only tests old, non-generic export logic.
+- [x] Update or remove documentation and comments referencing the old export flow.
+- [x] Ensure all URLs and client code are updated to use the new generic export endpoints.
+
+_Removed export_collections_to_file and all related legacy code/tests on 2025-05-02 after full migration to the generic export workflow._
 
 ## Example for Collections
 - In `CollectionCurrentPublishedListView`, export view passes only published collections.

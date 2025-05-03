@@ -144,9 +144,9 @@ class CollectionFlatSerializerTestCase(TestCase):
     def test_serializer_data_contains_all_fields(self):
         serializer = CollectionFlatSerializer(self.collection_nuts)
         keys = {'catchment', 'nuts_or_lau_id', 'collector', 'collection_system', 'country', 'waste_category',
-                'allowed_materials', 'forbidden_materials', 'fee_system',
-                'frequency', 'population', 'population_density', 'comments', 'sources',
-                'valid_from', 'valid_until', 'created_at', 'lastmodified_at'}
+                'allowed_materials', 'forbidden_materials', 'fee_system', 'frequency', 'connection_type',
+                'population', 'population_density', 'comments', 'sources', 'valid_from', 'valid_until', 'created_at',
+                'lastmodified_at'}
         self.assertSetEqual(keys, set(serializer.data.keys()))
 
     def test_serializer_gets_information_from_foreign_keys_correctly(self):

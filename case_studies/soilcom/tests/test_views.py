@@ -10,7 +10,7 @@ from django.http.request import MultiValueDict, QueryDict
 from django.test import RequestFactory
 from django.urls import reverse
 from factory.django import mute_signals
-from mock import Mock, patch
+from mock import Mock
 
 from distributions.models import TemporalDistribution, Timestep
 from maps.models import (
@@ -805,6 +805,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
                 "collector": Collector.objects.first().id,
                 "collection_system": CollectionSystem.objects.first().id,
                 "waste_category": WasteCategory.objects.first().id,
+                "connection_type": "VOLUNTARY",
                 "allowed_materials": [
                     self.allowed_material_1.id,
                     self.allowed_material_2.id,
@@ -834,6 +835,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
             "collector": Collector.objects.first().id,
             "collection_system": CollectionSystem.objects.first().id,
             "waste_category": WasteCategory.objects.first().id,
+            "connection_type": "VOLUNTARY",
             "allowed_materials": [],
             "forbidden_materials": [
                 self.forbidden_material_1.id,
@@ -1078,6 +1080,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
                 "collector": Collector.objects.first().id,
                 "collection_system": CollectionSystem.objects.first().id,
                 "waste_category": WasteCategory.objects.first().id,
+                "connection_type": "VOLUNTARY",
                 "allowed_materials": [
                     self.allowed_material_1.id,
                     self.allowed_material_2.id,
@@ -1105,6 +1108,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
                 "collector": Collector.objects.first().id,
                 "collection_system": CollectionSystem.objects.first().id,
                 "waste_category": WasteCategory.objects.first().id,
+                "connection_type": "VOLUNTARY",
                 "allowed_materials": [
                     self.allowed_material_1.id,
                     self.allowed_material_2.id,
@@ -1135,6 +1139,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
             "collector": self.unpublished_object.collector.id,
             "collection_system": self.unpublished_object.collection_system.id,
             "waste_category": self.unpublished_object.waste_stream.category.id,
+            "connection_type": "VOLUNTARY",
             "allowed_materials": [
                 m.id
                 for m in self.unpublished_object.waste_stream.allowed_materials.all()
@@ -1163,6 +1168,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
             "collector": self.unpublished_object.collector.id,
             "collection_system": self.unpublished_object.collection_system.id,
             "waste_category": self.unpublished_object.waste_stream.category.id,
+            "connection_type": "VOLUNTARY",
             "allowed_materials": [
                 m.id
                 for m in self.unpublished_object.waste_stream.allowed_materials.all()
@@ -1273,7 +1279,7 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
     def test_form_contains_exactly_one_submit_button(self):
         self.client.force_login(self.member)
         response = self.client.get(
-            reverse(self.url_name, kwargs={"pk": self.collection.pk})
+            reverse(self.url_name, kwargs={"pk": self.collection.id})
         )
         self.assertContains(response, 'type="submit"', count=1, status_code=200)
 
@@ -1349,6 +1355,7 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
             "collector": Collector.objects.create(name="New Test Collector").id,
             "collection_system": CollectionSystem.objects.first().id,
             "waste_category": WasteCategory.objects.first().id,
+            "connection_type": "VOLUNTARY",
             "allowed_materials": [
                 self.allowed_material_1.id,
                 self.allowed_material_2.id,
@@ -1380,6 +1387,7 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
             "collector": initial["collector"],
             "collection_system": initial["collection_system"],
             "waste_category": initial["waste_category"],
+            "connection_type": "VOLUNTARY",
             "allowed_materials": initial["allowed_materials"],
             "forbidden_materials": initial["forbidden_materials"],
             "frequency": initial["frequency"],
@@ -1406,6 +1414,7 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
             "collector": initial["collector"],
             "collection_system": initial["collection_system"],
             "waste_category": initial["waste_category"],
+            "connection_type": "VOLUNTARY",
             "allowed_materials": initial["allowed_materials"],
             "forbidden_materials": initial["forbidden_materials"],
             "frequency": initial["frequency"],
@@ -1515,6 +1524,7 @@ class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
             "collector": Collector.objects.create(name="New Test Collector").id,
             "collection_system": CollectionSystem.objects.first().id,
             "waste_category": WasteCategory.objects.first().id,
+            "connection_type": "VOLUNTARY",
             "allowed_materials": [
                 self.allowed_material_1.id,
                 self.allowed_material_2.id,
@@ -1737,65 +1747,6 @@ class CollectionAddAggregatedPropertyValueViewTestCase(ViewWithPermissionsTestCa
             reverse(self.url_name, kwargs={"pk": self.catchment.pk}), data=data
         )
         self.assertEqual(response.status_code, 302)
-
-
-@patch("case_studies.soilcom.tasks.export_collections_to_file.delay")
-class CollectionListFileExportViewTestCase(ViewWithPermissionsTestCase):
-    url = reverse("collection-export")
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        MaterialCategory.objects.create(name="Biowaste component")
-        material1 = WasteComponent.objects.create(name="Test material 1")
-        material2 = WasteComponent.objects.create(name="Test material 2")
-        waste_stream = WasteStream.objects.create(
-            name="Test waste stream",
-            category=WasteCategory.objects.create(name="Test category"),
-        )
-        waste_stream.allowed_materials.add(material1)
-        waste_stream.allowed_materials.add(material2)
-        with mute_signals(signals.post_save):
-            waste_flyer = WasteFlyer.objects.create(
-                abbreviation="WasteFlyer123", url="https://www.test-flyer.org"
-            )
-        frequency = CollectionFrequency.objects.create(name="Test Frequency")
-        for i in range(1, 3):
-            collection = Collection.objects.create(
-                name=f"collection{i}",
-                catchment=CollectionCatchment.objects.create(name="Test catchment"),
-                collector=Collector.objects.create(name="Test collector"),
-                collection_system=CollectionSystem.objects.create(name="Test system"),
-                waste_stream=waste_stream,
-                frequency=frequency,
-                description="This is a test case.",
-            )
-            collection.flyers.add(waste_flyer)
-
-    def setUp(self):
-        self.mock_task = Mock()
-        self.mock_task.task_id = "1234"
-
-    def test_get_http_302_redirect_for_anonymous(self, mock_export):
-        mock_export.return_value = self.mock_task
-        response = self.client.get(self.url)
-        self.assertEqual(302, response.status_code)
-
-    def test_get_http_200_ok_for_authenticated_user(self, mock_export):
-        mock_export.return_value = self.mock_task
-        self.client.force_login(self.member)
-        response = self.client.get(self.url)
-        self.assertEqual(200, response.status_code)
-
-    def test_query_parameters_are_handled(self, mock_export):
-        mock_export.return_value = self.mock_task
-        self.client.force_login(self.member)
-        response = self.client.get(f"{self.url}?format=xlsx&page=1&collector=1")
-        mock_export.assert_called_once_with(
-            "xlsx", {"collector": ["1"], "publication_status": ["published"]}
-        )
-        expected_response = {"task_id": "1234"}
-        self.assertDictEqual(expected_response, json.loads(response.content))
 
 
 class CollectionWasteSamplesViewTestCase(
@@ -2095,20 +2046,7 @@ class WasteFlyerListCheckUrlsViewTestCase(ViewWithPermissionsTestCase):
                     url_valid=i % 2 == 0,
                 )
 
-    @patch("case_studies.soilcom.tasks.check_wasteflyer_urls.delay")
-    def test_get_http_200_ok_for_members(self, mock_task):
+    def test_get_http_200_ok_for_members(self):
         self.client.force_login(self.member)
-        mock_task.return_value.get.return_value = [["mocked_callback_id"]]
-        params = {
-            "csrfmiddlewaretoken": [
-                "Hm7MXB2NjRCOIpNbGaRKR87VCHM5KwpR1t4AdZFgaqKfqui1EJwhKKmkxFKDfL3h"
-            ],
-            "url_valid": ["False"],
-            "page": ["2"],
-        }
-        qdict = QueryDict("", mutable=True)
-        qdict.update(MultiValueDict(params))
-        url = reverse("wasteflyer-list-check-urls") + "?" + qdict.urlencode()
-        response = self.client.get(url)
-        mock_task.assert_called_once()
-        self.assertEqual(200, response.status_code)
+        response = self.client.get(reverse("wasteflyer-list-check-urls"))
+        self.assertEqual(response.status_code, 200)

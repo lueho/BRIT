@@ -30,7 +30,6 @@ class FilteredListFileExportView(LoginRequiredMixin, View):
         Returns:
             Dictionary of processed filter parameters
         """
-        # Remove pagination parameters
         params.pop('page', None)
         list_type = params.pop('list_type', ['public'])[0]
 
@@ -44,7 +43,6 @@ class FilteredListFileExportView(LoginRequiredMixin, View):
         """
         Determine the allowed IDs for export based on the view's restriction (published, owned, etc).
         """
-        # Remove pagination and list_type for base queryset
         params = params.copy()
         params.pop('page', None)
         list_type = params.pop('list_type', ['public'])[0]
@@ -72,8 +70,8 @@ class FilteredListFileExportView(LoginRequiredMixin, View):
         params = dict(request.GET)
         file_format = params.pop('format', ['csv'])[0]
 
-        filter_params = self.get_filter_params(request, params)
-        allowed_ids = self.get_allowed_ids(request, params)
+        filter_params = self.get_filter_params(request, params.copy())
+        allowed_ids = self.get_allowed_ids(request, params.copy())
 
         task = self.task_function.delay(file_format, filter_params, allowed_ids)
 
@@ -110,8 +108,8 @@ class GenericUserCreatedObjectExportView(FilteredListFileExportView):
             raise NotImplementedError('Subclasses must set model_label')
         params = dict(request.GET)
         file_format = params.pop(self.file_format_param, ['csv'])[0]
-        filter_params = self.get_filter_params(request, params)
-        allowed_ids = self.get_allowed_ids(request, params)
+        filter_params = self.get_filter_params(request, params.copy())
+        allowed_ids = self.get_allowed_ids(request, params.copy())
         task = export_user_created_object_to_file.delay(self.model_label, file_format, filter_params, allowed_ids)
         response_data = {'task_id': task.task_id}
         return HttpResponse(json.dumps(response_data), content_type='application/json')
@@ -125,9 +123,7 @@ class ExportModalView(LoginRequiredMixin, TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # Always set export_url
         context['export_url'] = self.request.GET.get('export_url', '')
-        # Add all other GET params except 'export_url'
         for k, v in self.request.GET.items():
             if k != 'export_url':
                 context[k] = v

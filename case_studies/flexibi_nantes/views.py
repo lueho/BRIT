@@ -14,7 +14,7 @@ import case_studies.flexibi_nantes.tasks
 from maps.models import Catchment, GeoDataset
 from maps.views import GeoDataSetPublishedFilteredMapView
 from materials.models import MaterialComponentGroup
-from utils.file_export.views import FilteredListFileExportView
+from utils.file_export.views import GenericUserCreatedObjectExportView
 from utils.views import (NextOrSuccessUrlMixin, PrivateObjectFilterView, PrivateObjectListView,
                          PublishedObjectFilterView, PublishedObjectListView, UserCreatedObjectCreateView,
                          UserCreatedObjectDetailView, UserCreatedObjectModalCreateView,
@@ -245,5 +245,5 @@ class GreenhousesPublishedMapView(GeoDataSetPublishedFilteredMapView):
     map_title = 'Nantes Greenhouses'
 
 
-class NantesGreenhousesListFileExportView(FilteredListFileExportView):
-    task_function = case_studies.flexibi_nantes.tasks.export_nantes_greenhouses_to_file
+class NantesGreenhousesListFileExportView(GenericUserCreatedObjectExportView):
+    model_label = 'flexibi_nantes.NantesGreenhouses'
