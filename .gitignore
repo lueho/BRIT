@@ -15,4 +15,5 @@ settings.json
 
 /test-results/
 /.venv/
+/.devcontainer/
 /site/
