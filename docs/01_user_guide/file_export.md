@@ -9,12 +9,12 @@ This guide describes how to use, extend, and test the generic export workflow fo
 - **Export Views:**
   - Each exportable model has a dedicated export view, subclassing `GenericUserCreatedObjectExportView`.
   - The view sets `model_label` (e.g., `'soilcom.Collection'`).
-  - The view automatically determines which objects the user can export (published or owned) and passes only those IDs to the export task.
+  - The view automatically determines which objects the user can export (published or owned) and passes filter parameters and context (such as `user_id` and `list_type`) to the export task. No long lists of IDs are passed.
 
 - **Export Task:**
-  - The generic Celery task receives the model label, filter parameters, and allowed IDs.
+  - The generic Celery task receives the model label, filter parameters, and context (e.g., user ID, list type).
   - It loads the correct model, filterset, serializer, and renderer from the export registry.
-  - It restricts the queryset to the allowed IDs, applies filters, serializes, and renders the export file.
+  - It reconstructs the queryset using the context (e.g., published/owned restriction), applies filters, serializes, and renders the export file.
 
 - **Registry:**
   - All exportable models must be registered in `utils/file_export/registry_init.py`.
@@ -70,33 +70,32 @@ The export functionality supports passing any filter or context parameter from y
 
 This approach is fully general and supports any number of extra parameters or filters.
 
-## Removing Debugging Logs
+---
 
-All debugging logs related to export filtering have been removed from the codebase for production readiness.
+## Security and Consistency
+
+- The export task always reconstructs the queryset using the passed context (e.g., user ID, list type) and applies all filters, ensuring exports match what the user is allowed to see.
+- No sensitive or unnecessary data is passed to Celery.
+- If objects are deleted between export start and finish, they will simply be missing from the export (consistent with filtered list views).
 
 ---
 
-## Manual Testing Checklist
+## Migrating Legacy Exports
 
-- [ ] Export from a published list view (should only include published objects)
-- [ ] Export from a private list view (should only include user-owned objects)
-- [ ] Export with filter parameters (ensure filters are respected)
-- [ ] Try exporting as different users (verify security)
-- [ ] Try exporting with no matching objects (should return empty file)
-- [ ] Check file formats (CSV, XLSX)
-- [ ] Try exporting a newly registered model
+- If you are migrating an old export, remove any code that passes or expects lists of IDs.
+- Update your export views and tasks to use filter parameters and context instead.
+- See `notes/planning/file_export_object_workflow_plan.md` for the full rationale and migration checklist.
 
 ---
 
 ## Troubleshooting
 - If you get an error about missing registry entry, make sure your model is registered in `registry_init.py`.
-- If the export file is empty, check your allowed IDs logic and filters.
+- If the export file is empty, check your filter logic and filters.
 - For permission issues, ensure the view is subclassing `GenericUserCreatedObjectExportView` and your model has `owner` and `publication_status` fields.
 
 ---
 
 ## Advanced
-- You can customize allowed ID logic by overriding `get_allowed_ids()` in your export view.
 - For very large exports, consider batching or streaming if needed (not yet implemented).
 
 ---
@@ -104,3 +103,7 @@ All debugging logs related to export filtering have been removed from the codeba
 ## Questions?
 - See `notes/planning/file_export_object_workflow_plan.md` for design decisions and technical details.
 - Contact the engineering team for further help.
+
+---
+
+*Last updated: 2025-05-05. This documentation reflects the current, production-ready export workflow.*

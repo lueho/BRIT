@@ -1,5 +1,27 @@
 # Plan: Generalized Export Flow for UserCreatedObject Models
 
+---
+
+# Status: COMPLETE (2025-05-05)
+
+All code, tests, and documentation for the generic file export flow are now production-ready. Legacy code has been removed, and all usages are migrated. The new pattern is in place for all UserCreatedObject-derived models. No further action is required unless new models or requirements arise.
+
+## Checklist
+- [x] Plan and rationale documented here
+- [x] View and Celery task refactored to use filter parameters and context
+- [x] All usages migrated to new pattern
+- [x] Legacy code and tests removed
+- [x] Documentation updated
+- [x] Tests updated and passing
+
+## If new models are added
+- Register them in the export registry
+- Ensure their views and filtersets follow this pattern
+
+---
+
+*This plan is now archived. No further work is needed unless new requirements emerge.*
+
 ## Context
 - There are now two types of filter views for collections:
   - `CollectionCurrentPublishedListView`: should only export published collections.
