@@ -12,6 +12,7 @@ from django.urls import reverse
 from factory.django import mute_signals
 from mock import Mock
 
+from case_studies.soilcom.models import WasteFlyer, check_url_valid
 from distributions.models import TemporalDistribution, Timestep
 from maps.models import (
     GeoDataset,
@@ -23,6 +24,7 @@ from maps.models import (
 from materials.models import Material, MaterialCategory, Sample, SampleSeries
 from utils.properties.models import Property, Unit
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
+
 from .. import views
 from ..forms import BaseWasteFlyerUrlFormSet, CollectionModelForm
 from ..models import (
@@ -41,6 +43,14 @@ from ..models import (
     WasteFlyer,
     WasteStream,
 )
+
+
+def setUpModule():
+    post_save.disconnect(check_url_valid, sender=WasteFlyer)
+
+
+def tearDownModule():
+    post_save.connect(check_url_valid, sender=WasteFlyer)
 
 
 # ----------- Collector CRUD -------------------------------------------------------------------------------------------
@@ -204,7 +214,17 @@ class WasteFlyerCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
     view_detail_name = "wasteflyer-detail"
     view_modal_detail_name = "wasteflyer-detail-modal"
 
-    create_object_data = {"url": "https://www.test-flyer.org"}
+    create_object_data = {"url": "https://www.crud-test-flyer.org"}
+
+    # @classmethod
+    # def setUpClass(cls):
+    #     super().setUpClass()
+    #     post_save.disconnect(check_url_valid, sender=WasteFlyer)
+
+    # @classmethod
+    # def tearDownClass(cls):
+    #     post_save.connect(check_url_valid, sender=WasteFlyer)
+    #     super().tearDownClass()
 
     def test_list_unpublished_contains_check_urls_button_for_authenticated_owner(self):
         self.client.force_login(self.owner_user)
@@ -2032,6 +2052,9 @@ class WasteCollectionMapViewTestCase(ViewWithPermissionsTestCase):
         self.assertContains(response, "range_slider.min.css")
 
 
+from unittest.mock import patch
+
+
 class WasteFlyerListCheckUrlsViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = "change_wasteflyer"
 
@@ -2046,7 +2069,11 @@ class WasteFlyerListCheckUrlsViewTestCase(ViewWithPermissionsTestCase):
                     url_valid=i % 2 == 0,
                 )
 
-    def test_get_http_200_ok_for_members(self):
+    @patch("case_studies.soilcom.views.check_wasteflyer_urls.delay")
+    def test_get_http_200_ok_for_members(self, mock_delay):
+        mock_task = mock_delay.return_value
+        mock_task.get.return_value = [[123]]  # Simulate callback_id as in view
         self.client.force_login(self.member)
         response = self.client.get(reverse("wasteflyer-list-check-urls"))
         self.assertEqual(response.status_code, 200)
+        mock_delay.assert_called_once()
