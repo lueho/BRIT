@@ -3,9 +3,6 @@ from django.apps import apps
 from celery import shared_task
 import utils.file_export.storages
 from .export_registry import get_export_spec
-import logging
-
-logger = logging.getLogger(__name__)
 
 
 @shared_task(bind=True)
@@ -21,7 +18,11 @@ def export_user_created_object_to_file(
     if list_type == "private":
         base_qs = spec.model.objects.filter(owner_id=user_id)
     else:
-        base_qs = spec.model.objects.filter(publication_status="published")
+        # Only filter by publication_status if the field exists
+        if "publication_status" in [f.name for f in spec.model._meta.get_fields()]:
+            base_qs = spec.model.objects.filter(publication_status="published")
+        else:
+            base_qs = spec.model.objects.all()
     qs = spec.filterset(qdict, queryset=base_qs).qs
     data = spec.serializer(qs, many=True).data
     renderer = spec.renderers[file_format]
