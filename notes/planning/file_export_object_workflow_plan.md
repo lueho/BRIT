@@ -23,62 +23,63 @@ The export process must always respect the base queryset restrictions of the ori
 - **Problem**: The task uses `Collection.objects.all()`, so it ignores any base queryset restrictions (published/owned/etc) from the originating view.
 
 ## Proposed Solution
-### 1. Pass the Base Queryset Restriction
-- When triggering an export, the backend view should pass the same base queryset restriction (published/owned/other) to the export task.
-- The export task should apply the filterset to the **restricted** queryset, not to all objects.
+### 1. Pass Filter Parameters and Context, Not IDs
+- When triggering an export, the backend view should pass the same base queryset restriction (e.g., published/owned/other) as filter parameters and context (such as user ID and list type) to the export task.
+- The export task should reconstruct the queryset using these parameters, ensuring the queryset matches the originating list view's restrictions and any UI filters.
 
 ### 2. Implementation Steps
 #### a. Refactor Export Task Signature
-- Change the export task to accept a base queryset restriction (e.g., a filter dict, or a resolved list of IDs).
+- Change the export task to accept filter parameters (dict) and context (dict) instead of a list of IDs.
 - Example:
   ```python
-  export_collections_to_file.apply_async(args=[file_format, query_params, allowed_ids])
+  export_collections_to_file.apply_async(args=[file_format, filter_params, {'user_id': request.user.pk, 'list_type': params.get('list_type', ['public'])[0]}])
   ```
 - In the task:
   ```python
-  base_qs = Collection.objects.filter(pk__in=allowed_ids)
-  qs = CollectionFilterSet(qdict, base_qs).qs
+  def export_task(file_format, filter_params, context):
+      from case_studies.soilcom.models import Collection
+      user_id = context['user_id']
+      list_type = context['list_type']
+      if list_type == 'private':
+          base_qs = Collection.objects.filter(owner_id=user_id)
+      else:
+          base_qs = Collection.objects.filter(publication_status='published')
+      # Apply filter_params as needed...
   ```
-- For more complex restrictions (e.g., ownership), consider passing a list of allowed IDs.
 
-#### b. Update Export Views
-- In each export view, determine the base queryset restriction:
-  - For published: `{"published": True}` or use `.currently_valid()`
-  - For private: `{"owner": request.user}`
-- Pass these restrictions to the export task as `allowed_ids = list(base_qs.values_list('pk', flat=True))`.
+#### b. Extract Queryset Logic
+- Move queryset-building logic to a shared function to avoid duplication and ensure maintainability.
 
-#### c. Generalize for All UserCreatedObject Models
-- Make the export task generic (accept model, filterset, base restriction).
-- Use a registry or factory pattern to resolve the correct model/filterset for each export.
+#### c. Update All Usages
+- Update views, tasks, and tests to use the new pattern.
 
-#### d. Security
-- Double-check in the export task that the restriction is enforced, to prevent privilege escalation.
+#### d. Clean Up
+- Remove any code that builds or passes allowed IDs for this purpose.
 
 ## Open Questions (Resolved)
 
 ### 1. What is the best way to serialize complex queryset restrictions for Celery (IDs, filter dicts, etc)?
 - **Resolution:**
-  - For most cases, pass a list of allowed primary keys (IDs) to the export task. This is robust, simple to serialize, and avoids leaking filter logic to the task layer.
-  - The view should resolve the base queryset (e.g., published, owned) and pass `list(qs.values_list('pk', flat=True))` as `allowed_ids` to the task.
-  - The export task then uses `Model.objects.filter(pk__in=allowed_ids)` as the base queryset before applying any filterset logic.
-  - For very large exports, consider passing a filter dict, but default to IDs for clarity and security.
+  - For most cases, pass filter parameters and context (e.g., user ID, list type) to the export task. This is robust, simple to serialize, and avoids leaking filter logic to the task layer.
+  - The view should resolve the base queryset (e.g., published, owned) and pass the necessary parameters to the task.
+  - The export task then uses these parameters to reconstruct the queryset before applying any filterset logic.
 
 ### 2. Should we pass user ID to the task for ownership checks, or resolve IDs in the view?
 - **Resolution:**
-  - Always resolve ownership (or other base restrictions) in the view and pass the list of allowed IDs to the task.
+  - Always pass user ID and other context to the task, and let it reconstruct the queryset.
   - This avoids any ambiguity about user context in the async task, and ensures the task cannot escalate privileges or see more than intended.
 
 ### 3. How to handle edge cases (e.g., objects deleted between export start and finish)?
 - **Resolution:**
-  - If objects are deleted between export start and finish, they will simply be missing from the export (since the task uses a static list of IDs).
+  - If objects are deleted between export start and finish, they will simply be missing from the export (since the task uses a dynamic queryset).
   - This is acceptable for most business cases and is consistent with how filtered list views behave.
   - If strict consistency is needed, snapshotting or versioning would be required, but is out of scope for most exports.
 
 ## Progress Update (2025-05-02)
 
 - The new export flow for Collection was implemented and tested:
-    - Export views now resolve and pass allowed IDs to the Celery export task.
-    - The export task restricts the queryset to these IDs before applying filters.
+    - Export views now resolve and pass filter parameters and context to the Celery export task.
+    - The export task reconstructs the queryset using these parameters.
 - Legacy export code and old task functions have been removed.
 - Export modal links and all relevant templates now always pass the correct list_type, ensuring private/public context is preserved for exports.
 - All debug logging and print statements have been cleaned up from production code.
@@ -97,16 +98,16 @@ The export process must always respect the base queryset restrictions of the ori
 
 1. **In the export view:**
     - Compute the base queryset restriction (e.g., published, owned by user).
-    - Pass `allowed_ids = list(base_qs.values_list('pk', flat=True))` to the export task.
+    - Pass filter parameters and context (e.g., user ID, list type) to the export task.
 2. **In the export task:**
-    - Use `Model.objects.filter(pk__in=allowed_ids)` as the base queryset.
+    - Use the passed parameters to reconstruct the queryset.
     - Apply the filterset to this queryset with the user-supplied filter params.
 3. **Generalization:**
     - The same pattern applies for any UserCreatedObject-derived model.
     - The export task can be made generic by accepting the model and filterset class as arguments (or via a registry).
 4. **Security:**
-    - The task must never expand the queryset beyond the given IDs.
-    - All privilege checks are enforced in the view before passing IDs to the task.
+    - The task must never expand the queryset beyond the given parameters.
+    - All privilege checks are enforced in the view before passing parameters to the task.
 
 **This approach is robust, secure, and easy to maintain.**
 
