@@ -25,6 +25,24 @@
         <strong>Year:</strong><br>
         {{ object.valid_from|date:"Y" }}
     </p>
+    {% if object.min_ton_size is not None or object.min_ton_volume_per_inhabitant is not None %}
+        <p class="card-text">
+            <strong>Minimum container size (L):</strong><br>
+            {% if object.min_ton_size is not None %}
+                {{ object.min_ton_size }} L
+            {% else %}
+                <span class="text-muted">—</span>
+            {% endif %}
+        </p>
+        <p class="card-text">
+            <strong>Minimum container volume per inhabitant (L/person):</strong><br>
+            {% if object.min_ton_volume_per_inhabitant is not None %}
+                {{ object.min_ton_volume_per_inhabitant }} L/person
+            {% else %}
+                <span class="text-muted">—</span>
+            {% endif %}
+        </p>
+    {% endif %}
     {% if object.waste_stream.allowed_materials.exists %}
         <p class="card-text"><strong>Allowed Materials:</strong></p>
         <ul>

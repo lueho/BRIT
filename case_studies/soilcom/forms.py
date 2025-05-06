@@ -146,9 +146,7 @@ class CollectionSeasonFormHelper(FormHelper):
 
 class CollectionSeasonForm(SimpleForm):
     distribution = ModelChoiceField(
-        # queryset=TemporalDistribution.objects.filter(name='Months of the year'),
         queryset=TemporalDistribution.objects.none(),
-        # initial=TemporalDistribution.objects.get(name='Months of the year'),
         initial=None,
         empty_label=None,
         widget=HiddenInput(),
@@ -173,7 +171,6 @@ class CollectionSeasonForm(SimpleForm):
 
     def __init__(self, *args, **kwargs):
         super(CollectionSeasonForm, self).__init__(*args, **kwargs)
-        # Now, set the queryset and initial value when the form instance is created
         self.fields["distribution"].queryset = TemporalDistribution.objects.filter(
             name="Months of the year"
         )
@@ -182,7 +179,6 @@ class CollectionSeasonForm(SimpleForm):
                 name="Months of the year"
             )
         except TemporalDistribution.DoesNotExist:
-            # Handle the case where the 'Months of the year' distribution does not exist
             pass
         distribution_qs = TemporalDistribution.objects.filter(name="Months of the year")
         if distribution_qs.exists():
@@ -325,10 +321,15 @@ class CollectionModelFormHelper(FormHelper):
         Field("valid_from"),
         Field("valid_until"),
         Field("description"),
+        Field("min_ton_size"),
+        Field("min_ton_volume_per_inhabitant"),
     )
 
 
 class CollectionModelForm(CreateInlineMixin, AutoCompleteModelForm):
+    """
+    Model form for Collection, including all collection parameters and waste stream fields.
+    """
     catchment = ModelChoiceField(
         queryset=CollectionCatchment.objects.all(),
         widget=BSModelSelect2(url="catchment-autocomplete"),
@@ -366,6 +367,7 @@ class CollectionModelForm(CreateInlineMixin, AutoCompleteModelForm):
         help_text="Indicates whether connection to the collection system is compulsory or voluntary.",
         widget=RadioSelect,
     )
+    min_ton_volume_per_inhabitant = IntegerField(required=False, min_value=0)
 
     class Meta:
         model = Collection
@@ -382,6 +384,8 @@ class CollectionModelForm(CreateInlineMixin, AutoCompleteModelForm):
             "valid_from",
             "valid_until",
             "description",
+            "min_ton_size",
+            "min_ton_volume_per_inhabitant",
         )
         labels = {
             "description": "Comments",
@@ -395,16 +399,14 @@ class CollectionModelForm(CreateInlineMixin, AutoCompleteModelForm):
         form_helper_class = CollectionModelFormHelper
 
     def save(self, commit=True):
+        """
+        Save the collection, ensuring waste stream and predecessor handling.
+        """
         instance = super().save(commit=False)
-
         data = self.cleaned_data
-
-        # Create a name
         instance.name = (
             f'{data["catchment"]} {data["waste_category"]} {data["collection_system"]}'
         )
-
-        # Associate with a new or existing waste stream
         allowed_materials = Material.objects.filter(id__in=data["allowed_materials"])
         if not allowed_materials.exists():
             allowed_materials = Material.objects.none()
@@ -424,7 +426,6 @@ class CollectionModelForm(CreateInlineMixin, AutoCompleteModelForm):
             waste_stream.forbidden_materials.add(*data["forbidden_materials"])
         waste_stream.save()
         instance.waste_stream = waste_stream
-
         if commit:
             instance.save()
             for predecessor in instance.predecessors.all():

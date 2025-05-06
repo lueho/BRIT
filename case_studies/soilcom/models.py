@@ -414,6 +414,9 @@ CONNECTION_TYPE_CHOICES = [
 
 
 class Collection(NamedUserCreatedObject):
+    """
+    Represents a waste collection system, including collection parameters, waste stream, and container requirements.
+    """
     collector = models.ForeignKey(
         Collector, on_delete=models.CASCADE, blank=True, null=True
     )
@@ -465,11 +468,39 @@ class Collection(NamedUserCreatedObject):
         help_text="Indicates whether connection to the collection system is compulsory or voluntary.",
     )
 
+    min_ton_size = models.PositiveIntegerField(
+        verbose_name="Minimum container size (L)",
+        help_text="Smallest available container size for this collection (in liters)",
+        blank=True,
+        null=True,
+    )
+    min_ton_volume_per_inhabitant = models.PositiveIntegerField(
+        blank=True,
+        null=True,
+        help_text="Minimum available container volume per inhabitant (in liters per person)",
+        verbose_name="Minimum container volume per inhabitant (L/person)",
+    )
+
     objects = CollectionQuerySet.as_manager()
 
     @property
     def geom(self):
         return self.catchment.geom
+
+    def construct_name(self):
+        """
+        Construct a descriptive name for the collection using catchment, waste category, system, and year.
+        """
+        catchment = self.catchment.name if self.catchment else "Unknown catchment"
+        system = (
+            self.collection_system.name
+            if self.collection_system
+            else "Unknown collection system"
+        )
+        category = "Unknown waste category"
+        if self.waste_stream and self.waste_stream.category:
+            category = self.waste_stream.category.name
+        return f"{catchment} {category} {system} {self.valid_from.year}"
 
     def clean(self):
         if self.valid_from and self.valid_until:
@@ -487,19 +518,6 @@ class Collection(NamedUserCreatedObject):
             self.predecessors.add(predecessor)
             predecessor.valid_until = self.valid_from - timedelta(days=1)
             predecessor.save()
-
-    def construct_name(self):
-        catchment = self.catchment.name if self.catchment else "Unknown catchment"
-        system = (
-            self.collection_system.name
-            if self.collection_system
-            else "Unknown collection system"
-        )
-        category = "Unknown waste category"
-        if self.waste_stream:
-            if self.waste_stream.category:
-                category = self.waste_stream.category.name
-        return f"{catchment} {category} {system} {self.valid_from.year}"
 
     def __str__(self):
         return self.name
