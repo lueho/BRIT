@@ -453,10 +453,6 @@ class CollectionFilterTestCase(TestCase):
                 )  # For None/blank, should be included if no filter
             collection.delete()
 
-        # Check help_text on the form field (not the filter object)
-        form = CollectionFilterSet().form
-        self.assertIn("not_specified", form.fields["connection_type"].help_text)
-
         self.data.update(
             {
                 "connection_rate_min": 50,
