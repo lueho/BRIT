@@ -441,6 +441,72 @@ class CollectionModelFormTestCase(TestCase):
                 self.forbidden_material_1.id,
                 self.forbidden_material_2.id,
             ],
+            "frequency": self.frequency.id,
+            "min_bin_size": 120,
+            "required_bin_capacity": 5,
+            "required_bin_capacity_reference": "person",
+            "valid_from": date(2023, 1, 1),
+        }
+        form = CollectionModelForm(data=data)
+        self.assertTrue(form.is_valid(), form.errors)
+        instance = form.save(commit=False)
+        self.assertEqual(instance.required_bin_capacity_reference, "person")
+        # Null/blank value
+        data["required_bin_capacity_reference"] = ""
+        form = CollectionModelForm(data=data)
+        self.assertTrue(form.is_valid(), form.errors)
+        instance = form.save(commit=False)
+        self.assertIsNone(instance.required_bin_capacity_reference)
+
+    def test_connection_type_field_accepts_all_choices(self):
+        from case_studies.soilcom.forms import CONNECTION_TYPE_CHOICES
+        from case_studies.soilcom.models import Collection
+
+        valid_choices = [c[0] for c in CONNECTION_TYPE_CHOICES] + [None, ""]
+        for value in valid_choices:
+            data = {
+                "catchment": self.catchment.id,
+                "collector": self.collector.id,
+                "collection_system": self.collection_system.id,
+                "waste_category": self.waste_category.id,
+                "allowed_materials": [],
+                "forbidden_materials": [],
+                "min_bin_size": 120,
+                "required_bin_capacity": 5,
+                "required_bin_capacity_reference": "person",
+                "frequency": self.frequency.id,
+                "valid_from": date(2023, 1, 1),
+                "connection_type": value if value is not None else "",
+            }
+            form = CollectionModelForm(data=data)
+            self.assertTrue(
+                form.is_valid(),
+                f"Form should be valid for connection_type={value}: {form.errors}",
+            )
+            instance = form.save(commit=False)
+            # Blank/None from form should be saved as None
+            expected = value if value not in (None, "") else None
+            self.assertEqual(instance.connection_type, expected)
+        # Check help_text
+        form = CollectionModelForm()
+        self.assertIn("not specified", form.fields["connection_type"].help_text)
+
+        form = CollectionModelForm()
+        self.assertIn("required_bin_capacity_reference", form.fields)
+        # Valid value
+        data = {
+            "catchment": self.catchment.id,
+            "collector": self.collector.id,
+            "collection_system": self.collection_system.id,
+            "waste_category": self.waste_category.id,
+            "allowed_materials": [
+                self.allowed_material_1.id,
+                self.allowed_material_2.id,
+            ],
+            "forbidden_materials": [
+                self.forbidden_material_1.id,
+                self.forbidden_material_2.id,
+            ],
             "connection_type": "VOLUNTARY",
             "min_bin_size": 120,
             "required_bin_capacity": 5,

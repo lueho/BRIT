@@ -347,6 +347,7 @@ class CollectionFilterSet(CrispyAutocompleteFilterSet):
         label="Connection type",
         widget=RadioSelect,
         empty_label="All",
+        help_text="Filter by connection type. 'not_specified' means explicitly chosen; blank/None means never set."
     )
     min_bin_size = MinBinSizeRangeFilter(
         label="Smallest available bin size (L)",
@@ -371,6 +372,7 @@ class CollectionFilterSet(CrispyAutocompleteFilterSet):
             "collector",
             "collection_system",
             "waste_category",
+            "connection_type",
             "allowed_materials",
             "forbidden_materials",
             "connection_rate",
@@ -385,7 +387,6 @@ class CollectionFilterSet(CrispyAutocompleteFilterSet):
             "valid_on",
             "publication_status",
             "owner",
-            "connection_type",
         )
         # catchment_filter must always be applied first, because it grabs the initial queryset and does not filter any
         # existing queryset.

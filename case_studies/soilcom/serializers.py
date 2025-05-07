@@ -7,6 +7,7 @@ from maps.models import GeoPolygon
 from materials.models import Material
 from utils.properties.models import Property
 from utils.serializers import FieldLabelModelSerializer
+
 from . import models
 
 
@@ -79,6 +80,7 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
     collector = serializers.StringRelatedField()
     collection_system = serializers.StringRelatedField()
     waste_category = serializers.CharField(source="waste_stream.category")
+    connection_type = serializers.CharField(required=False, allow_null=True)
     allowed_materials = serializers.StringRelatedField(
         many=True, source="waste_stream.allowed_materials"
     )
@@ -105,6 +107,7 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
             "collector",
             "collection_system",
             "waste_category",
+            "connection_type",
             "allowed_materials",
             "forbidden_materials",
             "frequency",
@@ -156,7 +159,7 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
     required_bin_capacity_reference = serializers.CharField(
         required=False, allow_null=True
     )
-    connection_type = serializers.SerializerMethodField(label="Connection type")
+    connection_type = serializers.CharField(required=False, allow_null=True)
     population = serializers.SerializerMethodField()
     population_density = serializers.SerializerMethodField()
     comments = serializers.SerializerMethodField(source="description", label="Comments")
@@ -240,14 +243,6 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
             return comments
         else:
             return ""
-
-    @staticmethod
-    def get_connection_type(obj):
-        return (
-            obj.get_connection_type_display()
-            if hasattr(obj, "get_connection_type_display")
-            else obj.connection_type
-        )
 
     def to_representation(self, instance):
         # Call the superclass's to_representation method to get the default ordering

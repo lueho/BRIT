@@ -328,6 +328,7 @@ class CollectionModelForm(CreateInlineMixin, AutoCompleteModelForm):
     """
     Model form for Collection, including all collection parameters and waste stream fields.
     """
+
     catchment = ModelChoiceField(
         queryset=CollectionCatchment.objects.all(),
         widget=BSModelSelect2(url="catchment-autocomplete"),
@@ -359,16 +360,15 @@ class CollectionModelForm(CreateInlineMixin, AutoCompleteModelForm):
     )
     fee_system = ModelChoiceField(queryset=FeeSystem.objects.all(), required=False)
     connection_type = ChoiceField(
-        choices=CONNECTION_TYPE_CHOICES,
-        required=True,
+        choices=[("", "---------")] + list(CONNECTION_TYPE_CHOICES),
+        required=False,
         label="Connection type",
-        help_text="Indicates whether connection to the collection system is compulsory or voluntary.",
-        widget=RadioSelect,
+        help_text="Indicates whether connection to the collection system is mandatory, voluntary, or not specified. Leave blank for never set; select 'not specified' for explicit user choice.",
     )
     min_bin_size = IntegerField(required=False, min_value=0)
     required_bin_capacity = IntegerField(required=False, min_value=0)
     required_bin_capacity_reference = ChoiceField(
-        choices=REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES,
+        choices=[("", "---------")] + REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES,
         required=False,
         label="Reference unit for required bin capacity",
         help_text="Defines the unit (person, household, property) for which the required bin capacity applies. Leave blank if not specified.",
@@ -403,18 +403,6 @@ class CollectionModelForm(CreateInlineMixin, AutoCompleteModelForm):
             "connection_type": RadioSelect,
         }
         form_helper_class = CollectionModelFormHelper
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.fields["required_bin_capacity_reference"].choices = [("", "---------")] + list(self.fields["required_bin_capacity_reference"].choices)
-
-    def clean_required_bin_capacity_reference(self):
-        value = self.cleaned_data.get("required_bin_capacity_reference")
-        if value == "":
-            return None
-        if value == "not_specified":
-            return "not_specified"
-        return value
 
     def save(self, commit=True):
         """

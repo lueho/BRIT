@@ -103,8 +103,11 @@ class CollectionCSVRendererTestCase(TestCase):
         renderer.render(self.file, self.content)
         self.file.seek(0)
         reader = csv.DictReader(codecs.getreader("utf-8")(self.file), delimiter="\t")
+        valid_labels = [
+            "Compulsory", "Voluntary", "Mandatory", "Mandatory with exception for home composters", "Not specified", ""
+        ]
         for row in reader:
-            self.assertIn(row["Connection type"], ["Compulsory", "Voluntary"])
+            self.assertIn(row["Connection type"], valid_labels)
 
     def test_allowed_materials_formatted_as_comma_separated_list_in_one_field(self):
         renderer = CollectionCSVRenderer()

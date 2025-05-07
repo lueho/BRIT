@@ -25,6 +25,14 @@
         <strong>Year:</strong><br>
         {{ object.valid_from|date:"Y" }}
     </p>
+    <p class="card-text">
+        <strong>Connection Type:</strong><br>
+        {% if object.connection_type %}
+            {% if object.connection_type == 'MANDATORY' %}Mandatory{% elif object.connection_type == 'VOLUNTARY' %}Voluntary{% elif object.connection_type == 'MANDATORY_WITH_HOME_COMPOSTER_EXCEPTION' %}Mandatory with exception for home composters{% elif object.connection_type == 'not_specified' %}Not specified{% else %}{{ object.connection_type }}{% endif %}
+        {% else %}
+            <span class="text-muted">—</span>
+        {% endif %}
+    </p>
     {% if object.min_bin_size is not None or object.required_bin_capacity is not None or object.required_bin_capacity_reference %}
         <p class="card-text">
             <strong>Smallest available bin size (L):</strong><br>

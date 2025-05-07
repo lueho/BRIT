@@ -407,8 +407,13 @@ class CollectionQuerySet(UserCreatedObjectQuerySet):
 
 
 CONNECTION_TYPE_CHOICES = [
-    ("COMPULSORY", "Compulsory"),
-    ("VOLUNTARY", "Voluntary"),
+    ("MANDATORY", "mandatory"),
+    (
+        "MANDATORY_WITH_HOME_COMPOSTER_EXCEPTION",
+        "mandatory with exception for home composters",
+    ),
+    ("VOLUNTARY", "voluntary"),
+    ("not_specified", "not specified"),
 ]
 
 REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES = [
@@ -468,13 +473,13 @@ class Collection(NamedUserCreatedObject):
         "self", blank=True, symmetrical=False, related_name="successors"
     )
     connection_type = models.CharField(
-        max_length=12,
+        max_length=40,
         blank=True,
         null=True,
         choices=CONNECTION_TYPE_CHOICES,
-        default="VOLUNTARY",
+        default=None,
         verbose_name="Connection type",
-        help_text="Indicates whether connection to the collection system is compulsory or voluntary.",
+        help_text="Indicates whether connection to the collection system is mandatory, voluntary, or not specified. Leave blank for never set; select 'not specified' for explicit user choice.",
     )
 
     min_bin_size = models.PositiveIntegerField(

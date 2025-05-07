@@ -362,7 +362,6 @@ class CollectionFilterTestCase(TestCase):
             average=200,
         )
 
-
     def setUp(self):
         self.data = {
             field_name: field.initial
@@ -410,6 +409,54 @@ class CollectionFilterTestCase(TestCase):
         )
 
     def test_connection_rate_returns_only_collections_in_given_range(self):
+        self.data.update(
+            {
+                "connection_rate_min": 50,
+                "connection_rate_max": 100,
+                "connection_rate_is_null": False,
+            }
+        )
+        filtr = CollectionFilterSet(self.data, queryset=Collection.objects.all())
+        qs = filtr.qs
+        expected_qs = Collection.objects.filter(pk__in=[self.collection1.pk])
+        self.assertQuerySetEqual(expected_qs, qs, ordered=False)
+
+    def test_connection_type_filter_variants(self):
+        from case_studies.soilcom.models import Collection
+
+        base_kwargs = dict(
+            catchment=self.collection1.catchment,
+            collector=self.collection1.collector,
+            collection_system=self.collection1.collection_system,
+            waste_stream=self.collection1.waste_stream,
+        )
+        values = [
+            ("MANDATORY", "MANDATORY"),
+            ("VOLUNTARY", "VOLUNTARY"),
+            (
+                "MANDATORY_WITH_HOME_COMPOSTER_EXCEPTION",
+                "MANDATORY_WITH_HOME_COMPOSTER_EXCEPTION",
+            ),
+            ("not_specified", "not_specified"),
+            (None, None),
+            ("", None),
+        ]
+        for value, filter_value in values:
+            collection = Collection.objects.create(**base_kwargs, connection_type=value)
+            data = {"connection_type": filter_value} if filter_value else {}
+            filtr = CollectionFilterSet(data, queryset=Collection.objects.all())
+            if filter_value:
+                self.assertIn(collection, filtr.qs)
+            else:
+                self.assertIn(
+                    collection, filtr.qs
+                )  # For None/blank, should be included if no filter
+            collection.delete()
+
+        # Check help_text on the form field (not the filter object)
+        form = CollectionFilterSet().form
+        self.assertIn("not_specified", form.fields["connection_type"].help_text)
+
         self.data.update(
             {
                 "connection_rate_min": 50,

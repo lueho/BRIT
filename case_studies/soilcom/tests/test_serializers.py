@@ -99,7 +99,6 @@ class CollectionModelSerializerTestCase(TestCase):
         data = serializer.data
         self.assertIn("required_bin_capacity", data)
         self.assertEqual(int(data["required_bin_capacity"]), 120)
-
         self.collection.required_bin_capacity = None
         self.collection.save()
         serializer = CollectionModelSerializer(self.collection)
@@ -107,15 +106,34 @@ class CollectionModelSerializerTestCase(TestCase):
         self.assertIsNone(data["required_bin_capacity"])
 
     def test_required_bin_capacity_reference_serialization(self):
-        for value in ["person", "household", "property", "not_specified", None]:
+        for value in ["person", "household", "property", "not_specified", None, ""]:
             self.collection.required_bin_capacity_reference = value
             self.collection.save()
             serializer = CollectionModelSerializer(self.collection)
             data = serializer.data
             if value is None:
                 self.assertIsNone(data["required_bin_capacity_reference"])
+            elif value == "":
+                self.assertIn(data["required_bin_capacity_reference"], [None, ""])
             else:
                 self.assertEqual(data["required_bin_capacity_reference"], value)
+
+    def test_connection_type_serialization_handles_none_and_empty_string(self):
+        # None case
+        self.collection.connection_type = None
+        self.collection.save()
+        serializer = CollectionModelSerializer(self.collection)
+        data = serializer.data
+        self.assertIn("connection_type", data)
+        self.assertIsNone(data["connection_type"])
+
+        # Empty string case
+        self.collection.connection_type = ""
+        self.collection.save()
+        serializer = CollectionModelSerializer(self.collection)
+        data = serializer.data
+        self.assertIn("connection_type", data)
+        self.assertIn(data["connection_type"], [None, ""])
 
 
 class CollectionFlatSerializerTestCase(TestCase):
@@ -211,6 +229,7 @@ class CollectionFlatSerializerTestCase(TestCase):
             "collection_system",
             "country",
             "waste_category",
+            "connection_type",
             "allowed_materials",
             "forbidden_materials",
             "fee_system",
@@ -219,6 +238,13 @@ class CollectionFlatSerializerTestCase(TestCase):
             "required_bin_capacity",
             "required_bin_capacity_reference",
             "connection_type",
+            "allowed_materials",
+            "forbidden_materials",
+            "fee_system",
+            "frequency",
+            "min_bin_size",
+            "required_bin_capacity",
+            "required_bin_capacity_reference",
             "population",
             "population_density",
             "comments",
