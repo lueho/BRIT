@@ -345,13 +345,9 @@ class CollectionFilterSet(CrispyAutocompleteFilterSet):
     connection_type = ChoiceFilter(
         choices=CONNECTION_TYPE_CHOICES,
         label="Connection type",
-        widget=RadioSelect,
-        empty_label="All",
-        help_text="Filter by connection type. 'not_specified' means explicitly chosen; blank/None means never set."
     )
     min_bin_size = MinBinSizeRangeFilter(
         label="Smallest available bin size (L)",
-        help_text="Smallest physical bin size that the collector provides for this collection.",
     )
     required_bin_capacity = RequiredBinCapacityRangeFilter(
         label="Required bin capacity per unit (L)",
