@@ -21,7 +21,7 @@ urlpatterns = [
     path('cultures/<int:pk>/update/modal/', CultureModalUpdateView.as_view(), name='culture-update-modal'),
     path('cultures/<int:pk>/delete/modal/', CultureModalDeleteView.as_view(), name='culture-delete-modal'),
     path('greenhouses/map/', GreenhousesPublishedMapView.as_view(), name='NantesGreenhouses'),
-    path('roadside_trees/export/', NantesGreenhousesListFileExportView.as_view(), name='nantesgreenhouses-export'),
+    path('greenhouses/export/', NantesGreenhousesListFileExportView.as_view(), name='nantesgreenhouses-export'),
     path('greenhouses/catchment_autocomplete/', NantesGreenhousesCatchmentAutocompleteView.as_view(),
          name='nantesgreenhouses-catchment-autocomplete'),
     path('greenhouses/', GreenhousePublishedFilterView.as_view(), name='greenhouse-list'),
