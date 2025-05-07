@@ -109,6 +109,9 @@ class LicenceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
 
 
 class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model_add_permission = 'add_source'
+
+
     modal_detail_view = True
     modal_create_view = True
 
@@ -187,6 +190,67 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         self.client.force_login(self.non_owner_user)
         response = self.client.get(self.get_detail_url(self.published_object.pk))
         self.assertNotContains(response, "check url")
+
+    def test_create_source_without_author_succeeds(self):
+        """
+        Regression test: Creating a Source without any authors should succeed and not create a SourceAuthor row.
+        """
+        self.client.force_login(self.user_with_add_perm)
+        post_data = self.create_object_data.copy()
+        # Simulate no authors in the inline formset
+        related_post_data = {
+            "sourceauthors-TOTAL_FORMS": 1,
+            "sourceauthors-INITIAL_FORMS": 0,
+            "sourceauthors-0-id": "",
+            "sourceauthors-0-source": "",
+            "sourceauthors-0-author": "",  # No author selected
+        }
+        post_data.update(related_post_data)
+        response = self.client.post(self.get_create_url(), post_data, follow=True)
+        self.assertNotEqual(response.status_code, 500)
+        from ..models import Source
+        source = Source.objects.latest('pk')
+        self.assertEqual(source.sourceauthors.count(), 0)
+
+    def test_update_source_add_authors(self):
+        """
+        Test updating a Source that was created with no authors to add one or more authors.
+        """
+        self.client.force_login(self.user_with_add_perm)
+        post_data = self.create_object_data.copy()
+        # Create Source with no authors
+        related_post_data = {
+            "sourceauthors-TOTAL_FORMS": 1,
+            "sourceauthors-INITIAL_FORMS": 0,
+            "sourceauthors-0-id": "",
+            "sourceauthors-0-source": "",
+            "sourceauthors-0-author": "",  # No author selected
+        }
+        post_data.update(related_post_data)
+        response = self.client.post(self.get_create_url(), post_data, follow=True)
+        from ..models import Source
+        source = Source.objects.latest('pk')
+        self.assertEqual(source.sourceauthors.count(), 0)
+
+        # Now update the Source to add two authors
+        update_url = self.get_update_url(source.pk)
+        update_data = self.update_object_data.copy()
+        update_related_post_data = {
+            "sourceauthors-TOTAL_FORMS": 2,
+            "sourceauthors-INITIAL_FORMS": 0,
+            "sourceauthors-0-id": "",
+            "sourceauthors-0-source": source.pk,
+            "sourceauthors-0-author": self.source_author_1.author.pk,
+            "sourceauthors-1-id": "",
+            "sourceauthors-1-source": source.pk,
+            "sourceauthors-1-author": self.source_author_2.author.pk,
+        }
+        update_data.update(update_related_post_data)
+        response = self.client.post(update_url, update_data, follow=True)
+        source.refresh_from_db()
+        self.assertEqual(source.sourceauthors.count(), 2)
+        author_ids = set(source.sourceauthors.values_list('author_id', flat=True))
+        self.assertSetEqual(author_ids, {self.source_author_1.author.pk, self.source_author_2.author.pk})
 
 
 @patch("bibliography.views.check_source_url.delay")

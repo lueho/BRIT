@@ -94,7 +94,7 @@ class SourceAuthorFormSet(BaseInlineFormSet):
                 # Get all forms that aren't being deleted and have data
                 valid_forms = [
                     form for form in self.forms
-                    if form.cleaned_data and not form.cleaned_data.get('DELETE', False)
+                    if form.cleaned_data and not form.cleaned_data.get('DELETE', False) and form.cleaned_data.get('author')
                 ]
 
                 # Assign positions based on form order
