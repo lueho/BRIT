@@ -92,24 +92,30 @@ class CollectionModelSerializerTestCase(TestCase):
         for url in flyer_urls:
             self.assertIsInstance(url, str)
 
-    def test_min_ton_fields_serialization(self):
-        self.collection.min_ton_size = 120
-        self.collection.min_ton_volume_per_inhabitant = 5
+    def test_required_bin_capacity_field_serialization(self):
+        self.collection.required_bin_capacity = 120
         self.collection.save()
         serializer = CollectionModelSerializer(self.collection)
         data = serializer.data
-        self.assertIn("min_ton_size", data)
-        self.assertIn("min_ton_volume_per_inhabitant", data)
-        self.assertEqual(int(data["min_ton_size"]), 120)
-        self.assertEqual(int(data["min_ton_volume_per_inhabitant"]), 5)
-        # Null values
-        self.collection.min_ton_size = None
-        self.collection.min_ton_volume_per_inhabitant = None
+        self.assertIn("required_bin_capacity", data)
+        self.assertEqual(int(data["required_bin_capacity"]), 120)
+
+        self.collection.required_bin_capacity = None
         self.collection.save()
         serializer = CollectionModelSerializer(self.collection)
         data = serializer.data
-        self.assertIsNone(data["min_ton_size"])
-        self.assertIsNone(data["min_ton_volume_per_inhabitant"])
+        self.assertIsNone(data["required_bin_capacity"])
+
+    def test_required_bin_capacity_reference_serialization(self):
+        for value in ["person", "household", "property", "not_specified", None]:
+            self.collection.required_bin_capacity_reference = value
+            self.collection.save()
+            serializer = CollectionModelSerializer(self.collection)
+            data = serializer.data
+            if value is None:
+                self.assertIsNone(data["required_bin_capacity_reference"])
+            else:
+                self.assertEqual(data["required_bin_capacity_reference"], value)
 
 
 class CollectionFlatSerializerTestCase(TestCase):
@@ -209,6 +215,9 @@ class CollectionFlatSerializerTestCase(TestCase):
             "forbidden_materials",
             "fee_system",
             "frequency",
+            "min_bin_size",
+            "required_bin_capacity",
+            "required_bin_capacity_reference",
             "connection_type",
             "population",
             "population_density",

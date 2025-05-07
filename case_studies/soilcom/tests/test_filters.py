@@ -302,16 +302,19 @@ class CollectionFilterTestCase(TestCase):
             frequency=cls.not_seasonal_frequency,
             valid_from=timezone.now().date(),
             valid_until=timezone.now().date() + timezone.timedelta(days=30),
+            required_bin_capacity=120,
         )
         cls.collection2 = Collection.objects.create(
             catchment=cls.unrelated_catchment,
             frequency=cls.seasonal_frequency,
             valid_from=timezone.now().date(),
+            required_bin_capacity=240,
         )
         cls.child_collection = Collection.objects.create(
             catchment=child_catchment,
             frequency=fixed_once_per_week,
             valid_from=timezone.now().date(),
+            required_bin_capacity=360,
         )
         cls.predecessor_collection = Collection.objects.create(
             catchment=cls.catchment,
@@ -358,6 +361,7 @@ class CollectionFilterTestCase(TestCase):
             year=2022,
             average=200,
         )
+
 
     def setUp(self):
         self.data = {
@@ -562,130 +566,50 @@ class CollectionFilterTestCase(TestCase):
         self.assertNotIn(self.child_collection, qs)
         self.assertIn(self.predecessor_collection, qs)
 
-    def test_min_ton_size_filter(self):
-        # Setup required related objects
-        catchment = CollectionCatchment.objects.create(name="Catchment")
-        collection_system = CollectionSystem.objects.create(name="System")
-        category = WasteCategory.objects.create(name="Category")
-        waste_stream = WasteStream.objects.create(category=category)
-        # Setup test data
-        c1 = Collection.objects.create(
-            name="C1",
-            min_ton_size=120,
-            catchment=catchment,
-            collection_system=collection_system,
-            waste_stream=waste_stream,
-        )
-        c2 = Collection.objects.create(
-            name="C2",
-            min_ton_size=240,
-            catchment=catchment,
-            collection_system=collection_system,
-            waste_stream=waste_stream,
-        )
-        c3 = Collection.objects.create(
-            name="C3",
-            min_ton_size=360,
-            catchment=catchment,
-            collection_system=collection_system,
-            waste_stream=waste_stream,
-        )
-        # Filter by min_ton_size in range 200-400 (inclusive)
-        data = {"min_ton_size_min": 200, "min_ton_size_max": 400}
+    def test_required_bin_capacity_filter(self):
+        # Filter by required_bin_capacity in range 200-400 (inclusive)
+        data = {"required_bin_capacity_min": 200, "required_bin_capacity_max": 400}
         qs = CollectionFilterSet(
-            data, queryset=Collection.objects.filter(pk__in=[c1.pk, c2.pk, c3.pk])
+            data,
+            queryset=Collection.objects.filter(
+                pk__in=[
+                    self.collection1.pk,
+                    self.collection2.pk,
+                    self.child_collection.pk,
+                ]
+            ),
         ).qs
         qs_pks = set(qs.values_list("pk", flat=True))
-        self.assertNotIn(c1.pk, qs_pks)
-        self.assertIn(c2.pk, qs_pks)
-        self.assertIn(c3.pk, qs_pks)
-
+        self.assertNotIn(self.collection1.pk, qs_pks)
+        self.assertIn(self.collection2.pk, qs_pks)
+        self.assertIn(self.child_collection.pk, qs_pks)
         # Filter with null included
         c4 = Collection.objects.create(
-            name="C4",
-            min_ton_size=None,
-            catchment=catchment,
-            collection_system=collection_system,
-            waste_stream=waste_stream,
+            name="RequiredBinCapacityC4",
+            catchment=self.catchment,
+            required_bin_capacity=None,
         )
         data = {
-            "min_ton_size_min": 200,
-            "min_ton_size_max": 400,
-            "min_ton_size_isnull": "on",
+            "required_bin_capacity_min": 200,
+            "required_bin_capacity_max": 400,
+            "required_bin_capacity_is_null": True,
         }
         qs = CollectionFilterSet(
             data,
-            queryset=Collection.objects.filter(pk__in=[c1.pk, c2.pk, c3.pk, c4.pk]),
+            queryset=Collection.objects.filter(
+                pk__in=[
+                    self.collection1.pk,
+                    self.collection2.pk,
+                    self.child_collection.pk,
+                    c4.pk,
+                ]
+            ),
         ).qs
         qs_pks = set(qs.values_list("pk", flat=True))
-        self.assertNotIn(c1.pk, qs_pks)
-        self.assertIn(c2.pk, qs_pks)
-        self.assertIn(c3.pk, qs_pks)
+        self.assertNotIn(self.collection1.pk, qs_pks)
+        self.assertIn(self.collection2.pk, qs_pks)
+        self.assertIn(self.child_collection.pk, qs_pks)
         self.assertIn(c4.pk, qs_pks)
-
-    def test_min_ton_volume_per_inhabitant_filter(self):
-        # Setup required related objects
-        catchment = CollectionCatchment.objects.create(name="Catchment")
-        collection_system = CollectionSystem.objects.create(name="System")
-        category = WasteCategory.objects.create(name="Category")
-        waste_stream = WasteStream.objects.create(category=category)
-        # Setup test data
-        c1 = Collection.objects.create(
-            name="C1",
-            min_ton_volume_per_inhabitant=5.5,
-            catchment=catchment,
-            collection_system=collection_system,
-            waste_stream=waste_stream,
-        )
-        c2 = Collection.objects.create(
-            name="C2",
-            min_ton_volume_per_inhabitant=10.0,
-            catchment=catchment,
-            collection_system=collection_system,
-            waste_stream=waste_stream,
-        )
-        c3 = Collection.objects.create(
-            name="C3",
-            min_ton_volume_per_inhabitant=15.0,
-            catchment=catchment,
-            collection_system=collection_system,
-            waste_stream=waste_stream,
-        )
-        # Filter by min_ton_volume_per_inhabitant in range 10-15 (inclusive)
-        data = {
-            "min_ton_volume_per_inhabitant_min": 10,
-            "min_ton_volume_per_inhabitant_max": 15,
-        }
-        qs = CollectionFilterSet(
-            data, queryset=Collection.objects.filter(pk__in=[c1.pk, c2.pk, c3.pk])
-        ).qs
-        qs_pks = set(qs.values_list("pk", flat=True))
-        self.assertIn(c2.pk, qs_pks)
-        self.assertIn(c3.pk, qs_pks)
-        self.assertNotIn(c1.pk, qs_pks)
-
-        # Filter with null included
-        c4 = Collection.objects.create(
-            name="C4",
-            min_ton_volume_per_inhabitant=None,
-            catchment=catchment,
-            collection_system=collection_system,
-            waste_stream=waste_stream,
-        )
-        data = {
-            "min_ton_volume_per_inhabitant_min": 10,
-            "min_ton_volume_per_inhabitant_max": 15,
-            "min_ton_volume_per_inhabitant_isnull": "on",
-        }
-        qs = CollectionFilterSet(
-            data,
-            queryset=Collection.objects.filter(pk__in=[c1.pk, c2.pk, c3.pk, c4.pk]),
-        ).qs
-        qs_pks = set(qs.values_list("pk", flat=True))
-        self.assertIn(c2.pk, qs_pks)
-        self.assertIn(c3.pk, qs_pks)
-        self.assertIn(c4.pk, qs_pks)
-        self.assertNotIn(c1.pk, qs_pks)
 
 
 class CollectorFilterTestCase(TestCase):

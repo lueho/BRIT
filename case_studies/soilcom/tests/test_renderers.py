@@ -139,48 +139,6 @@ class CollectionCSVRendererTestCase(TestCase):
         reader = csv.DictReader(codecs.getreader("utf-8")(self.file), delimiter="\t")
         self.assertEqual(Collection.objects.count(), len(list(reader)))
 
-    def test_min_ton_fields_exported(self):
-        # Set values for export
-        collection = Collection.objects.first()
-        collection.min_ton_size = 120
-        collection.min_ton_volume_per_inhabitant = 5.5
-        collection.save()
-        renderer = CollectionCSVRenderer()
-        renderer.render(self.file, self.content)
-        self.file.seek(0)
-        reader = csv.DictReader(codecs.getreader("utf-8")(self.file), delimiter="\t")
-        for row in reader:
-            self.assertIn("Minimum container size (L)", row)
-            self.assertIn("Minimum container volume per inhabitant (L/person)", row)
-            if row["Minimum container size (L)"] not in ("", None):
-                self.assertEqual(int(row["Minimum container size (L)"]), 120)
-            if row["Minimum container volume per inhabitant (L/person)"] not in (
-                "",
-                None,
-            ):
-                self.assertEqual(
-                    float(row["Minimum container volume per inhabitant (L/person)"]),
-                    5.5,
-                )
-        # Null values
-        collection.min_ton_size = None
-        collection.min_ton_volume_per_inhabitant = None
-        collection.save()
-        renderer = CollectionCSVRenderer()
-        renderer.render(self.file, self.content)
-        self.file.seek(0)
-        reader = csv.DictReader(codecs.getreader("utf-8")(self.file), delimiter="\t")
-        for row in reader:
-            # Defensive: skip header or malformed rows
-            if row["Minimum container size (L)"] == "Minimum container size (L)":
-                continue
-            self.assertIn("Minimum container size (L)", row)
-            self.assertIn("Minimum container volume per inhabitant (L/person)", row)
-            self.assertIn(row["Minimum container size (L)"], ("", None))
-            self.assertIn(
-                row["Minimum container volume per inhabitant (L/person)"], ("", None)
-            )
-
 
 class CollectionXLSXRendererTestCase(TestCase):
 

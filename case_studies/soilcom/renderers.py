@@ -9,11 +9,14 @@ class CollectionXLSXRenderer(BaseXLSXRenderer):
         "collection_system": "Collection System",
         "country": "Country",
         "waste_category": "Waste Category",
+        "connection_type": "Connection type",
         "allowed_materials": "Allowed Materials",
         "forbidden_materials": "Forbidden Materials",
         "fee_system": "Fee System",
         "frequency": "Frequency",
-        "connection_type": "Connection type",
+        "min_ton_size": "Minimum bin size (L)",
+        "required_bin_capacity": "Required bin capacity per unit (L)",
+        "required_bin_capacity_reference": "Required bin capacity reference unit",
         "population": "Population",
         "population_density": "Population Density",
         "connection_rate_2019": "Connection Rate 2019 [%]",
@@ -32,8 +35,6 @@ class CollectionXLSXRenderer(BaseXLSXRenderer):
         "valid_until": "Valid until",
         "created_at": "Created at",
         "lastmodified_at": "Last modified at",
-        "min_ton_size": "Minimum container size (L)",
-        "min_ton_volume_per_inhabitant": "Minimum container volume per inhabitant (L/person)",
     }
 
     workbook_options = {"constant_memory": True, "strings_to_urls": False}
@@ -48,11 +49,14 @@ class CollectionCSVRenderer(BaseCSVRenderer):
         "collector",
         "collection_system",
         "waste_category",
+        "connection_type",
         "allowed_materials",
         "forbidden_materials",
         "fee_system",
         "frequency",
-        "connection_type",
+        "min_ton_size",
+        "required_bin_capacity",
+        "required_bin_capacity_reference",
         "population",
         "population_density",
         "connection_rate_2019",
@@ -71,8 +75,6 @@ class CollectionCSVRenderer(BaseCSVRenderer):
         "valid_until",
         "created_at",
         "lastmodified_at",
-        "min_ton_size",
-        "min_ton_volume_per_inhabitant",
     ]
 
     labels = {
@@ -87,6 +89,9 @@ class CollectionCSVRenderer(BaseCSVRenderer):
         "fee_system": "Fee System",
         "frequency": "Frequency",
         "connection_type": "Connection type",
+        "min_ton_size": "Minimum bin size (L)",
+        "required_bin_capacity": "Required bin capacity per unit (L)",
+        "required_bin_capacity_reference": "Required bin capacity reference unit",
         "population": "Population",
         "population_density": "Population Density",
         "connection_rate_2019": "Connection Rate 2019 [%]",
@@ -105,6 +110,4 @@ class CollectionCSVRenderer(BaseCSVRenderer):
         "valid_until": "Valid until",
         "created_at": "Created at",
         "lastmodified_at": "Last modified at",
-        "min_ton_size": "Minimum container size (L)",
-        "min_ton_volume_per_inhabitant": "Minimum container volume per inhabitant (L/person)",
     }

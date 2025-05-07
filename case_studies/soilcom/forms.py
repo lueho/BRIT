@@ -4,7 +4,6 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import HTML, Column, Div, Field, Layout, Row
 from django.core.exceptions import ValidationError
 from django.forms import (
-    CheckboxInput,
     CheckboxSelectMultiple,
     ChoiceField,
     DateInput,
@@ -28,13 +27,11 @@ from utils.forms import (
     SimpleForm,
     SimpleModelForm,
 )
-from utils.widgets import (
-    BSModelSelect2,
-    BSModelSelect2Multiple,
-)
+from utils.widgets import BSModelSelect2, BSModelSelect2Multiple
 
 from .models import (
     CONNECTION_TYPE_CHOICES,
+    REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES,
     AggregatedCollectionPropertyValue,
     Collection,
     CollectionCatchment,
@@ -318,11 +315,12 @@ class CollectionModelFormHelper(FormHelper):
         Field("forbidden_materials"),
         ForeignkeyField("fee_system"),
         Field("frequency"),
+        Field("min_bin_size"),
+        Field("required_bin_capacity"),
+        Field("required_bin_capacity_reference"),
         Field("valid_from"),
         Field("valid_until"),
         Field("description"),
-        Field("min_ton_size"),
-        Field("min_ton_volume_per_inhabitant"),
     )
 
 
@@ -367,7 +365,14 @@ class CollectionModelForm(CreateInlineMixin, AutoCompleteModelForm):
         help_text="Indicates whether connection to the collection system is compulsory or voluntary.",
         widget=RadioSelect,
     )
-    min_ton_volume_per_inhabitant = IntegerField(required=False, min_value=0)
+    min_bin_size = IntegerField(required=False, min_value=0)
+    required_bin_capacity = IntegerField(required=False, min_value=0)
+    required_bin_capacity_reference = ChoiceField(
+        choices=REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES,
+        required=False,
+        label="Reference unit for required bin capacity",
+        help_text="Defines the unit (person, household, property) for which the required bin capacity applies. Leave blank if not specified.",
+    )
 
     class Meta:
         model = Collection
@@ -384,8 +389,9 @@ class CollectionModelForm(CreateInlineMixin, AutoCompleteModelForm):
             "valid_from",
             "valid_until",
             "description",
-            "min_ton_size",
-            "min_ton_volume_per_inhabitant",
+            "min_bin_size",
+            "required_bin_capacity",
+            "required_bin_capacity_reference",
         )
         labels = {
             "description": "Comments",
@@ -397,6 +403,18 @@ class CollectionModelForm(CreateInlineMixin, AutoCompleteModelForm):
             "connection_type": RadioSelect,
         }
         form_helper_class = CollectionModelFormHelper
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields["required_bin_capacity_reference"].choices = [("", "---------")] + list(self.fields["required_bin_capacity_reference"].choices)
+
+    def clean_required_bin_capacity_reference(self):
+        value = self.cleaned_data.get("required_bin_capacity_reference")
+        if value == "":
+            return None
+        if value == "not_specified":
+            return "not_specified"
+        return value
 
     def save(self, commit=True):
         """

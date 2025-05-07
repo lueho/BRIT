@@ -390,11 +390,10 @@ class CollectionModelFormTestCase(TestCase):
         self.assertEqual(self.predecessor_collection_1.valid_until, date(2022, 12, 31))
         self.assertEqual(self.predecessor_collection_2.valid_until, date(2022, 12, 31))
 
-    def test_min_ton_fields_present_and_valid(self):
+    def test_required_bin_capacity_field_present_and_valid(self):
         form = CollectionModelForm()
-        self.assertIn("min_ton_size", form.fields)
-        self.assertIn("min_ton_volume_per_inhabitant", form.fields)
-        # Valid values
+        self.assertIn("required_bin_capacity", form.fields)
+        # Valid value
         data = {
             "catchment": self.catchment.id,
             "collector": self.collector.id,
@@ -408,26 +407,56 @@ class CollectionModelFormTestCase(TestCase):
                 self.forbidden_material_1.id,
                 self.forbidden_material_2.id,
             ],
-            "frequency": self.frequency.id,
-            "valid_from": date(2023, 1, 1),
-            "description": "Test min ton fields",
             "connection_type": "VOLUNTARY",
-            "min_ton_size": 120,
-            "min_ton_volume_per_inhabitant": 5,
+            "min_bin_size": 120,
+            "required_bin_capacity": 5,
+            "required_bin_capacity_reference": "person",
+            "valid_from": date(2023, 1, 1),
         }
         form = CollectionModelForm(data=data)
         self.assertTrue(form.is_valid(), form.errors)
         instance = form.save(commit=False)
-        self.assertEqual(instance.min_ton_size, 120)
-        self.assertEqual(instance.min_ton_volume_per_inhabitant, 5)
-        # Null/blank values
-        data["min_ton_size"] = ""
-        data["min_ton_volume_per_inhabitant"] = ""
+        self.assertEqual(instance.required_bin_capacity, 5)
+        # Null/blank value
+        data["required_bin_capacity"] = ""
         form = CollectionModelForm(data=data)
         self.assertTrue(form.is_valid(), form.errors)
         instance = form.save(commit=False)
-        self.assertIsNone(instance.min_ton_size)
-        self.assertIsNone(instance.min_ton_volume_per_inhabitant)
+        self.assertIsNone(instance.required_bin_capacity)
+
+    def test_required_bin_capacity_reference_field_present_and_valid(self):
+        form = CollectionModelForm()
+        self.assertIn("required_bin_capacity_reference", form.fields)
+        # Valid value
+        data = {
+            "catchment": self.catchment.id,
+            "collector": self.collector.id,
+            "collection_system": self.collection_system.id,
+            "waste_category": self.waste_category.id,
+            "allowed_materials": [
+                self.allowed_material_1.id,
+                self.allowed_material_2.id,
+            ],
+            "forbidden_materials": [
+                self.forbidden_material_1.id,
+                self.forbidden_material_2.id,
+            ],
+            "connection_type": "VOLUNTARY",
+            "min_bin_size": 120,
+            "required_bin_capacity": 5,
+            "required_bin_capacity_reference": "person",
+            "valid_from": date(2023, 1, 1),
+        }
+        form = CollectionModelForm(data=data)
+        self.assertTrue(form.is_valid(), form.errors)
+        instance = form.save(commit=False)
+        self.assertEqual(instance.required_bin_capacity_reference, "person")
+        # Null/blank value
+        data["required_bin_capacity_reference"] = ""
+        form = CollectionModelForm(data=data)
+        self.assertTrue(form.is_valid(), form.errors)
+        instance = form.save(commit=False)
+        self.assertIsNone(instance.required_bin_capacity_reference)
 
 
 class WasteFlyerUrlFormSetTestCase(TestCase):
@@ -527,10 +556,7 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             WasteFlyerModelForm, formset=BaseWasteFlyerUrlFormSet
         )
         formset = WasteFlyerModelFormSet(
-            parent_object=self.collection,
-            owner=self.collection.owner,
-            data=data,
-            relation_field_name="flyers",
+            data, parent_object=self.collection, relation_field_name="flyers"
         )
         self.assertTrue(formset.is_valid())
         with mute_signals(signals.post_save):
@@ -553,10 +579,7 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             WasteFlyerModelForm, formset=BaseWasteFlyerUrlFormSet
         )
         formset = WasteFlyerModelFormSet(
-            parent_object=self.collection,
-            owner=self.collection.owner,
-            data=data,
-            relation_field_name="flyers",
+            data, parent_object=self.collection, relation_field_name="flyers"
         )
         self.assertTrue(formset.is_valid())
         original_flyer_count = WasteFlyer.objects.count()
@@ -578,7 +601,7 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             WasteFlyerModelForm, formset=BaseWasteFlyerUrlFormSet
         )
         formset = WasteFlyerModelFormSet(
-            parent_object=self.collection, data=data, relation_field_name="flyers"
+            data, parent_object=self.collection, relation_field_name="flyers"
         )
         self.assertTrue(formset.is_valid())
         original_flyer_count = WasteFlyer.objects.count()
@@ -600,7 +623,7 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             "form-1-url": url,
         }
         formset = WasteFlyerModelFormSet(
-            data=data, parent_object=self.collection, relation_field_name="flyers"
+            data, parent_object=self.collection, relation_field_name="flyers"
         )
         self.assertTrue(formset.is_valid())
         original_flyer_count = WasteFlyer.objects.count()
@@ -785,19 +808,16 @@ class CollectionRemovePredecessorFormTestCase(TestCase):
             collector=collector,
             collection_system=collection_system,
             waste_stream=waste_stream,
-            description="Current Collection",
         )
         cls.predecessor_collection = Collection.objects.create(
             collector=collector,
             collection_system=collection_system,
             waste_stream=waste_stream,
-            description="Predecessor Collection 1",
         )
         cls.other_collection = Collection.objects.create(
             collector=collector,
             collection_system=collection_system,
             waste_stream=waste_stream,
-            description="Other Collection",
         )
 
     def test_collection_remove_predecessor_form_valid(self):

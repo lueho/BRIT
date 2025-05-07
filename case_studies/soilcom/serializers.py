@@ -73,6 +73,7 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
     """
     Serializer for the Collection model, including all collection parameters and waste stream fields.
     """
+
     id = serializers.IntegerField(label="id")
     catchment = serializers.StringRelatedField()
     collector = serializers.StringRelatedField()
@@ -86,9 +87,15 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
     )
     frequency = serializers.StringRelatedField()
     fee_system = serializers.StringRelatedField()
-    min_ton_size = serializers.IntegerField(required=False, allow_null=True)
-    min_ton_volume_per_inhabitant = serializers.IntegerField(required=False, allow_null=True)
-    comments = serializers.CharField(source="description", required=False, allow_blank=True)
+    min_bin_size = serializers.IntegerField(required=False, allow_null=True)
+    required_bin_capacity = serializers.IntegerField(required=False, allow_null=True)
+    required_bin_capacity_reference = serializers.CharField(
+        required=False, allow_null=True
+    )
+    comments = serializers.CharField(
+        source="description", required=False, allow_blank=True
+    )
+    sources = serializers.SerializerMethodField()
 
     class Meta:
         model = models.Collection
@@ -102,12 +109,23 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
             "forbidden_materials",
             "frequency",
             "fee_system",
+            "min_bin_size",
+            "required_bin_capacity",
+            "required_bin_capacity_reference",
             "valid_from",
             "valid_until",
             "comments",
-            "min_ton_size",
-            "min_ton_volume_per_inhabitant",
+            "sources",
         )
+
+    def get_sources(self, obj):
+        return [flyer.url for flyer in obj.flyers.all() if flyer.url]
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if "sources" not in data:
+            data["sources"] = []
+        return data
 
 
 class CollectionFlatSerializer(serializers.ModelSerializer):
@@ -133,6 +151,11 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
         source="fee_system.name", label="Fee system"
     )
     frequency = serializers.StringRelatedField(label="Frequency")
+    min_bin_size = serializers.IntegerField(required=False, allow_null=True)
+    required_bin_capacity = serializers.IntegerField(required=False, allow_null=True)
+    required_bin_capacity_reference = serializers.CharField(
+        required=False, allow_null=True
+    )
     connection_type = serializers.SerializerMethodField(label="Connection type")
     population = serializers.SerializerMethodField()
     population_density = serializers.SerializerMethodField()
@@ -154,6 +177,9 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
             "forbidden_materials",
             "fee_system",
             "frequency",
+            "min_bin_size",
+            "required_bin_capacity",
+            "required_bin_capacity_reference",
             "population",
             "population_density",
             "comments",

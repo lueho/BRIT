@@ -742,8 +742,6 @@ class CollectionCopyView(CollectionCreateView):
                 "forbidden_materials": [
                     mat.id for mat in self.object.waste_stream.forbidden_materials.all()
                 ],
-                "min_ton_size": self.object.min_ton_size,
-                "min_ton_volume_per_inhabitant": self.object.min_ton_volume_per_inhabitant,
             }
         )
         self.object = None
@@ -779,8 +777,6 @@ class CollectionCreateNewVersionView(CollectionCopyView):
                 "forbidden_materials": [
                     mat.id for mat in self.object.waste_stream.forbidden_materials.all()
                 ],
-                "min_ton_size": self.object.min_ton_size,
-                "min_ton_volume_per_inhabitant": self.object.min_ton_volume_per_inhabitant,
             }
         )
         self.predecessor = self.object

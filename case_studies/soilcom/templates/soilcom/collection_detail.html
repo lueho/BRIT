@@ -25,19 +25,26 @@
         <strong>Year:</strong><br>
         {{ object.valid_from|date:"Y" }}
     </p>
-    {% if object.min_ton_size is not None or object.min_ton_volume_per_inhabitant is not None %}
+    {% if object.min_bin_size is not None or object.required_bin_capacity is not None or object.required_bin_capacity_reference %}
         <p class="card-text">
-            <strong>Minimum container size (L):</strong><br>
-            {% if object.min_ton_size is not None %}
-                {{ object.min_ton_size }} L
+            <strong>Smallest available bin size (L):</strong><br>
+            {% if object.min_bin_size is not None %}
+                {{ object.min_bin_size }} L
             {% else %}
                 <span class="text-muted">—</span>
             {% endif %}
         </p>
         <p class="card-text">
-            <strong>Minimum container volume per inhabitant (L/person):</strong><br>
-            {% if object.min_ton_volume_per_inhabitant is not None %}
-                {{ object.min_ton_volume_per_inhabitant }} L/person
+            <strong>Required bin capacity:</strong><br>
+            {% if object.required_bin_capacity is not None %}
+                {{ object.required_bin_capacity }} L
+                {% if object.required_bin_capacity_reference %}
+                    {% if object.required_bin_capacity_reference == 'not_specified' %}
+                        <span class="text-muted">(reference not specified)</span>
+                    {% else %}
+                        <span class="text-muted">per {{ object.required_bin_capacity_reference }}</span>
+                    {% endif %}
+                {% endif %}
             {% else %}
                 <span class="text-muted">—</span>
             {% endif %}

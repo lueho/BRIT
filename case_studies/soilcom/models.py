@@ -183,7 +183,6 @@ class WasteStreamQuerySet(UserCreatedObjectQuerySet):
             if not instance.name:
                 instance.name = f"{instance.category.name} {len(allowed_materials)} {len(forbidden_materials)}"
                 instance.save()
-
         return instance, created
 
     def update_or_create(self, defaults=None, **kwargs):
@@ -412,11 +411,19 @@ CONNECTION_TYPE_CHOICES = [
     ("VOLUNTARY", "Voluntary"),
 ]
 
+REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES = [
+    ("person", "per person"),
+    ("household", "per household"),
+    ("property", "per property"),
+    ("not_specified", "not specified"),
+]
+
 
 class Collection(NamedUserCreatedObject):
     """
     Represents a waste collection system, including collection parameters, waste stream, and container requirements.
     """
+
     collector = models.ForeignKey(
         Collector, on_delete=models.CASCADE, blank=True, null=True
     )
@@ -462,23 +469,34 @@ class Collection(NamedUserCreatedObject):
     )
     connection_type = models.CharField(
         max_length=12,
+        blank=True,
+        null=True,
         choices=CONNECTION_TYPE_CHOICES,
         default="VOLUNTARY",
         verbose_name="Connection type",
         help_text="Indicates whether connection to the collection system is compulsory or voluntary.",
     )
 
-    min_ton_size = models.PositiveIntegerField(
-        verbose_name="Minimum container size (L)",
-        help_text="Smallest available container size for this collection (in liters)",
+    min_bin_size = models.PositiveIntegerField(
         blank=True,
         null=True,
+        verbose_name="Smallest available bin size (L)",
+        help_text="Smallest physical bin size that the collector provides for this collection. Exceprions may apply (e.g. for home composters)",
     )
-    min_ton_volume_per_inhabitant = models.PositiveIntegerField(
+    required_bin_capacity = models.PositiveIntegerField(
         blank=True,
         null=True,
-        help_text="Minimum available container volume per inhabitant (in liters per person)",
-        verbose_name="Minimum container volume per inhabitant (L/person)",
+        verbose_name="Required bin capacity per unit (L)",
+        help_text="Minimum total bin capacity that must be supplied per reference unit (see field below).",
+    )
+    required_bin_capacity_reference = models.CharField(
+        max_length=16,
+        blank=True,
+        null=True,
+        choices=REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES,
+        default=None,
+        verbose_name="Reference unit for required bin capacity",
+        help_text="Defines the unit (person, household, property) for which the required bin capacity applies. Leave blank if not specified.",
     )
 
     objects = CollectionQuerySet.as_manager()

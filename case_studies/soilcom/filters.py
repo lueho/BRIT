@@ -1,8 +1,9 @@
 import math
+
 from crispy_forms.bootstrap import Accordion
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Column, Field, Layout, Row, Submit
-from django.db.models import Avg, Count, Max, Min, Q, Sum
+from django.db.models import Avg, Count, Max, Q, Sum
 from django.forms import CheckboxSelectMultiple, DateInput, RadioSelect
 from django.utils import timezone
 from django_filters import (
@@ -12,7 +13,6 @@ from django_filters import (
     DateFilter,
     ModelChoiceFilter,
     ModelMultipleChoiceFilter,
-    NumberFilter,
 )
 
 from utils.crispy_fields import FilterAccordionGroup, RangeSliderField
@@ -22,7 +22,10 @@ from utils.filters import (
     NullableRangeFilter,
 )
 from utils.widgets import BSModelSelect2, NullableRangeSliderWidget
+
 from .models import (
+    CONNECTION_TYPE_CHOICES,
+    REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES,
     Collection,
     CollectionCatchment,
     CollectionCountOptions,
@@ -33,7 +36,6 @@ from .models import (
     WasteCategory,
     WasteComponent,
     WasteFlyer,
-    CONNECTION_TYPE_CHOICES,
 )
 
 
@@ -81,7 +83,6 @@ class CollectionFilterFormHelper(FormHelper):
                 "collector",
                 "collection_system",
                 "waste_category",
-                "connection_type",
                 Submit(
                     "filter",
                     "Filter",
@@ -91,6 +92,7 @@ class CollectionFilterFormHelper(FormHelper):
             ),
             FilterAccordionGroup(
                 "Advanced filters",
+                "connection_type",
                 "allowed_materials",
                 "forbidden_materials",
                 RangeSliderField("connection_rate"),
@@ -98,11 +100,12 @@ class CollectionFilterFormHelper(FormHelper):
                     Column(Field("seasonal_frequency"), css_class="col-md"),
                     Column(Field("optional_frequency"), css_class="col-md"),
                 ),
+                "fee_system",
+                RangeSliderField("min_bin_size"),
+                RangeSliderField("required_bin_capacity"),
+                Field("required_bin_capacity_reference"),
                 RangeSliderField("collections_per_year"),
                 RangeSliderField("spec_waste_collected"),
-                RangeSliderField("min_ton_size"),
-                RangeSliderField("min_ton_volume_per_inhabitant"),
-                "fee_system",
                 "valid_on",
                 Submit(
                     "filter",
@@ -226,25 +229,25 @@ class SpecWasteCollectedFilter(NullableCollectionPropertyValueRangeFilter):
     default_range_max = 1000
 
 
-class MinTonVolumePerInhabitantRangeFilter(NullableRangeFilter):
+class RequiredBinCapacityRangeFilter(NullableRangeFilter):
     """
-    Range filter for minimum container volume per inhabitant (L/person).
+    Range filter for minimum bin capacity per unit (L).
     """
+
     default_range_min = 0
     default_range_max = 1000
     default_range_step = 1
     default_include_null = True
-    unit = 'L/person'
+    unit = "L"
 
     def set_min_max(self):
         min_val = self.default_range_min
-        from .models import Collection
-
-        values = Collection.objects.exclude(min_ton_volume_per_inhabitant__isnull=True)
+        values = Collection.objects.exclude(required_bin_capacity__isnull=True)
         if values.exists():
-            max_val = values.aggregate(Max("min_ton_volume_per_inhabitant"))[
-                "min_ton_volume_per_inhabitant__max"
+            max_val = values.aggregate(Max("required_bin_capacity"))[
+                "required_bin_capacity__max"
             ]
+            self.default_range_max = max_val
         else:
             max_val = self.default_range_max
         self.extra["widget"] = NullableRangeSliderWidget(
@@ -257,20 +260,8 @@ class MinTonVolumePerInhabitantRangeFilter(NullableRangeFilter):
             }
         )
 
-    def filter(self, qs, range_with_null_flag):
-        if not range_with_null_flag:
-            return qs
-        range_vals, is_null = range_with_null_flag
-        q = Q(
-            min_ton_volume_per_inhabitant__gte=range_vals.start,
-            min_ton_volume_per_inhabitant__lte=range_vals.stop,
-        )
-        if is_null:
-            return qs.filter(q | Q(min_ton_volume_per_inhabitant__isnull=True))
-        return qs.filter(q)
 
-
-class MinTonSizeRangeFilter(NullableRangeFilter):
+class MinBinSizeRangeFilter(NullableRangeFilter):
     default_range_min = 0
     default_range_max = 2000
     default_range_step = 1
@@ -279,11 +270,10 @@ class MinTonSizeRangeFilter(NullableRangeFilter):
 
     def set_min_max(self):
         min_val = self.default_range_min
-        from .models import Collection
 
-        values = Collection.objects.exclude(min_ton_size__isnull=True)
+        values = Collection.objects.exclude(min_bin_size__isnull=True)
         if values.exists():
-            max_val = values.aggregate(Max("min_ton_size"))["min_ton_size__max"]
+            max_val = values.aggregate(Max("min_bin_size"))["min_bin_size__max"]
         else:
             max_val = self.default_range_max
         self.extra["widget"] = NullableRangeSliderWidget(
@@ -295,19 +285,6 @@ class MinTonSizeRangeFilter(NullableRangeFilter):
                 "data-unit": self.unit,
             }
         )
-
-    def filter(self, qs, range_with_null_flag):
-        if not range_with_null_flag:
-            return qs
-        range_vals, is_null = range_with_null_flag
-        if not (bool(is_null) and str(is_null).lower() not in ("false", "0", "")):
-            data = getattr(self.parent, "data", {})
-            key = f"{self.field_name}_isnull"
-            is_null = data.get(key) in (True, "on", "true", "1")
-        q = Q(min_ton_size__gte=range_vals.start, min_ton_size__lte=range_vals.stop)
-        if is_null:
-            return qs.filter(q | Q(min_ton_size__isnull=True))
-        return qs.filter(q)
 
 
 class CollectionFilterSet(CrispyAutocompleteFilterSet):
@@ -371,9 +348,19 @@ class CollectionFilterSet(CrispyAutocompleteFilterSet):
         widget=RadioSelect,
         empty_label="All",
     )
-    min_ton_size = MinTonSizeRangeFilter(label="Min. container size (L)")
-    min_ton_volume_per_inhabitant = MinTonVolumePerInhabitantRangeFilter(
-        label="Min. container volume per inhabitant (L/person)"
+    min_bin_size = MinBinSizeRangeFilter(
+        label="Smallest available bin size (L)",
+        help_text="Smallest physical bin size that the collector provides for this collection.",
+    )
+    required_bin_capacity = RequiredBinCapacityRangeFilter(
+        label="Required bin capacity per unit (L)",
+        help_text="Minimum total bin capacity that must be supplied per reference unit (see below).",
+    )
+    required_bin_capacity_reference = ChoiceFilter(
+        choices=REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES,
+        label="Reference unit for required bin capacity",
+        field_name="required_bin_capacity_reference",
+        help_text="Defines the unit (person, household, property) for which the required bin capacity applies. Leave blank if not specified.",
     )
 
     class Meta:
@@ -389,6 +376,9 @@ class CollectionFilterSet(CrispyAutocompleteFilterSet):
             "connection_rate",
             "seasonal_frequency",
             "optional_frequency",
+            "min_bin_size",
+            "required_bin_capacity",
+            "required_bin_capacity_reference",
             "collections_per_year",
             "spec_waste_collected",
             "fee_system",
@@ -396,8 +386,6 @@ class CollectionFilterSet(CrispyAutocompleteFilterSet):
             "publication_status",
             "owner",
             "connection_type",
-            "min_ton_size",
-            "min_ton_volume_per_inhabitant",
         )
         # catchment_filter must always be applied first, because it grabs the initial queryset and does not filter any
         # existing queryset.
@@ -409,8 +397,8 @@ class CollectionFilterSet(CrispyAutocompleteFilterSet):
         self.filters["connection_rate"].set_min_max()
         self.filters["collections_per_year"].set_min_max()
         self.filters["spec_waste_collected"].set_min_max()
-        self.filters["min_ton_volume_per_inhabitant"].set_min_max()
-        self.filters["min_ton_size"].set_min_max()
+        self.filters["required_bin_capacity"].set_min_max()
+        self.filters["min_bin_size"].set_min_max()
 
     @staticmethod
     def catchment_filter(_, __, value):
