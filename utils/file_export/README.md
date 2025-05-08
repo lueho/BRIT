@@ -10,20 +10,33 @@ The file_export package enables asynchronous export of filtered data to differen
 
 ### Views
 
-#### FilteredListFileExportView
+#### BaseFileExportView (Generic)
 
-A base view for exporting filtered model data to a file.
+A permission-agnostic base view for exporting filtered model data to a file. All permission logic (such as filtering by owner or publication status) must be implemented in a project-specific subclass or wrapper.
 
 ```python
-from utils.file_export.views import FilteredListFileExportView
+from utils.file_export.views import BaseFileExportView
 
-class MyModelExportView(FilteredListFileExportView):
+class MyProjectExportView(BaseFileExportView):
     task_function = my_export_task
     
     def get_filter_params(self, request, params):
-        # Custom filter parameter processing
+        # Implement any project-specific filtering here
         return processed_params
 ```
+
+#### Project-Specific Usage (e.g. BRIT)
+
+To add project-specific permission or filtering logic, implement a wrapper in your project. For example, in BRIT:
+
+```python
+from brit.export_views import BritGenericUserCreatedObjectExportView
+
+class CollectionListFileExportView(BritGenericUserCreatedObjectExportView):
+    model_label = "soilcom.Collection"
+```
+
+See `brit/export_views.py` for details. All permission logic should be kept outside the generic package.
 
 #### ExportModalView
 
@@ -114,8 +127,8 @@ from utils.file_export.storages import write_file_for_download
 from myapp.renderers import MyModelCSVRenderer, MyModelXLSXRenderer
 
 @shared_task
-def export_my_model_data(file_format, filter_params):
-    # Query the data based on filter_params
+def export_my_model_data(file_format, filter_params, context):
+    # Query the data based on filter_params (permission-agnostic)
     queryset = MyModel.objects.filter(**filter_params)
     data = [{'id': obj.id, 'name': obj.name, 'description': obj.description} for obj in queryset]
     
@@ -136,10 +149,10 @@ def export_my_model_data(file_format, filter_params):
 ### Setting Up the Export View
 
 ```python
-from utils.file_export.views import FilteredListFileExportView
+from utils.file_export.views import BaseFileExportView
 from myapp.tasks import export_my_model_data
 
-class MyModelExportView(FilteredListFileExportView):
+class MyModelExportView(BaseFileExportView):
     task_function = export_my_model_data
 ```
 
@@ -147,7 +160,7 @@ class MyModelExportView(FilteredListFileExportView):
 
 ```python
 from django.urls import path
-from utils.file_export.views import FilteredListFileExportProgressView, ExportModalView
+from utils.file_export.views import FilteredListFileExportProgressView, ExportModalView  # or use BaseFileExportView for new code
 from myapp.views import MyModelExportView
 
 urlpatterns = [

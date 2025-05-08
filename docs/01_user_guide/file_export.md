@@ -1,5 +1,15 @@
 # Exporting User-Created Objects
 
+The file_export functionality is provided by the standalone `utils.file_export` app. All detailed usage, API, and integration documentation can be found in `utils/file_export/README.md` within the codebase.
+
+To use file export features in BRIT or any project, add `utils.file_export` as a dependency and follow the instructions in its README.
+
+For project-specific integration patterns (such as BRIT's permission wrappers), see the examples in the README of the standalone app.
+
+---
+
+*This documentation intentionally omits technical details to avoid duplication. Always consult the app-level README for current usage and API patterns.*
+
 This guide describes how to use, extend, and test the generic export workflow for all models derived from `UserCreatedObject`, including Collections and future models. The new export system is secure, DRY, and easy to extend.
 
 ---

@@ -10,54 +10,36 @@ from django.views.generic import TemplateView
 logger = logging.getLogger(__name__)
 
 
-class FilteredListFileExportView(LoginRequiredMixin, View):
+class BaseFileExportView(View):
     """
-    Base view for exporting filtered model data to a file.
-
+    Generic base view for exporting filtered model data to a file.
     Subclasses should define:
     - task_function: The Celery task function to execute
-    - get_filter_params(request, params): Method to process filter parameters
+    - get_filter_params(request, params): Method to process filter parameters (default: no-op)
+    - get_export_context(request, params): Method to provide export context (default: empty dict)
+    This class is permission-agnostic and suitable for use as a standalone package.
     """
-
     task_function = None
 
     def get_filter_params(self, request, params):
         """
-        Process the filter parameters from the request.
-
-        Args:
-            request: The HTTP request
-            params: Dictionary of query parameters
-
-        Returns:
-            Dictionary of processed filter parameters
+        Override in subclasses to process filter parameters.
+        By default, returns params unchanged.
         """
-        params.pop("page", None)
-        list_type = params.pop("list_type", ["public"])[0]
-
-        if list_type == "private":
-            params["owner"] = [request.user.pk]
-        else:
-            params["publication_status"] = ["published"]
         return params
 
     def get_export_context(self, request, params):
         """
-        Build context dict for export task (e.g., user_id, list_type).
+        Override in subclasses to build a context dict for export task.
+        By default, returns empty dict.
         """
-        context = {
-            "user_id": request.user.pk,
-            "list_type": params.get("list_type", ["public"])[0],
-        }
-        return context
+        return {}
 
     def get(self, request, *args, **kwargs):
         """
         Handle GET requests for file export.
-
         Args:
             request: The HTTP request
-
         Returns:
             JSON response with task ID
         """
@@ -76,7 +58,7 @@ class FilteredListFileExportView(LoginRequiredMixin, View):
         return HttpResponse(json.dumps(response_data), content_type="application/json")
 
 
-class GenericUserCreatedObjectExportView(FilteredListFileExportView):
+class GenericUserCreatedObjectExportView(LoginRequiredMixin, BaseFileExportView):
     """
     Generic export view for any UserCreatedObject-derived model.
     Subclasses must define model_label (e.g. 'soilcom.Collection').

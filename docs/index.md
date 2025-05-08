@@ -7,6 +7,8 @@ Welcome to the BRIT User Guide. This section contains all user-facing documentat
 
 ---
 
+*File export is provided by the standalone `utils.file_export` app. See its README for all usage and API details.*
+
 *If you are new to BRIT, start with the How-Tos. For common problems, see Troubleshooting (planned).*  
 
 ---

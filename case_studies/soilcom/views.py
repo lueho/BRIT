@@ -33,7 +33,7 @@ from maps.views import (
     GeoDataSetPublishedFilteredMapView,
     MapMixin,
 )
-from utils.file_export.views import GenericUserCreatedObjectExportView
+from brit.export_views import BritGenericUserCreatedObjectExportView
 from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineFormSetMixin
 from utils.views import (
     OwnedObjectModelSelectOptionsView,
@@ -869,7 +869,7 @@ class CollectionAutoCompleteView(Select2QuerySetView):
         return qs
 
 
-class CollectionListFileExportView(GenericUserCreatedObjectExportView):
+class CollectionListFileExportView(BritGenericUserCreatedObjectExportView):
     model_label = "soilcom.Collection"
 
 

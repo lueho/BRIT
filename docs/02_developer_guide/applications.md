@@ -10,6 +10,7 @@ This document provides a summary of the core and sub-applications in the BRIT pr
 
 ### utils
 - Shared utilities and helper functions used across the project.
+- Includes the standalone `file_export` app. See `utils/file_export/README.md` for all usage, API, and integration details.
 
 ### users
 - User authentication, registration, and management.

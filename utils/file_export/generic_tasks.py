@@ -9,20 +9,14 @@ from .export_registry import get_export_spec
 def export_user_created_object_to_file(
     self, model_label, file_format, query_params, context
 ):
+    """
+    Generic, permission-agnostic export task.
+    Filtering/permission logic must be handled by the caller/context.
+    """
     spec = get_export_spec(model_label)
     qdict = QueryDict("", mutable=True)
     qdict.update(MultiValueDict(query_params))
-    # Build base queryset using context (user_id, list_type)
-    user_id = context.get("user_id")
-    list_type = context.get("list_type", "public")
-    if list_type == "private":
-        base_qs = spec.model.objects.filter(owner_id=user_id)
-    else:
-        # Only filter by publication_status if the field exists
-        if "publication_status" in [f.name for f in spec.model._meta.get_fields()]:
-            base_qs = spec.model.objects.filter(publication_status="published")
-        else:
-            base_qs = spec.model.objects.all()
+    base_qs = spec.model.objects.all()
     qs = spec.filterset(qdict, queryset=base_qs).qs
     data = spec.serializer(qs, many=True).data
     renderer = spec.renderers[file_format]

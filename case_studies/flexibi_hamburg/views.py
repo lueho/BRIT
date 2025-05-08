@@ -7,7 +7,7 @@ from django.views.decorators.clickjacking import xframe_options_exempt
 
 from maps.models import Catchment, GeoDataset
 from maps.views import GeoDataSetPublishedFilteredMapView
-from utils.file_export.views import GenericUserCreatedObjectExportView
+from brit.export_views import BritGenericUserCreatedObjectExportView
 
 from .filters import HamburgRoadsideTreesFilterSet
 
@@ -29,7 +29,7 @@ class RoadsideTreesPublishedMapIframeView(GeoDataSetPublishedFilteredMapView):
     map_title = "Roadside Trees"
 
 
-class HamburgRoadsideTreesListFileExportView(GenericUserCreatedObjectExportView):
+class HamburgRoadsideTreesListFileExportView(BritGenericUserCreatedObjectExportView):
     model_label = "flexibi_hamburg.HamburgRoadsideTrees"
 
 

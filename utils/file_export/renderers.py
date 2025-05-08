@@ -14,7 +14,7 @@ class BaseXLSXRenderer:
         bold = workbook.add_format({'bold': True})
 
         if data:
-            # Define the header row
+
             if not self.column_order:
                 if self.labels:
                     self.column_order = list(self.labels.keys())
@@ -25,7 +25,7 @@ class BaseXLSXRenderer:
             else:
                 header = self.column_order
 
-            # reorder columns in the data to match the given header row
+
             data = [dict((k, row.get(k)) for k in self.column_order)  for row in data]
 
             for col, label in enumerate(header):
