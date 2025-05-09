@@ -1,0 +1,65 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}{{ title }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <h1>{{ title }}</h1>
+    
+    {% if review_items %}
+        <div class="table-responsive">
+            <table class="table table-striped">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Name</th>
+                        <th>Owner</th>
+                        <th>Submitted</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in review_items %}
+                    <tr>
+                        <td>{{ item.verbose_name }}</td>
+                        <td>
+                            <a href="{{ item.detail_url }}">
+                                {{ item }}
+                            </a>
+                        </td>
+                        <td>{{ item.owner.username }}</td>
+                        <td>{{ item.submitted_at|date:"Y-m-d H:i" }}</td>
+                        <td>
+                            <div class="btn-group" role="group">
+                                <form method="post" action="{% url 'moderation:approve_item' content_type_id=item|get_content_type_id object_id=item.id %}" class="d-inline">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-success btn-sm" 
+                                            onclick="return confirm('Are you sure you want to approve this {{ item.verbose_name }}?')">
+                                        <i class="fas fa-check"></i> Approve
+                                    </button>
+                                </form>
+                                <form method="post" action="{% url 'moderation:reject_item' content_type_id=item|get_content_type_id object_id=item.id %}" class="d-inline ml-2">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-danger btn-sm"
+                                            onclick="return confirm('Are you sure you want to reject this {{ item.verbose_name }}?')">
+                                        <i class="fas fa-times"></i> Reject
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        
+        {% include "pagination.html" with page_obj=page_obj %}
+        
+    {% else %}
+        <div class="alert alert-info">
+            <p>There are no items currently in review.</p>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}

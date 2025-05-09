@@ -1,6 +1,10 @@
 {% extends 'simple_detail_card.html' %}
+{% load i18n %}
 
 {% block detail_body %}
+    <div class="mb-3">
+        {% include 'moderation/review_status_badge.html' with object=object %}
+    </div>
     <p class="card-text">
         <strong>Name:</strong><br>
         {{ object.name }}
@@ -188,8 +192,13 @@
 {% endblock detail_body %}
 
 {% block detail_footer %}
-    <a href="javascript:history.go(-1)"><i class="fas fa-fw fa-arrow-left"></i> back</a>
-    <a href="{% url 'collection-list' %}" class="nowrap ml-3">
+    {% if user.is_authenticated %}
+        {% include 'moderation/review_action_buttons.html' with object=object %}
+    {% endif %}
+    
+    <div class="mt-3">
+        <a href="javascript:history.go(-1)"><i class="fas fa-fw fa-arrow-left"></i> back</a>
+        <a href="{% url 'collection-list' %}" class="nowrap ml-3">
         <i class="fas fa-fw fa-list"></i> see all
     </a>
     {% if user == object.owner or user.is_staff %}

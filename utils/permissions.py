@@ -19,6 +19,12 @@ class UserCreatedObjectPermission(permissions.BasePermission):
     """
     Generic permission class for user-created objects.
     Handles ownership, publication_status, and moderation permissions dynamically.
+    
+    Supports the review workflow with methods for checking if a user can:
+    - submit_for_review: Only owners can submit their private objects for review
+    - withdraw_from_review: Only owners can withdraw their objects from review
+    - approve: Only moderators can approve objects in review
+    - reject: Only moderators can reject objects in review
     """
 
     def has_permission(self, request, view):
@@ -64,11 +70,13 @@ class UserCreatedObjectPermission(permissions.BasePermission):
         if not hasattr(obj, 'publication_status'):
             return False  # Deny access if publication_status is undefined
 
-        if obj.publication_status == 'published':
+        from utils.models import UserCreatedObject
+        
+        if obj.publication_status == UserCreatedObject.STATUS_PUBLISHED:
             return True
-        elif obj.publication_status == 'review':
+        elif obj.publication_status == UserCreatedObject.STATUS_REVIEW:
             return obj.owner == request.user or self._is_moderator(request.user, obj)
-        elif obj.publication_status == 'private':
+        elif obj.publication_status == UserCreatedObject.STATUS_PRIVATE:
             return obj.owner == request.user
 
         return False
@@ -78,10 +86,65 @@ class UserCreatedObjectPermission(permissions.BasePermission):
         Determines if the user has moderation permissions for the given object.
         Assumes that a permission named 'can_moderate_<modelname>' exists.
         """
+        if not user or not user.is_authenticated:
+            return False
+            
         model_name = obj._meta.model_name
         perm_codename = f'can_moderate_{model_name}'
         app_label = obj._meta.app_label
         return user.is_staff or user.has_perm(f'{app_label}.{perm_codename}')
+        
+    def has_submit_permission(self, request, obj):
+        """
+        Check if the user can submit an object for review.
+        Only owners can submit their private objects.
+        """
+        from utils.models import UserCreatedObject
+        
+        if not request.user or not request.user.is_authenticated:
+            return False
+            
+        return (obj.owner == request.user and 
+                obj.publication_status == UserCreatedObject.STATUS_PRIVATE)
+    
+    def has_withdraw_permission(self, request, obj):
+        """
+        Check if the user can withdraw an object from review.
+        Only owners can withdraw their objects from review.
+        """
+        from utils.models import UserCreatedObject
+        
+        if not request.user or not request.user.is_authenticated:
+            return False
+            
+        return (obj.owner == request.user and 
+                obj.publication_status == UserCreatedObject.STATUS_REVIEW)
+    
+    def has_approve_permission(self, request, obj):
+        """
+        Check if the user can approve an object.
+        Only moderators can approve objects in review.
+        """
+        from utils.models import UserCreatedObject
+        
+        if not request.user or not request.user.is_authenticated:
+            return False
+            
+        return (self._is_moderator(request.user, obj) and 
+                obj.publication_status == UserCreatedObject.STATUS_REVIEW)
+    
+    def has_reject_permission(self, request, obj):
+        """
+        Check if the user can reject an object.
+        Only moderators can reject objects in review.
+        """
+        from utils.models import UserCreatedObject
+        
+        if not request.user or not request.user.is_authenticated:
+            return False
+            
+        return (self._is_moderator(request.user, obj) and 
+                obj.publication_status == UserCreatedObject.STATUS_REVIEW)
 
 
 class HasModelPermission(permissions.BasePermission):

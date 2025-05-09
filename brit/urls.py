@@ -41,6 +41,7 @@ urlpatterns = [
     path('closecycle/', include('case_studies.closecycle.urls')),
     path('bibliography/', include('bibliography.urls')),
     path('cookies/', include('cookie_consent.urls')),
+    path('moderation/', include('moderation.urls')),
     path('privacy_policy/', PrivacyPolicyView.as_view(), name='privacypolicy'),
     path('api-token-auth/', obtain_auth_token, name='api-token-auth'),
     path('sitemap.xml', sitemap, {'sitemaps': sitemaps}, name='django.contrib.sitemaps.views.sitemap'),

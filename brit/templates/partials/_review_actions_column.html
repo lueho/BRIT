@@ -1,0 +1,5 @@
+<td data-label="Actions">
+    {% if user.is_authenticated %}
+        {% include 'moderation/review_action_buttons.html' with object=item %}
+    {% endif %}
+</td>

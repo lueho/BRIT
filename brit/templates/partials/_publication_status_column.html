@@ -1,9 +1,3 @@
-<td data-label="Public">
-    {% if object.publication_status == 'published' %}
-        <i class="fas fa-fw fa-check"></i>
-    {% elif object.publication_status == 'review' %}
-        <i class="fas fa-fw fa-times"></i>
-    {% elif object.publication_status == 'private' %}
-        <i class="fas fa-fw fa-lock"></i>
-    {% endif %}
+<td data-label="Status">
+    {% include 'moderation/review_status_badge.html' with object=item %}
 </td>

@@ -23,7 +23,8 @@
                                             <th>Name</th>
                                             <th>Description</th>
                                             {% if list_type == 'private' %}
-                                                <th>Public</th>
+                                                <th>Status</th>
+                                                <th>Actions</th>
                                             {% endif %}
                                         </tr>
                                         </thead>
@@ -36,6 +37,7 @@
                                                 <td>{{ item.description }}</td>
                                                 {% if list_type == 'private' %}
                                                     {% include 'partials/_publication_status_column.html' %}
+                                                    {% include 'partials/_review_actions_column.html' %}
                                                 {% endif %}
                                             </tr>
                                         {% endblock list_table_row %}

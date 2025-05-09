@@ -1,0 +1,15 @@
+{% load i18n %}
+
+{% if object.is_private %}
+<span class="badge bg-secondary" title="{% trans 'Private' %}">
+    <i class="fas fa-lock"></i> {% trans "Private" %}
+</span>
+{% elif object.is_in_review %}
+<span class="badge bg-warning text-dark" title="{% trans 'In Review' %}{% if object.submitted_at %} - {{ object.submitted_at|date:'Y-m-d H:i' }}{% endif %}">
+    <i class="fas fa-search"></i> {% trans "In Review" %}
+</span>
+{% elif object.is_published %}
+<span class="badge bg-success" title="{% trans 'Published' %}{% if object.approved_at %} - {{ object.approved_at|date:'Y-m-d H:i' }}{% endif %}">
+    <i class="fas fa-globe"></i> {% trans "Published" %}
+</span>
+{% endif %}
