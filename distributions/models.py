@@ -4,7 +4,7 @@ from django.db.models import Max
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-from users.models import get_default_owner
+from users.utils import get_default_owner
 from utils.models import NamedUserCreatedObject, UserCreatedObject
 
 

@@ -3,14 +3,14 @@ from decimal import Decimal
 from django.conf import settings
 from django.db import models
 from django.db.models import Max
-from django.db.models.signals import post_save
+from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.urls import reverse
 from factory.django import mute_signals
 
 from bibliography.models import Source
 from distributions.models import TemporalDistribution, Timestep
-from users.models import get_default_owner
+from users.utils import get_default_owner
 from utils.models import NamedUserCreatedObject, UserCreatedObjectManager
 
 
@@ -60,10 +60,12 @@ def get_default_material_pk():
 
 class MaterialComponentManager(UserCreatedObjectManager):
     def default(self):
-        return self.get_queryset().get(name='Fresh Matter (FM)', owner=get_default_owner())
+        name=getattr(settings, 'DEFAULT_MATERIAL_NAME', 'Fresh Matter (FM)')
+        return self.get_queryset().get(name=name, owner=get_default_owner())
 
     def other(self):
-        return self.get_queryset().get(name='Other', owner=get_default_owner())
+        name=getattr(settings, 'DEFAULT_OTHER_MATERIAL_NAME', 'Other')
+        return self.get_queryset().get_or_create(name=name, owner=get_default_owner())[0]
 
 
 class MaterialComponent(BaseMaterial):
@@ -88,20 +90,21 @@ def add_type_component(sender, instance, created, **kwargs):
 
 
 def get_default_component():
-    return MaterialComponent.objects.get_or_create(
-        name=getattr(settings, 'DEFAULT_MATERIALCOMPONENT_NAME', 'Fresh Matter (FM)')
-    )[0]
+    # Import inside function to avoid circular imports
+    from .utils import get_default_component as utils_get_default_component
+    return utils_get_default_component()
 
 
 def get_default_component_pk():
-    return MaterialComponent.objects.get_or_create(
-        name=getattr(settings, 'DEFAULT_MATERIALCOMPONENT_NAME', 'Fresh Matter (FM)')
-    )[0].pk
+    # Import inside function to avoid circular imports
+    from .utils import get_default_component as utils_get_default_component
+    return utils_get_default_component().pk
 
 
 class MaterialComponentGroupManager(UserCreatedObjectManager):
     def default(self):
-        return self.get_queryset().get(name='Total Material')
+        name = getattr(settings, 'DEFAULT_MATERIALCOMPONENTGROUP_NAME', 'Total Material')
+        return self.get_queryset().get_or_create(name=name)[0]
 
 
 class MaterialComponentGroup(NamedUserCreatedObject):
@@ -118,9 +121,9 @@ class MaterialComponentGroup(NamedUserCreatedObject):
 
 
 def get_default_group():
-    return MaterialComponentGroup.objects.get_or_create(
-        name=getattr(settings, 'DEFAULT_MATERIALCOMPONENTGROUP_NAME', 'Total Material')
-    )[0]
+    # Import inside function to avoid circular imports
+    from .utils import get_default_component_group
+    return get_default_component_group()
 
 
 class AnalyticalMethod(NamedUserCreatedObject):
@@ -191,9 +194,8 @@ class SampleSeries(NamedUserCreatedObject):
     """
     material = models.ForeignKey(
         Material,
-        default=get_default_material_pk,
         on_delete=models.PROTECT,
-        related_name='sample_series'
+        related_name='sample_series',
     )
     image = models.ImageField(upload_to='materials_sampleseries/', blank=True, null=True)
     publish = models.BooleanField(default=False)
@@ -359,7 +361,6 @@ class Sample(NamedUserCreatedObject):
     image = models.ImageField(upload_to='materials_sample/', blank=True, null=True)
     material = models.ForeignKey(
         Material,
-        default=get_default_material_pk,
         on_delete=models.PROTECT,
         related_name='samples',
         help_text='If no option fits, please choose "Other" and specify the material in the description.'
@@ -456,10 +457,18 @@ class Composition(NamedUserCreatedObject):
     fractions_of = models.ForeignKey(
         MaterialComponent,
         on_delete=models.PROTECT,
-        default=get_default_component_pk,
+        null=True,
+        blank=True,
         help_text='The component that the weight fractions of this composition are fractions of. Must be a component that is already defined.'
     )
     order = models.IntegerField(default=90)
+    
+    def save(self, *args, **kwargs):
+        # Set default component group if not provided
+        if not self.group_id:
+            from .utils import get_default_component_group
+            self.group = get_default_component_group()
+        super().save(*args, **kwargs)
 
     class Meta:
         ordering = ['order']
@@ -571,6 +580,12 @@ class Composition(NamedUserCreatedObject):
 
     def __str__(self):
         return f'Composition of {self.group.name} of sample {self.sample.name}'
+
+
+@receiver(pre_save, sender=Composition)
+def set_default_material(sender, instance, **kwargs):
+    if instance.fractions_of is None:
+        instance.fractions_of = MaterialComponent.objects.default()
 
 
 @receiver(post_save, sender=Composition)

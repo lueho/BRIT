@@ -17,7 +17,7 @@ from django.utils.translation import gettext as _
 
 from distributions.models import TemporalDistribution, Timestep
 from materials.models import Material, Sample
-from users.models import get_default_owner
+from users.utils import get_default_owner
 from utils.crispy_fields import ForeignkeyField
 from utils.forms import (
     AutoCompleteModelForm,

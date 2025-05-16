@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
+{% load moderation_tags %}
 
 {% block title %}{{ title }}{% endblock %}
 
@@ -54,7 +55,7 @@
             </table>
         </div>
         
-        {% include "pagination.html" with page_obj=page_obj %}
+        {% include "partials/_pagination.html" with page_obj=page_obj %}
         
     {% else %}
         <div class="alert alert-info">

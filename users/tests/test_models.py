@@ -2,7 +2,7 @@ from django.contrib.auth.models import Group, User
 from django.test import TestCase
 import os
 
-from ..models import get_default_owner
+from users.utils import get_default_owner
 
 
 class InitialDataTestCase(TestCase):

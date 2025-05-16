@@ -5,7 +5,7 @@ from django.db import models
 from django.db.models import Q
 from django.urls import exceptions, reverse
 
-from users.models import get_default_owner
+from users.utils import get_default_owner
 
 
 class CRUDUrlsMixin(models.Model):

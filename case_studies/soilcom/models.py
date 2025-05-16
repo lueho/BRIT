@@ -13,7 +13,7 @@ from bibliography.models import Source
 from distributions.models import Period, TemporalDistribution, Timestep
 from maps.models import Catchment, GeoPolygon
 from materials.models import Material, MaterialCategory, Sample, SampleSeries
-from users.models import get_default_owner
+from users.utils import get_default_owner
 from utils.models import (
     NamedUserCreatedObject,
     UserCreatedObject,
@@ -550,7 +550,7 @@ class Collection(NamedUserCreatedObject):
         if not self.predecessors.filter(id=predecessor.id).exists():
             self.predecessors.add(predecessor)
 
-    def approve(self):
+    def approve(self, user=None):
         """
         Publish the collection and invalidate predecessors.
 
@@ -563,7 +563,7 @@ class Collection(NamedUserCreatedObject):
 
         with transaction.atomic():
             # First publish the successor itself
-            super().approve()
+            super().approve(user=user)
 
             # Then expire predecessors
             update_date = self.valid_from - timedelta(days=1)

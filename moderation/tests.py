@@ -371,7 +371,11 @@ class ReviewWorkflowViewTests(TestCase):
         self.assertEqual(response.status_code, 200)
         
         # Dashboard should contain objects in review
-        self.assertContains(response, 'Review Collection')
+        expected_name = self.review_collection.construct_name()
+        if expected_name not in response.content.decode():
+            print('DASHBOARD HTML FOR DEBUGGING:')
+            print(response.content.decode())
+        self.assertContains(response, expected_name)
         
         # Regular user should be able to access the dashboard but see no items
         response = self.regular_client.get(url)

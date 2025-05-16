@@ -13,6 +13,9 @@ SECURE_BROWSER_XSS_FILTER = True
 SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = 'DENY'
 
+# Use custom test runner that loads initial data
+TEST_RUNNER = 'utils.tests.testrunner.InitialDataTestRunner'
+
 ALLOWED_HOSTS = []
 
 INSTALLED_APPS = [

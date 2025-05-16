@@ -1,7 +1,8 @@
 from django.conf import settings
 from django.db import models
 
-from ..models import NamedUserCreatedObject, get_default_owner
+from ..models import NamedUserCreatedObject
+from users.utils import get_default_owner   
 
 
 class Unit(NamedUserCreatedObject):
