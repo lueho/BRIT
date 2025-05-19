@@ -1,11 +1,10 @@
 from ambient_toolbox.models import CommonInfo
-from django.contrib.auth.models import Group, User
+from django.conf import settings
+from django.contrib.auth.models import User
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
 from django.urls import exceptions, reverse
-
-from users.utils import get_default_owner
 
 
 class CRUDUrlsMixin(models.Model):
@@ -98,29 +97,50 @@ class CRUDUrlsMixin(models.Model):
         return cls._meta.verbose_name_plural
 
 
-def get_default_owner_pk():
-    return get_default_owner().pk
-
-
 class GlobalObject(CRUDUrlsMixin, CommonInfo):
     """
     Abstract base model for Global Objects.
     """
+
     name = models.CharField(max_length=255, unique=True)
     description = models.TextField(blank=True, null=True)
 
     class Meta:
         abstract = True
-        ordering = ['name']
+        ordering = ["name"]
 
     def __str__(self):
         return self.name
 
 
+def get_default_owner():
+    """
+    Returns the default owner User instance, using DEFAULT_OBJECT_OWNER_USERNAME or ADMIN_USERNAME.
+    Raises RuntimeError if the user does not exist.
+    """
+    username = getattr(settings, "DEFAULT_OBJECT_OWNER_USERNAME", None)
+    if not username:
+        username = getattr(settings, "ADMIN_USERNAME", None)
+    if not username:
+        raise RuntimeError(
+            "Neither DEFAULT_OBJECT_OWNER_USERNAME in settings nor ADMIN_USERNAME env var is set."
+        )
+    try:
+        return User.objects.get(username=username)
+    except User.DoesNotExist:
+        raise RuntimeError(
+            f"Default owner user '{username}' does not exist. Run ensure_initial_data."
+        )
+
+
+def get_default_owner_pk():
+    return get_default_owner().pk
+
+
 STATUS_CHOICES = (
-    ('private', 'Private'),
-    ('review', 'Under Review'),
-    ('published', 'Published'),
+    ("private", "Private"),
+    ("review", "Under Review"),
+    ("published", "Published"),
 )
 
 
@@ -145,9 +165,9 @@ class UserCreatedObjectQuerySet(models.QuerySet):
             return self.all()
         else:
             return self.filter(
-                Q(owner=user) |
-                Q(publication_status=UserCreatedObject.STATUS_PUBLISHED) |
-                Q(publication_status=UserCreatedObject.STATUS_REVIEW, owner=user)
+                Q(owner=user)
+                | Q(publication_status=UserCreatedObject.STATUS_PUBLISHED)
+                | Q(publication_status=UserCreatedObject.STATUS_REVIEW, owner=user)
             )
 
     def _is_moderator(self, user):
@@ -156,9 +176,9 @@ class UserCreatedObjectQuerySet(models.QuerySet):
         Assumes that a permission named 'can_moderate_<modelname>' exists.
         """
         model_name = self.model._meta.model_name
-        perm_codename = f'can_moderate_{model_name}'
+        perm_codename = f"can_moderate_{model_name}"
         app_label = self.model._meta.app_label
-        return user.is_staff or user.has_perm(f'{app_label}.{perm_codename}')
+        return user.is_staff or user.has_perm(f"{app_label}.{perm_codename}")
 
 
 class UserCreatedObjectManager(models.Manager):
@@ -179,15 +199,21 @@ class UserCreatedObjectManager(models.Manager):
 
 
 class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
-    STATUS_PRIVATE = 'private'
-    STATUS_REVIEW = 'review'
-    STATUS_PUBLISHED = 'published'
+    STATUS_PRIVATE = "private"
+    STATUS_REVIEW = "review"
+    STATUS_PUBLISHED = "published"
 
-    owner = models.ForeignKey(User, on_delete=models.PROTECT, default=get_default_owner_pk)
-    publication_status = models.CharField(max_length=10, choices=STATUS_CHOICES, default=STATUS_PRIVATE)
+    owner = models.ForeignKey(
+        User, on_delete=models.PROTECT, default=get_default_owner_pk
+    )
+    publication_status = models.CharField(
+        max_length=10, choices=STATUS_CHOICES, default=STATUS_PRIVATE
+    )
     submitted_at = models.DateTimeField(null=True, blank=True)
     approved_at = models.DateTimeField(null=True, blank=True)
-    approved_by = models.ForeignKey(User, null=True, blank=True, on_delete=models.PROTECT, related_name='+')
+    approved_by = models.ForeignKey(
+        User, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    )
 
     objects = UserCreatedObjectManager()
 
@@ -196,7 +222,7 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
     class Meta:
         abstract = True
         indexes = [
-            models.Index(fields=['publication_status']),
+            models.Index(fields=["publication_status"]),
         ]
 
     def submit_for_review(self):
@@ -208,6 +234,7 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
             raise ValidationError("Only private objects can be submitted for review.")
         self.publication_status = self.STATUS_REVIEW
         from django.utils import timezone
+
         self.submitted_at = timezone.now()
         self.approved_at = None
         self.approved_by = None
@@ -236,6 +263,7 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
             raise ValidationError("Only objects in review can be approved.")
         self.publication_status = self.STATUS_PUBLISHED
         from django.utils import timezone
+
         self.approved_at = timezone.now()
         if user is not None:
             self.approved_by = user
@@ -275,7 +303,7 @@ class NamedUserCreatedObject(UserCreatedObject):
 
     class Meta:
         abstract = True
-        ordering = ['name', 'id']
+        ordering = ["name", "id"]
 
     def __str__(self):
         return self.name

@@ -4,7 +4,6 @@ import json
 from django.conf import settings
 from django.core.cache import caches
 
-# This app's initial data depends on the users app (default owner must exist)
 INITIALIZATION_DEPENDENCIES = ["users", "utils.properties"]
 
 

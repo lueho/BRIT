@@ -6,7 +6,7 @@ from django.test import Client, TestCase, modify_settings
 from django.urls import reverse
 from rest_framework.test import APIClient
 
-from users.models import User
+from utils.models import User
 
 
 @modify_settings(

@@ -6,5 +6,5 @@ from django.dispatch import receiver
 @receiver(post_save, sender=User)
 def add_new_user_to_group_registered(sender, instance, created, **kwargs):
     if created:
-        group, _ = Group.objects.get_or_create(name='registered')
+        group, _ = Group.objects.get_or_create(name="registered")
         instance.groups.add(group)

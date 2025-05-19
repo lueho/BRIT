@@ -1,4 +1,4 @@
-from decimal import Decimal, ROUND_HALF_UP
+from decimal import ROUND_HALF_UP, Decimal
 
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Field, Layout, Row
@@ -26,6 +26,7 @@ from utils.forms import (
     SimpleModelForm,
 )
 from utils.widgets import BSModelSelect2, BSModelSelect2Multiple
+
 from .models import (
     AnalyticalMethod,
     Composition,
@@ -185,18 +186,6 @@ class SampleModalModelForm(ModalModelFormMixin, SampleModelForm):
 
 
 class CompositionModelForm(SimpleModelForm):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        # Ensure field values are processed properly with dynamic defaults
-        if not self.instance.pk and not self.data:
-            from .utils import get_default_component_group
-
-            if "group" in self.fields and not self.initial.get("group"):
-                self.initial["group"] = get_default_component_group()
-
-        # Make fractions_of field optional for tests
-        if "fractions_of" in self.fields:
-            self.fields["fractions_of"].required = False
 
     class Meta:
         model = Composition

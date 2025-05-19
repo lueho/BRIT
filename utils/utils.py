@@ -1,0 +1,37 @@
+import os
+
+from django.conf import settings
+from django.contrib.auth.models import User
+from django.utils import timezone
+
+
+def ensure_initial_data(stdout=None):
+    """
+    Ensures all required initial data for the utils app exists.
+    Idempotent: safe to run multiple times.
+    Creates the default owner (from DEFAULT_OBJECT_OWNER_USERNAME if set, else ADMIN_USERNAME).
+    """
+    admin_username = os.environ.get("ADMIN_USERNAME")
+    owner_username = getattr(settings, "DEFAULT_OBJECT_OWNER_USERNAME", admin_username)
+
+    try:
+        default_owner = User.objects.get(username=owner_username)
+    except User.DoesNotExist:
+        default_owner = User(
+            is_active=True,
+            is_superuser=(owner_username == admin_username),
+            is_staff=(owner_username == admin_username),
+            username=owner_username,
+            email="",
+            last_login=timezone.now(),
+        )
+        default_owner.set_unusable_password()
+        default_owner.save()
+
+    if stdout:
+        print(
+            f"Ensured default owner '{owner_username}' exists.",
+            file=stdout,
+        )
+
+    return {"default_owner": default_owner}

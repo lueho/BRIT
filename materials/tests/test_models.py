@@ -15,8 +15,6 @@ from materials.models import (
     Sample,
     SampleSeries,
     WeightShare,
-    get_default_component,
-    get_default_component_pk,
 )
 
 
@@ -49,16 +47,6 @@ class MaterialComponentTestCase(TestCase):
         default = MaterialComponent.objects.default()
         self.assertIsInstance(default, MaterialComponent)
         self.assertEqual(default.name, "Fresh Matter (FM)")
-
-    def test_get_default_material_component_function(self):
-        default_component = get_default_component()
-        self.assertIsInstance(default_component, MaterialComponent)
-        self.assertEqual(default_component.name, "Fresh Matter (FM)")
-
-    def test_get_default_material_component_pk(self):
-        default_component_pk = get_default_component_pk()
-        self.assertIsInstance(default_component_pk, int)
-        self.assertEqual(default_component_pk, get_default_component().pk)
 
     def test_get_other_material_component_manager_function(self):
         default = MaterialComponent.objects.other()

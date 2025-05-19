@@ -3,22 +3,22 @@ from datetime import date, timedelta
 import celery
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
-from django.db import models, transaction
+from django.db import models
 from django.db.models import Count, Q, Sum
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.utils import timezone
 
 from bibliography.models import Source
-from distributions.models import Period, TemporalDistribution, Timestep
-from maps.models import Catchment, GeoPolygon
+from distributions.models import Period, TemporalDistribution
+from maps.models import Catchment
 from materials.models import Material, MaterialCategory, Sample, SampleSeries
-from users.utils import get_default_owner
 from utils.models import (
     NamedUserCreatedObject,
     UserCreatedObject,
     UserCreatedObjectManager,
     UserCreatedObjectQuerySet,
+    get_default_owner,
 )
 from utils.properties.models import PropertyValue
 
@@ -429,10 +429,6 @@ class Collection(NamedUserCreatedObject):
     Represents a waste collection system, including collection parameters, waste stream, and container requirements.
     """
 
-    submitted_at = models.DateTimeField(null=True, blank=True)
-    approved_at = models.DateTimeField(null=True, blank=True)
-    approved_by = models.ForeignKey('auth.User', null=True, blank=True, on_delete=models.PROTECT, related_name='+')
-
     collector = models.ForeignKey(
         Collector, on_delete=models.CASCADE, blank=True, null=True
     )
@@ -568,7 +564,10 @@ class Collection(NamedUserCreatedObject):
             # Then expire predecessors
             update_date = self.valid_from - timedelta(days=1)
             for predecessor in self.predecessors.all():
-                if predecessor.valid_until is None or predecessor.valid_until > update_date:
+                if (
+                    predecessor.valid_until is None
+                    or predecessor.valid_until > update_date
+                ):
                     predecessor.valid_until = update_date
                     predecessor.save(update_fields=["valid_until"])
 
