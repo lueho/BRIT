@@ -398,14 +398,17 @@ class CollectionFilterSet(CrispyAutocompleteFilterSet):
         self.filters["min_bin_size"].set_min_max()
 
     @staticmethod
-    def catchment_filter(_, __, value):
+    def catchment_filter(queryset, _, value):
         if value.type == "custom":
-            qs = value.inside_collections.order_by("name")
+            spatially_related_qs = value.inside_collections.order_by("name")
         else:
-            qs = value.downstream_collections.order_by("name")
-        if not qs.exists():
-            qs = value.upstream_collections.order_by("name")
-        return qs
+            spatially_related_qs = value.downstream_collections.order_by("name")
+            if not spatially_related_qs.exists():
+                spatially_related_qs = value.upstream_collections.order_by("name")
+
+        collection_ids = list(spatially_related_qs.values_list("id", flat=True))
+
+        return queryset.filter(id__in=collection_ids)
 
     @staticmethod
     def get_seasonal_frequency(queryset, _, value):

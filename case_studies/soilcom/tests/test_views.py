@@ -1,18 +1,28 @@
-import json
 from datetime import date, timedelta
 from urllib.parse import urlencode
 
+from django.contrib.gis.geos import MultiPolygon, Polygon
 from django.db.models import signals
 from django.db.models.signals import post_save
 from django.forms.formsets import BaseFormSet
 from django.http import JsonResponse
-from django.http.request import MultiValueDict, QueryDict
+from django.http.request import QueryDict
 from django.test import RequestFactory
 from django.urls import reverse
 from factory.django import mute_signals
-from mock import Mock
 
-from case_studies.soilcom.models import WasteFlyer, check_url_valid
+from case_studies.soilcom.models import (
+    Collection,
+    CollectionCatchment,
+    CollectionPropertyValue,
+    CollectionSystem,
+    Collector,
+    WasteCategory,
+    WasteComponent,
+    WasteFlyer,
+    WasteStream,
+    check_url_valid,
+)
 from distributions.models import TemporalDistribution, Timestep
 from maps.models import (
     GeoDataset,
@@ -29,19 +39,11 @@ from .. import views
 from ..forms import BaseWasteFlyerUrlFormSet, CollectionModelForm
 from ..models import (
     AggregatedCollectionPropertyValue,
-    Collection,
-    CollectionCatchment,
     CollectionCountOptions,
     CollectionFrequency,
-    CollectionPropertyValue,
     CollectionSeason,
-    CollectionSystem,
-    Collector,
     FeeSystem,
-    WasteCategory,
-    WasteComponent,
     WasteFlyer,
-    WasteStream,
 )
 
 
@@ -2077,3 +2079,124 @@ class WasteFlyerListCheckUrlsViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse("wasteflyer-list-check-urls"))
         self.assertEqual(response.status_code, 200)
         mock_delay.assert_called_once()
+
+
+# --- Regression tests -------------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class CollectionFilterWithCatchmentAndPropertiesRegressionTest(
+    ViewWithPermissionsTestCase
+):
+    """
+    Regression test for the following bug: When filtering for a catchment of type 'custom', the following error
+    occurred:
+    ProgrammingError
+    column "maps_geopolygon.geom" must appear in the GROUP BY clause or be used in an aggregate function
+    LINE 1: ...s_geopolygon"."geom"::bytea HAVING (((((ST_Within("maps_geop...
+    """
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+
+        cls.region_geom_poly = Polygon(((0, 0), (0, 10), (10, 10), (10, 0), (0, 0)))
+        cls.region_geom_multipoly = MultiPolygon(cls.region_geom_poly)
+        cls.region = Region.objects.create(
+            name="Test Region for GroupBy Test", geom=cls.region_geom_multipoly
+        )
+        cls.catchment = CollectionCatchment.objects.create(
+            name="Test Catchment for GroupBy Test",
+            region=cls.region,
+            geom=cls.region.geom,
+        )
+
+        cls.collector = Collector.objects.create(name="Test Collector for GroupBy Test")
+        cls.collection_system = CollectionSystem.objects.create(
+            name="Test System for GroupBy Test"
+        )
+        cls.waste_category = WasteCategory.objects.create(
+            name="Bio-waste for GroupBy Test"
+        )
+
+        MaterialCategory.objects.get_or_create(name="Biowaste component")
+
+        cls.waste_component = WasteComponent.objects.create(
+            name="Food scraps for GroupBy Test"
+        )
+        cls.waste_stream = WasteStream.objects.create(
+            name="Organic household waste for GroupBy Test", category=cls.waste_category
+        )
+        cls.waste_stream.allowed_materials.add(cls.waste_component)
+
+        cls.collection1 = Collection.objects.create(
+            name="Test Collection 1 for GroupBy Test",
+            catchment=cls.catchment,
+            collector=cls.collector,
+            collection_system=cls.collection_system,
+            waste_stream=cls.waste_stream,
+            publication_status="published",
+        )
+
+        # Property and Value to trigger the problematic annotation
+        # Using get_or_create for Property to avoid issues if tests are run multiple times
+        # and the "Connection rate" property might already exist from a previous run.
+        cls.connection_rate_property, _ = Property.objects.get_or_create(
+            name="Connection rate", defaults={"unit": "%"}
+        )
+        CollectionPropertyValue.objects.create(
+            collection=cls.collection1,
+            property=cls.connection_rate_property,
+            average=75.0,
+        )
+
+        cls.list_url = reverse("collection-list")
+
+    def test_geojson_with_connection_rate_filter_reproduces_programming_error(self):
+        """
+        Tests that the geojson endpoint with connection_rate_min filter and spatial query
+        reproduces the ProgrammingError related to GROUP BY.
+        """
+
+        query_params = {
+            "csrfmiddlewaretoken": "6FT2ft5HlbqXpjRUolmjklscDKHf9SSOVO1BMxxP5yxjE2iI9BXc7AoNIBSrpRP5",
+            "catchment": self.catchment.pk,
+            "collector": "",
+            "collection_system": "",
+            "filter": "Filter",
+            "connection_type": "",
+            "connection_rate_min": "0",
+            "connection_rate_max": "100",
+            "connection_rate_is_null": "true",
+            "seasonal_frequency": "",
+            "optional_frequency": "",
+            "fee_system": "",
+            "min_bin_size_min": "0",
+            "min_bin_size_max": "120",
+            "min_bin_size_is_null": "true",
+            "required_bin_capacity_min": "0",
+            "required_bin_capacity_max": "120",
+            "required_bin_capacity_is_null": "true",
+            "required_bin_capacity_reference": "",
+            "collections_per_year_min": "0",
+            "collections_per_year_max": "104",
+            "collections_per_year_is_null": "true",
+            "spec_waste_collected_min": "0",
+            "spec_waste_collected_max": "516",
+            "spec_waste_collected_is_null": "true",
+            "valid_on": "2025-05-20",
+        }
+
+        self.client.force_login(self.member)
+        response = self.client.get(self.list_url, query_params)
+        self.assertEqual(response.status_code, 200)
+
+        self.assertEqual(
+            response.context["filter"].data["catchment"], str(self.catchment.pk)
+        )
+
+        self.assertEqual(response.context["filter"].qs.count(), 1)
+
+        self.assertEqual(
+            response.context["filter"].qs.first().catchment, self.catchment
+        )
