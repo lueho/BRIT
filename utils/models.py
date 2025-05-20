@@ -209,11 +209,11 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
     publication_status = models.CharField(
         max_length=10, choices=STATUS_CHOICES, default=STATUS_PRIVATE
     )
-    submitted_at = models.DateTimeField(null=True, blank=True)
-    approved_at = models.DateTimeField(null=True, blank=True)
-    approved_by = models.ForeignKey(
-        User, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
-    )
+    # submitted_at = models.DateTimeField(null=True, blank=True)
+    # approved_at = models.DateTimeField(null=True, blank=True)
+    # approved_by = models.ForeignKey(
+    #     User, null=True, blank=True, on_delete=models.PROTECT, related_name="+"
+    # )
 
     objects = UserCreatedObjectManager()
 
