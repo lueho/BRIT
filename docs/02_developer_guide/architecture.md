@@ -29,6 +29,7 @@ This document provides a high-level overview of the BRIT system architecture, it
 - **Reusable Utilities:** Shared logic in `utils/`.
 - **Class-Based Views:** Preferred for clarity and extensibility.
 - **Signals:** Used for decoupled event handling.
+- **Canonical Initial Data & Default Objects:** All initial data and ForeignKey defaults are managed via fetch-only helpers in `utils.py` and per-app `ensure_initial_data()`. See the [canonical note](../../notes/default_objects_and_initial_data_review.md) and [MADR](../../notes/02_design_decisions/2025-05-16_default_objects_and_initial_data.madr.md).
 
 ---
 
