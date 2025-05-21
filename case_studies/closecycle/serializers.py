@@ -63,9 +63,11 @@ class ShowcaseSummaryListSerializer(ModelSerializer):
         fields = ['summaries']
 
     def to_representation(self, data):
+        # Get the context from the parent serializer
+        context = self.context 
         if isinstance(data, list):
-            return {'summaries': [ShowcaseFlatSerializer(instance).data for instance in data]}
-        return {'summaries': [ShowcaseFlatSerializer(data).data]}
+            return {'summaries': [ShowcaseFlatSerializer(instance, context=context).data for instance in data]}
+        return {'summaries': [ShowcaseFlatSerializer(data, context=context).data]}
 
 
 class ShowcaseGeoFeatureModelSerializer(BaseGeoFeatureModelSerializer):
