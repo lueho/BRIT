@@ -202,6 +202,7 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
     STATUS_PRIVATE = "private"
     STATUS_REVIEW = "review"
     STATUS_PUBLISHED = "published"
+    STATUS_ARCHIVED = "archived"
 
     owner = models.ForeignKey(
         User, on_delete=models.PROTECT, default=get_default_owner_pk

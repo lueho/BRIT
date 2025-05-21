@@ -1,16 +1,21 @@
 from datetime import date, timedelta
+from unittest.mock import patch
 from urllib.parse import urlencode
 
+from django.contrib.auth import get_user_model
+from django.contrib.auth.models import User
 from django.contrib.gis.geos import MultiPolygon, Polygon
+from django.core.exceptions import ValidationError
 from django.db.models import signals
 from django.db.models.signals import post_save
 from django.forms.formsets import BaseFormSet
 from django.http import JsonResponse
 from django.http.request import QueryDict
-from django.test import RequestFactory
+from django.test import RequestFactory, TestCase
 from django.urls import reverse
 from factory.django import mute_signals
 
+from case_studies.soilcom.models import MaterialCategory  # soilcom.MaterialCategory
 from case_studies.soilcom.models import (
     Collection,
     CollectionCatchment,
@@ -31,7 +36,12 @@ from maps.models import (
     MapLayerStyle,
     Region,
 )
-from materials.models import Material, MaterialCategory, Sample, SampleSeries
+from materials.models import (
+    Material,
+    MaterialCategory,
+    Sample,
+    SampleSeries,
+)
 from utils.properties.models import Property, Unit
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 
@@ -784,8 +794,14 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
         )
         return data
 
+    def get_current_list_url(self, publication_status=None):
+        """
+        Returns the URL for the current list view based on the valid_on filter.
+        """
+        return self.get_list_url(publication_status=publication_status)
+
     def get_delete_success_url(self, publication_status=None):
-        return f"{reverse('collection-list-owned')}?valid_on={date.today()}"
+        return reverse("collection-list-owned")
 
     def test_post_get_formset_kwargs_fetches_correct_parent_object(self):
         request = RequestFactory().post(self.get_create_url())
@@ -881,102 +897,6 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
             response, reverse("collection-detail", kwargs={"pk": new_collection.pk})
         )
         self.assertFalse(new_collection.waste_stream.allowed_materials.exists())
-
-    def test_list_view_published_as_anonymous(self):
-        response = self.client.get(self.get_list_url(), follow=True)
-        redirect_url = f'{self.get_list_url()}?{urlencode({"valid_on": date.today()})}'
-        self.assertRedirects(
-            response, redirect_url, status_code=302, target_status_code=200
-        )
-        self.assertNotContains(response, self.get_create_url(), status_code=200)
-
-    def test_list_view_published_as_authenticated_owner(self):
-        self.client.force_login(self.owner_user)
-        response = self.client.get(self.get_list_url(), follow=True)
-        redirect_url = f'{self.get_list_url()}?{urlencode({"valid_on": date.today()})}'
-        self.assertRedirects(
-            response, redirect_url, status_code=302, target_status_code=200
-        )
-        self.assertNotContains(response, self.get_create_url(), status_code=200)
-
-    def test_list_view_published_as_authenticated_non_owner(self):
-        self.client.force_login(self.non_owner_user)
-        response = self.client.get(self.get_list_url(), follow=True)
-        redirect_url = f'{self.get_list_url()}?{urlencode({"valid_on": date.today()})}'
-        self.assertRedirects(
-            response, redirect_url, status_code=302, target_status_code=200
-        )
-        self.assertNotContains(response, self.get_create_url(), status_code=200)
-
-    def test_list_view_published_as_staff_user(self):
-        self.client.force_login(self.staff_user)
-        response = self.client.get(self.get_list_url(), follow=True)
-        redirect_url = f'{self.get_list_url()}?{urlencode({"valid_on": date.today()})}'
-        self.assertRedirects(
-            response, redirect_url, status_code=302, target_status_code=200
-        )
-        self.assertContains(response, self.get_create_url(), status_code=200)
-
-    def test_list_view_private_as_authenticated_owner(self):
-        self.client.force_login(self.owner_user)
-        response = self.client.get(
-            self.get_list_url(publication_status="private"), follow=True
-        )
-        redirect_url = f'{self.get_list_url(publication_status="private")}?{urlencode({"valid_on": date.today()})}'
-        self.assertRedirects(
-            response, redirect_url, status_code=302, target_status_code=200
-        )
-        self.assertContains(response, self.get_dashboard_url())
-        self.assertNotContains(response, self.get_create_url())
-        self.assertContains(response, self.get_list_url(publication_status="published"))
-
-    def test_list_view_private_as_authenticated_non_owner(self):
-        self.client.force_login(self.non_owner_user)
-        response = self.client.get(
-            self.get_list_url(publication_status="private"), follow=True
-        )
-        redirect_url = f'{self.get_list_url(publication_status="private")}?{urlencode({"valid_on": date.today()})}'
-        self.assertRedirects(
-            response, redirect_url, status_code=302, target_status_code=200
-        )
-        self.assertContains(response, self.get_dashboard_url())
-        self.assertNotContains(response, self.get_create_url())
-        self.assertContains(response, self.get_list_url(publication_status="published"))
-
-    def test_list_view_private_as_authenticated_staff_user(self):
-        self.client.force_login(self.staff_user)
-        response = self.client.get(
-            self.get_list_url(publication_status="private"), follow=True
-        )
-        redirect_url = f'{self.get_list_url(publication_status="private")}?{urlencode({"valid_on": date.today()})}'
-        self.assertRedirects(
-            response, redirect_url, status_code=302, target_status_code=200
-        )
-        self.assertContains(response, self.get_dashboard_url())
-        self.assertContains(response, self.get_create_url())
-        self.assertContains(response, self.get_list_url(publication_status="published"))
-
-    def test_list_view_published_pagination_works_without_further_query_parameters(
-        self,
-    ):
-        query_params = urlencode(
-            {"valid_until": date.today() - timedelta(days=2), "page": 2}
-        )
-        response = self.client.get(f"{self.get_list_url()}?{query_params}")
-        self.assertEqual(response.status_code, 200)
-
-    def test_list_view_published_initial_queryset_only_contains_current_collections(
-        self,
-    ):
-        response = self.client.get(self.get_list_url(), follow=True)
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(len(response.context["object_list"]), 1)
-        self.assertQuerySetEqual(
-            Collection.objects.filter(publication_status="published").exclude(
-                valid_until__lt=date.today()
-            ),
-            response.context["object_list"],
-        )
 
     def test_template_contains_predecessor_collections(self):
         response = self.client.get(self.get_detail_url(self.published_object.pk))
@@ -1907,7 +1827,7 @@ class CollectionPredecessorsViewTestCase(
         )
 
 
-class WasteCollectionMapViewTestCase(ViewWithPermissionsTestCase):
+class WasteCollectionPublishedMapViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = (
         "add_collection",
         "view_collection",
@@ -1940,121 +1860,274 @@ class WasteCollectionMapViewTestCase(ViewWithPermissionsTestCase):
             name="Test Catchment", region=region
         )
         cls.collection = Collection.objects.create(
-            name="Test Collection", catchment=catchment
+            name="Test Collection",
+            catchment=catchment,
+            publication_status=Collection.STATUS_PUBLISHED,
         )
 
     def test_http_200_ok_for_anonymous(self):
         response = self.client.get(self.url)
-        redirect_url = (
-            f'{reverse("WasteCollection")}?{urlencode({"valid_on": date.today()})}'
-        )
-        self.assertRedirects(
-            response, redirect_url, status_code=302, target_status_code=200
-        )
+        self.assertEqual(response.status_code, 200)
 
     def test_http_200_ok_for_member(self):
         self.client.force_login(self.member)
         response = self.client.get(self.url)
-        redirect_url = (
-            f'{reverse("WasteCollection")}?{urlencode({"valid_on": date.today()})}'
-        )
-        self.assertRedirects(
-            response, redirect_url, status_code=302, target_status_code=200
-        )
+        self.assertEqual(response.status_code, 200)
 
     def test_uses_correct_template(self):
         self.client.force_login(self.member)
         response = self.client.get(self.url, follow=True)
-        redirect_url = f'{self.url}?{urlencode({"valid_on": date.today()})}'
-        self.assertRedirects(
-            response, redirect_url, status_code=302, target_status_code=200
-        )
         self.assertTemplateUsed(response, "waste_collection_map.html")
 
     def test_create_collection_option_visible_for_member(self):
         self.client.force_login(self.member)
         response = self.client.get(self.url, follow=True)
-        redirect_url = f'{self.url}?{urlencode({"valid_on": date.today()})}'
-        self.assertRedirects(
-            response, redirect_url, status_code=302, target_status_code=200
-        )
         self.assertContains(response, "Add new collection")
 
     def test_create_collection_option_not_available_for_outsider(self):
         self.client.force_login(self.outsider)
         response = self.client.get(self.url, follow=True)
-        redirect_url = f'{self.url}?{urlencode({"valid_on": date.today()})}'
-        self.assertRedirects(
-            response, redirect_url, status_code=302, target_status_code=200
-        )
         self.assertNotContains(response, "Add new collection")
 
     def test_copy_collection_option_visible_for_member(self):
         self.client.force_login(self.member)
         response = self.client.get(self.url, follow=True)
-        redirect_url = f'{self.url}?{urlencode({"valid_on": date.today()})}'
-        self.assertRedirects(
-            response, redirect_url, status_code=302, target_status_code=200
-        )
         self.assertContains(response, "Copy selected collection")
 
     def test_copy_collection_option_not_available_for_outsider(self):
         self.client.force_login(self.outsider)
         response = self.client.get(self.url, follow=True)
-        redirect_url = f'{self.url}?{urlencode({"valid_on": date.today()})}'
-        self.assertRedirects(
-            response, redirect_url, status_code=302, target_status_code=200
-        )
         self.assertNotContains(response, "Copy selected collection")
 
     def test_update_collection_option_visible_for_staff(self):
         self.client.force_login(self.staff)
         response = self.client.get(self.url, follow=True)
-        redirect_url = f'{self.url}?{urlencode({"valid_on": date.today()})}'
-        self.assertRedirects(
-            response, redirect_url, status_code=302, target_status_code=200
-        )
         self.assertContains(response, "Edit selected collection")
 
     def test_update_collection_option_not_available_for_outsider(self):
         self.client.force_login(self.outsider)
         response = self.client.get(self.url, follow=True)
-        redirect_url = f'{self.url}?{urlencode({"valid_on": date.today()})}'
-        self.assertRedirects(
-            response, redirect_url, status_code=302, target_status_code=200
-        )
         self.assertNotContains(response, "Edit selected collection")
 
     def test_collection_dashboard_option_visible_for_member(self):
         self.client.force_login(self.member)
         response = self.client.get(self.url, follow=True)
-        redirect_url = f'{self.url}?{urlencode({"valid_on": date.today()})}'
-        self.assertRedirects(
-            response, redirect_url, status_code=302, target_status_code=200
-        )
         self.assertContains(response, "Waste collection explorer")
 
     def test_collection_dashboard_option_not_available_for_outsider(self):
         self.client.force_login(self.outsider)
         response = self.client.get(self.url, follow=True)
-        redirect_url = f'{self.url}?{urlencode({"valid_on": date.today()})}'
-        self.assertRedirects(
-            response, redirect_url, status_code=302, target_status_code=200
-        )
         self.assertContains(response, "Waste collection explorer")
 
     def test_range_slider_static_files_are_embedded(self):
         self.client.force_login(self.member)
         response = self.client.get(self.url, follow=True)
-        redirect_url = f'{self.url}?{urlencode({"valid_on": date.today()})}'
-        self.assertRedirects(
-            response, redirect_url, status_code=302, target_status_code=200
-        )
         self.assertContains(response, "range_slider.min.js")
         self.assertContains(response, "range_slider.min.css")
 
 
-from unittest.mock import patch
+class CollectionReviewProcessWithPredecessorsTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        # Ensure a MaterialCategory (materials.models) for "Biowaste component" exists
+        # This might be used by signals or other underlying logic.
+        MaterialCategory.objects.get_or_create(name="Biowaste component")
+
+        # Create a test user with necessary permissions
+        cls.user = User.objects.create_user(
+            username="testuser", password="12345", is_staff=True, is_superuser=True
+        )
+
+        # Create common related objects (Collector, System, Catchment)
+        # Assuming these models have an 'owner' field like others.
+        cls.collector = Collector.objects.create(name="Test Collector", owner=cls.user)
+        cls.collection_system = CollectionSystem.objects.create(
+            name="Test System", owner=cls.user
+        )
+        cls.catchment = CollectionCatchment.objects.create(
+            name="Test Catchment", owner=cls.user
+        )
+
+        # Create WasteCategory (soilcom.models)
+        cls.waste_category = WasteCategory.objects.create(
+            name="Test Waste Category", owner=cls.user
+        )
+
+        # Create MaterialCategory (soilcom.models) for "Biowaste component"
+        # This is distinct from the MaterialCategory above.
+        cls.soilcom_biowaste_material_category, _ = (
+            MaterialCategory.objects.get_or_create(
+                name="Biowaste component", defaults={"owner": cls.user}
+            )
+        )
+
+        # Create WasteComponent and associate with the soilcom.MaterialCategory
+        cls.waste_component = WasteComponent.objects.create(
+            name="Test Component", owner=cls.user, type="material"
+        )
+        cls.waste_component.categories.add(cls.soilcom_biowaste_material_category)
+
+        # Create WasteStream
+        cls.waste_stream = WasteStream.objects.create(
+            name="Test Stream", category=cls.waste_category, owner=cls.user
+        )
+
+        cls.waste_stream.allowed_materials.add(cls.waste_component)
+
+        # Create MaterialCategory and Material (materials.models)
+        cls.material_category = MaterialCategory.objects.create(
+            name="Test Material Category", owner=cls.user
+        )
+        cls.material = Material.objects.create(
+            name="Test Material",
+            owner=cls.user,
+        )
+        cls.material.categories.add(cls.material_category)
+
+        # Add the Material to the WasteStream's allowed materials
+        cls.waste_stream.allowed_materials.add(cls.material)
+        cls.waste_stream.save()  # Save WasteStream after M2M modifications
+
+        # Create a base published collection for use in tests
+        # Assumes Collection.catchment is a ManyToManyField to CollectionCatchment
+        cls.published_collection = Collection.objects.create(
+            catchment=cls.catchment,
+            collector=cls.collector,
+            collection_system=cls.collection_system,
+            waste_stream=cls.waste_stream,
+            valid_from=date.today() - timedelta(days=30),
+            valid_until=date.today() + timedelta(days=30),
+            publication_status=Collection.STATUS_PUBLISHED,
+            owner=cls.user,
+            connection_type="VOLUNTARY",
+        )
+
+    def setUp(self):
+        """
+        Prepare environment for each test method.
+        Re-fetch mutable objects from DB to ensure test isolation with TransactionTestCase.
+        Log in the test user.
+        """
+        # Re-fetch user to ensure a fresh object (though often not strictly needed for user itself if not modified)
+        self.client.force_login(self.user)
+
+        # Re-fetch objects that might be modified by tests or require a pristine state
+        self.collector = Collector.objects.get(pk=self.collector.pk)
+        self.collection_system = CollectionSystem.objects.get(
+            pk=self.collection_system.pk
+        )
+        self.catchment = CollectionCatchment.objects.get(pk=self.catchment.pk)
+        self.waste_category = WasteCategory.objects.get(pk=self.waste_category.pk)
+        self.waste_stream = WasteStream.objects.get(pk=self.waste_stream.pk)
+
+        # Crucially, refresh the published_collection as its attributes (e.g., valid_until, status) can change
+        self.published_collection = Collection.objects.get(
+            pk=self.published_collection.pk
+        )
+
+    def test_predecessor_visibility_during_versioning(self):
+        """Test that the predecessor remains visible until the new version is published."""
+        # 1. Create a new version of the collection via POST request
+        # The form data should accurately reflect the fields expected by the view/form.
+
+        form_data = {
+            "catchment": self.catchment.pk,
+            "collector": self.collector.pk,
+            "collection_system": self.collection_system.pk,
+            "waste_category": self.waste_category.pk,
+            "connection_type": "VOLUNTARY",
+            "waste_stream": self.waste_stream.pk,
+            "valid_from": date.today(),
+            "form-TOTAL_FORMS": 1,
+            "form-INITIAL_FORMS": 0,
+            "form-0-url": "https://www.test-flyer.org",
+            "form-0-id": "",
+        }
+        response = self.client.post(
+            reverse(
+                "collection-new-version", kwargs={"pk": self.published_collection.pk}
+            ),
+            form_data,
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200, "Failed to create new version")
+
+        new_version = Collection.objects.get(
+            predecessors=self.published_collection,
+            valid_from=form_data["valid_from"],
+            owner=self.user,
+        )
+
+        self.assertIsNotNone(
+            new_version, "New version was not created or could not be found."
+        )
+
+        # 2. Verify new version is private, predecessor is still published
+        self.assertEqual(new_version.publication_status, Collection.STATUS_PRIVATE)
+        self.published_collection.refresh_from_db()
+        self.assertEqual(
+            self.published_collection.publication_status, Collection.STATUS_PUBLISHED
+        )
+
+        # 3. Verify predecessor is visible in list view
+        collections = self.client.get(reverse("collection-list")).context["object_list"]
+        self.assertIn(self.published_collection, collections)
+        self.assertNotIn(new_version, collections)
+
+        # 4. Private object cannot be approved before submission for review.
+        with self.assertRaises(ValidationError):
+            new_version.approve(user=self.user)
+
+        # 5. Submit new version for review
+        new_version.submit_for_review()
+        new_version.refresh_from_db()
+
+        # 6. Publish the new version
+        new_version.approve(
+            user=self.user
+        )  # Assumes 'approve' method handles status change
+        new_version.refresh_from_db()
+
+        # 7. After publishing the new version, predecessor should be archived
+        self.published_collection.refresh_from_db()
+        self.assertEqual(
+            self.published_collection.publication_status, Collection.STATUS_ARCHIVED
+        )
+
+        # 7. Verify new version is now published
+        self.assertEqual(new_version.publication_status, Collection.STATUS_PUBLISHED)
+
+        # 8. Verify both versions appear in the list view (if business logic requires)
+        collections = self.client.get(reverse("collection-list")).context["object_list"]
+        self.assertIn(new_version, collections)
+        self.assertNotIn(self.published_collection, collections)
+
+        # 9. Verify predecessor/successor relationships
+        self.assertIn(self.published_collection, new_version.predecessors.all())
+        self.assertIn(new_version, self.published_collection.successors.all())
+
+    def test_approve_only_allowed_from_review(self):
+        """Test that approve() raises ValidationError if called on a non-review status."""
+        for status in [
+            Collection.STATUS_PRIVATE,
+            Collection.STATUS_PUBLISHED,
+            Collection.STATUS_ARCHIVED,
+        ]:
+            collection = Collection.objects.create(
+                catchment=self.catchment,
+                collector=self.collector,
+                collection_system=self.collection_system,
+                waste_stream=self.waste_stream,
+                valid_from=date.today() + timedelta(days=100),
+                valid_until=date.today() + timedelta(days=120),
+                publication_status=status,
+                owner=self.user,
+                connection_type="VOLUNTARY",
+            )
+            with self.assertRaises(ValidationError) as cm:
+                collection.approve(user=self.user)
+            self.assertIn("Only objects in review can be approved", str(cm.exception))
 
 
 class WasteFlyerListCheckUrlsViewTestCase(ViewWithPermissionsTestCase):
@@ -2137,6 +2210,9 @@ class CollectionFilterWithCatchmentAndPropertiesRegressionTest(
             waste_stream=cls.waste_stream,
             publication_status="published",
         )
+        # Ensure this is the only published collection and has no published successors
+        # (No successors created here)
+        # If any other collections are created in the future, ensure they are not published or not successors of this one.
 
         # Property and Value to trigger the problematic annotation
         # Using get_or_create for Property to avoid issues if tests are run multiple times
@@ -2184,7 +2260,6 @@ class CollectionFilterWithCatchmentAndPropertiesRegressionTest(
             "spec_waste_collected_min": "0",
             "spec_waste_collected_max": "516",
             "spec_waste_collected_is_null": "true",
-            "valid_on": "2025-05-20",
         }
 
         self.client.force_login(self.member)

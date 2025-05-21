@@ -5,7 +5,6 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Column, Field, Layout, Row, Submit
 from django.db.models import Avg, Count, Max, Q, Sum
 from django.forms import CheckboxSelectMultiple, DateInput, RadioSelect
-from django.utils import timezone
 from django_filters import (
     BooleanFilter,
     CharFilter,
@@ -339,7 +338,6 @@ class CollectionFilterSet(CrispyAutocompleteFilterSet):
     valid_on = DateFilter(
         method="filter_valid_on",
         widget=DateInput(attrs={"type": "date"}),
-        initial=timezone.now().date(),
         label="Valid on",
     )
     connection_type = ChoiceFilter(

@@ -14,7 +14,6 @@ from django.views import View
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.generic import TemplateView
 
-import case_studies.soilcom.tasks
 from bibliography.views import (
     SourceCheckUrlView,
     SourceCreateView,
@@ -49,6 +48,7 @@ from utils.views import (
     UserCreatedObjectModalUpdateView,
     UserCreatedObjectUpdateView,
 )
+
 from .filters import CollectionFilterSet, CollectorFilter, WasteFlyerFilter
 from .forms import (
     AggregatedCollectionPropertyValueModelForm,
@@ -645,36 +645,16 @@ class CollectionCatchmentUpdateView(CatchmentUpdateView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CollectionCurrentPublishedListView(PublishedObjectFilterView):
+class CollectionPublishedListView(PublishedObjectFilterView):
     model = Collection
     filterset_class = CollectionFilterSet
     dashboard_url = reverse_lazy("wastecollection-dashboard")
 
-    def get_queryset(self):
-        queryset = super().get_queryset()
 
-        # Check if it's a GET request and no query parameters are present
-        # This implies that the user has just opened the page and no filtering has been applied yet.
-        if self.request.method == "GET" and not self.request.GET:
-            queryset = queryset.currently_valid()
-
-        return queryset
-
-
-class CollectionCurrentPrivateListView(PrivateObjectFilterView):
+class CollectionPrivateListView(PrivateObjectFilterView):
     model = Collection
     filterset_class = CollectionFilterSet
     dashboard_url = reverse_lazy("wastecollection-dashboard")
-
-    def get_queryset(self):
-        queryset = super().get_queryset()
-
-        # Check if it's a GET request and no query parameters are present
-        # This implies that the user has just opened the page and no filtering has been applied yet.
-        if self.request.method == "GET" and not self.request.GET:
-            queryset = queryset.currently_valid()
-
-        return queryset
 
 
 class CollectionCreateView(M2MInlineFormSetMixin, UserCreatedObjectCreateView):
