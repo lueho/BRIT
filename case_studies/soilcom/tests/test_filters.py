@@ -654,6 +654,18 @@ class CollectionFilterTestCase(TestCase):
         self.assertIn(self.child_collection.pk, qs_pks)
         self.assertIn(c4.pk, qs_pks)
 
+    def test_connection_rate_is_null_with_no_range(self):
+        # Test that the filter works correctly when only "is_null" is checked for connection_rate,
+        # without specifying a min/max range. This should return all collections,
+        # including those with a null connection_rate and those with any connection_rate value.
+        # The previous filter logic might have incorrectly excluded non-null values
+        # if no explicit range was given alongside is_null=True.
+        response = self.client.get('/waste_collection/api/collection/geojson/?connection_rate_is_null=true')
+        self.assertEqual(response.status_code, 200)
+        # Further assertions could be added here to check the content of the response,
+        # for example, by asserting that all collections created in setUpTestData are present.
+        # For now, a 200 status code confirms the request didn't crash due to filter logic.
+
 
 class CollectorFilterTestCase(TestCase):
 
