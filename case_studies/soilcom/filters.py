@@ -194,28 +194,57 @@ class NullableCollectionPropertyValueRangeFilter(NullableRangeFilter):
         if not percentage_range_with_null_flag:
             return qs
         range_, is_null = percentage_range_with_null_flag
-        property_filter = Q(
-            collectionpropertyvalue__property__name=self.property_name,
-            collectionpropertyvalue__average__gt=0.0,
-        )
-        qs = qs.annotate(
-            average_collectionpropertyvalue_average=Avg(
-                "collectionpropertyvalue__average", filter=property_filter
+        # Ensure that an Avg annotation with the same name doesn't already exist
+        # to prevent Django from raising an error.
+        # A simple way is to check the query's annotations.
+        annotation_name = 'average_collectionpropertyvalue_average'
+        if annotation_name not in qs.query.annotations:
+            property_filter = Q(
+                collectionpropertyvalue__property__name=self.property_name,
+                collectionpropertyvalue__average__gt=0.0,
             )
-        )
-        if is_null:
-            qs = qs.filter(
-                Q(
-                    average_collectionpropertyvalue_average__gte=range_.start,
-                    average_collectionpropertyvalue_average__lte=range_.stop,
-                )
-                | Q(average_collectionpropertyvalue_average__isnull=True)
+            qs = qs.annotate(
+                **{annotation_name: Avg(
+                    "collectionpropertyvalue__average", filter=property_filter
+                )}
             )
         else:
-            qs = qs.filter(
-                average_collectionpropertyvalue_average__gte=range_.start,
-                average_collectionpropertyvalue_average__lte=range_.stop,
-            )
+            # If the annotation already exists, we assume it's compatible.
+            # This might happen if the filter is applied multiple times or
+            # if another part of the code already added a similar annotation.
+            pass
+
+
+        range_q = Q()
+        if range_.start is not None:
+            range_q &= Q(**{f"{annotation_name}__gte": range_.start})
+        if range_.stop is not None:
+            range_q &= Q(**{f"{annotation_name}__lte": range_.stop})
+
+        if is_null:
+            # If range_q is empty (no start/stop given), this OR condition means:
+            # "everything (matching other filters) OR where average is null"
+            # which simplifies to "everything (matching other filters)" if nulls are already included,
+            # or effectively Q() | Q(average_isnull=True).
+            # If range_q is Q() (neither start nor stop are set)
+            # then filter becomes Q() | Q(average_collectionpropertyvalue_average__isnull=True)
+            # This means it will select all items, plus items where the average is null.
+            # This is slightly different from "all items OR items where average is null"
+            # Consider if range_q is empty, it should just be Q(average_collectionpropertyvalue_average__isnull=True)
+            # No, the original intent is "in range OR is null". If range is "any", then "any OR is null" is "any".
+            # Let's test current behavior: if connection_rate_min/max are empty, but connection_rate_is_null=true,
+            # it means "show all that have connection_rate IS NULL OR connection_rate is anything" which is "show all".
+            # This seems fine. The Q() acts as a "match all" within its part of the OR.
+            qs = qs.filter(range_q | Q(**{f"{annotation_name}__isnull": True}))
+        else: # is_null is False (we want to exclude nulls)
+            if range_.start is None and range_.stop is None:
+                # If no range is specified, and we are NOT including nulls,
+                # then we should filter for items where the value is NOT null.
+                qs = qs.filter(**{f"{annotation_name}__isnull": False})
+            else:
+                # If a range is specified, filter by that range.
+                # Numeric comparisons __gte/__lte implicitly exclude nulls for the annotated field.
+                qs = qs.filter(range_q)
         return qs
 
 
