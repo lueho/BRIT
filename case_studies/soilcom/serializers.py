@@ -89,8 +89,8 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
     )
     frequency = serializers.StringRelatedField()
     fee_system = serializers.StringRelatedField()
-    min_bin_size = serializers.IntegerField(required=False, allow_null=True)
-    required_bin_capacity = serializers.IntegerField(required=False, allow_null=True)
+    min_bin_size = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
+    required_bin_capacity = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
     required_bin_capacity_reference = serializers.CharField(
         required=False, allow_null=True
     )
@@ -154,8 +154,8 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
         source="fee_system.name", label="Fee system"
     )
     frequency = serializers.StringRelatedField(label="Frequency")
-    min_bin_size = serializers.IntegerField(required=False, allow_null=True)
-    required_bin_capacity = serializers.IntegerField(required=False, allow_null=True)
+    min_bin_size = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
+    required_bin_capacity = serializers.DecimalField(max_digits=10, decimal_places=2, required=False, allow_null=True)
     required_bin_capacity_reference = serializers.CharField(
         required=False, allow_null=True
     )

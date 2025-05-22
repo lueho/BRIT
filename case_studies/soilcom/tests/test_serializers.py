@@ -1,4 +1,5 @@
 from datetime import date
+from decimal import Decimal
 
 from django.db import models
 from django.test import TestCase
@@ -98,12 +99,40 @@ class CollectionModelSerializerTestCase(TestCase):
         serializer = CollectionModelSerializer(self.collection)
         data = serializer.data
         self.assertIn("required_bin_capacity", data)
-        self.assertEqual(int(data["required_bin_capacity"]), 120)
+        self.assertEqual(Decimal(data["required_bin_capacity"]), Decimal("120.00")) # Check Decimal
         self.collection.required_bin_capacity = None
         self.collection.save()
         serializer = CollectionModelSerializer(self.collection)
         data = serializer.data
         self.assertIsNone(data["required_bin_capacity"])
+
+    def test_min_bin_size_serialization_decimal_values(self):
+        valid_decimal_values = [Decimal('0.00'), Decimal('10.50'), Decimal('75.2'), None]
+        for value in valid_decimal_values:
+            with self.subTest(value=value):
+                self.collection.min_bin_size = value
+                self.collection.save()
+                serializer = CollectionModelSerializer(self.collection)
+                data = serializer.data
+                self.assertIn("min_bin_size", data)
+                if value is None:
+                    self.assertIsNone(data["min_bin_size"])
+                else:
+                    self.assertEqual(Decimal(data["min_bin_size"]), value)
+
+    def test_required_bin_capacity_serialization_decimal_values(self):
+        valid_decimal_values = [Decimal('0.00'), Decimal('12.75'), Decimal('100.00'), None]
+        for value in valid_decimal_values:
+            with self.subTest(value=value):
+                self.collection.required_bin_capacity = value
+                self.collection.save()
+                serializer = CollectionModelSerializer(self.collection)
+                data = serializer.data
+                self.assertIn("required_bin_capacity", data)
+                if value is None:
+                    self.assertIsNone(data["required_bin_capacity"])
+                else:
+                    self.assertEqual(Decimal(data["required_bin_capacity"]), value)
 
     def test_required_bin_capacity_reference_serialization(self):
         for value in ["person", "household", "property", "not_specified", None, ""]:
@@ -300,3 +329,49 @@ class CollectionFlatSerializerTestCase(TestCase):
         serializer = CollectionFlatSerializer(self.collection_nuts)
         self.assertNotIn("\n", serializer.data["comments"])
         self.assertNotIn("\r", serializer.data["comments"])
+
+    def test_flat_min_bin_size_serialization_decimal_values(self):
+        valid_decimal_values = [Decimal('0.00'), Decimal('25.75'), Decimal('60'), None]
+        for value in valid_decimal_values:
+            with self.subTest(value=value):
+                self.collection_nuts.min_bin_size = value
+                self.collection_nuts.save()
+                serializer = CollectionFlatSerializer(self.collection_nuts)
+                data = serializer.data
+                self.assertIn("min_bin_size", data)
+                if value is None:
+                    self.assertIsNone(data["min_bin_size"])
+                else:
+                    # Serializer might format it as string, ensure it matches the decimal value
+                    self.assertEqual(Decimal(data["min_bin_size"]), value.quantize(Decimal("0.01")))
+
+
+    def test_flat_required_bin_capacity_serialization_decimal_values(self):
+        valid_decimal_values = [Decimal('0.00'), Decimal('30.50'), Decimal('90.00'), None]
+        for value in valid_decimal_values:
+            with self.subTest(value=value):
+                self.collection_nuts.required_bin_capacity = value
+                self.collection_nuts.save()
+                serializer = CollectionFlatSerializer(self.collection_nuts)
+                data = serializer.data
+                self.assertIn("required_bin_capacity", data)
+                if value is None:
+                    self.assertIsNone(data["required_bin_capacity"])
+                else:
+                    self.assertEqual(Decimal(data["required_bin_capacity"]), value.quantize(Decimal("0.01")))
+
+    def test_flat_min_bin_size_none_serialization(self):
+        self.collection_nuts.min_bin_size = None
+        self.collection_nuts.save()
+        serializer = CollectionFlatSerializer(self.collection_nuts)
+        data = serializer.data
+        self.assertIn("min_bin_size", data)
+        self.assertIsNone(data["min_bin_size"])
+
+    def test_flat_required_bin_capacity_none_serialization(self):
+        self.collection_nuts.required_bin_capacity = None
+        self.collection_nuts.save()
+        serializer = CollectionFlatSerializer(self.collection_nuts)
+        data = serializer.data
+        self.assertIn("required_bin_capacity", data)
+        self.assertIsNone(data["required_bin_capacity"])

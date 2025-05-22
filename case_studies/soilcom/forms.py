@@ -7,6 +7,7 @@ from django.forms import (
     CheckboxSelectMultiple,
     ChoiceField,
     DateInput,
+    DecimalField,
     HiddenInput,
     IntegerField,
     ModelChoiceField,
@@ -365,8 +366,8 @@ class CollectionModelForm(CreateInlineMixin, AutoCompleteModelForm):
         label="Connection type",
         help_text="Indicates whether connection to the collection system is mandatory, voluntary, or not specified. Leave blank for never set; select 'not specified' for explicit user choice.",
     )
-    min_bin_size = IntegerField(required=False, min_value=0)
-    required_bin_capacity = IntegerField(required=False, min_value=0)
+    min_bin_size = DecimalField(required=False, min_value=0)
+    required_bin_capacity = DecimalField(required=False, min_value=0)
     required_bin_capacity_reference = ChoiceField(
         choices=[("", "---------")] + REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES,
         required=False,

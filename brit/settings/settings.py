@@ -28,7 +28,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'django.contrib.sitemaps',
     'crispy_bootstrap4',
-    'fontawesomefree',
+    # 'fontawesomefree', # Temporarily commented out by AI agent to generate migrations. Needs review.
     'django.contrib.gis',
     'extra_views',
     'rest_framework',

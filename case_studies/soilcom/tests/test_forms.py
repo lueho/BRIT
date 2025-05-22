@@ -1,4 +1,5 @@
 from datetime import date
+from decimal import Decimal
 
 from django.db.models import signals
 from django.db.models.signals import post_save
@@ -458,6 +459,134 @@ class CollectionModelFormTestCase(TestCase):
         self.assertTrue(form.is_valid(), form.errors)
         instance = form.save(commit=False)
         self.assertIn(instance.required_bin_capacity_reference, [None, ""])
+
+    def test_form_min_bin_size_valid_decimal_inputs(self):
+        valid_decimal_inputs = ['0.00', '10.50', '50', '75.2']
+        for val_str in valid_decimal_inputs:
+            with self.subTest(val_str=val_str):
+                data = {
+                    "catchment": self.catchment.id,
+                    "collector": self.collector.id,
+                    "collection_system": self.collection_system.id,
+                    "waste_category": self.waste_category.id,
+                    "valid_from": date(2023, 1, 1),
+                    "min_bin_size": val_str,
+                    "required_bin_capacity": '10.0' # Default valid value
+                }
+                form = CollectionModelForm(data=data)
+                self.assertTrue(form.is_valid(), f"Form errors: {form.errors} for input {val_str}")
+                instance = form.save(commit=False)
+                self.assertEqual(instance.min_bin_size, Decimal(val_str))
+
+    def test_form_required_bin_capacity_valid_decimal_inputs(self):
+        valid_decimal_inputs = ['0.00', '12.75', '100', '25.5']
+        for val_str in valid_decimal_inputs:
+            with self.subTest(val_str=val_str):
+                data = {
+                    "catchment": self.catchment.id,
+                    "collector": self.collector.id,
+                    "collection_system": self.collection_system.id,
+                    "waste_category": self.waste_category.id,
+                    "valid_from": date(2023, 1, 1),
+                    "required_bin_capacity": val_str,
+                    "min_bin_size": '5.0' # Default valid value
+                }
+                form = CollectionModelForm(data=data)
+                self.assertTrue(form.is_valid(), f"Form errors: {form.errors} for input {val_str}")
+                instance = form.save(commit=False)
+                self.assertEqual(instance.required_bin_capacity, Decimal(val_str))
+
+    def test_form_min_bin_size_none_input(self):
+        data = {
+            "catchment": self.catchment.id,
+            "collector": self.collector.id,
+            "collection_system": self.collection_system.id,
+            "waste_category": self.waste_category.id,
+            "valid_from": date(2023, 1, 1),
+            "min_bin_size": "", # Represents None/empty input
+        }
+        form = CollectionModelForm(data=data)
+        self.assertTrue(form.is_valid(), f"Form errors: {form.errors}")
+        instance = form.save(commit=False)
+        self.assertIsNone(instance.min_bin_size)
+
+    def test_form_required_bin_capacity_none_input(self):
+        data = {
+            "catchment": self.catchment.id,
+            "collector": self.collector.id,
+            "collection_system": self.collection_system.id,
+            "waste_category": self.waste_category.id,
+            "valid_from": date(2023, 1, 1),
+            "required_bin_capacity": "", # Represents None/empty input
+        }
+        form = CollectionModelForm(data=data)
+        self.assertTrue(form.is_valid(), f"Form errors: {form.errors}")
+        instance = form.save(commit=False)
+        self.assertIsNone(instance.required_bin_capacity)
+
+    def test_form_min_bin_size_invalid_negative_input(self):
+        invalid_inputs = ['-0.1', '-10.75']
+        for val_str in invalid_inputs:
+            with self.subTest(val_str=val_str):
+                data = {
+                    "catchment": self.catchment.id,
+                    "collector": self.collector.id,
+                    "collection_system": self.collection_system.id,
+                    "waste_category": self.waste_category.id,
+                    "valid_from": date(2023, 1, 1),
+                    "min_bin_size": val_str,
+                }
+                form = CollectionModelForm(data=data)
+                self.assertFalse(form.is_valid())
+                self.assertIn('min_bin_size', form.errors)
+                # The DecimalField in form has min_value=0
+                self.assertTrue(any("greater than or equal to 0" in e for e in form.errors['min_bin_size']))
+
+
+    def test_form_required_bin_capacity_invalid_negative_input(self):
+        invalid_inputs = ['-5.5', '-20']
+        for val_str in invalid_inputs:
+            with self.subTest(val_str=val_str):
+                data = {
+                    "catchment": self.catchment.id,
+                    "collector": self.collector.id,
+                    "collection_system": self.collection_system.id,
+                    "waste_category": self.waste_category.id,
+                    "valid_from": date(2023, 1, 1),
+                    "required_bin_capacity": val_str,
+                }
+                form = CollectionModelForm(data=data)
+                self.assertFalse(form.is_valid())
+                self.assertIn('required_bin_capacity', form.errors)
+                self.assertTrue(any("greater than or equal to 0" in e for e in form.errors['required_bin_capacity']))
+
+    def test_form_min_bin_size_invalid_text_input(self):
+        data = {
+            "catchment": self.catchment.id,
+            "collector": self.collector.id,
+            "collection_system": self.collection_system.id,
+            "waste_category": self.waste_category.id,
+            "valid_from": date(2023, 1, 1),
+            "min_bin_size": "abc",
+        }
+        form = CollectionModelForm(data=data)
+        self.assertFalse(form.is_valid())
+        self.assertIn('min_bin_size', form.errors)
+        self.assertTrue(any("Enter a number." in e for e in form.errors['min_bin_size']))
+
+    def test_form_required_bin_capacity_invalid_text_input(self):
+        data = {
+            "catchment": self.catchment.id,
+            "collector": self.collector.id,
+            "collection_system": self.collection_system.id,
+            "waste_category": self.waste_category.id,
+            "valid_from": date(2023, 1, 1),
+            "required_bin_capacity": "xyz",
+        }
+        form = CollectionModelForm(data=data)
+        self.assertFalse(form.is_valid())
+        self.assertIn('required_bin_capacity', form.errors)
+        self.assertTrue(any("Enter a number." in e for e in form.errors['required_bin_capacity']))
 
     def test_connection_type_field_accepts_all_choices(self):
         from case_studies.soilcom.forms import CONNECTION_TYPE_CHOICES

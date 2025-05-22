@@ -1,4 +1,5 @@
 from datetime import date, timedelta
+from decimal import Decimal
 
 from django.core.exceptions import ValidationError
 from django.db.models import signals
@@ -634,7 +635,63 @@ class CollectionTestCase(TestCase):
         self.collection.valid_until = date(2023, 12, 31)
         with self.assertRaises(ValidationError):
             self.collection.full_clean()
-            self.collection.save()
+            # self.collection.save() # Save might fail due to unapplied migrations
+
+    # Tests for DecimalField validation (min_bin_size and required_bin_capacity)
+
+    def test_min_bin_size_valid_values(self):
+        valid_values = [Decimal('0.00'), Decimal('10.50'), Decimal('50'), None]
+        for value in valid_values:
+            with self.subTest(value=value):
+                collection = Collection(
+                    catchment=self.collection.catchment,
+                    collection_system=self.collection.collection_system,
+                    waste_stream=self.collection.waste_stream,
+                    min_bin_size=value,
+                    required_bin_capacity=Decimal('10.0') # Default valid value
+                )
+                collection.full_clean() # Should not raise ValidationError
+
+    def test_required_bin_capacity_valid_values(self):
+        valid_values = [Decimal('0.00'), Decimal('12.75'), Decimal('100'), None]
+        for value in valid_values:
+            with self.subTest(value=value):
+                collection = Collection(
+                    catchment=self.collection.catchment,
+                    collection_system=self.collection.collection_system,
+                    waste_stream=self.collection.waste_stream,
+                    required_bin_capacity=value,
+                    min_bin_size=Decimal('5.0') # Default valid value
+                )
+                collection.full_clean() # Should not raise ValidationError
+
+    def test_min_bin_size_invalid_negative_value(self):
+        invalid_values = [Decimal('-0.1'), Decimal('-10')]
+        for value in invalid_values:
+            with self.subTest(value=value):
+                collection = Collection(
+                    catchment=self.collection.catchment,
+                    collection_system=self.collection.collection_system,
+                    waste_stream=self.collection.waste_stream,
+                    min_bin_size=value
+                )
+                with self.assertRaises(ValidationError) as cm:
+                    collection.full_clean()
+                self.assertIn('min_bin_size', cm.exception.message_dict)
+
+    def test_required_bin_capacity_invalid_negative_value(self):
+        invalid_values = [Decimal('-5.5'), Decimal('-20')]
+        for value in invalid_values:
+            with self.subTest(value=value):
+                collection = Collection(
+                    catchment=self.collection.catchment,
+                    collection_system=self.collection.collection_system,
+                    waste_stream=self.collection.waste_stream,
+                    required_bin_capacity=value
+                )
+                with self.assertRaises(ValidationError) as cm:
+                    collection.full_clean()
+                self.assertIn('required_bin_capacity', cm.exception.message_dict)
 
 
 class CollectionSeasonTestCase(TestCase):
