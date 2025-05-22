@@ -25,7 +25,7 @@ class DummyExportView(FilteredListFileExportView):
 class FilteredListFileExportViewTests(TestCase):
     def setUp(self):
         self.factory = RequestFactory()
-        self.user = User.objects.create_user(username="testuser", password="testpass")
+        self.user = User.objects.create_user(username="testuser")
 
     def test_login_required(self):
         """

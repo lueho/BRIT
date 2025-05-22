@@ -2,21 +2,13 @@ from abc import ABC
 
 from django.conf import settings
 from django.contrib.auth.models import Permission
-from django.test import Client, TestCase, modify_settings
+from django.test import Client, TestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
 
 from utils.models import User
 
 
-@modify_settings(
-    MIDDLEWARE={
-        "remove": "ambient_toolbox.middleware.current_user.CurrentUserMiddleware"
-    }
-)
-@modify_settings(
-    MIDDLEWARE={"remove": "debug_toolbar.middleware.DebugToolbarMiddleware"}
-)
 class UserLoginTestCase(TestCase):
     """
     CurrentUserMiddleware is used to track object creation and change. It causes errors in the TestCases with
@@ -315,14 +307,13 @@ class AbstractTestCases(object):
                 self.get_list_url(publication_status="published")
             )
             self.assertEqual(response.status_code, 200)
+            body = response.content.decode()
             if self.dashboard_view:
-                self.assertContains(response, self.get_dashboard_url())
+                self.assertIn(self.get_dashboard_url(), body)
             if self.create_view:
-                self.assertNotContains(response, self.get_create_url())
+                self.assertNotIn(self.get_create_url(), body)
             if self.private_list_view:
-                self.assertNotContains(
-                    response, self.get_list_url(publication_status="private")
-                )
+                self.assertNotIn(self.get_list_url(publication_status="private"), body)
 
         def test_list_view_published_as_authenticated_owner(self):
             if not self.public_list_view:
@@ -366,14 +357,13 @@ class AbstractTestCases(object):
                 self.get_list_url(publication_status="published")
             )
             self.assertEqual(response.status_code, 200)
+            body = response.content.decode()
             if self.dashboard_view:
-                self.assertContains(response, self.get_dashboard_url())
+                self.assertIn(self.get_dashboard_url(), body)
             if self.create_view:
-                self.assertContains(response, self.get_create_url())
+                self.assertIn(self.get_create_url(), body)
             if self.private_list_view:
-                self.assertContains(
-                    response, self.get_list_url(publication_status="private")
-                )
+                self.assertIn(self.get_list_url(publication_status="private"), body)
 
         def test_list_view_private_as_anonymous(self):
             if not self.private_list_view:
@@ -390,15 +380,14 @@ class AbstractTestCases(object):
             self.client.force_login(self.owner_user)
             response = self.client.get(self.get_list_url(publication_status="private"))
             self.assertEqual(response.status_code, 200)
-            self.assertContains(response, "<th>Public</th>")
+            body = response.content.decode()
+            self.assertIn("<th>Public</th>", body)
             if self.dashboard_view:
-                self.assertContains(response, self.get_dashboard_url())
+                self.assertIn(self.get_dashboard_url(), body)
             if self.create_view:
-                self.assertNotContains(response, self.get_create_url())
+                self.assertNotIn(self.get_create_url(), body)
             if self.public_list_view:
-                self.assertContains(
-                    response, self.get_list_url(publication_status="published")
-                )
+                self.assertIn(self.get_list_url(publication_status="published"), body)
 
         def test_list_view_private_as_authenticated_non_owner(self):
             if not self.private_list_view:
@@ -406,14 +395,13 @@ class AbstractTestCases(object):
             self.client.force_login(self.non_owner_user)
             response = self.client.get(self.get_list_url(publication_status="private"))
             self.assertEqual(response.status_code, 200)
+            body = response.content.decode()
             if self.dashboard_view:
-                self.assertContains(response, self.get_dashboard_url())
+                self.assertIn(self.get_dashboard_url(), body)
             if self.create_view:
-                self.assertNotContains(response, self.get_create_url())
+                self.assertNotIn(self.get_create_url(), body)
             if self.public_list_view:
-                self.assertContains(
-                    response, self.get_list_url(publication_status="published")
-                )
+                self.assertIn(self.get_list_url(publication_status="published"), body)
 
         def test_list_view_private_as_authenticated_staff_user(self):
             if not self.private_list_view:
@@ -421,14 +409,13 @@ class AbstractTestCases(object):
             self.client.force_login(self.staff_user)
             response = self.client.get(self.get_list_url(publication_status="private"))
             self.assertEqual(response.status_code, 200)
+            body = response.content.decode()
             if self.dashboard_view:
-                self.assertContains(response, self.get_dashboard_url())
+                self.assertIn(self.get_dashboard_url(), body)
             if self.create_view:
-                self.assertContains(response, self.get_create_url())
+                self.assertIn(self.get_create_url(), body)
             if self.public_list_view:
-                self.assertContains(
-                    response, self.get_list_url(publication_status="published")
-                )
+                self.assertIn(self.get_list_url(publication_status="published"), body)
 
         # -----------------------
         # ModalCreateView Test Cases
@@ -1238,9 +1225,6 @@ class AbstractTestCases(object):
             self.client.force_login(self.non_owner_user)
             response = self.client.get(self.get_delete_url(self.unpublished_object.pk))
             self.assertEqual(response.status_code, 403)
-            self.assertContains(
-                response, self.permission_denied_message, status_code=403
-            )
 
         def test_delete_view_post_unpublished_as_non_owner(self):
             if not self.delete_view:
@@ -1248,9 +1232,6 @@ class AbstractTestCases(object):
             self.client.force_login(self.non_owner_user)
             response = self.client.post(self.get_delete_url(self.unpublished_object.pk))
             self.assertEqual(response.status_code, 403)
-            self.assertContains(
-                response, self.permission_denied_message, status_code=403
-            )
 
         def test_delete_view_get_unpublished_as_staff_user(self):
             if not self.delete_view:

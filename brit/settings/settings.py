@@ -14,7 +14,7 @@ SECURE_CONTENT_TYPE_NOSNIFF = True
 X_FRAME_OPTIONS = "DENY"
 
 # Use custom test runner that loads initial data
-TEST_RUNNER = "utils.tests.testrunner.InitialDataTestRunner"
+TEST_RUNNER = "utils.tests.testrunner.SerialAwareTestRunner"
 
 ALLOWED_HOSTS = []
 

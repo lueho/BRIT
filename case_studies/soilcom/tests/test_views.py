@@ -2,7 +2,6 @@ from datetime import date, timedelta
 from unittest.mock import patch
 from urllib.parse import urlencode
 
-from django.contrib.auth import get_user_model
 from django.contrib.auth.models import User
 from django.contrib.gis.geos import MultiPolygon, Polygon
 from django.core.exceptions import ValidationError
@@ -1936,7 +1935,7 @@ class CollectionReviewProcessWithPredecessorsTestCase(TestCase):
 
         # Create a test user with necessary permissions
         cls.user = User.objects.create_user(
-            username="testuser", password="12345", is_staff=True, is_superuser=True
+            username="testuser", is_staff=True, is_superuser=True
         )
 
         # Create common related objects (Collector, System, Catchment)

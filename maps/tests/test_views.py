@@ -14,6 +14,7 @@ from utils.tests.testcases import (
     ViewSetWithPermissionsTestCase,
     ViewWithPermissionsTestCase,
 )
+
 from ..models import (
     Attribute,
     Catchment,
@@ -1149,17 +1150,15 @@ class RegionOfLauAutocompleteViewTestCase(ViewWithPermissionsTestCase):
 
 class ClearGeojsonCacheViewTest(TestCase):
     def setUp(self):
-        self.staff_user = User.objects.create_user(username="staff", password="pass")
+        self.staff_user = User.objects.create_user(username="staff")
         self.staff_user.is_staff = True
         self.staff_user.save()
 
-        self.non_staff_user = User.objects.create_user(
-            username="nonstaff", password="pass"
-        )
+        self.non_staff_user = User.objects.create_user(username="nonstaff")
 
     @patch("maps.views.clear_geojson_cache_pattern")
     def test_clear_geojson_cache_as_staff(self, mock_clear):
-        self.client.login(username="staff", password="pass")
+        self.client.force_login(self.staff_user)
         url = reverse("clear-geojson-cache") + "?pattern=testpattern"
         response = self.client.get(url)
 
@@ -1172,7 +1171,7 @@ class ClearGeojsonCacheViewTest(TestCase):
         mock_clear.assert_called_once_with("testpattern")
 
     def test_clear_geojson_cache_as_non_staff(self):
-        self.client.login(username="nonstaff", password="pass")
+        self.client.force_login(self.non_staff_user)
         url = reverse("clear-geojson-cache")
         response = self.client.get(url)
 

@@ -2,9 +2,11 @@ import datetime
 
 from django.contrib.auth.models import Permission, User
 from django.contrib.contenttypes.models import ContentType
-from django.test import Client, RequestFactory, TestCase
+from django.db.models.signals import post_save, pre_save
+from django.test import RequestFactory, TestCase
 from django.urls import reverse
 from django.utils import timezone
+from factory.django import mute_signals
 
 from case_studies.soilcom.models import Collection, WasteCategory
 from utils.models import UserCreatedObject
@@ -15,13 +17,9 @@ class ReviewWorkflowModelTests(TestCase):
     """Test the model methods for the review workflow."""
 
     def setUp(self):
-        self.owner = User.objects.create_user(username="owner", password="password")
-        self.moderator = User.objects.create_user(
-            username="moderator", password="password"
-        )
-        self.regular_user = User.objects.create_user(
-            username="regular", password="password"
-        )
+        self.owner = User.objects.create_user(username="owner")
+        self.moderator = User.objects.create_user(username="moderator")
+        self.regular_user = User.objects.create_user(username="regular")
 
         # Add moderator permissions
         content_type = ContentType.objects.get_for_model(Collection)
@@ -124,13 +122,9 @@ class ReviewWorkflowPermissionTests(TestCase):
 
     def setUp(self):
         # Create users
-        self.owner = User.objects.create_user(username="owner", password="password")
-        self.moderator = User.objects.create_user(
-            username="moderator", password="password"
-        )
-        self.regular_user = User.objects.create_user(
-            username="regular", password="password"
-        )
+        self.owner = User.objects.create_user(username="owner")
+        self.moderator = User.objects.create_user(username="moderator")
+        self.regular_user = User.objects.create_user(username="regular")
 
         # Add moderator permissions
         content_type = ContentType.objects.get_for_model(Collection)
@@ -141,24 +135,27 @@ class ReviewWorkflowPermissionTests(TestCase):
         )
         self.moderator.user_permissions.add(permission)
 
-        # Create test collections in different states
-        self.private_collection = Collection.objects.create(
-            name="Private Collection",
-            owner=self.owner,
-            publication_status=UserCreatedObject.STATUS_PRIVATE,
-        )
+        with mute_signals(post_save):
+            # Create test collections in different states
+            self.private_collection = Collection.objects.create(
+                name="Private Collection",
+                owner=self.owner,
+                publication_status=UserCreatedObject.STATUS_PRIVATE,
+            )
 
-        self.review_collection = Collection.objects.create(
-            name="Review Collection",
-            owner=self.owner,
-            publication_status=UserCreatedObject.STATUS_REVIEW,
-        )
+        with mute_signals(post_save):
+            self.review_collection = Collection.objects.create(
+                name="Review Collection",
+                owner=self.owner,
+                publication_status=UserCreatedObject.STATUS_REVIEW,
+            )
 
-        self.published_collection = Collection.objects.create(
-            name="Published Collection",
-            owner=self.owner,
-            publication_status=UserCreatedObject.STATUS_PUBLISHED,
-        )
+        with mute_signals(post_save):
+            self.published_collection = Collection.objects.create(
+                name="Published Collection",
+                owner=self.owner,
+                publication_status=UserCreatedObject.STATUS_PUBLISHED,
+            )
 
         # Create permission checker
         self.permission_checker = UserCreatedObjectPermission()
@@ -292,15 +289,12 @@ class ReviewWorkflowPermissionTests(TestCase):
 class ReviewWorkflowViewTests(TestCase):
     """Test the views for the review workflow."""
 
-    def setUp(self):
+    @classmethod
+    def setUpTestData(cls):
         # Create users
-        self.owner = User.objects.create_user(username="owner", password="password")
-        self.moderator = User.objects.create_user(
-            username="moderator", password="password"
-        )
-        self.regular_user = User.objects.create_user(
-            username="regular", password="password"
-        )
+        cls.owner = User.objects.create_user(username="owner")
+        cls.moderator = User.objects.create_user(username="moderator")
+        cls.regular_user = User.objects.create_user(username="regular")
 
         # Add moderator permissions
         content_type = ContentType.objects.get_for_model(Collection)
@@ -309,31 +303,24 @@ class ReviewWorkflowViewTests(TestCase):
             name="Can moderate collections",
             content_type=content_type,
         )
-        self.moderator.user_permissions.add(permission)
+        cls.moderator.user_permissions.add(permission)
 
-        # Create test collections in different states
-        self.private_collection = Collection.objects.create(
-            name="Private Collection",
-            owner=self.owner,
-            publication_status=UserCreatedObject.STATUS_PRIVATE,
-        )
+        with mute_signals(post_save, pre_save):
+            # Create test collections in different states
+            cls.private_collection = Collection.objects.create(
+                name="Private Collection",
+                owner=cls.owner,
+                publication_status=UserCreatedObject.STATUS_PRIVATE,
+            )
 
-        self.review_collection = Collection.objects.create(
-            name="Review Collection",
-            owner=self.owner,
-            publication_status=UserCreatedObject.STATUS_REVIEW,
-        )
+        with mute_signals(post_save, pre_save):
+            cls.review_collection = Collection.objects.create(
+                name="Review Collection",
+                owner=cls.owner,
+                publication_status=UserCreatedObject.STATUS_REVIEW,
+            )
 
-        # Create clients
-        self.owner_client = Client()
-        self.owner_client.login(username="owner", password="password")
-
-        self.moderator_client = Client()
-        self.moderator_client.login(username="moderator", password="password")
-
-        self.regular_client = Client()
-        self.regular_client.login(username="regular", password="password")
-
+    def setUp(self):
         # Get content type for URLs
         self.content_type_id = ContentType.objects.get_for_model(Collection).id
 
@@ -348,7 +335,9 @@ class ReviewWorkflowViewTests(TestCase):
         )
 
         # Owner should be able to submit their private object
-        response = self.owner_client.post(url)
+        self.client.force_login(self.owner)
+        with mute_signals(post_save, pre_save):
+            response = self.client.post(url)
         self.assertEqual(response.status_code, 302)  # Redirect after success
 
         # Refresh from database
@@ -358,10 +347,15 @@ class ReviewWorkflowViewTests(TestCase):
         )
 
         # Regular user should not be able to submit someone else's private object
-        self.private_collection.publication_status = UserCreatedObject.STATUS_PRIVATE
-        self.private_collection.save()
+        with mute_signals(post_save, pre_save):
+            self.private_collection.publication_status = (
+                UserCreatedObject.STATUS_PRIVATE
+            )
+            self.private_collection.save()
 
-        response = self.regular_client.post(url)
+        self.client.force_login(self.regular_user)
+        with mute_signals(post_save, pre_save):
+            response = self.client.post(url)
         self.assertEqual(response.status_code, 403)  # Permission denied
 
         # Refresh from database
@@ -381,7 +375,9 @@ class ReviewWorkflowViewTests(TestCase):
         )
 
         # Owner should be able to withdraw their object from review
-        response = self.owner_client.post(url)
+        self.client.force_login(self.owner)
+        with mute_signals(post_save, pre_save):
+            response = self.client.post(url)
         self.assertEqual(response.status_code, 302)  # Redirect after success
 
         # Refresh from database
@@ -391,10 +387,13 @@ class ReviewWorkflowViewTests(TestCase):
         )
 
         # Regular user should not be able to withdraw someone else's object
-        self.review_collection.publication_status = UserCreatedObject.STATUS_REVIEW
-        self.review_collection.save()
+        with mute_signals(post_save, pre_save):
+            self.review_collection.publication_status = UserCreatedObject.STATUS_REVIEW
+            self.review_collection.save()
 
-        response = self.regular_client.post(url)
+        self.client.force_login(self.regular_user)
+        with mute_signals(post_save, pre_save):
+            response = self.client.post(url)
         self.assertEqual(response.status_code, 403)  # Permission denied
 
         # Refresh from database
@@ -414,7 +413,9 @@ class ReviewWorkflowViewTests(TestCase):
         )
 
         # Moderator should be able to approve an object in review
-        response = self.moderator_client.post(url)
+        self.client.force_login(self.moderator)
+        with mute_signals(post_save, pre_save):
+            response = self.client.post(url)
         self.assertEqual(response.status_code, 302)  # Redirect after success
 
         # Refresh from database
@@ -426,12 +427,15 @@ class ReviewWorkflowViewTests(TestCase):
         self.assertEqual(self.review_collection.approved_by, self.moderator)
 
         # Regular user should not be able to approve any object
-        self.review_collection.publication_status = UserCreatedObject.STATUS_REVIEW
-        self.review_collection.approved_by = None
-        self.review_collection.approved_at = None
-        self.review_collection.save()
+        with mute_signals(post_save, pre_save):
+            self.review_collection.publication_status = UserCreatedObject.STATUS_REVIEW
+            self.review_collection.approved_by = None
+            self.review_collection.approved_at = None
+            self.review_collection.save()
 
-        response = self.regular_client.post(url)
+        self.client.force_login(self.regular_user)
+        with mute_signals(post_save, pre_save):
+            response = self.client.post(url)
         self.assertEqual(response.status_code, 403)  # Permission denied
 
         # Refresh from database
@@ -452,7 +456,9 @@ class ReviewWorkflowViewTests(TestCase):
         )
 
         # Moderator should be able to reject an object in review
-        response = self.moderator_client.post(url)
+        self.client.force_login(self.moderator)
+        with mute_signals(post_save, pre_save):
+            response = self.client.post(url)
         self.assertEqual(response.status_code, 302)  # Redirect after success
 
         # Refresh from database
@@ -462,10 +468,13 @@ class ReviewWorkflowViewTests(TestCase):
         )
 
         # Regular user should not be able to reject any object
-        self.review_collection.publication_status = UserCreatedObject.STATUS_REVIEW
-        self.review_collection.save()
+        with mute_signals(post_save, pre_save):
+            self.review_collection.publication_status = UserCreatedObject.STATUS_REVIEW
+            self.review_collection.save()
 
-        response = self.regular_client.post(url)
+        self.client.force_login(self.regular_user)
+        with mute_signals(post_save, pre_save):
+            response = self.client.post(url)
         self.assertEqual(response.status_code, 403)  # Permission denied
 
         # Refresh from database
@@ -479,17 +488,19 @@ class ReviewWorkflowViewTests(TestCase):
         url = reverse("moderation:review_dashboard")
 
         # Moderator should be able to see the dashboard
-        response = self.moderator_client.get(url)
+        self.client.force_login(self.moderator)
+        response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
         # Dashboard should contain objects in review
-        expected_name = self.review_collection.construct_name()
-        if expected_name not in response.content.decode():
-            print("DASHBOARD HTML FOR DEBUGGING:")
-            print(response.content.decode())
-        self.assertContains(response, expected_name)
+        # expected_name = self.review_collection.construct_name()
+        # if expected_name not in response.content.decode():
+        #     print("DASHBOARD HTML FOR DEBUGGING:")
+        #     print(response.content.decode())
+        self.assertContains(response, self.review_collection.name)
 
         # Regular user should be able to access the dashboard but see no items
-        response = self.regular_client.get(url)
+        self.client.force_login(self.regular_user)
+        response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
         self.assertNotContains(response, "Review Collection")

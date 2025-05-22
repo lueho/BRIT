@@ -16,7 +16,6 @@ from layer_manager.models import (
 )
 from maps.models import Catchment, GeoDataset, Region
 from materials.models import Material, MaterialComponent, SampleSeries
-from materials.utils import ensure_initial_data
 
 
 class LayerTestCase(TestCase):
