@@ -394,7 +394,9 @@ class UserCreatedObjectPermissionTests(BaseAPITestCase):
     # ---------------------------------------------------------- has_permission
     def test_has_permission_create(self):
         scenarios = [
+            # (user, has_perm_return_value)
             (self.staff_user, True),
+            (self.staff_user, False),
             (self.regular_user, True),
             (self.regular_user, False),
             (self.anonymous_user, False),
@@ -409,7 +411,8 @@ class UserCreatedObjectPermissionTests(BaseAPITestCase):
                     return_value=has_perm if user.is_authenticated else False,
                 ):
                     allowed = self.permission.has_permission(req, self.view)
-                    self.assertEqual(allowed, user.is_authenticated and has_perm)
+                    expected = user.is_staff or (user.is_authenticated and has_perm)
+                    self.assertEqual(allowed, expected)
 
     # ---------------------------------------------------- has_object_permission
     def test_owner_always_allowed(self):
@@ -424,6 +427,8 @@ class UserCreatedObjectPermissionTests(BaseAPITestCase):
             owner=self.regular_user, publication_status="private"
         )
         req = self._detail_request("put", self.staff_user)
+        req = Request(req)
+        req.user = self.staff_user
         self.assertFalse(self.permission.has_object_permission(req, self.view, obj))
 
     def test_non_owner_denied_private(self):
@@ -446,3 +451,81 @@ class UserCreatedObjectPermissionTests(BaseAPITestCase):
             self.permission, "_check_safe_permissions", return_value=True
         ):
             self.assertTrue(self.permission.has_object_permission(req, self.view, obj))
+
+    def test_owner_cannot_edit_published(self):
+        obj = MockUserCreatedObject(
+            owner=self.regular_user, publication_status="published"
+        )
+        req = self._detail_request("put", self.regular_user)
+        req = Request(req)
+        req.user = self.regular_user
+        self.assertFalse(self.permission.has_object_permission(req, self.view, obj))
+
+    def test_owner_can_edit_review(self):
+        obj = MockUserCreatedObject(
+            owner=self.regular_user, publication_status="review"
+        )
+        req = self._detail_request("put", self.regular_user)
+        req = Request(req)
+        req.user = self.regular_user
+        self.assertTrue(self.permission.has_object_permission(req, self.view, obj))
+
+    def test_staff_can_edit_published(self):
+        obj = MockUserCreatedObject(
+            owner=self.regular_user, publication_status="published"
+        )
+        req = self._detail_request("put", self.staff_user)
+        req = Request(req)
+        req.user = self.staff_user
+        self.assertTrue(self.permission.has_object_permission(req, self.view, obj))
+
+    def test_staff_can_edit_archived(self):
+        obj = MockUserCreatedObject(
+            owner=self.regular_user, publication_status="archived"
+        )
+        req = self._detail_request("put", self.staff_user)
+        req = Request(req)
+        req.user = self.staff_user
+        self.assertTrue(self.permission.has_object_permission(req, self.view, obj))
+
+    def test_owner_can_read_review(self):
+        obj = MockUserCreatedObject(
+            owner=self.regular_user, publication_status="review"
+        )
+        req = self._detail_request("get", self.regular_user)
+        self.assertTrue(self.permission.has_object_permission(req, self.view, obj))
+
+    def test_staff_can_read_review(self):
+        obj = MockUserCreatedObject(
+            owner=self.regular_user, publication_status="review"
+        )
+        req = self._detail_request("get", self.staff_user)
+        self.assertTrue(self.permission.has_object_permission(req, self.view, obj))
+
+    def test_owner_can_read_archived(self):
+        obj = MockUserCreatedObject(
+            owner=self.regular_user, publication_status="archived"
+        )
+        req = self._detail_request("get", self.regular_user)
+        self.assertTrue(self.permission.has_object_permission(req, self.view, obj))
+
+    def test_staff_can_read_archived(self):
+        obj = MockUserCreatedObject(
+            owner=self.regular_user, publication_status="archived"
+        )
+        req = self._detail_request("get", self.staff_user)
+        self.assertTrue(self.permission.has_object_permission(req, self.view, obj))
+
+    def test_anonymous_cannot_read_archived(self):
+        obj = MockUserCreatedObject(
+            owner=self.regular_user, publication_status="archived"
+        )
+        req = self._detail_request("get", self.anonymous_user)
+        self.assertFalse(self.permission.has_object_permission(req, self.view, obj))
+
+    def test_staff_can_read_private(self):
+        obj = MockUserCreatedObject(
+            owner=self.regular_user, publication_status="private"
+        )
+        req = self._detail_request("get", self.staff_user)
+        self.assertTrue(self.permission.has_object_permission(req, self.view, obj))

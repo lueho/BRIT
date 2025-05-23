@@ -1,5 +1,6 @@
 from django.core.exceptions import ImproperlyConfigured
 from rest_framework import permissions
+from rest_framework import exceptions as drf_exceptions
 
 
 class IsStaffOrReadOnly(permissions.BasePermission):
@@ -66,10 +67,25 @@ class UserCreatedObjectPermission(permissions.BasePermission):
         user = request.user
 
         if obj.owner == user:
-            # If 'publication_status' is being modified, ensure the user is a moderator
-            if 'publication_status' in request.data:
-                if not self._is_moderator(user, obj):
-                    return False
+            from utils.models import UserCreatedObject
+
+            # Owners cannot modify objects that are already published or archived
+            if getattr(obj, 'publication_status', None) in (
+                UserCreatedObject.STATUS_PUBLISHED,
+                getattr(UserCreatedObject, 'STATUS_ARCHIVED', 'archived'),
+            ):
+                return False
+
+            # Safely access request data (can raise UnsupportedMediaType for empty multipart)
+            try:
+                payload = request.data
+            except drf_exceptions.UnsupportedMediaType:
+                payload = {}
+
+            # If attempting to change publication_status, require moderator rights
+            if 'publication_status' in payload and not self._is_moderator(user, obj):
+                return False
+
             return True  # Owners can modify other fields
 
         # Check if user is a moderator
@@ -90,12 +106,23 @@ class UserCreatedObjectPermission(permissions.BasePermission):
 
         from utils.models import UserCreatedObject
         
-        if obj.publication_status == UserCreatedObject.STATUS_PUBLISHED:
+        status = obj.publication_status
+
+        # Published objects are always readable
+        if status == UserCreatedObject.STATUS_PUBLISHED:
             return True
-        elif obj.publication_status == UserCreatedObject.STATUS_REVIEW:
+
+        # Objects in review: owner or moderator/staff can view
+        if status == UserCreatedObject.STATUS_REVIEW:
             return obj.owner == request.user or self._is_moderator(request.user, obj)
-        elif obj.publication_status == UserCreatedObject.STATUS_PRIVATE:
-            return obj.owner == request.user
+
+        # Private objects: owner or moderator/staff can view
+        if status == UserCreatedObject.STATUS_PRIVATE:
+            return obj.owner == request.user or self._is_moderator(request.user, obj)
+
+        # Archived objects: owner or moderator/staff can view
+        if status == getattr(UserCreatedObject, 'STATUS_ARCHIVED', 'archived'):
+            return obj.owner == request.user or self._is_moderator(request.user, obj)
 
         return False
 
