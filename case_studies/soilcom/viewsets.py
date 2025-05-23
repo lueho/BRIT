@@ -6,26 +6,23 @@ from case_studies.soilcom.filters import CollectionFilterSet
 from case_studies.soilcom.models import Collection
 from case_studies.soilcom.serializers import (CollectionFlatSerializer, CollectionModelSerializer,
                                               WasteCollectionGeometrySerializer)
-from utils.viewsets import AutoPermModelViewSet
+from maps.mixins import GeoJSONMixin
+from utils.viewsets import UserCreatedObjectViewSet
 
 
-class CollectionViewSet(AutoPermModelViewSet):
+class CollectionViewSet(GeoJSONMixin, UserCreatedObjectViewSet):
+    """Collection viewset that integrates with GeoJSONMixin and UserCreatedObjectViewSet.
+    
+    Provides the standard CRUD operations for collections, plus:
+    - GeoJSON endpoint with scope-based filtering
+    - Review workflow actions (register_for_review, withdraw_from_review, approve, reject)
+    - Publication status filtering based on user permissions
+    """
     queryset = Collection.objects.all()
     serializer_class = CollectionFlatSerializer
+    geojson_serializer_class = WasteCollectionGeometrySerializer
     filter_backends = (rf_filters.DjangoFilterBackend,)
     filterset_class = CollectionFilterSet
-    custom_permission_required = {
-        'list': None,
-        'retrieve': None,
-        'geojson': None,
-        'summaries': None,
-    }
-
-    @action(detail=False, methods=['get'])
-    def geojson(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        serializer = WasteCollectionGeometrySerializer(queryset, many=True, context={'request': request})
-        return Response(serializer.data)
 
     @action(detail=False, methods=['get'])
     def summaries(self, request, *args, **kwargs):
