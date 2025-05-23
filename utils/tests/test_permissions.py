@@ -192,12 +192,84 @@ class TestUserCreatedObjectPermission(TestCase):
     def test_has_permission_create_action_authenticated_user(self):
         request = self.create_request(user=self.owner_user)
         view = self.create_view(action="create")
-        self.assertTrue(self.permission.has_permission(request, view))
+
+        # When view.get_queryset() is not implemented, the permission should default to False
+        self.assertFalse(self.permission.has_permission(request, view))
 
     def test_has_permission_create_action_unauthenticated_user(self):
         request = self.create_request(user=self.anonymous_user)
         view = self.create_view(action="create")
         self.assertFalse(self.permission.has_permission(request, view))
+
+    def test_has_permission_create_action_authenticated_user_with_model_permission(
+        self,
+    ):
+        # Setup a user with model add permission
+        user_with_perm = Mock(spec=User)
+        user_with_perm.is_authenticated = True
+        user_with_perm.is_staff = False
+        # Configure has_perm to return True for the specific model permission
+        user_with_perm.has_perm = Mock(return_value=True)
+
+        request = self.create_request(user=user_with_perm)
+
+        # Setup a view with queryset that has a model
+        view = self.create_view(action="create")
+        model_mock = Mock()
+        model_mock._meta.app_label = "testapp"
+        model_mock._meta.model_name = "testmodel"
+        queryset_mock = Mock()
+        queryset_mock.model = model_mock
+        view.get_queryset = Mock(return_value=queryset_mock)
+
+        # Test - should allow create with model permission
+        self.assertTrue(self.permission.has_permission(request, view))
+
+        # Verify the permission was checked correctly
+        user_with_perm.has_perm.assert_called_with("testapp.add_testmodel")
+
+    def test_has_permission_create_action_authenticated_user_without_model_permission(
+        self,
+    ):
+        # Setup a user without model add permission
+        user_without_perm = Mock(spec=User)
+        user_without_perm.is_authenticated = True
+        user_without_perm.is_staff = False
+        # Configure has_perm to return False for any permission
+        user_without_perm.has_perm = Mock(return_value=False)
+
+        request = self.create_request(user=user_without_perm)
+
+        # Setup a view with queryset that has a model
+        view = self.create_view(action="create")
+        model_mock = Mock()
+        model_mock._meta.app_label = "testapp"
+        model_mock._meta.model_name = "testmodel"
+        queryset_mock = Mock()
+        queryset_mock.model = model_mock
+        view.get_queryset = Mock(return_value=queryset_mock)
+
+        # Test - should deny create without model permission
+        self.assertFalse(self.permission.has_permission(request, view))
+
+        # Verify the permission was checked correctly
+        user_without_perm.has_perm.assert_called_with("testapp.add_testmodel")
+
+    def test_has_permission_create_action_staff_user(self):
+        # Staff users should be able to create objects without explicit permission
+        request = self.create_request(user=self.staff_user)
+
+        # Setup a view with queryset that has a model
+        view = self.create_view(action="create")
+        model_mock = Mock()
+        model_mock._meta.app_label = "testapp"
+        model_mock._meta.model_name = "testmodel"
+        queryset_mock = Mock()
+        queryset_mock.model = model_mock
+        view.get_queryset = Mock(return_value=queryset_mock)
+
+        # Test - staff should always be allowed
+        self.assertTrue(self.permission.has_permission(request, view))
 
     def test_has_permission_update_action_authenticated_user(self):
         request = self.create_request(user=self.owner_user)
@@ -443,6 +515,8 @@ class TestUserCreatedObjectPermission(TestCase):
 
 
 class HasModelPermissionTestCase(TestCase):
+    # TODO: EOL this class
+
     def setUp(self):
         self.factory = RequestFactory()
         self.permission = HasModelPermission()

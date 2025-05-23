@@ -32,9 +32,27 @@ class UserCreatedObjectPermission(permissions.BasePermission):
         if getattr(view, 'action', None) in ['list', 'retrieve']:
             return True
 
-        # Allow authenticated users to create objects
+        # For create action, check proper model permissions
         if getattr(view, 'action', None) == 'create':
-            return request.user and request.user.is_authenticated
+            # User must be authenticated
+            if not (request.user and request.user.is_authenticated):
+                return False
+                
+            # Staff users can always create objects
+            if request.user.is_staff:
+                return True
+                
+            # Get model from viewset's queryset
+            try:
+                model = view.get_queryset().model
+                app_label = model._meta.app_label
+                model_name = model._meta.model_name
+                
+                # Check if user has 'add' permission for this model
+                return request.user.has_perm(f'{app_label}.add_{model_name}')
+            except (AttributeError, Exception):
+                # If we can't determine the model permission, default to False for security
+                return False
 
         # For other actions, ensure the user is authenticated
         return request.user and request.user.is_authenticated
