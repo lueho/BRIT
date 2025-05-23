@@ -1,5 +1,5 @@
 from django.core.exceptions import ValidationError
-from django.db.models import Q
+from django.db.models import F, Prefetch, Q
 from django.shortcuts import get_object_or_404
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
@@ -13,6 +13,7 @@ from .permissions import (
 )
 
 
+# TODO: EOL this class
 class AutoPermModelViewSet(ModelViewSet):
     """
     A custom ViewSet that extends the base ModelViewSet provided by Django REST Framework.
@@ -103,24 +104,42 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
     queryset = None  # Must be set in the concrete viewset
 
     def get_queryset(self):
-        user = self.request.user
-        model = self.queryset.model
+        """Return a queryset filtered according to user permissions and scope parameter.
 
-        if user.is_authenticated:
-            # Check if user has moderation permissions
-            if self._is_moderator(user, model):
-                return model.objects.all()
-            else:
-                # Owners can see their own objects and published or review objects
-                return model.objects.filter(
-                    Q(owner=user)
-                    | Q(publication_status="published")
-                    | Q(publication_status="review", owner=user)
-                    | Q(publication_status="archived", owner=user)
-                )
+        Supports query parameter:
+        - scope: Different filtering options for objects
+          'published' - Only published objects (default)
+          'private' - Only user's own objects
+          'review' - User's own objects or objects in review
+        """
+        user = self.request.user
+        queryset = self.queryset
+        scope = self.request.query_params.get("scope", "published")
+
+        # Staff users see all objects without filtering
+        if user.is_staff:
+            return queryset
+
+        # Unauthenticated users only see published objects
+        if not user.is_authenticated:
+            return queryset.filter(publication_status="published")
+
+        # Handle different scopes for authenticated non-staff users
+        if scope == "private":
+            # Private scope: only user's own objects
+            return queryset.filter(owner=user)
+        elif scope == "review":
+            # Review scope: user's own objects or objects in review
+            q_owner = Q(owner=user)
+            q_review = Q(publication_status="review")
+            return queryset.filter(q_owner | q_review)
+        elif scope == "published":
+            # Published scope: only published objects
+            return queryset.filter(publication_status="published")
         else:
-            # Unauthenticated users can only see published objects
-            return model.objects.filter(publication_status="published")
+            # Default behavior for invalid scope: same as no scope
+            # See user's own objects and published objects
+            return queryset.filter(Q(owner=user) | Q(publication_status="published"))
 
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
