@@ -82,6 +82,14 @@ class UserCreatedObjectPermission(permissions.BasePermission):
             except drf_exceptions.UnsupportedMediaType:
                 payload = {}
 
+            # Four eyes principle: moderators cannot publish their own objects
+            if (
+                'publication_status' in payload
+                and payload['publication_status'] == UserCreatedObject.STATUS_PUBLISHED
+                and self._is_moderator(user, obj)
+            ):
+                return False
+
             # If attempting to change publication_status, require moderator rights
             if 'publication_status' in payload and not self._is_moderator(user, obj):
                 return False
@@ -93,6 +101,17 @@ class UserCreatedObjectPermission(permissions.BasePermission):
             # Moderators cannot modify 'private' objects unless they are the owner
             if getattr(obj, 'publication_status', None) == 'private' and obj.owner != user:
                 return False
+            # Moderators may only change 'publication_status'—nothing else
+            if request.method in ('PATCH', 'PUT'):
+                try:
+                    payload = request.data
+                except Exception:
+                    payload = {}
+                # Only allow if the only field being changed is 'publication_status'
+                allowed_fields = {'publication_status'}
+                changed_fields = set(payload.keys())
+                if not changed_fields.issubset(allowed_fields):
+                    return False
             return True
 
         return False

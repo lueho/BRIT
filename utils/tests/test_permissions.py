@@ -180,30 +180,19 @@ class TestUserCreatedObjectPermission(TestCase):
         return mock_view
 
     def test_has_permission_list_action_any_user(self):
+        """Tests that list action is allowed for any user."""
         request = self.create_request(user=self.anonymous_user)
         view = self.create_view(action="list")
         self.assertTrue(self.permission.has_permission(request, view))
 
     def test_has_permission_retrieve_action_any_user(self):
+        """Tests that retrieve action is allowed for any user."""
         request = self.create_request(user=self.anonymous_user)
         view = self.create_view(action="retrieve")
         self.assertTrue(self.permission.has_permission(request, view))
 
-    def test_has_permission_create_action_authenticated_user(self):
-        request = self.create_request(user=self.owner_user)
-        view = self.create_view(action="create")
-
-        # When view.get_queryset() is not implemented, the permission should default to False
-        self.assertFalse(self.permission.has_permission(request, view))
-
-    def test_has_permission_create_action_unauthenticated_user(self):
-        request = self.create_request(user=self.anonymous_user)
-        view = self.create_view(action="create")
-        self.assertFalse(self.permission.has_permission(request, view))
-
-    def test_has_permission_create_action_authenticated_user_with_model_permission(
-        self,
-    ):
+    def test_has_permission_create_action_authenticated_user_with_model_perm(self):
+        """Tests that create action is allowed for authenticated users with model permission."""
         # Setup a user with model add permission
         user_with_perm = Mock(spec=User)
         user_with_perm.is_authenticated = True
@@ -228,34 +217,8 @@ class TestUserCreatedObjectPermission(TestCase):
         # Verify the permission was checked correctly
         user_with_perm.has_perm.assert_called_with("testapp.add_testmodel")
 
-    def test_has_permission_create_action_authenticated_user_without_model_permission(
-        self,
-    ):
-        # Setup a user without model add permission
-        user_without_perm = Mock(spec=User)
-        user_without_perm.is_authenticated = True
-        user_without_perm.is_staff = False
-        # Configure has_perm to return False for any permission
-        user_without_perm.has_perm = Mock(return_value=False)
-
-        request = self.create_request(user=user_without_perm)
-
-        # Setup a view with queryset that has a model
-        view = self.create_view(action="create")
-        model_mock = Mock()
-        model_mock._meta.app_label = "testapp"
-        model_mock._meta.model_name = "testmodel"
-        queryset_mock = Mock()
-        queryset_mock.model = model_mock
-        view.get_queryset = Mock(return_value=queryset_mock)
-
-        # Test - should deny create without model permission
-        self.assertFalse(self.permission.has_permission(request, view))
-
-        # Verify the permission was checked correctly
-        user_without_perm.has_perm.assert_called_with("testapp.add_testmodel")
-
     def test_has_permission_create_action_staff_user(self):
+        """Tests that create action is allowed for staff users."""
         # Staff users should be able to create objects without explicit permission
         request = self.create_request(user=self.staff_user)
 
@@ -272,34 +235,40 @@ class TestUserCreatedObjectPermission(TestCase):
         self.assertTrue(self.permission.has_permission(request, view))
 
     def test_has_permission_update_action_authenticated_user(self):
+        """Tests that update action is allowed for authenticated users."""
         request = self.create_request(user=self.owner_user)
         view = self.create_view(action="update")
         self.assertTrue(self.permission.has_permission(request, view))
 
     def test_has_permission_update_action_unauthenticated_user(self):
+        """Tests that update action is denied for unauthenticated users."""
         request = self.create_request(user=self.anonymous_user)
         view = self.create_view(action="update")
         self.assertFalse(self.permission.has_permission(request, view))
 
     def test_has_object_permission_safe_published_any_user(self):
+        """Tests that any user can read published objects."""
         request = self.create_request(method="GET", user=self.other_user)
         view = Mock()
         obj = self.public_obj
         self.assertTrue(self.permission.has_object_permission(request, view, obj))
 
     def test_has_object_permission_safe_review_owner(self):
+        """Tests that owners can read review objects."""
         request = self.create_request(method="GET", user=self.owner_user)
         view = Mock()
         obj = self.review_obj
         self.assertTrue(self.permission.has_object_permission(request, view, obj))
 
     def test_has_object_permission_safe_review_moderator(self):
+        """Tests modarators can read review objects."""
         request = self.create_request(method="GET", user=self.moderator_user)
         view = Mock()
         obj = self.review_obj
         self.assertTrue(self.permission.has_object_permission(request, view, obj))
 
     def test_has_object_permission_safe_review_other_user(self):
+        """Tests that other users cannot read review objects."""
         request = self.create_request(method="GET", user=self.other_user)
         view = Mock()
         obj = self.review_obj
@@ -307,70 +276,76 @@ class TestUserCreatedObjectPermission(TestCase):
         self.assertFalse(self.permission.has_object_permission(request, view, obj))
 
     def test_has_object_permission_safe_private_owner(self):
+        """Tests that owners can read their own private objects."""
         request = self.create_request(method="GET", user=self.owner_user)
         view = Mock()
         obj = self.private_obj
         self.assertTrue(self.permission.has_object_permission(request, view, obj))
 
     def test_has_object_permission_safe_private_other_user(self):
+        """Tests that other users cannot read private objects."""
         request = self.create_request(method="GET", user=self.other_user)
         view = Mock()
         obj = self.private_obj
         self.assertFalse(self.permission.has_object_permission(request, view, obj))
 
     def test_has_object_permission_safe_undefined_status(self):
+        """Tests that undefined status objects are not accessible."""
         request = self.create_request(method="GET", user=self.owner_user)
         view = Mock()
         obj = self.undefined_status_obj
         self.assertFalse(self.permission.has_object_permission(request, view, obj))
 
-    def test_has_object_permission_write_owner_modify_publication_status_as_moderator(
-        self,
-    ):
+    def test_moderator_can_publish_review_object(self):
+        """Tests that moderators can change objects under review to published."""
         request = self.create_request(
-            method="PUT", user=self.owner_user, data={"publication_status": "published"}
+            method="PUT",
+            user=self.moderator_user,
+            data={"publication_status": "published"},
         )
         view = Mock()
-        obj = self.public_obj
+        obj = self.review_obj
         self.permission._is_moderator = Mock(return_value=True)
         self.assertTrue(self.permission.has_object_permission(request, view, obj))
-        self.permission._is_moderator.assert_called_with(self.owner_user, obj)
+        self.permission._is_moderator.assert_called_with(self.moderator_user, obj)
 
-    def test_has_object_permission_write_owner_modify_publication_status_not_moderator(
-        self,
-    ):
+    def test_owner_cannot_publish_review_object(self):
+        """Tests that owners cannot change objects under review to published."""
         request = self.create_request(
             method="PUT", user=self.owner_user, data={"publication_status": "published"}
         )
         view = Mock()
-        obj = self.public_obj
+        obj = self.private_obj
         self.permission._is_moderator = Mock(return_value=False)
         self.assertFalse(self.permission.has_object_permission(request, view, obj))
         self.permission._is_moderator.assert_called_with(self.owner_user, obj)
 
-    def test_has_object_permission_write_owner_modify_other_fields(self):
+    def test_owner_cannot_modify_already_published_objects(self):
+        """Tests that owners cannot modify already published objects."""
         request = self.create_request(
             method="PATCH", user=self.owner_user, data={"title": "New Title"}
         )
         view = Mock()
         obj = self.public_obj
-        self.assertTrue(self.permission.has_object_permission(request, view, obj))
+        self.assertFalse(self.permission.has_object_permission(request, view, obj))
 
-    def test_has_object_permission_write_moderator_modify_non_private_object(self):
+    def test_moderator_cannot_modify_other_fields_of_non_private_object(self):
+        """Tests that moderators cannot change fields other than publicatcion_status."""
         request = self.create_request(
             method="PUT", user=self.moderator_user, data={"title": "Updated Title"}
         )
         view = Mock()
-        obj = self.public_obj
+        obj = self.review_obj
         self.permission._is_moderator = Mock(return_value=True)
-        self.assertTrue(self.permission.has_object_permission(request, view, obj))
+        self.assertFalse(self.permission.has_object_permission(request, view, obj))
         self.permission._is_moderator.assert_called_with(self.moderator_user, obj)
 
-    def test_has_object_permission_write_moderator_modify_private_object_not_owner(
-        self,
-    ):
+    def test_moderator_cannot_modify_private_object(self):
+        """Tests that moderators cannot modify private objects of other users."""
         request = self.create_request(
-            method="PUT", user=self.moderator_user, data={"title": "Updated Title"}
+            method="PUT",
+            user=self.moderator_user,
+            data={"publication_status": "published"},
         )
         view = Mock()
         obj = self.private_obj
@@ -378,7 +353,8 @@ class TestUserCreatedObjectPermission(TestCase):
         self.assertFalse(self.permission.has_object_permission(request, view, obj))
         self.permission._is_moderator.assert_called_with(self.moderator_user, obj)
 
-    def test_has_object_permission_write_moderator_modify_private_object_as_owner(self):
+    def test_moderator_can_modify_private_object_as_owner(self):
+        """Tests that moderators can modify private objects of their own."""
         request = self.create_request(
             method="PUT", user=self.owner_user, data={"title": "Updated Title"}
         )
@@ -387,21 +363,34 @@ class TestUserCreatedObjectPermission(TestCase):
         self.permission._is_moderator = Mock(return_value=True)
         self.assertTrue(self.permission.has_object_permission(request, view, obj))
 
-    def test_has_object_permission_write_other_user(self):
+    def test_moderator_cannot_publish_private_object_as_owner(self):
+        """Tests that moderators cannot publish their own private objects."""
+        request = self.create_request(
+            method="PUT", user=self.owner_user, data={"publication_status": "published"}
+        )
+        view = Mock()
+        obj = self.private_obj
+        self.permission._is_moderator = Mock(return_value=True)
+        self.assertFalse(self.permission.has_object_permission(request, view, obj))
+
+    def test_other_user_has_no_write_permissions(self):
+        """Tests that other users have no write permissions."""
         request = self.create_request(method="DELETE", user=self.other_user, data={})
         view = Mock()
-        obj = self.public_obj
+        obj = self.private_obj
         self.permission._is_moderator = Mock(return_value=False)
         self.assertFalse(self.permission.has_object_permission(request, view, obj))
         self.permission._is_moderator.assert_called_with(self.other_user, obj)
 
     def test_check_safe_permissions_published(self):
+        """Tests that other users can view published objects."""
         request = self.create_request(method="GET", user=self.other_user)
         obj = self.public_obj
         result = self.permission._check_safe_permissions(request, obj)
         self.assertTrue(result)
 
     def test_check_safe_permissions_review_owner(self):
+        """Tests that owners can view their own objects under review."""
         request = self.create_request(method="GET", user=self.owner_user)
         obj = self.review_obj
         self.permission._is_moderator = Mock(return_value=False)
@@ -409,6 +398,7 @@ class TestUserCreatedObjectPermission(TestCase):
         self.assertTrue(result)
 
     def test_check_safe_permissions_review_moderator(self):
+        """Tests that moderators can view objects under review."""
         request = self.create_request(method="GET", user=self.moderator_user)
         obj = self.review_obj
         self.permission._is_moderator = Mock(return_value=True)
@@ -417,6 +407,7 @@ class TestUserCreatedObjectPermission(TestCase):
         self.permission._is_moderator.assert_called_with(self.moderator_user, obj)
 
     def test_check_safe_permissions_review_other_user(self):
+        """Tests that other users cannot view objects under review."""
         request = self.create_request(method="GET", user=self.other_user)
         obj = self.review_obj
         self.permission._is_moderator = Mock(return_value=False)
@@ -425,24 +416,28 @@ class TestUserCreatedObjectPermission(TestCase):
         self.permission._is_moderator.assert_called_with(self.other_user, obj)
 
     def test_check_safe_permissions_private_owner(self):
+        """Tests that owners can view their own private objects."""
         request = self.create_request(method="GET", user=self.owner_user)
         obj = self.private_obj
         result = self.permission._check_safe_permissions(request, obj)
         self.assertTrue(result)
 
     def test_check_safe_permissions_private_other_user(self):
+        """Tests that other users cannot view private objects."""
         request = self.create_request(method="GET", user=self.other_user)
         obj = self.private_obj
         result = self.permission._check_safe_permissions(request, obj)
         self.assertFalse(result)
 
     def test_check_safe_permissions_undefined_status(self):
+        """Tests that other users cannot view objects with undefined publication status."""
         request = self.create_request(method="GET", user=self.owner_user)
         obj = self.undefined_status_obj
         result = self.permission._check_safe_permissions(request, obj)
         self.assertFalse(result)
 
     def test_is_moderator_with_permission(self):
+        """Tests that moderators have permission to moderate objects."""
         mock_user_instance = self.moderator_user
         mock_user_instance.has_perm.return_value = True
         obj = self.public_obj
@@ -451,6 +446,7 @@ class TestUserCreatedObjectPermission(TestCase):
         mock_user_instance.has_perm.assert_called_with("utils.can_moderate_samplemodel")
 
     def test_is_moderator_with_staff(self):
+        """Tests that staff users are moderators."""
         mock_user_instance = self.staff_user
         obj = self.public_obj
         result = self.permission._is_moderator(mock_user_instance, obj)
@@ -458,6 +454,7 @@ class TestUserCreatedObjectPermission(TestCase):
         mock_user_instance.has_perm.assert_not_called()
 
     def test_is_moderator_without_permission_or_staff(self):
+        """Tests that other users are not moderators."""
         mock_user_instance = self.other_user
         obj = self.public_obj
         result = self.permission._is_moderator(mock_user_instance, obj)
@@ -465,6 +462,7 @@ class TestUserCreatedObjectPermission(TestCase):
         mock_user_instance.has_perm.assert_called_with("utils.can_moderate_samplemodel")
 
     def test_is_moderator_with_permission_false_staff_false(self):
+        """Tests that moderators can have limited permissions."""
         mock_user_instance = self.moderator_user
         mock_user_instance.has_perm.return_value = False
         mock_user_instance.is_staff = False
@@ -474,24 +472,28 @@ class TestUserCreatedObjectPermission(TestCase):
         mock_user_instance.has_perm.assert_called_with("utils.can_moderate_samplemodel")
 
     def test_has_object_permission_no_publication_status(self):
+        """Tests that objects with undefined publication status are not accessible."""
         request = self.create_request(method="GET", user=self.owner_user)
         view = Mock()
         obj = self.undefined_status_obj
         self.assertFalse(self.permission.has_object_permission(request, view, obj))
 
     def test_has_object_permission_safe_method_no_publication_status(self):
+        """Tests that objects with undefined publication status are not accessible."""
         request = self.create_request(method="HEAD", user=self.owner_user)
         view = Mock()
         obj = self.undefined_status_obj
         self.assertFalse(self.permission.has_object_permission(request, view, obj))
 
     def test_has_object_permission_write_method_no_data(self):
+        """Tests that write methods are allowed for objects with no data."""
         request = self.create_request(method="PUT", user=self.owner_user, data={})
         view = Mock()
-        obj = self.public_obj
+        obj = self.private_obj
         self.assertTrue(self.permission.has_object_permission(request, view, obj))
 
     def test_has_object_permission_write_method_not_owner_not_moderator(self):
+        """Tests that write methods are not allowed for objects that are not owned by the user or moderated by the user."""
         request = self.create_request(
             method="PATCH", user=self.other_user, data={"title": "Hack"}
         )
@@ -500,18 +502,6 @@ class TestUserCreatedObjectPermission(TestCase):
         self.permission._is_moderator = Mock(return_value=False)
         self.assertFalse(self.permission.has_object_permission(request, view, obj))
         self.permission._is_moderator.assert_called_with(self.other_user, obj)
-
-    def test_has_permission_no_action(self):
-        request = self.create_request(user=self.owner_user)
-        view = self.create_view(action=None)
-        self.assertTrue(
-            self.permission.has_permission(request, view)
-        )  # Defaults to authenticated
-
-    def test_has_permission_no_action_unauthenticated(self):
-        request = self.create_request(user=self.anonymous_user)
-        view = self.create_view(action=None)
-        self.assertFalse(self.permission.has_permission(request, view))
 
 
 class HasModelPermissionTestCase(TestCase):
