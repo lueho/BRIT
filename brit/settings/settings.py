@@ -58,7 +58,7 @@ INSTALLED_APPS = [
     "interfaces.simucf.apps.SimucfConfig",
     "utils.file_export.apps.FileExportConfig",
     "utils.properties.apps.PropertiesConfig",
-    "moderation.apps.ModerationConfig",
+    "utils.object_management.apps.ObjectManagementConfig",
     "django.forms",
     "django_filters",
     "crispy_forms",

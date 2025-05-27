@@ -1,7 +1,7 @@
 from django.core.exceptions import ObjectDoesNotExist
 
 from distributions.models import Period, TemporalDistribution, Timestep
-from utils.models import get_default_owner
+from utils.object_management.models import get_default_owner
 
 from .models import CollectionCountOptions, CollectionFrequency, CollectionSeason
 

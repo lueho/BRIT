@@ -4,6 +4,11 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.utils import timezone
 
+from distributions.utils import INITIALIZATION_DEPENDENCIES
+
+
+INITIALIZATION_DEPENDENCIES = ["users"]
+
 
 def ensure_initial_data(stdout=None):
     """

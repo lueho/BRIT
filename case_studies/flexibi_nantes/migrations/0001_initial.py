@@ -13,141 +13,501 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('distributions', '0001_initial'),
-        ('materials', '0001_initial'),
+        ("distributions", "0001_initial"),
+        ("materials", "0001_initial"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='NantesGreenhouses',
+            name="NantesGreenhouses",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('geom', django.contrib.gis.db.models.fields.PointField(blank=True, null=True, srid=4326)),
-                ('id_exp', models.CharField(blank=True, max_length=255, null=True)),
-                ('nom_exp', models.CharField(blank=True, max_length=255, null=True)),
-                ('id_serre', models.CharField(blank=True, max_length=255, null=True)),
-                ('lat', models.FloatField(blank=True, null=True)),
-                ('lon', models.FloatField(blank=True, null=True)),
-                ('surface_ha', models.FloatField(blank=True, null=True)),
-                ('nb_cycles', models.IntegerField(blank=True, null=True)),
-                ('culture_1', models.CharField(blank=True, max_length=255, null=True)),
-                ('start_cycle_1', models.CharField(blank=True, max_length=255, null=True)),
-                ('end_cycle_1', models.CharField(blank=True, max_length=255, null=True)),
-                ('culture_2', models.CharField(blank=True, max_length=255, null=True)),
-                ('start_cycle_2', models.CharField(blank=True, max_length=255, null=True)),
-                ('end_cycle_2', models.CharField(blank=True, max_length=255, null=True)),
-                ('culture_3', models.CharField(blank=True, max_length=255, null=True)),
-                ('start_cycle_3', models.CharField(blank=True, max_length=20, null=True)),
-                ('end_cycle_3', models.CharField(blank=True, max_length=255, null=True)),
-                ('layer', models.CharField(blank=True, max_length=255, null=True)),
-                ('heated', models.BooleanField(blank=True, null=True)),
-                ('lighted', models.BooleanField(blank=True, null=True)),
-                ('high_wire', models.BooleanField(blank=True, null=True)),
-                ('above_ground', models.BooleanField(blank=True, null=True)),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "geom",
+                    django.contrib.gis.db.models.fields.PointField(
+                        blank=True, null=True, srid=4326
+                    ),
+                ),
+                ("id_exp", models.CharField(blank=True, max_length=255, null=True)),
+                ("nom_exp", models.CharField(blank=True, max_length=255, null=True)),
+                ("id_serre", models.CharField(blank=True, max_length=255, null=True)),
+                ("lat", models.FloatField(blank=True, null=True)),
+                ("lon", models.FloatField(blank=True, null=True)),
+                ("surface_ha", models.FloatField(blank=True, null=True)),
+                ("nb_cycles", models.IntegerField(blank=True, null=True)),
+                ("culture_1", models.CharField(blank=True, max_length=255, null=True)),
+                (
+                    "start_cycle_1",
+                    models.CharField(blank=True, max_length=255, null=True),
+                ),
+                (
+                    "end_cycle_1",
+                    models.CharField(blank=True, max_length=255, null=True),
+                ),
+                ("culture_2", models.CharField(blank=True, max_length=255, null=True)),
+                (
+                    "start_cycle_2",
+                    models.CharField(blank=True, max_length=255, null=True),
+                ),
+                (
+                    "end_cycle_2",
+                    models.CharField(blank=True, max_length=255, null=True),
+                ),
+                ("culture_3", models.CharField(blank=True, max_length=255, null=True)),
+                (
+                    "start_cycle_3",
+                    models.CharField(blank=True, max_length=20, null=True),
+                ),
+                (
+                    "end_cycle_3",
+                    models.CharField(blank=True, max_length=255, null=True),
+                ),
+                ("layer", models.CharField(blank=True, max_length=255, null=True)),
+                ("heated", models.BooleanField(blank=True, null=True)),
+                ("lighted", models.BooleanField(blank=True, null=True)),
+                ("high_wire", models.BooleanField(blank=True, null=True)),
+                ("above_ground", models.BooleanField(blank=True, null=True)),
             ],
         ),
         migrations.CreateModel(
-            name='CaseStudyBaseObjects',
+            name="CaseStudyBaseObjects",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('reference_distribution', models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT, to='distributions.temporaldistribution')),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "reference_distribution",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to="distributions.temporaldistribution",
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='Culture',
+            name="Culture",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Under Review'), ('published', 'Published')], default='private', max_length=10)),
-                ('name', models.CharField(max_length=255)),
-                ('description', models.TextField(blank=True, null=True)),
-                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                ('owner', models.ForeignKey(default=utils.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
-                ('residue', models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT, to='materials.sampleseries')),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created at",
+                    ),
+                ),
+                (
+                    "lastmodified_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Last modified at",
+                    ),
+                ),
+                (
+                    "publication_status",
+                    models.CharField(
+                        choices=[
+                            ("private", "Private"),
+                            ("review", "Under Review"),
+                            ("published", "Published"),
+                        ],
+                        default="private",
+                        max_length=10,
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                ("description", models.TextField(blank=True, null=True)),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_created",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Created by",
+                    ),
+                ),
+                (
+                    "lastmodified_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_lastmodified",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Last modified by",
+                    ),
+                ),
+                (
+                    "owner",
+                    models.ForeignKey(
+                        default=utils.object_management.models.get_default_owner_pk,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "residue",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to="materials.sampleseries",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['name', 'id'],
-                'abstract': False,
+                "ordering": ["name", "id"],
+                "abstract": False,
             },
         ),
         migrations.CreateModel(
-            name='Greenhouse',
+            name="Greenhouse",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Under Review'), ('published', 'Published')], default='private', max_length=10)),
-                ('name', models.CharField(max_length=255)),
-                ('description', models.TextField(blank=True, null=True)),
-                ('heated', models.BooleanField(blank=True, null=True)),
-                ('lighted', models.BooleanField(blank=True, null=True)),
-                ('high_wire', models.BooleanField(blank=True, null=True)),
-                ('above_ground', models.BooleanField(blank=True, null=True)),
-                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                ('owner', models.ForeignKey(default=utils.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created at",
+                    ),
+                ),
+                (
+                    "lastmodified_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Last modified at",
+                    ),
+                ),
+                (
+                    "publication_status",
+                    models.CharField(
+                        choices=[
+                            ("private", "Private"),
+                            ("review", "Under Review"),
+                            ("published", "Published"),
+                        ],
+                        default="private",
+                        max_length=10,
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                ("description", models.TextField(blank=True, null=True)),
+                ("heated", models.BooleanField(blank=True, null=True)),
+                ("lighted", models.BooleanField(blank=True, null=True)),
+                ("high_wire", models.BooleanField(blank=True, null=True)),
+                ("above_ground", models.BooleanField(blank=True, null=True)),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_created",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Created by",
+                    ),
+                ),
+                (
+                    "lastmodified_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_lastmodified",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Last modified by",
+                    ),
+                ),
+                (
+                    "owner",
+                    models.ForeignKey(
+                        default=utils.object_management.models.get_default_owner_pk,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'ordering': ['name', 'id'],
-                'abstract': False,
+                "ordering": ["name", "id"],
+                "abstract": False,
             },
         ),
         migrations.CreateModel(
-            name='GreenhouseGrowthCycle',
+            name="GreenhouseGrowthCycle",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Under Review'), ('published', 'Published')], default='private', max_length=10)),
-                ('cycle_number', models.IntegerField(default=1)),
-                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                ('culture', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='flexibi_nantes.culture')),
-                ('greenhouse', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='flexibi_nantes.greenhouse')),
-                ('group_settings', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='materials.composition')),
-                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                ('owner', models.ForeignKey(default=utils.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created at",
+                    ),
+                ),
+                (
+                    "lastmodified_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Last modified at",
+                    ),
+                ),
+                (
+                    "publication_status",
+                    models.CharField(
+                        choices=[
+                            ("private", "Private"),
+                            ("review", "Under Review"),
+                            ("published", "Published"),
+                        ],
+                        default="private",
+                        max_length=10,
+                    ),
+                ),
+                ("cycle_number", models.IntegerField(default=1)),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_created",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Created by",
+                    ),
+                ),
+                (
+                    "culture",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="flexibi_nantes.culture",
+                    ),
+                ),
+                (
+                    "greenhouse",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="flexibi_nantes.greenhouse",
+                    ),
+                ),
+                (
+                    "group_settings",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="materials.composition",
+                    ),
+                ),
+                (
+                    "lastmodified_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_lastmodified",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Last modified by",
+                    ),
+                ),
+                (
+                    "owner",
+                    models.ForeignKey(
+                        default=utils.object_management.models.get_default_owner_pk,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'abstract': False,
+                "abstract": False,
             },
         ),
         migrations.CreateModel(
-            name='GrowthTimeStepSet',
+            name="GrowthTimeStepSet",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('growth_cycle', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='flexibi_nantes.greenhousegrowthcycle')),
-                ('owner', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to=settings.AUTH_USER_MODEL)),
-                ('timestep', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, to='distributions.timestep')),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "growth_cycle",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="flexibi_nantes.greenhousegrowthcycle",
+                    ),
+                ),
+                (
+                    "owner",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "timestep",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="distributions.timestep",
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='GrowthShare',
+            name="GrowthShare",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Under Review'), ('published', 'Published')], default='private', max_length=10)),
-                ('average', models.FloatField(default=0.0)),
-                ('standard_deviation', models.FloatField(default=0.0)),
-                ('component', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='materials.materialcomponent')),
-                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                ('owner', models.ForeignKey(default=utils.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
-                ('timestepset', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='flexibi_nantes.growthtimestepset')),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created at",
+                    ),
+                ),
+                (
+                    "lastmodified_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Last modified at",
+                    ),
+                ),
+                (
+                    "publication_status",
+                    models.CharField(
+                        choices=[
+                            ("private", "Private"),
+                            ("review", "Under Review"),
+                            ("published", "Published"),
+                        ],
+                        default="private",
+                        max_length=10,
+                    ),
+                ),
+                ("average", models.FloatField(default=0.0)),
+                ("standard_deviation", models.FloatField(default=0.0)),
+                (
+                    "component",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="materials.materialcomponent",
+                    ),
+                ),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_created",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Created by",
+                    ),
+                ),
+                (
+                    "lastmodified_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_lastmodified",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Last modified by",
+                    ),
+                ),
+                (
+                    "owner",
+                    models.ForeignKey(
+                        default=utils.object_management.models.get_default_owner_pk,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "timestepset",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="flexibi_nantes.growthtimestepset",
+                    ),
+                ),
             ],
             options={
-                'abstract': False,
+                "abstract": False,
             },
         ),
         migrations.AddIndex(
-            model_name='greenhousegrowthcycle',
-            index=models.Index(fields=['publication_status'], name='flexibi_nan_publica_d66165_idx'),
+            model_name="greenhousegrowthcycle",
+            index=models.Index(
+                fields=["publication_status"], name="flexibi_nan_publica_d66165_idx"
+            ),
         ),
         migrations.AddIndex(
-            model_name='growthshare',
-            index=models.Index(fields=['publication_status'], name='flexibi_nan_publica_3516d7_idx'),
+            model_name="growthshare",
+            index=models.Index(
+                fields=["publication_status"], name="flexibi_nan_publica_3516d7_idx"
+            ),
         ),
     ]

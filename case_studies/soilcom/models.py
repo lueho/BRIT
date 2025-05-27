@@ -13,7 +13,7 @@ from bibliography.models import Source
 from distributions.models import Period, TemporalDistribution
 from maps.models import Catchment
 from materials.models import Material, MaterialCategory, Sample, SampleSeries
-from utils.models import (
+from utils.object_management.models import (
     NamedUserCreatedObject,
     UserCreatedObject,
     UserCreatedObjectManager,

@@ -1,6 +1,6 @@
-from utils.models import get_default_owner
+from utils.object_management.models import get_default_owner
 
-INITIALIZATION_DEPENDENCIES = ["users"]
+INITIALIZATION_DEPENDENCIES = ["users", "utils.object_management"]
 
 
 def ensure_initial_data(stdout=None):

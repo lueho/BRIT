@@ -1,4 +1,4 @@
-from django.contrib.auth import get_user_model
+from django.contrib.auth.models import User
 from django.urls import reverse
 from rest_framework.test import APIRequestFactory, APITestCase
 
@@ -13,9 +13,7 @@ from case_studies.soilcom.models import (
     WasteStream,
 )
 from case_studies.soilcom.viewsets import CollectionViewSet
-from utils.models import UserCreatedObject
-
-User = get_user_model()
+from utils.object_management.models import UserCreatedObject
 
 
 class CollectionViewSetTestCase(APITestCase):

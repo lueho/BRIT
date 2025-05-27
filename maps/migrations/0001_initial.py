@@ -15,338 +15,1356 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('bibliography', '0001_initial'),
-        ('contenttypes', '0002_remove_content_type_name'),
+        ("bibliography", "0001_initial"),
+        ("contenttypes", "0002_remove_content_type_name"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='GeoPolygon',
+            name="GeoPolygon",
             fields=[
-                ('fid', models.BigAutoField(primary_key=True, serialize=False)),
-                ('geom', django.contrib.gis.db.models.fields.MultiPolygonField(blank=True, null=True, srid=4326)),
+                ("fid", models.BigAutoField(primary_key=True, serialize=False)),
+                (
+                    "geom",
+                    django.contrib.gis.db.models.fields.MultiPolygonField(
+                        blank=True, null=True, srid=4326
+                    ),
+                ),
             ],
         ),
         migrations.CreateModel(
-            name='Region',
+            name="Region",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Under Review'), ('published', 'Published')], default='private', max_length=10)),
-                ('name', models.CharField(max_length=255)),
-                ('description', models.TextField(blank=True, null=True)),
-                ('country', models.CharField(max_length=56)),
-                ('borders', models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT, to='maps.geopolygon')),
-                ('composed_of', models.ManyToManyField(blank=True, related_name='composing_regions', to='maps.region')),
-                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                ('owner', models.ForeignKey(default=utils.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created at",
+                    ),
+                ),
+                (
+                    "lastmodified_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Last modified at",
+                    ),
+                ),
+                (
+                    "publication_status",
+                    models.CharField(
+                        choices=[
+                            ("private", "Private"),
+                            ("review", "Under Review"),
+                            ("published", "Published"),
+                        ],
+                        default="private",
+                        max_length=10,
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                ("description", models.TextField(blank=True, null=True)),
+                ("country", models.CharField(max_length=56)),
+                (
+                    "borders",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to="maps.geopolygon",
+                    ),
+                ),
+                (
+                    "composed_of",
+                    models.ManyToManyField(
+                        blank=True, related_name="composing_regions", to="maps.region"
+                    ),
+                ),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_created",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Created by",
+                    ),
+                ),
+                (
+                    "lastmodified_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_lastmodified",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Last modified by",
+                    ),
+                ),
+                (
+                    "owner",
+                    models.ForeignKey(
+                        default=utils.object_management.models.get_default_owner_pk,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'ordering': ['name', 'id'],
-                'abstract': False,
+                "ordering": ["name", "id"],
+                "abstract": False,
             },
         ),
         migrations.CreateModel(
-            name='Attribute',
+            name="Attribute",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Under Review'), ('published', 'Published')], default='private', max_length=10)),
-                ('name', models.CharField(max_length=255)),
-                ('description', models.TextField(blank=True, null=True)),
-                ('unit', models.CharField(max_length=127)),
-                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                ('owner', models.ForeignKey(default=utils.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created at",
+                    ),
+                ),
+                (
+                    "lastmodified_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Last modified at",
+                    ),
+                ),
+                (
+                    "publication_status",
+                    models.CharField(
+                        choices=[
+                            ("private", "Private"),
+                            ("review", "Under Review"),
+                            ("published", "Published"),
+                        ],
+                        default="private",
+                        max_length=10,
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                ("description", models.TextField(blank=True, null=True)),
+                ("unit", models.CharField(max_length=127)),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_created",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Created by",
+                    ),
+                ),
+                (
+                    "lastmodified_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_lastmodified",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Last modified by",
+                    ),
+                ),
+                (
+                    "owner",
+                    models.ForeignKey(
+                        default=utils.object_management.models.get_default_owner_pk,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'ordering': ['name', 'id'],
-                'abstract': False,
+                "ordering": ["name", "id"],
+                "abstract": False,
             },
         ),
         migrations.CreateModel(
-            name='Catchment',
+            name="Catchment",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Under Review'), ('published', 'Published')], default='private', max_length=10)),
-                ('name', models.CharField(max_length=255)),
-                ('description', models.TextField(blank=True, null=True)),
-                ('type', models.CharField(choices=[('administrative', 'administrative'), ('custom', 'custom'), ('nuts', 'nuts'), ('lau', 'lau')], default='custom', max_length=14)),
-                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                ('owner', models.ForeignKey(default=utils.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
-                ('parent', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.CASCADE, related_name='children', to='maps.catchment', verbose_name='parent')),
-                ('parent_region', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, related_name='child_catchments', to='maps.region')),
-                ('region', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='maps.region')),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created at",
+                    ),
+                ),
+                (
+                    "lastmodified_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Last modified at",
+                    ),
+                ),
+                (
+                    "publication_status",
+                    models.CharField(
+                        choices=[
+                            ("private", "Private"),
+                            ("review", "Under Review"),
+                            ("published", "Published"),
+                        ],
+                        default="private",
+                        max_length=10,
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                ("description", models.TextField(blank=True, null=True)),
+                (
+                    "type",
+                    models.CharField(
+                        choices=[
+                            ("administrative", "administrative"),
+                            ("custom", "custom"),
+                            ("nuts", "nuts"),
+                            ("lau", "lau"),
+                        ],
+                        default="custom",
+                        max_length=14,
+                    ),
+                ),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_created",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Created by",
+                    ),
+                ),
+                (
+                    "lastmodified_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_lastmodified",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Last modified by",
+                    ),
+                ),
+                (
+                    "owner",
+                    models.ForeignKey(
+                        default=utils.object_management.models.get_default_owner_pk,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "parent",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="children",
+                        to="maps.catchment",
+                        verbose_name="parent",
+                    ),
+                ),
+                (
+                    "parent_region",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="child_catchments",
+                        to="maps.region",
+                    ),
+                ),
+                (
+                    "region",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="maps.region",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['name', 'id'],
-                'abstract': False,
+                "ordering": ["name", "id"],
+                "abstract": False,
             },
         ),
         migrations.CreateModel(
-            name='GeoreferencedCatchment',
+            name="GeoreferencedCatchment",
             fields=[
-                ('catchment_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, to='maps.catchment')),
-                ('geopolygon_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='maps.geopolygon')),
+                (
+                    "catchment_ptr",
+                    models.OneToOneField(
+                        auto_created=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        parent_link=True,
+                        to="maps.catchment",
+                    ),
+                ),
+                (
+                    "geopolygon_ptr",
+                    models.OneToOneField(
+                        auto_created=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        parent_link=True,
+                        primary_key=True,
+                        serialize=False,
+                        to="maps.geopolygon",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['name', 'id'],
-                'abstract': False,
+                "ordering": ["name", "id"],
+                "abstract": False,
             },
-            bases=('maps.geopolygon', 'maps.catchment'),
+            bases=("maps.geopolygon", "maps.catchment"),
         ),
         migrations.CreateModel(
-            name='GeoreferencedRegion',
+            name="GeoreferencedRegion",
             fields=[
-                ('region_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, to='maps.region')),
-                ('geopolygon_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='maps.geopolygon')),
+                (
+                    "region_ptr",
+                    models.OneToOneField(
+                        auto_created=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        parent_link=True,
+                        to="maps.region",
+                    ),
+                ),
+                (
+                    "geopolygon_ptr",
+                    models.OneToOneField(
+                        auto_created=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        parent_link=True,
+                        primary_key=True,
+                        serialize=False,
+                        to="maps.geopolygon",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['name', 'id'],
-                'abstract': False,
+                "ordering": ["name", "id"],
+                "abstract": False,
             },
-            bases=('maps.geopolygon', 'maps.region'),
+            bases=("maps.geopolygon", "maps.region"),
         ),
         migrations.CreateModel(
-            name='NutsRegion',
+            name="NutsRegion",
             fields=[
-                ('region_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='maps.region')),
-                ('nuts_id', models.CharField(blank=True, max_length=5, null=True)),
-                ('levl_code', models.IntegerField(blank=True, null=True)),
-                ('cntr_code', models.CharField(blank=True, max_length=2, null=True)),
-                ('name_latn', models.CharField(blank=True, max_length=70, null=True)),
-                ('nuts_name', models.CharField(blank=True, max_length=106, null=True)),
-                ('mount_type', models.IntegerField(blank=True, null=True)),
-                ('urbn_type', models.IntegerField(blank=True, null=True)),
-                ('coast_type', models.IntegerField(blank=True, null=True)),
-                ('parent', models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT, related_name='children', to='maps.nutsregion')),
+                (
+                    "region_ptr",
+                    models.OneToOneField(
+                        auto_created=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        parent_link=True,
+                        primary_key=True,
+                        serialize=False,
+                        to="maps.region",
+                    ),
+                ),
+                ("nuts_id", models.CharField(blank=True, max_length=5, null=True)),
+                ("levl_code", models.IntegerField(blank=True, null=True)),
+                ("cntr_code", models.CharField(blank=True, max_length=2, null=True)),
+                ("name_latn", models.CharField(blank=True, max_length=70, null=True)),
+                ("nuts_name", models.CharField(blank=True, max_length=106, null=True)),
+                ("mount_type", models.IntegerField(blank=True, null=True)),
+                ("urbn_type", models.IntegerField(blank=True, null=True)),
+                ("coast_type", models.IntegerField(blank=True, null=True)),
+                (
+                    "parent",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="children",
+                        to="maps.nutsregion",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['name', 'id'],
-                'abstract': False,
+                "ordering": ["name", "id"],
+                "abstract": False,
             },
-            bases=('maps.region',),
+            bases=("maps.region",),
         ),
         migrations.CreateModel(
-            name='Location',
+            name="Location",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Under Review'), ('published', 'Published')], default='private', max_length=10)),
-                ('name', models.CharField(max_length=255)),
-                ('description', models.TextField(blank=True, null=True)),
-                ('geom', django.contrib.gis.db.models.fields.PointField(null=True, srid=4326)),
-                ('address', models.CharField(blank=True, max_length=255, null=True)),
-                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                ('owner', models.ForeignKey(default=utils.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created at",
+                    ),
+                ),
+                (
+                    "lastmodified_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Last modified at",
+                    ),
+                ),
+                (
+                    "publication_status",
+                    models.CharField(
+                        choices=[
+                            ("private", "Private"),
+                            ("review", "Under Review"),
+                            ("published", "Published"),
+                        ],
+                        default="private",
+                        max_length=10,
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                ("description", models.TextField(blank=True, null=True)),
+                (
+                    "geom",
+                    django.contrib.gis.db.models.fields.PointField(
+                        null=True, srid=4326
+                    ),
+                ),
+                ("address", models.CharField(blank=True, max_length=255, null=True)),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_created",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Created by",
+                    ),
+                ),
+                (
+                    "lastmodified_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_lastmodified",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Last modified by",
+                    ),
+                ),
+                (
+                    "owner",
+                    models.ForeignKey(
+                        default=utils.object_management.models.get_default_owner_pk,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Location',
+                "verbose_name": "Location",
             },
         ),
         migrations.CreateModel(
-            name='MapConfiguration',
+            name="MapConfiguration",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Under Review'), ('published', 'Published')], default='private', max_length=10)),
-                ('name', models.CharField(max_length=255)),
-                ('description', models.TextField(blank=True, null=True)),
-                ('adjust_bounds_to_layer', models.CharField(choices=[('region', 'Region'), ('catchment', 'Catchment'), ('features', 'Features')], default='region', help_text='Layer to which the map bounds should be adjusted.', max_length=50)),
-                ('apply_filter_to_features', models.BooleanField(default=False)),
-                ('load_features_layer_summary', models.BooleanField(default=False)),
-                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                ('owner', models.ForeignKey(default=utils.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created at",
+                    ),
+                ),
+                (
+                    "lastmodified_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Last modified at",
+                    ),
+                ),
+                (
+                    "publication_status",
+                    models.CharField(
+                        choices=[
+                            ("private", "Private"),
+                            ("review", "Under Review"),
+                            ("published", "Published"),
+                        ],
+                        default="private",
+                        max_length=10,
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                ("description", models.TextField(blank=True, null=True)),
+                (
+                    "adjust_bounds_to_layer",
+                    models.CharField(
+                        choices=[
+                            ("region", "Region"),
+                            ("catchment", "Catchment"),
+                            ("features", "Features"),
+                        ],
+                        default="region",
+                        help_text="Layer to which the map bounds should be adjusted.",
+                        max_length=50,
+                    ),
+                ),
+                ("apply_filter_to_features", models.BooleanField(default=False)),
+                ("load_features_layer_summary", models.BooleanField(default=False)),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_created",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Created by",
+                    ),
+                ),
+                (
+                    "lastmodified_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_lastmodified",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Last modified by",
+                    ),
+                ),
+                (
+                    "owner",
+                    models.ForeignKey(
+                        default=utils.object_management.models.get_default_owner_pk,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'ordering': ['name', 'id'],
-                'abstract': False,
+                "ordering": ["name", "id"],
+                "abstract": False,
             },
         ),
         migrations.CreateModel(
-            name='GeoDataset',
+            name="GeoDataset",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Under Review'), ('published', 'Published')], default='private', max_length=10)),
-                ('name', models.CharField(max_length=255)),
-                ('description', models.TextField(blank=True, null=True)),
-                ('preview', models.ImageField(default='generic_map.png', upload_to='maps_geodataset/')),
-                ('publish', models.BooleanField(default=False)),
-                ('model_name', models.CharField(choices=[('HamburgRoadsideTrees', 'HamburgRoadsideTrees'), ('HamburgGreenAreas', 'HamburgGreenAreas'), ('NantesGreenhouses', 'NantesGreenhouses'), ('NutsRegion', 'NutsRegion'), ('WasteCollection', 'WasteCollection')], max_length=56, null=True)),
-                ('data_object_id', models.PositiveIntegerField(null=True)),
-                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                ('data_content_type', models.ForeignKey(null=True, on_delete=django.db.models.deletion.CASCADE, to='contenttypes.contenttype')),
-                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                ('owner', models.ForeignKey(default=utils.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
-                ('sources', models.ManyToManyField(related_name='geodatasets', to='bibliography.source')),
-                ('region', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='geodatasets', to='maps.region')),
-                ('map_configuration', models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT, related_name='geodatasets', to='maps.mapconfiguration')),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created at",
+                    ),
+                ),
+                (
+                    "lastmodified_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Last modified at",
+                    ),
+                ),
+                (
+                    "publication_status",
+                    models.CharField(
+                        choices=[
+                            ("private", "Private"),
+                            ("review", "Under Review"),
+                            ("published", "Published"),
+                        ],
+                        default="private",
+                        max_length=10,
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                ("description", models.TextField(blank=True, null=True)),
+                (
+                    "preview",
+                    models.ImageField(
+                        default="generic_map.png", upload_to="maps_geodataset/"
+                    ),
+                ),
+                ("publish", models.BooleanField(default=False)),
+                (
+                    "model_name",
+                    models.CharField(
+                        choices=[
+                            ("HamburgRoadsideTrees", "HamburgRoadsideTrees"),
+                            ("HamburgGreenAreas", "HamburgGreenAreas"),
+                            ("NantesGreenhouses", "NantesGreenhouses"),
+                            ("NutsRegion", "NutsRegion"),
+                            ("WasteCollection", "WasteCollection"),
+                        ],
+                        max_length=56,
+                        null=True,
+                    ),
+                ),
+                ("data_object_id", models.PositiveIntegerField(null=True)),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_created",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Created by",
+                    ),
+                ),
+                (
+                    "data_content_type",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        to="contenttypes.contenttype",
+                    ),
+                ),
+                (
+                    "lastmodified_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_lastmodified",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Last modified by",
+                    ),
+                ),
+                (
+                    "owner",
+                    models.ForeignKey(
+                        default=utils.object_management.models.get_default_owner_pk,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "sources",
+                    models.ManyToManyField(
+                        related_name="geodatasets", to="bibliography.source"
+                    ),
+                ),
+                (
+                    "region",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="geodatasets",
+                        to="maps.region",
+                    ),
+                ),
+                (
+                    "map_configuration",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="geodatasets",
+                        to="maps.mapconfiguration",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['name', 'id'],
-                'abstract': False,
+                "ordering": ["name", "id"],
+                "abstract": False,
             },
         ),
         migrations.CreateModel(
-            name='MapLayerConfiguration',
+            name="MapLayerConfiguration",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Under Review'), ('published', 'Published')], default='private', max_length=10)),
-                ('name', models.CharField(max_length=255)),
-                ('description', models.TextField(blank=True, null=True)),
-                ('layer_type', models.CharField(choices=[('region', 'Region'), ('catchment', 'Catchment'), ('features', 'Features')], help_text='Type of the layer (region, catchment, feature).', max_length=50)),
-                ('load_layer', models.BooleanField(default=True, help_text='If False, the dataset will not be loaded initially to avoid long loading times.')),
-                ('feature_id', models.CharField(blank=True, help_text='Unique identifier for the feature if fixed.', max_length=255)),
-                ('api_basename', models.CharField(blank=True, help_text='Base name for API used to derive endpoint urls for geometries, details and summaries', max_length=255)),
-                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                ('owner', models.ForeignKey(default=utils.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created at",
+                    ),
+                ),
+                (
+                    "lastmodified_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Last modified at",
+                    ),
+                ),
+                (
+                    "publication_status",
+                    models.CharField(
+                        choices=[
+                            ("private", "Private"),
+                            ("review", "Under Review"),
+                            ("published", "Published"),
+                        ],
+                        default="private",
+                        max_length=10,
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                ("description", models.TextField(blank=True, null=True)),
+                (
+                    "layer_type",
+                    models.CharField(
+                        choices=[
+                            ("region", "Region"),
+                            ("catchment", "Catchment"),
+                            ("features", "Features"),
+                        ],
+                        help_text="Type of the layer (region, catchment, feature).",
+                        max_length=50,
+                    ),
+                ),
+                (
+                    "load_layer",
+                    models.BooleanField(
+                        default=True,
+                        help_text="If False, the dataset will not be loaded initially to avoid long loading times.",
+                    ),
+                ),
+                (
+                    "feature_id",
+                    models.CharField(
+                        blank=True,
+                        help_text="Unique identifier for the feature if fixed.",
+                        max_length=255,
+                    ),
+                ),
+                (
+                    "api_basename",
+                    models.CharField(
+                        blank=True,
+                        help_text="Base name for API used to derive endpoint urls for geometries, details and summaries",
+                        max_length=255,
+                    ),
+                ),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_created",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Created by",
+                    ),
+                ),
+                (
+                    "lastmodified_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_lastmodified",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Last modified by",
+                    ),
+                ),
+                (
+                    "owner",
+                    models.ForeignKey(
+                        default=utils.object_management.models.get_default_owner_pk,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'ordering': ['name', 'id'],
-                'abstract': False,
+                "ordering": ["name", "id"],
+                "abstract": False,
             },
         ),
         migrations.AddField(
-            model_name='mapconfiguration',
-            name='layers',
-            field=models.ManyToManyField(help_text='Layers associated with this map configuration.', related_name='map_configurations', to='maps.maplayerconfiguration'),
+            model_name="mapconfiguration",
+            name="layers",
+            field=models.ManyToManyField(
+                help_text="Layers associated with this map configuration.",
+                related_name="map_configurations",
+                to="maps.maplayerconfiguration",
+            ),
         ),
         migrations.CreateModel(
-            name='MapLayerStyle',
+            name="MapLayerStyle",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Under Review'), ('published', 'Published')], default='private', max_length=10)),
-                ('name', models.CharField(max_length=255)),
-                ('description', models.TextField(blank=True, null=True)),
-                ('stroke', models.BooleanField(default=True, help_text='If False, the layer will not have a stroke.')),
-                ('color', models.CharField(default='#3388ff', help_text='Stroke color for the layer in hexadecimal format.', max_length=7, validators=[django.core.validators.RegexValidator(message='Enter a valid hex color code.', regex='^#(?:[0-9a-fA-F]{3}){1,2}$')])),
-                ('weight', models.PositiveIntegerField(default=3, help_text='Stroke width in pixels.')),
-                ('opacity', models.FloatField(default=1.0, help_text='Stroke opacity, between 0 and 1.', validators=[django.core.validators.MinValueValidator(0.0), django.core.validators.MaxValueValidator(1.0)])),
-                ('fill', models.BooleanField(default=True, help_text='If False, the layer will not have a fill.')),
-                ('fill_color', models.CharField(blank=True, help_text='Fill color for the layer in hexadecimal format.', max_length=7, validators=[django.core.validators.RegexValidator(message='Enter a valid hex color code.', regex='^#(?:[0-9a-fA-F]{3}){1,2}$')])),
-                ('fill_opacity', models.FloatField(default=0.2, help_text='Fill opacity, between 0 and 1.', validators=[django.core.validators.MinValueValidator(0.0), django.core.validators.MaxValueValidator(1.0)])),
-                ('dash_array', models.CharField(blank=True, help_text="Define the stroke dash pattern, e.g., '5, 10'.", max_length=50)),
-                ('dash_offset', models.CharField(blank=True, help_text='Define the stroke dash offset.', max_length=50)),
-                ('line_cap', models.CharField(choices=[('butt', 'Butt'), ('round', 'Round'), ('square', 'Square')], default='round', help_text='Shape to be used at the end of the stroke.', max_length=10)),
-                ('line_join', models.CharField(choices=[('miter', 'Miter'), ('round', 'Round'), ('bevel', 'Bevel')], default='round', help_text='Shape to be used at the joints between segments.', max_length=10)),
-                ('fill_rule', models.CharField(choices=[('evenodd', 'Even-Odd'), ('nonzero', 'Non-Zero')], default='evenodd', help_text='Rule used to determine if a point is inside the path.', max_length=10)),
-                ('class_name', models.CharField(blank=True, help_text='CSS class name(s) to add to the layer for additional styling.', max_length=50)),
-                ('radius', models.FloatField(default=10.0, help_text='Radius of the circle marker in pixels.')),
-                ('bubbling_mouse_events', models.BooleanField(default=True, help_text='When true, a mouse event on this path will trigger the same event on the map.')),
-                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                ('owner', models.ForeignKey(default=utils.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created at",
+                    ),
+                ),
+                (
+                    "lastmodified_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Last modified at",
+                    ),
+                ),
+                (
+                    "publication_status",
+                    models.CharField(
+                        choices=[
+                            ("private", "Private"),
+                            ("review", "Under Review"),
+                            ("published", "Published"),
+                        ],
+                        default="private",
+                        max_length=10,
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                ("description", models.TextField(blank=True, null=True)),
+                (
+                    "stroke",
+                    models.BooleanField(
+                        default=True,
+                        help_text="If False, the layer will not have a stroke.",
+                    ),
+                ),
+                (
+                    "color",
+                    models.CharField(
+                        default="#3388ff",
+                        help_text="Stroke color for the layer in hexadecimal format.",
+                        max_length=7,
+                        validators=[
+                            django.core.validators.RegexValidator(
+                                message="Enter a valid hex color code.",
+                                regex="^#(?:[0-9a-fA-F]{3}){1,2}$",
+                            )
+                        ],
+                    ),
+                ),
+                (
+                    "weight",
+                    models.PositiveIntegerField(
+                        default=3, help_text="Stroke width in pixels."
+                    ),
+                ),
+                (
+                    "opacity",
+                    models.FloatField(
+                        default=1.0,
+                        help_text="Stroke opacity, between 0 and 1.",
+                        validators=[
+                            django.core.validators.MinValueValidator(0.0),
+                            django.core.validators.MaxValueValidator(1.0),
+                        ],
+                    ),
+                ),
+                (
+                    "fill",
+                    models.BooleanField(
+                        default=True,
+                        help_text="If False, the layer will not have a fill.",
+                    ),
+                ),
+                (
+                    "fill_color",
+                    models.CharField(
+                        blank=True,
+                        help_text="Fill color for the layer in hexadecimal format.",
+                        max_length=7,
+                        validators=[
+                            django.core.validators.RegexValidator(
+                                message="Enter a valid hex color code.",
+                                regex="^#(?:[0-9a-fA-F]{3}){1,2}$",
+                            )
+                        ],
+                    ),
+                ),
+                (
+                    "fill_opacity",
+                    models.FloatField(
+                        default=0.2,
+                        help_text="Fill opacity, between 0 and 1.",
+                        validators=[
+                            django.core.validators.MinValueValidator(0.0),
+                            django.core.validators.MaxValueValidator(1.0),
+                        ],
+                    ),
+                ),
+                (
+                    "dash_array",
+                    models.CharField(
+                        blank=True,
+                        help_text="Define the stroke dash pattern, e.g., '5, 10'.",
+                        max_length=50,
+                    ),
+                ),
+                (
+                    "dash_offset",
+                    models.CharField(
+                        blank=True,
+                        help_text="Define the stroke dash offset.",
+                        max_length=50,
+                    ),
+                ),
+                (
+                    "line_cap",
+                    models.CharField(
+                        choices=[
+                            ("butt", "Butt"),
+                            ("round", "Round"),
+                            ("square", "Square"),
+                        ],
+                        default="round",
+                        help_text="Shape to be used at the end of the stroke.",
+                        max_length=10,
+                    ),
+                ),
+                (
+                    "line_join",
+                    models.CharField(
+                        choices=[
+                            ("miter", "Miter"),
+                            ("round", "Round"),
+                            ("bevel", "Bevel"),
+                        ],
+                        default="round",
+                        help_text="Shape to be used at the joints between segments.",
+                        max_length=10,
+                    ),
+                ),
+                (
+                    "fill_rule",
+                    models.CharField(
+                        choices=[("evenodd", "Even-Odd"), ("nonzero", "Non-Zero")],
+                        default="evenodd",
+                        help_text="Rule used to determine if a point is inside the path.",
+                        max_length=10,
+                    ),
+                ),
+                (
+                    "class_name",
+                    models.CharField(
+                        blank=True,
+                        help_text="CSS class name(s) to add to the layer for additional styling.",
+                        max_length=50,
+                    ),
+                ),
+                (
+                    "radius",
+                    models.FloatField(
+                        default=10.0, help_text="Radius of the circle marker in pixels."
+                    ),
+                ),
+                (
+                    "bubbling_mouse_events",
+                    models.BooleanField(
+                        default=True,
+                        help_text="When true, a mouse event on this path will trigger the same event on the map.",
+                    ),
+                ),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_created",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Created by",
+                    ),
+                ),
+                (
+                    "lastmodified_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_lastmodified",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Last modified by",
+                    ),
+                ),
+                (
+                    "owner",
+                    models.ForeignKey(
+                        default=utils.object_management.models.get_default_owner_pk,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'ordering': ['name', 'id'],
-                'abstract': False,
+                "ordering": ["name", "id"],
+                "abstract": False,
             },
         ),
         migrations.AddField(
-            model_name='maplayerconfiguration',
-            name='style',
-            field=models.ForeignKey(help_text='Styling information for the layer.', on_delete=django.db.models.deletion.PROTECT, related_name='layer_configurations', to='maps.maplayerstyle'),
+            model_name="maplayerconfiguration",
+            name="style",
+            field=models.ForeignKey(
+                help_text="Styling information for the layer.",
+                on_delete=django.db.models.deletion.PROTECT,
+                related_name="layer_configurations",
+                to="maps.maplayerstyle",
+            ),
         ),
         migrations.CreateModel(
-            name='ModelMapConfiguration',
+            name="ModelMapConfiguration",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('model_name', models.CharField(choices=maps.models.get_model_choices, max_length=100, unique=True)),
-                ('map_config', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='model_map_configurations', to='maps.mapconfiguration')),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "model_name",
+                    models.CharField(
+                        choices=maps.models.get_model_choices,
+                        max_length=100,
+                        unique=True,
+                    ),
+                ),
+                (
+                    "map_config",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="model_map_configurations",
+                        to="maps.mapconfiguration",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['model_name'],
+                "ordering": ["model_name"],
             },
         ),
         migrations.CreateModel(
-            name='RegionAttributeTextValue',
+            name="RegionAttributeTextValue",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Under Review'), ('published', 'Published')], default='private', max_length=10)),
-                ('name', models.CharField(max_length=255)),
-                ('description', models.TextField(blank=True, null=True)),
-                ('date', models.DateField(blank=True, null=True)),
-                ('value', models.CharField(max_length=511)),
-                ('attribute', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='maps.attribute')),
-                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                ('owner', models.ForeignKey(default=utils.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
-                ('region', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='maps.region')),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created at",
+                    ),
+                ),
+                (
+                    "lastmodified_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Last modified at",
+                    ),
+                ),
+                (
+                    "publication_status",
+                    models.CharField(
+                        choices=[
+                            ("private", "Private"),
+                            ("review", "Under Review"),
+                            ("published", "Published"),
+                        ],
+                        default="private",
+                        max_length=10,
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                ("description", models.TextField(blank=True, null=True)),
+                ("date", models.DateField(blank=True, null=True)),
+                ("value", models.CharField(max_length=511)),
+                (
+                    "attribute",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT, to="maps.attribute"
+                    ),
+                ),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_created",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Created by",
+                    ),
+                ),
+                (
+                    "lastmodified_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_lastmodified",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Last modified by",
+                    ),
+                ),
+                (
+                    "owner",
+                    models.ForeignKey(
+                        default=utils.object_management.models.get_default_owner_pk,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "region",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT, to="maps.region"
+                    ),
+                ),
             ],
             options={
-                'ordering': ['name', 'id'],
-                'abstract': False,
+                "ordering": ["name", "id"],
+                "abstract": False,
             },
         ),
         migrations.CreateModel(
-            name='RegionAttributeValue',
+            name="RegionAttributeValue",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Under Review'), ('published', 'Published')], default='private', max_length=10)),
-                ('name', models.CharField(max_length=255)),
-                ('description', models.TextField(blank=True, null=True)),
-                ('date', models.DateField(blank=True, null=True)),
-                ('value', models.FloatField(default=0.0)),
-                ('standard_deviation', models.FloatField(blank=True, default=0.0, null=True)),
-                ('attribute', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='maps.attribute')),
-                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                ('owner', models.ForeignKey(default=utils.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
-                ('region', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='maps.region')),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created at",
+                    ),
+                ),
+                (
+                    "lastmodified_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Last modified at",
+                    ),
+                ),
+                (
+                    "publication_status",
+                    models.CharField(
+                        choices=[
+                            ("private", "Private"),
+                            ("review", "Under Review"),
+                            ("published", "Published"),
+                        ],
+                        default="private",
+                        max_length=10,
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                ("description", models.TextField(blank=True, null=True)),
+                ("date", models.DateField(blank=True, null=True)),
+                ("value", models.FloatField(default=0.0)),
+                (
+                    "standard_deviation",
+                    models.FloatField(blank=True, default=0.0, null=True),
+                ),
+                (
+                    "attribute",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT, to="maps.attribute"
+                    ),
+                ),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_created",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Created by",
+                    ),
+                ),
+                (
+                    "lastmodified_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_lastmodified",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Last modified by",
+                    ),
+                ),
+                (
+                    "owner",
+                    models.ForeignKey(
+                        default=utils.object_management.models.get_default_owner_pk,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "region",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT, to="maps.region"
+                    ),
+                ),
             ],
             options={
-                'ordering': ['name', 'id'],
-                'abstract': False,
+                "ordering": ["name", "id"],
+                "abstract": False,
             },
         ),
         migrations.CreateModel(
-            name='GeoreferencedNutsRegion',
+            name="GeoreferencedNutsRegion",
             fields=[
-                ('nutsregion_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, to='maps.nutsregion')),
-                ('geopolygon_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='maps.geopolygon')),
+                (
+                    "nutsregion_ptr",
+                    models.OneToOneField(
+                        auto_created=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        parent_link=True,
+                        to="maps.nutsregion",
+                    ),
+                ),
+                (
+                    "geopolygon_ptr",
+                    models.OneToOneField(
+                        auto_created=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        parent_link=True,
+                        primary_key=True,
+                        serialize=False,
+                        to="maps.geopolygon",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['name', 'id'],
-                'abstract': False,
+                "ordering": ["name", "id"],
+                "abstract": False,
             },
-            bases=('maps.geopolygon', 'maps.nutsregion'),
+            bases=("maps.geopolygon", "maps.nutsregion"),
         ),
         migrations.CreateModel(
-            name='LauRegion',
+            name="LauRegion",
             fields=[
-                ('region_ptr', models.OneToOneField(auto_created=True, on_delete=django.db.models.deletion.CASCADE, parent_link=True, primary_key=True, serialize=False, to='maps.region')),
-                ('cntr_code', models.CharField(blank=True, max_length=2, null=True)),
-                ('lau_id', models.CharField(blank=True, max_length=13, null=True)),
-                ('lau_name', models.CharField(blank=True, max_length=113, null=True)),
-                ('year', models.IntegerField(blank=True, null=True)),
-                ('nuts_parent', models.ForeignKey(null=True, on_delete=django.db.models.deletion.PROTECT, related_name='lau_children', to='maps.nutsregion')),
+                (
+                    "region_ptr",
+                    models.OneToOneField(
+                        auto_created=True,
+                        on_delete=django.db.models.deletion.CASCADE,
+                        parent_link=True,
+                        primary_key=True,
+                        serialize=False,
+                        to="maps.region",
+                    ),
+                ),
+                ("cntr_code", models.CharField(blank=True, max_length=2, null=True)),
+                ("lau_id", models.CharField(blank=True, max_length=13, null=True)),
+                ("lau_name", models.CharField(blank=True, max_length=113, null=True)),
+                ("year", models.IntegerField(blank=True, null=True)),
+                (
+                    "nuts_parent",
+                    models.ForeignKey(
+                        null=True,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="lau_children",
+                        to="maps.nutsregion",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['name', 'id'],
-                'abstract': False,
+                "ordering": ["name", "id"],
+                "abstract": False,
             },
-            bases=('maps.region',),
+            bases=("maps.region",),
         ),
     ]

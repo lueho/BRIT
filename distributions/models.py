@@ -3,7 +3,11 @@ from django.db.models import Max
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-from utils.models import NamedUserCreatedObject, UserCreatedObject, get_default_owner
+from utils.object_management.models import (
+    NamedUserCreatedObject,
+    UserCreatedObject,
+    get_default_owner,
+)
 
 
 class TemporalDistributionManager(models.Manager):

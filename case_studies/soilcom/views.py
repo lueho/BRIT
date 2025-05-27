@@ -34,7 +34,7 @@ from maps.views import (
 )
 from utils.file_export.views import GenericUserCreatedObjectExportView
 from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineFormSetMixin
-from utils.views import (
+from utils.object_management.views import (
     OwnedObjectModelSelectOptionsView,
     PrivateObjectFilterView,
     PrivateObjectListView,

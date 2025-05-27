@@ -6,7 +6,7 @@ from django.test import Client, TestCase
 from django.urls import reverse
 from rest_framework.test import APIClient
 
-from utils.models import User
+from utils.object_management.models import User
 
 
 class UserLoginTestCase(TestCase):

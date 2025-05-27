@@ -13,50 +13,131 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('maps', '0001_initial'),
+        ("maps", "0001_initial"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='BiogasPlantsSweden',
+            name="BiogasPlantsSweden",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('geom', django.contrib.gis.db.models.fields.PointField(blank=True, null=True, srid=4326)),
-                ('type', models.CharField(blank=True, null=True)),
-                ('name', models.CharField(blank=True, null=True)),
-                ('county', models.CharField(blank=True, null=True)),
-                ('city', models.CharField(blank=True, null=True)),
-                ('municipality', models.CharField(blank=True, null=True)),
-                ('creation_year', models.CharField(blank=True, null=True)),
-                ('size', models.CharField(blank=True, null=True)),
-                ('to_upgrade', models.CharField(blank=True, null=True)),
-                ('main_type', models.CharField(blank=True, null=True)),
-                ('sub_type', models.CharField(blank=True, null=True)),
-                ('tech_type', models.CharField(blank=True, null=True)),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "geom",
+                    django.contrib.gis.db.models.fields.PointField(
+                        blank=True, null=True, srid=4326
+                    ),
+                ),
+                ("type", models.CharField(blank=True, null=True)),
+                ("name", models.CharField(blank=True, null=True)),
+                ("county", models.CharField(blank=True, null=True)),
+                ("city", models.CharField(blank=True, null=True)),
+                ("municipality", models.CharField(blank=True, null=True)),
+                ("creation_year", models.CharField(blank=True, null=True)),
+                ("size", models.CharField(blank=True, null=True)),
+                ("to_upgrade", models.CharField(blank=True, null=True)),
+                ("main_type", models.CharField(blank=True, null=True)),
+                ("sub_type", models.CharField(blank=True, null=True)),
+                ("tech_type", models.CharField(blank=True, null=True)),
             ],
             options={
-                'db_table': 'closecycle_biogas_plants_sweden',
-                'managed': False,
+                "db_table": "closecycle_biogas_plants_sweden",
+                "managed": False,
             },
         ),
         migrations.CreateModel(
-            name='Showcase',
+            name="Showcase",
             fields=[
-                ('id', models.BigAutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Under Review'), ('published', 'Published')], default='private', max_length=10)),
-                ('name', models.CharField(max_length=255)),
-                ('description', models.TextField(blank=True, null=True)),
-                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                ('owner', models.ForeignKey(default=utils.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
-                ('region', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.PROTECT, to='maps.region')),
+                (
+                    "id",
+                    models.BigAutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created at",
+                    ),
+                ),
+                (
+                    "lastmodified_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Last modified at",
+                    ),
+                ),
+                (
+                    "publication_status",
+                    models.CharField(
+                        choices=[
+                            ("private", "Private"),
+                            ("review", "Under Review"),
+                            ("published", "Published"),
+                        ],
+                        default="private",
+                        max_length=10,
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                ("description", models.TextField(blank=True, null=True)),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_created",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Created by",
+                    ),
+                ),
+                (
+                    "lastmodified_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_lastmodified",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Last modified by",
+                    ),
+                ),
+                (
+                    "owner",
+                    models.ForeignKey(
+                        default=utils.object_management.models.get_default_owner_pk,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "region",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to="maps.region",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['name', 'id'],
-                'abstract': False,
+                "ordering": ["name", "id"],
+                "abstract": False,
             },
         ),
     ]

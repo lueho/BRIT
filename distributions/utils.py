@@ -1,4 +1,4 @@
-from utils.models import get_default_owner
+from utils.object_management.models import get_default_owner
 
 INITIALIZATION_DEPENDENCIES = ["users"]
 

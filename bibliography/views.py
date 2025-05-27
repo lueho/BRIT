@@ -9,7 +9,7 @@ from django.urls import reverse_lazy
 from django.views import View
 from django.views.generic import TemplateView
 
-from utils.views import (PrivateObjectFilterView, PrivateObjectListView, PublishedObjectFilterView,
+from utils.object_management.views import (PrivateObjectFilterView, PrivateObjectListView, PublishedObjectFilterView,
                          PublishedObjectListView, UserCreatedObjectCreateView, UserCreatedObjectCreateWithInlinesView,
                          UserCreatedObjectDetailView, UserCreatedObjectModalCreateView,
                          UserCreatedObjectModalDeleteView, UserCreatedObjectModalDetailView,

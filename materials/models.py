@@ -10,7 +10,7 @@ from factory.django import mute_signals
 
 from bibliography.models import Source
 from distributions.models import TemporalDistribution, Timestep
-from utils.models import (
+from utils.object_management.models import (
     NamedUserCreatedObject,
     UserCreatedObjectManager,
     get_default_owner,

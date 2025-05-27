@@ -26,7 +26,7 @@ from utils.forms import (
     SimpleForm,
     SimpleModelForm,
 )
-from utils.models import get_default_owner
+from utils.object_management.models import get_default_owner
 from utils.widgets import BSModelSelect2, BSModelSelect2Multiple
 
 from .models import (

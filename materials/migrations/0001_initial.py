@@ -13,259 +13,1014 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ('bibliography', '0001_initial'),
-        ('distributions', '0001_initial'),
+        ("bibliography", "0001_initial"),
+        ("distributions", "0001_initial"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 
     operations = [
         migrations.CreateModel(
-            name='AnalyticalMethod',
+            name="AnalyticalMethod",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Under Review'), ('published', 'Published')], default='private', max_length=10)),
-                ('name', models.CharField(max_length=255)),
-                ('description', models.TextField(blank=True, null=True)),
-                ('ontology_uri', models.URLField(blank=True, help_text='External ontology URI (e.g., CHMO term) for this analytical method.', null=True)),
-                ('technique', models.CharField(blank=True, help_text='Analytical technique (e.g., ICP-OES, Gravimetry).', max_length=100)),
-                ('standard', models.CharField(blank=True, help_text='Standard or protocol (e.g., DIN EN 15936).', max_length=100)),
-                ('instrument_type', models.CharField(blank=True, help_text='Type of instrument used (local override if not fetched externally).', max_length=100)),
-                ('lower_detection_limit', models.CharField(blank=True, help_text="Lower detection limit (e.g., '0.5 mg/kg').", max_length=50)),
-                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                ('owner', models.ForeignKey(default=utils.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
-                ('sources', models.ManyToManyField(blank=True, help_text='Sources or references for this analytical method.', to='bibliography.source')),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created at",
+                    ),
+                ),
+                (
+                    "lastmodified_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Last modified at",
+                    ),
+                ),
+                (
+                    "publication_status",
+                    models.CharField(
+                        choices=[
+                            ("private", "Private"),
+                            ("review", "Under Review"),
+                            ("published", "Published"),
+                        ],
+                        default="private",
+                        max_length=10,
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                ("description", models.TextField(blank=True, null=True)),
+                (
+                    "ontology_uri",
+                    models.URLField(
+                        blank=True,
+                        help_text="External ontology URI (e.g., CHMO term) for this analytical method.",
+                        null=True,
+                    ),
+                ),
+                (
+                    "technique",
+                    models.CharField(
+                        blank=True,
+                        help_text="Analytical technique (e.g., ICP-OES, Gravimetry).",
+                        max_length=100,
+                    ),
+                ),
+                (
+                    "standard",
+                    models.CharField(
+                        blank=True,
+                        help_text="Standard or protocol (e.g., DIN EN 15936).",
+                        max_length=100,
+                    ),
+                ),
+                (
+                    "instrument_type",
+                    models.CharField(
+                        blank=True,
+                        help_text="Type of instrument used (local override if not fetched externally).",
+                        max_length=100,
+                    ),
+                ),
+                (
+                    "lower_detection_limit",
+                    models.CharField(
+                        blank=True,
+                        help_text="Lower detection limit (e.g., '0.5 mg/kg').",
+                        max_length=50,
+                    ),
+                ),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_created",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Created by",
+                    ),
+                ),
+                (
+                    "lastmodified_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_lastmodified",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Last modified by",
+                    ),
+                ),
+                (
+                    "owner",
+                    models.ForeignKey(
+                        default=utils.object_management.models.get_default_owner_pk,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "sources",
+                    models.ManyToManyField(
+                        blank=True,
+                        help_text="Sources or references for this analytical method.",
+                        to="bibliography.source",
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Analytical Method',
-                'verbose_name_plural': 'Analytical Methods',
+                "verbose_name": "Analytical Method",
+                "verbose_name_plural": "Analytical Methods",
             },
         ),
         migrations.CreateModel(
-            name='BaseMaterial',
+            name="BaseMaterial",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Under Review'), ('published', 'Published')], default='private', max_length=10)),
-                ('name', models.CharField(max_length=255)),
-                ('description', models.TextField(blank=True, null=True)),
-                ('type', models.CharField(default='material', max_length=127)),
-                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                ('owner', models.ForeignKey(default=utils.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created at",
+                    ),
+                ),
+                (
+                    "lastmodified_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Last modified at",
+                    ),
+                ),
+                (
+                    "publication_status",
+                    models.CharField(
+                        choices=[
+                            ("private", "Private"),
+                            ("review", "Under Review"),
+                            ("published", "Published"),
+                        ],
+                        default="private",
+                        max_length=10,
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                ("description", models.TextField(blank=True, null=True)),
+                ("type", models.CharField(default="material", max_length=127)),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_created",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Created by",
+                    ),
+                ),
+                (
+                    "lastmodified_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_lastmodified",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Last modified by",
+                    ),
+                ),
+                (
+                    "owner",
+                    models.ForeignKey(
+                        default=utils.object_management.models.get_default_owner_pk,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'verbose_name': 'Material',
+                "verbose_name": "Material",
             },
         ),
         migrations.CreateModel(
-            name='Material',
-            fields=[
-            ],
+            name="Material",
+            fields=[],
             options={
-                'proxy': True,
-                'indexes': [],
-                'constraints': [],
+                "proxy": True,
+                "indexes": [],
+                "constraints": [],
             },
-            bases=('materials.basematerial',),
+            bases=("materials.basematerial",),
         ),
         migrations.CreateModel(
-            name='MaterialComponent',
-            fields=[
-            ],
+            name="MaterialComponent",
+            fields=[],
             options={
-                'verbose_name': 'component',
-                'ordering': ['name'],
-                'proxy': True,
-                'indexes': [],
-                'constraints': [],
+                "verbose_name": "component",
+                "ordering": ["name"],
+                "proxy": True,
+                "indexes": [],
+                "constraints": [],
             },
-            bases=('materials.basematerial',),
+            bases=("materials.basematerial",),
         ),
         migrations.CreateModel(
-            name='MaterialCategory',
+            name="MaterialCategory",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Under Review'), ('published', 'Published')], default='private', max_length=10)),
-                ('name', models.CharField(max_length=255)),
-                ('description', models.TextField(blank=True, null=True)),
-                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                ('owner', models.ForeignKey(default=utils.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created at",
+                    ),
+                ),
+                (
+                    "lastmodified_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Last modified at",
+                    ),
+                ),
+                (
+                    "publication_status",
+                    models.CharField(
+                        choices=[
+                            ("private", "Private"),
+                            ("review", "Under Review"),
+                            ("published", "Published"),
+                        ],
+                        default="private",
+                        max_length=10,
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                ("description", models.TextField(blank=True, null=True)),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_created",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Created by",
+                    ),
+                ),
+                (
+                    "lastmodified_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_lastmodified",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Last modified by",
+                    ),
+                ),
+                (
+                    "owner",
+                    models.ForeignKey(
+                        default=utils.object_management.models.get_default_owner_pk,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'ordering': ['name', 'id'],
-                'abstract': False,
+                "ordering": ["name", "id"],
+                "abstract": False,
             },
         ),
         migrations.AddField(
-            model_name='basematerial',
-            name='categories',
-            field=models.ManyToManyField(blank=True, to='materials.materialcategory'),
+            model_name="basematerial",
+            name="categories",
+            field=models.ManyToManyField(blank=True, to="materials.materialcategory"),
         ),
         migrations.CreateModel(
-            name='MaterialComponentGroup',
+            name="MaterialComponentGroup",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Under Review'), ('published', 'Published')], default='private', max_length=10)),
-                ('name', models.CharField(max_length=255)),
-                ('description', models.TextField(blank=True, null=True)),
-                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                ('owner', models.ForeignKey(default=utils.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created at",
+                    ),
+                ),
+                (
+                    "lastmodified_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Last modified at",
+                    ),
+                ),
+                (
+                    "publication_status",
+                    models.CharField(
+                        choices=[
+                            ("private", "Private"),
+                            ("review", "Under Review"),
+                            ("published", "Published"),
+                        ],
+                        default="private",
+                        max_length=10,
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                ("description", models.TextField(blank=True, null=True)),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_created",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Created by",
+                    ),
+                ),
+                (
+                    "lastmodified_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_lastmodified",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Last modified by",
+                    ),
+                ),
+                (
+                    "owner",
+                    models.ForeignKey(
+                        default=utils.object_management.models.get_default_owner_pk,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'unique_together': {('name', 'owner')},
+                "unique_together": {("name", "owner")},
             },
         ),
         migrations.CreateModel(
-            name='MaterialProperty',
+            name="MaterialProperty",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Under Review'), ('published', 'Published')], default='private', max_length=10)),
-                ('name', models.CharField(max_length=255)),
-                ('description', models.TextField(blank=True, null=True)),
-                ('unit', models.CharField(max_length=63)),
-                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                ('owner', models.ForeignKey(default=utils.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created at",
+                    ),
+                ),
+                (
+                    "lastmodified_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Last modified at",
+                    ),
+                ),
+                (
+                    "publication_status",
+                    models.CharField(
+                        choices=[
+                            ("private", "Private"),
+                            ("review", "Under Review"),
+                            ("published", "Published"),
+                        ],
+                        default="private",
+                        max_length=10,
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                ("description", models.TextField(blank=True, null=True)),
+                ("unit", models.CharField(max_length=63)),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_created",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Created by",
+                    ),
+                ),
+                (
+                    "lastmodified_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_lastmodified",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Last modified by",
+                    ),
+                ),
+                (
+                    "owner",
+                    models.ForeignKey(
+                        default=utils.object_management.models.get_default_owner_pk,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
             ],
             options={
-                'ordering': ['name', 'id'],
-                'abstract': False,
+                "ordering": ["name", "id"],
+                "abstract": False,
             },
         ),
         migrations.CreateModel(
-            name='MaterialPropertyValue',
+            name="MaterialPropertyValue",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Under Review'), ('published', 'Published')], default='private', max_length=10)),
-                ('name', models.CharField(max_length=255)),
-                ('description', models.TextField(blank=True, null=True)),
-                ('average', models.FloatField()),
-                ('standard_deviation', models.FloatField()),
-                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                ('owner', models.ForeignKey(default=utils.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
-                ('property', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, to='materials.materialproperty')),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created at",
+                    ),
+                ),
+                (
+                    "lastmodified_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Last modified at",
+                    ),
+                ),
+                (
+                    "publication_status",
+                    models.CharField(
+                        choices=[
+                            ("private", "Private"),
+                            ("review", "Under Review"),
+                            ("published", "Published"),
+                        ],
+                        default="private",
+                        max_length=10,
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                ("description", models.TextField(blank=True, null=True)),
+                ("average", models.FloatField()),
+                ("standard_deviation", models.FloatField()),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_created",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Created by",
+                    ),
+                ),
+                (
+                    "lastmodified_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_lastmodified",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Last modified by",
+                    ),
+                ),
+                (
+                    "owner",
+                    models.ForeignKey(
+                        default=utils.object_management.models.get_default_owner_pk,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "property",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to="materials.materialproperty",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['name', 'id'],
-                'abstract': False,
+                "ordering": ["name", "id"],
+                "abstract": False,
             },
         ),
         migrations.CreateModel(
-            name='Sample',
+            name="Sample",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Under Review'), ('published', 'Published')], default='private', max_length=10)),
-                ('name', models.CharField(max_length=255)),
-                ('description', models.TextField(blank=True, null=True)),
-                ('image', models.ImageField(blank=True, null=True, upload_to='materials_sample/')),
-                ('datetime', models.DateTimeField(blank=True, help_text='Choose 00:00 if time is unknown.', null=True)),
-                ('location', models.CharField(blank=True, help_text='Name of town, address or coordinates', max_length=511, null=True)),
-                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                ('owner', models.ForeignKey(default=utils.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
-                ('properties', models.ManyToManyField(to='materials.materialpropertyvalue')),
-                ('sources', models.ManyToManyField(to='bibliography.source')),
-                ('timestep', models.ForeignKey(blank=True, help_text='If the sample represents a specific time step in a series, select it here.', null=True, on_delete=django.db.models.deletion.PROTECT, related_name='samples', to='distributions.timestep')),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created at",
+                    ),
+                ),
+                (
+                    "lastmodified_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Last modified at",
+                    ),
+                ),
+                (
+                    "publication_status",
+                    models.CharField(
+                        choices=[
+                            ("private", "Private"),
+                            ("review", "Under Review"),
+                            ("published", "Published"),
+                        ],
+                        default="private",
+                        max_length=10,
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                ("description", models.TextField(blank=True, null=True)),
+                (
+                    "image",
+                    models.ImageField(
+                        blank=True, null=True, upload_to="materials_sample/"
+                    ),
+                ),
+                (
+                    "datetime",
+                    models.DateTimeField(
+                        blank=True,
+                        help_text="Choose 00:00 if time is unknown.",
+                        null=True,
+                    ),
+                ),
+                (
+                    "location",
+                    models.CharField(
+                        blank=True,
+                        help_text="Name of town, address or coordinates",
+                        max_length=511,
+                        null=True,
+                    ),
+                ),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_created",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Created by",
+                    ),
+                ),
+                (
+                    "lastmodified_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_lastmodified",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Last modified by",
+                    ),
+                ),
+                (
+                    "owner",
+                    models.ForeignKey(
+                        default=utils.object_management.models.get_default_owner_pk,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "properties",
+                    models.ManyToManyField(to="materials.materialpropertyvalue"),
+                ),
+                ("sources", models.ManyToManyField(to="bibliography.source")),
+                (
+                    "timestep",
+                    models.ForeignKey(
+                        blank=True,
+                        help_text="If the sample represents a specific time step in a series, select it here.",
+                        null=True,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="samples",
+                        to="distributions.timestep",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['name', 'id'],
-                'abstract': False,
+                "ordering": ["name", "id"],
+                "abstract": False,
             },
         ),
         migrations.CreateModel(
-            name='Composition',
+            name="Composition",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Under Review'), ('published', 'Published')], default='private', max_length=10)),
-                ('name', models.CharField(max_length=255)),
-                ('description', models.TextField(blank=True, null=True)),
-                ('order', models.IntegerField(default=90)),
-                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                ('owner', models.ForeignKey(default=utils.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
-                ('group', models.ForeignKey(help_text='The group of components that this composition is part of. Typically determined by type of analysis.', on_delete=django.db.models.deletion.PROTECT, related_name='compositions', to='materials.materialcomponentgroup')),
-                ('sample', models.ForeignKey(help_text='The sample that this composition is part of.', on_delete=django.db.models.deletion.CASCADE, related_name='compositions', to='materials.sample')),
-                ('fractions_of', models.ForeignKey(blank=True, help_text='The component that the weight fractions of this composition are fractions of. Must be a component that is already defined.', null=True, on_delete=django.db.models.deletion.PROTECT, to='materials.materialcomponent')),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created at",
+                    ),
+                ),
+                (
+                    "lastmodified_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Last modified at",
+                    ),
+                ),
+                (
+                    "publication_status",
+                    models.CharField(
+                        choices=[
+                            ("private", "Private"),
+                            ("review", "Under Review"),
+                            ("published", "Published"),
+                        ],
+                        default="private",
+                        max_length=10,
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                ("description", models.TextField(blank=True, null=True)),
+                ("order", models.IntegerField(default=90)),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_created",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Created by",
+                    ),
+                ),
+                (
+                    "lastmodified_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_lastmodified",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Last modified by",
+                    ),
+                ),
+                (
+                    "owner",
+                    models.ForeignKey(
+                        default=utils.object_management.models.get_default_owner_pk,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "group",
+                    models.ForeignKey(
+                        help_text="The group of components that this composition is part of. Typically determined by type of analysis.",
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="compositions",
+                        to="materials.materialcomponentgroup",
+                    ),
+                ),
+                (
+                    "sample",
+                    models.ForeignKey(
+                        help_text="The sample that this composition is part of.",
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="compositions",
+                        to="materials.sample",
+                    ),
+                ),
+                (
+                    "fractions_of",
+                    models.ForeignKey(
+                        blank=True,
+                        help_text="The component that the weight fractions of this composition are fractions of. Must be a component that is already defined.",
+                        null=True,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to="materials.materialcomponent",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['order'],
+                "ordering": ["order"],
             },
         ),
         migrations.CreateModel(
-            name='SampleSeries',
+            name="SampleSeries",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Under Review'), ('published', 'Published')], default='private', max_length=10)),
-                ('name', models.CharField(max_length=255)),
-                ('description', models.TextField(blank=True, null=True)),
-                ('image', models.ImageField(blank=True, null=True, upload_to='materials_sampleseries/')),
-                ('publish', models.BooleanField(default=False)),
-                ('standard', models.BooleanField(default=True)),
-                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                ('owner', models.ForeignKey(default=utils.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
-                ('temporal_distributions', models.ManyToManyField(to='distributions.temporaldistribution')),
-                ('material', models.ForeignKey(on_delete=django.db.models.deletion.PROTECT, related_name='sample_series', to='materials.material')),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created at",
+                    ),
+                ),
+                (
+                    "lastmodified_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Last modified at",
+                    ),
+                ),
+                (
+                    "publication_status",
+                    models.CharField(
+                        choices=[
+                            ("private", "Private"),
+                            ("review", "Under Review"),
+                            ("published", "Published"),
+                        ],
+                        default="private",
+                        max_length=10,
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                ("description", models.TextField(blank=True, null=True)),
+                (
+                    "image",
+                    models.ImageField(
+                        blank=True, null=True, upload_to="materials_sampleseries/"
+                    ),
+                ),
+                ("publish", models.BooleanField(default=False)),
+                ("standard", models.BooleanField(default=True)),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_created",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Created by",
+                    ),
+                ),
+                (
+                    "lastmodified_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_lastmodified",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Last modified by",
+                    ),
+                ),
+                (
+                    "owner",
+                    models.ForeignKey(
+                        default=utils.object_management.models.get_default_owner_pk,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "temporal_distributions",
+                    models.ManyToManyField(to="distributions.temporaldistribution"),
+                ),
+                (
+                    "material",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.PROTECT,
+                        related_name="sample_series",
+                        to="materials.material",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['name', 'id'],
-                'abstract': False,
+                "ordering": ["name", "id"],
+                "abstract": False,
             },
         ),
         migrations.AddField(
-            model_name='sample',
-            name='series',
-            field=models.ForeignKey(blank=True, help_text='If this sample belongs to a sample series or campaign, select it here.', null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='samples', to='materials.sampleseries'),
+            model_name="sample",
+            name="series",
+            field=models.ForeignKey(
+                blank=True,
+                help_text="If this sample belongs to a sample series or campaign, select it here.",
+                null=True,
+                on_delete=django.db.models.deletion.SET_NULL,
+                related_name="samples",
+                to="materials.sampleseries",
+            ),
         ),
         migrations.AddField(
-            model_name='sample',
-            name='material',
-            field=models.ForeignKey(help_text='If no option fits, please choose "Other" and specify the material in the description.', on_delete=django.db.models.deletion.PROTECT, related_name='samples', to='materials.material'),
+            model_name="sample",
+            name="material",
+            field=models.ForeignKey(
+                help_text='If no option fits, please choose "Other" and specify the material in the description.',
+                on_delete=django.db.models.deletion.PROTECT,
+                related_name="samples",
+                to="materials.material",
+            ),
         ),
         migrations.CreateModel(
-            name='WeightShare',
+            name="WeightShare",
             fields=[
-                ('id', models.AutoField(auto_created=True, primary_key=True, serialize=False, verbose_name='ID')),
-                ('created_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Created at')),
-                ('lastmodified_at', models.DateTimeField(db_index=True, default=django.utils.timezone.now, verbose_name='Last modified at')),
-                ('publication_status', models.CharField(choices=[('private', 'Private'), ('review', 'Under Review'), ('published', 'Published')], default='private', max_length=10)),
-                ('name', models.CharField(max_length=255)),
-                ('description', models.TextField(blank=True, null=True)),
-                ('average', models.DecimalField(decimal_places=10, default=Decimal('0.0'), max_digits=11)),
-                ('standard_deviation', models.DecimalField(decimal_places=10, default=Decimal('0.0'), max_digits=11)),
-                ('composition', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='shares', to='materials.composition')),
-                ('created_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_created', to=settings.AUTH_USER_MODEL, verbose_name='Created by')),
-                ('lastmodified_by', models.ForeignKey(blank=True, null=True, on_delete=django.db.models.deletion.SET_NULL, related_name='%(app_label)s_%(class)s_lastmodified', to=settings.AUTH_USER_MODEL, verbose_name='Last modified by')),
-                ('owner', models.ForeignKey(default=utils.models.get_default_owner_pk, on_delete=django.db.models.deletion.PROTECT, to=settings.AUTH_USER_MODEL)),
-                ('component', models.ForeignKey(on_delete=django.db.models.deletion.CASCADE, related_name='shares', to='materials.materialcomponent')),
+                (
+                    "id",
+                    models.AutoField(
+                        auto_created=True,
+                        primary_key=True,
+                        serialize=False,
+                        verbose_name="ID",
+                    ),
+                ),
+                (
+                    "created_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Created at",
+                    ),
+                ),
+                (
+                    "lastmodified_at",
+                    models.DateTimeField(
+                        db_index=True,
+                        default=django.utils.timezone.now,
+                        verbose_name="Last modified at",
+                    ),
+                ),
+                (
+                    "publication_status",
+                    models.CharField(
+                        choices=[
+                            ("private", "Private"),
+                            ("review", "Under Review"),
+                            ("published", "Published"),
+                        ],
+                        default="private",
+                        max_length=10,
+                    ),
+                ),
+                ("name", models.CharField(max_length=255)),
+                ("description", models.TextField(blank=True, null=True)),
+                (
+                    "average",
+                    models.DecimalField(
+                        decimal_places=10, default=Decimal("0.0"), max_digits=11
+                    ),
+                ),
+                (
+                    "standard_deviation",
+                    models.DecimalField(
+                        decimal_places=10, default=Decimal("0.0"), max_digits=11
+                    ),
+                ),
+                (
+                    "composition",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="shares",
+                        to="materials.composition",
+                    ),
+                ),
+                (
+                    "created_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_created",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Created by",
+                    ),
+                ),
+                (
+                    "lastmodified_by",
+                    models.ForeignKey(
+                        blank=True,
+                        null=True,
+                        on_delete=django.db.models.deletion.SET_NULL,
+                        related_name="%(app_label)s_%(class)s_lastmodified",
+                        to=settings.AUTH_USER_MODEL,
+                        verbose_name="Last modified by",
+                    ),
+                ),
+                (
+                    "owner",
+                    models.ForeignKey(
+                        default=utils.object_management.models.get_default_owner_pk,
+                        on_delete=django.db.models.deletion.PROTECT,
+                        to=settings.AUTH_USER_MODEL,
+                    ),
+                ),
+                (
+                    "component",
+                    models.ForeignKey(
+                        on_delete=django.db.models.deletion.CASCADE,
+                        related_name="shares",
+                        to="materials.materialcomponent",
+                    ),
+                ),
             ],
             options={
-                'ordering': ['-average'],
+                "ordering": ["-average"],
             },
         ),
         migrations.AlterUniqueTogether(
-            name='basematerial',
-            unique_together={('name', 'owner')},
+            name="basematerial",
+            unique_together={("name", "owner")},
         ),
     ]
