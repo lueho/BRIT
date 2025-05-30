@@ -40,6 +40,7 @@ from utils.object_management.views import (
     PrivateObjectListView,
     PublishedObjectFilterView,
     PublishedObjectListView,
+    UserCreatedObjectModalArchiveView,
     UserCreatedObjectCreateView,
     UserCreatedObjectDetailView,
     UserCreatedObjectModalCreateView,
@@ -967,6 +968,10 @@ class CollectionPredecessorsView(UserCreatedObjectUpdateView):
         if self.request.POST["submit"] == "Remove":
             self.object.predecessors.remove(form.cleaned_data["predecessor"])
         return HttpResponseRedirect(self.get_success_url())
+
+
+class CollectionModalArchiveView(UserCreatedObjectModalArchiveView):
+    model = Collection
 
 
 # ----------- Maps -----------------------------------------------------------------------------------------------------

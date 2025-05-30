@@ -454,6 +454,11 @@ urlpatterns = [
         name="collection-new-version",
     ),
     path(
+        "collections/<int:pk>/archive/modal/",
+        views.CollectionModalArchiveView.as_view(),
+        name="collection-archive-modal",
+    ),
+    path(
         "collections/<int:pk>/delete/modal/",
         views.CollectionModalDeleteView.as_view(),
         name="collection-delete-modal",

@@ -1,0 +1,41 @@
+/* Visually enhanced review status badge styles */
+.review-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5em;
+    padding: 0.35em 1em;
+    font-size: 0.98em;
+    border-radius: 999px;
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    border: none;
+    transition: box-shadow 0.18s, background 0.18s;
+    line-height: 1.2;
+}
+.review-status-badge .fas {
+    margin-right: 0.5em;
+    font-size: 1em;
+}
+
+/* Specific status colors */
+.review-status-private {
+    background: linear-gradient(90deg, #a0aec0 60%, #cbd5e1 100%);
+    color: #23272f;
+}
+.review-status-in-review {
+    background: linear-gradient(90deg, #ffe066 60%, #ffd43b 100%);
+    color: #7c5700;
+}
+.review-status-published {
+    background: linear-gradient(90deg, #51cf66 60%, #38d9a9 100%);
+    color: #0a3622;
+}
+.review-status-archived {
+    background: linear-gradient(90deg, #adb5bd 60%, #dee2e6 100%);
+    color: #495057;
+}
+
+.review-status-badge:hover, .review-status-badge:focus {
+    box-shadow: 0 4px 16px rgba(0,0,0,0.13);
+    text-decoration: none;
+}

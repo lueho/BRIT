@@ -2,6 +2,228 @@
    BRIT | Custom styles
    ============================================================================= */
 
+/* Card modern look */
+.card {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.07);
+    margin-bottom: 2rem;
+    padding: 0;
+    /* overflow: hidden; */
+    display: flex;
+    flex-direction: column;
+    border: none;
+}
+
+.card-footer {
+    background: #f5f7fa;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #e5e9f2;
+    /* overflow: visible; */
+}
+
+.card-header {
+    background: #f5f7fa;
+    padding: 1.1rem 1.5rem;
+    font-weight: 600;
+    font-size: 1.15rem;
+    border-bottom: 1px solid #e5e9f2;
+    color: #222;
+}
+
+.card-body {
+    padding: 1.5rem;
+}
+
+.card-footer {
+    background: #f5f7fa;
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #e5e9f2;
+}
+
+.card-footer.d-flex {
+    display: flex !important;
+    gap: 1rem;
+    align-items: center;
+}
+
+/* Detail view sectioning */
+.detail-section {
+    background: #fafbfc;
+    border-radius: 8px;
+    padding: 1.25rem 1.5rem;
+    margin-bottom: 2rem;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+}
+.section-title {
+    font-size: 1.13rem;
+    font-weight: 600;
+    margin-bottom: 1rem;
+    color: #323a47;
+}
+.badge {
+    display: inline-block;
+    padding: 0.35em 0.7em;
+    font-size: 0.97em;
+    font-weight: 500;
+    border-radius: 1em;
+    background: #e5e9f2;
+    color: #222;
+    margin-right: 0.25em;
+    margin-bottom: 0.2em;
+}
+.badge-success {
+    background: #d4f5e9;
+    color: #176b47;
+}
+.badge-danger {
+    background: #fbe4e6;
+    color: #a33a3a;
+}
+
+/* Table modern look */
+.table {
+    width: 100%;
+    border-collapse: separate;
+    border-spacing: 0;
+    background: transparent;
+    font-size: 1rem;
+    border-radius: 10px;
+    overflow: hidden;
+}
+
+.table th,
+.table td {
+    padding: 0.85rem 1.1rem;
+    border-bottom: 1px solid #e5e9f2;
+    text-align: left;
+    vertical-align: middle;
+}
+
+.card .table th {
+    background: transparent;
+    font-weight: 600;
+    color: #222;
+    border-top: none;
+    font-size: 0.97em;
+    padding-top: 0.6rem;
+    padding-bottom: 0.6rem;
+}
+
+.card .table {
+    margin-top: 0;
+}
+
+.card .card-body {
+    padding-top: 1rem;
+    padding-bottom: 1rem;
+}
+
+.table th {
+    background: #f5f7fa;
+    font-weight: 600;
+    color: #222;
+    border-top: none;
+}
+
+.table tr:last-child td {
+    border-bottom: none;
+}
+
+/* Badge modern look */
+.review-status-badge {
+    display: inline-flex;
+    align-items: center;
+    font-size: 0.97em;
+    font-weight: 500;
+    border-radius: 1em;
+    padding: 0.28em 0.95em;
+    margin-right: 0.18em;
+    background: #e5e9f2;
+    color: #222;
+    gap: 0.5em;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+    letter-spacing: 0.01em;
+}
+
+.review-status-private {
+    background: #f8d7da;
+    color: #a71d2a;
+}
+
+.review-status-in-review {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.review-status-published {
+    background: #d4edda;
+    color: #155724;
+}
+
+.review-status-archived {
+    background: #e2e3e5;
+    color: #383d41;
+}
+
+/* Dropdown modern look (still using .dropdown, .dropdown-menu, .dropdown-item) */
+.dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 1000;
+    display: none;
+    float: left;
+    min-width: 180px;
+    padding: 0.5em 0;
+    margin: 0.125rem 0 0;
+    font-size: 0.97em;
+    color: #222;
+    text-align: left;
+    list-style: none;
+    background-color: #fff;
+    background-clip: padding-box;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.07);
+    border: 1px solid #e5e9f2;
+}
+
+.dropdown-menu.show {
+    display: block;
+}
+
+
+.dropdown-item {
+    padding: 0.6em 1.2em;
+    color: #222;
+    transition: background 0.2s;
+}
+
+.dropdown-item:hover,
+.dropdown-item:focus {
+    background: #f5f7fa;
+    color: #111;
+}
+
+.btn {
+    border-radius: 6px;
+    font-weight: 500;
+    transition: background 0.2s, color 0.2s;
+}
+
+.btn-secondary {
+    background: #f5f7fa;
+    border: 1px solid #e5e9f2;
+    color: #222;
+}
+
+.btn-secondary:hover,
+.btn-secondary:focus {
+    background: #e5e9f2;
+    color: #111;
+}
+
+
 /* -----------------------------------------------------------------------------
    Select2 / autocomplete sizing
    -----------------------------------------------------------------------------
@@ -12,15 +234,20 @@
 
 /* 1) Global: override inline width so Select2 always spans its parent */
 .select2-container {
-    width: 100% !important; /* force full‑width */
-    min-width: 0 !important; /* allow flex/blocks to shrink */
-    box-sizing: border-box; /* include padding/border */
+    width: 100% !important;
+    /* force full‑width */
+    min-width: 0 !important;
+    /* allow flex/blocks to shrink */
+    box-sizing: border-box;
+    /* include padding/border */
 }
 
 /* 2) In an input‑group: switch to auto‑width + flex so the “+” button stays inline */
 .input-group .select2-container {
-    width: auto !important; /* don’t force 100% here */
-    flex: 1 1 auto !important; /* let it grow/shrink to fit */
+    width: auto !important;
+    /* don’t force 100% here */
+    flex: 1 1 auto !important;
+    /* let it grow/shrink to fit */
     min-width: 0 !important;
 }
 
@@ -28,7 +255,8 @@
 .select2-container .select2-dropdown {
     max-width: 100% !important;
     box-sizing: border-box;
-    overflow-x: auto; /* scroll if option text is absurdly long */
+    overflow-x: auto;
+    /* scroll if option text is absurdly long */
 }
 
 
@@ -60,9 +288,12 @@
 }
 
 .svg-icon-header svg {
-    height: 1em; /* match font-size */
-    fill: currentColor; /* current text color */
-    vertical-align: middle; /* align with text */
+    height: 1em;
+    /* match font-size */
+    fill: currentColor;
+    /* current text color */
+    vertical-align: middle;
+    /* align with text */
 }
 
 

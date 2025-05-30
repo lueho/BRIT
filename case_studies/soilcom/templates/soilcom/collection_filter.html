@@ -46,7 +46,9 @@
                 <a href="{{ object.collection_system.get_absolute_url }}">{{ object.collection_system }}</a>
             </td>
             {% if list_type == 'private' %}
-            {% include 'partials/_publication_status_column.html' %}
+            <td>
+                {% include 'object_management/review_status_badge.html' with object=object %}
+            </td>
             {% endif %}
         </tr>
         {% endfor %}

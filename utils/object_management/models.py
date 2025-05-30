@@ -192,6 +192,13 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
         self.save()
         # TODO: Implement notification to the owner
 
+    def archive(self):
+        if self.publication_status != self.STATUS_PUBLISHED:
+            raise ValidationError("Only published objects can be archived.")
+        self.publication_status = self.STATUS_ARCHIVED
+        self.save()
+        # TODO: Implement notification to the owner
+
     @property
     def is_private(self):
         return self.publication_status == self.STATUS_PRIVATE
@@ -203,6 +210,10 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
     @property
     def is_published(self):
         return self.publication_status == self.STATUS_PUBLISHED
+
+    @property
+    def is_archived(self):
+        return self.publication_status == self.STATUS_ARCHIVED
 
     @property
     def verbose_name(self):

@@ -663,6 +663,37 @@ class UserCreatedObjectModalUpdateView(
         return context
 
 
+class UserCreatedObjectModalArchiveView(
+    UserCreatedObjectWriteAccessMixin, NextOrSuccessUrlMixin, BSModalDeleteView
+):
+    """
+    A repurposed update view that opens up a modal to ask for confirmation, similar to
+    BSModalDeleteView. Instead of deleting the object, after confirmation only the archive method
+    instead of the delete method of the object is called.
+    """
+
+    template_name = "modal_archive.html"
+    success_message = "Successfully archived."
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(
+            {
+                "modal_title": f"Archive {self.object._meta.verbose_name}",
+                "submit_button_text": "Archive",
+            }
+        )
+        return context
+
+    def get_success_url(self):
+        return self.object.get_absolute_url()
+
+    def form_valid(self, form):
+        success_url = self.get_success_url()
+        self.object.archive()
+        return HttpResponseRedirect(success_url)
+
+
 class UserCreatedObjectModalDeleteView(
     UserCreatedObjectWriteAccessMixin, NextOrSuccessUrlMixin, BSModalDeleteView
 ):

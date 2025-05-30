@@ -3,63 +3,87 @@
 {% block title %}BRIT | {{ object.name }} details{% endblock %}
 
 {% block content %}
-    <div class="row mb-4">
-        <div class="col">
-            <div class="card shadow">
-                <div class="card-header"><strong>
-                    {% block detail_header %}{{ object.verbose_name|capfirst }} details{% endblock %}</strong></div>
+<div class="row mb-4">
+    <div class="col">
+        <div class="card shadow">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <strong>
+                    {% block detail_header %}{{ object.verbose_name|capfirst }} details{% endblock %}
+                </strong>
+                {% block detail_header_badge %}{% endblock %}
+            </div>
 
-                {% block detail_top_image %}{% endblock %}
+            {% block detail_top_image %}{% endblock %}
 
-                <div class="card-body">
-                    {% block detail_body %}
-                        <p class="card-text"><strong>Name:</strong><br>{{ object.name }}</p>
-                        {% if object.description %}
-                            <p class="card-text"><strong>Description:</strong><br>{{ object.description }}</p>
-                        {% endif %}
-                    {% endblock detail_body %}
-                </div>
-                <div class="card-footer">
-                    {% block detail_footer %}
-                        {% block back_button %}
-                            <a href="javascript:history.go(-1)" class="nowrap">
-                                <i class="fas fa-fw fa-arrow-left">
-                                </i> back
-                            </a>
-                        {% endblock back_button %}
-                        {% block list_link %}
-                            {% if object.list_url %}
-                                <a href="{{ object.list_url }}" class="ml-3">
-                                    <i class="fas fa-fw fa-list">
-                                    </i> see all
-                                </a>
-                            {% endif %}
-                        {% endblock list_link %}
+            <div class="card-body">
+                {% block detail_body %}
+                <p class="card-text"><strong>Name:</strong><br>{{ object.name }}</p>
+                {% if object.description %}
+                <p class="card-text"><strong>Description:</strong><br>{{ object.description }}</p>
+                {% endif %}
+                {% endblock detail_body %}
+            </div>
+            <div class="card-footer d-flex">
+                {% block detail_card_footer %}
+                    {% block detail_card_navigation_dropdown %}
+                        <div class="dropdown">
+                            <button class="btn btn-secondary dropdown-toggle mr-3" type="button"
+                                    id="detailNavigateDropdown"
+                                    data-toggle="dropdown" aria-expanded="false">
+                                Navigate
+                            </button>
+                            <div class="dropdown-menu" aria-labelledby="detailNavigateDropdown">
+                                {% block detail_back_button %}
+                                    <a class="dropdown-item" href="javascript:history.go(-1)">
+                                        <i class="fas fa-fw fa-arrow-left"></i> Back
+                                    </a>
+                                {% endblock detail_back_button %}
+                                {% block detail_list_link %}
+                                    {% if object.list_url %}
+                                        <a class="dropdown-item" href="{{ object.list_url }}">
+                                            <i class="fas fa-fw fa-list"></i> See all
+                                        </a>
+                                    {% endif %}
+                                {% endblock detail_list_link %}
+                                {% block detail_card_navigation_dropdown_additional_links %}{% endblock %}
+                            </div>
+                        </div>
+                    {% endblock detail_card_navigation_dropdown %}
+                    {% block detail_card_options_dropdown %}
                         {% if request.user == object.owner or request.user.is_staff %}
-                            {% block update_link %}
-                                {% if object.update_url %}
-                                    <a href="{{ object.update_url }}" class="ml-3">
-                                        <i class="fas fa-fw fa-edit">
-                                        </i> edit
-                                    </a>
-                                {% endif %}
-                            {% endblock update_link %}
-                            {% block delete_link %}
-                                {% if object.modal_delete_url %}
-                                    <a href="{{ object.modal_delete_url }}" class="modal-link ml-3">
-                                        <i class="fas fa-fw fa-trash">
-                                        </i> delete
-                                    </a>
-                                {% endif %}
-                            {% endblock delete_link %}
+                        <div class="dropdown">
+                            <button class="btn btn-secondary dropdown-toggle" type="button"
+                                    id="detailOptionsDropdown"
+                                    data-toggle="dropdown" aria-expanded="false">
+                                Options
+                            </button>
+                            <div class="dropdown-menu" aria-labelledby="detailOptionsDropdown">
+                                {% block detail_update_link %}
+                                    {% if object.update_url %}
+                                        <a class="dropdown-item" href="{{ object.update_url }}">
+                                            <i class="fas fa-fw fa-edit"></i> Edit
+                                        </a>
+                                    {% endif %}
+                                {% endblock detail_update_link %}
+                                {% block detail_delete_link %}
+                                    {% if object.modal_delete_url %}
+                                        <a class="dropdown-item modal-link" href="{{ object.modal_delete_url }}">
+                                            <i class="fas fa-fw fa-trash"></i> Delete
+                                        </a>
+                                    {% endif %}
+                                {% endblock detail_delete_link %}
+                                {% block detail_card_options_dropdown_additional_links %}{% endblock %}
+                            </div>
+                        </div>
                         {% endif %}
-                        {% block additional_footer_links %}{% endblock %}
-                    {% endblock detail_footer %}
-                </div>
+                    {% endblock detail_card_options_dropdown %}
+                    {% block additional_footer_links %}{% endblock %}
+                {% endblock detail_card_footer %}
             </div>
         </div>
     </div>
-    <div class="row mb-4">
-        {% block second_row %}{% endblock %}
-    </div>
+</div>
+<div class="row mb-4">
+    {% block second_row %}{% endblock %}
+</div>
 {% endblock %}

@@ -36,8 +36,9 @@
                                 <td><a href="{{ item.get_absolute_url }}">{{ item.name }}</a></td>
                                 <td>{{ item.description }}</td>
                                 {% if list_type == 'private' %}
-                                {% include 'partials/_publication_status_column.html' %}
-                                {% include 'partials/_review_actions_column.html' %}
+                                <td>
+                                    {% include 'object_management/review_status_badge.html' with object=item %}
+                                </td>
                                 {% endif %}
                             </tr>
                             {% endblock list_table_row %}
