@@ -29,10 +29,12 @@ class CollectionViewSet(GeoJSONMixin, UserCreatedObjectViewSet):
     filter_backends = (rf_filters.DjangoFilterBackend,)
     filterset_class = CollectionFilterSet
 
-    @action(detail=False, methods=["get"])
+    @action(detail=False, methods=["get"], permission_classes=[permissions.AllowAny])
     def summaries(self, request, *args, **kwargs):
+        self.check_permissions(request)
+        queryset = self.get_queryset().filter(id__in=request.query_params.getlist("id"))
         serializer = CollectionModelSerializer(
-            Collection.objects.filter(id__in=request.query_params.getlist("id")),
+            queryset,
             many=True,
             field_labels_as_keys=True,
             context={"request": request},
