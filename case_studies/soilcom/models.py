@@ -7,6 +7,7 @@ from django.db import models, transaction
 from django.db.models import Count, Q, Sum
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
+from django.urls import reverse
 from django.utils import timezone
 
 from bibliography.models import Source
@@ -573,6 +574,14 @@ class Collection(NamedUserCreatedObject):
                 if predecessor.publication_status != "archived":
                     predecessor.publication_status = "archived"
                     predecessor.save(update_fields=["publication_status"])
+
+    @classmethod
+    def public_map_url(cls):
+        return reverse("WasteCollection")
+
+    @classmethod
+    def private_map_url(cls):
+        return reverse("WasteCollection-owned")
 
     def __str__(self):
         return self.name

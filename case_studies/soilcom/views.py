@@ -1011,6 +1011,13 @@ class WasteCollectionPublishedMapView(GeoDataSetPublishedFilteredMapView):
     map_title = "Household Waste Collections"
     dashboard_url = reverse_lazy("wastecollection-dashboard")
 
+    def get_filterset_kwargs(self, filterset_class=None):
+        kwargs = super().get_filterset_kwargs(filterset_class)
+        data = kwargs.get("data").copy() if kwargs.get("data") else {}
+        data["scope"] = "published"
+        kwargs["data"] = data
+        return kwargs
+
 
 class WasteCollectionPrivateMapView(GeoDataSetPrivateFilteredMapView):
     model_name = "WasteCollection"
@@ -1020,6 +1027,13 @@ class WasteCollectionPrivateMapView(GeoDataSetPrivateFilteredMapView):
     map_title = "My Household Waste Collections"
     dashboard_url = reverse_lazy("wastecollection-dashboard")
 
+    def get_filterset_kwargs(self, filterset_class=None):
+        kwargs = super().get_filterset_kwargs(filterset_class)
+        data = kwargs.get("data").copy() if kwargs.get("data") else {}
+        data["scope"] = "private"
+        kwargs["data"] = data
+        return kwargs
+
 
 @method_decorator(xframe_options_exempt, name="dispatch")
 class WasteCollectionPublishedMapIframeView(GeoDataSetPublishedFilteredMapView):
@@ -1028,3 +1042,10 @@ class WasteCollectionPublishedMapIframeView(GeoDataSetPublishedFilteredMapView):
     filterset_class = CollectionFilterSet
     features_layer_api_basename = "api-waste-collection"
     map_title = "Household Waste Collection Europe"
+
+    def get_filterset_kwargs(self, filterset_class=None):
+        kwargs = super().get_filterset_kwargs(filterset_class)
+        data = kwargs.get("data").copy() if kwargs.get("data") else {}
+        data["scope"] = "published"
+        kwargs["data"] = data
+        return kwargs

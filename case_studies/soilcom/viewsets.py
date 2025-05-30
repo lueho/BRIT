@@ -1,4 +1,5 @@
 from django_filters import rest_framework as rf_filters
+from rest_framework import permissions
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
@@ -37,3 +38,8 @@ class CollectionViewSet(GeoJSONMixin, UserCreatedObjectViewSet):
             context={"request": request},
         )
         return Response({"summaries": serializer.data})
+
+    @action(detail=False, methods=["get"], permission_classes=[permissions.AllowAny])
+    def geojson(self, request, *args, **kwargs):
+        """GeoJSON endpoint with the same permission checks as standard endpoints."""
+        return super().geojson(request, *args, **kwargs)

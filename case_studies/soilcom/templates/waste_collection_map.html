@@ -4,215 +4,184 @@
 {% load file_export_tags %}
 
 {% block map_card_navigation_dropdown_additional_links %}
-    <a class="dropdown-item"
-       href="javascript:void(0)"
-       id="link-collections-as-list"
-       data-href-template="{{ object_list.model.public_list_url }}"
-       onclick="clickedListLink()">
-        <i class="fa fa-fw fa-list"></i>
-        View as list
-    </a>
+<a class="dropdown-item" href="javascript:void(0)" id="link-collections-as-list"
+    data-href-template="{% if list_type == 'private' %}{{ object_list.model.private_list_url }}{% else %}{{ object_list.model.public_list_url }}{% endif %}"
+    onclick="clickedListLink()">
+    <i class="fa fa-fw fa-list"></i>
+    View as list
+</a>
 {% endblock map_card_navigation_dropdown_additional_links %}
 
 {% block map_card_options_dropdown_additional_links %}
-    <a class="dropdown-item"
-       href="{% url 'aggregatedcollectionpropertyvalue-create' %}">
-        <i class="fas fa-fw fa-plus-circle"></i> Add property to collection group
-    </a>
-    {% if user.is_authenticated %}
-        <a class="dropdown-item modal-link"
-           href="{% export_link_modal 'collection-export' list_type=list_type %}">
-            <i class="fas fa-fw fa-file-export"></i> Export data
-        </a>
-    {% endif %}
+<a class="dropdown-item" href="{% url 'aggregatedcollectionpropertyvalue-create' %}">
+    <i class="fas fa-fw fa-plus-circle"></i> Add property to collection group
+</a>
+{% if user.is_authenticated %}
+<a class="dropdown-item modal-link" href="{% export_link_modal 'collection-export' list_type=list_type %}">
+    <i class="fas fa-fw fa-file-export"></i> Export data
+</a>
+{% endif %}
 {% endblock map_card_options_dropdown_additional_links %}
 
 {% block user_actions %}
-    <form method="get">
-        {% crispy filter.form %}
-    </form>
-    <div class="card shadow" id="filter_result_card">
-        <div class="card-header"
-             role="button"
-             data-toggle="collapse"
-             href="#info-card-body"
-             aria-expanded="true"
-             aria-controls="info-card-body">
-            <b>Summary</b>
+<form method="get">
+    {% crispy filter.form %}
+</form>
+<div class="card shadow" id="filter_result_card">
+    <div class="card-header" role="button" data-toggle="collapse" href="#info-card-body" aria-expanded="true"
+        aria-controls="info-card-body">
+        <b>Summary</b>
+    </div>
+    <div class="card-body collapse show" id="info-card-body">
+        <div id="summary-container">
+            <p class="card-text">No data selected, yet.</p>
         </div>
-        <div class="card-body collapse show" id="info-card-body">
-            <div id="summary-container">
-                <p class="card-text">No data selected, yet.</p>
+        {% if object.sources.first %}
+        <p class="card-text mt-3">
+            <strong>Sources:</strong><br>
+            {% for source in object.sources.all %}
+            <a href="{% url 'source-detail-modal' source.id %}" class="modal-link">
+                {{ source.abbreviation }}{% if not forloop.last %},{% endif %}
+            </a>
+            {% endfor %}
+        </p>
+        {% endif %}
+        <div class="text-center">
+            <a id="btn-collection-detail" class="btn btn-primary w-75 d-none"
+                data-href-template="/waste_collection/collections/__pk__/" href="javascript:void(0)">
+                Full Details
+            </a>
+        </div>
+    </div>
+</div>
+<div class="card shadow">
+
+    <div class="card-header" role="button" data-toggle="collapse" href="#options-body" aria-expanded="true"
+        aria-controls="options-body">
+        <b>Options</b>
+    </div>
+
+    <div class="card-body collapse" id="options-body">
+
+        <div class="row">
+            <div class="col">
+                <div class="text-center">
+                    <a id="btn-collections-as-list" class="btn btn-primary w-75" href="javascript:void(0)"
+                        data-href-template="/waste_collection/collections/" onclick="clickedListButton()">
+                        View as list
+                    </a>
+                </div>
             </div>
-            {% if object.sources.first %}
-                <p class="card-text mt-3">
-                    <strong>Sources:</strong><br>
-                    {% for source in object.sources.all %}
-                        <a href="{% url 'source-detail-modal' source.id %}"
-                           class="modal-link">
-                            {{ source.abbreviation }}{% if not forloop.last %},{% endif %}
-                        </a>
-                    {% endfor %}
-                </p>
-            {% endif %}
-            <div class="text-center">
-                <a id="btn-collection-detail"
-                   class="btn btn-primary w-75 d-none"
-                   data-href-template="/waste_collection/collections/__pk__/"
-                   href="javascript:void(0)">
-                    Full Details
+        </div>
+
+        <div class="row mt-3">
+            <div class="col">
+                <div class="text-center">
+                    <a class="btn btn-primary w-75" href="{% url 'wastecollection-dashboard' %}">
+                        Waste collection explorer
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        {% if 'soilcom.add_collection' in perms %}
+        <div class="row mt-3">
+            <div class="col">
+                <div class="text-center">
+                    <a id="btn-collection-create" class="btn btn-primary w-75" href="{% url 'collection-create' %}">
+                        Add new collection
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if 'soilcom.add_collection' in perms %}
+        <div class="row mt-3">
+            <div class="col">
+                <div class="text-center">
+                    <a id="btn-collection-copy" class="btn btn-primary w-75"
+                        data-href-template="/waste_collection/collections/__pk__/copy/" href="javascript:void(0)">
+                        Copy selected collection
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {# TODO: Make these links available to the owner #}
+        {% if user.is_staff %}
+        <div class="row mt-3">
+            <div class="col">
+                <div class="text-center">
+                    <a id="btn-collection-update" class="btn btn-primary w-75" href="javascript:void(0)"
+                        data-href-template="/waste_collection/collections/__pk__/update/">
+                        Edit selected collection
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if user.is_staff %}
+        <div class="row mt-3">
+            <div class="col">
+                <div class="text-center">
+                    <a id="btn-collection-delete" class="btn btn-danger modal-link w-75" href="javascript:void(0)"
+                        data-href-template="/waste_collection/collections/__pk__/delete/modal/">
+                        Delete selected collection
+                    </a>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+<div class="card shadow">
+    <div class="card-header" role="button" data-toggle="collapse" href="#learning-card-body" aria-expanded="true"
+        aria-controls="learning-card-body">
+        <strong><i class="fas fa-fw fa-graduation-cap"></i> Learning material</strong>
+    </div>
+    <div class="card-body collapse" id="learning-card-body">
+        <p class="card-text">
+            To get an introduction of how the circular economy of food waste works, check out the
+            <a href="https://www.hoou.de/projects/biocycle/" target="_blank">BioCycle</a>:
+        </p>
+        <ul>
+            <li>
+                <a href="https://www.hoou.de/projects/biocycle/" target="_blank">
+                    The BioCycle - From Resource to Waste to Resource
                 </a>
-            </div>
-        </div>
+            </li>
+        </ul>
+        <p>
+            If you want to dig in more deeply into the food waste management, you find additional resources in the
+            Lectures for Future series "Residue and by-Product Based Bioresources" and "Sustainable Urban
+            Bioresource
+            Management" of the Hamburg Open Online University.
+            Recommended lectures for this topic:
+        </p>
+        <ul>
+            <li>
+                <a href="https://www.hoou.de/projects/lff/pages/residue-and-by-product-based-bioresources"
+                    target="_blank">"Territorial Biowaste Management: Local Food Waste Valorisation"
+                </a>
+            </li>
+            <li>
+                <a href="https://www.hoou.de/projects/lff/pages/sustainable-urban-bioresource-management"
+                    target="_blank">"Biowaste Collection: Current Status and Factors Influencing Correct Sorting"
+                </a>
+            </li>
+        </ul>
     </div>
-    <div class="card shadow">
-
-        <div class="card-header"
-             role="button"
-             data-toggle="collapse"
-             href="#options-body"
-             aria-expanded="true"
-             aria-controls="options-body">
-            <b>Options</b>
-        </div>
-
-        <div class="card-body collapse" id="options-body">
-
-            <div class="row">
-                <div class="col">
-                    <div class="text-center">
-                        <a id="btn-collections-as-list"
-                           class="btn btn-primary w-75"
-                           href="javascript:void(0)"
-                           data-href-template="/waste_collection/collections/"
-                           onclick="clickedListButton()">
-                            View as list
-                        </a>
-                    </div>
-                </div>
-            </div>
-
-            <div class="row mt-3">
-                <div class="col">
-                    <div class="text-center">
-                        <a class="btn btn-primary w-75"
-                           href="{% url 'wastecollection-dashboard' %}">
-                            Waste collection explorer
-                        </a>
-                    </div>
-                </div>
-            </div>
-
-            {% if 'soilcom.add_collection' in perms %}
-                <div class="row mt-3">
-                    <div class="col">
-                        <div class="text-center">
-                            <a id="btn-collection-create"
-                               class="btn btn-primary w-75"
-                               href="{% url 'collection-create' %}">
-                                Add new collection
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            {% endif %}
-
-            {% if 'soilcom.add_collection' in perms %}
-                <div class="row mt-3">
-                    <div class="col">
-                        <div class="text-center">
-                            <a id="btn-collection-copy"
-                               class="btn btn-primary w-75"
-                               data-href-template="/waste_collection/collections/__pk__/copy/"
-                               href="javascript:void(0)">
-                                Copy selected collection
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            {% endif %}
-
-            {# TODO: Make these links available to the owner #}
-            {% if user.is_staff %}
-                <div class="row mt-3">
-                    <div class="col">
-                        <div class="text-center">
-                            <a id="btn-collection-update"
-                               class="btn btn-primary w-75"
-                               href="javascript:void(0)"
-                               data-href-template="/waste_collection/collections/__pk__/update/">
-                                Edit selected collection
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            {% endif %}
-
-            {% if user.is_staff %}
-                <div class="row mt-3">
-                    <div class="col">
-                        <div class="text-center">
-                            <a id="btn-collection-delete"
-                               class="btn btn-danger modal-link w-75"
-                               href="javascript:void(0)"
-                               data-href-template="/waste_collection/collections/__pk__/delete/modal/">
-                                Delete selected collection
-                            </a>
-                        </div>
-                    </div>
-                </div>
-            {% endif %}
-
-        </div>
-    </div>
-    <div class="card shadow">
-        <div class="card-header"
-             role="button"
-             data-toggle="collapse"
-             href="#learning-card-body"
-             aria-expanded="true"
-             aria-controls="learning-card-body">
-            <strong><i class="fas fa-fw fa-graduation-cap"></i> Learning material</strong>
-        </div>
-        <div class="card-body collapse" id="learning-card-body">
-            <p class="card-text">
-                To get an introduction of how the circular economy of food waste works, check out the
-                <a href="https://www.hoou.de/projects/biocycle/" target="_blank">BioCycle</a>:
-            </p>
-            <ul>
-                <li>
-                    <a href="https://www.hoou.de/projects/biocycle/" target="_blank">
-                        The BioCycle - From Resource to Waste to Resource
-                    </a>
-                </li>
-            </ul>
-            <p>
-                If you want to dig in more deeply into the food waste management, you find additional resources in the
-                Lectures for Future series "Residue and by-Product Based Bioresources" and "Sustainable Urban
-                Bioresource
-                Management" of the Hamburg Open Online University.
-                Recommended lectures for this topic:
-            </p>
-            <ul>
-                <li>
-                    <a href="https://www.hoou.de/projects/lff/pages/residue-and-by-product-based-bioresources"
-                       target="_blank">"Territorial Biowaste Management: Local Food Waste Valorisation"
-                    </a>
-                </li>
-                <li>
-                    <a href="https://www.hoou.de/projects/lff/pages/sustainable-urban-bioresource-management"
-                       target="_blank">"Biowaste Collection: Current Status and Factors Influencing Correct Sorting"
-                    </a>
-                </li>
-            </ul>
-        </div>
-    </div>
+</div>
 {% endblock user_actions %}
 
 
 {% block javascript %}
-    {{ block.super }}
-    <script src="{% static 'lib/turf-inside/inside.min.js' %}"></script>
-    <script src="{% static 'js/waste_collection_map.min.js' %}"></script>
-    <script src="{% static 'js/file_export.min.js' %}"></script>
+{{ block.super }}
+<script src="{% static 'lib/turf-inside/inside.min.js' %}"></script>
+<script src="{% static 'js/waste_collection_map.min.js' %}"></script>
+<script src="{% static 'js/file_export.min.js' %}"></script>
 {% endblock javascript %}

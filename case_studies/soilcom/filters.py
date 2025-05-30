@@ -4,7 +4,7 @@ from crispy_forms.bootstrap import Accordion
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Column, Field, Layout, Row, Submit
 from django.db.models import Avg, Count, Max, Q, Sum
-from django.forms import CheckboxSelectMultiple, DateInput, RadioSelect
+from django.forms import CheckboxSelectMultiple, DateInput, HiddenInput, RadioSelect
 from django_filters import (
     BooleanFilter,
     CharFilter,
@@ -106,6 +106,7 @@ class CollectionFilterFormHelper(FormHelper):
                 RangeSliderField("collections_per_year"),
                 RangeSliderField("spec_waste_collected"),
                 "valid_on",
+                "scope",
                 Submit(
                     "filter",
                     "Filter",
@@ -287,6 +288,12 @@ class MinBinSizeRangeFilter(NullableRangeFilter):
 
 
 class CollectionFilterSet(CrispyAutocompleteFilterSet):
+    scope = ChoiceFilter(
+        choices=(("published", "Published"), ("private", "Private")),
+        widget=HiddenInput(),
+        method="filter_scope",
+        label="",
+    )
     id = ModelMultipleChoiceFilter(
         queryset=Collection.objects.all(), to_field_name="id"
     )
@@ -381,6 +388,7 @@ class CollectionFilterSet(CrispyAutocompleteFilterSet):
             "valid_on",
             "publication_status",
             "owner",
+            "scope",
         )
         # catchment_filter must always be applied first, because it grabs the initial queryset and does not filter any
         # existing queryset.
@@ -443,6 +451,15 @@ class CollectionFilterSet(CrispyAutocompleteFilterSet):
         return qs.filter(
             Q(valid_from__lte=value), Q(valid_until__gte=value) | Q(valid_until=None)
         )
+
+    def filter_scope(self, queryset, name, value):
+        """Filter queryset by published vs private depending on scope param."""
+        if value == "private":
+            if not self.request.user.is_authenticated:
+                return queryset.none()
+            return queryset.filter(owner=self.request.user)
+        # default to published
+        return queryset.filter(publication_status="published")
 
 
 class WasteFlyerFilter(CrispyAutocompleteFilterSet):
