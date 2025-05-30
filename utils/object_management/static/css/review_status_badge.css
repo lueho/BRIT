@@ -1,4 +1,10 @@
 /* Visually enhanced review status badge styles */
+
+/* Badge container for consistent display in lists */
+.status-badge-container {
+    display: inline-block;
+    margin-right: 10px;
+}
 .review-status-badge {
     display: inline-flex;
     align-items: center;

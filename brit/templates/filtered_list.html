@@ -16,38 +16,49 @@
                 <div class="card-body">
                     {% block list_card_body %}
                     {% block list_table %}
-                    <table class="table">
-                        {% block list_table_head %}
-                        <thead>
-                            <tr>
-                                <th>Name</th>
-                                <th>Description</th>
-                                {% if list_type == 'private' %}
-                                <th>Status</th>
-                                <th>Actions</th>
-                                {% endif %}
-                            </tr>
-                        </thead>
-                        {% endblock list_table_head %}
-                        <tbody>
-                            {% for item in object_list %}
-                            {% block list_table_row %}
-                            <tr>
-                                <td><a href="{{ item.get_absolute_url }}">{{ item.name }}</a></td>
-                                <td>{{ item.description }}</td>
-                                {% if list_type == 'private' %}
-                                <td>
-                                    {% include 'object_management/review_status_badge.html' with object=item %}
-                                </td>
-                                {% endif %}
-                            </tr>
-                            {% endblock list_table_row %}
-                            {% endfor %}
-                        </tbody>
-                        {% block list_table_footer %}
-                        <tfoot></tfoot>
-                        {% endblock list_table_footer %}
-                    </table>
+                    <div class="table-responsive">
+                        <table class="table modern-table">
+                            {% block list_table_head %}
+                            <thead>
+                                <tr>
+                                    <th>Name</th>
+                                    <th>Description</th>
+                                    {% if list_type == 'private' %}
+                                    <th>Status</th>
+                                    <th>Actions</th>
+                                    {% endif %}
+                                </tr>
+                            </thead>
+                            {% endblock list_table_head %}
+                            <tbody>
+                                {% for item in object_list %}
+                                {% block list_table_row %}
+                                <tr tabindex="0" onclick="window.location='{{ item.get_absolute_url }}'">
+                                    <td data-label="Name"><a href="{{ item.get_absolute_url }}">{{ item.name }}</a></td>
+                                    <td data-label="Description">{{ item.description }}</td>
+                                    {% if list_type == 'private' %}
+                                    <td data-label="Status">
+                                        {% include 'object_management/review_status_badge.html' with object=item %}
+                                    </td>
+                                    <td data-label="Actions">
+                                        <div class="dropdown">
+                                            <button class="btn btn-sm btn-secondary dropdown-toggle" type="button" data-toggle="dropdown" aria-expanded="false">⋮</button>
+                                            <div class="dropdown-menu">
+                                                <a class="dropdown-item" href="{{ item.get_absolute_url }}">View</a>
+                                                <!-- More actions can go here -->
+                                            </div>
+                                        </div>
+                                    </td>
+                                    {% endif %}
+                                </tr>
+                                {% endblock list_table_row %}
+                                {% endfor %}
+                            </tbody>
+                            {% block list_table_footer %}
+                            <tfoot></tfoot>
+                            {% endblock list_table_footer %}
+                        </table>
+                    </div>
                     {% endblock list_table %}
                     {% block list_pagination %}
                     <div class="pagination">

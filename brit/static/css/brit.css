@@ -2,6 +2,17 @@
    BRIT | Custom styles
    ============================================================================= */
 
+/* =============================================================================
+   Responsive utilities
+   ============================================================================= */
+
+/* Action container for consistent layout */
+.action-container {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
 /* Card modern look */
 .card {
     background: #fff;
@@ -53,14 +64,16 @@
     border-radius: 8px;
     padding: 1.25rem 1.5rem;
     margin-bottom: 2rem;
-    box-shadow: 0 1px 4px rgba(0,0,0,0.03);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.03);
 }
+
 .section-title {
     font-size: 1.13rem;
     font-weight: 600;
     margin-bottom: 1rem;
     color: #323a47;
 }
+
 .badge {
     display: inline-block;
     padding: 0.35em 0.7em;
@@ -72,10 +85,12 @@
     margin-right: 0.25em;
     margin-bottom: 0.2em;
 }
+
 .badge-success {
     background: #d4f5e9;
     color: #176b47;
 }
+
 .badge-danger {
     background: #fbe4e6;
     color: #a33a3a;
@@ -91,6 +106,99 @@
     border-radius: 10px;
     overflow: hidden;
 }
+
+/* Modern, responsive table UX */
+.modern-table tr {
+    transition: background 0.15s;
+}
+
+.modern-table tr:hover,
+.modern-table tr:focus {
+    background: #f5f7fa;
+    cursor: pointer;
+}
+
+.modern-table tbody tr:nth-child(even) {
+    background: #fafbfc;
+}
+
+/* Collection link styling */
+.collection-link {
+    display: block;
+    padding: 0.5rem 0;
+    color: inherit;
+    text-decoration: none;
+}
+
+.collection-link:hover {
+    color: inherit;
+    text-decoration: none;
+}
+
+.collection-link strong {
+    color: #2c3e50;
+    font-size: 1.05rem;
+    margin-bottom: 0.25rem;
+}
+
+/* Actions column */
+.actions-column {
+    width: 140px;
+    text-align: right;
+    white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+    .modern-table thead {
+        display: none;
+    }
+
+    .modern-table,
+    .modern-table tbody,
+    .modern-table tr,
+    .modern-table td {
+        display: block;
+        width: 100%;
+    }
+
+    .modern-table tr {
+        margin-bottom: 1.2rem;
+        background: #fff;
+        border-radius: 8px;
+        box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+        padding: 1rem 0.5rem;
+    }
+
+    .modern-table td {
+        padding-left: 50%;
+        position: relative;
+        border: none;
+        min-height: 2.2rem;
+        font-size: 1.01em;
+        box-sizing: border-box;
+        word-break: break-word;
+    }
+
+    .modern-table td:before {
+        content: attr(data-label);
+        position: absolute;
+        left: 1rem;
+        top: 0;
+        font-weight: 600;
+        color: #888;
+        width: 45%;
+        white-space: nowrap;
+    }
+
+    .modern-table td a {
+        word-break: break-word;
+    }
+
+    .modern-table .dropdown {
+        width: 100%;
+    }
+}
+
 
 .table th,
 .table td {
@@ -128,6 +236,11 @@
 
 .table tr:last-child td {
     border-bottom: none;
+}
+
+/* Review badge fix */
+.review-status-badge-container {
+    margin-right: 0.5rem;
 }
 
 /* Badge modern look */

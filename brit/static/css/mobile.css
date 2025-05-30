@@ -1,0 +1,313 @@
+/* =============================================================================
+   Mobile optimizations for BRIT
+   ============================================================================= */
+
+/* Action container for consistent layout
+   ============================================================================= */
+.action-container {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+}
+
+/* Collection item styling */
+table tbody tr {
+    transition: background-color 0.15s ease;
+}
+
+table tbody tr:hover {
+    background-color: rgba(0, 0, 0, 0.02);
+}
+
+/* Collection title styling */
+.collection-link {
+    font-weight: 600;
+    color: #2c3e50;
+    text-decoration: none;
+    transition: color 0.15s ease;
+}
+
+.collection-link:hover {
+    color: #3498db;
+    text-decoration: none;
+}
+
+/* Status badge container standardization */
+.status-badge-container {
+    display: inline-flex;
+    margin: 0.5rem 0.5rem 0.5rem 0;
+}
+
+/* Status badge styling enhancements */
+.review-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.8rem;
+    border-radius: 30px;
+    font-size: 0.85rem;
+    font-weight: 600;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.08);
+    letter-spacing: 0.01rem;
+}
+
+.review-status-published {
+    background-color: #d4edda;
+    color: #155724;
+}
+
+.review-status-private {
+    background-color: #f8d7da;
+    color: #721c24;
+}
+
+.review-status-in-review {
+    background-color: #fff3cd;
+    color: #856404;
+}
+
+/* Action buttons styling */
+.dropdown-item {
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    transition: background-color 0.15s ease;
+}
+
+.dropdown-toggle.btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.82rem;
+    border-radius: 0.2rem;
+}
+
+/* Card styling improvements
+   ============================================================================= */
+.card {
+    transition: box-shadow 0.2s ease;
+    border: none;
+}
+
+.card:hover {
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.09);
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+    font-weight: 600;
+}
+
+.card-header[role="button"] {
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+}
+
+.card-header[role="button"]:hover {
+    background-color: #f0f0f0;
+}
+
+/* Collection item and detail formatting */
+.collection-meta {
+    color: #6c757d;
+    font-size: 0.85rem;
+    margin-top: 0.25rem;
+}
+
+/* Mobile optimizations
+   ============================================================================= */
+@media (max-width: 767.98px) {
+
+    /* Target Bootstrap containers with high specificity */
+    html body .container,
+    html body .container-fluid,
+    html body .container-sm,
+    html body .container-md,
+    html body .container-lg,
+    html body .container-xl {
+        padding-left: 0.25rem !important;
+        padding-right: 0.25rem !important;
+        max-width: 100% !important;
+        width: 100% !important;
+    }
+
+    /* Target Bootstrap rows */
+    html body .row {
+        margin-left: -0.25rem !important;
+        margin-right: -0.25rem !important;
+    }
+
+    /* Target Bootstrap columns */
+    html body [class^="col-"],
+    html body .col {
+        padding-left: 0.25rem !important;
+        padding-right: 0.25rem !important;
+    }
+
+    /* Aggressively reduce card padding */
+    html body .card {
+        margin-bottom: 1rem !important;
+        border-radius: 6px !important;
+    }
+
+    html body .card-body {
+        padding: 1rem 0.75rem !important;
+    }
+
+    html body .card-header,
+    html body .card-footer {
+        padding: 0.75rem 0.5rem !important;
+    }
+
+    /* Completely hide data-labels in mobile view */
+    @media (max-width: 767.98px) {
+
+        /* Hide all pseudo-elements used for data-labels */
+        .table-responsive .table td::before,
+        .table-responsive table td[data-label]::before,
+        html body .table td[data-label]::before {
+            display: none !important;
+            content: none !important;
+        }
+
+        /* Style table cells properly without labels */
+        .table-responsive .table td,
+        html body .table td[data-label] {
+            text-align: left !important;
+            display: block !important;
+            border: none !important;
+            padding-top: 0.75rem !important;
+            padding-left: 0.75rem !important;
+            padding-bottom: 0.75rem !important;
+        }
+    }
+
+    /* Remove column header label for custom columns */
+    html body .mobile-no-label:before {
+        content: normal !important;
+        display: none !important;
+    }
+
+    /* Simple centered layout for custom columns */
+    html body .mobile-no-label {
+        text-align: center !important;
+        padding: 0.5rem !important;
+        border-top: none !important;
+        display: block !important;
+    }
+
+    /* Hide mobile dropdowns completely */
+    html body .mobile-hide,
+    html body .d-md-block.d-none {
+        display: none !important;
+    }
+
+    /* Center badge container on mobile */
+    html body .mobile-no-label .status-badge-container {
+        margin: 0 auto !important;
+    }
+
+    /* Table cells */
+    html body .table td,
+    html body .table th {
+        padding: 0.5rem 0.25rem !important;
+    }
+}
+
+/* Header alignment fixes */
+.card-header strong {
+    display: block;
+    padding-left: 0.25rem;
+}
+
+.table-responsive {
+    overflow-x: visible;
+}
+
+.table th {
+    padding-left: 0.75rem;
+}
+
+/* Collection card iPhone optimizations */
+@media (max-width: 767.98px) {
+
+    /* Fix header alignment with collection content */
+    .card-header strong {
+        padding-left: 0.75rem;
+    }
+
+    .table th {
+        padding-left: 0.75rem !important;
+    }
+
+    /* Fix table responsive container */
+    .table-responsive {
+        margin: 0 !important;
+        padding: 0 !important;
+    }
+
+    /* Clean collection list style */
+    .collection-link {
+        font-size: 1.05rem;
+        display: block;
+        margin-bottom: 0.25rem;
+    }
+
+    /* Add subtle separation between collection items */
+    tbody tr {
+        border-bottom: 8px solid #f8f9fa;
+        padding: 1rem 0;
+    }
+
+    tbody td {
+        padding-top: 0.75rem !important;
+        padding-bottom: 0.75rem !important;
+    }
+
+    /* Optimize badge placement */
+    .status-badge-container {
+        margin: 0.25rem auto 0.5rem auto;
+    }
+
+    /* Nicer action button */
+    .dropdown-toggle.btn-sm {
+        padding: 0.35rem 0.75rem;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+    }
+}
+
+/* Extra aggressive for iPhone */
+@media (max-width: 414px) {
+
+    /* Further reduce container padding */
+    html body .container,
+    html body .container-fluid,
+    html body .container-sm,
+    html body .container-md,
+    html body .container-lg,
+    html body .container-xl {
+        padding-left: 0.15rem !important;
+        padding-right: 0.15rem !important;
+    }
+
+    /* Minimize card margins and padding */
+    html body .card {
+        margin-bottom: 0.75rem !important;
+        border-width: 1px !important;
+    }
+
+    html body .card-body,
+    html body .card-header,
+    html body .card-footer {
+        padding: 0.5rem 0.35rem !important;
+    }
+
+    /* Optimize table for very small screens */
+    html body .table th,
+    html body .table td {
+        padding: 0.5rem 0.35rem !important;
+    }
+
+    /* Remove unnecessary margins from form elements */
+    html body .form-group {
+        margin-bottom: 0.5rem !important;
+    }
+}

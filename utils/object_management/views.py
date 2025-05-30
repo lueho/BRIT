@@ -14,7 +14,8 @@ from django.contrib.contenttypes.models import ContentType
 from django.contrib.messages.views import SuccessMessageMixin
 from django.core.exceptions import ImproperlyConfigured, PermissionDenied
 from django.http import HttpResponseRedirect
-from django.shortcuts import get_object_or_404, redirect
+from django.shortcuts import get_object_or_404
+from django.urls import reverse
 from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.generic import CreateView, DetailView, ListView, UpdateView, View
@@ -76,17 +77,50 @@ class ReviewDashboardView(ListView):
         return context
 
 
-class ApproveItemView(View):
-    """View to approve an item that is in review."""
+class BaseReviewActionView(NextOrSuccessUrlMixin, View):
+    """Base view for all review workflow actions.
+
+    Provides common functionality for review actions including:
+    - Permission checking
+    - Object retrieval from ContentType and ID
+    - Success URL determination (respecting 'next' parameter)
+    """
 
     @method_decorator(login_required)
-    def post(self, request, *args, **kwargs):
+    def dispatch(self, *args, **kwargs):
+        return super().dispatch(*args, **kwargs)
+
+    def get_object(self, request, *args, **kwargs):
+        """Get the object being reviewed based on content type and ID."""
         content_type_id = kwargs.get("content_type_id")
         object_id = kwargs.get("object_id")
 
         content_type = get_object_or_404(ContentType, pk=content_type_id)
         model_class = content_type.model_class()
-        obj = get_object_or_404(model_class, pk=object_id)
+        return get_object_or_404(model_class, pk=object_id)
+
+    def get_default_success_url(self, obj):
+        """Default URL to redirect to if no 'next' parameter is provided."""
+        return obj.get_absolute_url()
+
+    def get_success_url(self):
+        """Override to support both 'next' parameter and fallback to object URL."""
+        next_url = self.request.GET.get("next")
+        if next_url:
+            return next_url
+        return self.get_default_success_url(self.object)
+
+
+class ApproveItemView(BaseReviewActionView):
+    """View to approve an item that is in review."""
+
+    def get_default_success_url(self, obj):
+        """Default redirect to dashboard if no 'next' parameter."""
+        return reverse("object_management:review_dashboard")
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object(request, *args, **kwargs)
+        obj = self.object
 
         # Check permissions
         if not UserCreatedObjectPermission().has_approve_permission(request, obj):
@@ -101,21 +135,20 @@ class ApproveItemView(View):
         except Exception as e:
             messages.error(request, f"Error approving item: {str(e)}")
 
-        # Redirect back to the dashboard
-        return redirect("object_management:review_dashboard")
+        # Redirect using the success URL (handles 'next' parameter)
+        return HttpResponseRedirect(self.get_success_url())
 
 
-class RejectItemView(View):
+class RejectItemView(BaseReviewActionView):
     """View to reject an item that is in review."""
 
-    @method_decorator(login_required)
-    def post(self, request, *args, **kwargs):
-        content_type_id = kwargs.get("content_type_id")
-        object_id = kwargs.get("object_id")
+    def get_default_success_url(self, obj):
+        """Default redirect to dashboard if no 'next' parameter."""
+        return reverse("object_management:review_dashboard")
 
-        content_type = get_object_or_404(ContentType, pk=content_type_id)
-        model_class = content_type.model_class()
-        obj = get_object_or_404(model_class, pk=object_id)
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object(request, *args, **kwargs)
+        obj = self.object
 
         # Check permissions
         if not UserCreatedObjectPermission().has_approve_permission(request, obj):
@@ -131,21 +164,16 @@ class RejectItemView(View):
         except Exception as e:
             messages.error(request, f"Error rejecting item: {str(e)}")
 
-        # Redirect back to the dashboard
-        return redirect("object_management:review_dashboard")
+        # Redirect using the success URL (handles 'next' parameter)
+        return HttpResponseRedirect(self.get_success_url())
 
 
-class SubmitForReviewView(View):
+class SubmitForReviewView(BaseReviewActionView):
     """View to submit an item for review."""
 
-    @method_decorator(login_required)
     def post(self, request, *args, **kwargs):
-        content_type_id = kwargs.get("content_type_id")
-        object_id = kwargs.get("object_id")
-
-        content_type = get_object_or_404(ContentType, pk=content_type_id)
-        model_class = content_type.model_class()
-        obj = get_object_or_404(model_class, pk=object_id)
+        self.object = self.get_object(request, *args, **kwargs)
+        obj = self.object
 
         # Check permissions (must be owner)
         if obj.owner != request.user and not request.user.is_staff:
@@ -162,21 +190,16 @@ class SubmitForReviewView(View):
         except Exception as e:
             messages.error(request, f"Error submitting for review: {str(e)}")
 
-        # Redirect back to the object detail page
-        return HttpResponseRedirect(obj.get_absolute_url())
+        # Redirect using the success URL (handles 'next' parameter)
+        return HttpResponseRedirect(self.get_success_url())
 
 
-class WithdrawFromReviewView(View):
+class WithdrawFromReviewView(BaseReviewActionView):
     """View to withdraw an item from review."""
 
-    @method_decorator(login_required)
     def post(self, request, *args, **kwargs):
-        content_type_id = kwargs.get("content_type_id")
-        object_id = kwargs.get("object_id")
-
-        content_type = get_object_or_404(ContentType, pk=content_type_id)
-        model_class = content_type.model_class()
-        obj = get_object_or_404(model_class, pk=object_id)
+        self.object = self.get_object(request, *args, **kwargs)
+        obj = self.object
 
         # Check permissions (must be owner)
         if obj.owner != request.user and not request.user.is_staff:
@@ -193,8 +216,8 @@ class WithdrawFromReviewView(View):
         except Exception as e:
             messages.error(request, f"Error withdrawing from review: {str(e)}")
 
-        # Redirect back to the object detail page
-        return HttpResponseRedirect(obj.get_absolute_url())
+        # Redirect using the success URL (handles 'next' parameter)
+        return HttpResponseRedirect(self.get_success_url())
 
 
 class UserOwnsObjectMixin(UserPassesTestMixin):

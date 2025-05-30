@@ -194,7 +194,7 @@ class UserCreatedObjectPermission(permissions.BasePermission):
     def has_approve_permission(self, request, obj):
         """
         Check if the user can approve an object.
-        Only moderators can approve objects in review.
+        Only moderators who are NOT the owner can approve objects in review (four eyes principle).
         """
         from .models import UserCreatedObject
 
@@ -204,12 +204,13 @@ class UserCreatedObjectPermission(permissions.BasePermission):
         return (
             self._is_moderator(request.user, obj)
             and obj.publication_status == UserCreatedObject.STATUS_REVIEW
+            and obj.owner != request.user  # Four eyes principle: can't approve own objects
         )
 
     def has_reject_permission(self, request, obj):
         """
         Check if the user can reject an object.
-        Only moderators can reject objects in review.
+        Only moderators who are NOT the owner can reject objects in review (four eyes principle).
         """
         from .models import UserCreatedObject
 
@@ -219,4 +220,5 @@ class UserCreatedObjectPermission(permissions.BasePermission):
         return (
             self._is_moderator(request.user, obj)
             and obj.publication_status == UserCreatedObject.STATUS_REVIEW
+            and obj.owner != request.user  # Four eyes principle: can't reject own objects
         )
