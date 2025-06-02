@@ -16,3 +16,5 @@
 /.devcontainer/
 /.windsurf/
 /site/
+.windsurf
+.vscode
