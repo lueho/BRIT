@@ -116,19 +116,6 @@ table tbody tr:hover {
    ============================================================================= */
 @media (max-width: 767.98px) {
 
-    /* Target Bootstrap containers with high specificity */
-    html body .container,
-    html body .container-fluid,
-    html body .container-sm,
-    html body .container-md,
-    html body .container-lg,
-    html body .container-xl {
-        padding-left: 0.25rem !important;
-        padding-right: 0.25rem !important;
-        max-width: 100% !important;
-        width: 100% !important;
-    }
-
     /* Target Bootstrap rows */
     html body .row {
         margin-left: -0.25rem !important;
@@ -276,17 +263,6 @@ table tbody tr:hover {
 
 /* Extra aggressive for iPhone */
 @media (max-width: 414px) {
-
-    /* Further reduce container padding */
-    html body .container,
-    html body .container-fluid,
-    html body .container-sm,
-    html body .container-md,
-    html body .container-lg,
-    html body .container-xl {
-        padding-left: 0.15rem !important;
-        padding-right: 0.15rem !important;
-    }
 
     /* Minimize card margins and padding */
     html body .card {

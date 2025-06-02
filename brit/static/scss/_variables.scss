@@ -16,7 +16,7 @@ $gray-800: #5a5c69 !default;
 $gray-900: #3a3b45 !default;
 $black: #000 !default;
 
-$blue: #4e73df !default;
+$blue: #04555E !default;
 $indigo: #6610f2 !default;
 $purple: #6f42c1 !default;
 $pink: #e83e8c !default;
@@ -26,6 +26,12 @@ $yellow: #f6c23e !default;
 $green: #1cc88a !default;
 $teal: #20c9a6 !default;
 $cyan: #36b9cc !default;
+
+// Link color overrides
+$link-color: $blue !default;
+$link-hover-color: $blue !default;
+$link-decoration: none !default;
+$link-hover-decoration: underline !default;
 
 // Custom Colors
 $brand-google: #ea4335;

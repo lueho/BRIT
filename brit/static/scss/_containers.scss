@@ -1,0 +1,43 @@
+// Responsive container padding overrides
+// Define padding per breakpoint
+$container-padding-xs: 0.75rem !default;
+$container-padding-sm: 0.75rem !default;
+$container-padding-md: 1rem !default;
+$container-padding-lg: 1.5rem !default;
+
+// XS: up to 575px
+.container,
+.container-fluid {
+  padding-left: $container-padding-xs;
+  padding-right: $container-padding-xs;
+}
+
+// SM: ≥576px
+@media (min-width: 576px) {
+
+  .container,
+  .container-fluid {
+    padding-left: $container-padding-sm;
+    padding-right: $container-padding-sm;
+  }
+}
+
+// MD: ≥768px
+@media (min-width: 768px) {
+
+  .container,
+  .container-fluid {
+    padding-left: $container-padding-md;
+    padding-right: $container-padding-md;
+  }
+}
+
+// LG: ≥992px
+@media (min-width: 992px) {
+
+  .container,
+  .container-fluid {
+    padding-left: $container-padding-lg;
+    padding-right: $container-padding-lg;
+  }
+}
