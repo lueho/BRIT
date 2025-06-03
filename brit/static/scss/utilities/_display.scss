@@ -2,3 +2,16 @@
 .o-hidden {
   overflow: hidden !important;
 }
+
+// Action container helper
+.action-container {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+// Hide on mobile
+.mobile-hide,
+.d-md-block.d-none {
+  display: none !important;
+}

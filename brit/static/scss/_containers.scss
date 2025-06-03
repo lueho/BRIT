@@ -41,3 +41,16 @@ $container-padding-lg: 1.5rem !default;
     padding-right: $container-padding-lg;
   }
 }
+
+// Mobile row/col tweaks
+@media (max-width: 767.98px) {
+  html body .row {
+    margin-left: -0.25rem !important;
+    margin-right: -0.25rem !important;
+  }
+  html body [class^="col-"],
+  html body .col {
+    padding-left: 0.25rem !important;
+    padding-right: 0.25rem !important;
+  }
+}

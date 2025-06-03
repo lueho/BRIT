@@ -1,0 +1,133 @@
+// Table styling and mobile-responsive tweaks
+
+// Base table transitions and hover
+table tbody tr {
+  transition: background-color 0.15s ease;
+}
+table tbody tr:hover {
+  background-color: rgba(0, 0, 0, 0.02);
+}
+
+// Overflow fix for responsive tables
+.table-responsive {
+  overflow-x: visible;
+}
+
+// Header cell padding
+.table th {
+  padding-left: 0.75rem;
+}
+
+// Mobile optimizations for tables
+@media (max-width: 767.98px) {
+  .table-responsive {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  html body .table td::before,
+  html body .table td[data-label]::before {
+    display: none !important;
+    content: none !important;
+  }
+  html body .table td,
+  html body .table td[data-label] {
+    text-align: left !important;
+    display: block !important;
+    border: none !important;
+    padding-top: 0.75rem !important;
+    padding-left: 0.75rem !important;
+    padding-bottom: 0.75rem !important;
+  }
+  html body .table td,
+  html body .table th {
+    padding: 0.5rem 0.25rem !important;
+  }
+}
+
+@media (max-width: 414px) {
+  html body .table th,
+  html body .table td {
+    padding: 0.5rem 0.35rem !important;
+  }
+}
+
+// BRIT | Custom Table Styles
+.table {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0;
+  background: transparent;
+  font-size: 1rem;
+  border-radius: 10px;
+  overflow: hidden;
+  th, td {
+    padding: 0.85rem 1.1rem;
+    border-bottom: 1px solid #e5e9f2;
+    text-align: left;
+    vertical-align: middle;
+  }
+  tr:last-child td {
+    border-bottom: none;
+  }
+}
+
+.modern-table {
+  tr {
+    transition: background 0.15s;
+  }
+  tr:hover, tr:focus {
+    background: #f5f7fa;
+    cursor: pointer;
+  }
+  tbody tr:nth-child(even) {
+    background: #fafbfc;
+  }
+}
+
+.actions-column {
+  width: 140px;
+  text-align: right;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .modern-table thead {
+    display: none;
+  }
+  .modern-table, .modern-table tbody, .modern-table tr, .modern-table td {
+    display: block;
+    width: 100%;
+  }
+  .modern-table tr {
+    margin-bottom: 1.2rem;
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.04);
+    padding: 1rem 0.5rem;
+  }
+  .modern-table td {
+    padding-left: 50%;
+    position: relative;
+    border: none;
+    min-height: 2.2rem;
+    font-size: 1.01em;
+    box-sizing: border-box;
+    word-break: break-word;
+  }
+  .modern-table td::before {
+    content: attr(data-label);
+    position: absolute;
+    left: 1rem;
+    top: 0;
+    font-weight: 600;
+    color: #888;
+    width: 45%;
+    white-space: nowrap;
+  }
+  .modern-table td a {
+    word-break: break-word;
+  }
+  .modern-table .dropdown {
+    width: 100%;
+  }
+}

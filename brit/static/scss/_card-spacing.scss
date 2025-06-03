@@ -11,15 +11,18 @@ $card-mobile-padding-x: 0.35rem !default;
     margin-bottom: $card-mobile-margin-bottom;
     border-width: $card-mobile-border-width;
   }
-
-  .card-body,
-  .card-header,
-  .card-footer {
+  .card-body {
     padding: $card-mobile-padding-y $card-mobile-padding-x;
   }
 }
 
 // Extra small devices (e.g., iPhone)
+@media (max-width: 767.98px) {
+  .card {
+    margin-bottom: $card-mobile-margin-bottom;
+  }
+}
+
 @media (max-width: 414px) {
   .card {
     margin-bottom: $card-mobile-margin-bottom;

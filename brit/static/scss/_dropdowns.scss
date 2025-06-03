@@ -3,11 +3,45 @@
 .dropdown {
   .dropdown-menu {
     font-size: $dropdown-font-size;
+    position: absolute;
+    top: 100%;
+    left: 0;
+    z-index: 1000;
+    display: none;
+    float: left;
+    min-width: 180px;
+    padding: 0.5em 0;
+    margin: 0.125rem 0 0;
+    color: #222;
+    text-align: left;
+    list-style: none;
+    background-color: #fff;
+    background-clip: padding-box;
+    border-radius: 8px;
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.07);
+    border: 1px solid #e5e9f2;
+
+    &.show {
+      display: block;
+    }
+
     .dropdown-header {
       @extend .text-uppercase;
       font-weight: 800;
       font-size: 0.65rem;
       color: $gray-500;
+    }
+
+    .dropdown-item {
+      padding: 0.6em 1.2em;
+      color: #222;
+      transition: background 0.2s;
+
+      &:hover,
+      &:focus {
+        background: #f5f7fa;
+        color: #111;
+      }
     }
   }
 }
