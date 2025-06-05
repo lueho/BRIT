@@ -25,10 +25,11 @@ class RangeSliderWidget(SuffixedMultiWidget):
         default_range_step (float): Default step size if not specified.
         default_include_null (bool): Whether to include null values by default.
     """
-    template_name = 'widgets/range_slider_widget.html'
+
+    template_name = "widgets/range_slider_widget.html"
     widgets = [HiddenInput(), HiddenInput()]
-    suffixes = ['min', 'max']
-    unit = ''
+    suffixes = ["min", "max"]
+    unit = ""
     range_min = None
     range_max = None
     range_step = None
@@ -38,10 +39,8 @@ class RangeSliderWidget(SuffixedMultiWidget):
     default_include_null = True
 
     class Media:
-        css = {
-            'all': ('css/range_slider.min.css',)
-        }
-        js = ('js/range_slider.min.js',)
+        css = {"all": ("css/range_slider.min.css",)}
+        js = ("js/range_slider.min.js",)
 
     def __init__(self, attrs=None, **kwargs):
         """
@@ -61,13 +60,19 @@ class RangeSliderWidget(SuffixedMultiWidget):
         """
         super().__init__(self.widgets, attrs)
         if attrs is not None:
-            self.unit = attrs.get('data-unit', self.unit)
-            self.range_min = attrs.get('data-range_min', self.range_min)
-            self.range_max = attrs.get('data-range_max', self.range_max)
-            self.range_step = attrs.get('data-range_step', self.range_step)
-            self.default_range_min = attrs.get('data-default_range_min', self.default_range_min)
-            self.default_range_max = attrs.get('data-default_range_max', self.default_range_max)
-            self.default_include_null = attrs.get('data-default_include_null', self.default_include_null)
+            self.unit = attrs.get("data-unit", self.unit)
+            self.range_min = attrs.get("data-range_min", self.range_min)
+            self.range_max = attrs.get("data-range_max", self.range_max)
+            self.range_step = attrs.get("data-range_step", self.range_step)
+            self.default_range_min = attrs.get(
+                "data-default_range_min", self.default_range_min
+            )
+            self.default_range_max = attrs.get(
+                "data-default_range_max", self.default_range_max
+            )
+            self.default_include_null = attrs.get(
+                "data-default_include_null", self.default_include_null
+            )
 
     def decompress(self, value):
         """
@@ -104,20 +109,22 @@ class RangeSliderWidget(SuffixedMultiWidget):
         context = super().get_context(name, value, attrs)
         cur_min, cur_max = value[0], value[1]
         if cur_min is None:
-            cur_min = context['widget']['attrs']['data-range_min']
+            cur_min = context["widget"]["attrs"]["data-range_min"]
         if cur_max is None:
-            cur_max = context['widget']['attrs']['data-range_max']
-        step = context['widget']['attrs'].get('data-step', 1)
-        context['widget']['attrs'].update({
-            'data-cur_min': cur_min,
-            'data-cur_max': cur_max,
-            'data-step': step,
-            'data-unit': self.unit,
-        })
-        base_id = context['widget']['attrs'].get('id', context['widget']['name'])
-        for idx, subwidget in enumerate(context['widget']['subwidgets']):
-            subwidget['attrs']['id'] = f'{base_id}_{self.suffixes[idx]}'
-        context['widget']['value_text'] = f'{cur_min}{self.unit} - {cur_max}{self.unit}'
+            cur_max = context["widget"]["attrs"]["data-range_max"]
+        step = context["widget"]["attrs"].get("data-step", 1)
+        context["widget"]["attrs"].update(
+            {
+                "data-cur_min": cur_min,
+                "data-cur_max": cur_max,
+                "data-step": step,
+                "data-unit": self.unit,
+            }
+        )
+        base_id = context["widget"]["attrs"].get("id", context["widget"]["name"])
+        for idx, subwidget in enumerate(context["widget"]["subwidgets"]):
+            subwidget["attrs"]["id"] = f"{base_id}_{self.suffixes[idx]}"
+        context["widget"]["value_text"] = f"{cur_min}{self.unit} - {cur_max}{self.unit}"
         return context
 
 
@@ -134,22 +141,24 @@ class NullableRangeSliderWidget(RangeSliderWidget):
         widgets (list): List of widget classes for each subfield.
         suffixes (list): List of suffixes for the subfield names.
     """
-    template_name = 'widgets/nullable_range_slider.html'
+
+    template_name = "widgets/nullable_range_slider.html"
     widgets = [HiddenInput, HiddenInput, HiddenInput]
-    suffixes = ['min', 'max', 'is_null']
+    suffixes = ["min", "max", "is_null"]
 
     class Media:
-        css = {
-            'all': ('css/range_slider.min.css',)
-        }
-        js = ('js/range_slider.min.js', 'js/nullable_range_slider.min.js',)
+        css = {"all": ("css/range_slider.min.css",)}
+        js = (
+            "js/range_slider.min.js",
+            "js/nullable_range_slider.min.js",
+        )
 
     def decompress(self, range_with_null_flag):
         """
         Decompress the value into a list of values for the individual subwidgets.
 
         Args:
-            range_with_null_flag: A tuple containing a slice object representing 
+            range_with_null_flag: A tuple containing a slice object representing
                 the range and a boolean indicating whether to include null values,
                 or None.
 
@@ -157,7 +166,7 @@ class NullableRangeSliderWidget(RangeSliderWidget):
             list: A list containing the start value, stop value, and null flag.
         """
         if not range_with_null_flag:
-            return [None, None, 'true']
+            return [None, None, "true"]
         value, is_null = range_with_null_flag
         return [value.start, value.stop, is_null]
 
@@ -182,11 +191,13 @@ class NullableRangeSliderWidget(RangeSliderWidget):
             value = self.decompress(value)
         cur_is_null = value[2]
         if cur_is_null is None:
-            cur_is_null = 'true'
+            cur_is_null = "true"
 
-        context['widget']['attrs'].update({
-            'data-cur_is_null': str(cur_is_null == 'true').lower(),
-        })
+        context["widget"]["attrs"].update(
+            {
+                "data-cur_is_null": str(cur_is_null == "true").lower(),
+            }
+        )
 
         return context
 
@@ -202,7 +213,8 @@ class NullablePercentageRangeSliderWidget(NullableRangeSliderWidget):
     Attributes:
         unit (str): The unit to display after the values, set to '%'.
     """
-    unit = '%'
+
+    unit = "%"
 
 
 class BSModelSelect2(autocomplete.ModelSelect2):
@@ -212,6 +224,7 @@ class BSModelSelect2(autocomplete.ModelSelect2):
     This widget extends django-autocomplete-light's ModelSelect2 widget
     to use Bootstrap 4 styling for the Select2 dropdown.
     """
+
     @property
     def media(self):
         """
@@ -224,7 +237,11 @@ class BSModelSelect2(autocomplete.ModelSelect2):
         """
         base_media = super().media
         extra_media = Media(
-            css={'screen': ('lib/select2-bootstrap-theme/select2-bootstrap4.min.css',)}
+            css={
+                "screen": (
+                    "https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css",
+                )
+            }
         )
         return base_media + extra_media
 
@@ -236,6 +253,7 @@ class BSModelSelect2Multiple(autocomplete.ModelSelect2Multiple):
     This widget extends django-autocomplete-light's ModelSelect2Multiple widget
     to use Bootstrap 4 styling for the Select2 dropdown.
     """
+
     @property
     def media(self):
         """
@@ -248,7 +266,11 @@ class BSModelSelect2Multiple(autocomplete.ModelSelect2Multiple):
         """
         base_media = super().media
         extra_media = Media(
-            css={'screen': ('lib/select2-bootstrap-theme/select2-bootstrap4.min.css',)}
+            css={
+                "screen": (
+                    "https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css",
+                )
+            }
         )
         return base_media + extra_media
 
@@ -260,6 +282,7 @@ class BSListSelect2(autocomplete.ListSelect2):
     This widget extends django-autocomplete-light's ListSelect2 widget
     to use Bootstrap 4 styling for the Select2 dropdown.
     """
+
     @property
     def media(self):
         """
@@ -272,6 +295,10 @@ class BSListSelect2(autocomplete.ListSelect2):
         """
         base_media = super().media
         extra_media = Media(
-            css={'screen': ('lib/select2-bootstrap-theme/select2-bootstrap4.min.css',)}
+            css={
+                "screen": (
+                    "https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css",
+                )
+            }
         )
         return base_media + extra_media

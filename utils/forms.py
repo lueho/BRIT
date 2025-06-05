@@ -2,7 +2,14 @@ from bootstrap_modal_forms.mixins import CreateUpdateAjaxMixin, PopRequestMixin
 from crispy_forms.helper import FormHelper
 from dal_select2.widgets import Select2WidgetMixin
 from django.core.exceptions import ImproperlyConfigured
-from django.forms import BaseFormSet, BaseModelFormSet, Form, ModelForm, formset_factory, modelformset_factory
+from django.forms import (
+    BaseFormSet,
+    BaseModelFormSet,
+    Form,
+    ModelForm,
+    formset_factory,
+    modelformset_factory,
+)
 
 
 class FormHelperMixin:
@@ -19,7 +26,7 @@ class FormHelperMixin:
         if isinstance(self.helper, FormHelper):
             return  # helper already set elsewhere
 
-        if hasattr(self, 'Meta') and hasattr(self.Meta, 'form_helper_class'):
+        if hasattr(self, "Meta") and hasattr(self.Meta, "form_helper_class"):
             self.helper = self.Meta.form_helper_class()
         else:
             self.helper = FormHelper()
@@ -44,7 +51,7 @@ class CreateInlineMixin:
     """
 
     class Media:
-        js = ('js/create_inline.min.js',)
+        js = ("js/create_inline.min.js",)
 
 
 class ModalFormMixin(NoFormTagMixin, PopRequestMixin):
@@ -85,11 +92,42 @@ class ModalModelForm(ModalModelFormMixin, ModelForm):
     """
 
 
+def apply_select2_theme(form):
+    """
+    Updates the attrs of all Select2WidgetMixin instances in a form to match the current SELECT2_THEME environment
+    variable.
+
+    :param form: The form whose fields should be updated.
+    :type form: Form
+    """
+    from dal_select2.widgets import Select2WidgetMixin
+    from django.conf import settings
+
+    try:
+        select2_theme = settings.SELECT2_THEME
+    except AttributeError:
+        raise ImproperlyConfigured(
+            "SELECT2_THEME environment variable is not set. Make sure to set the theme if you want the autocomplete fields to be compatible with django-crispy-forms."
+        )
+    for field in form.fields.values():
+        if isinstance(field.widget, Select2WidgetMixin):
+            field.widget.attrs.update(
+                {
+                    "data-theme": select2_theme,
+                    "data-width": "style",  # Changed from 'resolve' to respect CSS width
+                    "data-minimum-input-length": 0,
+                    # "data-dropdown-auto-width": "true",
+                    "data-placeholder": "--------   ",
+                }
+            )
+
+
 class AutoCompleteMixin:
     """
-    Allows the integration of django-autocomplete-light with django-crispy-forms and bootstrap 4. When using this
+    Allows the integration of django-autocomplete-light with django-crispy-forms and bootstrap 5. When using this
     mixin, form media need to be manually loaded in the template using {{ form.media }}.
     """
+
     fields: dict
 
     def __init__(self, *args, **kwargs):
@@ -99,27 +137,24 @@ class AutoCompleteMixin:
         # Suppressing media inclusion here and explicitly adding {{ form.media }} in the template solves this.
         # See https://github.com/yourlabs/django-autocomplete-light/issues/788
         self.helper.include_media = False
-
-        for name, field in self.fields.items():
-            if isinstance(field.widget, Select2WidgetMixin):
-                field.widget.attrs = {'data-theme': 'bootstrap4'}
+        apply_select2_theme(self)
 
 
 class AutoCompleteForm(AutoCompleteMixin, SimpleForm):
     """
-    Form that works with django-autocomplete-light in combination with bootstrap 4.
+    Form that works with django-autocomplete-light in combination with bootstrap 5.
     """
 
 
 class AutoCompleteModelForm(AutoCompleteMixin, SimpleModelForm):
     """
-    Model form that works with django-autocomplete-light in combination with bootstrap 4.
+    Model form that works with django-autocomplete-light in combination with bootstrap 5.
     """
 
 
 class AutoCompleteModalModelForm(AutoCompleteMixin, ModalModelForm):
     """
-    Model form that works with django-autocomplete-light in combination with bootstrap 4 and
+    Model form that works with django-autocomplete-light in combination with bootstrap 5 and
     django-bootstrap-modal-forms.
     """
 
@@ -132,16 +167,16 @@ class DynamicTableInlineFormSetHelper(FormHelper):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.template = 'bootstrap4/dynamic_table_inline_formset.html'
-        self.form_method = 'post'
+        self.template = "bootstrap5/dynamic_table_inline_formset.html"
+        self.form_method = "post"
         self.form_tag = False
 
 
 class M2MInlineFormSet(BaseFormSet):
 
     def __init__(self, *args, **kwargs):
-        self.parent_object = kwargs.pop('parent_object', None)
-        self.relation_field_name = kwargs.pop('relation_field_name')
+        self.parent_object = kwargs.pop("parent_object", None)
+        self.relation_field_name = kwargs.pop("relation_field_name")
         super().__init__(*args, **kwargs)
 
     def save(self, commit=True):
@@ -158,6 +193,7 @@ class M2MInlineFormSetMixin:
     """
     Mixin for class-based views based on ModelFormView. Allows to add one additional ModelFormSet to the view.
     """
+
     object = None
     form_class = None
     formset_model = None
@@ -165,7 +201,7 @@ class M2MInlineFormSetMixin:
     formset_form_class = None
     formset_helper_class = None
     formset_factory_kwargs = {}
-    relation_field_name = ''
+    relation_field_name = ""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -176,26 +212,33 @@ class M2MInlineFormSetMixin:
         FormSet = formset_factory(
             self.formset_form_class,
             formset=self.formset_class,
-            **self.formset_factory_kwargs
+            **self.formset_factory_kwargs,
         )
         return FormSet(**self.get_formset_kwargs())
 
     def get_formset_kwargs(self, **kwargs):
-        kwargs.update({
-            'initial': self.get_formset_initial(),
-            'relation_field_name': self.get_relation_field_name()
-        })
+        kwargs.update(
+            {
+                "initial": self.get_formset_initial(),
+                "relation_field_name": self.get_relation_field_name(),
+            }
+        )
         if self.object:
-            kwargs.update({'parent_object': self.object})
+            kwargs.update({"parent_object": self.object})
         if self.request.method in ("POST", "PUT"):
-            kwargs.update({'data': self.request.POST.copy()})
+            kwargs.update({"data": self.request.POST.copy()})
         return kwargs
 
     def get_formset_initial(self):
         if self.object:
             related_objects = getattr(self.object, self.relation_field_name).all()
-            return [{name: getattr(obj, name) for name, _ in self.formset_form_class.base_fields.items()} for obj in
-                    related_objects]
+            return [
+                {
+                    name: getattr(obj, name)
+                    for name, _ in self.formset_form_class.base_fields.items()
+                }
+                for obj in related_objects
+            ]
         else:
             return []
 
@@ -208,23 +251,23 @@ class M2MInlineFormSetMixin:
     def get_relation_field_name(self):
         if not hasattr(self.model, self.relation_field_name):
             raise ImproperlyConfigured(
-                '%(rfn)s is not a valid relational field name of model %(cls)s'
-                % {'rfn': self.relation_field_name, 'cls': self.model.__name__}
+                "%(rfn)s is not a valid relational field name of model %(cls)s"
+                % {"rfn": self.relation_field_name, "cls": self.model.__name__}
             )
         return self.relation_field_name
 
     def get_context_data(self, **kwargs):
-        if 'formset' not in kwargs:
-            kwargs['formset'] = self.get_formset()
-        kwargs['formset_helper'] = self.formset_helper_class
+        if "formset" not in kwargs:
+            kwargs["formset"] = self.get_formset()
+        kwargs["formset_helper"] = self.formset_helper_class
         return super().get_context_data(**kwargs)
 
 
 class M2MInlineModelFormSet(BaseModelFormSet):
 
     def __init__(self, *args, **kwargs):
-        self.parent_object = kwargs.pop('parent_object', None)
-        self.relation_field_name = kwargs.pop('relation_field_name', None)
+        self.parent_object = kwargs.pop("parent_object", None)
+        self.relation_field_name = kwargs.pop("relation_field_name", None)
         super().__init__(*args, **kwargs)
 
 
@@ -232,29 +275,30 @@ class M2MInlineModelFormSetMixin:
     """
     Mixin for class-based views based on ModelFormView. Allows to add one additional ModelFormSet to the view.
     """
+
     object = None
     formset_model = None
     formset_class = M2MInlineModelFormSet
     formset_form_class = SimpleModelForm
     formset_factory_kwargs = {}
     formset_helper_class = None
-    relation_field_name = ''
+    relation_field_name = ""
 
     def get_formset(self, **kwargs):
         FormSet = modelformset_factory(
             self.formset_model,
             form=self.formset_form_class,
             formset=self.formset_class,
-            **self.formset_factory_kwargs
+            **self.formset_factory_kwargs,
         )
         return FormSet(**self.get_formset_kwargs())
 
     def get_formset_kwargs(self, **kwargs):
-        kwargs.update({'queryset': self.get_formset_queryset()})
+        kwargs.update({"queryset": self.get_formset_queryset()})
         if self.object:
-            kwargs.update({'parent_object': self.object})
+            kwargs.update({"parent_object": self.object})
         if self.request.method in ("POST", "PUT"):
-            kwargs.update({'data': self.request.POST.copy()})
+            kwargs.update({"data": self.request.POST.copy()})
         return kwargs
 
     def get_formset_queryset(self):
@@ -274,7 +318,7 @@ class M2MInlineModelFormSetMixin:
             return self.formset_class.helper
 
     def get_context_data(self, **kwargs):
-        if 'formset' not in kwargs:
-            kwargs['formset'] = self.get_formset()
-            kwargs['formset_helper'] = self.get_formset_helper_class()()
+        if "formset" not in kwargs:
+            kwargs["formset"] = self.get_formset()
+            kwargs["formset_helper"] = self.get_formset_helper_class()()
         return super().get_context_data(**kwargs)

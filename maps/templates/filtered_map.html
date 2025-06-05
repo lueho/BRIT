@@ -14,7 +14,7 @@
 
 {% block content %}
 <div class="row">
-    <div class="col">
+    <div class="col-md-9">
         {% block map_content %}
         {% leaflet_js %}
         {% leaflet_css %}
@@ -23,7 +23,7 @@
             <div class="card-header"><b>
                     {% block map_card_header %}{{ map_title }}{% endblock %}
                 </b></div>
-            <div class="card-body p-0 vh-75" style="position: relative;">
+            <div class="card-body p-0 vh-100" style="position: relative;">
                 <div id="map-overlay" style="display: none">
                     <div class="overlay-content">
                         <p>
@@ -102,7 +102,7 @@
         {% endblock map_content %}
     </div>
 
-    <div class="col-sm-3">
+    <div class="col-md-3">
         {% block user_actions %}
         <div class="accordion">
             {% block filter_form_card %}
@@ -114,7 +114,7 @@
                 <div class="card-body collapse show" id="filter-card-body">
 
                     {% block filter_form %}
-                    <form method="GET">
+                    <form method="get">
                         {% crispy filter.form %}
                     </form>
                     {% endblock filter_form %}
@@ -164,10 +164,10 @@
 {% block javascript %}
 {{ block.super }}
 {# For filters that use forms with autocomplete fields, the inclusion of form media is suppressed #}
-{# by the form helper. It needs to be included after loading jquery.js and before select2-bootstrap4.css #}
+{# by the form helper. It needs to be included after loading jquery.js and before select2-bootstrap5-theme.css #}
 {# See AutoCompleteMixin class in utils/forms.#}
 {{ filter.form.media }}
-<link rel="stylesheet" href="{% static 'lib/select2-bootstrap-theme/select2-bootstrap4.min.css' %}">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css">
 <script src="{% static 'js/filter_utils.min.js' %}"></script>
 <script src="{% static 'js/maps.js' %}"></script>
 

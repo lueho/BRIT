@@ -41,7 +41,7 @@
                                     </td>
                                     <td data-label="Actions">
                                         <div class="dropdown">
-                                            <button class="btn btn-sm btn-secondary dropdown-toggle" type="button" data-toggle="dropdown" aria-expanded="false">⋮</button>
+                                            <button class="btn btn-sm btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-container="body" aria-expanded="false">⋮</button>
                                             <div class="dropdown-menu">
                                                 <a class="dropdown-item" href="{{ item.get_absolute_url }}">View</a>
                                                 <!-- More actions can go here -->
@@ -84,8 +84,8 @@
                     {% block list_card_footer %}
                     {% block list_card_navigation_dropdown %}
                     <div class="dropdown">
-                        <button class="btn btn-secondary dropdown-toggle mr-3" type="button" id="navigateDropdown"
-                            data-toggle="dropdown" aria-expanded="false">
+                        <button class="btn btn-secondary dropdown-toggle me-3" type="button" id="navigateDropdown"
+                            data-bs-toggle="dropdown" aria-expanded="false">
                             Navigate
                         </button>
                         <div class="dropdown-menu" aria-labelledby="navigateDropdown">
@@ -118,8 +118,8 @@
                     {% block list_card_options_dropdown %}
                     {% if user.is_authenticated %}
                     <div class="dropdown">
-                        <button class="btn btn-secondary dropdown-toggle mr-3" type="button" id="optionsDropdown"
-                            data-toggle="dropdown" aria-expanded="false">
+                        <button class="btn btn-secondary dropdown-toggle me-3" type="button" id="optionsDropdown"
+                            data-bs-toggle="dropdown" aria-expanded="false">
                             Options
                         </button>
                         <div class="dropdown-menu" aria-labelledby="optionsDropdown">
@@ -145,7 +145,7 @@
         <div class="col-lg-4 order-1 order-lg-2">
             {% block filter_column %}
             <div class="card shadow">
-                <div class="card-header" id="filterFormHeading" data-toggle="collapse" data-target="#filterForm"
+                <div class="card-header" id="filterFormHeading" data-bs-toggle="collapse" data-bs-target="#filterForm"
                     aria-expanded="true" aria-controls="filterForm">
                     {% block filter_header %}<strong>Filter</strong>{% endblock %}
                     <span class="arrow" aria-hidden="true"></span>
@@ -175,6 +175,6 @@
 {% block javascript %}
 {{ block.super }}
 {{ filter.form.media }}
-<link href="{% static 'lib/select2-bootstrap-theme/select2-bootstrap4.min.css' %}" rel="stylesheet">
+<link rel="stylesheet" href="https://unpkg.com/select2-bootstrap-5-theme/dist/select2-bootstrap-5-theme.min.css">
 <script src="{% static 'js/filter_utils.min.js' %}" type="text/javascript"></script>
 {% endblock %}

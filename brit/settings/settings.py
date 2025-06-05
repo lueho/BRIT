@@ -30,8 +30,9 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
     "django.contrib.sitemaps",
-    "crispy_bootstrap4",
-    "fontawesomefree",
+    "crispy_forms",
+    "bootstrap_modal_forms",
+    "crispy_bootstrap5",
     "django.contrib.gis",
     "extra_views",
     "rest_framework",
@@ -61,8 +62,6 @@ INSTALLED_APPS = [
     "utils.object_management.apps.ObjectManagementConfig",
     "django.forms",
     "django_filters",
-    "crispy_forms",
-    "bootstrap_modal_forms",
     "debug_toolbar",
 ]
 
@@ -188,6 +187,7 @@ AWS_S3_CUSTOM_DOMAIN = f"{AWS_STORAGE_BUCKET_NAME}.s3.amazonaws.com"
 AWS_S3_USE_SSL = True
 AWS_S3_OBJECT_PARAMETERS = {"CacheControl": "max-age=2592000"}
 
+
 MEDIAFILES_LOCATION = "media"
 MEDIA_URL = f"https://{AWS_S3_CUSTOM_DOMAIN}/{MEDIAFILES_LOCATION}/"
 
@@ -233,7 +233,10 @@ ADMINS = [(os.environ.get("ADMIN_NAME"), os.environ.get("ADMIN_EMAIL"))]
 # Additional packages settings
 GOOGLE_ANALYTICS_KEY = os.environ.get("GOOGLE_ANALYTICS_KEY")
 
-CRISPY_TEMPLATE_PACK = "bootstrap4"
+CRISPY_ALLOWED_TEMPLATE_PACKS = ("bootstrap5",)
+CRISPY_TEMPLATE_PACK = "bootstrap5"
+
+SELECT2_THEME = "bootstrap-5"
 
 COOKIE_CONSENT_NAME = "cookie_consent"
 

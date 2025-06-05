@@ -1,0 +1,48 @@
+# Task: Bootstrap 4 to 5 Migration
+
+## Checklist
+- [x] Audit Bootstrap 4 class usage in markup templates
+  - Located in templates:
+    - `brit/templates/partials/_footer.html`: `col-md-4 mb-4 mb-md-0` (×2)
+    - `brit/templates/learning.html`: `col col-12 col-md-6 mb-4`, `col col-12 col-md-6 col-lg-3 mb-4`
+    - `brit/templates/home.html`: `col col-12 col-md-6 mb-4`, `col-12 col-lg-7 col-xl-6 order-2 order-lg-1`, `col-12 col-lg-7 col-xl-6 order-1 order-lg-2`, `col col-12 col-md-6 col-lg-3 mb-4`
+    - `brit/templates/filtered_list.html`: `col-lg-8 order-2 order-lg-1`, `col-lg-4 order-1 order-lg-2`
+    - `brit/templates/cookie_consent/cookiegroup_list.html`: `col col-12 col-md-6 col-lg-3 mt-4`
+    - `brit/templates/base_single_card.html`: `card-deck  col-xs-12 col-sm-10 col-md-8 col-lg-6 col-xl-4`
+- [ ] Audit Bootstrap 4 usage in dependencies
+  - identified relevant depencendies:
+    - `django-bootstrap-modal-forms==3.0.5`
+    - `django-bootstrap4==2024.10`
+    - `django-crispy-forms==2.3`
+- [x] Update HTML markup for grid, utilities, and component changes
+  - Files updated: base_single_card.html, filtered_list.html, partials/_topbar.html, simple_list_card.html, simple_detail_card.html, cookie_consent/_cookie_group.html
+- [x] Update SCSS imports to Bootstrap 5 and adjust custom overrides
+  - Files updated: static/scss/sb-admin-2.scss
+- [ ] Remove sb-admin-2/Bootstrap 4 CSS and SCSS imports
+- [ ] Update JS initialization for Bootstrap 5 plugins (Popper, dropdowns, modals)
+- [ ] Test UI components and layouts across breakpoints
+  - [ ] Specifically review custom dropdown styling in `_dropdowns.scss` for redundancy against Bootstrap 5 defaults and variables.
+  - [ ] Review custom border utilities in `utilities/_border.scss` (e.g., `.border-left-primary`) for usage frequency, consistency with BS5 border width scale, and the necessity of `!important`.
+  - [ ] Review custom text size utilities `.text-xs` and `.text-lg` in `utilities/_text.scss` for potential integration into Bootstrap's `$font-sizes` map.
+  - [ ] During UI/accessibility testing, review the `a:focus { outline: none; }` style in `_global.scss` to ensure it doesn't negatively impact accessibility or Bootstrap's intended focus indicators.
+  - [ ] Long-term: Consider refactoring the `#wrapper`/`#content-wrapper` layout structure from `_global.scss` as part of phasing out sb-admin-2 theme remnants.
+  - [ ] Test layouts thoroughly, especially on smaller screens, after changes to `_containers.scss` (custom padding/gutters commented out). Adopt Bootstrap 5 responsive gutter utilities (e.g., `.g-1`, `.gx-sm-2`) where specific gutter widths are needed, instead of global overrides.
+  - [ ] Review `.badge-counter` styling in `navs/_global.scss`; consider if Bootstrap 5 positioning utilities could simplify its implementation while retaining the desired appearance (especially the `transform: scale(0.7)`).
+  - [ ] In HTML templates, ensure instances of `.navbar-nav.ml-auto` within the topbar are updated to `.navbar-nav.ms-auto` to align with Bootstrap 5 and the updated `navs/_topbar.scss` styles.
+  - [ ] During UI/accessibility testing, review `outline: none` styles for `.nav-item:focus` and `.nav-link:focus` in `navs/_topbar.scss`.
+  - [ ] In HTML templates, ensure sidebar accordion elements update `data-toggle="collapse"` to `data-bs-toggle="collapse"` to match changes in `navs/_sidebar.scss`.
+  - [ ] During UI/accessibility testing, review `outline: none` style for `#sidebarToggle:focus` in `navs/_sidebar.scss`.
+  - [ ] Verify usage of `.custom-checkbox` in login/authentication page templates. If Bootstrap 5's `.form-check` is used, remove or adapt the `.custom-checkbox.small` styles in `_login.scss`. If `.custom-checkbox` is still used, plan for HTML update to `.form-check`.
+  - [ ] Scan templates for `data-bs-toggle="tooltip"` or `data-bs-toggle="popover"`. If found, ensure they are initialized in JavaScript (e.g., in `sb-admin-2.js` or a dedicated script snippet), as Bootstrap 5 requires manual initialization for these components.
+  - [!] **Missing File**: `jquery.bootstrap.modal.forms.js` (referenced in `base.html` via `{% static 'js/jquery.bootstrap.modal.forms.js' %}`) was not found in `brit/static/js/`. Investigate its source (Django app? Manual file?) and restore it.
+  - [X] ~~Missing File~~: `jquery.bootstrap.modal.forms.js` is from `django-bootstrap-modal-forms`. For BS5, use `bootstrap5.modal.forms.min.js`.
+  - [X] Updated `base.html` and `base_iframe.html` to load `{% static 'js/bootstrap5.modal.forms.min.js' %}`.
+  - [X] **Locate and update `django-bootstrap-modal-forms` JavaScript initialization calls** from the BS4 jQuery style (`$('#el').modalForm(...)`) to the BS5 vanilla JS style (`modalForm(document.getElementById('el'), ...)`). Updated inline script in `base.html`.
+- [ ] Update documentation referencing Bootstrap 4 in docs/
+- [ ] Run tests and fix any regressions
+- [ ] Clean up obsolete Bootstrap 4 code and assets
+
+## Context
+- Current: project uses Bootstrap 4 and sb-admin-2 theme
+- Goal: migrate fully to Bootstrap 5 and custom design system
+- SCSS modules and Live Sass Compiler in use; no npm or Node.js

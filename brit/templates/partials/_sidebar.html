@@ -1,118 +1,54 @@
-{% load static %}
-
-<ul class="navbar-nav sidebar sidebar-light accordion" id="accordionSidebar">
-    <!-- Sidebar - Brand -->
-    <a class="sidebar-brand d-flex align-items-center justify-content-center mx-0" href="{% url 'home' %}">
-        {#        <img class="sidebar-brand-icon img-fluid" src="{% static 'img/LOGO_Flexibi_Farbe.png' %}" alt="Flexibi logo">#}
-    </a>
-
-    <!-- Divider -->
-    <hr class="sidebar-divider my-0">
-
-    <!-- Nav Item - Dashboard -->
-    <li class="nav-item {% if request.path == '/' or request.path == '/home/' %}active{% endif %}">
-        <a class="nav-link" href="{% url 'home' %}">
-            <i class="fas fa-fw fa-tachometer-alt"></i>
-            <span>Start</span>
-        </a>
-    </li>
-
-    <!-- Divider -->
-    <hr class="sidebar-divider">
-
-    <!-- Heading -->
-    <div class="sidebar-heading">
-        Tools
+<nav class="sb-sidenav accordion sb-sidenav-light" id="sidenavAccordion">
+    <div class="sb-sidenav-menu">
+        <div class="nav">
+            <a class="nav-link" href="{% url 'home' %}">
+                <div class="sb-nav-link-icon"><i class="fas fa-tachometer-alt"></i></div>
+                Home
+            </a>
+            <div class="sb-sidenav-menu-heading">Tools</div>
+            <a class="nav-link {% if '/maps/' in request.path %}active{% endif %}" href="{% url 'maps_list' %}">
+                <div class="sb-nav-link-icon"><i class="fas fa-globe-europe"></i></div>
+                Maps
+            </a>
+            <a class="nav-link {% if '/materials/' in request.path %}active{% endif %}" href="{% url 'sample-list-featured' %}">
+                <div class="sb-nav-link-icon"><i class="fas fa-leaf"></i></div>
+                Materials
+            </a>
+            <a class="nav-link {% if '/sources/' in request.path %}active{% endif %}" href="{% url 'sources-list' %}">
+                <div class="sb-nav-link-icon"><i class="fas fa-expand-arrows-alt"></i></div>
+                Sources
+            </a>
+            {% if perms.processes.access_app_feature %}
+            <a class="nav-link {% if '/processes/' in request.path %}active{% endif %}" href="{% url 'processes:dashboard' %}">
+                <div class="sb-nav-link-icon"><i class="fas fa-flask"></i></div>
+                Processes
+            </a>
+            {% endif %}
+            <a class="nav-link {% if '/inventories/' in request.path %}active{% endif %}" href="{% url 'scenario-list' %}">
+                <div class="sb-nav-link-icon"><i class="fas fa-chart-bar"></i></div>
+                Inventories
+            </a>
+            <a class="nav-link {% if '/bibliography/' in request.path %}active{% endif %}" href="{% url 'source-list' %}">
+                <div class="sb-nav-link-icon"><i class="fas fa-book"></i></div>
+                Bibliography
+            </a>
+            <div class="sb-sidenav-menu-heading">Sites</div>
+            <a class="nav-link {% if '/learning/' in request.path %}active{% endif %}" href="{% url 'learning' %}">
+                <div class="sb-nav-link-icon"><i class="fas fa-graduation-cap"></i></div>
+                Learning
+            </a>
+            <a class="nav-link {% if '/about/' in request.path %}active{% endif %}" href="{% url 'about' %}">
+                <div class="sb-nav-link-icon"><i class="fas fa-info-circle"></i></div>
+                About
+            </a>
+            <a class="nav-link {% if '/privacy_policy/' in request.path %}active{% endif %}" href="{% url 'privacypolicy' %}">
+                <div class="sb-nav-link-icon"><i class="fas fa-shield-alt"></i></div>
+                Privacy Policy
+            </a>
+        </div>
     </div>
-
-    <!-- Maps -->
-    <li class="nav-item {% if '/maps/' in request.path %}active{% endif %}">
-        <a class="nav-link" href="{% url 'maps_list' %}">
-            <i class="fas fa-fw fa-globe-europe"></i>
-            <span>Maps</span>
-        </a>
-    </li>
-
-    <!-- Materials -->
-    <li class="nav-item {% if '/materials/' in request.path %}active{% endif %}">
-        <a class="nav-link" href="{% url 'sample-list-featured' %}">
-            <i class="fas fa-fw fa-leaf"></i>
-            <span>Materials</span>
-        </a>
-    </li>
-
-    <!-- Sources -->
-    <li class="nav-item {% if '/sources/' in request.path %}active{% endif %}">
-        <a class="nav-link" href="{% url 'sources-list' %}">
-            <i class="fas fa-fw fa-expand-arrows-alt"></i>
-            <span>Sources</span>
-        </a>
-    </li>
-
-    <!-- Processes Dashboard -->
-    {% if perms.processes.access_app_feature %}
-    <li class="nav-item {% if '/processes/' in request.path %}active{% endif %}">
-        <a class="nav-link" href="{% url 'processes:dashboard' %}">
-            <i class="fas fa-fw fa-flask"></i>
-            <span>Processes</span>
-        </a>
-    </li>
-    {% endif %}
-
-    <!-- Inventories -->
-    <li class="nav-item {% if '/inventories/' in request.path %}active{% endif %}">
-        <a class="nav-link" href="{% url 'scenario-list' %}">
-            <i class="fas fa-fw fa-chart-bar"></i>
-            <span>Inventories</span>
-        </a>
-    </li>
-
-    <!-- Bibliography -->
-    <li class="nav-item {% if '/bibliography/' in request.path %}active{% endif %}">
-        <a class="nav-link" href="{% url 'source-list' %}">
-            <i class="fas fa-fw fa-book"></i>
-            <span>Bibliography</span>
-        </a>
-    </li>
-
-    <!-- Divider -->
-    <hr class="sidebar-divider">
-
-    <!-- Heading -->
-    <div class="sidebar-heading">
-        Sites
+    <div class="sb-sidenav-footer">
+        <div class="small">Logged in as:</div>
+        Start Bootstrap
     </div>
-
-    <!-- Learning -->
-    <li class="nav-item {% if '/learning/' in request.path %}active{% endif %}">
-        <a class="nav-link" href="{% url 'learning' %}">
-            <i class="fas fa-fw fa-graduation-cap"></i>
-            <span>Learning</span>
-        </a>
-    </li>
-
-    <!-- About -->
-    <li class="nav-item {% if '/about/' in request.path %}active{% endif %}">
-        <a class="nav-link" href="{% url 'about' %}">
-            <i class="fas fa-fw fa-info-circle"></i>
-            <span>About</span>
-        </a>
-    </li>
-
-    <!-- Privacy Policy -->
-    <li class="nav-item {% if '/privacy_policy/' in request.path %}active{% endif %}">
-        <a class="nav-link" href="{% url 'privacypolicy' %}">
-            <i class="fas fa-fw fa-user-shield"></i>
-            <span>Privacy Policy</span>
-        </a>
-    </li>
-
-    <!-- Divider -->
-    <hr class="sidebar-divider d-none d-md-block">
-
-    <!-- Sidebar Toggler (Sidebar) -->
-    <div class="text-center d-none d-md-inline">
-        <button class="rounded-circle border-0" id="sidebarToggle"></button>
-    </div>
-</ul>
-<!-- End of Sidebar -->
+</nav>

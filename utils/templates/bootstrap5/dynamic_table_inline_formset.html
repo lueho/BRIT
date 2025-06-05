@@ -1,0 +1,73 @@
+{% load crispy_forms_tags %}
+{% load crispy_forms_utils %}
+{% load crispy_forms_field %}
+{% load crispy_forms_filters %}
+
+{% specialspaceless %}
+    {% if formset_tag %}
+        <form {{ flat_attrs|safe }} method="{{ form_method }}" {% if formset.is_multipart %}
+                                    enctype="multipart/form-data"{% endif %}>
+    {% endif %}
+{% if formset_method|lower == 'post' and not disable_csrf %}
+    {% csrf_token %}
+{% endif %}
+
+<div>
+    {{ formset.management_form|crispy }}
+</div>
+
+<table{% if form_id %} id="{{ form_id }}_table"{% endif %} class="table table-sm table-borderless">
+    <thead>
+    {% if formset.readonly and not formset.queryset.exists %}
+    {% else %}
+        <tr>
+            {% for field in formset.empty_form %}
+                {% if field.label and not field.is_hidden %}
+                    <th for="{{ field.auto_id }}"
+                        class="col-form-label {% if field.field.required %}requiredField{% endif %}">
+                        {{ field.label|safe }}{% if field.field.required and not field|is_checkbox %}
+                            <span class="asteriskField">*</span>{% endif %}
+                    </th>
+                {% endif %}
+            {% endfor %}
+        </tr>
+    {% endif %}
+    </thead>
+
+    <tbody id="formset-container">
+
+    <tr id="empty-form-row" class="d-none">
+        {% for field in formset.empty_form %}
+            {% include 'bootstrap5/field.html' with tag="td" form_show_labels=False %}
+        {% endfor %}
+    </tr>
+    {% for form in formset %}
+        {% if form_show_errors and not form.is_extra %}
+            {% include "bootstrap5/errors.html" %}
+        {% endif %}
+        <tr class="formset-form-row">
+            {% for field in form %}
+                {% include 'bootstrap5/field.html' with tag="td" form_show_labels=False %}
+            {% endfor %}
+        </tr>
+    {% endfor %}
+    </tbody>
+    <tfoot>
+    <tr>
+        <td>
+            <a href="javascript:void(0)"
+               id="add-form"
+               title="Add another form">
+                <i class="fas fa-fw fa-plus"></i>
+            </a>
+        </td>
+    </tr>
+    </tfoot>
+</table>
+
+{% include "bootstrap5/errors_formset.html" %}
+
+{% include "bootstrap5/inputs.html" %}
+
+{% if formset_tag %}</form>{% endif %}
+{% endspecialspaceless %}

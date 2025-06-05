@@ -1,0 +1,60 @@
+// Global component styles
+
+html {
+  position: relative;
+  min-height: 100%;
+}
+
+body {
+  height: 100%;
+}
+
+a {
+  &:focus {
+    outline: none;
+  }
+}
+
+// Main page wrapper
+#wrapper {
+  display: flex;
+  flex-direction: row; // Explicitly set horizontal layout
+
+  #content-wrapper {
+    background-color: $gray-100;
+    flex-grow: 1; // Allow content wrapper to take available space
+    overflow-x: hidden;
+    // min-width: 0; // Potentially add if content inside #content-wrapper is too wide and breaks layout
+
+    #content {
+      flex: 1 0 auto;
+    }
+  }
+}
+
+// Scroll to top button
+.scroll-to-top {
+  position: fixed;
+  right: 1rem;
+  bottom: 1rem;
+  display: none;
+  width: 2.75rem;
+  height: 2.75rem;
+  text-align: center;
+  color: $white;
+  background: fade-out($gray-800, .5);
+  line-height: 46px;
+
+  &:focus,
+  &:hover {
+    color: white;
+  }
+
+  &:hover {
+    background: $gray-800;
+  }
+
+  i {
+    font-weight: 800;
+  }
+}

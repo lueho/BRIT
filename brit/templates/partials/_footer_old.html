@@ -1,0 +1,57 @@
+{% load static %}
+<footer class="sticky-footer bg-white">
+    <div class="container my-auto">
+        <div class="row">
+            <div class="col-md-4 mb-4 mb-md-0">
+                <div class="text-center text-md-left">
+                    <h5 class="text-primary mb-3">BRIT</h5>
+                    <p class="small text-gray-600">
+                        The Bioresource Information Tool (BRIT) provides information about sources, quantities and
+                        properties of residue-based bioresources. It is an open source, open data tool hosted by the
+                        Hamburg University of Technology.
+                    </p>
+                </div>
+            </div>
+            <div class="col-md-4 mb-4 mb-md-0">
+                <div class="text-center">
+                    <h5 class="text-primary mb-3">Quick Links</h5>
+                    <ul class="list-unstyled">
+                        <li class="mb-2"><a href="{% url 'home' %}" class="text-gray-600 hover-primary">Home</a></li>
+                        <li class="mb-2"><a href="{% url 'maps_list' %}" class="text-gray-600 hover-primary">Maps</a>
+                        </li>
+                        <li class="mb-2"><a href="{% url 'sample-list-featured' %}" class="text-gray-600 hover-primary">Materials</a>
+                        </li>
+                        <li class="mb-2"><a href="{% url 'about' %}" class="text-gray-600 hover-primary">About</a></li>
+                    </ul>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="text-center text-md-right">
+                    <h5 class="text-primary mb-3">Contact</h5>
+                    <p class="small text-gray-600">
+                        <a href="mailto:info@bioresource-tools.net" class="text-gray-600 hover-primary">
+                            <i class="fas fa-envelope mr-2"></i>info@bioresource-tools.net
+                        </a>
+                    </p>
+                    <div class="mt-3">
+                        <a href="https://www.tuhh.de/aww/en/research/biem" target="_blank" class="text-gray-600 hover-primary mr-3">
+                            <i class="fas fa-university fa-lg"></i>
+                        </a>
+                        <a href="https://github.com/lueho/BRIT" target="_blank"
+                           class="text-gray-600 hover-primary mr-3">
+                            <i class="fab fa-github fa-lg"></i>
+                        </a>
+{#                        <a href="https://www.linkedin.com" target="_blank" class="text-gray-600 hover-primary">#}
+{#                            <i class="fab fa-linkedin fa-lg"></i>#}
+{#                        </a>#}
+                    </div>
+                </div>
+            </div>
+        </div>
+        <hr class="my-4">
+        <div class="copyright text-center my-auto">
+            <span>Copyright &copy; BRIT 2025 | <a href="{% url 'privacypolicy' %}" class="text-gray-600 hover-primary">Privacy Policy</a> | <a
+                    href="{% url 'about' %}" class="text-gray-600 hover-primary">Imprint</a></span>
+        </div>
+    </div>
+</footer>

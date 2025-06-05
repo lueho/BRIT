@@ -62,9 +62,9 @@
                     {% block list_card_footer %}
                         {% block list_card_navigation_dropdown %}
                             <div class="dropdown">
-                                <button class="btn btn-secondary dropdown-toggle mr-3" type="button"
+                                <button class="btn btn-secondary dropdown-toggle me-3" type="button"
                                         id="navigateDropdown"
-                                        data-toggle="dropdown" aria-expanded="false">
+                                        data-bs-toggle="dropdown" aria-expanded="false">
                                     Navigate
                                 </button>
                                 <div class="dropdown-menu" aria-labelledby="navigateDropdown">
@@ -98,9 +98,9 @@
                         {% block list_card_options_dropdown %}
                             {% if user.is_authenticated %}
                                 <div class="dropdown">
-                                    <button class="btn btn-secondary dropdown-toggle mr-3" type="button"
+                                    <button class="btn btn-secondary dropdown-toggle me-3" type="button"
                                             id="optionsDropdown"
-                                            data-toggle="dropdown" aria-expanded="false">
+                                            data-bs-toggle="dropdown" aria-expanded="false">
                                         Options
                                     </button>
                                     <div class="dropdown-menu" aria-labelledby="optionsDropdown">

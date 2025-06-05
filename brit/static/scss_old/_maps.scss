@@ -1,0 +1,19 @@
+// SCSS for Leaflet Overrides
+
+// Adjust zoom control size to be more compact
+.leaflet-control-zoom a,
+.leaflet-control-zoom button {
+  // Also target button element if Leaflet uses it
+  font-size: 1.1rem !important; // Reduce font size, !important might be needed to override BS5
+  width: 28px !important; // Reduce width
+  height: 28px !important; // Reduce height
+  line-height: 28px !important; // Adjust line height accordingly
+}
+
+// You can add more specific Leaflet overrides here as needed, for example:
+// .leaflet-popup-content-wrapper {
+//   font-size: 0.9rem;
+// }
+// .leaflet-tooltip {
+//   font-size: 0.85rem;
+// }
