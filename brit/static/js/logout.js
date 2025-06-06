@@ -5,13 +5,14 @@ document.addEventListener("DOMContentLoaded", function () {
 
     if (logoutLink) {
         logoutLink.addEventListener('click', function (event) {
-            event.preventDefault(); // Prevent the default link behavior
+            event.preventDefault();
 
-            // Make an AJAX POST request to log the user out
-            fetch("{% url 'auth_logout' %}", {
+            const url = logoutLink.dataset.logoutUrl;
+            const csrfToken = logoutLink.dataset.csrfToken || logoutLink.dataset.csrfToken;
+            fetch(url, {
                 method: "POST",
                 headers: {
-                    'X-CSRFToken': '{{ csrf_token }}',
+                    'X-CSRFToken': csrfToken,
                 }
             }).then(response => {
                 if (response.ok) {
