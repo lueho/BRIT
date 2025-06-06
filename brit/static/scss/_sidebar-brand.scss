@@ -1,0 +1,81 @@
+// 
+// Custom Sidebar Brand Styling
+//
+
+// Sidebar background using Deep Pine with a subtle gradient for depth
+.sidebar {
+  background: linear-gradient(180deg, $success 0%, darken($success, 5%) 100%);
+
+  .nav-item {
+
+    // Lighter text for better contrast on dark background
+    .nav-link {
+      color: rgba(255, 255, 255, 0.9);
+
+      i {
+        color: rgba(255, 255, 255, 0.6);
+      }
+
+      &:hover,
+      &:focus {
+        color: #fff;
+
+        i {
+          color: #fff;
+        }
+      }
+
+      &.active {
+        color: #fff;
+        background-color: rgba($secondary, 0.2);
+        border-left: 4px solid $secondary;
+
+        i {
+          color: #fff;
+        }
+      }
+    }
+  }
+
+  // Brand styling for the sidebar header
+  .sidebar-brand {
+    background-color: darken($success, 8%);
+
+    .sidebar-brand-icon,
+    .sidebar-brand-text {
+      color: #fff;
+    }
+
+    &:hover {
+      background-color: darken($success, 10%);
+    }
+  }
+
+  // Custom divider color
+  .sidebar-divider {
+    border-top: 1px solid rgba(255, 255, 255, 0.15);
+  }
+
+  // Heading style within sidebar
+  .sidebar-heading {
+    color: $secondary;
+    font-weight: 600;
+    letter-spacing: 0.05rem;
+  }
+
+  // Collapse arrow color
+  .nav-item .nav-link[data-toggle="collapse"]::after {
+    color: rgba(255, 255, 255, 0.5);
+  }
+}
+
+// Toggled state (collapsed sidebar)
+.sidebar.toggled {
+  .nav-item .nav-link {
+    padding: 0.65rem 1rem;
+
+    &.active {
+      border-left: 2px solid $secondary;
+    }
+  }
+}

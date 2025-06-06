@@ -1,0 +1,17 @@
+// 
+// Theme Map Override
+// 
+// This file redefines the Bootstrap theme-colors map after our brand variables are set
+// This ensures all components that use theme-based colors (buttons, alerts, etc.) use our custom palette
+
+// Override the Bootstrap theme-colors map with our custom brand colors
+$theme-colors: (
+  "primary":   $primary,    // Forest Green
+  "secondary": $secondary,  // Sage Green
+  "success":   $success,    // Deep Pine
+  "info":      $info,       // Chestnut
+  "warning":   $warning,    // Rust Orange
+  "danger":    $danger,     // Crimson Red
+  "light":     $light,      // Golden Beige
+  "dark":      $gray-900    // Keep standard dark color
+);

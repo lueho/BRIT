@@ -2,8 +2,21 @@
 // Styles
 // 
 
-// Import Custom Variables
+// Import Custom SB Admin 2 Variables (Overrides Default Bootstrap Variables)
 @import "variables.scss";
+
+// Import Bootstrap functions and variables first
+@import "../lib/bootstrap/scss/functions.scss";
+@import "../lib/bootstrap/scss/variables.scss";
+
+// Import Bootstrap mixins
+@import "../lib/bootstrap/scss/mixins.scss";
+
+// Import Brand Overrides (must come after Bootstrap variables but before Bootstrap components)
+@import "brand-variables.scss";
+
+// Import Theme Map Override (must come after brand variables to use them in the map)
+@import "theme-map-override.scss";
 
 // Import Bootstrap
 @import "../lib/bootstrap/scss/bootstrap.scss";
@@ -23,6 +36,10 @@
 @import "navigation/sidenav/sidenav.scss";
 @import "navigation/sidenav/sidenav-dark.scss";
 @import "navigation/sidenav/sidenav-light.scss";
+
+// Custom Brand Theme Components
+@import "sidebar-brand.scss"; // Enhanced sidebar styling
+@import "component-styles.scss"; // Enhanced card and UI component styling
 
 // Plugins
 @import "plugins/simple-datatables.scss";
