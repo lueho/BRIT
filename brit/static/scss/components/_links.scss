@@ -1,0 +1,11 @@
+// Links
+// Excludes
+// - buttons (.btn)
+// - nav links (.nav-link)
+a:not(.btn):not(.nav-link) {
+  color: $success;
+
+  &:hover {
+    color: darken($success, 10%);
+  }
+}

@@ -1922,7 +1922,6 @@ class WasteCollectionPublishedMapViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(self.url, follow=True)
         self.assertContains(response, "range_slider.min.js")
-        self.assertContains(response, "range_slider.min.css")
 
 
 class CollectionReviewProcessWithPredecessorsTestCase(TestCase):

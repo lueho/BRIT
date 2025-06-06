@@ -1,0 +1,14 @@
+@import "../../lib/bootstrap/scss/variables";
+
+$primary: #4B7156;
+$secondary: #A0C7A6;
+$success: #376046;
+$info: #6B2F1B;
+$warning: #D26A4E;
+$danger: #B03A2E;
+$light: $gray-100;
+$dark: $gray-900;
+
+$btn-link-color: $primary !default;
+// Set form label color to body text color instead of default brown
+$form-label-color: $body-color;

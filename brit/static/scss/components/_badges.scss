@@ -1,0 +1,20 @@
+// Badge styles
+.badge {
+  &.badge-primary {
+    background-color: $primary;
+  }
+
+  &.badge-secondary {
+    background-color: $secondary;
+    color: $success;
+  }
+
+  &.badge-success {
+    background-color: $success;
+  }
+
+  &.badge-warning {
+    background-color: $warning;
+    color: $light;
+  }
+}
