@@ -48,13 +48,8 @@
         </div>
     </div>
     <div class="sb-sidenav-footer">
-        {% if user.is_authenticated %}
-        <div class="small">Logged in as:</div>
-        {{ user.username }}
-        {% else %}
-        <div class="small">Not logged in</div>
-        <a href="{% url 'auth_login' %}">Login</a>
-        <a href="{% url 'registration_register' %}">Register</a>
-        {% endif %}
+        <div class="small">
+            <a href="mailto:info@bioresource-tools.net">Contact / Feedback</a>
+        </div>
     </div>
 </nav>

@@ -1,11 +1,34 @@
-<footer class="py-4 bg-light mt-auto">
+{% load static %}
+<footer class="py-3 bg-light mt-auto">
     <div class="container-fluid px-4">
-        <div class="d-flex align-items-center justify-content-between small">
-            <div class="text-muted">Copyright &copy; Your Website 2021</div>
-            <div>
-                <a href="#">Privacy Policy</a>
-                &middot;
-                <a href="#">Terms &amp; Conditions</a>
+        <div class="row">
+            <div class="col-md-4 mb-3 mb-md-0 text-center text-md-start">
+                <h5 class="text-primary mb-2">Bioresource Information Tool (BRIT)</h5>
+                <p class="small">
+                    Part of the <a href='https://bioresource-tools.net' target='_blank' rel='noopener noreferrer'>Bioresource Tools</a> initiative.
+                </p>
+            </div>
+            <div class="col-md-4 mb-3 mb-md-0 text-center">
+                <h5 class="text-primary mb-2">Navigation & Legal</h5>
+                <ul class="list-unstyled small">
+                    <li class="mb-1 d-lg-inline-block me-lg-3"><a href="{% url 'privacypolicy' %}" class="text-gray-600 hover-primary">Privacy Policy</a></li>
+                    <li class="mb-1 d-lg-inline-block"><a href="{% url 'about' %}" class="text-gray-600 hover-primary">Imprint/About</a></li>
+                </ul>
+            </div>
+            <div class="col-md-4 text-center text-md-end">
+                <h5 class="text-primary mb-2">Related Links</h5>
+                <div class="d-lg-flex justify-content-lg-end align-items-lg-center">
+                    <p class="small mb-lg-0 me-lg-3">
+                        <a href="https://www.tuhh.de/aww/en/research/biem" target="_blank" rel="noopener noreferrer" class="text-gray-600 hover-primary me-2">
+                            <i class="fas fa-university fa-lg"></i> TUHH/BIEM
+                        </a>
+                    </p>
+                    <p class="small mb-lg-0">
+                        <a href="https://github.com/lueho/BRIT" target="_blank" rel="noopener noreferrer" class="text-gray-600 hover-primary">
+                            <i class="fab fa-github fa-lg"></i> BRIT on GitHub
+                        </a>
+                    </p>
+                </div>
             </div>
         </div>
     </div>
