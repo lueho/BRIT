@@ -32,14 +32,6 @@
     <link rel="icon" href="{% static 'img/favicon.ico' %}" type="image/x-icon">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.8.1/nouislider.min.css">
     {% block style_sheets %}{% endblock style_sheets %}
-
-    {% block style %}
-    <!-- Custom inline CSS blocks can go here -->
-    <style type="text/css">
-        /* Page-specific styles */
-    </style>
-    {% endblock style %}
-
 </head>
 
 <body class="sb-nav-fixed">
@@ -51,7 +43,11 @@
         </div>
         <div id="layoutSidenav_content">
             <main>
-                <div class="container-fluid px-4">
+                <div class="container-fluid p-4">
+                    <h1>Bioresource Information Tool</h1>
+                    <ol class="breadcrumb my-4">
+                        <li class="breadcrumb-item active">Breadcrumbs</li>
+                    </ol>
                     {% block content %}{% endblock content %}
                 </div>
             </main>
