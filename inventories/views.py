@@ -57,7 +57,7 @@ class SeasonalDistributionCreateView(LoginRequiredMixin, CreateView):
 
 class ScenarioNameAutocompleteView(AutocompleteModelView):
     model = Scenario
-    field_lookups = ["name"]
+    search_lookups = ["name__icontains"]
     ordering = ["name"]
 
 

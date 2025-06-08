@@ -586,6 +586,8 @@ class CatchmentAutocompleteView(AutocompleteModelView):
     model = Catchment
     search_lookups = ["name__icontains"]
     ordering = ["name"]
+    allow_anonymous = True
+    page_size = 15
 
 
 # ----------- Region Utils ---------------------------------------------------------------------------------------------
