@@ -3,7 +3,6 @@ from django.db import transaction
 from django.forms import BaseInlineFormSet, DateInput
 from django_tomselect.app_settings import PluginClearButton
 from django_tomselect.forms import TomSelectConfig, TomSelectModelChoiceField
-from extra_views import InlineFormSetFactory
 
 from utils.forms import ModalModelFormMixin, SimpleModelForm
 
@@ -152,18 +151,6 @@ class SourceAuthorFormSet(BaseInlineFormSet):
             if author.position != i:
                 author.position = i
                 author.save(update_fields=["position"])
-
-
-class SourceAuthorInline(InlineFormSetFactory):
-    model = SourceAuthor
-    form_class = SourceAuthorForm
-    formset_class = SourceAuthorFormSet
-    fields = ("author",)
-    factory_kwargs = {
-        "extra": 0,
-        "min_num": 1,
-        "can_delete": True,
-    }
 
 
 class SourceSimpleFilterForm(SimpleModelForm):

@@ -9,11 +9,12 @@ from django.forms import (
     ModelChoiceField,
     NumberInput,
     Widget,
+    DateTimeInput,
 )
 from django.forms.models import BaseInlineFormSet
 from django.utils.safestring import mark_safe
 from django_tomselect.app_settings import PluginClearButton, TomSelectConfig
-from django_tomselect.forms import TomSelectModelMultipleChoiceField
+from django_tomselect.forms import TomSelectModelMultipleChoiceField, TomSelectModelChoiceField
 from extra_views import InlineFormSetFactory
 
 from bibliography.models import Source

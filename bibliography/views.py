@@ -30,10 +30,10 @@ from .forms import (
     AuthorModelForm,
     LicenceModalModelForm,
     LicenceModelForm,
-    SourceAuthorInline,
     SourceModalModelForm,
     SourceModelForm,
 )
+from .inlines import SourceAuthorInline
 from .models import SOURCE_TYPES, Author, Licence, Source
 from .serializers import HyperlinkedSourceSerializer
 from .tasks import check_source_url, check_source_urls
@@ -99,6 +99,7 @@ class AuthorModalDeleteView(UserCreatedObjectModalDeleteView):
 
 
 class AuthorAutocompleteView(AutocompleteModelView):
+    allow_anonymous = True
     model = Author
     search_lookups = [
         "last_names__icontains",
@@ -269,6 +270,7 @@ class SourceListCheckUrlsView(PermissionRequiredMixin, View):
 
 
 class SourceAutocompleteView(AutocompleteModelView):
+    allow_anonymous = True
     model = Source
     search_lookups = [
         "title__icontains",
