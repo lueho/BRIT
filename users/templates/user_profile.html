@@ -25,21 +25,3 @@
     </div>
 
 {% endblock card_body %}
-
-{% block javascript %}
-    {{ block.super }}
-
-    <script type="text/javascript">
-        $(document).ready(function () {
-
-            $(".modal-link").each(function () {
-                $(this).modalForm({
-                    formURL: $(this).data()["link"],
-                    errorClass: ".is-invalid"
-                })
-            });
-
-        });
-    </script>
-
-{% endblock javascript %}

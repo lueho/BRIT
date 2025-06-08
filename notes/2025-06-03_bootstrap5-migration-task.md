@@ -18,7 +18,7 @@
   - Files updated: base_single_card.html, filtered_list.html, partials/_topbar.html, simple_list_card.html, simple_detail_card.html, cookie_consent/_cookie_group.html
 - [x] Update SCSS imports to Bootstrap 5 and adjust custom overrides
   - Files updated: static/scss/sb-admin-2.scss
-- [ ] Remove sb-admin-2/Bootstrap 4 CSS and SCSS imports
+- [ ] Remove sb-admin-2/Bootstrap 4 CSS and SCSS imports (including `sb-admin-2.min.js` from `base_iframe.html`)
 - [ ] Update JS initialization for Bootstrap 5 plugins (Popper, dropdowns, modals)
 - [ ] Test UI components and layouts across breakpoints
   - [ ] Specifically review custom dropdown styling in `_dropdowns.scss` for redundancy against Bootstrap 5 defaults and variables.
@@ -40,7 +40,23 @@
   - [X] **Locate and update `django-bootstrap-modal-forms` JavaScript initialization calls** from the BS4 jQuery style (`$('#el').modalForm(...)`) to the BS5 vanilla JS style (`modalForm(document.getElementById('el'), ...)`). Updated inline script in `base.html`.
 - [ ] Update documentation referencing Bootstrap 4 in docs/
 - [ ] Run tests and fix any regressions
+- [ ] Update `bootstrap.bundle.min.js` in `base.html` from v5.1.3 to v5.3.2 (to match CSS and `base_iframe.html`)
 - [ ] Clean up obsolete Bootstrap 4 code and assets
+
+- [ ] Address remaining Bootstrap 4 class usage:
+  - [ ] `card-deck` in `brit/templates/about.html` and `brit/templates/privacy_policy.html`
+  - [ ] `.custom-checkbox` in `brit/static/scss/components/_sliders.scss`
+  - [ ] `form-row` in `utils/templates/widgets/nullable_range_slider.html`
+  - [ ] `form-row` in `utils/templates/bootstrap5/dynamic_table_inline_formset.html` (and associated JS in `materials/templates/materials/composition_form.html`)
+  - [ ] Replace `mr-*` with `me-*` (margin end)
+  - [ ] Replace `ml-*` with `ms-*` (margin start), including `ml-auto` to `ms-auto`
+  - [ ] Replace `pr-*` with `pe-*` (padding end)
+  - [ ] Replace `pl-*` with `ps-*` (padding start)
+  - [ ] Replace `text-left` with `text-start`
+  - [ ] Replace `text-right` with `text-end`
+  - [ ] Replace `float-left` with `float-start`
+  - [ ] Replace `float-right` with `float-end`
+  - [ ] Replace `data-toggle` with `data-bs-toggle` for all components (dropdowns, collapse, tabs, etc.)
 
 ## Context
 - Current: project uses Bootstrap 4 and sb-admin-2 theme

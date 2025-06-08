@@ -155,8 +155,9 @@ function updateUrls(feature_id) {
     try {
         const delete_button = document.getElementById('btn-collection-delete');
         const delete_url = delete_button.dataset.hrefTemplate.replace('__pk__', feature_id.toString()) + '?' + params.toString();
-        $('#btn-collection-delete').modalForm({
-            formURL: delete_url, errorClass: ".is-invalid"
+        modalForm(delete_button, {
+            formURL: delete_url,
+            errorClass: ".is-invalid"
         });
     } catch (error) {
         console.warn(`Delete button not updated: ${error}`);
