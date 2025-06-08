@@ -548,8 +548,6 @@ class CollectionAddPredecessorForm(SimpleModelForm):
     Fields:
     predecessor: A ModelChoiceField that represents the predecessor to be added.
                  The queryset for this field is all Collection instances.
-                 The widget used is ModelSelect2 with 'collection-autocomplete' as the url,
-                 which provides autocomplete functionality.
     """
 
     predecessor = TomSelectModelChoiceField(

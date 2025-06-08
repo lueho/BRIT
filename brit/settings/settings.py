@@ -22,7 +22,6 @@ INSTALLED_APPS = [
     "django.contrib.sites",
     "registration",
     "dal",
-    "dal_select2",
     "django_tomselect",
     "django.contrib.admin",
     "django.contrib.auth",
@@ -238,8 +237,6 @@ GOOGLE_ANALYTICS_KEY = os.environ.get("GOOGLE_ANALYTICS_KEY")
 
 CRISPY_ALLOWED_TEMPLATE_PACKS = ("bootstrap5",)
 CRISPY_TEMPLATE_PACK = "bootstrap5"
-
-SELECT2_THEME = "bootstrap-5"
 
 COOKIE_CONSENT_NAME = "cookie_consent"
 

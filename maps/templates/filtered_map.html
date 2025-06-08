@@ -163,11 +163,6 @@
 
 {% block javascript %}
 {{ block.super }}
-{# For filters that use forms with autocomplete fields, the inclusion of form media is suppressed #}
-{# by the form helper. It needs to be included after loading jquery.js and before select2-bootstrap5-theme.css #}
-{# See AutoCompleteMixin class in utils/forms.#}
-{{ filter.form.media }}
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/select2-bootstrap-5-theme@1.3.0/dist/select2-bootstrap-5-theme.min.css">
 <script src="{% static 'js/filter_utils.min.js' %}"></script>
 <script src="{% static 'js/maps.js' %}"></script>
 
