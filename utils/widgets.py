@@ -4,7 +4,7 @@ from django_filters.widgets import SuffixedMultiWidget
 
 class RangeSliderWidget(SuffixedMultiWidget):
     """
-    A range slider widget that is compatible with django-crispy-forms and jQuery UI range slider.
+    A range slider widget that is compatible with django-crispy-forms.
 
     This widget allows users to select a range of values using a slider interface.
     It renders as two hidden inputs for the minimum and maximum values, with a
