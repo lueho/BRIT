@@ -269,4 +269,10 @@ LEAFLET_CONFIG = {
 
 TOMSELECT = {
     "DEFAULT_CSS_FRAMEWORK": "bootstrap5",
+    "DEFAULT_CONFIG": {
+        "highlight": True,
+        "placeholder": "------",
+        "open_on_focus": True,
+        "preload": "focus",
+    },
 }
