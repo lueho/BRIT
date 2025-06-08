@@ -30,20 +30,20 @@
                             </thead>
                             {% endblock list_table_head %}
                             <tbody>
-                                {% for item in object_list %}
+                                {% for object in object_list %}
                                 {% block list_table_row %}
-                                <tr tabindex="0" onclick="window.location='{{ item.get_absolute_url }}'">
-                                    <td data-label="Name"><a href="{{ item.get_absolute_url }}">{{ item.name }}</a></td>
-                                    <td data-label="Description">{{ item.description }}</td>
+                                <tr tabindex="0" onclick="window.location='{{ object.get_absolute_url }}'">
+                                    <td data-label="Name"><a href="{{ object.get_absolute_url }}">{{ object.name }}</a></td>
+                                    <td data-label="Description">{{ object.description }}</td>
                                     {% if list_type == 'private' %}
                                     <td data-label="Status">
-                                        {% include 'object_management/review_status_badge.html' with object=item %}
+                                        {% include 'object_management/review_status_badge.html' with object=object %}
                                     </td>
                                     <td data-label="Actions">
                                         <div class="dropdown">
                                             <button class="btn btn-sm btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-container="body" aria-expanded="false">⋮</button>
                                             <div class="dropdown-menu">
-                                                <a class="dropdown-item" href="{{ item.get_absolute_url }}">View</a>
+                                                <a class="dropdown-item" href="{{ object.get_absolute_url }}">View</a>
                                                 <!-- More actions can go here -->
                                             </div>
                                         </div>
