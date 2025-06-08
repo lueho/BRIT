@@ -14,12 +14,17 @@ from django.forms import (
     RadioSelect,
 )
 from django.utils.translation import gettext as _
+from django_tomselect.app_settings import PluginClearButton
+from django_tomselect.forms import (
+    TomSelectConfig,
+    TomSelectModelChoiceField,
+    TomSelectModelMultipleChoiceField,
+)
 
 from distributions.models import TemporalDistribution, Timestep
 from materials.models import Material, Sample
 from utils.crispy_fields import ForeignkeyField
 from utils.forms import (
-    AutoCompleteModelForm,
     CreateInlineMixin,
     M2MInlineFormSet,
     ModalModelFormMixin,
@@ -27,14 +32,12 @@ from utils.forms import (
     SimpleModelForm,
 )
 from utils.object_management.models import get_default_owner
-from utils.widgets import BSModelSelect2, BSModelSelect2Multiple
 
 from .models import (
     CONNECTION_TYPE_CHOICES,
     REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES,
     AggregatedCollectionPropertyValue,
     Collection,
-    CollectionCatchment,
     CollectionCountOptions,
     CollectionFrequency,
     CollectionPropertyValue,
@@ -49,10 +52,19 @@ from .models import (
 )
 
 
-class CollectorModelForm(AutoCompleteModelForm):
-    catchment = ModelChoiceField(
-        queryset=CollectionCatchment.objects.all(),
-        widget=BSModelSelect2(url="catchment-autocomplete"),
+class CollectorModelForm(SimpleModelForm):
+    catchment = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="catchment-autocomplete",
+            placeholder="------",
+            highlight=True,
+            label_field="name",
+            open_on_focus=True,
+            plugin_clear_button=PluginClearButton(
+                title="Clear Selection", class_name="clear-button"
+            ),
+        ),
+        label="Catchment",
         required=False,
     )
 
@@ -273,7 +285,21 @@ class BaseWasteFlyerUrlFormSet(M2MInlineFormSet):
         return child_objects
 
 
-class CollectionPropertyValueModelForm(AutoCompleteModelForm):
+class CollectionPropertyValueModelForm(SimpleModelForm):
+    collection = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="collection-autocomplete",
+            placeholder="------",
+            highlight=True,
+            label_field="name",
+            open_on_focus=True,
+            plugin_clear_button=PluginClearButton(
+                title="Clear Selection", class_name="clear-button"
+            ),
+        ),
+        label="Collection",
+    )
+
     class Meta:
         model = CollectionPropertyValue
         fields = (
@@ -284,12 +310,23 @@ class CollectionPropertyValueModelForm(AutoCompleteModelForm):
             "average",
             "standard_deviation",
         )
-        widgets = {
-            "collection": BSModelSelect2(url="collection-autocomplete"),
-        }
 
 
-class AggregatedCollectionPropertyValueModelForm(AutoCompleteModelForm):
+class AggregatedCollectionPropertyValueModelForm(SimpleModelForm):
+    collections = TomSelectModelMultipleChoiceField(
+        config=TomSelectConfig(
+            url="collection-autocomplete",
+            placeholder="------",
+            highlight=True,
+            label_field="name",
+            open_on_focus=True,
+            plugin_clear_button=PluginClearButton(
+                title="Clear Selection", class_name="clear-button"
+            ),
+        ),
+        label="Collections",
+    )
+
     class Meta:
         model = AggregatedCollectionPropertyValue
         fields = (
@@ -300,7 +337,6 @@ class AggregatedCollectionPropertyValueModelForm(AutoCompleteModelForm):
             "average",
             "standard_deviation",
         )
-        widgets = {"collections": BSModelSelect2Multiple(url="collection-autocomplete")}
 
 
 class CollectionModelFormHelper(FormHelper):
@@ -324,19 +360,37 @@ class CollectionModelFormHelper(FormHelper):
     )
 
 
-class CollectionModelForm(CreateInlineMixin, AutoCompleteModelForm):
+class CollectionModelForm(CreateInlineMixin, SimpleModelForm):
     """
     Model form for Collection, including all collection parameters and waste stream fields.
     """
 
-    catchment = ModelChoiceField(
-        queryset=CollectionCatchment.objects.all(),
-        widget=BSModelSelect2(url="catchment-autocomplete"),
+    catchment = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="catchment-autocomplete",
+            placeholder="------",
+            highlight=True,
+            label_field="name",
+            open_on_focus=True,
+            plugin_clear_button=PluginClearButton(
+                title="Clear Selection", class_name="clear-button"
+            ),
+        ),
+        label="Catchment",
         required=True,
     )
-    collector = ModelChoiceField(
-        queryset=Collector.objects.all(),
-        widget=BSModelSelect2(url="collector-autocomplete"),
+    collector = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="collector-autocomplete",
+            placeholder="------",
+            highlight=True,
+            label_field="name",
+            open_on_focus=True,
+            plugin_clear_button=PluginClearButton(
+                title="Clear Selection", class_name="clear-button"
+            ),
+        ),
+        label="Collector",
         required=True,
     )
     collection_system = ModelChoiceField(
@@ -353,9 +407,17 @@ class CollectionModelForm(CreateInlineMixin, AutoCompleteModelForm):
         widget=CheckboxSelectMultiple,
         required=False,
     )
-    frequency = ModelChoiceField(
-        queryset=CollectionFrequency.objects.all(),
-        widget=BSModelSelect2(url="collectionfrequency-autocomplete"),
+    frequency = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="collectionfrequency-autocomplete",
+            placeholder="------",
+            highlight=True,
+            label_field="name",
+            open_on_focus=True,
+            plugin_clear_button=PluginClearButton(
+                title="Clear Selection", class_name="clear-button"
+            ),
+        ),
         required=False,
     )
     fee_system = ModelChoiceField(queryset=FeeSystem.objects.all(), required=False)
@@ -444,9 +506,19 @@ class CollectionModelForm(CreateInlineMixin, AutoCompleteModelForm):
             return super().save(commit=False)
 
 
-class CollectionAddWasteSampleForm(AutoCompleteModelForm):
-    sample = ModelChoiceField(
-        queryset=Sample.objects.all(), widget=BSModelSelect2(url="sample-autocomplete")
+class CollectionAddWasteSampleForm(SimpleModelForm):
+    sample = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="sample-autocomplete",
+            placeholder="------",
+            highlight=True,
+            label_field="name",
+            open_on_focus=True,
+            plugin_clear_button=PluginClearButton(
+                title="Clear Selection", class_name="clear-button"
+            ),
+        ),
+        label="Sample",
     )
 
     class Meta:
@@ -468,7 +540,7 @@ class CollectionRemoveWasteSampleForm(SimpleModelForm):
         )
 
 
-class CollectionAddPredecessorForm(AutoCompleteModelForm):
+class CollectionAddPredecessorForm(SimpleModelForm):
     """
     This form is used to add a predecessor to a Collection instance. A predecessor is a Collection instance that
     was replaced by the current Collection instance.
@@ -480,9 +552,18 @@ class CollectionAddPredecessorForm(AutoCompleteModelForm):
                  which provides autocomplete functionality.
     """
 
-    predecessor = ModelChoiceField(
-        queryset=Collection.objects.all(),
-        widget=BSModelSelect2(url="collection-autocomplete"),
+    predecessor = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="collection-autocomplete",
+            placeholder="------",
+            highlight=True,
+            label_field="name",
+            open_on_focus=True,
+            plugin_clear_button=PluginClearButton(
+                title="Clear Selection", class_name="clear-button"
+            ),
+        ),
+        label="Predecessor",
     )
 
     class Meta:

@@ -1,24 +1,39 @@
-from django_filters import CharFilter, ModelChoiceFilter
+from django_tomselect.app_settings import PluginClearButton, TomSelectConfig
+from django_tomselect.forms import TomSelectModelChoiceField
 
-from maps.models import Catchment
-from utils.filters import CrispyAutocompleteFilterSet
-from utils.widgets import BSListSelect2, BSModelSelect2
+from utils.filters import BaseCrispyFilterSet
+
 from .models import Scenario
 
 
-class ScenarioFilterSet(CrispyAutocompleteFilterSet):
-    name = CharFilter(
-        field_name='name',
-        lookup_expr='icontains',
-        widget=BSListSelect2(url='scenario-name-autocomplete'),
-        label='Scenario Name'
+class ScenarioFilterSet(BaseCrispyFilterSet):
+    name = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="scenario-name-autocomplete",
+            placeholder="------",
+            highlight=True,
+            label_field="name",
+            open_on_focus=True,
+            plugin_clear_button=PluginClearButton(
+                title="Clear Selection", class_name="clear-button"
+            ),
+        ),
+        label="Scenario Name",
     )
-    catchment = ModelChoiceFilter(
-        queryset=Catchment.objects.all(),
-        widget=BSModelSelect2(url='catchment-autocomplete'),
-        label='Catchment'
+    catchment = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="catchment-autocomplete",
+            placeholder="------",
+            highlight=True,
+            label_field="name",
+            open_on_focus=True,
+            plugin_clear_button=PluginClearButton(
+                title="Clear Selection", class_name="clear-button"
+            ),
+        ),
+        label="Catchment",
     )
 
     class Meta:
         model = Scenario
-        fields = ['name', 'catchment']
+        fields = ["name", "catchment"]

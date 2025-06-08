@@ -1,4 +1,3 @@
-from dal import autocomplete
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.gis.geos import MultiPolygon
 from django.core.exceptions import ImproperlyConfigured
@@ -11,6 +10,7 @@ from django.views import View
 from django.views.generic import TemplateView
 from django.views.generic.edit import FormMixin
 from django_filters.views import FilterView
+from django_tomselect.autocompletes import AutocompleteModelView
 from rest_framework.exceptions import NotFound, ParseError
 from rest_framework.views import APIView, Response
 
@@ -582,60 +582,48 @@ class CatchmentModalDeleteView(UserCreatedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CatchmentAutocompleteView(autocomplete.Select2QuerySetView):
-    def get_queryset(self):
-        if self.request.user.is_authenticated:
-            qs = Catchment.objects.filter(
-                Q(owner=self.request.user) | Q(publication_status="published")
-            )
-        else:
-            qs = Catchment.objects.filter(publication_status="published")
-        qs = qs.order_by("name")
-        if self.q:
-            qs = qs.filter(name__icontains=self.q)
-        return qs
+class CatchmentAutocompleteView(AutocompleteModelView):
+    model = Catchment
+    search_lookups = ["name__icontains"]
+    ordering = ["name"]
 
 
 # ----------- Region Utils ---------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class RegionAutocompleteView(autocomplete.Select2QuerySetView):
-    def get_queryset(self):
-        qs = Region.objects.all().order_by("name")
-        if self.q:
-            qs = qs.filter(name__icontains=self.q)
+class RegionAutocompleteView(AutocompleteModelView):
+    model = Region
+    search_lookups = ["name__icontains"]
+    ordering = ["name"]
+
+
+class NutsRegionAutocompleteView(AutocompleteModelView):
+    model = NutsRegion
+    search_lookups = ["name__icontains", "code__icontains"]
+    ordering = ["name"]
+
+    def apply_filters(self, qs):
+        """
+        `filter_by` / `exclude_by` parameters that the widgets add
+        are already honoured by `super().apply_filters(qs)`.
+        Here we add one extra, *static* filter that does not depend
+        on any other field: the level of the NUTS node.
+        """
+        qs = super().apply_filters(qs)
+
+        level = self.request.GET.get("level_code")
+        if level is not None:
+            qs = qs.filter(level_code=level)
+
         return qs
 
 
-class NutsRegionAutocompleteView(autocomplete.Select2QuerySetView):
-    def get_queryset(self):
+class RegionOfLauAutocompleteView(AutocompleteModelView):
+    model = Region
+    search_lookups = ["name__icontains"]
+    ordering = ["name"]
 
-        qs = NutsRegion.objects.all()
-
-        levl_code = self.forwarded.get("levl_code", None)
-        if levl_code is not None:
-            qs = qs.filter(levl_code=levl_code)
-
-        parent = self.forwarded.get("parent", None)
-        if parent:
-            qs = qs.filter(parent_id=parent)
-
-        grandparent = self.forwarded.get("grandparent", None)
-        if grandparent:
-            qs = qs.filter(parent__parent_id=grandparent)
-
-        great_grandparent = self.forwarded.get("great_grandparent", None)
-        if great_grandparent:
-            qs = qs.filter(parent__parent__parent_id=great_grandparent)
-
-        if self.q:
-            qs = qs.filter(name__icontains=self.q)
-
-        return qs.order_by("name")
-
-
-class RegionOfLauAutocompleteView(autocomplete.Select2QuerySetView):
     def get_queryset(self):
         qs = Region.objects.filter(
             pk__in=Subquery(LauRegion.objects.all().values("pk"))

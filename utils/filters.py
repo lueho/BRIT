@@ -1,8 +1,7 @@
 from crispy_forms.helper import FormHelper
-from dal_select2.widgets import Select2WidgetMixin
 from django_filters import FilterSet, RangeFilter
-from utils.fields import NullableRangeField, NullablePercentageRangeField
-from utils.forms import apply_select2_theme
+
+from utils.fields import NullablePercentageRangeField, NullableRangeField
 
 
 class BaseCrispyFilterSet(FilterSet):
@@ -19,16 +18,6 @@ class BaseCrispyFilterSet(FilterSet):
         if not hasattr(form, "helper"):
             form.helper = self.get_form_helper()
         form.helper.form_tag = False
-        return form
-
-
-class CrispyAutocompleteFilterSet(BaseCrispyFilterSet):
-
-    @property
-    def form(self):
-        form = super().form
-        form.helper.include_media = False
-        apply_select2_theme(form)
         return form
 
 

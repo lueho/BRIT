@@ -4,28 +4,26 @@ from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Field, Layout, Row
 from django.core.exceptions import ValidationError
 from django.forms import (
-    DateTimeInput,
     DecimalField,
     HiddenInput,
     ModelChoiceField,
-    ModelMultipleChoiceField,
     NumberInput,
     Widget,
 )
 from django.forms.models import BaseInlineFormSet
 from django.utils.safestring import mark_safe
+from django_tomselect.app_settings import PluginClearButton, TomSelectConfig
+from django_tomselect.forms import TomSelectModelMultipleChoiceField
 from extra_views import InlineFormSetFactory
 
 from bibliography.models import Source
 from distributions.models import TemporalDistribution
 from utils.forms import (
-    AutoCompleteModelForm,
     ModalForm,
     ModalModelForm,
     ModalModelFormMixin,
     SimpleModelForm,
 )
-from utils.widgets import BSModelSelect2, BSModelSelect2Multiple
 
 from .models import (
     AnalyticalMethod,
@@ -104,11 +102,20 @@ class MaterialPropertyValueModalModelForm(
     pass
 
 
-class AnalyticalMethodModelForm(AutoCompleteModelForm):
-    sources = ModelMultipleChoiceField(
-        queryset=Source.objects.all(),
-        required=False,
-        widget=BSModelSelect2Multiple(url="source-autocomplete"),
+class AnalyticalMethodModelForm(SimpleModelForm):
+    sources = TomSelectModelMultipleChoiceField(
+        config=TomSelectConfig(
+            url="source-autocomplete",
+            placeholder="------",
+            highlight=True,
+            label_field="label",
+            open_on_focus=True,
+            plugin_clear_button=PluginClearButton(
+                title="Clear Selection", class_name="clear-button"
+            ),
+        ),
+        attrs={"class": "form-control mb-3"},
+        label="Sources",
         help_text="Optional: Select multiple sources if applicable.",
     )
 
@@ -149,12 +156,44 @@ class SampleSeriesAddTemporalDistributionModalModelForm(ModalModelForm):
         )
 
 
-class SampleModelForm(AutoCompleteModelForm):
-    sources = ModelMultipleChoiceField(
-        queryset=Source.objects.all(),
-        required=False,
-        widget=BSModelSelect2Multiple(url="source-autocomplete"),
-        help_text="Optional: Select multiple sources if applicable.",
+class SampleModelForm(SimpleModelForm):
+    material = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="material-autocomplete",
+            placeholder="------",
+            highlight=True,
+            open_on_focus=True,
+            plugin_clear_button=PluginClearButton(
+                title="Clear Selection", class_name="clear-button"
+            ),
+        ),
+        label="Material",
+    )
+    series = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="sampleseries-autocomplete",
+            placeholder="------",
+            highlight=True,
+            open_on_focus=True,
+            plugin_clear_button=PluginClearButton(
+                title="Clear Selection", class_name="clear-button"
+            ),
+        ),
+        label="Series",
+    )
+    sources = TomSelectModelMultipleChoiceField(
+        config=TomSelectConfig(
+            url="source-autocomplete",
+            placeholder="------",
+            highlight=True,
+            open_on_focus=True,
+            plugin_clear_button=PluginClearButton(
+                title="Clear Selection", class_name="clear-button"
+            ),
+        ),
+        attrs={"class": "form-control mb-3"},
+        label="Single Select",
+        help_text="Example of single select with autocomplete and clear button.",
     )
 
     class Meta:
@@ -171,9 +210,7 @@ class SampleModelForm(AutoCompleteModelForm):
             "sources",
         )
         widgets = {
-            "series": BSModelSelect2(url="sampleseries-autocomplete"),
             "datetime": DateTimeInput(attrs={"type": "datetime-local"}),
-            "material": BSModelSelect2(url="material-autocomplete"),
         }
         labels = {
             "datetime": "Date/Time",
@@ -196,7 +233,7 @@ class CompositionModalModelForm(ModalModelFormMixin, CompositionModelForm):
     pass
 
 
-class SampleAddCompositionForm(AutoCompleteModelForm):
+class SampleAddCompositionForm(SimpleModelForm):
     sample = ModelChoiceField(queryset=Sample.objects.none())
 
     class Meta:

@@ -1,17 +1,19 @@
 from django.core.exceptions import ValidationError
 from django.db import transaction
-from django.forms import (BaseInlineFormSet, DateInput, ModelChoiceField)
+from django.forms import BaseInlineFormSet, DateInput
+from django_tomselect.app_settings import PluginClearButton
+from django_tomselect.forms import TomSelectConfig, TomSelectModelChoiceField
 from extra_views import InlineFormSetFactory
 
-from utils.forms import AutoCompleteModelForm, ModalModelFormMixin, SimpleModelForm
-from utils.widgets import BSModelSelect2
+from utils.forms import ModalModelFormMixin, SimpleModelForm
+
 from .models import Author, Licence, Source, SourceAuthor
 
 
 class AuthorModelForm(SimpleModelForm):
     class Meta:
         model = Author
-        fields = ('first_names', 'last_names')
+        fields = ("first_names", "last_names")
 
 
 class AuthorModalModelForm(ModalModelFormMixin, AuthorModelForm):
@@ -21,7 +23,7 @@ class AuthorModalModelForm(ModalModelFormMixin, AuthorModelForm):
 class LicenceModelForm(SimpleModelForm):
     class Meta:
         model = Licence
-        fields = ('name', 'reference_url')
+        fields = ("name", "reference_url")
 
 
 class LicenceModalModelForm(ModalModelFormMixin, LicenceModelForm):
@@ -32,11 +34,24 @@ class SourceModelForm(SimpleModelForm):
     class Meta:
         model = Source
         fields = (
-            'abbreviation', 'publisher', 'title', 'type', 'journal', 'issue', 'year', 'licence',
-            'attributions', 'url', 'url_valid', 'url_checked', 'doi', 'last_accessed')
+            "abbreviation",
+            "publisher",
+            "title",
+            "type",
+            "journal",
+            "issue",
+            "year",
+            "licence",
+            "attributions",
+            "url",
+            "url_valid",
+            "url_checked",
+            "doi",
+            "last_accessed",
+        )
         widgets = {
-            'url_checked': DateInput(attrs={'type': 'date'}),
-            'last_accessed': DateInput(attrs={'type': 'date'})
+            "url_checked": DateInput(attrs={"type": "date"}),
+            "last_accessed": DateInput(attrs={"type": "date"}),
         }
 
 
@@ -44,17 +59,23 @@ class SourceModalModelForm(ModalModelFormMixin, SourceModelForm):
     pass
 
 
-class SourceAuthorForm(AutoCompleteModelForm):
-    author = ModelChoiceField(
-        queryset=Author.objects.all(),
-        widget=BSModelSelect2(url='author-autocomplete'),
-        label='Authors',
-        required=False
+class SourceAuthorForm(SimpleModelForm):
+    author = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="author-autocomplete",
+            placeholder="------",
+            highlight=True,
+            label_field="label",
+            plugin_clear_button=PluginClearButton(
+                title="Clear Selection", class_name="clear-button"
+            ),
+        ),
+        label="Authors",
     )
 
     class Meta:
         model = SourceAuthor
-        fields = ('author',)
+        fields = ("author",)
 
 
 class SourceAuthorFormSet(BaseInlineFormSet):
@@ -68,12 +89,16 @@ class SourceAuthorFormSet(BaseInlineFormSet):
             # Don't validate if individual forms have errors
             return
 
-        forms = [form for form in self.forms if form.cleaned_data and not form.cleaned_data.get('DELETE', False)]
+        forms = [
+            form
+            for form in self.forms
+            if form.cleaned_data and not form.cleaned_data.get("DELETE", False)
+        ]
 
         # Check for duplicate authors
         authors = {}
         for form in forms:
-            author = form.cleaned_data.get('author')
+            author = form.cleaned_data.get("author")
 
             if author:
                 if author.id in authors:
@@ -93,8 +118,11 @@ class SourceAuthorFormSet(BaseInlineFormSet):
             if commit:
                 # Get all forms that aren't being deleted and have data
                 valid_forms = [
-                    form for form in self.forms
-                    if form.cleaned_data and not form.cleaned_data.get('DELETE', False) and form.cleaned_data.get('author')
+                    form
+                    for form in self.forms
+                    if form.cleaned_data
+                    and not form.cleaned_data.get("DELETE", False)
+                    and form.cleaned_data.get("author")
                 ]
 
                 # Assign positions based on form order
@@ -117,30 +145,42 @@ class SourceAuthorFormSet(BaseInlineFormSet):
         Ensure positions are sequential without gaps.
         """
         source = self.instance
-        authors = list(source.sourceauthors.all().order_by('position'))
+        authors = list(source.sourceauthors.all().order_by("position"))
 
         # Update positions if necessary
         for i, author in enumerate(authors, 1):
             if author.position != i:
                 author.position = i
-                author.save(update_fields=['position'])
+                author.save(update_fields=["position"])
 
 
 class SourceAuthorInline(InlineFormSetFactory):
     model = SourceAuthor
     form_class = SourceAuthorForm
     formset_class = SourceAuthorFormSet
-    fields = ('author',)
+    fields = ("author",)
     factory_kwargs = {
-        'extra': 0,
-        'min_num': 1,
-        'can_delete': True,
+        "extra": 0,
+        "min_num": 1,
+        "can_delete": True,
     }
 
 
-class SourceSimpleFilterForm(AutoCompleteModelForm):
-    source = ModelChoiceField(queryset=Source.objects.all(), widget=BSModelSelect2(url='source-autocomplete'))
+class SourceSimpleFilterForm(SimpleModelForm):
+    source = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="source-autocomplete",
+            placeholder="------",
+            highlight=True,
+            label_field="label",
+            open_on_focus=True,
+            plugin_clear_button=PluginClearButton(
+                title="Clear Selection", class_name="clear-button"
+            ),
+        ),
+        label="Source",
+    )
 
     class Meta:
         model = Source
-        fields = ('source',)
+        fields = ("source",)

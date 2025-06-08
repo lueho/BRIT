@@ -96,7 +96,7 @@ urlpatterns = [
     ),
     path(
         "collectors/autocomplete/",
-        views.CollectorAutoCompleteView.as_view(),
+        views.CollectorAutocompleteView.as_view(),
         name="collector-autocomplete",
     ),
     path(
@@ -284,7 +284,7 @@ urlpatterns = [
     ),
     path(
         "frequencies/autocomplete/",
-        views.FrequencyAutoCompleteView.as_view(),
+        views.FrequencyAutocompleteView.as_view(),
         name="collectionfrequency-autocomplete",
     ),
     path(
@@ -480,7 +480,7 @@ urlpatterns = [
     ),
     path(
         "collections/autocomplete/",
-        views.CollectionAutoCompleteView.as_view(),
+        views.CollectionAutocompleteView.as_view(),
         name="collection-autocomplete",
     ),
     path(

@@ -1,6 +1,5 @@
 from bootstrap_modal_forms.mixins import CreateUpdateAjaxMixin, PopRequestMixin
 from crispy_forms.helper import FormHelper
-from dal_select2.widgets import Select2WidgetMixin
 from django.core.exceptions import ImproperlyConfigured
 from django.forms import (
     BaseFormSet,
@@ -89,73 +88,6 @@ class ModalForm(ModalFormMixin, Form):
 class ModalModelForm(ModalModelFormMixin, ModelForm):
     """
     ModelForm that can be used within bootstrap modals. Makes use of the django-boostrap-modal-forms package.
-    """
-
-
-def apply_select2_theme(form):
-    """
-    Updates the attrs of all Select2WidgetMixin instances in a form to match the current SELECT2_THEME environment
-    variable.
-
-    :param form: The form whose fields should be updated.
-    :type form: Form
-    """
-    from dal_select2.widgets import Select2WidgetMixin
-    from django.conf import settings
-
-    try:
-        select2_theme = settings.SELECT2_THEME
-    except AttributeError:
-        raise ImproperlyConfigured(
-            "SELECT2_THEME environment variable is not set. Make sure to set the theme if you want the autocomplete fields to be compatible with django-crispy-forms."
-        )
-    for field in form.fields.values():
-        if isinstance(field.widget, Select2WidgetMixin):
-            field.widget.attrs.update(
-                {
-                    "data-theme": select2_theme,
-                    "data-width": "style",  # Changed from 'resolve' to respect CSS width
-                    "data-minimum-input-length": 0,
-                    # "data-dropdown-auto-width": "true",
-                    "data-placeholder": "--------   ",
-                }
-            )
-
-
-class AutoCompleteMixin:
-    """
-    Allows the integration of django-autocomplete-light with django-crispy-forms and bootstrap 5. When using this
-    mixin, form media need to be manually loaded in the template using {{ form.media }}.
-    """
-
-    fields: dict
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-
-        # django-crispy-forms and django-autocomplete-light conflict in the order JQuery needs to be loaded.
-        # Suppressing media inclusion here and explicitly adding {{ form.media }} in the template solves this.
-        # See https://github.com/yourlabs/django-autocomplete-light/issues/788
-        self.helper.include_media = False
-        apply_select2_theme(self)
-
-
-class AutoCompleteForm(AutoCompleteMixin, SimpleForm):
-    """
-    Form that works with django-autocomplete-light in combination with bootstrap 5.
-    """
-
-
-class AutoCompleteModelForm(AutoCompleteMixin, SimpleModelForm):
-    """
-    Model form that works with django-autocomplete-light in combination with bootstrap 5.
-    """
-
-
-class AutoCompleteModalModelForm(AutoCompleteMixin, ModalModelForm):
-    """
-    Model form that works with django-autocomplete-light in combination with bootstrap 5 and
-    django-bootstrap-modal-forms.
     """
 
 

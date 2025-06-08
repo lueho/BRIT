@@ -1,9 +1,7 @@
-import json
-
-from dal import autocomplete
 from django.db.models import Q
 from django.utils.decorators import method_decorator
 from django.views.decorators.clickjacking import xframe_options_exempt
+from django_tomselect.autocompletes import AutocompleteModelView
 
 from maps.models import Catchment, GeoDataset
 from maps.views import GeoDataSetPublishedFilteredMapView
@@ -33,7 +31,9 @@ class HamburgRoadsideTreesListFileExportView(GenericUserCreatedObjectExportView)
     model_label = "flexibi_hamburg.HamburgRoadsideTrees"
 
 
-class HamburgRoadsideTreeCatchmentAutocompleteView(autocomplete.Select2QuerySetView):
+class HamburgRoadsideTreeCatchmentAutocompleteView(AutocompleteModelView):
+    model = Catchment
+
     def get_queryset(self):
         if self.request.user.is_authenticated:
             qs = Catchment.objects.filter(

@@ -13,14 +13,15 @@ from django_filters import (
     ModelChoiceFilter,
     ModelMultipleChoiceFilter,
 )
+from django_tomselect.app_settings import TomSelectConfig
+from django_tomselect.widgets import TomSelectModelWidget
 
 from utils.crispy_fields import FilterAccordionGroup, RangeSliderField
 from utils.filters import (
     BaseCrispyFilterSet,
-    CrispyAutocompleteFilterSet,
     NullableRangeFilter,
 )
-from utils.widgets import BSModelSelect2, NullableRangeSliderWidget
+from utils.widgets import NullableRangeSliderWidget
 
 from .models import (
     CONNECTION_TYPE_CHOICES,
@@ -49,7 +50,7 @@ class CollectorFilter(BaseCrispyFilterSet):
         fields = ("name", "catchment")
 
 
-class CollectionCatchmentFilterSet(CrispyAutocompleteFilterSet):
+class CollectionCatchmentFilterSet(BaseCrispyFilterSet):
     name = CharFilter(lookup_expr="icontains")
 
     class Meta:
@@ -287,7 +288,7 @@ class MinBinSizeRangeFilter(NullableRangeFilter):
         )
 
 
-class CollectionFilterSet(CrispyAutocompleteFilterSet):
+class CollectionFilterSet(BaseCrispyFilterSet):
     scope = ChoiceFilter(
         choices=(("published", "Published"), ("private", "Private")),
         widget=HiddenInput(),
@@ -299,12 +300,16 @@ class CollectionFilterSet(CrispyAutocompleteFilterSet):
     )
     catchment = ModelChoiceFilter(
         queryset=CollectionCatchment.objects.all(),
-        widget=BSModelSelect2(url="catchment-autocomplete"),
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(url="catchment-autocomplete")
+        ),
         method="catchment_filter",
     )
     collector = ModelChoiceFilter(
         queryset=Collector.objects.all(),
-        widget=BSModelSelect2(url="collector-autocomplete"),
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(url="collector-autocomplete")
+        ),
     )
     waste_category = ModelMultipleChoiceFilter(
         queryset=WasteCategory.objects.all(),
@@ -462,7 +467,7 @@ class CollectionFilterSet(CrispyAutocompleteFilterSet):
         return queryset.filter(publication_status="published")
 
 
-class WasteFlyerFilter(CrispyAutocompleteFilterSet):
+class WasteFlyerFilter(BaseCrispyFilterSet):
     url_valid = BooleanFilter(
         widget=RadioSelect(choices=((True, "True"), (False, "False")))
     )
@@ -481,7 +486,9 @@ class WasteFlyerFilter(CrispyAutocompleteFilterSet):
     catchment = ModelChoiceFilter(
         queryset=CollectionCatchment.objects.all(),
         label="Catchment",
-        widget=BSModelSelect2(url="catchment-autocomplete"),
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(url="catchment-autocomplete")
+        ),
         method="get_catchment",
     )
 

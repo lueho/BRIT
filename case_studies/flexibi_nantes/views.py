@@ -1,20 +1,16 @@
-import json
-
 from crispy_forms.helper import FormHelper
-from dal import autocomplete
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
 from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.views.generic import UpdateView
+from django_tomselect.autocompletes import AutocompleteModelView
 from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 
-import case_studies.flexibi_nantes.tasks
 from maps.models import Catchment, GeoDataset
 from maps.views import GeoDataSetPublishedFilteredMapView
 from materials.models import MaterialComponentGroup
-from utils.views import NextOrSuccessUrlMixin
 from utils.file_export.views import GenericUserCreatedObjectExportView
 from utils.object_management.views import (
     PrivateObjectFilterView,
@@ -29,6 +25,8 @@ from utils.object_management.views import (
     UserCreatedObjectUpdateView,
     UserOwnsObjectMixin,
 )
+from utils.views import NextOrSuccessUrlMixin
+
 from .filters import GreenhouseTypeFilter, NantesGreenhousesFilterSet
 from .forms import (
     CultureModalModelForm,
@@ -44,7 +42,6 @@ from .forms import (
     UpdateGreenhouseGrowthCycleValuesForm,
 )
 from .models import Culture, Greenhouse, GrowthTimeStepSet
-
 
 # ----------- Culture CRUD ---------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
@@ -263,7 +260,9 @@ class UpdateGreenhouseGrowthCycleValuesView(LoginRequiredMixin, UpdateView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class NantesGreenhousesCatchmentAutocompleteView(autocomplete.Select2QuerySetView):
+class NantesGreenhousesCatchmentAutocompleteView(AutocompleteModelView):
+    model = Catchment
+
     def get_queryset(self):
         if self.request.user.is_authenticated:
             qs = Catchment.objects.filter(

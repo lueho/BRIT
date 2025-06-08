@@ -1,6 +1,5 @@
 from bootstrap_modal_forms.generic import BSModalFormView, BSModalUpdateView
 from crispy_forms.helper import FormHelper
-from dal import autocomplete
 from django.contrib.auth.mixins import (
     LoginRequiredMixin,
     PermissionRequiredMixin,
@@ -20,6 +19,7 @@ from utils.object_management.views import (
     PrivateObjectListView,
     PublishedObjectFilterView,
     PublishedObjectListView,
+    UserCreatedObjectAutocompleteView,
     UserCreatedObjectCreateView,
     UserCreatedObjectDetailView,
     UserCreatedObjectModalCreateView,
@@ -32,7 +32,10 @@ from utils.object_management.views import (
 )
 from utils.views import NextOrSuccessUrlMixin
 
-from .filters import PublishedSampleFilter, SampleSeriesFilter, UserOwnedSampleFilter
+from .filters import (
+    SampleFilter,
+    SampleSeriesFilter,
+)
 from .forms import (
     AddComponentModalForm,
     AddCompositionModalForm,
@@ -188,24 +191,12 @@ class MaterialModalDeleteView(UserCreatedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class MaterialAutocompleteView(autocomplete.Select2QuerySetView):
-    def get_queryset(self):
-        qs = Material.objects.filter(type="material").order_by("id")
-        if self.q:
-            qs = qs.filter(name__icontains=self.q)
-        return qs
+class MaterialAutocompleteView(UserCreatedObjectAutocompleteView):
+    model = Material
 
 
 # ----------- Material Component CRUD ----------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
-
-
-class ComponentAutoCompleteView(autocomplete.Select2QuerySetView):
-    def get_queryset(self):
-        qs = MaterialComponent.objects.all()
-        if self.q:
-            qs = qs.filter(name__icontains=self.q)
-        return qs
 
 
 class ComponentPublishedListView(PublishedObjectListView):
@@ -247,6 +238,14 @@ class ComponentModalUpdateView(UserCreatedObjectModalUpdateView):
 
 
 class ComponentModalDeleteView(UserCreatedObjectModalDeleteView):
+    model = MaterialComponent
+
+
+# ----------- Material Component Utils ---------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class ComponentAutocompleteView(UserCreatedObjectAutocompleteView):
     model = MaterialComponent
 
 
@@ -443,7 +442,7 @@ class SampleSeriesModalDeleteView(UserCreatedObjectModalDeleteView):
     model = SampleSeries
 
 
-# ----------- Sample Series Utilities ----------------------------------------------------------------------------------
+# ----------- Sample Series Utils --------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 
@@ -468,17 +467,8 @@ class SampleSeriesModalAddDistributionView(UserCreatedObjectModalUpdateView):
         return HttpResponseRedirect(self.get_success_url())
 
 
-class SampleSeriesAutoCompleteView(autocomplete.Select2QuerySetView):
-    def get_queryset(self):
-        if not self.request.user.is_authenticated:
-            return SampleSeries.objects.none()
-
-        qs = SampleSeries.objects.filter(owner=self.request.user)
-
-        if self.q:
-            qs = qs.filter(name__icontains=self.q)
-
-        return qs
+class SampleSeriesAutoCompleteView(UserCreatedObjectAutocompleteView):
+    model = SampleSeries
 
 
 # ----------- Sample CRUD ----------------------------------------------------------------------------------------------
@@ -487,13 +477,13 @@ class SampleSeriesAutoCompleteView(autocomplete.Select2QuerySetView):
 
 class SamplePublishedListView(PublishedObjectFilterView):
     model = Sample
-    filterset_class = PublishedSampleFilter
+    filterset_class = SampleFilter
     dashboard_url = reverse_lazy("materials-dashboard")
 
 
 class SamplePrivateListView(PrivateObjectFilterView):
     model = Sample
-    filterset_class = UserOwnedSampleFilter
+    filterset_class = SampleFilter
     dashboard_url = reverse_lazy("materials-dashboard")
 
 
@@ -546,20 +536,16 @@ class SampleModalDeleteView(UserCreatedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class SampleAutoCompleteView(autocomplete.Select2QuerySetView):
-    def get_queryset(self):
-        qs = Sample.objects.order_by("name")
-        if self.q:
-            qs = qs.filter(name__icontains=self.q)
-        return qs
+class SampleAutocompleteView(UserCreatedObjectAutocompleteView):
+    model = Sample
 
 
-class PublishedSampleAutoCompleteView(SampleAutoCompleteView):
+class PublishedSampleAutoCompleteView(SampleAutocompleteView):
     def get_queryset(self):
         return super().get_queryset().filter(publication_status="published")
 
 
-class UserOwnedSampleAutoCompleteView(SampleAutoCompleteView):
+class UserOwnedSampleAutoCompleteView(SampleAutocompleteView):
     def get_queryset(self):
         return super().get_queryset().filter(owner=self.request.user)
 

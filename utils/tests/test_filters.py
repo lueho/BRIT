@@ -1,13 +1,12 @@
 from crispy_forms.helper import FormHelper
 from django.test import TestCase
 
-from .models import DummyModel
 from ..filters import (
     BaseCrispyFilterSet,
-    CrispyAutocompleteFilterSet,
-    NullableRangeFilter,
     NullablePercentageRangeFilter,
+    NullableRangeFilter,
 )
+from .models import DummyModel
 
 
 class CustomFormHelper(FormHelper):
@@ -17,7 +16,7 @@ class CustomFormHelper(FormHelper):
 class DummyFilterSet(BaseCrispyFilterSet):
     class Meta:
         model = DummyModel
-        fields = ('test_field',)
+        fields = ("test_field",)
         form_helper = CustomFormHelper
 
 
@@ -30,7 +29,7 @@ class BaseCrispyFilterSetTestCase(TestCase):
         class CustomFilterSetWithoutFormHelper(BaseCrispyFilterSet):
             class Meta:
                 model = DummyModel
-                fields = ('test_field',)
+                fields = ("test_field",)
 
         filter_set = CustomFilterSetWithoutFormHelper(queryset=DummyModel.objects.all())
         self.assertIsInstance(filter_set.get_form_helper(), FormHelper)
@@ -41,10 +40,10 @@ class BaseCrispyFilterSetTestCase(TestCase):
         self.assertFalse(form.helper.form_tag)
 
 
-class DummyAutoCompleteFilterSet(CrispyAutocompleteFilterSet):
+class DummyAutoCompleteFilterSet(BaseCrispyFilterSet):
     class Meta:
         model = DummyModel
-        fields = ('test_field',)
+        fields = ("test_field",)
 
 
 class AutocompleteFilterSetTestCase(TestCase):
@@ -64,14 +63,14 @@ class TestNullableRangeFilter(TestCase):
 
     def test_filter_with_null_value(self):
         range_with_null_flag = (slice(20, 90), True)
-        filter_ = NullableRangeFilter(field_name='test_field')
+        filter_ = NullableRangeFilter(field_name="test_field")
         result = filter_.filter(DummyModel.objects.all(), range_with_null_flag)
         expected = DummyModel.objects.filter(id__in=[self.fifty.id, self.none.id])
         self.assertQuerySetEqual(result, expected, ordered=False)
 
     def test_filter_without_null_value(self):
         range_with_null_flag = (slice(20, 100), False)
-        filter_ = NullableRangeFilter(field_name='test_field')
+        filter_ = NullableRangeFilter(field_name="test_field")
         result = filter_.filter(DummyModel.objects.all(), range_with_null_flag)
         expected = DummyModel.objects.filter(id__in=[self.fifty.id, self.hundred.id])
         self.assertQuerySetEqual(result, expected, ordered=False)
@@ -88,14 +87,14 @@ class NullablePercentageRangeFilterTestCase(TestCase):
 
     def test_filter_with_null_value(self):
         range_with_null_flag = (slice(20, 90), True)
-        filter_ = NullablePercentageRangeFilter(field_name='test_field')
+        filter_ = NullablePercentageRangeFilter(field_name="test_field")
         result = filter_.filter(DummyModel.objects.all(), range_with_null_flag)
         expected = DummyModel.objects.filter(id__in=[self.fifty.id, self.none.id])
         self.assertQuerySetEqual(result, expected, ordered=False)
 
     def test_filter_without_null_value(self):
         range_with_null_flag = (slice(20, 100), False)
-        filter_ = NullablePercentageRangeFilter(field_name='test_field')
+        filter_ = NullablePercentageRangeFilter(field_name="test_field")
         result = filter_.filter(DummyModel.objects.all(), range_with_null_flag)
         expected = DummyModel.objects.filter(id__in=[self.fifty.id, self.hundred.id])
         self.assertQuerySetEqual(result, expected, ordered=False)

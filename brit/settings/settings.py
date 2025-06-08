@@ -23,6 +23,7 @@ INSTALLED_APPS = [
     "registration",
     "dal",
     "dal_select2",
+    "django_tomselect",
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
@@ -76,6 +77,7 @@ MIDDLEWARE = [
     "django.contrib.messages.middleware.MessageMiddleware",
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "maps.middleware.CacheMonitoringMiddleware",
+    "django_tomselect.middleware.TomSelectMiddleware",
 ]
 
 ROOT_URLCONF = "brit.urls"
@@ -95,6 +97,7 @@ TEMPLATES = [
                 "django.contrib.auth.context_processors.auth",
                 "django.contrib.messages.context_processors.messages",
                 "brit.context_processors.google_analytics",
+                "django_tomselect.context_processors.tomselect",
             ],
         },
     },
@@ -266,4 +269,8 @@ LEAFLET_CONFIG = {
             "auto-include": True,
         },
     },
+}
+
+TOMSELECT = {
+    "DEFAULT_CSS_FRAMEWORK": "bootstrap5",
 }

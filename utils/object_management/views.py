@@ -20,6 +20,7 @@ from django.utils import timezone
 from django.utils.decorators import method_decorator
 from django.views.generic import CreateView, DetailView, ListView, UpdateView, View
 from django_filters.views import FilterView
+from django_tomselect.autocompletes import AutocompleteModelView
 from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 
 from case_studies.soilcom.models import Collection
@@ -741,3 +742,22 @@ class OwnedObjectModelSelectOptionsView(
     PermissionRequiredMixin, ModelSelectOptionsView
 ):
     pass
+
+
+class UserCreatedObjectAutocompleteView(AutocompleteModelView):
+    search_lookups = ["name__icontains"]
+    ordering = ["name"]
+    allow_anonymous = True
+    page_size = 15
+
+    def apply_filters(self, queryset):
+        print(self.filter_by)
+        lookup, value = unquote(self.filter_by).replace("'", "").split("=")
+        print(lookup, value)
+        if lookup == "scope__name":
+            if value == "private":
+                if not self.request.user.is_authenticated:
+                    return queryset.none()
+                return queryset.filter(owner=self.request.user)
+            elif value == "published":
+                return queryset.filter(publication_status="published")

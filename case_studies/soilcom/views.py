@@ -3,7 +3,6 @@ from datetime import date
 from urllib.parse import urlencode
 
 from celery.result import AsyncResult
-from dal.autocomplete import Select2QuerySetView
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.db.models import Max
 from django.forms.models import model_to_dict
@@ -13,6 +12,7 @@ from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.generic import TemplateView
+from django_tomselect.autocompletes import AutocompleteModelView
 
 from bibliography.views import (
     SourceCheckUrlView,
@@ -40,9 +40,9 @@ from utils.object_management.views import (
     PrivateObjectListView,
     PublishedObjectFilterView,
     PublishedObjectListView,
-    UserCreatedObjectModalArchiveView,
     UserCreatedObjectCreateView,
     UserCreatedObjectDetailView,
+    UserCreatedObjectModalArchiveView,
     UserCreatedObjectModalCreateView,
     UserCreatedObjectModalDeleteView,
     UserCreatedObjectModalDetailView,
@@ -151,12 +151,10 @@ class CollectorModalDeleteView(UserCreatedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CollectorAutoCompleteView(Select2QuerySetView):
-    def get_queryset(self):
-        qs = Collector.objects.order_by("name")
-        if self.q:
-            qs = qs.filter(name__icontains=self.q)
-        return qs
+class CollectorAutocompleteView(AutocompleteModelView):
+    model = Collector
+    search_lookups = ["name__icontains"]
+    ordering = ["name"]
 
 
 # ----------- Collection System CRUD -----------------------------------------------------------------------------------
@@ -547,12 +545,10 @@ class FrequencyModalDeleteView(UserCreatedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class FrequencyAutoCompleteView(Select2QuerySetView):
-    def get_queryset(self):
-        qs = CollectionFrequency.objects.order_by("name")
-        if self.q:
-            qs = qs.filter(name__icontains=self.q)
-        return qs
+class FrequencyAutocompleteView(AutocompleteModelView):
+    model = CollectionFrequency
+    search_lookups = ["name__icontains"]
+    ordering = ["name"]
 
 
 # ----------- CollectionPropertyValue CRUD -----------------------------------------------------------------------------
@@ -842,12 +838,10 @@ class CollectionModalDeleteView(UserCreatedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CollectionAutoCompleteView(Select2QuerySetView):
-    def get_queryset(self):
-        qs = Collection.objects.order_by("name")
-        if self.q:
-            qs = qs.filter(name__icontains=self.q)
-        return qs
+class CollectionAutocompleteView(AutocompleteModelView):
+    model = Collection
+    search_lookups = ["name__icontains"]
+    ordering = ["name"]
 
 
 class CollectionListFileExportView(GenericUserCreatedObjectExportView):

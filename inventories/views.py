@@ -2,13 +2,13 @@ import io
 import json
 
 from celery.result import AsyncResult
-from dal_select2.views import Select2ListView
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
 from django.views.generic import CreateView, DetailView, View
 from django.views.generic.base import TemplateResponseMixin
 from django.views.generic.edit import ModelFormMixin
+from django_tomselect.autocompletes import AutocompleteModelView
 from rest_framework.views import APIView
 
 from layer_manager.models import Layer
@@ -24,6 +24,7 @@ from utils.object_management.views import (
     UserCreatedObjectModalDeleteView,
     UserCreatedObjectUpdateView,
 )
+
 from .evaluations import ScenarioResult
 from .filters import ScenarioFilterSet
 from .forms import (
@@ -54,18 +55,10 @@ class SeasonalDistributionCreateView(LoginRequiredMixin, CreateView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class ScenarioNameAutocompleteView(Select2ListView):
-
-    def get_list(self):
-        if self.request.user.is_authenticated:
-            qs = Scenario.objects.accessible_by_user(self.request.user)
-        else:
-            qs = Scenario.objects.published()
-
-        if self.q:
-            qs = qs.filter(name__icontains=self.q)
-
-        return qs.values_list("name", flat=True)
+class ScenarioNameAutocompleteView(AutocompleteModelView):
+    model = Scenario
+    field_lookups = ["name"]
+    ordering = ["name"]
 
 
 class PublishedScenarioFilterView(PublishedObjectFilterView):

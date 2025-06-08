@@ -1,75 +1,91 @@
-from dal import forward
 from django.forms import HiddenInput
-from django_filters import CharFilter, ModelChoiceFilter, NumberFilter
+from django_filters import CharFilter, NumberFilter
+from django_tomselect.app_settings import TomSelectConfig
+from django_tomselect.forms import TomSelectModelChoiceField
 
-from utils.filters import BaseCrispyFilterSet, CrispyAutocompleteFilterSet
-from utils.widgets import BSModelSelect2
-from .models import Catchment, GeoDataset, NutsRegion, Region
+from utils.filters import BaseCrispyFilterSet
+
+from .models import Catchment, GeoDataset, Region
 
 
-class CatchmentFilterSet(CrispyAutocompleteFilterSet):
+class CatchmentFilterSet(BaseCrispyFilterSet):
     id = NumberFilter(widget=HiddenInput())
-    name = CharFilter(lookup_expr='icontains')
+    name = CharFilter(lookup_expr="icontains")
 
     class Meta:
         model = Catchment
-        fields = ('id', 'name', 'type',)
+        fields = (
+            "id",
+            "name",
+            "type",
+        )
 
 
-class RegionFilterSet(CrispyAutocompleteFilterSet):
-    name_icontains = CharFilter(field_name='name', lookup_expr='icontains', label='Name contains')
+class RegionFilterSet(BaseCrispyFilterSet):
+    name_icontains = CharFilter(
+        field_name="name", lookup_expr="icontains", label="Name contains"
+    )
 
     class Meta:
         model = Region
-        fields = ('id', 'name', 'name_icontains', 'country',)
+        fields = (
+            "id",
+            "name",
+            "name_icontains",
+            "country",
+        )
 
 
-class NutsRegionFilterSet(CrispyAutocompleteFilterSet):
-    level_0 = ModelChoiceFilter(queryset=NutsRegion.objects.filter(levl_code=0),
-                                field_name='levl_code',
-                                widget=BSModelSelect2(url='nutsregion-autocomplete',
-                                                      forward=(forward.Const(0, 'levl_code'),)),
-                                label='Level 0')
-    level_1 = ModelChoiceFilter(queryset=NutsRegion.objects.filter(levl_code=1),
-                                field_name='levl_code',
-                                widget=BSModelSelect2(
-                                    url='nutsregion-autocomplete',
-                                    forward=(
-                                        forward.Const(1, 'levl_code'),
-                                        forward.Field('level_0', 'parent')
-                                    )
-                                ),
-                                label='Level 1')
-    level_2 = ModelChoiceFilter(queryset=NutsRegion.objects.filter(levl_code=2),
-                                field_name='levl_code',
-                                widget=BSModelSelect2(
-                                    url='nutsregion-autocomplete',
-                                    forward=(
-                                        forward.Const(2, 'levl_code'),
-                                        forward.Field('level_0', 'grandparent'),
-                                        forward.Field('level_1', 'parent')
-                                    )
-                                ),
-                                label='Level 2')
-    level_3 = ModelChoiceFilter(queryset=NutsRegion.objects.filter(levl_code=3),
-                                field_name='levl_code',
-                                widget=BSModelSelect2(
-                                    url='nutsregion-autocomplete',
-                                    forward=(
-                                        forward.Const(3, 'levl_code'),
-                                        forward.Field('level_0', 'great_grandparent'),
-                                        forward.Field('level_1', 'grandparent'),
-                                        forward.Field('level_2', 'parent')
-                                    )
-                                ),
-                                label='Level 3')
+class NutsRegionFilterSet(BaseCrispyFilterSet):
+    # ── top level ────────────────────────────────────────────────────────────
+    nuts0 = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="nutsregion-autocomplete",
+            value_field="id",
+            label_field="name",
+            placeholder="NUTS 0 (country)",
+        ),
+        required=True,
+    )
 
-    class Meta:
-        model = NutsRegion
-        fields = ['level_0', 'level_1', 'level_2', 'level_3']
+    # ── NUTS-1  (depends on nuts0 → parent_id) ──────────────────────────────
+    nuts1 = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="nutsregion-autocomplete",
+            value_field="id",
+            label_field="name",
+            filter_by=("nuts0", "parent_id"),  # sends  ?parent_id=<nuts0>
+            placeholder="NUTS 1 region",
+        ),
+        required=False,
+    )
+
+    # ── NUTS-2  (depends on nuts1) ──────────────────────────────────────────
+    nuts2 = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="nutsregion-autocomplete",
+            value_field="id",
+            label_field="name",
+            filter_by=("nuts1", "parent_id"),
+            placeholder="NUTS 2 region",
+        ),
+        required=False,
+    )
+
+    # ── NUTS-3  (depends on nuts2) ──────────────────────────────────────────
+    nuts3 = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="nutsregion-autocomplete",
+            value_field="id",
+            label_field="name",
+            filter_by=("nuts2", "parent_id"),
+            placeholder="NUTS 3 region",
+        ),
+        required=False,
+    )
 
 
 class GeoDataSetFilterSet(BaseCrispyFilterSet):
     class Meta:
         model = GeoDataset
-        fields = ('id',)
+        fields = ("id",)
