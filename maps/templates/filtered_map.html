@@ -38,8 +38,8 @@
                 {% block map_card_footer %}
                 {% block map_card_navigation_dropdown %}
                 <div class="dropdown">
-                    <button class="btn btn-secondary dropdown-toggle mr-3" type="button" id="navigateDropdown"
-                        data-toggle="dropdown" aria-expanded="false">
+                    <button class="btn btn-secondary dropdown-toggle me-3" type="button" id="navigateDropdown"
+                        data-bs-toggle="dropdown" aria-expanded="false">
                         Navigate
                     </button>
                     <div class="dropdown-menu" aria-labelledby="navigateDropdown">
@@ -76,8 +76,8 @@
                 {% block map_card_options_dropdown %}
                 {% if user.is_authenticated %}
                 <div class="dropdown">
-                    <button class="btn btn-secondary dropdown-toggle mr-3" type="button" id="optionsDropdown"
-                        data-toggle="dropdown" aria-expanded="false">
+                    <button class="btn btn-secondary dropdown-toggle me-3" type="button" id="optionsDropdown"
+                        data-bs-toggle="dropdown" aria-expanded="false">
                         Options
                     </button>
                     <div class="dropdown-menu" aria-labelledby="optionsDropdown">
@@ -107,7 +107,7 @@
         <div class="accordion">
             {% block filter_form_card %}
             <div class="card shadow">
-                <div class="card-header" role="button" data-toggle="collapse" href="#filter-card-body"
+                <div class="card-header" role="button" data-bs-toggle="collapse" href="#filter-card-body"
                     aria-expanded="true" aria-controls="filter-card-body">
                     <b>Filter</b>
                 </div>
@@ -131,7 +131,7 @@
 
             {% block filter_result_card %}
             <div class="card shadow">
-                <div class="card-header" role="button" data-toggle="collapse" href="#info-card-body"
+                <div class="card-header" role="button" data-bs-toggle="collapse" href="#info-card-body"
                     aria-expanded="true" aria-controls="info-card-body">
                     <b>Summary</b>
                 </div>

@@ -44,7 +44,7 @@
         </form>
         <form method="post"
             action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}"
-            class="d-inline ml-2">
+            class="d-inline ms-2">
             {% csrf_token %}
             <button type="submit" class="btn btn-danger btn-sm" onclick="return confirm('{{ reject_confirm }}')">
                 <i class="fas fa-times"></i> {% trans "Reject" %}

@@ -76,7 +76,7 @@
                                     {% if user == object.owner or user.is_staff %}
                                         <form method="post" action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
                                             {% csrf_token %}
-                                            <button type="submit" class="dropdown-item btn-block text-left text-primary">
+                                            <button type="submit" class="dropdown-item text-start text-primary">
                                                 <i class="fas fa-paper-plane"></i> Submit for Review
                                             </button>
                                         </form>
@@ -87,7 +87,7 @@
                                     {% if user == object.owner or user.is_staff %}
                                         <form method="post" action="{% url 'object_management:withdraw_from_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
                                             {% csrf_token %}
-                                            <button type="submit" class="dropdown-item btn-block text-left text-warning">
+                                            <button type="submit" class="dropdown-item text-start text-warning">
                                                 <i class="fas fa-undo"></i> Withdraw from Review
                                             </button>
                                         </form>
@@ -98,13 +98,13 @@
                                     {% if user.is_staff and user != object.owner or perms.can_moderate and user != object.owner %}
                                         <form method="post" action="{% url 'object_management:approve_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
                                             {% csrf_token %}
-                                            <button type="submit" class="dropdown-item btn-block text-left text-success">
+                                            <button type="submit" class="dropdown-item text-start text-success">
                                                 <i class="fas fa-check"></i> Approve
                                             </button>
                                         </form>
                                         <form method="post" action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
                                             {% csrf_token %}
-                                            <button type="submit" class="dropdown-item btn-block text-left text-danger">
+                                            <button type="submit" class="dropdown-item btn-block text-start text-danger">
                                                 <i class="fas fa-times"></i> Reject
                                             </button>
                                         </form>

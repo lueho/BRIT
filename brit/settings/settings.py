@@ -21,7 +21,6 @@ ALLOWED_HOSTS = []
 INSTALLED_APPS = [
     "django.contrib.sites",
     "registration",
-    "dal",
     "django_tomselect",
     "django.contrib.admin",
     "django.contrib.auth",

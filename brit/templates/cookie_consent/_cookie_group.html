@@ -26,7 +26,7 @@
     <div class="cookie-group-form">
 
         {% if not request|cookie_group_accepted:cookie_group.varname %}
-            <div class="float-left mr-3">
+            <div class="float-start me-3">
                 <form class="cookie-consent-accept"
                       action="{% url "cookie_consent_accept" cookie_group.varname %}"
                       method="POST">
@@ -36,7 +36,7 @@
             </div>
         {% endif %}
         {% if not request|cookie_group_declined:cookie_group.varname %}
-            <div class="float-left mr-3">
+            <div class="float-start me-3">
                 <form class="cookie-consent-decline"
                       action="{% url "cookie_consent_decline" cookie_group.varname %}" method="POST">
                     {% csrf_token %}

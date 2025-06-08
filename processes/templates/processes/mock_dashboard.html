@@ -22,7 +22,7 @@
       <div class="card shadow h-100">
         <div class="card-header">
           <a href="{% url 'processes:type_detail' p.id %}"><strong>{{ p.name }}</strong></a>
-          <span class="badge badge-secondary float-right">{{ p.category }}</span>
+          <span class="badge badge-secondary float-end">{{ p.category }}</span>
         </div>
         <div class="card-body">
           <p class="card-text">
@@ -52,7 +52,7 @@
         </div>
         <div class="card-footer d-flex">
           <div class="dropdown">
-            <button class="btn btn-secondary dropdown-toggle mr-3" type="button" id="navDropdown{{ p.id }}" data-toggle="dropdown" aria-expanded="false">
+            <button class="btn btn-secondary dropdown-toggle me-3" type="button" id="navDropdown{{ p.id }}" data-bs-toggle="dropdown" aria-expanded="false">
               Navigate
             </button>
             <div class="dropdown-menu" aria-labelledby="navDropdown{{ p.id }}">
