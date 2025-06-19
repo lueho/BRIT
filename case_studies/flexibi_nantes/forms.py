@@ -98,8 +98,11 @@ class InlineGrowthShare(InlineFormSetFactory):
 class GrowthShareFormSetHelper(FormHelper):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.template = "bootstrap5/dynamic_table_inline_formset.html"
+        self.template = "bootstrap5/formset_base.html"
         self.form_method = "post"
+        self.form_tag = False
+        # Use table layout instead of div layout
+        self.attrs = {"data-formset-type": "standard", "layout": "table"}
         self.layout = Layout(
             Row(
                 Field("component"),

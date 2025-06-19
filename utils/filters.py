@@ -1,5 +1,6 @@
 from crispy_forms.helper import FormHelper
-from django_filters import FilterSet, RangeFilter
+from django.forms import HiddenInput
+from django_filters import ChoiceFilter, FilterSet, RangeFilter
 
 from utils.fields import NullablePercentageRangeField, NullableRangeField
 
@@ -102,3 +103,41 @@ class NullablePercentageRangeFilter(NullableRangeFilter):
             is_null,
         )
         return super().filter(qs, decimal_range_with_null_flag)
+
+
+class UserCreatedObjectScopedFilterSet(BaseCrispyFilterSet):
+    """FilterSet base class for user-created objects supporting a `scope` parameter.
+
+    Adds a hidden ``scope`` ChoiceFilter that can take the values ``published`` or
+    ``private``. When ``private`` is selected, only objects owned by the
+    requesting user are returned (and an empty queryset for anonymous users).
+    When ``published`` (the default) is selected, only objects with
+    ``publication_status='published'`` are returned.
+    """
+
+    scope = ChoiceFilter(
+        choices=(
+            ("published", "Published"),
+            ("private", "Private"),
+        ),
+        widget=HiddenInput(),
+        method="filter_scope",
+        label="",
+        initial="published",  # Default to published for most contexts
+    )
+
+    def filter_scope(self, queryset, name, value):
+        """Filter *queryset* according to *value* of ``scope``.
+
+        - ``private``: return objects owned by the authenticated user; anonymous
+          users get an empty queryset.
+        - any other value (including ``published`` or empty): return only
+          published objects.
+        """
+        if value == "private":
+            user = getattr(self.request, "user", None)
+            if user is None or not user.is_authenticated:
+                return queryset.none()
+            return queryset.filter(owner=user)
+        # Default / fallback: only published objects
+        return queryset.filter(publication_status="published")

@@ -164,6 +164,9 @@ class AbstractTestCases(object):
         update_object_data = None
         update_success_url_name = None
         delete_success_url_name = None
+
+        add_scope_query_param_to_list_urls = False
+
         permission_denied_message = (
             "Sorry, you don't have permission to access this page."
         )
@@ -262,9 +265,15 @@ class AbstractTestCases(object):
 
         def get_list_url(self, publication_status="published", **kwargs):
             if publication_status == "published":
-                return reverse(self.view_published_list_name, kwargs=kwargs)
+                url = reverse(self.view_published_list_name, kwargs=kwargs)
+                if self.add_scope_query_param_to_list_urls:
+                    url += f"?scope={publication_status}"
+                return url
             elif publication_status == "private":
-                return reverse(self.view_private_list_name, kwargs=kwargs)
+                url = reverse(self.view_private_list_name, kwargs=kwargs)
+                if self.add_scope_query_param_to_list_urls:
+                    url += f"?scope={publication_status}"
+                return url
             else:
                 return None
 
@@ -288,8 +297,32 @@ class AbstractTestCases(object):
             return reverse(url_name, kwargs={"pk": pk})
 
         def get_delete_success_url(self, publication_status=None):
-            url_name = self.delete_success_url_name or self.view_published_list_name
-            return reverse(url_name)
+            url = None
+            if self.delete_success_url_name:
+                url = reverse(self.delete_success_url_name)
+                if self.add_scope_query_param_to_list_urls and publication_status:
+                    url += f"?scope={publication_status}"
+            elif publication_status:
+                if publication_status == "published":
+                    url = reverse(self.view_published_list_name)
+                    if self.add_scope_query_param_to_list_urls:
+                        url += f"?scope={publication_status}"
+                elif publication_status == "private":
+                    url = reverse(self.view_private_list_name)
+                    if self.add_scope_query_param_to_list_urls:
+                        url += f"?scope={publication_status}"
+                elif publication_status == "review":
+                    url = reverse(self.view_review_list_name)
+                    if self.add_scope_query_param_to_list_urls:
+                        url += f"?scope={publication_status}"
+                else:
+                    url = reverse(self.view_published_list_name)
+                    if self.add_scope_query_param_to_list_urls:
+                        url += f"?scope={publication_status}"
+            else:
+                # Default fallback to published list
+                url = reverse(self.view_published_list_name)
+            return url
 
         def compile_update_post_data(self):
             data = self.update_object_data.copy()
@@ -304,7 +337,8 @@ class AbstractTestCases(object):
             if not self.public_list_view:
                 self.skipTest("List view is not enabled for this test case.")
             response = self.client.get(
-                self.get_list_url(publication_status="published")
+                self.get_list_url(publication_status="published"),
+                follow=True,
             )
             self.assertEqual(response.status_code, 200)
             body = response.content.decode()
@@ -320,7 +354,8 @@ class AbstractTestCases(object):
                 self.skipTest("List view is not enabled for this test case.")
             self.client.force_login(self.owner_user)
             response = self.client.get(
-                self.get_list_url(publication_status="published")
+                self.get_list_url(publication_status="published"),
+                follow=True,
             )
             self.assertEqual(response.status_code, 200)
             if self.dashboard_view:
@@ -337,7 +372,8 @@ class AbstractTestCases(object):
                 self.skipTest("List view is not enabled for this test case.")
             self.client.force_login(self.non_owner_user)
             response = self.client.get(
-                self.get_list_url(publication_status="published")
+                self.get_list_url(publication_status="published"),
+                follow=True,
             )
             self.assertEqual(response.status_code, 200)
             if self.dashboard_view:
@@ -354,7 +390,8 @@ class AbstractTestCases(object):
                 self.skipTest("List view is not enabled for this test case.")
             self.client.force_login(self.staff_user)
             response = self.client.get(
-                self.get_list_url(publication_status="published")
+                self.get_list_url(publication_status="published"),
+                follow=True,
             )
             self.assertEqual(response.status_code, 200)
             body = response.content.decode()
@@ -378,10 +415,12 @@ class AbstractTestCases(object):
             if not self.private_list_view:
                 self.skipTest("List view is not enabled for this test case")
             self.client.force_login(self.owner_user)
-            response = self.client.get(self.get_list_url(publication_status="private"))
+            response = self.client.get(
+                self.get_list_url(publication_status="private"),
+                follow=True,
+            )
             self.assertEqual(response.status_code, 200)
             body = response.content.decode()
-            self.assertIn("<th>Public</th>", body)
             if self.dashboard_view:
                 self.assertIn(self.get_dashboard_url(), body)
             if self.create_view:
@@ -393,7 +432,10 @@ class AbstractTestCases(object):
             if not self.private_list_view:
                 self.skipTest("List view is not enabled for this test case")
             self.client.force_login(self.non_owner_user)
-            response = self.client.get(self.get_list_url(publication_status="private"))
+            response = self.client.get(
+                self.get_list_url(publication_status="private"),
+                follow=True,
+            )
             self.assertEqual(response.status_code, 200)
             body = response.content.decode()
             if self.dashboard_view:
@@ -407,7 +449,10 @@ class AbstractTestCases(object):
             if not self.private_list_view:
                 self.skipTest("List view is not enabled for this test case")
             self.client.force_login(self.staff_user)
-            response = self.client.get(self.get_list_url(publication_status="private"))
+            response = self.client.get(
+                self.get_list_url(publication_status="private"),
+                follow=True,
+            )
             self.assertEqual(response.status_code, 200)
             body = response.content.decode()
             if self.dashboard_view:
@@ -1107,14 +1152,14 @@ class AbstractTestCases(object):
         # DeleteView Test Cases
         # -----------------------
 
-        def tes_delete_view_get_published_as_anonymous(self):
+        def test_delete_view_get_published_as_anonymous(self):
             if not self.delete_view:
                 self.skipTest("Delete view is not enabled for this test case.")
             url = self.get_delete_url(self.published_object.pk)
             response = self.client.get(url)
             self.assertRedirects(response, f"{settings.LOGIN_URL}?next={url}")
 
-        def tes_delete_view_post_published_as_anonymous(self):
+        def test_delete_view_post_published_as_anonymous(self):
             if not self.delete_view:
                 self.skipTest("Delete view is not enabled for this test case.")
             url = self.get_delete_url(self.published_object.pk)

@@ -1,10 +1,9 @@
-from django.forms import HiddenInput
-from django_filters import ChoiceFilter, ModelChoiceFilter
+from django_filters import ModelChoiceFilter
 from django_filters import rest_framework as rf_filters
 from django_tomselect.app_settings import TomSelectConfig
 from django_tomselect.widgets import TomSelectModelWidget
 
-from utils.filters import BaseCrispyFilterSet
+from utils.filters import BaseCrispyFilterSet, UserCreatedObjectScopedFilterSet
 
 from .models import Composition, Material, Sample, SampleSeries
 
@@ -24,13 +23,7 @@ class CompositionFilterSet(rf_filters.FilterSet):
         )
 
 
-class SampleFilter(BaseCrispyFilterSet):
-    scope = ChoiceFilter(
-        choices=(("published", "Published"), ("private", "Private")),
-        widget=HiddenInput(),
-        method="filter_scope",
-        label="",
-    )
+class SampleFilter(UserCreatedObjectScopedFilterSet):
     name = ModelChoiceFilter(
         queryset=Sample.objects.none(),
         field_name="name",
@@ -60,14 +53,6 @@ class SampleFilter(BaseCrispyFilterSet):
             "name",
             "material",
         )
-
-    def filter_scope(self, queryset, name, value):
-        """Filter queryset by published vs private depending on scope param."""
-        if value == "private":
-            if not self.request.user.is_authenticated:
-                return queryset.none()
-            return queryset.filter(owner=self.request.user)
-        return queryset.filter(publication_status="published")
 
 
 class PublishedSampleFilter(SampleFilter):

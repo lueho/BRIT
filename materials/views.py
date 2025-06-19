@@ -526,10 +526,7 @@ class SampleUpdateView(UserCreatedObjectUpdateView):
 
 
 class SampleModalDeleteView(UserCreatedObjectModalDeleteView):
-    template_name = "modal_delete.html"
     model = Sample
-    success_message = "Successfully deleted."
-    success_url = reverse_lazy("sample-list")
 
 
 # ----------- Sample Utilities -----------------------------------------------------------------------------------------

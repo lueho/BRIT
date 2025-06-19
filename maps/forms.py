@@ -13,7 +13,6 @@ from django.forms import (
 )
 from django.forms.widgets import CheckboxSelectMultiple, RadioSelect
 from django.urls import reverse
-from django_tomselect.app_settings import PluginClearButton
 from django_tomselect.forms import TomSelectConfig, TomSelectModelChoiceField
 from leaflet.forms.widgets import LeafletWidget
 
@@ -79,13 +78,7 @@ class RegionAttributeValueModelForm(SimpleModelForm):
     region = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="region-autocomplete",
-            placeholder="------",
-            highlight=True,
             label_field="name",
-            open_on_focus=True,
-            plugin_clear_button=PluginClearButton(
-                title="Clear Selection", class_name="clear-button"
-            ),
         ),
         label="Region",
     )
@@ -115,26 +108,14 @@ class CatchmentModelForm(SimpleModelForm):
     region = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="region-autocomplete",
-            placeholder="------",
-            highlight=True,
             label_field="name",
-            open_on_focus=True,
-            plugin_clear_button=PluginClearButton(
-                title="Clear Selection", class_name="clear-button"
-            ),
         ),
         label="Region",
     )
     parent_region = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="region-autocomplete",
-            placeholder="------",
-            highlight=True,
             label_field="name",
-            open_on_focus=True,
-            plugin_clear_button=PluginClearButton(
-                title="Clear Selection", class_name="clear-button"
-            ),
         ),
         label="Parent region",
         required=False,
@@ -155,13 +136,7 @@ class CatchmentCreateDrawCustomForm(SimpleModelForm):
     parent_region = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="region-autocomplete",
-            placeholder="------",
-            highlight=True,
             label_field="name",
-            open_on_focus=True,
-            plugin_clear_button=PluginClearButton(
-                title="Clear Selection", class_name="clear-button"
-            ),
         ),
         label="Parent region",
         required=False,
@@ -185,13 +160,6 @@ class CatchmentCreateMergeLauForm(SimpleModelForm):
     parent_region = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="region-autocomplete",
-            placeholder="------",
-            highlight=True,
-            label_field="name",
-            open_on_focus=True,
-            plugin_clear_button=PluginClearButton(
-                title="Clear Selection", class_name="clear-button"
-            ),
         ),
         label="Parent region",
         required=True,
@@ -216,13 +184,7 @@ class RegionMergeForm(SimpleForm):
     region = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="region-of-lau-autocomplete",
-            placeholder="------",
-            highlight=True,
-            label_field="name",
-            open_on_focus=True,
-            plugin_clear_button=PluginClearButton(
-                title="Clear Selection", class_name="clear-button"
-            ),
+            label_field="text",
         ),
         label="Regions",
         required=False,

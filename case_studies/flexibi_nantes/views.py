@@ -1,11 +1,9 @@
 from crispy_forms.helper import FormHelper
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.urls import reverse
 from django.views.generic import UpdateView
-from django_tomselect.autocompletes import AutocompleteModelView
 from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 
 from maps.models import Catchment, GeoDataset
@@ -17,6 +15,7 @@ from utils.object_management.views import (
     PrivateObjectListView,
     PublishedObjectFilterView,
     PublishedObjectListView,
+    UserCreatedObjectAutocompleteView,
     UserCreatedObjectCreateView,
     UserCreatedObjectDetailView,
     UserCreatedObjectModalCreateView,
@@ -260,23 +259,17 @@ class UpdateGreenhouseGrowthCycleValuesView(LoginRequiredMixin, UpdateView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class NantesGreenhousesCatchmentAutocompleteView(AutocompleteModelView):
+class NantesGreenhousesCatchmentAutocompleteView(UserCreatedObjectAutocompleteView):
     model = Catchment
+    geodataset_model_name = "NantesGreenhouses"
 
     def get_queryset(self):
-        if self.request.user.is_authenticated:
-            qs = Catchment.objects.filter(
-                Q(owner=self.request.user) | Q(publication_status="published")
-            )
-        else:
-            qs = Catchment.objects.filter(publication_status="published")
-        dataset_region = GeoDataset.objects.get(model_name="NantesGreenhouses").region
-        qs = qs.filter(region__borders__geom__within=dataset_region.geom).order_by(
-            "name"
+        dataset_region = GeoDataset.objects.get(
+            model_name=self.geodataset_model_name
+        ).region
+        return Catchment.objects.filter(
+            region__borders__geom__within=dataset_region.geom
         )
-        if self.q:
-            qs = qs.filter(name__icontains=self.q)
-        return qs
 
 
 class GreenhousesPublishedMapView(GeoDataSetPublishedFilteredMapView):

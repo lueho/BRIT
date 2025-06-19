@@ -6,13 +6,14 @@ from django.http import HttpResponse
 from django.urls import reverse_lazy
 from django.views import View
 from django.views.generic import TemplateView
-from django_tomselect.autocompletes import AutocompleteModelView
 
+from utils.forms import TomSelectFormsetHelper
 from utils.object_management.views import (
     PrivateObjectFilterView,
     PrivateObjectListView,
     PublishedObjectFilterView,
     PublishedObjectListView,
+    UserCreatedObjectAutocompleteView,
     UserCreatedObjectCreateView,
     UserCreatedObjectCreateWithInlinesView,
     UserCreatedObjectDetailView,
@@ -98,8 +99,7 @@ class AuthorModalDeleteView(UserCreatedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class AuthorAutocompleteView(AutocompleteModelView):
-    allow_anonymous = True
+class AuthorAutocompleteView(UserCreatedObjectAutocompleteView):
     model = Author
     search_lookups = [
         "last_names__icontains",
@@ -108,10 +108,11 @@ class AuthorAutocompleteView(AutocompleteModelView):
     ordering = "last_names"
     page_size = 10
     value_fields = ["id", "last_names", "first_names"]
+    virtual_fields = ["label"]
 
     def hook_prepare_results(self, results):
         for result in results:
-            result["label"] = f"{result['first_names']}, {result['last_names']}"
+            result["label"] = f"{result['last_names']}, {result['first_names']}"
         return results
 
 
@@ -189,6 +190,7 @@ class SourceCreateView(UserCreatedObjectCreateWithInlinesView):
     form_class = SourceModelForm
     inlines = [SourceAuthorInline]
     permission_required = "bibliography.add_source"
+    formset_helper_class = TomSelectFormsetHelper
 
 
 class SourceModalCreateView(UserCreatedObjectModalCreateView):
@@ -220,6 +222,7 @@ class SourceUpdateView(UserCreatedObjectUpdateWithInlinesView):
     model = Source
     form_class = SourceModelForm
     inlines = [SourceAuthorInline]
+    formset_helper_class = TomSelectFormsetHelper
 
 
 class SourceModalDeleteView(UserCreatedObjectModalDeleteView):
@@ -269,8 +272,7 @@ class SourceListCheckUrlsView(PermissionRequiredMixin, View):
         return HttpResponse(json.dumps(response_data), content_type="application/json")
 
 
-class SourceAutocompleteView(AutocompleteModelView):
-    allow_anonymous = True
+class SourceAutocompleteView(UserCreatedObjectAutocompleteView):
     model = Source
     search_lookups = [
         "title__icontains",
@@ -283,7 +285,7 @@ class SourceAutocompleteView(AutocompleteModelView):
 
     def hook_prepare_results(self, results):
         for result in results:
-            result["label"] = (
-                f"{result['authors__last_names']}, {result['authors__first_names']}. {result['title']}"
-            )
+            formatted_name = f"{result['authors__last_names']}, {result['authors__first_names']}. {result['title']}"
+            result["text"] = formatted_name
+            result["selected_text"] = formatted_name
         return results

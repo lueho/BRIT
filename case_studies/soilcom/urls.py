@@ -42,6 +42,11 @@ urlpatterns = [
         name="collectioncatchment-delete-modal",
     ),
     path(
+        "catchments/autocomplete/",
+        views.CollectionCatchmentAutocompleteView.as_view(),
+        name="collectioncatchment-autocomplete",
+    ),
+    path(
         "catchments/<int:pk>/add_aggregated_property/",
         views.CollectionCatchmentAddAggregatedPropertyView.as_view(),
         name="collectioncatchment-add-aggregatedpropertyvalue",

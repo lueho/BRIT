@@ -1,5 +1,4 @@
 from django.forms import HiddenInput
-from django_tomselect.app_settings import PluginClearButton
 from django_tomselect.forms import TomSelectConfig, TomSelectModelChoiceField
 
 from distributions.models import TemporalDistribution
@@ -19,27 +18,15 @@ class ScenarioModelForm(SimpleModelForm):
     region = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="region-autocomplete",
-            placeholder="------",
-            highlight=True,
             label_field="name",
-            open_on_focus=True,
-            plugin_clear_button=PluginClearButton(
-                title="Clear Selection", class_name="clear-button"
-            ),
         ),
         label="Region",
     )
     catchment = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="catchment-autocomplete",
-            placeholder="------",
             filter_by=("region", "region_id"),
-            highlight=True,
             label_field="name",
-            open_on_focus=True,
-            plugin_clear_button=PluginClearButton(
-                title="Clear Selection", class_name="clear-button"
-            ),
         ),
         label="Catchment",
         required=False,

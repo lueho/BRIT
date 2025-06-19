@@ -1,3 +1,6 @@
+import logging
+from urllib.parse import unquote
+
 from bootstrap_modal_forms.generic import (
     BSModalCreateView,
     BSModalDeleteView,
@@ -338,6 +341,14 @@ class PrivateObjectFilterView(PrivateObjectListMixin, FilterDefaultsMixin, Filte
     A view to display a list of objects owned by the currently logged-in user with default filters applied.
     """
 
+    def get_default_filters(self):
+        """Override to set scope to 'private' for private object views."""
+        initial_values = super().get_default_filters()
+        # Override scope to 'private' for private views
+        if "scope" in self.filterset_class.base_filters:
+            initial_values["scope"] = "private"
+        return initial_values
+
     def get_template_names(self):
         template_names = super().get_template_names()
         template_names.append("filtered_list.html")
@@ -359,7 +370,10 @@ class PublishedObjectListView(PublishedObjectListMixin, ListView):
         return context
 
     def get_template_names(self):
-        template_names = super().get_template_names()
+        try:
+            template_names = super().get_template_names()
+        except ImproperlyConfigured:
+            template_names = []
         template_names.append("simple_list_card.html")
         return template_names
 
@@ -631,7 +645,7 @@ class UserCreatedObjectCreateWithInlinesView(
             {
                 "form_title": f"Create New {self.form_class._meta.model._meta.verbose_name}",
                 "submit_button_text": "Save",
-                "formset_helper": self.formset_helper_class,
+                "formset_helper": self.formset_helper_class(),
             }
         )
         return context
@@ -641,7 +655,7 @@ class UserCreatedObjectCreateWithInlinesView(
             template_names = super().get_template_names()
         except ImproperlyConfigured:
             template_names = []
-        template_names.append("form_with_inlines_card.html")
+        template_names.append("formsets_card.html")
         return template_names
 
 
@@ -656,7 +670,7 @@ class UserCreatedObjectUpdateWithInlinesView(
             {
                 "form_title": f"Update {self.object._meta.verbose_name}",
                 "submit_button_text": "Save",
-                "formset_helper": self.formset_helper_class,
+                "formset_helper": self.formset_helper_class(),
             }
         )
         return context
@@ -666,7 +680,7 @@ class UserCreatedObjectUpdateWithInlinesView(
             template_names = super().get_template_names()
         except ImproperlyConfigured:
             template_names = []
-        template_names.append("form_with_inlines_card.html")
+        template_names.append("formsets_card.html")
         return template_names
 
 
@@ -735,7 +749,38 @@ class UserCreatedObjectModalDeleteView(
         return context
 
     def get_success_url(self):
-        return self.success_url or self.model.public_list_url()
+        if self.success_url:
+            return self.success_url
+
+        if self.object:
+            # Determine if this model should use scope parameters in redirect URLs
+            # by checking if it's one of the models that have scope-filtered list views
+            model_name = self.model.__name__
+            # All UserCreatedObject models now have scope filters in their filtersets
+            models_with_scope_filtering = ['Scenario', 'Collection', 'WasteFlyer', 'Collector']
+            
+            if model_name in models_with_scope_filtering:
+                # Add scope parameter for models that support scope filtering
+                if self.object.publication_status == "published":
+                    url = self.model.public_list_url()
+                    return f"{url}?scope=published"
+                elif self.object.publication_status == "private":
+                    url = self.model.private_list_url()
+                    return f"{url}?scope=private"
+                elif self.object.publication_status == "review":
+                    url = self.model.review_list_url()
+                    return f"{url}?scope=review"
+            else:
+                # For models without scope filtering, use standard URLs without scope params
+                if self.object.publication_status == "published":
+                    return self.model.public_list_url()
+                elif self.object.publication_status == "private":
+                    return self.model.private_list_url()
+                elif self.object.publication_status == "review":
+                    return self.model.review_list_url()
+        
+        # Fallback to public list without scope
+        return self.model.public_list_url()
 
 
 class OwnedObjectModelSelectOptionsView(
@@ -746,18 +791,100 @@ class OwnedObjectModelSelectOptionsView(
 
 class UserCreatedObjectAutocompleteView(AutocompleteModelView):
     search_lookups = ["name__icontains"]
+    value_fields = [
+        "name",
+    ]
     ordering = ["name"]
     allow_anonymous = True
     page_size = 15
 
     def apply_filters(self, queryset):
-        print(self.filter_by)
-        lookup, value = unquote(self.filter_by).replace("'", "").split("=")
-        print(lookup, value)
+        # Add comprehensive logging to trace parameter passing
+        logger = logging.getLogger(__name__)
+        logger.debug(f"=== UserCreatedObjectAutocompleteView.apply_filters DEBUG ===")
+        logger.debug(f"Raw self.filter_by: {repr(self.filter_by)}")
+        logger.debug(f"self.request.GET: {dict(self.request.GET)}")
+        logger.debug(f"self.request.POST: {dict(self.request.POST)}")
+        logger.debug(f"Queryset model: {queryset.model}")
+
+        # If no scope is given, default to public objects
+        if not self.filter_by:
+            logger.debug("No filter_by found, returning original queryset")
+            return queryset
+
+        try:
+            logger.debug(f"Before unquote: {repr(self.filter_by)}")
+            unquoted = unquote(self.filter_by)
+            logger.debug(f"After unquote: {repr(unquoted)}")
+            cleaned = unquoted.replace("'", "")
+            logger.debug(f"After quote removal: {repr(cleaned)}")
+
+            if "=" not in cleaned:
+                logger.warning(
+                    f"No '=' found in filter_by: {repr(cleaned)}, returning original queryset"
+                )
+                return queryset
+
+            lookup, value = cleaned.split(
+                "=", 1
+            )  # Use maxsplit=1 to handle multiple '=' chars
+            logger.debug(f"Parsed - lookup: {repr(lookup)}, value: {repr(value)}")
+
+        except Exception as e:
+            logger.error(f"Error parsing filter_by '{self.filter_by}': {e}")
+            return queryset
+
+        if not value:
+            value = "published"
+            logger.debug(f"Empty value, defaulting to: {repr(value)}")
+
+        logger.debug(f"Final lookup: {repr(lookup)}, Final value: {repr(value)}")
+
         if lookup == "scope__name":
+            logger.debug(f"Processing scope__name filter with value: {repr(value)}")
             if value == "private":
+                logger.debug("Applying private scope filter")
                 if not self.request.user.is_authenticated:
-                    return queryset.none()
-                return queryset.filter(owner=self.request.user)
+                    logger.debug("User not authenticated, returning empty queryset")
+                    queryset = queryset.none()
+                else:
+                    logger.debug(f"Filtering by owner: {self.request.user}")
+                    queryset = queryset.filter(owner=self.request.user)
             elif value == "published":
-                return queryset.filter(publication_status="published")
+                logger.debug("Applying published scope filter")
+                queryset = queryset.filter(publication_status="published")
+            else:
+                logger.warning(
+                    f"Unexpected scope value: {repr(value)}, expected 'private' or 'published'. Defaulting to 'published' behavior."
+                )
+                queryset = queryset.filter(publication_status="published")
+        # Generic guard: skip obviously invalid values (e.g. the language code accidentally
+        # injected in the request) that would break lookups expecting an integer PK.
+        # Django would raise FieldError / ValueError when trying to cast the string to int.
+        if (
+            value
+            and isinstance(value, str)
+            and value.lower() in {"en-us", "en", "de", "fr"}
+        ):
+            logger.warning(
+                "Invalid language code %s supplied for lookup %s – skipping this filter to "
+                "avoid EmptyQuerySet and widget validation errors.",
+                value,
+                lookup,
+            )
+            return queryset
+
+        # Additional guard for *_id style lookups that require an integer value.
+        if lookup.endswith("_id") and value and not value.isdigit():
+            logger.warning(
+                "Non-numeric value %s supplied for integer lookup %s – skipping filter.",
+                value,
+                lookup,
+            )
+            return queryset
+        else:
+            logger.debug(f"Non-scope lookup: {repr(lookup)}, not processing")
+
+        logger.debug(f"Final queryset count: {queryset.count()}")
+        logger.debug(f"=== End apply_filters DEBUG ===")
+        return queryset

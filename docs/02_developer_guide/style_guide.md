@@ -28,7 +28,7 @@ This document outlines the coding and documentation conventions for the BRIT pro
 
 ## HTML & CSS
 - Use semantic HTML5 elements.
-- Use Bootstrap 4 classes for layout and components.
+- Use Bootstrap 5 classes for layout and components.
 - Place custom styles in `static/css/` and scope them to avoid conflicts.
 - Use BEM naming for custom CSS classes.
 

@@ -275,4 +275,7 @@ TOMSELECT = {
         "open_on_focus": True,
         "preload": "focus",
     },
+    "PLUGINS": {
+        "clear_button": {"title": "Clear Selection", "class_name": "clear-button"},
+    },
 }

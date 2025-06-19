@@ -1,20 +1,23 @@
 from decimal import ROUND_HALF_UP, Decimal
 
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Field, Layout, Row
+from crispy_forms.layout import HTML, Field, Layout, Row
 from django.core.exceptions import ValidationError
 from django.forms import (
+    DateTimeInput,
     DecimalField,
     HiddenInput,
     ModelChoiceField,
     NumberInput,
     Widget,
-    DateTimeInput,
 )
 from django.forms.models import BaseInlineFormSet
 from django.utils.safestring import mark_safe
-from django_tomselect.app_settings import PluginClearButton, TomSelectConfig
-from django_tomselect.forms import TomSelectModelMultipleChoiceField, TomSelectModelChoiceField
+from django_tomselect.forms import (
+    TomSelectConfig,
+    TomSelectModelChoiceField,
+    TomSelectModelMultipleChoiceField,
+)
 from extra_views import InlineFormSetFactory
 
 from bibliography.models import Source
@@ -107,16 +110,11 @@ class AnalyticalMethodModelForm(SimpleModelForm):
     sources = TomSelectModelMultipleChoiceField(
         config=TomSelectConfig(
             url="source-autocomplete",
-            placeholder="------",
-            highlight=True,
             label_field="label",
-            open_on_focus=True,
-            plugin_clear_button=PluginClearButton(
-                title="Clear Selection", class_name="clear-button"
-            ),
         ),
         attrs={"class": "form-control mb-3"},
         label="Sources",
+        required=False,
         help_text="Optional: Select multiple sources if applicable.",
     )
 
@@ -161,39 +159,25 @@ class SampleModelForm(SimpleModelForm):
     material = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="material-autocomplete",
-            placeholder="------",
-            highlight=True,
-            open_on_focus=True,
-            plugin_clear_button=PluginClearButton(
-                title="Clear Selection", class_name="clear-button"
-            ),
+            label_field="name",
         ),
         label="Material",
     )
     series = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="sampleseries-autocomplete",
-            placeholder="------",
-            highlight=True,
-            open_on_focus=True,
-            plugin_clear_button=PluginClearButton(
-                title="Clear Selection", class_name="clear-button"
-            ),
         ),
+        required=False,
         label="Series",
     )
     sources = TomSelectModelMultipleChoiceField(
         config=TomSelectConfig(
             url="source-autocomplete",
-            placeholder="------",
-            highlight=True,
-            open_on_focus=True,
-            plugin_clear_button=PluginClearButton(
-                title="Clear Selection", class_name="clear-button"
-            ),
+            label_field="label",
         ),
         attrs={"class": "form-control mb-3"},
         label="Single Select",
+        required=False,
         help_text="Example of single select with autocomplete and clear button.",
     )
 
@@ -392,10 +376,21 @@ class WeightShareModelForm(SimpleModelForm):
 
 
 class WeightShareInlineForm(WeightShareModelForm):
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, user=None, **kwargs):
+        """Hide component label, pass current user for ownership and pre-populate owner on the instance."""
         super().__init__(*args, **kwargs)
-        self.fields.get("component").label = " "
-        self.fields.get("component").required = False
+        self.user = user
+        if self.user and not getattr(self.instance, "owner_id", None):
+            self.instance.owner = self.user
+
+    def save(self, commit=True):
+        obj = super().save(commit=False)
+        # Ensure owner is set programmatically
+        if not getattr(obj, "owner_id", None):
+            obj.owner = self.user
+        if commit:
+            obj.save()
+        return obj
 
 
 class WeightShareInlineFormset(BaseInlineFormSet):
@@ -426,34 +421,41 @@ class WeightShareInlineFormset(BaseInlineFormSet):
 
 class InlineWeightShare(InlineFormSetFactory):
     model = WeightShare
-    fields = ("owner", "component", "average", "standard_deviation")
+    fields = ("component", "average", "standard_deviation")
     factory_kwargs = {
-        "form": WeightShareModelForm,
+        "form": WeightShareInlineForm,
         "formset": WeightShareInlineFormset,
         "extra": 0,
         "min_num": 1,
         "can_delete": True,
-        "widgets": {
-            "owner": HiddenInput(),
-        },
     }
 
     def get_formset_kwargs(self):
         kwargs = super().get_formset_kwargs()
-        kwargs["form_kwargs"] = {"initial": {"owner": self.request.user}}
+        # Pass current user to each inline form so it can set owner automatically
+        kwargs["form_kwargs"] = {"user": self.request.user}
         return kwargs
 
 
 class WeightShareUpdateFormSetHelper(FormHelper):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.template = "bootstrap5/dynamic_table_inline_formset.html"
+        self.template = "bootstrap5/formset_base.html"
         self.form_method = "post"
+        self.form_tag = False
+        # Use table layout instead of div layout
+        self.attrs = {"data-formset-type": "standard", "layout": "table"}
         self.layout = Layout(
             Row(
                 Field("component"),
                 Field("average"),
                 Field("standard_deviation"),
+                Field(
+                    "DELETE",
+                    type="hidden",
+                    wrapper_class="d-none",
+                    css_class="d-none",
+                ),
             ),
         )
         self.render_required_fields = True
@@ -507,8 +509,11 @@ class AddTemporalDistributionForm(ModalModelForm):
 class ComponentShareDistributionFormSetHelper(FormHelper):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.template = "bootstrap5/dynamic_table_inline_formset.html"
+        self.template = "bootstrap5/formset_base.html"
         self.form_method = "post"
+        self.form_tag = False
+        # Use table layout instead of div layout
+        self.attrs = {"data-formset-type": "standard", "layout": "table"}
         self.layout = Layout(
             Row(
                 Field("component"),

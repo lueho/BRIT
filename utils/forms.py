@@ -91,17 +91,60 @@ class ModalModelForm(ModalModelFormMixin, ModelForm):
     """
 
 
-class DynamicTableInlineFormSetHelper(FormHelper):
-    """
-    Formhelper that is used to render Formsets as table that includes a plus button in the table footer to add
-    additional forms as rows.
+class BaseFormsetHelper(FormHelper):
+    """Base FormHelper class for formsets.
+
+    This abstract base helper provides common functionality for all formset helpers.
+    Configure formset_type in subclasses to specify the formset behavior.
     """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.template = "bootstrap5/dynamic_table_inline_formset.html"
+        self.template = "bootstrap5/formset_base.html"
         self.form_method = "post"
         self.form_tag = False
+        self.formset_type = "standard"
+
+        # Add formset_type to the helper context
+        if not hasattr(self, "attrs"):
+            self.attrs = {}
+        self.attrs["data-formset-type"] = self.formset_type
+
+
+class DynamicFormsetHelper(BaseFormsetHelper):
+    """FormHelper for standard dynamic formsets.
+
+    Renders formsets with add/remove functionality but no advanced field features.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.formset_type = "standard"
+
+
+class DynamicTableInlineFormSetHelper(BaseFormsetHelper):
+    """FormHelper that renders formsets as a table with add/remove buttons.
+
+    Includes a plus button in the table footer to add additional forms as rows.
+    Maintained for backward compatibility.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.template = "bootstrap5/formset_base.html"  # Use the base template directly
+        self.formset_type = "standard"
+
+
+class TomSelectFormsetHelper(BaseFormsetHelper):
+    """FormHelper for formsets with TomSelect fields.
+
+    Renders formsets with TomSelect autocomplete functionality and add/remove buttons.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.template = "bootstrap5/formset_tomselect.html"
+        self.formset_type = "tomselect"
 
 
 class M2MInlineFormSet(BaseFormSet):

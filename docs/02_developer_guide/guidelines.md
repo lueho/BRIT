@@ -139,6 +139,6 @@ class ExampleTestCase(TestCase):
    - Many models inherit from `UserCreatedObject`.
    - Views inherit from `UserCreatedObjectCreateView`, etc.
 4. **Frontend:**
-   - Bootstrap 4 for UI; Crispy Forms for forms; Bootstrap Modal Forms for dialogs.
+   - Bootstrap 5 for UI; Crispy Forms for forms; Bootstrap Modal Forms for dialogs.
    - Planned upgrade to Bootstrap 5.
    - Long-term goal: phase out jQuery; write new code with this in mind.

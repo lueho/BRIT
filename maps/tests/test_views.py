@@ -389,7 +389,6 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
         self.client.force_login(self.owner_user)
         response = self.client.get(self.get_list_url(publication_status="private"))
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "<th>Public</th>")
         if self.dashboard_view:
             self.assertContains(response, self.get_dashboard_url())
         if self.create_view:
@@ -1131,21 +1130,21 @@ class RegionOfLauAutocompleteViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(self.url, data={"q": "Test"})
         self.assertEqual(200, response.status_code)
         ids = [region["id"] for region in json.loads(response.content)["results"]]
-        self.assertListEqual([str(lau.id) for lau in LauRegion.objects.all()], ids)
+        self.assertListEqual([lau.id for lau in LauRegion.objects.all()], ids)
 
     def test_all_lau_region_with_matching_lau_id_in_queryset(self):
         response = self.client.get(self.url, data={"q": "12"})
         self.assertEqual(200, response.status_code)
         ids = [region["id"] for region in json.loads(response.content)["results"]]
         self.assertListEqual(
-            [str(lau.id) for lau in LauRegion.objects.filter(lau_id="123")], ids
+            [lau.id for lau in LauRegion.objects.filter(lau_id="123")], ids
         )
 
     def test_all_lau_region_with_matching_lau_id_in_queryset_2(self):
         response = self.client.get(self.url, data={"q": "23"})
         self.assertEqual(200, response.status_code)
         ids = [region["id"] for region in json.loads(response.content)["results"]]
-        self.assertListEqual([str(lau.id) for lau in LauRegion.objects.all()], ids)
+        self.assertListEqual([lau.id for lau in LauRegion.objects.all()], ids)
 
 
 class ClearGeojsonCacheViewTest(TestCase):

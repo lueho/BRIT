@@ -8,7 +8,6 @@ from django.shortcuts import redirect, render
 from django.views.generic import CreateView, DetailView, View
 from django.views.generic.base import TemplateResponseMixin
 from django.views.generic.edit import ModelFormMixin
-from django_tomselect.autocompletes import AutocompleteModelView
 from rest_framework.views import APIView
 
 from layer_manager.models import Layer
@@ -19,6 +18,7 @@ from materials.models import SampleSeries
 from utils.object_management.views import (
     PrivateObjectFilterView,
     PublishedObjectFilterView,
+    UserCreatedObjectAutocompleteView,
     UserCreatedObjectCreateView,
     UserCreatedObjectDetailView,
     UserCreatedObjectModalDeleteView,
@@ -53,12 +53,6 @@ class SeasonalDistributionCreateView(LoginRequiredMixin, CreateView):
 
 # ----------- Scenario CRUD --------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
-
-
-class ScenarioNameAutocompleteView(AutocompleteModelView):
-    model = Scenario
-    search_lookups = ["name__icontains"]
-    ordering = ["name"]
 
 
 class PublishedScenarioFilterView(PublishedObjectFilterView):
@@ -112,6 +106,14 @@ class ScenarioUpdateView(UserCreatedObjectUpdateView):
 
 
 class ScenarioModalDeleteView(UserCreatedObjectModalDeleteView):
+    model = Scenario
+
+
+# ----------- Scenario Utils -------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class ScenarioAutocompleteView(UserCreatedObjectAutocompleteView):
     model = Scenario
 
 

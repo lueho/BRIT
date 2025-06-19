@@ -404,7 +404,7 @@ class CollectionFilterTestCase(TestCase):
         self.data.update({"connection_rate_min": 50, "connection_rate_max": 99})
         filtr = CollectionFilterSet(self.data, queryset=Collection.objects.all())
         self.assertInHTML(
-            '<span class="numeric-slider-range-text font-italic" id="id_connection_rate_text">50% - 99%</span>',
+            '<span class="numeric-slider-range-text fst-italic" id="id_connection_rate_text">50% - 99%</span>',
             filtr.form.as_p(),
         )
 
@@ -552,7 +552,7 @@ class CollectionFilterTestCase(TestCase):
     def test_collections_per_year_range_filter_renders_with_calculated_boundaries(self):
         filtr = CollectionFilterSet(self.data, queryset=Collection.objects.all())
         self.assertInHTML(
-            '<span class="numeric-slider-range-text font-italic" id="id_collections_per_year_text">0 - 70</span>',
+            '<span class="numeric-slider-range-text fst-italic" id="id_collections_per_year_text">0 - 70</span>',
             filtr.form.as_p(),
         )
 

@@ -40,6 +40,12 @@ from .models import (
 
 
 class CollectorFilter(BaseCrispyFilterSet):
+    scope = ChoiceFilter(
+        choices=(("published", "Published"), ("private", "Private")),
+        widget=HiddenInput(),
+        method="filter_scope",
+        label="",
+    )
     name = CharFilter(lookup_expr="icontains")
     catchment = CharFilter(
         lookup_expr="name__icontains", label="Catchment name contains"
@@ -47,7 +53,7 @@ class CollectorFilter(BaseCrispyFilterSet):
 
     class Meta:
         model = Collector
-        fields = ("name", "catchment")
+        fields = ("scope", "name", "catchment")
 
 
 class CollectionCatchmentFilterSet(BaseCrispyFilterSet):
@@ -468,6 +474,12 @@ class CollectionFilterSet(BaseCrispyFilterSet):
 
 
 class WasteFlyerFilter(BaseCrispyFilterSet):
+    scope = ChoiceFilter(
+        choices=(("published", "Published"), ("private", "Private")),
+        widget=HiddenInput(),
+        method="filter_scope",
+        label="",
+    )
     url_valid = BooleanFilter(
         widget=RadioSelect(choices=((True, "True"), (False, "False")))
     )
@@ -494,7 +506,7 @@ class WasteFlyerFilter(BaseCrispyFilterSet):
 
     class Meta:
         model = WasteFlyer
-        fields = ("url_valid", "url_checked_before", "url_checked_after", "catchment")
+        fields = ("scope", "url_valid", "url_checked_before", "url_checked_after", "catchment")
 
     @staticmethod
     def get_catchment(qs, _, value):

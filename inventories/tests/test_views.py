@@ -1,7 +1,7 @@
 from maps.models import Catchment, Region
 from utils.tests.testcases import AbstractTestCases
-from ..models import Scenario
 
+from ..models import Scenario
 
 # ----------- Scenario CRUD --------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
@@ -12,26 +12,32 @@ class ScenarioCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
 
     model = Scenario
 
-    view_create_name = 'scenario-create'
-    view_published_list_name = 'scenario-list'
-    view_private_list_name = 'scenario-list-owned'
-    view_detail_name = 'scenario-detail'
-    view_update_name = 'scenario-update'
-    view_delete_name = 'scenario-delete-modal'
+    view_create_name = "scenario-create"
+    view_published_list_name = "scenario-list"
+    view_private_list_name = "scenario-list-owned"
+    view_detail_name = "scenario-detail"
+    view_update_name = "scenario-update"
+    view_delete_name = "scenario-delete-modal"
 
-    create_object_data = {'name': 'Test Scenario'}
-    update_object_data = {'name': 'Updated Test Scenario'}
+    add_scope_query_param_to_list_urls = True
+
+    create_object_data = {"name": "Test Scenario"}
+    update_object_data = {"name": "Updated Test Scenario"}
 
     @classmethod
     def create_related_objects(cls):
-        region = Region.objects.create(name='Test Region')
+        region = Region.objects.create(name="Test Region")
         return {
-            'region': region,
-            'catchment': Catchment.objects.create(name='Test Catchment', region=region, parent_region=region)
+            "region": region,
+            "catchment": Catchment.objects.create(
+                name="Test Catchment", region=region, parent_region=region
+            ),
         }
 
 
-class ScenarioResultCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+class ScenarioResultCRUDViewsTestCase(
+    AbstractTestCases.UserCreatedObjectCRUDViewTestCase
+):
     dashboard_view = False
     create_view = False
     public_list_view = False
@@ -41,14 +47,16 @@ class ScenarioResultCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDVie
     update_view = False
 
     model = Scenario
-    view_detail_name = 'scenario-result'
+    view_detail_name = "scenario-result"
 
-    create_object_data = {'name': 'Test Scenario'}
+    create_object_data = {"name": "Test Scenario"}
 
     @classmethod
     def create_related_objects(cls):
-        region = Region.objects.create(name='Test Region')
+        region = Region.objects.create(name="Test Region")
         return {
-            'region': region,
-            'catchment': Catchment.objects.create(name='Test Catchment', region=region, parent_region=region)
+            "region": region,
+            "catchment": Catchment.objects.create(
+                name="Test Catchment", region=region, parent_region=region
+            ),
         }

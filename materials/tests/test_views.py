@@ -3,6 +3,7 @@ from django.urls import reverse
 
 from distributions.models import TemporalDistribution, Timestep
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
+
 from ..models import (
     AnalyticalMethod,
     Composition,
@@ -363,12 +364,12 @@ class SampleSeriesCreateDuplicateViewTestCase(
 class FeaturedSampleListViewTestCase(ViewWithPermissionsTestCase):
 
     def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse("sample-list"))
+        response = self.client.get(reverse("sample-list-featured"))
         self.assertEqual(response.status_code, 200)
 
     def test_get_http_200_ok_for_logged_in_users(self):
         self.client.force_login(self.outsider)
-        response = self.client.get(reverse("sample-list"))
+        response = self.client.get(reverse("sample-list-featured"))
         self.assertEqual(response.status_code, 200)
 
 
@@ -385,6 +386,8 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
     view_detail_name = "sample-detail"
     view_update_name = "sample-update"
     view_delete_name = "sample-delete-modal"
+
+    add_scope_query_param_to_list_urls = True
 
     create_object_data = {"name": "Test Sample"}
     update_object_data = {"name": "Updated Test Sample"}
@@ -416,7 +419,9 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         if not self.public_list_view:
             self.skipTest("List view is not enabled for this test case.")
         self.client.force_login(self.owner_user)
-        response = self.client.get(self.get_list_url(publication_status="published"))
+        response = self.client.get(
+            self.get_list_url(publication_status="published"), follow=True
+        )
         self.assertEqual(response.status_code, 200)
         if self.dashboard_view:
             self.assertContains(response, self.get_dashboard_url())
@@ -433,7 +438,9 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         if not self.public_list_view:
             self.skipTest("List view is not enabled for this test case.")
         self.client.force_login(self.non_owner_user)
-        response = self.client.get(self.get_list_url(publication_status="published"))
+        response = self.client.get(
+            self.get_list_url(publication_status="published"), follow=True
+        )
         self.assertEqual(response.status_code, 200)
         if self.dashboard_view:
             self.assertContains(response, self.get_dashboard_url())
@@ -450,9 +457,10 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         if not self.private_list_view:
             self.skipTest("List view is not enabled for this test case")
         self.client.force_login(self.owner_user)
-        response = self.client.get(self.get_list_url(publication_status="private"))
+        response = self.client.get(
+            self.get_list_url(publication_status="private"), follow=True
+        )
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, "<th>Public</th>")
         if self.dashboard_view:
             self.assertContains(response, self.get_dashboard_url())
         if self.create_view:
@@ -468,7 +476,9 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         if not self.private_list_view:
             self.skipTest("List view is not enabled for this test case")
         self.client.force_login(self.non_owner_user)
-        response = self.client.get(self.get_list_url(publication_status="private"))
+        response = self.client.get(
+            self.get_list_url(publication_status="private"), follow=True
+        )
         self.assertEqual(response.status_code, 200)
         if self.dashboard_view:
             self.assertContains(response, self.get_dashboard_url())

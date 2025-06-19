@@ -2,7 +2,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.contrib.gis.geos import MultiPolygon
 from django.core.exceptions import ImproperlyConfigured
 from django.db import transaction
-from django.db.models import Q, Subquery
+from django.db.models import Subquery
 from django.forms import formset_factory
 from django.http import JsonResponse
 from django.urls import NoReverseMatch, reverse, reverse_lazy
@@ -10,7 +10,6 @@ from django.views import View
 from django.views.generic import TemplateView
 from django.views.generic.edit import FormMixin
 from django_filters.views import FilterView
-from django_tomselect.autocompletes import AutocompleteModelView
 from rest_framework.exceptions import NotFound, ParseError
 from rest_framework.views import APIView, Response
 
@@ -24,7 +23,7 @@ from maps.serializers import (
     NutsRegionSummarySerializer,
     RegionGeoFeatureModelSerializer,
 )
-from utils.forms import DynamicTableInlineFormSetHelper
+from utils.forms import DynamicTableInlineFormSetHelper, TomSelectFormsetHelper
 from utils.object_management.views import (
     CreateUserObjectMixin,
     OwnedObjectModelSelectOptionsView,
@@ -32,6 +31,7 @@ from utils.object_management.views import (
     PrivateObjectListView,
     PublishedObjectFilterView,
     PublishedObjectListView,
+    UserCreatedObjectAutocompleteView,
     UserCreatedObjectCreateView,
     UserCreatedObjectDetailView,
     UserCreatedObjectModalCreateView,
@@ -509,7 +509,7 @@ class CatchmentCreateMergeLauView(UserCreatedObjectCreateView):
     formset_model = Region
     formset_class = RegionMergeFormSet
     formset_form_class = RegionMergeForm
-    formset_helper_class = DynamicTableInlineFormSetHelper
+    formset_helper_class = TomSelectFormsetHelper
     formset_factory_kwargs = {"extra": 2}
     permission_required = "maps.add_catchment"
 
@@ -554,7 +554,7 @@ class CatchmentCreateMergeLauView(UserCreatedObjectCreateView):
     def get_context_data(self, **kwargs):
         if "formset" not in kwargs:
             kwargs["formset"] = self.get_formset()
-        kwargs["formset_helper"] = self.formset_helper_class
+        kwargs["formset_helper"] = self.formset_helper_class()
         return super().get_context_data(**kwargs)
 
     def form_valid(self, form):
@@ -582,28 +582,33 @@ class CatchmentModalDeleteView(UserCreatedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CatchmentAutocompleteView(AutocompleteModelView):
+class CatchmentAutocompleteView(UserCreatedObjectAutocompleteView):
     model = Catchment
-    search_lookups = ["name__icontains"]
-    ordering = ["name"]
-    allow_anonymous = True
-    page_size = 15
+    geodataset_model_name = None
+
+    def get_region(self):
+        return GeoDataset.objects.get(model_name=self.geodataset_model_name).region
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if self.geodataset_model_name:
+            queryset = queryset.filter(
+                region__borders__geom__within=self.get_region().geom
+            )
+        return queryset
 
 
 # ----------- Region Utils ---------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class RegionAutocompleteView(AutocompleteModelView):
+class RegionAutocompleteView(UserCreatedObjectAutocompleteView):
     model = Region
-    search_lookups = ["name__icontains"]
-    ordering = ["name"]
 
 
-class NutsRegionAutocompleteView(AutocompleteModelView):
+class NutsRegionAutocompleteView(UserCreatedObjectAutocompleteView):
     model = NutsRegion
     search_lookups = ["name__icontains", "code__icontains"]
-    ordering = ["name"]
 
     def apply_filters(self, qs):
         """
@@ -621,20 +626,28 @@ class NutsRegionAutocompleteView(AutocompleteModelView):
         return qs
 
 
-class RegionOfLauAutocompleteView(AutocompleteModelView):
+class RegionOfLauAutocompleteView(UserCreatedObjectAutocompleteView):
     model = Region
-    search_lookups = ["name__icontains"]
-    ordering = ["name"]
+    search_lookups = ["name__icontains", "lauregion__lau_id__contains"]
+    value_fields = ["name", "lauregion__lau_id", "lauregion__lau_name"]
 
-    def get_queryset(self):
-        qs = Region.objects.filter(
-            pk__in=Subquery(LauRegion.objects.all().values("pk"))
-        ).order_by("name")
-        if self.q:
-            qs = qs.filter(
-                Q(name__icontains=self.q) | Q(lauregion__lau_id__contains=self.q)
-            )
-        return qs
+    def hook_queryset(self, queryset):
+        """
+        Filter Regions to only show those that have a corresponding LAU Region.
+        """
+        return queryset.filter(pk__in=Subquery(LauRegion.objects.all().values("pk")))
+
+    def hook_prepare_results(self, results):
+        """
+        Customize the display label to include the LAU ID code, similar to
+        LauRegion.__str__ method: f"{self.lau_name} ({self.lau_id})"
+        """
+        for item in results:
+            # Get the LAU ID from the related LauRegion object
+            lau_id = item.get("lauregion__lau_id")
+            lau_name = item.get("lauregion__lau_name")
+            item["text"] = f"{lau_name} ({lau_id})"
+        return results
 
 
 class CatchmentOptionGeometryAPI(APIView):
@@ -725,6 +738,7 @@ class CatchmentRegionSummaryAPIView(APIView):
 
 
 class NutsRegionPublishedMapView(GeoDataSetPublishedFilteredMapView):
+    model = NutsRegion
     model_name = "NutsRegion"
     template_name = "nuts_region_map.html"
     filterset_class = NutsRegionFilterSet

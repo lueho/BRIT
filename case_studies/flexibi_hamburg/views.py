@@ -1,10 +1,7 @@
-from django.db.models import Q
 from django.utils.decorators import method_decorator
 from django.views.decorators.clickjacking import xframe_options_exempt
-from django_tomselect.autocompletes import AutocompleteModelView
 
-from maps.models import Catchment, GeoDataset
-from maps.views import GeoDataSetPublishedFilteredMapView
+from maps.views import CatchmentAutocompleteView, GeoDataSetPublishedFilteredMapView
 from utils.file_export.views import GenericUserCreatedObjectExportView
 
 from .filters import HamburgRoadsideTreesFilterSet
@@ -31,22 +28,5 @@ class HamburgRoadsideTreesListFileExportView(GenericUserCreatedObjectExportView)
     model_label = "flexibi_hamburg.HamburgRoadsideTrees"
 
 
-class HamburgRoadsideTreeCatchmentAutocompleteView(AutocompleteModelView):
-    model = Catchment
-
-    def get_queryset(self):
-        if self.request.user.is_authenticated:
-            qs = Catchment.objects.filter(
-                Q(owner=self.request.user) | Q(publication_status="published")
-            )
-        else:
-            qs = Catchment.objects.filter(publication_status="published")
-        dataset_region = GeoDataset.objects.get(
-            model_name="HamburgRoadsideTrees"
-        ).region
-        qs = qs.filter(region__borders__geom__within=dataset_region.geom).order_by(
-            "name"
-        )
-        if self.q:
-            qs = qs.filter(name__icontains=self.q)
-        return qs
+class HamburgRoadsideTreeCatchmentAutocompleteView(CatchmentAutocompleteView):
+    geodataset_model_name = "HamburgRoadsideTrees"

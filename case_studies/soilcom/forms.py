@@ -14,7 +14,6 @@ from django.forms import (
     RadioSelect,
 )
 from django.utils.translation import gettext as _
-from django_tomselect.app_settings import PluginClearButton
 from django_tomselect.forms import (
     TomSelectConfig,
     TomSelectModelChoiceField,
@@ -56,13 +55,7 @@ class CollectorModelForm(SimpleModelForm):
     catchment = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="catchment-autocomplete",
-            placeholder="------",
-            highlight=True,
             label_field="name",
-            open_on_focus=True,
-            plugin_clear_button=PluginClearButton(
-                title="Clear Selection", class_name="clear-button"
-            ),
         ),
         label="Catchment",
         required=False,
@@ -289,13 +282,7 @@ class CollectionPropertyValueModelForm(SimpleModelForm):
     collection = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="collection-autocomplete",
-            placeholder="------",
-            highlight=True,
             label_field="name",
-            open_on_focus=True,
-            plugin_clear_button=PluginClearButton(
-                title="Clear Selection", class_name="clear-button"
-            ),
         ),
         label="Collection",
     )
@@ -316,13 +303,7 @@ class AggregatedCollectionPropertyValueModelForm(SimpleModelForm):
     collections = TomSelectModelMultipleChoiceField(
         config=TomSelectConfig(
             url="collection-autocomplete",
-            placeholder="------",
-            highlight=True,
             label_field="name",
-            open_on_focus=True,
-            plugin_clear_button=PluginClearButton(
-                title="Clear Selection", class_name="clear-button"
-            ),
         ),
         label="Collections",
     )
@@ -367,14 +348,8 @@ class CollectionModelForm(CreateInlineMixin, SimpleModelForm):
 
     catchment = TomSelectModelChoiceField(
         config=TomSelectConfig(
-            url="catchment-autocomplete",
-            placeholder="------",
-            highlight=True,
+            url="collectioncatchment-autocomplete",
             label_field="name",
-            open_on_focus=True,
-            plugin_clear_button=PluginClearButton(
-                title="Clear Selection", class_name="clear-button"
-            ),
         ),
         label="Catchment",
         required=True,
@@ -382,13 +357,7 @@ class CollectionModelForm(CreateInlineMixin, SimpleModelForm):
     collector = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="collector-autocomplete",
-            placeholder="------",
-            highlight=True,
             label_field="name",
-            open_on_focus=True,
-            plugin_clear_button=PluginClearButton(
-                title="Clear Selection", class_name="clear-button"
-            ),
         ),
         label="Collector",
         required=True,
@@ -410,13 +379,7 @@ class CollectionModelForm(CreateInlineMixin, SimpleModelForm):
     frequency = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="collectionfrequency-autocomplete",
-            placeholder="------",
-            highlight=True,
             label_field="name",
-            open_on_focus=True,
-            plugin_clear_button=PluginClearButton(
-                title="Clear Selection", class_name="clear-button"
-            ),
         ),
         required=False,
     )
@@ -510,13 +473,7 @@ class CollectionAddWasteSampleForm(SimpleModelForm):
     sample = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="sample-autocomplete",
-            placeholder="------",
-            highlight=True,
             label_field="name",
-            open_on_focus=True,
-            plugin_clear_button=PluginClearButton(
-                title="Clear Selection", class_name="clear-button"
-            ),
         ),
         label="Sample",
     )
@@ -553,13 +510,7 @@ class CollectionAddPredecessorForm(SimpleModelForm):
     predecessor = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="collection-autocomplete",
-            placeholder="------",
-            highlight=True,
             label_field="name",
-            open_on_focus=True,
-            plugin_clear_button=PluginClearButton(
-                title="Clear Selection", class_name="clear-button"
-            ),
         ),
         label="Predecessor",
     )

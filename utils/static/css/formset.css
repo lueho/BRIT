@@ -1,0 +1,26 @@
+/* 
+ * Formset styling enhancements
+ * ---------------------------
+ * Contains CSS rules for improving formset display and hiding duplicate labels
+ */
+
+/* Hide labels inside formset rows while preserving other crispy form styling */
+.formset-form-row label.form-label {
+    display: none;
+}
+
+/* Ensure proper spacing in formset tables */
+.formset-form-row td {
+    padding-top: 0.25rem;
+    padding-bottom: 0.25rem;
+}
+
+/* Ensure form controls fill their cells properly */
+.formset-form-row .form-control {
+    width: 100%;
+}
+
+/* TomSelect specific adjustments */
+.formset-form-row .ts-control {
+    min-width: 12rem;
+}

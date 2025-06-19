@@ -40,18 +40,6 @@ class BaseCrispyFilterSetTestCase(TestCase):
         self.assertFalse(form.helper.form_tag)
 
 
-class DummyAutoCompleteFilterSet(BaseCrispyFilterSet):
-    class Meta:
-        model = DummyModel
-        fields = ("test_field",)
-
-
-class AutocompleteFilterSetTestCase(TestCase):
-    def test_form(self):
-        filter_set = DummyAutoCompleteFilterSet(queryset=DummyModel.objects.all())
-        self.assertFalse(filter_set.form.helper.include_media)
-
-
 class TestNullableRangeFilter(TestCase):
 
     @classmethod

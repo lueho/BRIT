@@ -11,7 +11,7 @@ This document provides a high-level overview of the BRIT system architecture, it
 - **Web Application:** Django project with multiple apps (see [Applications Overview](applications.md)).
 - **Database:** PostgreSQL with PostGIS for spatial data.
 - **Task Queue:** Celery with Redis as broker for background tasks.
-- **Frontend:** Bootstrap 4, some jQuery (being phased out), and vanilla JS.
+- **Frontend:** Bootstrap 5, some jQuery (being phased out), and vanilla JS.
 - **APIs:** RESTful endpoints for all major resources.
 
 ## Data Flow
@@ -25,6 +25,16 @@ This document provides a high-level overview of the BRIT system architecture, it
 - Production: Heroku (or compatible PaaS), with environment variables for configuration.
 
 ## Key Architectural Patterns
+- **SCSS and Frontend Styling:**
+  - The project utilizes Bootstrap 5 as its core CSS framework.
+  - Customizations and theming are achieved by leveraging Bootstrap's Sass features (variables, functions, mixins).
+  - The main SCSS manifest file is `brit/static/scss/brit-theme.scss`.
+  - Custom SCSS partials are organized into subdirectories under `brit/static/scss/`:
+    - `variables/`: For overriding Bootstrap default variables and defining custom theme variables (e.g., colors, spacing, navigation elements).
+    - `components/`: For styling custom components or overriding Bootstrap component styles.
+    - `layout/`: For global layout styles (e.g., page structure, authentication pages).
+    - `navigation/`: For styling navigation elements like topnav and sidenav.
+  - The project uses the Live Sass Compiler extension for Visual Studio Code, which automatically compiles `brit-theme.scss` to `brit-theme.css` upon changes.
 - **Modular Apps:** Each domain is a separate Django app.
 - **Reusable Utilities:** Shared logic in `utils/`.
 - **Class-Based Views:** Preferred for clarity and extensibility.

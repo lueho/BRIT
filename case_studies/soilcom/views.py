@@ -12,7 +12,6 @@ from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.generic import TemplateView
-from django_tomselect.autocompletes import AutocompleteModelView
 
 from bibliography.views import (
     SourceCheckUrlView,
@@ -40,6 +39,7 @@ from utils.object_management.views import (
     PrivateObjectListView,
     PublishedObjectFilterView,
     PublishedObjectListView,
+    UserCreatedObjectAutocompleteView,
     UserCreatedObjectCreateView,
     UserCreatedObjectDetailView,
     UserCreatedObjectModalArchiveView,
@@ -147,14 +147,12 @@ class CollectorModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Collector
 
 
-# ----------- Collector utilities --------------------------------------------------------------------------------------
+# ----------- Collector Utils ------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CollectorAutocompleteView(AutocompleteModelView):
+class CollectorAutocompleteView(UserCreatedObjectAutocompleteView):
     model = Collector
-    search_lookups = ["name__icontains"]
-    ordering = ["name"]
 
 
 # ----------- Collection System CRUD -----------------------------------------------------------------------------------
@@ -455,6 +453,7 @@ class FrequencyCreateView(M2MInlineFormSetMixin, UserCreatedObjectCreateView):
     formset_factory_kwargs = {"extra": 0}
     relation_field_name = "seasons"
     permission_required = "soilcom.add_collectionfrequency"
+    template_name = "formsets_card.html"
 
     def get_formset_initial(self):
         return list(
@@ -498,6 +497,7 @@ class FrequencyUpdateView(M2MInlineFormSetMixin, UserCreatedObjectUpdateView):
     formset_helper_class = CollectionSeasonFormHelper
     formset_factory_kwargs = {"extra": 0}
     relation_field_name = "seasons"
+    template_name = "formsets_card.html"
 
     def get_formset_initial(self):
         initial = []
@@ -545,10 +545,8 @@ class FrequencyModalDeleteView(UserCreatedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class FrequencyAutocompleteView(AutocompleteModelView):
+class FrequencyAutocompleteView(UserCreatedObjectAutocompleteView):
     model = CollectionFrequency
-    search_lookups = ["name__icontains"]
-    ordering = ["name"]
 
 
 # ----------- CollectionPropertyValue CRUD -----------------------------------------------------------------------------
@@ -636,6 +634,15 @@ class CollectionCatchmentUpdateView(CatchmentUpdateView):
 
     def get_success_url(self):
         return reverse("collectioncatchment-detail", kwargs={"pk": self.object.pk})
+
+
+# ----------- CollectionCatchment Utils -------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class CollectionCatchmentAutocompleteView(UserCreatedObjectAutocompleteView):
+    model = CollectionCatchment
+    geodataset_model_name = "WasteCollection"
 
 
 # ----------- Collection CRUD ------------------------------------------------------------------------------------------
@@ -834,14 +841,12 @@ class CollectionModalDeleteView(UserCreatedObjectModalDeleteView):
     success_url = reverse_lazy("collection-list-owned")
 
 
-# ----------- Collection utils -----------------------------------------------------------------------------------------
+# ----------- Collection Utils -----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CollectionAutocompleteView(AutocompleteModelView):
+class CollectionAutocompleteView(UserCreatedObjectAutocompleteView):
     model = Collection
-    search_lookups = ["name__icontains"]
-    ordering = ["name"]
 
 
 class CollectionListFileExportView(GenericUserCreatedObjectExportView):

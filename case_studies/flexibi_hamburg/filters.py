@@ -86,7 +86,7 @@ class HamburgRoadsideTreesFilterSet(BaseCrispyFilterSet):
     catchment = ModelChoiceFilter(
         queryset=Catchment.objects.all(),
         widget=TomSelectModelWidget(
-            config=TomSelectConfig(url="hamburg-roadside-trees-catchment-autocomplete"),
+            config=TomSelectConfig(url="hamburgroadsidetrees-catchment-autocomplete"),
         ),
         method="catchment_filter",
         label="Catchment",

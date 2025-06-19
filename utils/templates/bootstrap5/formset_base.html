@@ -1,0 +1,207 @@
+{% load crispy_forms_tags %}
+{% load crispy_forms_utils %}
+{% load crispy_forms_filters %}
+{% load crispy_forms_field %}
+
+{% specialspaceless %}
+    {% if formset_tag %}
+        <form {{ flat_attrs|safe }} method="{{ form_method }}" {% if formset.is_multipart %}
+                                    enctype="multipart/form-data"{% endif %}>
+    {% endif %}
+{% if formset_method|lower == 'post' and not disable_csrf %}
+    {% csrf_token %}
+{% endif %}
+
+<div>
+    {{ formset.management_form|crispy }}
+</div>
+{% if formset.non_form_errors %}
+    <div class="alert alert-danger">
+        <ul class="m-0">
+            {{ formset.non_form_errors|unordered_list }}
+        </ul>
+    </div>
+{% endif %}
+
+{% comment %}
+    The formset can be rendered in two different layouts:
+    1. Table Layout (default) - Each form is rendered as a table row
+    2. Div Layout - Each form is rendered as a div with columns
+{% endcomment %}
+
+{% block formset_variables %}{% endblock %}
+
+{% if layout|default:"table" == "table" %}
+    {% comment %}Table layout with labels only in the header{% endcomment %}
+    
+    <table{% if form_id %} id="{{ form_id }}_table"{% endif %} class="table {% if table_class %}{{ table_class }}{% else %}table-sm table-borderless{% endif %}"
+           {% if formset_helper.formset_type == 'tomselect' or formset_type == 'tomselect' %}
+               data-formset-type="tomselect"
+           {% else %}
+               data-formset-type="standard"
+           {% endif %}
+           data-formset="{{ formset.prefix }}"
+           {% if form_id %}data-formset-id="{{ form_id }}"{% endif %}>
+        <thead>
+        {% if formset.readonly and not formset.queryset.exists %}
+        {% else %}
+            <tr>
+                {% for field in formset.empty_form %}
+                    {% if not field.is_hidden %}
+                        <th for="{{ field.auto_id }}"
+                            class="col-form-label {% if field.field.required %}requiredField{% endif %}">
+                            {{ field.label|safe }}{% if field.field.required and not field|is_checkbox %}
+                                <span class="asteriskField">*</span>{% endif %}
+                        </th>
+                    {% endif %}
+                {% endfor %}
+                <th class="formset-actions-col"></th>
+            </tr>
+        {% endif %}
+        </thead>
+        
+        <tbody id="{% if form_id %}{{ form_id }}_{% endif %}formset-container">
+            {# Empty form template (hidden) #}
+            <tr id="{% if form_id %}{{ form_id }}_{% endif %}empty-form-row" class="d-none formset-form-row">
+                {% for field in formset.empty_form %}
+                    {% if field.name == 'DELETE' %}
+                        {# Always include DELETE fields as hidden inputs for JS functionality #}
+                        <td class="d-none">
+                            <input type="hidden" name="{{ field.html_name }}" id="{{ field.auto_id }}" value="{{ field.value|default:'False' }}">
+                        </td>
+                    {% elif field.is_hidden %}
+                        <td class="d-none">{{ field }}</td>
+                    {% else %}
+                        {% include 'bootstrap5/field.html' with field=field tag="td" form_show_labels=False %}
+                    {% endif %}
+                {% endfor %}
+                <td class="formset-actions">
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-form">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+            {% for form in formset %}
+                {% if form_show_errors and not form.is_extra %}
+                    {% include "bootstrap5/errors.html" %}
+                {% endif %}
+                <tr class="formset-form-row">
+                    {% for field in form %}
+                        {% if field.name == 'DELETE' %}
+                            {# Always include DELETE fields as hidden inputs for JS functionality #}
+                            <td class="d-none">
+                                <input type="hidden" name="{{ field.html_name }}" id="{{ field.auto_id }}" value="{{ field.value|default:'False' }}">
+                            </td>
+                        {% elif field.is_hidden %}
+                            <td class="d-none">{{ field }}</td>
+                        {% else %}
+                            {% include 'bootstrap5/field.html' with field=field tag="td" form_show_labels=False %}
+                        {% endif %}
+                    {% endfor %}
+                    <td class="formset-actions">
+                        <button type="button" class="btn btn-sm btn-outline-danger remove-form">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+        
+        <tfoot>
+            <tr>
+                <td colspan="{{ formset.empty_form|length|add:"1" }}">
+                    <button type="button" id="{% if form_id %}{{ form_id }}_{% endif %}add-form" class="btn btn-sm btn-outline-success">
+                        <i class="fas fa-plus"></i> Add
+                    </button>
+                </td>
+            </tr>
+        </tfoot>
+    </table>
+{% else %}
+    <div class="formset-container"
+         data-formset-type="{{ formset_type|default:'standard' }}"
+         data-formset="{{ formset.prefix }}"
+         {% if form_id %}data-formset-id="{{ form_id }}"{% endif %}>
+         
+        {% if form_show_labels|default:True %}
+        <!-- Field labels row (shown once) -->
+        <div class="row mb-2">
+            {% for field in formset.empty_form %}
+                {% if not field.is_hidden %}
+                    <div class="col{% if field_class %}-{{ field_class }}{% endif %}">
+                        <label for="{{ field.auto_id }}" class="form-label {% if field.field.required %}requiredField{% endif %}">
+                            {{ field.label|safe }}{% if field.field.required %}<span class="asteriskField">*</span>{% endif %}
+                        </label>
+                    </div>
+                {% endif %}
+            {% endfor %}
+            <div class="col-auto"><!-- Actions column --></div>
+        </div>
+        {% endif %}
+        
+        {% comment %}Div layout with labels in a separate row{% endcomment %}
+        
+        {# Empty form template (hidden) #}
+        <div id="{% if form_id %}{{ form_id }}_{% endif %}empty-form-row" class="d-none formset-form-row row mb-3">
+            {% for field in formset.empty_form %}
+                {% if field.name == 'DELETE' %}
+                    {# Always include DELETE fields as hidden inputs for JS functionality #}
+                    <div class="col{% if field_class %}-{{ field_class }}{% endif %} d-none">
+                        <input type="hidden" name="{{ field.html_name }}" id="{{ field.auto_id }}" value="{{ field.value|default:'False' }}">
+                    </div>
+                {% elif field.is_hidden %}
+                    <div class="col{% if field_class %}-{{ field_class }}{% endif %} d-none">{{ field }}</div>
+                {% else %}
+                    <div class="col{% if field_class %}-{{ field_class }}{% endif %}">
+                        {{ field|as_crispy_field }}
+                    </div>
+                {% endif %}
+            {% endfor %}
+            <div class="col-auto formset-actions">
+                <button type="button" class="btn btn-sm btn-outline-danger remove-form">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        </div>
+
+        <div id="{% if form_id %}{{ form_id }}_{% endif %}formset-container">
+            {% for form in formset %}
+                <div class="row mb-3 formset-form-row">
+                    {% for field in form %}
+                        {% if field.name == 'DELETE' %}
+                            {# Always include DELETE fields as hidden inputs for JS functionality #}
+                            <div class="col{% if field_class %}-{{ field_class }}{% endif %} d-none">
+                                <input type="hidden" name="{{ field.html_name }}" id="{{ field.auto_id }}" value="{{ field.value|default:'False' }}">
+                            </div>
+                        {% elif field.is_hidden %}
+                            <div class="col{% if field_class %}-{{ field_class }}{% endif %} d-none">{{ field }}</div>
+                        {% else %}
+                            <div class="col{% if field_class %}-{{ field_class }}{% endif %}">
+                                {{ field|as_crispy_field }}
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                    <div class="col-auto formset-actions">
+                        <button type="button" class="btn btn-sm btn-outline-danger remove-form">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+        
+        <div class="row">
+            <div class="col-12">
+                <button type="button" id="{% if form_id %}{{ form_id }}_{% endif %}add-form" class="btn btn-sm btn-outline-success">
+                    <i class="fas fa-plus"></i> Add
+                </button>
+            </div>
+        </div>
+    </div>
+{% endif %}
+
+{% if formset_tag %}
+    </form>
+{% endif %}
+
+{% endspecialspaceless %}
