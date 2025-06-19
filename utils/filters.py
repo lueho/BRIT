@@ -8,7 +8,7 @@ from utils.fields import NullablePercentageRangeField, NullableRangeField
 class BaseCrispyFilterSet(FilterSet):
 
     def get_form_helper(self):
-        if hasattr(self.Meta, "form_helper"):
+        if hasattr(self, "Meta") and hasattr(self.Meta, "form_helper"):
             return self.Meta.form_helper()
         else:
             return FormHelper()

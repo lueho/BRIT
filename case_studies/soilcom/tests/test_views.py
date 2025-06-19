@@ -1972,7 +1972,9 @@ class CollectionReviewProcessWithPredecessorsTestCase(TestCase):
     def setUpTestData(cls):
         # Ensure a MaterialCategory (materials.models) for "Biowaste component" exists
         # This might be used by signals or other underlying logic.
-        MaterialCategory.objects.get_or_create(name="Biowaste component")
+        MaterialCategory.objects.get_or_create(
+            name="Biowaste component", publication_status="published"
+        )
 
         # Create a test user with necessary permissions
         cls.user = User.objects.create_user(
@@ -2091,6 +2093,7 @@ class CollectionReviewProcessWithPredecessorsTestCase(TestCase):
             form_data,
             follow=True,
         )
+
         self.assertEqual(response.status_code, 200, "Failed to create new version")
 
         new_version = Collection.objects.get(
@@ -2111,7 +2114,9 @@ class CollectionReviewProcessWithPredecessorsTestCase(TestCase):
         )
 
         # 3. Verify predecessor is visible in list view
-        collections = self.client.get(reverse("collection-list")).context["object_list"]
+        response = self.client.get(reverse("collection-list"), follow=True)
+        self.assertEqual(response.status_code, 200)
+        collections = response.context["object_list"]
         self.assertIn(self.published_collection, collections)
         self.assertNotIn(new_version, collections)
 
@@ -2139,7 +2144,8 @@ class CollectionReviewProcessWithPredecessorsTestCase(TestCase):
         self.assertEqual(new_version.publication_status, Collection.STATUS_PUBLISHED)
 
         # 8. Verify both versions appear in the list view (if business logic requires)
-        collections = self.client.get(reverse("collection-list")).context["object_list"]
+        response = self.client.get(reverse("collection-list"), follow=True)
+        collections = response.context["object_list"]
         self.assertIn(new_version, collections)
         self.assertNotIn(self.published_collection, collections)
 

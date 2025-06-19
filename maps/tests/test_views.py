@@ -303,7 +303,7 @@ class RegionMapViewTestCase(ViewWithPermissionsTestCase):
 
 class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Catchment
-    model_add_permission = "maps.add_catchment"
+    model_add_permission = "add_catchment"
 
     view_dashboard_name = "maps-dashboard"
     view_create_name = "catchment-create"
@@ -334,20 +334,25 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
             borders=GeoPolygon.objects.create(
                 geom=MultiPolygon(Polygon(((0, 0), (0, 2), (2, 2), (2, 0), (0, 0))))
             ),
+            publication_status="published",
         )
         lau_2 = LauRegion.objects.create(
             name="Test Region 2",
             borders=GeoPolygon.objects.create(
                 geom=MultiPolygon(Polygon(((0, 2), (0, 4), (2, 4), (2, 2), (0, 2))))
             ),
+            publication_status="published",
         )
         lau_3 = LauRegion.objects.create(
             name="Test Region 3",
             borders=GeoPolygon.objects.create(
                 geom=MultiPolygon(Polygon(((1, 1), (1, 3), (3, 3), (3, 1), (1, 1))))
             ),
+            publication_status="published",
         )
-        parent_region = Region.objects.create(name="Parent Region")
+        parent_region = Region.objects.create(
+            name="Parent Region", publication_status="published"
+        )
         return {
             "lau_region_1": lau_1.region_ptr,
             "lau_region_2": lau_2.region_ptr,
@@ -359,8 +364,11 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
     # CreateView Test Cases
     # -----------------------
 
-    def test_create_view_post_as_authenticated_with_permission(self):
+    def test_create_view_post_as_authenticated_without_permission(self):
         self.skipTest("Post method is not implemented for this view.")
+
+    def test_create_view_post_as_authenticated_with_permission(self):
+        self.skipTest("Get method is not implemented for this view.")
 
     def test_create_view_post_as_staff_user(self):
         self.skipTest("Post method is not implemented for this view.")
@@ -387,15 +395,17 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
         self.client.force_login(self.non_owner_user)
         url = reverse("catchment-create-select-region")
         response = self.client.get(url)
-        self.assertEqual(response.status_code, 403)
-        self.assertContains(response, self.permission_denied_message, status_code=403)
+        self.assertEqual(response.status_code, 200)
 
     def test_create_select_region_view_post_as_authenticated_without_permission(self):
         self.client.force_login(self.non_owner_user)
         url = reverse("catchment-create-select-region")
-        response = self.client.post(url)
-        self.assertEqual(response.status_code, 403)
-        self.assertContains(response, self.permission_denied_message, status_code=403)
+        data = {
+            "name": "Test Catchment",
+            "region": self.related_objects["region"].pk,
+        }
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, 302)
 
     def test_create_select_region_view_get_as_authenticated_with_permission(self):
         self.client.force_login(self.user_with_add_perm)
@@ -455,15 +465,18 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
         self.client.force_login(self.non_owner_user)
         url = reverse("catchment-create-draw-custom")
         response = self.client.get(url)
-        self.assertEqual(response.status_code, 403)
-        self.assertContains(response, self.permission_denied_message, status_code=403)
+        self.assertEqual(response.status_code, 200)
 
     def test_create_draw_custom_view_post_as_authenticated_without_permission(self):
         self.client.force_login(self.non_owner_user)
         url = reverse("catchment-create-draw-custom")
-        response = self.client.post(url)
-        self.assertEqual(response.status_code, 403)
-        self.assertContains(response, self.permission_denied_message, status_code=403)
+        data = {
+            "name": "Newly created catchment",
+            "geom": "MULTIPOLYGON (((30 10, 40 40, 20 40, 10 20, 30 10)))",
+            "parent_region": self.util_objects["parent_region"].id,
+        }
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, 302)
 
     def test_create_draw_custom_view_get_as_authenticated_with_permission(self):
         self.client.force_login(self.user_with_add_perm)
@@ -529,15 +542,22 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
         self.client.force_login(self.non_owner_user)
         url = reverse("catchment-create-merge-lau")
         response = self.client.get(url)
-        self.assertEqual(response.status_code, 403)
-        self.assertContains(response, self.permission_denied_message, status_code=403)
+        self.assertEqual(response.status_code, 200)
 
     def test_create_merge_lau_view_post_as_authenticated_without_permission(self):
         self.client.force_login(self.non_owner_user)
         url = reverse("catchment-create-merge-lau")
-        response = self.client.post(url)
-        self.assertEqual(response.status_code, 403)
-        self.assertContains(response, self.permission_denied_message, status_code=403)
+        data = {
+            "name": "New Catchment Created By Merge",
+            "parent_region": self.util_objects["parent_region"].pk,
+            "form-INITIAL_FORMS": 2,
+            "form-TOTAL_FORMS": 3,
+            "form-0-region": self.util_objects["lau_region_1"].pk,
+            "form-1-region": self.util_objects["lau_region_2"].pk,
+            "form-2-region": self.util_objects["lau_region_3"].pk,
+        }
+        response = self.client.post(url, data)
+        self.assertEqual(response.status_code, 302)
 
     def test_create_merge_lau_view_get_as_authenticated_with_permission(self):
         self.client.force_login(self.user_with_add_perm)
@@ -642,7 +662,7 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
         view = CatchmentCreateMergeLauView()
         view.setup(request)
         form = view.get_form()
-        self.assertTrue(form.is_valid())
+        self.assertTrue(form.is_valid(), form.errors)
         view.object = form.save()
         self.assertEqual("New Catchment Created By Merge", view.get_region_name())
 

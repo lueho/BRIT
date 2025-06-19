@@ -68,7 +68,7 @@ class AuthorAutoCompleteViewTestCase(ViewWithPermissionsTestCase):
             first_names="Test", last_names="Author", publication_status="published"
         )
         Author.objects.create(
-            first_names="Another", last_names="Author", publication_status="unpublished"
+            first_names="Another", last_names="Author", publication_status="published"
         )
         response = self.client.get(reverse("author-autocomplete"), {"q": "Test"})
 
@@ -167,25 +167,21 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
             source=cls.published_object,
             author=author_1,
             position=1,
-            publication_status="published",
         )
         cls.source_author_2 = SourceAuthor.objects.create(
             source=cls.published_object,
             author=author_2,
             position=2,
-            publication_status="published",
         )
         cls.source_author_3 = SourceAuthor.objects.create(
             source=cls.unpublished_object,
             author=author_1,
             position=1,
-            publication_status="unpublished",
         )
         cls.source_author_4 = SourceAuthor.objects.create(
             source=cls.unpublished_object,
             author=author_2,
             position=2,
-            publication_status="unpublished",
         )
 
     def related_objects_post_data(self):

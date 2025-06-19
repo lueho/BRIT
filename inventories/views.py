@@ -99,11 +99,6 @@ class ScenarioUpdateView(UserCreatedObjectUpdateView):
     model = Scenario
     form_class = ScenarioModelForm
 
-    def get_form_kwargs(self):
-        kwargs = super().get_form_kwargs()
-        kwargs.update({"region_id": self.object.region.id})
-        return kwargs
-
 
 class ScenarioModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Scenario

@@ -5,7 +5,7 @@ from django_tomselect.forms import TomSelectModelChoiceField
 
 from utils.filters import BaseCrispyFilterSet
 
-from .models import Catchment, GeoDataset, Region
+from .models import Catchment, GeoDataset, NutsRegion, Region
 
 
 class CatchmentFilterSet(BaseCrispyFilterSet):
@@ -37,7 +37,6 @@ class RegionFilterSet(BaseCrispyFilterSet):
 
 
 class NutsRegionFilterSet(BaseCrispyFilterSet):
-    # ── top level ────────────────────────────────────────────────────────────
     nuts0 = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="nutsregion-autocomplete",
@@ -48,19 +47,17 @@ class NutsRegionFilterSet(BaseCrispyFilterSet):
         required=True,
     )
 
-    # ── NUTS-1  (depends on nuts0 → parent_id) ──────────────────────────────
     nuts1 = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="nutsregion-autocomplete",
             value_field="id",
             label_field="name",
-            filter_by=("nuts0", "parent_id"),  # sends  ?parent_id=<nuts0>
+            filter_by=("nuts0", "parent_id"),
             placeholder="NUTS 1 region",
         ),
         required=False,
     )
 
-    # ── NUTS-2  (depends on nuts1) ──────────────────────────────────────────
     nuts2 = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="nutsregion-autocomplete",
@@ -72,7 +69,6 @@ class NutsRegionFilterSet(BaseCrispyFilterSet):
         required=False,
     )
 
-    # ── NUTS-3  (depends on nuts2) ──────────────────────────────────────────
     nuts3 = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="nutsregion-autocomplete",
