@@ -12,11 +12,15 @@ Implements topological sorting to handle dependencies between apps.
 
 import importlib
 import inspect
+import logging
 from collections import defaultdict
 
 from django.apps import apps
 from django.core.management.base import BaseCommand
 from django.db import transaction
+
+
+logger = logging.getLogger(__name__)
 
 
 class Command(BaseCommand):
@@ -129,9 +133,7 @@ class Command(BaseCommand):
         def visit(node):
             if node in temp_marked:
                 # This is a circular dependency
-                self.stderr.write(
-                    self.style.ERROR(f"Circular dependency detected for app '{node}'")
-                )
+                logger.error(f"Circular dependency detected for app '{node}'")
                 return
 
             if node not in visited:
@@ -165,7 +167,7 @@ class Command(BaseCommand):
         This command automatically discovers initialization functions in all installed apps,
         resolves dependencies using topological sorting, and executes them in the correct order.
         """
-        self.stdout.write("Ensuring initial data exists...")
+        logger.info("Ensuring initial data exists...")
 
         app_label = options.get("app_label")
         list_only = options.get("list_only")
@@ -177,27 +179,23 @@ class Command(BaseCommand):
         # Handle list-only mode
         if list_only:
             if found_initializers:
-                self.stdout.write(
-                    self.style.SUCCESS("Apps with initialization functions:")
-                )
+                logger.info("Apps with initialization functions:")
                 for app_label, _, _ in found_initializers:
-                    self.stdout.write(f"  - {app_label}")
+                    logger.info(f"  - {app_label}")
             else:
-                self.stdout.write(
-                    self.style.WARNING("No apps with initialization functions found")
-                )
+                logger.warning("No apps with initialization functions found")
             return
 
         # Show dependencies if requested
         if show_dependencies:
-            self.stdout.write(self.style.SUCCESS("App initialization dependencies:"))
+            logger.info("App initialization dependencies:")
             for app_label, _, dependencies in found_initializers:
                 if dependencies:
-                    self.stdout.write(
+                    logger.info(
                         f'  - {app_label} depends on: {", ".join(dependencies)}'
                     )
                 else:
-                    self.stdout.write(f"  - {app_label} has no dependencies")
+                    logger.info(f"  - {app_label} has no dependencies")
             return
 
         # Sort initializers based on dependencies
@@ -205,23 +203,23 @@ class Command(BaseCommand):
         {app for app, _ in ordered_initializers}
 
         # Show execution order
-        self.stdout.write(self.style.SUCCESS("Execution order:"))
+        logger.info("Execution order:")
         for i, (app_label, _) in enumerate(ordered_initializers, 1):
-            self.stdout.write(f"  {i}. {app_label}")
+            logger.info(f"  {i}. {app_label}")
 
         # Execute all discovered initializers in order
         for app_label, init_func in ordered_initializers:
-            self.stdout.write(f"Running initialization for {app_label}...")
+            logger.info(f"Running initialization for {app_label}...")
 
             # Determine function parameters to handle different signatures
             sig = inspect.signature(init_func)
-            if "stdout" in sig.parameters:
-                # Function expects a stdout parameter
-                result = init_func(stdout=self.stdout)
+            if "logger" in sig.parameters:
+                # Function expects a logger parameter
+                result = init_func(logger=logger)
             else:
                 # Standard function with no parameters
                 init_func()
 
-            self.stdout.write(f"Completed initialization for {app_label}")
+            logger.info(f"Completed initialization for {app_label}")
 
-        self.stdout.write(self.style.SUCCESS("Successfully created all initial data"))
+        logger.info("Successfully created all initial data")

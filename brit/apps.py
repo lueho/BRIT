@@ -8,3 +8,5 @@ class BRITConfig(AppConfig):
     def ready(self):
         # Ensure export registry is initialized at startup
         import utils.file_export.registry_init
+
+        from .signals import populate_initial_data

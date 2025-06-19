@@ -1,4 +1,4 @@
-import debug_toolbar
+from debug_toolbar.toolbar import debug_toolbar_urls
 from django.conf import settings
 from django.conf.urls.static import static
 from django.contrib import admin
@@ -30,7 +30,6 @@ sitemaps = {
 
 urlpatterns = [
     path("", RedirectView.as_view(url="/home/"), name="entry"),
-    path("__debug__/", include(debug_toolbar.urls)),
     path("utils/", include("utils.urls")),
     path("home/", HomeView.as_view(), name="home"),
     path("admin/", admin.site.urls),
@@ -66,7 +65,7 @@ urlpatterns = [
     path("set_settion/", set_session, name="set_session"),
     path("get_settion/", get_session, name="get_session"),
     path("<str:short_code>/", DynamicRedirectView.as_view(), name="redirect"),
-]
+] + debug_toolbar_urls()
 
 if settings.DEBUG:
     urlpatterns += static(settings.STATIC_URL, document_root=settings.STATIC_ROOT)
