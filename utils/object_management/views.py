@@ -16,6 +16,7 @@ from django.contrib.auth.mixins import (
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.messages.views import SuccessMessageMixin
 from django.core.exceptions import ImproperlyConfigured, PermissionDenied
+from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
@@ -36,6 +37,8 @@ from ..views import (
     NextOrSuccessUrlMixin,
     NoFormTagMixin,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class ReviewDashboardView(ListView):
@@ -757,8 +760,15 @@ class UserCreatedObjectModalDeleteView(
             # by checking if it's one of the models that have scope-filtered list views
             model_name = self.model.__name__
             # All UserCreatedObject models now have scope filters in their filtersets
-            models_with_scope_filtering = ['Scenario', 'Collection', 'WasteFlyer', 'Collector']
-            
+            models_with_scope_filtering = [
+                "Scenario",
+                "Collection",
+                "WasteFlyer",
+                "Collector",
+                "CollectionCatchment",
+                "Catchment",
+            ]
+
             if model_name in models_with_scope_filtering:
                 # Add scope parameter for models that support scope filtering
                 if self.object.publication_status == "published":
@@ -778,7 +788,7 @@ class UserCreatedObjectModalDeleteView(
                     return self.model.private_list_url()
                 elif self.object.publication_status == "review":
                     return self.model.review_list_url()
-        
+
         # Fallback to public list without scope
         return self.model.public_list_url()
 
@@ -798,26 +808,23 @@ class UserCreatedObjectAutocompleteView(AutocompleteModelView):
     allow_anonymous = True
     page_size = 15
 
-    def apply_filters(self, queryset):
-        # Add comprehensive logging to trace parameter passing
-        logger = logging.getLogger(__name__)
-        logger.debug(f"=== UserCreatedObjectAutocompleteView.apply_filters DEBUG ===")
-        logger.debug(f"Raw self.filter_by: {repr(self.filter_by)}")
-        logger.debug(f"self.request.GET: {dict(self.request.GET)}")
-        logger.debug(f"self.request.POST: {dict(self.request.POST)}")
-        logger.debug(f"Queryset model: {queryset.model}")
+    def hook_queryset(self, queryset):
+        if self.request.user and self.request.user.is_authenticated:
+            if self.request.user.is_staff:
+                return queryset
+            return queryset.filter(
+                Q(owner=self.request.user) | Q(publication_status="published")
+            )
+        return queryset.filter(publication_status="published")
 
-        # If no scope is given, default to public objects
+    def apply_filters(self, queryset):
+
         if not self.filter_by:
-            logger.debug("No filter_by found, returning original queryset")
             return queryset
 
         try:
-            logger.debug(f"Before unquote: {repr(self.filter_by)}")
             unquoted = unquote(self.filter_by)
-            logger.debug(f"After unquote: {repr(unquoted)}")
             cleaned = unquoted.replace("'", "")
-            logger.debug(f"After quote removal: {repr(cleaned)}")
 
             if "=" not in cleaned:
                 logger.warning(
@@ -828,7 +835,6 @@ class UserCreatedObjectAutocompleteView(AutocompleteModelView):
             lookup, value = cleaned.split(
                 "=", 1
             )  # Use maxsplit=1 to handle multiple '=' chars
-            logger.debug(f"Parsed - lookup: {repr(lookup)}, value: {repr(value)}")
 
         except Exception as e:
             logger.error(f"Error parsing filter_by '{self.filter_by}': {e}")
@@ -836,22 +842,14 @@ class UserCreatedObjectAutocompleteView(AutocompleteModelView):
 
         if not value:
             value = "published"
-            logger.debug(f"Empty value, defaulting to: {repr(value)}")
-
-        logger.debug(f"Final lookup: {repr(lookup)}, Final value: {repr(value)}")
 
         if lookup == "scope__name":
-            logger.debug(f"Processing scope__name filter with value: {repr(value)}")
             if value == "private":
-                logger.debug("Applying private scope filter")
                 if not self.request.user.is_authenticated:
-                    logger.debug("User not authenticated, returning empty queryset")
                     queryset = queryset.none()
                 else:
-                    logger.debug(f"Filtering by owner: {self.request.user}")
                     queryset = queryset.filter(owner=self.request.user)
             elif value == "published":
-                logger.debug("Applying published scope filter")
                 queryset = queryset.filter(publication_status="published")
             else:
                 logger.warning(
@@ -883,8 +881,4 @@ class UserCreatedObjectAutocompleteView(AutocompleteModelView):
             )
             return queryset
         else:
-            logger.debug(f"Non-scope lookup: {repr(lookup)}, not processing")
-
-        logger.debug(f"Final queryset count: {queryset.count()}")
-        logger.debug(f"=== End apply_filters DEBUG ===")
-        return queryset
+            return queryset

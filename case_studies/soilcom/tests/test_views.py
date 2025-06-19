@@ -86,6 +86,8 @@ class CollectorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
     view_modal_update_name = "collector-update-modal"
     view_delete_name = "collector-delete-modal"
 
+    add_scope_query_param_to_list_urls = True
+
     create_object_data = {"name": "Test Collector"}
     update_object_data = {"name": "Updated Test Collector"}
 
@@ -175,7 +177,9 @@ class WasteComponentCRUDViewsTestCase(
 
     @classmethod
     def create_related_objects(cls):
-        MaterialCategory.objects.create(name="Biowaste component")
+        MaterialCategory.objects.create(
+            name="Biowaste component", publication_status="published"
+        )
         return {}
 
     @classmethod
@@ -227,24 +231,14 @@ class WasteFlyerCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
 
     create_object_data = {"url": "https://www.crud-test-flyer.org"}
 
-    # @classmethod
-    # def setUpClass(cls):
-    #     super().setUpClass()
-    #     post_save.disconnect(check_url_valid, sender=WasteFlyer)
-
-    # @classmethod
-    # def tearDownClass(cls):
-    #     post_save.connect(check_url_valid, sender=WasteFlyer)
-    #     super().tearDownClass()
-
     def test_list_unpublished_contains_check_urls_button_for_authenticated_owner(self):
         self.client.force_login(self.owner_user)
-        response = self.client.get(reverse("wasteflyer-list-owned"))
+        response = self.client.get(reverse("wasteflyer-list-owned"), follow=True)
         self.assertContains(response, "check urls")
 
     def test_list_published_contains_check_urls_button_for_staff_user(self):
         self.client.force_login(self.staff_user)
-        response = self.client.get(reverse("wasteflyer-list"))
+        response = self.client.get(reverse("wasteflyer-list"), follow=True)
         self.assertContains(response, "check urls")
 
     def test_detail_view_unpublished_contains_check_url_button_for_owner(self):
@@ -475,10 +469,16 @@ class CollectionPropertyValueCRUDViewsTestCase(
     def create_related_objects(cls):
         return {
             "collection": Collection.objects.create(
-                owner=cls.owner_user, name="Test Collection"
+                owner=cls.owner_user,
+                name="Test Collection",
+                publication_status="published",
             ),
-            "property": Property.objects.create(name="Test Property"),
-            "unit": Unit.objects.create(name="Test Unit"),
+            "property": Property.objects.create(
+                name="Test Property", publication_status="published"
+            ),
+            "unit": Unit.objects.create(
+                name="Test Unit", publication_status="published"
+            ),
         }
 
     def get_delete_success_url(self, publication_status=None):
@@ -512,8 +512,12 @@ class AggregatedCollectionPropertyValueCRUDViewsTestCase(
     def setUpTestData(cls):
         super().setUpTestData()
         cls.related_collections = [
-            Collection.objects.create(name="Test Collection 1"),
-            Collection.objects.create(name="Test Collection 2"),
+            Collection.objects.create(
+                name="Test Collection 1", publication_status="published"
+            ),
+            Collection.objects.create(
+                name="Test Collection 2", publication_status="published"
+            ),
         ]
         cls.published_object.collections.set(cls.related_collections)
         cls.unpublished_object.collections.set(cls.related_collections)
@@ -521,8 +525,12 @@ class AggregatedCollectionPropertyValueCRUDViewsTestCase(
     @classmethod
     def create_related_objects(cls):
         return {
-            "property": Property.objects.create(name="Test Property"),
-            "unit": Unit.objects.create(name="Test Unit"),
+            "property": Property.objects.create(
+                name="Test Property", publication_status="published"
+            ),
+            "unit": Unit.objects.create(
+                name="Test Unit", publication_status="published"
+            ),
         }
 
     def related_objects_post_data(self):
@@ -530,8 +538,12 @@ class AggregatedCollectionPropertyValueCRUDViewsTestCase(
         data.update(
             {
                 "collections": [
-                    Collection.objects.create(name="Test Collection 3").pk,
-                    Collection.objects.create(name="Test Collection 4").pk,
+                    Collection.objects.create(
+                        name="Test Collection 3", publication_status="published"
+                    ).pk,
+                    Collection.objects.create(
+                        name="Test Collection 4", publication_status="published"
+                    ).pk,
                 ]
             }
         )
@@ -562,6 +574,7 @@ class CollectionCatchmentCRUDViewsTestCase(
     view_update_name = "collectioncatchment-update"
     view_delete_name = "collectioncatchment-delete-modal"
 
+    allow_create_for_any_authenticated_user = True
     add_scope_query_param_to_list_urls = True
 
     create_object_data = {"name": "Test Catchment"}
@@ -569,11 +582,18 @@ class CollectionCatchmentCRUDViewsTestCase(
 
     @classmethod
     def create_related_objects(cls):
-        return {"region": Region.objects.create(name="Test Region")}
+        return {
+            "region": Region.objects.create(
+                name="Test Region", publication_status="published"
+            )
+        }
 
     # -----------------------
     # CreateView Test Cases
     # -----------------------
+
+    def test_create_view_post_as_authenticated_without_permission(self):
+        self.skipTest("Post method is not implemented for this view.")
 
     def test_create_view_post_as_authenticated_with_permission(self):
         self.skipTest("Post method is not implemented for this view.")
@@ -632,32 +652,45 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
 
     @classmethod
     def create_related_objects(cls):
-        MaterialCategory.objects.create(name="Biowaste component")
-        catchment = CollectionCatchment.objects.create(name="Test catchment")
-        collector = Collector.objects.create(name="Test collector")
-        collection_system = CollectionSystem.objects.create(name="Test system")
-        waste_category = WasteCategory.objects.create(name="Test category")
+        MaterialCategory.objects.create(
+            name="Biowaste component", publication_status="published"
+        )
+        catchment = CollectionCatchment.objects.create(
+            name="Test catchment", publication_status="published"
+        )
+        collector = Collector.objects.create(
+            name="Test collector", publication_status="published"
+        )
+        collection_system = CollectionSystem.objects.create(
+            name="Test system", publication_status="published"
+        )
+        waste_category = WasteCategory.objects.create(
+            name="Test category", publication_status="published"
+        )
         cls.allowed_material_1 = WasteComponent.objects.create(
-            name="Allowed material 1"
+            name="Allowed material 1", publication_status="published"
         )
         cls.allowed_material_2 = WasteComponent.objects.create(
-            name="Allowed material 2"
+            name="Allowed material 2", publication_status="published"
         )
         cls.forbidden_material_1 = WasteComponent.objects.create(
-            name="Forbidden material 1"
+            name="Forbidden material 1", publication_status="published"
         )
         cls.forbidden_material_2 = WasteComponent.objects.create(
-            name="Forbidden material 2"
+            name="Forbidden material 2", publication_status="published"
         )
         waste_stream = WasteStream.objects.create(
             name="Test waste stream",
+            publication_status="published",
             category=waste_category,
         )
         waste_stream.allowed_materials.add(cls.allowed_material_1)
         waste_stream.allowed_materials.add(cls.allowed_material_2)
         waste_stream.forbidden_materials.add(cls.forbidden_material_1)
         waste_stream.forbidden_materials.add(cls.forbidden_material_2)
-        frequency = CollectionFrequency.objects.create(name="Test Frequency")
+        frequency = CollectionFrequency.objects.create(
+            name="Test Frequency", publication_status="published"
+        )
         Collection.objects.create(
             catchment=catchment,
             collector=collector,
@@ -667,6 +700,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
             valid_from=date.today() - timedelta(days=365),
             valid_until=date.today() - timedelta(days=1),
             description="Predecessor Collection 1",
+            publication_status="published",
         )
         Collection.objects.create(
             catchment=catchment,
@@ -677,6 +711,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
             valid_from=date.today() - timedelta(days=365),
             valid_until=date.today() - timedelta(days=1),
             description="Predecessor Collection 2",
+            publication_status="published",
         )
         # Create a bunch of unused outdated collections
         for i in range(12):
@@ -777,7 +812,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
                     self.forbidden_material_1.id,
                     self.forbidden_material_2.id,
                 ],
-                "frequency": CollectionFrequency.objects.first().id,
+                "frequency": self.frequency.id,
                 "valid_from": date(2020, 1, 1),
                 "description": "This is a test case that should pass!",
                 "form-INITIAL_FORMS": "0",
@@ -804,7 +839,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
                 self.forbidden_material_1.id,
                 self.forbidden_material_2.id,
             ],
-            "frequency": CollectionFrequency.objects.first().id,
+            "frequency": self.related_objects["frequency"].id,
             "valid_from": date(2020, 1, 1),
             "description": "This is a test case that should pass!",
             "form-INITIAL_FORMS": "0",
@@ -956,7 +991,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
                     self.forbidden_material_1.id,
                     self.forbidden_material_2.id,
                 ],
-                "frequency": CollectionFrequency.objects.first().id,
+                "frequency": self.related_objects["frequency"].id,
                 "valid_from": date(2020, 1, 1),
                 "description": "This is a test case that should pass!",
                 "form-INITIAL_FORMS": "0",
@@ -980,7 +1015,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
                     self.allowed_material_1.id,
                     self.allowed_material_2.id,
                 ],
-                "frequency": CollectionFrequency.objects.first().id,
+                "frequency": self.related_objects["frequency"].id,
                 "valid_from": date(2020, 1, 1),
                 "description": "This is a test case that should pass!",
                 "form-INITIAL_FORMS": "2",
@@ -1015,7 +1050,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
                 m.id
                 for m in self.unpublished_object.waste_stream.forbidden_materials.all()
             ],
-            "frequency": self.unpublished_object.frequency.id,
+            "frequency": self.related_objects["frequency"].id,
             "valid_from": date(2020, 1, 1),
             "description": self.unpublished_object.description,
             "form-INITIAL_FORMS": "1",
@@ -1082,43 +1117,64 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
 
-        MaterialCategory.objects.create(name="Biowaste component")
+        cls.material_category = MaterialCategory.objects.create(
+            name="Biowaste component", publication_status="published"
+        )
         cls.allowed_material_1 = WasteComponent.objects.create(
-            name="Allowed material 1"
+            name="Allowed material 1", publication_status="published"
         )
         cls.allowed_material_2 = WasteComponent.objects.create(
-            name="Allowed material 2"
+            name="Allowed material 2", publication_status="published"
         )
         cls.forbidden_material_1 = WasteComponent.objects.create(
-            name="Forbidden material 1"
+            name="Forbidden material 1", publication_status="published"
         )
         cls.forbidden_material_2 = WasteComponent.objects.create(
-            name="Forbidden material 2"
+            name="Forbidden material 2", publication_status="published"
         )
-        waste_stream = WasteStream.objects.create(
+        cls.waste_category = WasteCategory.objects.create(
+            name="Test category", publication_status="published"
+        )
+        cls.waste_stream = WasteStream.objects.create(
             name="Test waste stream",
-            category=WasteCategory.objects.create(name="Test category"),
+            category=cls.waste_category,
         )
-        waste_stream.allowed_materials.add(cls.allowed_material_1)
-        waste_stream.allowed_materials.add(cls.allowed_material_2)
-        waste_stream.forbidden_materials.add(cls.forbidden_material_1)
-        waste_stream.forbidden_materials.add(cls.forbidden_material_2)
+        cls.waste_stream.allowed_materials.add(cls.allowed_material_1)
+        cls.waste_stream.allowed_materials.add(cls.allowed_material_2)
+        cls.waste_stream.forbidden_materials.add(cls.forbidden_material_1)
+        cls.waste_stream.forbidden_materials.add(cls.forbidden_material_2)
         with mute_signals(signals.post_save):
             cls.flyer = WasteFlyer.objects.create(
-                abbreviation="WasteFlyer123", url="https://www.test-flyer.org"
+                abbreviation="WasteFlyer123",
+                url="https://www.test-flyer.org",
+                publication_status="published",
             )
             cls.flyer2 = WasteFlyer.objects.create(
-                abbreviation="WasteFlyer234", url="https://www.fest-flyer.org"
+                abbreviation="WasteFlyer234",
+                url="https://www.fest-flyer.org",
+                publication_status="published",
             )
-        frequency = CollectionFrequency.objects.create(name="Test Frequency")
+        cls.frequency = CollectionFrequency.objects.create(
+            name="Test Frequency", publication_status="published"
+        )
+        cls.collection_catchment = CollectionCatchment.objects.create(
+            name="Test catchment", publication_status="published"
+        )
+        cls.collector = Collector.objects.create(
+            name="Test collector", publication_status="published"
+        )
+        cls.collection_system = CollectionSystem.objects.create(
+            name="Test system", publication_status="published"
+        )
         cls.collection = Collection.objects.create(
             name="collection1",
-            catchment=CollectionCatchment.objects.create(name="Test catchment"),
-            collector=Collector.objects.create(name="Test collector"),
-            collection_system=CollectionSystem.objects.create(name="Test system"),
-            waste_stream=waste_stream,
-            frequency=frequency,
+            catchment=cls.collection_catchment,
+            collector=cls.collector,
+            collection_system=cls.collection_system,
+            waste_stream=cls.waste_stream,
+            frequency=cls.frequency,
             description="This is a test case.",
+            publication_status="published",
         )
         cls.collection.flyers.add(cls.flyer)
         cls.collection.flyers.add(cls.flyer2)
@@ -1218,10 +1274,12 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
     def test_post_http_302_redirect_for_member(self):
         self.client.force_login(self.member)
         data = {
-            "catchment": CollectionCatchment.objects.first().id,
-            "collector": Collector.objects.create(name="New Test Collector").id,
-            "collection_system": CollectionSystem.objects.first().id,
-            "waste_category": WasteCategory.objects.first().id,
+            "catchment": self.collection_catchment.id,
+            "collector": Collector.objects.create(
+                name="New Test Collector", publication_status="published"
+            ).id,
+            "collection_system": self.collection_system.id,
+            "waste_category": self.waste_stream.category.id,
             "connection_type": "VOLUNTARY",
             "allowed_materials": [
                 self.allowed_material_1.id,
@@ -1231,7 +1289,7 @@ class CollectionCopyViewTestCase(ViewWithPermissionsTestCase):
                 self.forbidden_material_1.id,
                 self.forbidden_material_2.id,
             ],
-            "frequency": CollectionFrequency.objects.first().id,
+            "frequency": self.frequency.id,
             "valid_from": date(2022, 1, 1),
             "description": "This is a test case that should pass!",
             "form-INITIAL_FORMS": "0",
@@ -1310,22 +1368,26 @@ class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
 
-        MaterialCategory.objects.create(name="Biowaste component")
+        cls.material_category = MaterialCategory.objects.create(
+            name="Biowaste component", publication_status="published"
+        )
         cls.allowed_material_1 = WasteComponent.objects.create(
-            name="Allowed material 1"
+            name="Allowed material 1", publication_status="published"
         )
         cls.allowed_material_2 = WasteComponent.objects.create(
-            name="Allowed material 2"
+            name="Allowed material 2", publication_status="published"
         )
         cls.forbidden_material_1 = WasteComponent.objects.create(
-            name="Forbidden material 1"
+            name="Forbidden material 1", publication_status="published"
         )
         cls.forbidden_material_2 = WasteComponent.objects.create(
-            name="Forbidden material 2"
+            name="Forbidden material 2", publication_status="published"
         )
         waste_stream = WasteStream.objects.create(
             name="Test waste stream",
-            category=WasteCategory.objects.create(name="Test category"),
+            category=WasteCategory.objects.create(
+                name="Test category", publication_status="published"
+            ),
         )
         waste_stream.allowed_materials.add(cls.allowed_material_1)
         waste_stream.allowed_materials.add(cls.allowed_material_2)
@@ -1333,20 +1395,42 @@ class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
         waste_stream.forbidden_materials.add(cls.forbidden_material_2)
         with mute_signals(signals.post_save):
             cls.flyer = WasteFlyer.objects.create(
-                abbreviation="WasteFlyer123", url="https://www.test-flyer.org"
+                abbreviation="WasteFlyer123",
+                url="https://www.test-flyer.org",
+                publication_status="published",
             )
             cls.flyer2 = WasteFlyer.objects.create(
-                abbreviation="WasteFlyer234", url="https://www.fest-flyer.org"
+                abbreviation="WasteFlyer234",
+                url="https://www.fest-flyer.org",
+                publication_status="published",
             )
-        frequency = CollectionFrequency.objects.create(name="Test Frequency")
+        cls.frequency = CollectionFrequency.objects.create(
+            name="Test Frequency", publication_status="published"
+        )
+        cls.catchment = CollectionCatchment.objects.create(
+            name="Test catchment", publication_status="published"
+        )
+        cls.collector = Collector.objects.create(
+            name="Test collector", publication_status="published"
+        )
+        cls.collection_system = CollectionSystem.objects.create(
+            name="Test system", publication_status="published"
+        )
+        cls.waste_stream = WasteStream.objects.create(
+            category=WasteCategory.objects.create(
+                name="Test category", publication_status="published"
+            ),
+            publication_status="published",
+        )
         cls.collection = Collection.objects.create(
             name="collection1",
-            catchment=CollectionCatchment.objects.create(name="Test catchment"),
-            collector=Collector.objects.create(name="Test collector"),
-            collection_system=CollectionSystem.objects.create(name="Test system"),
+            catchment=cls.catchment,
+            collector=cls.collector,
+            collection_system=cls.collection_system,
             waste_stream=waste_stream,
-            frequency=frequency,
+            frequency=cls.frequency,
             description="This is a test case.",
+            publication_status="published",
         )
         cls.collection.flyers.add(cls.flyer)
         cls.collection.flyers.add(cls.flyer2)
@@ -1387,10 +1471,10 @@ class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
     def test_post_http_302_redirect_for_member(self):
         self.client.force_login(self.member)
         data = {
-            "catchment": CollectionCatchment.objects.first().id,
-            "collector": Collector.objects.create(name="New Test Collector").id,
-            "collection_system": CollectionSystem.objects.first().id,
-            "waste_category": WasteCategory.objects.first().id,
+            "catchment": self.catchment.id,
+            "collector": self.collector.id,
+            "collection_system": self.collection_system.id,
+            "waste_category": self.waste_stream.category.id,
             "connection_type": "VOLUNTARY",
             "allowed_materials": [
                 self.allowed_material_1.id,
@@ -1400,7 +1484,7 @@ class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
                 self.forbidden_material_1.id,
                 self.forbidden_material_2.id,
             ],
-            "frequency": CollectionFrequency.objects.first().id,
+            "frequency": self.frequency.id,
             "valid_from": date(2022, 1, 1),
             "description": "This is a test case that should pass!",
             "form-INITIAL_FORMS": "0",
@@ -1422,10 +1506,12 @@ class CollectionAutocompleteViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         Collection.objects.create(
-            catchment=CollectionCatchment.objects.create(name="Hamburg")
+            catchment=CollectionCatchment.objects.create(name="Hamburg"),
+            publication_status="published",
         )
         Collection.objects.create(
-            catchment=CollectionCatchment.objects.create(name="Berlin")
+            catchment=CollectionCatchment.objects.create(name="Berlin"),
+            publication_status="published",
         )
 
     def test_get_http_200_ok_for_anonymous(self):
@@ -1449,9 +1535,13 @@ class CollectionAddPropertyValueViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.collection = Collection.objects.create(name="Test Collection")
-        cls.unit = Unit.objects.create(name="Test Unit")
-        cls.prop = Property.objects.create(name="Test Property")
+        cls.collection = Collection.objects.create(
+            name="Test Collection", publication_status="published"
+        )
+        cls.unit = Unit.objects.create(name="Test Unit", publication_status="published")
+        cls.prop = Property.objects.create(
+            name="Test Property", publication_status="published"
+        )
         cls.prop.allowed_units.add(cls.unit)
 
     def test_get_http_302_redirect_for_anonymous(self):
@@ -1530,15 +1620,25 @@ class CollectionAddAggregatedPropertyValueViewTestCase(ViewWithPermissionsTestCa
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.catchment = CollectionCatchment.objects.create()
-        Collection.objects.create(
-            catchment=CollectionCatchment.objects.create(parent=cls.catchment)
+        cls.catchment = CollectionCatchment.objects.create(
+            publication_status="published"
         )
         Collection.objects.create(
-            catchment=CollectionCatchment.objects.create(parent=cls.catchment)
+            catchment=CollectionCatchment.objects.create(
+                parent=cls.catchment, publication_status="published"
+            ),
+            publication_status="published",
         )
-        cls.unit = Unit.objects.create(name="Test Unit")
-        cls.prop = Property.objects.create(name="Test Property")
+        Collection.objects.create(
+            catchment=CollectionCatchment.objects.create(
+                parent=cls.catchment, publication_status="published"
+            ),
+            publication_status="published",
+        )
+        cls.unit = Unit.objects.create(name="Test Unit", publication_status="published")
+        cls.prop = Property.objects.create(
+            name="Test Property", publication_status="published"
+        )
         cls.prop.allowed_units.add(cls.unit)
 
     def test_get_http_302_redirect_for_anonymous(self):
@@ -1635,15 +1735,22 @@ class CollectionWasteSamplesViewTestCase(
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        material = Material.objects.create(name="Test Material")
-        series = SampleSeries.objects.create(name="Test Series", material=material)
+        material = Material.objects.create(
+            name="Test Material", publication_status="published"
+        )
+        series = SampleSeries.objects.create(
+            name="Test Series", material=material, publication_status="published"
+        )
         cls.unpublished_object.samples.add(
             Sample.objects.create(
                 name="Test Sample 1", material=material, series=series
             )
         )
         cls.sample = Sample.objects.create(
-            name="Test Sample 2", material=material, series=series
+            name="Test Sample 2",
+            material=material,
+            series=series,
+            publication_status="published",
         )
 
     def compile_update_post_data(self):
@@ -1705,17 +1812,26 @@ class CollectionPredecessorsViewTestCase(
             collector=cls.related_objects["collector"],
             collection_system=cls.related_objects["collection_system"],
             waste_stream=cls.related_objects["waste_stream"],
+            publication_status="published",
         )
 
     @classmethod
     def create_related_objects(cls):
         return {
-            "catchment": CollectionCatchment.objects.create(name="Test Catchment"),
-            "collector": Collector.objects.create(name="Test Collector"),
-            "collection_system": CollectionSystem.objects.create(name="Test System"),
+            "catchment": CollectionCatchment.objects.create(
+                name="Test Catchment", publication_status="published"
+            ),
+            "collector": Collector.objects.create(
+                name="Test Collector", publication_status="published"
+            ),
+            "collection_system": CollectionSystem.objects.create(
+                name="Test System", publication_status="published"
+            ),
             "waste_stream": WasteStream.objects.create(
                 name="Test Waste Stream",
-                category=WasteCategory.objects.create(name="Test Category"),
+                category=WasteCategory.objects.create(
+                    name="Test Category", publication_status="published"
+                ),
             ),
         }
 
@@ -1791,12 +1907,12 @@ class WasteCollectionPublishedMapViewTestCase(ViewWithPermissionsTestCase):
         )
 
     def test_http_200_ok_for_anonymous(self):
-        response = self.client.get(self.url)
+        response = self.client.get(self.url, follow=True)
         self.assertEqual(response.status_code, 200)
 
     def test_http_200_ok_for_member(self):
         self.client.force_login(self.member)
-        response = self.client.get(self.url)
+        response = self.client.get(self.url, follow=True)
         self.assertEqual(response.status_code, 200)
 
     def test_uses_correct_template(self):

@@ -123,7 +123,7 @@ class UserCreatedObjectScopedFilterSet(BaseCrispyFilterSet):
         widget=HiddenInput(),
         method="filter_scope",
         label="",
-        initial="published",  # Default to published for most contexts
+        initial="published",
     )
 
     def filter_scope(self, queryset, name, value):

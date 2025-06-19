@@ -264,12 +264,11 @@ class NantesGreenhousesCatchmentAutocompleteView(UserCreatedObjectAutocompleteVi
     geodataset_model_name = "NantesGreenhouses"
 
     def get_queryset(self):
+        queryset = super().get_queryset()
         dataset_region = GeoDataset.objects.get(
             model_name=self.geodataset_model_name
         ).region
-        return Catchment.objects.filter(
-            region__borders__geom__within=dataset_region.geom
-        )
+        return queryset.filter(region__borders__geom__within=dataset_region.geom)
 
 
 class GreenhousesPublishedMapView(GeoDataSetPublishedFilteredMapView):

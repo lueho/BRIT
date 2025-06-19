@@ -26,11 +26,16 @@ class ScenarioCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
 
     @classmethod
     def create_related_objects(cls):
-        region = Region.objects.create(name="Test Region")
+        region = Region.objects.create(
+            name="Test Region", publication_status="published"
+        )
         return {
             "region": region,
             "catchment": Catchment.objects.create(
-                name="Test Catchment", region=region, parent_region=region
+                name="Test Catchment",
+                region=region,
+                parent_region=region,
+                publication_status="published",
             ),
         }
 
@@ -53,10 +58,15 @@ class ScenarioResultCRUDViewsTestCase(
 
     @classmethod
     def create_related_objects(cls):
-        region = Region.objects.create(name="Test Region")
+        region = Region.objects.create(
+            name="Test Region", publication_status="published"
+        )
         return {
             "region": region,
             "catchment": Catchment.objects.create(
-                name="Test Catchment", region=region, parent_region=region
+                name="Test Catchment",
+                region=region,
+                parent_region=region,
+                publication_status="published",
             ),
         }

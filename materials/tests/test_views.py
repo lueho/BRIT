@@ -327,7 +327,9 @@ class SampleSeriesCRUDViewsTestCase(
 
     @classmethod
     def create_related_objects(cls):
-        material = Material.objects.create(name="Test Material")
+        material = Material.objects.create(
+            name="Test Material", publication_status="published"
+        )
         return {"material": material}
 
 
@@ -354,7 +356,11 @@ class SampleSeriesCreateDuplicateViewTestCase(
 
     @classmethod
     def create_related_objects(cls):
-        return {"material": Material.objects.create(name="Test Material")}
+        return {
+            "material": Material.objects.create(
+                name="Test Material", publication_status="published"
+            )
+        }
 
 
 # ----------- Sample CRUD ----------------------------------------------------------------------------------------------
@@ -387,6 +393,7 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
     view_update_name = "sample-update"
     view_delete_name = "sample-delete-modal"
 
+    allow_create_for_any_authenticated_user = True
     add_scope_query_param_to_list_urls = True
 
     create_object_data = {"name": "Test Sample"}
@@ -394,10 +401,18 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
 
     @classmethod
     def create_related_objects(cls):
-        material = Material.objects.create(name="Test Material")
-        prop = MaterialProperty.objects.create(name="Test Property", unit="Test Unit")
+        material = Material.objects.create(
+            name="Test Material", publication_status="published"
+        )
+        prop = MaterialProperty.objects.create(
+            name="Test Property", unit="Test Unit", publication_status="published"
+        )
         MaterialPropertyValue.objects.create(
-            name="Test Value", property=prop, average=123.3, standard_deviation=0.13
+            name="Test Value",
+            property=prop,
+            average=123.3,
+            standard_deviation=0.13,
+            publication_status="published",
         )
         return {"material": material}
 

@@ -130,11 +130,12 @@ class GeoJSONCachingTests(TestCase):
 
         # Verify cache key was set
         expected_key = get_region_cache_key(filters={"name": unique_name})
-        if self.geojson_cache.get(expected_key) is None:
-            self.skipTest(
-                "Cache key missing after first request; likely due to parallel test interference."
-            )
-        self.assertIsNotNone(self.geojson_cache.get(expected_key))
+        cached_data = self.geojson_cache.get(expected_key)
+        # Using a proper assertion with message rather than skipTest + assertion
+        self.assertIsNotNone(
+            cached_data,
+            f"Cache key '{expected_key}' missing after first request. This could be due to parallel test interference or a caching issue."
+        )
 
         # 2. Second request (HIT)
         response_hit = self.client.get(url)

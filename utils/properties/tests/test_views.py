@@ -51,7 +51,11 @@ class PropertyCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
 
     @classmethod
     def create_related_objects(cls):
-        return {"unit": Unit.objects.create(name="Test Unit")}
+        return {
+            "unit": Unit.objects.create(
+                name="Test Unit", publication_status="published"
+            )
+        }
 
     def related_objects_post_data(self):
         data = super().related_objects_post_data()

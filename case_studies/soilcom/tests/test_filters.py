@@ -5,6 +5,7 @@ from factory.django import mute_signals
 
 from distributions.models import TemporalDistribution, Timestep
 from utils.properties.models import Property
+
 from ..filters import (
     CollectionFilterSet,
     CollectionsPerYearFilter,
@@ -20,10 +21,10 @@ from ..models import (
     CollectionFrequency,
     CollectionPropertyValue,
     CollectionSeason,
-    Collector,
-    WasteFlyer,
     CollectionSystem,
+    Collector,
     WasteCategory,
+    WasteFlyer,
     WasteStream,
 )
 
@@ -303,24 +304,28 @@ class CollectionFilterTestCase(TestCase):
             valid_from=timezone.now().date(),
             valid_until=timezone.now().date() + timezone.timedelta(days=30),
             required_bin_capacity=120,
+            publication_status="published",
         )
         cls.collection2 = Collection.objects.create(
             catchment=cls.unrelated_catchment,
             frequency=cls.seasonal_frequency,
             valid_from=timezone.now().date(),
             required_bin_capacity=240,
+            publication_status="published",
         )
         cls.child_collection = Collection.objects.create(
             catchment=child_catchment,
             frequency=fixed_once_per_week,
             valid_from=timezone.now().date(),
             required_bin_capacity=360,
+            publication_status="published",
         )
         cls.predecessor_collection = Collection.objects.create(
             catchment=cls.catchment,
             valid_from=timezone.now().date() - timezone.timedelta(days=90),
             valid_until=timezone.now().date() - timezone.timedelta(days=1),
             description="Predecessor collection",
+            publication_status="published",
         )
         cls.collection1.add_predecessor(cls.predecessor_collection)
 

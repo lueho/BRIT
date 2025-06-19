@@ -229,30 +229,42 @@ class CollectionModelFormTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.catchment = CollectionCatchment.objects.create(name="Catchment")
-        cls.collector = Collector.objects.create(name="Collector")
-        cls.collection_system = CollectionSystem.objects.create(name="System")
-        cls.waste_category = WasteCategory.objects.create(name="Category")
-        cls.material_group = MaterialCategory.objects.create(name="Biowaste component")
+        cls.catchment = CollectionCatchment.objects.create(
+            name="Catchment", publication_status="published"
+        )
+        cls.collector = Collector.objects.create(
+            name="Collector", publication_status="published"
+        )
+        cls.collection_system = CollectionSystem.objects.create(
+            name="System", publication_status="published"
+        )
+        cls.waste_category = WasteCategory.objects.create(
+            name="Category", publication_status="published"
+        )
+        cls.material_group = MaterialCategory.objects.create(
+            name="Biowaste component", publication_status="published"
+        )
         cls.allowed_material_1 = WasteComponent.objects.create(
-            name="Allowed Material 1"
+            name="Allowed Material 1", publication_status="published"
         )
         cls.allowed_material_1.categories.add(cls.material_group)
         cls.allowed_material_2 = WasteComponent.objects.create(
-            name="Allowed Material 2"
+            name="Allowed Material 2", publication_status="published"
         )
         cls.allowed_material_2.categories.add(cls.material_group)
         cls.forbidden_material_1 = WasteComponent.objects.create(
-            name="Forbidden Material 1"
+            name="Forbidden Material 1", publication_status="published"
         )
         cls.forbidden_material_1.categories.add(cls.material_group)
         cls.forbidden_material_2 = WasteComponent.objects.create(
-            name="Forbidden Material 2"
+            name="Forbidden Material 2", publication_status="published"
         )
         cls.forbidden_material_2.categories.add(cls.material_group)
-        cls.frequency = CollectionFrequency.objects.create(name="fix")
+        cls.frequency = CollectionFrequency.objects.create(
+            name="fix", publication_status="published"
+        )
         waste_stream = WasteStream.objects.create(
-            category=cls.waste_category,
+            category=cls.waste_category, publication_status="published"
         )
         waste_stream.allowed_materials.set(
             [cls.allowed_material_1, cls.allowed_material_2]
@@ -267,6 +279,7 @@ class CollectionModelFormTestCase(TestCase):
             waste_stream=waste_stream,
             frequency=cls.frequency,
             valid_from=date(2021, 1, 1),
+            publication_status="published",
         )
         cls.predecessor_collection_2 = Collection.objects.create(
             catchment=cls.catchment,
@@ -275,6 +288,7 @@ class CollectionModelFormTestCase(TestCase):
             waste_stream=waste_stream,
             frequency=cls.frequency,
             valid_from=date(2022, 1, 1),
+            publication_status="published",
         )
         cls.collection = Collection.objects.create(
             catchment=cls.catchment,
@@ -284,6 +298,7 @@ class CollectionModelFormTestCase(TestCase):
             frequency=cls.frequency,
             valid_from=date(2023, 1, 1),
             valid_until=date(2023, 12, 31),
+            publication_status="published",
         )
         cls.collection.predecessors.set(
             [cls.predecessor_collection_1, cls.predecessor_collection_2]
@@ -706,13 +721,18 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
 
 class CollectionAddWasteSampleFormTestCase(TestCase):
     def setUp(self):
-        self.material = Material.objects.create(name="Test Material")
+        self.material = Material.objects.create(
+            name="Test Material", publication_status="published"
+        )
         self.sample = Sample.objects.create(
             name="Test Sample",
             material=self.material,
             series=SampleSeries.objects.create(
-                name="Test Series", material=self.material
+                name="Test Series",
+                material=self.material,
+                publication_status="published",
             ),
+            publication_status="published",
         )
 
     def test_form_is_valid_with_existing_sample(self):
@@ -797,12 +817,23 @@ class CollectionAddPredecessorFormTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        catchment1 = CollectionCatchment.objects.create(name="Catchment 1")
-        catchment2 = CollectionCatchment.objects.create(name="Catchment 2")
-        collector = Collector.objects.create(name="Collector")
-        collection_system = CollectionSystem.objects.create(name="System")
+        catchment1 = CollectionCatchment.objects.create(
+            name="Catchment 1", publication_status="published"
+        )
+        catchment2 = CollectionCatchment.objects.create(
+            name="Catchment 2", publication_status="published"
+        )
+        collector = Collector.objects.create(
+            name="Collector", publication_status="published"
+        )
+        collection_system = CollectionSystem.objects.create(
+            name="System", publication_status="published"
+        )
         waste_stream = WasteStream.objects.create(
-            category=WasteCategory.objects.create(name="Category")
+            category=WasteCategory.objects.create(
+                name="Category", publication_status="published"
+            ),
+            publication_status="published",
         )
         cls.collection = Collection.objects.create(
             name="Current Collection",
@@ -810,6 +841,7 @@ class CollectionAddPredecessorFormTestCase(TestCase):
             collector=collector,
             collection_system=collection_system,
             waste_stream=waste_stream,
+            publication_status="published",
         )
         cls.other_collection = Collection.objects.create(
             name="Predecessor Collection",
@@ -817,6 +849,7 @@ class CollectionAddPredecessorFormTestCase(TestCase):
             collector=collector,
             collection_system=collection_system,
             waste_stream=waste_stream,
+            publication_status="published",
         )
         cls.predecessor_collection = Collection.objects.create(
             name="Predecessor Collection",
@@ -824,6 +857,7 @@ class CollectionAddPredecessorFormTestCase(TestCase):
             collector=collector,
             collection_system=collection_system,
             waste_stream=waste_stream,
+            publication_status="published",
         )
 
     def test_queryset_excludes_current_collection(self):

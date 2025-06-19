@@ -1,7 +1,5 @@
 from django.urls import include, path
 
-from maps.views import CatchmentModalDeleteView
-
 from . import views
 from .router import router
 
@@ -38,7 +36,7 @@ urlpatterns = [
     ),
     path(
         "catchments/<int:pk>/delete/modal/",
-        CatchmentModalDeleteView.as_view(),
+        views.CollectionCatchmentModalDeleteView.as_view(),
         name="collectioncatchment-delete-modal",
     ),
     path(

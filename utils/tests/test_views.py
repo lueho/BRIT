@@ -1,6 +1,8 @@
 from django.urls import reverse
+import logging
 
 from utils.tests.testcases import ViewWithPermissionsTestCase
+from utils.object_management.views import UserCreatedObjectAutocompleteView
 
 
 class UtilsDashboardViewTestCase(ViewWithPermissionsTestCase):

@@ -109,7 +109,7 @@ class CollectorPublishedListView(PublishedObjectFilterView):
     dashboard_url = reverse_lazy("wastecollection-dashboard")
 
 
-class CollectorPrivateListView(PrivateObjectListView):
+class CollectorPrivateListView(PrivateObjectFilterView):
     model = Collector
     filterset_class = CollectorFilter
     dashboard_url = reverse_lazy("wastecollection-dashboard")
@@ -636,6 +636,16 @@ class CollectionCatchmentUpdateView(CatchmentUpdateView):
         return reverse("collectioncatchment-detail", kwargs={"pk": self.object.pk})
 
 
+class CollectionCatchmentModalDeleteView(UserCreatedObjectModalDeleteView):
+    model = CollectionCatchment
+
+    def get_success_url(self):
+        if self.object.publication_status == "published":
+            return f"{reverse('collectioncatchment-list')}?scope=published"
+        elif self.object.publication_status == "private":
+            return f"{reverse('collectioncatchment-list-owned')}?scope=private"
+
+
 # ----------- CollectionCatchment Utils -------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -838,7 +848,6 @@ class CollectionUpdateView(M2MInlineFormSetMixin, UserCreatedObjectUpdateView):
 
 class CollectionModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Collection
-    success_url = reverse_lazy("collection-list-owned")
 
 
 # ----------- Collection Utils -----------------------------------------------------------------------------------------

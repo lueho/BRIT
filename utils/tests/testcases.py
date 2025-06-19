@@ -165,6 +165,7 @@ class AbstractTestCases(object):
         update_success_url_name = None
         delete_success_url_name = None
 
+        allow_create_for_any_authenticated_user = False
         add_scope_query_param_to_list_urls = False
 
         permission_denied_message = (
@@ -182,15 +183,21 @@ class AbstractTestCases(object):
             cls.non_owner_user = User.objects.create(username="non_owner")
             cls.staff_user = User.objects.create(username="staff", is_staff=True)
 
-            # Create a user with add permission for the model
-            cls.user_with_add_perm = User.objects.create(username="user_with_add_perm")
             if cls.model:
                 add_perm_codename = (
                     cls.model_add_permission or f"add_{cls.model._meta.model_name}"
                 )
-                cls.user_with_add_perm.user_permissions.add(
-                    Permission.objects.get(codename=add_perm_codename)
+                add_perm = Permission.objects.get(codename=add_perm_codename)
+
+                cls.user_with_add_perm = User.objects.create(
+                    username="user_with_add_perm"
                 )
+                cls.user_with_add_perm.user_permissions.add(add_perm)
+
+            if cls.allow_create_for_any_authenticated_user:
+                cls.owner_user.user_permissions.add(add_perm)
+                cls.non_owner_user.user_permissions.add(add_perm)
+                cls.staff_user.user_permissions.add(add_perm)
 
             cls.related_objects = cls.create_related_objects()
             cls.util_objects = cls.create_util_objects()
@@ -361,7 +368,13 @@ class AbstractTestCases(object):
             if self.dashboard_view:
                 self.assertContains(response, self.get_dashboard_url())
             if self.create_view:
-                self.assertNotContains(response, self.get_create_url())
+                if (
+                    self.model_add_permission
+                    and self.allow_create_for_any_authenticated_user
+                ):
+                    self.assertContains(response, self.get_create_url())
+                else:
+                    self.assertNotContains(response, self.get_create_url())
             if self.private_list_view:
                 self.assertContains(
                     response, self.get_list_url(publication_status="private")
@@ -379,7 +392,13 @@ class AbstractTestCases(object):
             if self.dashboard_view:
                 self.assertContains(response, self.get_dashboard_url())
             if self.create_view:
-                self.assertNotContains(response, self.get_create_url())
+                if (
+                    self.model_add_permission
+                    and self.allow_create_for_any_authenticated_user
+                ):
+                    self.assertContains(response, self.get_create_url())
+                else:
+                    self.assertNotContains(response, self.get_create_url())
             if self.private_list_view:
                 self.assertContains(
                     response, self.get_list_url(publication_status="private")
@@ -424,7 +443,13 @@ class AbstractTestCases(object):
             if self.dashboard_view:
                 self.assertIn(self.get_dashboard_url(), body)
             if self.create_view:
-                self.assertNotIn(self.get_create_url(), body)
+                if (
+                    self.model_add_permission
+                    and self.allow_create_for_any_authenticated_user
+                ):
+                    self.assertIn(self.get_create_url(), body)
+                else:
+                    self.assertNotIn(self.get_create_url(), body)
             if self.public_list_view:
                 self.assertIn(self.get_list_url(publication_status="published"), body)
 
@@ -441,7 +466,13 @@ class AbstractTestCases(object):
             if self.dashboard_view:
                 self.assertIn(self.get_dashboard_url(), body)
             if self.create_view:
-                self.assertNotIn(self.get_create_url(), body)
+                if (
+                    self.model_add_permission
+                    and self.allow_create_for_any_authenticated_user
+                ):
+                    self.assertIn(self.get_create_url(), body)
+                else:
+                    self.assertNotIn(self.get_create_url(), body)
             if self.public_list_view:
                 self.assertIn(self.get_list_url(publication_status="published"), body)
 
@@ -454,13 +485,16 @@ class AbstractTestCases(object):
                 follow=True,
             )
             self.assertEqual(response.status_code, 200)
-            body = response.content.decode()
             if self.dashboard_view:
-                self.assertIn(self.get_dashboard_url(), body)
+                self.assertContains(response, self.get_dashboard_url())
             if self.create_view:
-                self.assertIn(self.get_create_url(), body)
+                self.assertContains(response, self.get_create_url())
             if self.public_list_view:
-                self.assertIn(self.get_list_url(publication_status="published"), body)
+                self.assertContains(
+                    response,
+                    self.get_list_url(publication_status="published"),
+                    html=False,
+                )
 
         # -----------------------
         # ModalCreateView Test Cases
@@ -490,21 +524,31 @@ class AbstractTestCases(object):
             self.client.force_login(self.non_owner_user)
             url = self.get_modal_create_url()
             response = self.client.get(url)
-            self.assertEqual(response.status_code, 403)
-            self.assertContains(
-                response, self.permission_denied_message, status_code=403
-            )
+            if self.allow_create_for_any_authenticated_user:
+                self.assertEqual(response.status_code, 200)
+            else:
+                self.assertEqual(response.status_code, 403)
+                self.assertContains(
+                    response, self.permission_denied_message, status_code=403
+                )
 
         def test_modal_create_view_post_as_authenticated_without_permission(self):
             if not self.modal_create_view:
                 self.skipTest("Modal create view is not enabled for this test case.")
             self.client.force_login(self.non_owner_user)
             url = self.get_modal_create_url()
-            response = self.client.post(url)
-            self.assertEqual(response.status_code, 403)
-            self.assertContains(
-                response, self.permission_denied_message, status_code=403
-            )
+            data = {}
+            if self.allow_create_for_any_authenticated_user:
+                data = self.create_object_data.copy()
+                data.update(self.related_objects_post_data())
+            response = self.client.post(url, data)
+            if self.allow_create_for_any_authenticated_user:
+                self.assertEqual(response.status_code, 302)
+            else:
+                self.assertEqual(response.status_code, 403)
+                self.assertContains(
+                    response, self.permission_denied_message, status_code=403
+                )
 
         def test_modal_create_view_get_as_authenticated_with_permission(self):
             if not self.modal_create_view:
@@ -578,21 +622,31 @@ class AbstractTestCases(object):
             self.client.force_login(self.non_owner_user)
             url = self.get_create_url()
             response = self.client.get(url)
-            self.assertEqual(response.status_code, 403)
-            self.assertContains(
-                response, self.permission_denied_message, status_code=403
-            )
+            if self.allow_create_for_any_authenticated_user:
+                self.assertEqual(response.status_code, 200)
+            else:
+                self.assertEqual(response.status_code, 403)
+                self.assertContains(
+                    response, self.permission_denied_message, status_code=403
+                )
 
         def test_create_view_post_as_authenticated_without_permission(self):
             if not self.create_view:
                 self.skipTest("Create view is not enabled for this test case.")
             self.client.force_login(self.non_owner_user)
             url = self.get_create_url()
-            response = self.client.post(url)
-            self.assertEqual(response.status_code, 403)
-            self.assertContains(
-                response, self.permission_denied_message, status_code=403
-            )
+            data = {}
+            if self.allow_create_for_any_authenticated_user:
+                data = self.create_object_data.copy()
+                data.update(self.related_objects_post_data())
+            response = self.client.post(url, data)
+            if self.allow_create_for_any_authenticated_user:
+                self.assertEqual(response.status_code, 302)
+            else:
+                self.assertEqual(response.status_code, 403)
+                self.assertContains(
+                    response, self.permission_denied_message, status_code=403
+                )
 
         def test_create_view_get_as_authenticated_with_permission(self):
             if not self.create_view:

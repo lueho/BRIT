@@ -303,6 +303,7 @@ class RegionMapViewTestCase(ViewWithPermissionsTestCase):
 
 class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Catchment
+    model_add_permission = "maps.add_catchment"
 
     view_dashboard_name = "maps-dashboard"
     view_create_name = "catchment-create"
@@ -312,13 +313,18 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
     view_update_name = "catchment-update"
     view_delete_name = "catchment-delete-modal"
 
+    allow_create_for_any_authenticated_user = True
+    add_scope_query_param_to_list_urls = True
+
     create_object_data = {"name": "Test Catchment"}
     update_object_data = {"name": "Updated Test Catchment"}
 
     @classmethod
     def create_related_objects(cls):
         return {
-            "region": Region.objects.create(name="Test Region"),
+            "region": Region.objects.create(
+                name="Test Region", publication_status="published"
+            ),
         }
 
     @classmethod
@@ -348,74 +354,6 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
             "lau_region_3": lau_3.region_ptr,
             "parent_region": parent_region,
         }
-
-    def test_list_view_published_as_authenticated_owner(self):
-        if not self.public_list_view:
-            self.skipTest("List view is not enabled for this test case.")
-        self.client.force_login(self.owner_user)
-        response = self.client.get(self.get_list_url(publication_status="published"))
-        self.assertEqual(response.status_code, 200)
-        if self.dashboard_view:
-            self.assertContains(response, self.get_dashboard_url())
-        if self.create_view:
-            self.assertContains(
-                response, self.get_create_url()
-            )  # This is the difference to the original test function
-        if self.private_list_view:
-            self.assertContains(
-                response, self.get_list_url(publication_status="private")
-            )
-
-    def test_list_view_published_as_authenticated_non_owner(self):
-        if not self.public_list_view:
-            self.skipTest("List view is not enabled for this test case.")
-        self.client.force_login(self.non_owner_user)
-        response = self.client.get(self.get_list_url(publication_status="published"))
-        self.assertEqual(response.status_code, 200)
-        if self.dashboard_view:
-            self.assertContains(response, self.get_dashboard_url())
-        if self.create_view:
-            self.assertContains(
-                response, self.get_create_url()
-            )  # This is the difference to the original test function
-        if self.private_list_view:
-            self.assertContains(
-                response, self.get_list_url(publication_status="private")
-            )
-
-    def test_list_view_private_as_authenticated_owner(self):
-        if not self.private_list_view:
-            self.skipTest("List view is not enabled for this test case")
-        self.client.force_login(self.owner_user)
-        response = self.client.get(self.get_list_url(publication_status="private"))
-        self.assertEqual(response.status_code, 200)
-        if self.dashboard_view:
-            self.assertContains(response, self.get_dashboard_url())
-        if self.create_view:
-            self.assertContains(
-                response, self.get_create_url()
-            )  # This is the difference to the original test function
-        if self.public_list_view:
-            self.assertContains(
-                response, self.get_list_url(publication_status="published")
-            )
-
-    def test_list_view_private_as_authenticated_non_owner(self):
-        if not self.private_list_view:
-            self.skipTest("List view is not enabled for this test case")
-        self.client.force_login(self.non_owner_user)
-        response = self.client.get(self.get_list_url(publication_status="private"))
-        self.assertEqual(response.status_code, 200)
-        if self.dashboard_view:
-            self.assertContains(response, self.get_dashboard_url())
-        if self.create_view:
-            self.assertContains(
-                response, self.get_create_url()
-            )  # This is the difference to the original test function
-        if self.public_list_view:
-            self.assertContains(
-                response, self.get_list_url(publication_status="published")
-            )
 
     # -----------------------
     # CreateView Test Cases
@@ -1091,9 +1029,11 @@ class RegionAttributeValueCRUDViewsTestCase(
     @classmethod
     def create_related_objects(cls):
         return {
-            "region": Region.objects.create(owner=cls.owner_user, name="Test Region"),
+            "region": Region.objects.create(
+                owner=cls.owner_user, name="Test Region", publication_status="published"
+            ),
             "attribute": Attribute.objects.create(
-                name="Test Attribute", unit="Test Unit"
+                name="Test Attribute", unit="Test Unit", publication_status="published"
             ),
         }
 
@@ -1119,12 +1059,14 @@ class RegionOfLauAutocompleteViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.region_1 = LauRegion.objects.create(
-            name="Test Region 1", lau_id="123"
+            name="Test Region 1", lau_id="123", publication_status="published"
         ).region_ptr
         cls.region_2 = LauRegion.objects.create(
-            name="Test Region 2", lau_id="234"
+            name="Test Region 2", lau_id="234", publication_status="published"
         ).region_ptr
-        cls.region_3 = Region.objects.create(name="Test Region Not In Queryset")
+        cls.region_3 = Region.objects.create(
+            name="Test Region Not In Queryset", publication_status="published"
+        )
 
     def test_all_lau_regions_with_matching_name_string_in_queryset(self):
         response = self.client.get(self.url, data={"q": "Test"})

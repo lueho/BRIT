@@ -20,6 +20,7 @@ from utils.crispy_fields import FilterAccordionGroup, RangeSliderField
 from utils.filters import (
     BaseCrispyFilterSet,
     NullableRangeFilter,
+    UserCreatedObjectScopedFilterSet,
 )
 from utils.widgets import NullableRangeSliderWidget
 
@@ -39,13 +40,7 @@ from .models import (
 )
 
 
-class CollectorFilter(BaseCrispyFilterSet):
-    scope = ChoiceFilter(
-        choices=(("published", "Published"), ("private", "Private")),
-        widget=HiddenInput(),
-        method="filter_scope",
-        label="",
-    )
+class CollectorFilter(UserCreatedObjectScopedFilterSet):
     name = CharFilter(lookup_expr="icontains")
     catchment = CharFilter(
         lookup_expr="name__icontains", label="Catchment name contains"
@@ -294,13 +289,7 @@ class MinBinSizeRangeFilter(NullableRangeFilter):
         )
 
 
-class CollectionFilterSet(BaseCrispyFilterSet):
-    scope = ChoiceFilter(
-        choices=(("published", "Published"), ("private", "Private")),
-        widget=HiddenInput(),
-        method="filter_scope",
-        label="",
-    )
+class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
     id = ModelMultipleChoiceFilter(
         queryset=Collection.objects.all(), to_field_name="id"
     )
@@ -463,23 +452,8 @@ class CollectionFilterSet(BaseCrispyFilterSet):
             Q(valid_from__lte=value), Q(valid_until__gte=value) | Q(valid_until=None)
         )
 
-    def filter_scope(self, queryset, name, value):
-        """Filter queryset by published vs private depending on scope param."""
-        if value == "private":
-            if not self.request.user.is_authenticated:
-                return queryset.none()
-            return queryset.filter(owner=self.request.user)
-        # default to published
-        return queryset.filter(publication_status="published")
 
-
-class WasteFlyerFilter(BaseCrispyFilterSet):
-    scope = ChoiceFilter(
-        choices=(("published", "Published"), ("private", "Private")),
-        widget=HiddenInput(),
-        method="filter_scope",
-        label="",
-    )
+class WasteFlyerFilter(UserCreatedObjectScopedFilterSet):
     url_valid = BooleanFilter(
         widget=RadioSelect(choices=((True, "True"), (False, "False")))
     )
@@ -506,7 +480,13 @@ class WasteFlyerFilter(BaseCrispyFilterSet):
 
     class Meta:
         model = WasteFlyer
-        fields = ("scope", "url_valid", "url_checked_before", "url_checked_after", "catchment")
+        fields = (
+            "scope",
+            "url_valid",
+            "url_checked_before",
+            "url_checked_after",
+            "catchment",
+        )
 
     @staticmethod
     def get_catchment(qs, _, value):

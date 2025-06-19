@@ -16,6 +16,7 @@ MIDDLEWARE = [
     "django.contrib.auth.middleware.AuthenticationMiddleware",
     "django.contrib.messages.middleware.MessageMiddleware",
     "maps.middleware.CacheMonitoringMiddleware",
+    "django_tomselect.middleware.TomSelectMiddleware",
 ]
 
 SILENCED_SYSTEM_CHECKS = ["debug_toolbar.W001"]

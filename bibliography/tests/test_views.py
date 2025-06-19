@@ -1,4 +1,5 @@
-from unittest.mock import patch, Mock
+from unittest.mock import Mock, patch
+
 from django.db.models.signals import post_save
 from django.urls import reverse
 from factory.django import mute_signals
@@ -63,8 +64,12 @@ class AuthorAutoCompleteViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_get_returns_only_authors_with_given_string_in_name(self):
-        test_author = Author.objects.create(first_names="Test", last_names="Author")
-        Author.objects.create(first_names="Another", last_names="Author")
+        test_author = Author.objects.create(
+            first_names="Test", last_names="Author", publication_status="published"
+        )
+        Author.objects.create(
+            first_names="Another", last_names="Author", publication_status="unpublished"
+        )
         response = self.client.get(reverse("author-autocomplete"), {"q": "Test"})
 
         expected_result = {
@@ -112,12 +117,11 @@ class LicenceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
 
 
 class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
+    model = Source
     model_add_permission = "add_source"
 
     modal_detail_view = True
     modal_create_view = True
-
-    model = Source
 
     view_dashboard_name = "bibliography-dashboard"
     view_create_name = "source-create"
@@ -128,6 +132,8 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
     view_modal_detail_name = "source-detail-modal"
     view_update_name = "source-update"
     view_delete_name = "source-delete-modal"
+
+    allow_create_for_any_authenticated_user = True
 
     create_object_data = {
         "abbreviation": "TS1",
@@ -145,21 +151,41 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        author_1_data = {"last_names": "Test Author", "first_names": "One"}
-        author_2_data = {"last_names": "Test Author", "first_names": "Two"}
+        author_1_data = {
+            "last_names": "Test Author",
+            "first_names": "One",
+            "publication_status": "published",
+        }
+        author_2_data = {
+            "last_names": "Test Author",
+            "first_names": "Two",
+            "publication_status": "published",
+        }
         author_1 = Author.objects.create(**author_1_data)
         author_2 = Author.objects.create(**author_2_data)
         cls.source_author_1 = SourceAuthor.objects.create(
-            source=cls.published_object, author=author_1, position=1
+            source=cls.published_object,
+            author=author_1,
+            position=1,
+            publication_status="published",
         )
         cls.source_author_2 = SourceAuthor.objects.create(
-            source=cls.published_object, author=author_2, position=2
+            source=cls.published_object,
+            author=author_2,
+            position=2,
+            publication_status="published",
         )
         cls.source_author_3 = SourceAuthor.objects.create(
-            source=cls.unpublished_object, author=author_1, position=1
+            source=cls.unpublished_object,
+            author=author_1,
+            position=1,
+            publication_status="unpublished",
         )
         cls.source_author_4 = SourceAuthor.objects.create(
-            source=cls.unpublished_object, author=author_2, position=2
+            source=cls.unpublished_object,
+            author=author_2,
+            position=2,
+            publication_status="unpublished",
         )
 
     def related_objects_post_data(self):
