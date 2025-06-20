@@ -214,9 +214,10 @@ class MapMixin:
     def get_override_params(self):
         params = {}
 
-        # If filter parameters are set, assume that features should be loaded.
+        # If any filter parameters besides the scope parameter are set, assume that features should be loaded
         if self.request.GET:
-            params["load_features"] = True
+            if any(key not in ["scope"] for key in self.request.GET):
+                params["load_features"] = True
 
         # Previous assumption can be overridden by explicitly setting the load_features parameter.
         for key in ["load_region", "load_catchment", "load_features"]:
