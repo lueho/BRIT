@@ -1,7 +1,7 @@
 // This files must be included after the range_slider.js file.
 document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('.checkbox-include-unknown').forEach(checkbox => {
-        const formRow = checkbox.closest('.form-row');
+        const formRow = checkbox.closest('.row.g-3');
         if (!formRow) return;
         const slider = formRow.querySelector('.numeric-slider-range');
         if (!slider) return;
@@ -13,7 +13,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     document.querySelectorAll('.checkbox-include-unknown').forEach(checkbox => {
         checkbox.addEventListener('click', () => {
-            const formRow = checkbox.closest('.form-row');
+            const formRow = checkbox.closest('.row.g-3');
             if (!formRow) return;
             const slider = formRow.querySelector('.numeric-slider-range');
             if (!slider) return;
