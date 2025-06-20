@@ -609,22 +609,55 @@ class RegionAutocompleteView(UserCreatedObjectAutocompleteView):
 
 class NutsRegionAutocompleteView(UserCreatedObjectAutocompleteView):
     model = NutsRegion
-    search_lookups = ["name__icontains", "code__icontains"]
+    search_lookups = ["name_latn__icontains", "levl_code__icontains"]
+    value_fields = ["id", "name_latn", "levl_code", "parent_id"]
 
-    def apply_filters(self, qs):
+    def apply_filters(self, queryset):
+        """Apply additional filters to the queryset.
+
+        The filter_by and exclude_by parameters, if provided, are expected to be in the format:
+        'dependent_field__lookup_field=value'
         """
-        `filter_by` / `exclude_by` parameters that the widgets add
-        are already honoured by `super().apply_filters(qs)`.
-        Here we add one extra, *static* filter that does not depend
-        on any other field: the level of the NUTS node.
-        """
-        qs = super().apply_filters(qs)
+        print("Running filter_by")
+        if not self.filter_by and not self.exclude_by:
+            return queryset
+        print("Filter_by found")
 
-        level = self.request.GET.get("level_code")
-        if level is not None:
-            qs = qs.filter(level_code=level)
+        if self.filter_by:
+            print("Filter_by: ", self.filter_by)
+            import urllib.parse
 
-        return qs
+            lookup, value = (
+                urllib.parse.unquote(self.filter_by).replace("'", "").split("=")
+            )
+            print("Lookup: ", lookup)
+            print("Value: ", value)
+            dependent_field, dependent_field_lookup = lookup.split("__")
+            print("Dependent field: ", dependent_field)
+            print("Dependent field lookup: ", dependent_field_lookup)
+            levl_code = int(dependent_field.split("_")[-1]) + 1
+            print("Level code: ", levl_code)
+
+            filter_dict = {"levl_code": levl_code, "parent_id": value}
+            print("Filter dict: ", filter_dict)
+            queryset = queryset.filter(**filter_dict)
+
+        return queryset
+
+    # def apply_filters(self, qs):
+    #     """
+    #     `filter_by` / `exclude_by` parameters that the widgets add
+    #     are already honoured by `super().apply_filters(qs)`.
+    #     Here we add one extra, *static* filter that does not depend
+    #     on any other field: the level of the NUTS node.
+    #     """
+    #     qs = super().apply_filters(qs)
+
+    #     level = self.request.GET.get("level_code")
+    #     if level is not None:
+    #         qs = qs.filter(levl_code=level)
+
+    #     return qs
 
 
 class RegionOfLauAutocompleteView(UserCreatedObjectAutocompleteView):

@@ -51,12 +51,14 @@ function adaptMapConfig() {
 }
 
 async function clickedFeature(event) {
+    console.log("Clicked feature")
     lockForm();
     const feature = event.layer.feature;
     const featureId = feature.properties.id;
     const featureDetails = await fetchFeatureDetails(featureId);
+    console.log(featureDetails)
     renderFeatureDetails(featureDetails);
-    setSelect2Value(
+    setTomSelectValue(
         `#id_level_${feature.properties.level}`,
         featureId,
         `${featureDetails.name} (${featureDetails.nuts_id})`
@@ -79,37 +81,38 @@ function getQueryParameters() {
     return params;
 }
 
-function setSelect2Value(selectSelector, id, name) {
+function setTomSelectValue(selectSelector, id, name) {
+    console.log("Setting TomSelect value")
     const select = document.querySelector(selectSelector);
+    console.log(select)
     if (!select) {
         console.warn(`Select element not found: ${selectSelector}`);
         return;
     }
 
-    // Check if option with this value already exists
-    const existingOption = select.querySelector(`option[value="${id}"]`);
-
-    if (!existingOption) {
-        // Create a new option element
-        const option = document.createElement('option');
-        option.value = id;
-        option.text = name;
-        option.selected = true;
-
-        setProgrammaticChange(() => {
-            select.appendChild(option);
-            // Dispatch change event
-            const event = new Event('change', { bubbles: true });
-            select.dispatchEvent(event);
-        });
-    } else {
-        setProgrammaticChange(() => {
-            select.value = id;
-            // Dispatch change event
-            const event = new Event('change', { bubbles: true });
-            select.dispatchEvent(event);
-        });
+    if (!select.tomselect) {
+        console.warn(`TomSelect not initialized for: ${selectSelector}`);
+        return;
     }
+    console.log(select.tomselect)
+    console.log(select.tomselect.options)
+
+    // Check if option with this value already exists in TomSelect
+    const existingOption = select.tomselect.options[id];
+    console.log(existingOption)
+
+    setProgrammaticChange(() => {
+        if (!existingOption) {
+            // Add the option to TomSelect
+            console.log("Adding option to TomSelect")
+            console.log(id)
+            console.log(name)
+            select.tomselect.setValue(id, false);
+        }
+
+        // Set the value
+        select.tomselect.setValue(id, true);
+    });
 }
 
 async function populateParents(regionId) {
@@ -124,7 +127,7 @@ async function populateParents(regionId) {
             const level = key.split('_')[1];
 
             if (value) {
-                setSelect2Value(`#id_level_${level}`, value.id, value.name);
+                setTomSelectValue(`#id_level_${level}`, value.id, value.name);
             }
         }
     } catch (error) {
@@ -139,22 +142,26 @@ function setProgrammaticChange(callback) {
 }
 
 async function updateMapAccordingToSelection() {
+    console.log("Updating map according to selection")
     const level0 = document.getElementById('id_level_0').value;
     const level1 = document.getElementById('id_level_1').value;
     const level2 = document.getElementById('id_level_2').value;
     const level3 = document.getElementById('id_level_3').value;
 
     const selectedLevel = level3 || level2 || level1 || level0;
+    console.log(selectedLevel)
 
     if (selectedLevel) {
         mapConfig.adjustBoundsToLayer = 'catchment';
         setLayerOrder(['region', 'features', 'catchment']);
         if (level3) {
+            console.log("Updating map according to selection level 3")
             await updateLayers({
                 catchment_params: { id: selectedLevel },
                 feature_params: { id: selectedLevel }
             });
         } else {
+            console.log("Updating map according to selection")
             await updateLayers({
                 catchment_params: { id: selectedLevel },
                 feature_params: { parent_id: selectedLevel }
@@ -199,10 +206,10 @@ const changedSelect = async function (e) {
     let regionId = e.target.value;
 
     if (regionId) {
-        await populateParents(regionId);
-        clearLowerFields(changedField);
+        // await populateParents(regionId);
+        // clearLowerFields(changedField);
     } else {
-        clearLowerFields(changedField);
+        // clearLowerFields(changedField);
         if (changedField === 'id_level_0') {
             resetFeatureDetails();
         }
@@ -233,7 +240,7 @@ function clearLowerFields(level) {
         id_level_3: []
     };
     if (fieldMap[level]) {
-        clearFields(fieldMap[level]);
+        // clearFields(fieldMap[level]);
     }
 }
 
@@ -246,4 +253,30 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
+
+    setTimeout(() => {
+        // Map each field to its level code
+        const levelCodeMap = {
+            'id_level_0': 0,
+            'id_level_1': 1,
+            'id_level_2': 2,
+            'id_level_3': 3
+        };
+
+        // For each field, intercept the TomSelect instance and modify its load function
+        Object.entries(levelCodeMap).forEach(([fieldId, levelCode]) => {
+            const field = document.getElementById(fieldId);
+            if (!field || !field.tomselect) return;
+
+            // Get the original load function from the TomSelect instance
+            const originalLoad = field.tomselect.settings.load;
+
+            // Override with a new function that adds the level_code parameter
+            field.tomselect.settings.load = function (query, callback) {
+                // Add level_code parameter to the URL
+                const self = this;
+                return originalLoad.call(this, query, callback, { level_code: levelCode });
+            };
+        });
+    }, 500); // Give TomSelect time to initialize
 });
