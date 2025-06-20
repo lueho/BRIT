@@ -1,5 +1,6 @@
 // Card styling
 .card {
+  overflow: visible !important; // Ensure dropdowns are not clipped by card boundaries
   border-color: rgba($secondary, 0.3);
 
   .card-header {
