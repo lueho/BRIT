@@ -211,15 +211,23 @@ class Command(BaseCommand):
         for app_label, init_func in ordered_initializers:
             logger.info(f"Running initialization for {app_label}...")
 
-            # Determine function parameters to handle different signatures
-            sig = inspect.signature(init_func)
-            if "logger" in sig.parameters:
-                # Function expects a logger parameter
-                result = init_func(logger=logger)
-            else:
-                # Standard function with no parameters
-                init_func()
+            try:
+                # Determine function parameters to handle different signatures
+                sig = inspect.signature(init_func)
+                if "logger" in sig.parameters:
+                    # Function expects a logger parameter
+                    result = init_func(logger=logger)
+                else:
+                    # Standard function with no parameters
+                    init_func()
 
-            logger.info(f"Completed initialization for {app_label}")
+                logger.info(f"Completed initialization for {app_label}")
+            except Exception as e:
+                logger.error(
+                    f"An error occurred during initialization for app '{app_label}': {e}",
+                    exc_info=True,  # This will log the full traceback
+                )
+                # Re-raise the exception to ensure the command fails and stops the release
+                raise
 
         logger.info("Successfully created all initial data")
