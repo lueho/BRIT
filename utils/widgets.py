@@ -22,6 +22,11 @@ class RangeSliderWidget(SuffixedMultiWidget):
         default_range_max (float): Default maximum value if not specified.
         default_range_step (float): Default step size if not specified.
         default_include_null (bool): Whether to include null values by default.
+        number_format (str): Format to use when displaying numbers. Options:
+            - 'integer': No decimal places (e.g., years)
+            - 'float-1': One decimal place
+            - 'float-2': Two decimal places
+            - 'auto': Smart formatting based on step size (default)
     """
 
     template_name = "widgets/range_slider_widget.html"
@@ -34,6 +39,7 @@ class RangeSliderWidget(SuffixedMultiWidget):
     default_range_min = 0
     default_range_max = 100
     default_range_step = 1
+    number_format = "auto"
     default_include_null = True
 
     class Media:
@@ -61,6 +67,7 @@ class RangeSliderWidget(SuffixedMultiWidget):
                 - data-default_range_min: Default minimum if not specified
                 - data-default_range_max: Default maximum if not specified
                 - data-default_include_null: Whether to include null values
+                - data-number_format: Format for displaying numbers (integer, float-1, float-2, auto)
             **kwargs: Additional keyword arguments passed to the parent class.
         """
         super().__init__(self.widgets, attrs)
@@ -78,6 +85,7 @@ class RangeSliderWidget(SuffixedMultiWidget):
             self.default_include_null = attrs.get(
                 "data-default_include_null", self.default_include_null
             )
+            self.number_format = attrs.get("data-number_format", self.number_format)
 
     def decompress(self, value):
         """
@@ -124,6 +132,7 @@ class RangeSliderWidget(SuffixedMultiWidget):
                 "data-cur_max": cur_max,
                 "data-step": step,
                 "data-unit": self.unit,
+                "data-number_format": self.number_format,
             }
         )
         base_id = context["widget"]["attrs"].get("id", context["widget"]["name"])
