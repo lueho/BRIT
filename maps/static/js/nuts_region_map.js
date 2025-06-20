@@ -50,20 +50,33 @@ function adaptMapConfig() {
     mapConfig.layerOrder = ['features', 'region', 'catchment'];
 }
 
+function loadAndSelect(selectSelector, id, name) {
+    const ts = document.querySelector(selectSelector)?.tomselect;
+    if (!ts) return;
+    return new Promise(res => {
+        const once = () => {
+            if (ts.options[id]) {
+                ts.setValue(id);
+                ts.off('load', once);
+                res();
+            }
+        };
+        ts.on('load', once);
+        ts.load(id);
+    });
+}
+
 async function clickedFeature(event) {
-    console.log("Clicked feature")
     lockForm();
     const feature = event.layer.feature;
     const featureId = feature.properties.id;
     const featureDetails = await fetchFeatureDetails(featureId);
-    console.log(featureDetails)
     renderFeatureDetails(featureDetails);
-    setTomSelectValue(
+    await loadAndSelect(
         `#id_level_${feature.properties.level}`,
         featureId,
         `${featureDetails.name} (${featureDetails.nuts_id})`
     );
-    await updateMapAccordingToSelection();
 }
 
 /**
@@ -82,9 +95,7 @@ function getQueryParameters() {
 }
 
 function setTomSelectValue(selectSelector, id, name) {
-    console.log("Setting TomSelect value")
     const select = document.querySelector(selectSelector);
-    console.log(select)
     if (!select) {
         console.warn(`Select element not found: ${selectSelector}`);
         return;
@@ -94,12 +105,9 @@ function setTomSelectValue(selectSelector, id, name) {
         console.warn(`TomSelect not initialized for: ${selectSelector}`);
         return;
     }
-    console.log(select.tomselect)
-    console.log(select.tomselect.options)
 
     // Check if option with this value already exists in TomSelect
     const existingOption = select.tomselect.options[id];
-    console.log(existingOption)
 
     setProgrammaticChange(() => {
         if (!existingOption) {
@@ -107,11 +115,9 @@ function setTomSelectValue(selectSelector, id, name) {
             console.log("Adding option to TomSelect")
             console.log(id)
             console.log(name)
-            select.tomselect.setValue(id, false);
+            select.tomselect.load(id);
+            select.tomselect.setValue(id);
         }
-
-        // Set the value
-        select.tomselect.setValue(id, true);
     });
 }
 
@@ -144,9 +150,13 @@ function setProgrammaticChange(callback) {
 async function updateMapAccordingToSelection() {
     console.log("Updating map according to selection")
     const level0 = document.getElementById('id_level_0').value;
+    console.log(level0)
     const level1 = document.getElementById('id_level_1').value;
+    console.log(level1)
     const level2 = document.getElementById('id_level_2').value;
+    console.log(level2)
     const level3 = document.getElementById('id_level_3').value;
+    console.log(level3)
 
     const selectedLevel = level3 || level2 || level1 || level0;
     console.log(selectedLevel)

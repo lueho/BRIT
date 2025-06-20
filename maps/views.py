@@ -609,55 +609,45 @@ class RegionAutocompleteView(UserCreatedObjectAutocompleteView):
 
 class NutsRegionAutocompleteView(UserCreatedObjectAutocompleteView):
     model = NutsRegion
-    search_lookups = ["name_latn__icontains", "levl_code__icontains"]
+    search_lookups = ["region_ptr", "name_latn__icontains", "levl_code__icontains"]
     value_fields = ["id", "name_latn", "levl_code", "parent_id"]
 
     def apply_filters(self, queryset):
-        """Apply additional filters to the queryset.
-
-        The filter_by and exclude_by parameters, if provided, are expected to be in the format:
-        'dependent_field__lookup_field=value'
-        """
-        print("Running filter_by")
         if not self.filter_by and not self.exclude_by:
             return queryset
-        print("Filter_by found")
 
         if self.filter_by:
-            print("Filter_by: ", self.filter_by)
             import urllib.parse
 
             lookup, value = (
                 urllib.parse.unquote(self.filter_by).replace("'", "").split("=")
             )
-            print("Lookup: ", lookup)
-            print("Value: ", value)
             dependent_field, dependent_field_lookup = lookup.split("__")
-            print("Dependent field: ", dependent_field)
-            print("Dependent field lookup: ", dependent_field_lookup)
             levl_code = int(dependent_field.split("_")[-1]) + 1
-            print("Level code: ", levl_code)
-
             filter_dict = {"levl_code": levl_code, "parent_id": value}
-            print("Filter dict: ", filter_dict)
             queryset = queryset.filter(**filter_dict)
 
         return queryset
 
-    # def apply_filters(self, qs):
-    #     """
-    #     `filter_by` / `exclude_by` parameters that the widgets add
-    #     are already honoured by `super().apply_filters(qs)`.
-    #     Here we add one extra, *static* filter that does not depend
-    #     on any other field: the level of the NUTS node.
-    #     """
-    #     qs = super().apply_filters(qs)
 
-    #     level = self.request.GET.get("level_code")
-    #     if level is not None:
-    #         qs = qs.filter(levl_code=level)
+class NutsRegionLevel0AutocompleteView(NutsRegionAutocompleteView):
+    def hook_queryset(self, queryset):
+        return queryset.filter(levl_code=0)
 
-    #     return qs
+
+class NutsRegionLevel1AutocompleteView(NutsRegionAutocompleteView):
+    def hook_queryset(self, queryset):
+        return queryset.filter(levl_code=1)
+
+
+class NutsRegionLevel2AutocompleteView(NutsRegionAutocompleteView):
+    def hook_queryset(self, queryset):
+        return queryset.filter(levl_code=2)
+
+
+class NutsRegionLevel3AutocompleteView(NutsRegionAutocompleteView):
+    def hook_queryset(self, queryset):
+        return queryset.filter(levl_code=3)
 
 
 class RegionOfLauAutocompleteView(UserCreatedObjectAutocompleteView):

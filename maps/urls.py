@@ -40,6 +40,10 @@ from .views import (
     MapsDashboardView,
     NutsAndLauCatchmentPedigreeAPI,
     NutsRegionAutocompleteView,
+    NutsRegionLevel0AutocompleteView,
+    NutsRegionLevel1AutocompleteView,
+    NutsRegionLevel2AutocompleteView,
+    NutsRegionLevel3AutocompleteView,
     NutsRegionParentsDetailAPI,
     NutsRegionPedigreeAPI,
     NutsRegionPublishedMapView,
@@ -242,6 +246,26 @@ urlpatterns = [
         "nutsregions/autocomplete/",
         NutsRegionAutocompleteView.as_view(),
         name="nutsregion-autocomplete",
+    ),
+    path(
+        "nutsregions/autocomplete/level0/",
+        NutsRegionLevel0AutocompleteView.as_view(),
+        name="nutsregion-autocomplete-level0",
+    ),
+    path(
+        "nutsregions/autocomplete/level1/",
+        NutsRegionLevel1AutocompleteView.as_view(),
+        name="nutsregion-autocomplete-level1",
+    ),
+    path(
+        "nutsregions/autocomplete/level2/",
+        NutsRegionLevel2AutocompleteView.as_view(),
+        name="nutsregion-autocomplete-level2",
+    ),
+    path(
+        "nutsregions/autocomplete/level3/",
+        NutsRegionLevel3AutocompleteView.as_view(),
+        name="nutsregion-autocomplete-level3",
     ),
     path(
         "lau_options/data/",
