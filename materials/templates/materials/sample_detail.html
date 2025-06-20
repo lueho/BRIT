@@ -293,10 +293,14 @@
 
         Object.keys(charts).forEach(key => {
             let container = document.getElementById(key);
-            let canvas = document.createElement('canvas');
-            canvas.setAttribute('id', key);
-            container.appendChild(canvas);
-            new Chart(canvas.getContext('2d'), charts[key]);
+            if (container) {
+                let canvas = document.createElement('canvas');
+                canvas.setAttribute('id', key + '-canvas');
+                container.appendChild(canvas);
+                new Chart(canvas.getContext('2d'), charts[key]);
+            } else {
+                console.error('Chart container not found:', key);
+            }
         });
 
     </script>
