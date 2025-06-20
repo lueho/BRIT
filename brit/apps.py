@@ -6,7 +6,5 @@ class BRITConfig(AppConfig):
     name = "brit"
 
     def ready(self):
-        # Ensure export registry is initialized at startup
-        import utils.file_export.registry_init
-
+        # Signals are connected here
         from .signals import populate_initial_data

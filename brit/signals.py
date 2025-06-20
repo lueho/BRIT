@@ -5,4 +5,7 @@ from django.dispatch import receiver
 
 @receiver(post_migrate)
 def populate_initial_data(sender, **kwargs):
+    # Initialize the file export registry after migrations are complete
+    import utils.file_export.registry_init
+
     call_command("ensure_initial_data")
