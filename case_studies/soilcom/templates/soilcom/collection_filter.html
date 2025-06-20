@@ -129,10 +129,13 @@
 {% endblock list_card_navigation_dropdown_additional_links %}
 
 {% block list_card_options_dropdown_additional_links %}
+{% if user.is_authenticated %}
+{% if "soilcom.add_aggregatedcollectionpropertyvalue" in perms %}
 <a class="dropdown-item" href="{% url 'aggregatedcollectionpropertyvalue-create' %}">
     <i class="fas fa-fw fa-plus-circle"></i> Add property to collection group
 </a>
-{% if user.is_authenticated %}
+{% endif %}
+
 <a class="dropdown-item modal-link" href="{% export_link_modal 'collection-export' list_type=list_type %}">
     <i class="fas fa-fw fa-file-export"></i> Export data
 </a>
