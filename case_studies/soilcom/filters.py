@@ -4,8 +4,7 @@ from crispy_forms.bootstrap import Accordion
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Column, Field, Layout, Row, Submit
 from django.db.models import Avg, Count, Max, Q, Sum
-from django.forms import CheckboxSelectMultiple, DateInput, RadioSelect
-from django.utils import timezone
+from django.forms import CheckboxSelectMultiple, DateInput, HiddenInput, RadioSelect
 from django_filters import (
     BooleanFilter,
     CharFilter,
@@ -14,14 +13,16 @@ from django_filters import (
     ModelChoiceFilter,
     ModelMultipleChoiceFilter,
 )
+from django_tomselect.app_settings import TomSelectConfig
+from django_tomselect.widgets import TomSelectModelWidget
 
 from utils.crispy_fields import FilterAccordionGroup, RangeSliderField
 from utils.filters import (
     BaseCrispyFilterSet,
-    CrispyAutocompleteFilterSet,
     NullableRangeFilter,
+    UserCreatedObjectScopedFilterSet,
 )
-from utils.widgets import BSModelSelect2, NullableRangeSliderWidget
+from utils.widgets import NullableRangeSliderWidget
 
 from .models import (
     CONNECTION_TYPE_CHOICES,
@@ -39,7 +40,7 @@ from .models import (
 )
 
 
-class CollectorFilter(BaseCrispyFilterSet):
+class CollectorFilter(UserCreatedObjectScopedFilterSet):
     name = CharFilter(lookup_expr="icontains")
     catchment = CharFilter(
         lookup_expr="name__icontains", label="Catchment name contains"
@@ -47,10 +48,10 @@ class CollectorFilter(BaseCrispyFilterSet):
 
     class Meta:
         model = Collector
-        fields = ("name", "catchment")
+        fields = ("scope", "name", "catchment")
 
 
-class CollectionCatchmentFilterSet(CrispyAutocompleteFilterSet):
+class CollectionCatchmentFilterSet(BaseCrispyFilterSet):
     name = CharFilter(lookup_expr="icontains")
 
     class Meta:
@@ -107,6 +108,7 @@ class CollectionFilterFormHelper(FormHelper):
                 RangeSliderField("collections_per_year"),
                 RangeSliderField("spec_waste_collected"),
                 "valid_on",
+                "scope",
                 Submit(
                     "filter",
                     "Filter",
@@ -287,18 +289,22 @@ class MinBinSizeRangeFilter(NullableRangeFilter):
         )
 
 
-class CollectionFilterSet(CrispyAutocompleteFilterSet):
+class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
     id = ModelMultipleChoiceFilter(
         queryset=Collection.objects.all(), to_field_name="id"
     )
     catchment = ModelChoiceFilter(
         queryset=CollectionCatchment.objects.all(),
-        widget=BSModelSelect2(url="catchment-autocomplete"),
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(url="catchment-autocomplete")
+        ),
         method="catchment_filter",
     )
     collector = ModelChoiceFilter(
         queryset=Collector.objects.all(),
-        widget=BSModelSelect2(url="collector-autocomplete"),
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(url="collector-autocomplete")
+        ),
     )
     waste_category = ModelMultipleChoiceFilter(
         queryset=WasteCategory.objects.all(),
@@ -339,7 +345,6 @@ class CollectionFilterSet(CrispyAutocompleteFilterSet):
     valid_on = DateFilter(
         method="filter_valid_on",
         widget=DateInput(attrs={"type": "date"}),
-        initial=timezone.now().date(),
         label="Valid on",
     )
     connection_type = ChoiceFilter(
@@ -383,6 +388,7 @@ class CollectionFilterSet(CrispyAutocompleteFilterSet):
             "valid_on",
             "publication_status",
             "owner",
+            "scope",
         )
         # catchment_filter must always be applied first, because it grabs the initial queryset and does not filter any
         # existing queryset.
@@ -398,14 +404,17 @@ class CollectionFilterSet(CrispyAutocompleteFilterSet):
         self.filters["min_bin_size"].set_min_max()
 
     @staticmethod
-    def catchment_filter(_, __, value):
+    def catchment_filter(queryset, _, value):
         if value.type == "custom":
-            qs = value.inside_collections.order_by("name")
+            spatially_related_qs = value.inside_collections.order_by("name")
         else:
-            qs = value.downstream_collections.order_by("name")
-        if not qs.exists():
-            qs = value.upstream_collections.order_by("name")
-        return qs
+            spatially_related_qs = value.downstream_collections.order_by("name")
+            if not spatially_related_qs.exists():
+                spatially_related_qs = value.upstream_collections.order_by("name")
+
+        collection_ids = list(spatially_related_qs.values_list("id", flat=True))
+
+        return queryset.filter(id__in=collection_ids)
 
     @staticmethod
     def get_seasonal_frequency(queryset, _, value):
@@ -444,7 +453,7 @@ class CollectionFilterSet(CrispyAutocompleteFilterSet):
         )
 
 
-class WasteFlyerFilter(CrispyAutocompleteFilterSet):
+class WasteFlyerFilter(UserCreatedObjectScopedFilterSet):
     url_valid = BooleanFilter(
         widget=RadioSelect(choices=((True, "True"), (False, "False")))
     )
@@ -463,13 +472,21 @@ class WasteFlyerFilter(CrispyAutocompleteFilterSet):
     catchment = ModelChoiceFilter(
         queryset=CollectionCatchment.objects.all(),
         label="Catchment",
-        widget=BSModelSelect2(url="catchment-autocomplete"),
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(url="catchment-autocomplete")
+        ),
         method="get_catchment",
     )
 
     class Meta:
         model = WasteFlyer
-        fields = ("url_valid", "url_checked_before", "url_checked_after", "catchment")
+        fields = (
+            "scope",
+            "url_valid",
+            "url_checked_before",
+            "url_checked_after",
+            "catchment",
+        )
 
     @staticmethod
     def get_catchment(qs, _, value):

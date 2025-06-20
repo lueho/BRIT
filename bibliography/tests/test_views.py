@@ -1,4 +1,4 @@
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from django.db.models.signals import post_save
 from django.urls import reverse
@@ -64,18 +64,26 @@ class AuthorAutoCompleteViewTestCase(ViewWithPermissionsTestCase):
         self.assertEqual(response.status_code, 200)
 
     def test_get_returns_only_authors_with_given_string_in_name(self):
-        test_author = Author.objects.create(first_names="Test", last_names="Author")
-        Author.objects.create(first_names="Another", last_names="Author")
+        test_author = Author.objects.create(
+            first_names="Test", last_names="Author", publication_status="published"
+        )
+        Author.objects.create(
+            first_names="Another", last_names="Author", publication_status="published"
+        )
         response = self.client.get(reverse("author-autocomplete"), {"q": "Test"})
-        results = [
-            {
-                "id": str(test_author.pk),
-                "text": "Author, Test",
-                "selected_text": "Author, Test",
-            }
-        ]
+
+        expected_result = {
+            "id": test_author.pk,
+            "label": "Author, Test",
+            "first_names": "Test",
+            "last_names": "Author",
+            "can_view": True,
+            "can_update": True,
+            "can_delete": True,
+        }
+
         self.assertEqual(1, len(response.json()["results"]))
-        self.assertDictEqual(results[0], response.json()["results"][0])
+        self.assertDictEqual(expected_result, response.json()["results"][0])
 
 
 # ----------- Licence CRUD ---------------------------------------------------------------------------------------------
@@ -109,13 +117,11 @@ class LicenceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
 
 
 class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
-    model_add_permission = 'add_source'
-
+    model = Source
+    model_add_permission = "add_source"
 
     modal_detail_view = True
     modal_create_view = True
-
-    model = Source
 
     view_dashboard_name = "bibliography-dashboard"
     view_create_name = "source-create"
@@ -126,6 +132,8 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
     view_modal_detail_name = "source-detail-modal"
     view_update_name = "source-update"
     view_delete_name = "source-delete-modal"
+
+    allow_create_for_any_authenticated_user = True
 
     create_object_data = {
         "abbreviation": "TS1",
@@ -143,21 +151,37 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        author_1_data = {"last_names": "Test Author", "first_names": "One"}
-        author_2_data = {"last_names": "Test Author", "first_names": "Two"}
+        author_1_data = {
+            "last_names": "Test Author",
+            "first_names": "One",
+            "publication_status": "published",
+        }
+        author_2_data = {
+            "last_names": "Test Author",
+            "first_names": "Two",
+            "publication_status": "published",
+        }
         author_1 = Author.objects.create(**author_1_data)
         author_2 = Author.objects.create(**author_2_data)
         cls.source_author_1 = SourceAuthor.objects.create(
-            source=cls.published_object, author=author_1, position=1
+            source=cls.published_object,
+            author=author_1,
+            position=1,
         )
         cls.source_author_2 = SourceAuthor.objects.create(
-            source=cls.published_object, author=author_2, position=2
+            source=cls.published_object,
+            author=author_2,
+            position=2,
         )
         cls.source_author_3 = SourceAuthor.objects.create(
-            source=cls.unpublished_object, author=author_1, position=1
+            source=cls.unpublished_object,
+            author=author_1,
+            position=1,
         )
         cls.source_author_4 = SourceAuthor.objects.create(
-            source=cls.unpublished_object, author=author_2, position=2
+            source=cls.unpublished_object,
+            author=author_2,
+            position=2,
         )
 
     def related_objects_post_data(self):
@@ -209,7 +233,8 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         response = self.client.post(self.get_create_url(), post_data, follow=True)
         self.assertNotEqual(response.status_code, 500)
         from ..models import Source
-        source = Source.objects.latest('pk')
+
+        source = Source.objects.latest("pk")
         self.assertEqual(source.sourceauthors.count(), 0)
 
     def test_update_source_add_authors(self):
@@ -229,7 +254,8 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         post_data.update(related_post_data)
         response = self.client.post(self.get_create_url(), post_data, follow=True)
         from ..models import Source
-        source = Source.objects.latest('pk')
+
+        source = Source.objects.latest("pk")
         self.assertEqual(source.sourceauthors.count(), 0)
 
         # Now update the Source to add two authors
@@ -249,11 +275,12 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         response = self.client.post(update_url, update_data, follow=True)
         source.refresh_from_db()
         self.assertEqual(source.sourceauthors.count(), 2)
-        author_ids = set(source.sourceauthors.values_list('author_id', flat=True))
-        self.assertSetEqual(author_ids, {self.source_author_1.author.pk, self.source_author_2.author.pk})
+        author_ids = set(source.sourceauthors.values_list("author_id", flat=True))
+        self.assertSetEqual(
+            author_ids, {self.source_author_1.author.pk, self.source_author_2.author.pk}
+        )
 
 
-@patch("bibliography.views.check_source_url.delay")
 class SourceCheckUrlViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = ["change_source"]
 
@@ -267,10 +294,7 @@ class SourceCheckUrlViewTestCase(ViewWithPermissionsTestCase):
                 url="https://httpbin.org/status/200",
             )
 
-    def test_get_http_302_redirect_to_login_for_anonymous(self, mock_check_task):
-        mock_check_task.return_value = type(
-            "task", (object,), {"task_id": "fake_task_id"}
-        )
+    def test_get_http_302_redirect_to_login_for_anonymous(self):
         request_url = reverse("source-check-url", kwargs={"pk": self.source.pk})
         response = self.client.get(request_url, follow=True)
         self.assertRedirects(
@@ -280,29 +304,21 @@ class SourceCheckUrlViewTestCase(ViewWithPermissionsTestCase):
             target_status_code=200,
         )
 
-    def test_get_http_403_forbidden_for_outsiders(self, mock_check_task):
-        mock_check_task.return_value = type(
-            "task", (object,), {"task_id": "fake_task_id"}
-        )
+    def test_get_http_403_forbidden_for_outsiders(self):
         self.client.force_login(self.outsider)
         response = self.client.get(
             reverse("source-check-url", kwargs={"pk": self.source.pk})
         )
         self.assertEqual(response.status_code, 403)
 
-    def test_get_http_200_ok_for_members(self, mock_check_task):
-        mock_check_task.return_value = type(
-            "task", (object,), {"task_id": "fake_task_id"}
-        )
+    def test_get_http_200_ok_for_members(self):
         self.client.force_login(self.member)
         response = self.client.get(
             reverse("source-check-url", kwargs={"pk": self.source.pk})
         )
         self.assertEqual(200, response.status_code)
-        self.assertTrue(mock_check_task.called_with(self.source.pk))
 
 
-@patch("bibliography.views.check_source_urls.delay")
 class SourceListCheckUrlsViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = ["change_source"]
 
@@ -326,31 +342,21 @@ class SourceListCheckUrlsViewTestCase(ViewWithPermissionsTestCase):
                 url="https://httpbin.org/status/404",
             )
 
-    def test_get_http_302_redirect_to_login_for_anonymous(self, mock_check_task):
-        mock_check_task.return_value = type(
-            "task", (object,), {"task_id": "fake_task_id"}
-        )
+    def test_get_http_302_redirect_to_login_for_anonymous(self):
         request_url = f"{reverse('source-list-check-urls')}?url_valid=False"
         response = self.client.get(request_url, follow=True)
         self.assertRedirects(
             response, f"{reverse('auth_login')}?next={request_url}", status_code=302
         )
 
-    def test_get_http_403_forbidden_for_outsiders(self, mock_check_task):
-        mock_check_task.return_value = type(
-            "task", (object,), {"task_id": "fake_task_id"}
-        )
+    def test_get_http_403_forbidden_for_outsiders(self):
         self.client.force_login(self.outsider)
         request_url = f"{reverse('source-list-check-urls')}?url_valid=False"
         response = self.client.get(request_url)
         self.assertEqual(response.status_code, 403)
 
-    def test_get_http_200_ok_for_members(self, mock_check_task):
-        mock_check_task.return_value = type(
-            "task", (object,), {"task_id": "fake_task_id"}
-        )
+    def test_get_http_200_ok_for_members(self):
         self.client.force_login(self.member)
         request_url = f"{reverse('source-list-check-urls')}?url_valid=False&page=1"
         response = self.client.get(request_url)
         self.assertEqual(200, response.status_code)
-        self.assertTrue(mock_check_task.called_with(url_valid=False))

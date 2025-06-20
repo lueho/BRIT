@@ -6,186 +6,171 @@
 {% load user_created_object_tags %}
 
 {% block style_sheets %}
-    {{ block.super }}
-    <link rel="stylesheet" href="{% static 'css/maps.min.css' %}">
+{{ block.super }}
+<link rel="stylesheet" href="{% static 'css/maps.min.css' %}">
 {% endblock style_sheets %}
 
 {% block title %}Maps | {{ map_title }}{% endblock %}
 
 {% block content %}
-    <div class="row">
-        <div class="col">
-            {% block map_content %}
-                {% leaflet_js %}
-                {% leaflet_css %}
+<div class="row">
+    <div class="col-md-9">
+        {% block map_content %}
+        {% leaflet_js %}
+        {% leaflet_css %}
 
-                <div class="card shadow">
-                    <div class="card-header"><b>
-                        {% block map_card_header %}{{ map_title }}{% endblock %}
-                    </b></div>
-                    <div class="card-body p-0 vh-75" style="position: relative;">
-                        <div id="map-overlay" style="display: none">
-                            <div class="overlay-content">
-                                <p>
-                                    This dataset is large. Loading it completely can take a while. Please choose filter
-                                    parameters first.
-                                </p>
-                            </div>
-                        </div>
-                        {% leaflet_map "main" %}
-                    </div>
-                    <div class="card-footer d-flex">
-                        {% block map_card_footer %}
-                            {% block map_card_navigation_dropdown %}
-                                <div class="dropdown">
-                                    <button class="btn btn-secondary dropdown-toggle mr-3" type="button"
-                                            id="navigateDropdown"
-                                            data-toggle="dropdown" aria-expanded="false">
-                                        Navigate
-                                    </button>
-                                    <div class="dropdown-menu" aria-labelledby="navigateDropdown">
-                                        {% block map_card_footer_list_link %}
-                                            {% if object_list.model|is_user_created %}
-                                                {% if private_list_owner %}
-                                                    <a class="dropdown-item"
-                                                       href="{{ object_list.model.public_list_url }}">
-                                                        <i class="fas fa-fw fa-list"></i>
-                                                        Published {{ object_list.model.get_verbose_name_plural }}
-                                                    </a>
-                                                {% elif user.is_authenticated %}
-                                                    <a class="dropdown-item"
-                                                       href="{{ object_list.model.private_list_url }}">
-                                                        <i class="fas fa-fw fa-list"></i>
-                                                        My {{ object_list.model.get_verbose_name_plural }}
-                                                    </a>
-                                                {% endif %}
-                                            {% endif %}
-                                        {% endblock map_card_footer_list_link %}
-                                        {% block map_card_footer_dashboard_link %}
-                                            {% if dashboard_url %}
-                                                <a class="dropdown-item"
-                                                   href="{{ dashboard_url }}">
-                                                    <i class="fas fa-fw fa-th-large"></i> Explorer
-                                                </a>
-                                            {% endif %}
-                                        {% endblock map_card_footer_dashboard_link %}
-                                        {% block map_card_navigation_dropdown_additional_links %}{% endblock %}
-                                    </div>
-                                </div>
-                            {% endblock map_card_navigation_dropdown %}
-                            {% block map_card_options_dropdown %}
-                                {% if user.is_authenticated %}
-                                    <div class="dropdown">
-                                        <button class="btn btn-secondary dropdown-toggle mr-3" type="button"
-                                                id="optionsDropdown"
-                                                data-toggle="dropdown" aria-expanded="false">
-                                            Options
-                                        </button>
-                                        <div class="dropdown-menu" aria-labelledby="optionsDropdown">
-                                            {% block map_card_footer_create_link %}
-                                                {% if create_permission in perms or user.is_staff %}
-                                                    <a class="dropdown-item"
-                                                       href="{{ object_list.model.create_url }}"
-                                                       aria-label="Create new {{ object_list.model.get_verbose_name }}">
-                                                        <i class=" fas fa-fw fa-plus"></i>
-                                                        Create new {{ object_list.model.get_verbose_name }}
-                                                    </a>
-                                                {% endif %}
-                                            {% endblock map_card_footer_create_link %}
-                                            {% block map_card_options_dropdown_additional_links %}{% endblock %}
-                                        </div>
-                                    </div>
-                                {% endif %}
-                            {% endblock map_card_options_dropdown %}
-                            {% block map_card_footer_additional_links %}{% endblock %}
-                        {% endblock map_card_footer %}
+        <div class="card shadow">
+            <div class="card-header"><b>
+                    {% block map_card_header %}{{ map_title }}{% endblock %}
+                </b></div>
+            <div class="card-body p-0 vh-100" style="position: relative;">
+                <div id="map-overlay" style="display: none">
+                    <div class="overlay-content">
+                        <p>
+                            This dataset is large. Loading it completely can take a while. Please choose filter
+                            parameters first.
+                        </p>
                     </div>
                 </div>
-            {% endblock map_content %}
-        </div>
-
-        <div class="col-sm-3">
-            {% block user_actions %}
-                <div class="accordion">
-                    {% block filter_form_card %}
-                        <div class="card shadow">
-                            <div class="card-header" role="button" data-toggle="collapse" href="#filter-card-body"
-                                 aria-expanded="true" aria-controls="filter-card-body">
-                                <b>Filter</b>
-                            </div>
-                            <div class="card-body collapse show" id="filter-card-body">
-
-                                {% block filter_form %}
-                                    <form method="GET">
-                                        {% crispy filter.form %}
-                                    </form>
-                                {% endblock filter_form %}
-
-                                {% block filter_form_buttons %}
-                                    <button class="btn btn-primary submit-filter" id="filter-button"
-                                            onclick="clickedFilterButton()">
-                                        Filter
-                                    </button>
-                                {% endblock filter_form_buttons %}
-
-                            </div>
-                        </div>
-                    {% endblock filter_form_card %}
-
-                    {% block filter_result_card %}
-                        <div class="card shadow">
-                            <div class="card-header"
-                                 role="button"
-                                 data-toggle="collapse"
-                                 href="#info-card-body"
-                                 aria-expanded="true"
-                                 aria-controls="info-card-body">
-                                <b>Summary</b>
-                            </div>
-                            <div class="card-body collapse" id="info-card-body">
-                                <div id="summary-container">
-                                    <p class="card-text">No data selected, yet.</p>
-                                </div>
-                                {% if object.sources.first %}
-                                    <p class="card-text mt-3">
-                                        <strong>Sources:</strong><br>
-                                        {% for source in object.sources.all %}
-                                            <a href="{% url 'source-detail-modal' source.id %}"
-                                               class="modal-link">
-                                                {{ source.abbreviation }}{% if not forloop.last %},{% endif %}
-                                            </a>
-                                        {% endfor %}
-                                    </p>
-                                {% endif %}
-                            </div>
-                        </div>
-                    {% endblock filter_result_card %}
-                    {% block extra_cards %}{% endblock extra_cards %}
+                {% leaflet_map "main" %}
+            </div>
+            <div class="card-footer d-flex">
+                {% block map_card_footer %}
+                {% block map_card_navigation_dropdown %}
+                <div class="dropdown">
+                    <button class="btn btn-secondary dropdown-toggle me-3" type="button" id="navigateDropdown"
+                        data-bs-toggle="dropdown" aria-expanded="false">
+                        Navigate
+                    </button>
+                    <div class="dropdown-menu" aria-labelledby="navigateDropdown">
+                        {% block map_card_footer_list_link %}
+                        {% if object_list.model|is_user_created %}
+                        {% if private_list_owner %}
+                        <a class="dropdown-item" id="link-map-public" href="javascript:void(0)"
+                            data-href-template="{{ object_list.model.public_map_url }}"
+                            onclick="clickedPublicMapButton(event)">
+                            <i class="fas fa-fw fa-map"></i>
+                            Published {{ object_list.model.get_verbose_name_plural }}
+                        </a>
+                        {% elif user.is_authenticated %}
+                        <a class="dropdown-item" id="link-map-private" href="javascript:void(0)"
+                            data-href-template="{{ object_list.model.private_map_url }}"
+                            onclick="clickedPrivateMapButton(event)">
+                            <i class="fas fa-fw fa-map"></i>
+                            My {{ object_list.model.get_verbose_name_plural }}
+                        </a>
+                        {% endif %}
+                        {% endif %}
+                        {% endblock map_card_footer_list_link %}
+                        {% block map_card_footer_dashboard_link %}
+                        {% if dashboard_url %}
+                        <a class="dropdown-item" href="{{ dashboard_url }}">
+                            <i class="fas fa-fw fa-th-large"></i> Explorer
+                        </a>
+                        {% endif %}
+                        {% endblock map_card_footer_dashboard_link %}
+                        {% block map_card_navigation_dropdown_additional_links %}{% endblock %}
+                    </div>
                 </div>
-            {% endblock user_actions %}
+                {% endblock map_card_navigation_dropdown %}
+                {% block map_card_options_dropdown %}
+                {% if user.is_authenticated %}
+                <div class="dropdown">
+                    <button class="btn btn-secondary dropdown-toggle me-3" type="button" id="optionsDropdown"
+                        data-bs-toggle="dropdown" aria-expanded="false">
+                        Options
+                    </button>
+                    <div class="dropdown-menu" aria-labelledby="optionsDropdown">
+                        {% block map_card_footer_create_link %}
+                        {% if create_permission in perms or user.is_staff %}
+                        <a class="dropdown-item" href="{{ object_list.model.create_url }}"
+                            aria-label="Create new {{ object_list.model.get_verbose_name }}">
+                            <i class=" fas fa-fw fa-plus"></i>
+                            Create new {{ object_list.model.get_verbose_name }}
+                        </a>
+                        {% endif %}
+                        {% endblock map_card_footer_create_link %}
+                        {% block map_card_options_dropdown_additional_links %}{% endblock %}
+                    </div>
+                </div>
+                {% endif %}
+                {% endblock map_card_options_dropdown %}
+                {% block map_card_footer_additional_links %}{% endblock %}
+                {% endblock map_card_footer %}
+            </div>
         </div>
-
+        {% endblock map_content %}
     </div>
+
+    <div class="col-md-3">
+        {% block user_actions %}
+        <div class="accordion">
+            {% block filter_form_card %}
+            <div class="card shadow">
+                <div class="card-header" role="button" data-bs-toggle="collapse" href="#filter-card-body"
+                    aria-expanded="true" aria-controls="filter-card-body">
+                    <b>Filter</b>
+                </div>
+                <div class="card-body collapse show" id="filter-card-body">
+
+                    {% block filter_form %}
+                    <form method="get">
+                        {% crispy filter.form %}
+                    </form>
+                    {% endblock filter_form %}
+
+                    {% block filter_form_buttons %}
+                    <button class="btn btn-primary submit-filter" id="filter-button" onclick="clickedFilterButton()">
+                        Filter
+                    </button>
+                    {% endblock filter_form_buttons %}
+
+                </div>
+            </div>
+            {% endblock filter_form_card %}
+
+            {% block filter_result_card %}
+            <div class="card shadow">
+                <div class="card-header" role="button" data-bs-toggle="collapse" href="#info-card-body"
+                    aria-expanded="true" aria-controls="info-card-body">
+                    <b>Summary</b>
+                </div>
+                <div class="card-body collapse" id="info-card-body">
+                    <div id="summary-container">
+                        <p class="card-text">No data selected, yet.</p>
+                    </div>
+                    {% if object.sources.first %}
+                    <p class="card-text mt-3">
+                        <strong>Sources:</strong><br>
+                        {% for source in object.sources.all %}
+                        <a href="{% url 'source-detail-modal' source.id %}" class="modal-link">
+                            {{ source.abbreviation }}{% if not forloop.last %},{% endif %}
+                        </a>
+                        {% endfor %}
+                    </p>
+                    {% endif %}
+                </div>
+            </div>
+            {% endblock filter_result_card %}
+            {% block extra_cards %}{% endblock extra_cards %}
+        </div>
+        {% endblock user_actions %}
+    </div>
+
+</div>
 
 {% endblock content %}
 
 {% block javascript %}
-    {{ block.super }}
-    {# For filters that use forms with autocomplete fields, the inclusion of form media is suppressed #}
-    {# by the form helper. It needs to be included after loading jquery.js and before select2-bootstrap4.css #}
-    {# See AutoCompleteMixin class in utils/forms.#}
-    {{ filter.form.media }}
-    <link rel="stylesheet" href="{% static 'lib/select2-bootstrap-theme/select2-bootstrap4.min.css' %}">
-    <script src="{% static 'js/filter_utils.min.js' %}"></script>
-    <script src="{% static 'js/maps.js' %}"></script>
+{{ block.super }}
+<script src="{% static 'js/filter_utils.min.js' %}"></script>
+<script src="{% static 'js/maps.js' %}"></script>
 
-    {{ map_config|json_script:"mapConfig" }}
-    <script type="text/javascript">
-        const mapConfig = JSON.parse(document.getElementById("mapConfig").textContent);
-        window.onload = () => {
-            loadMap(mapConfig);
-        };
-    </script>
+{{ map_config|json_script:"mapConfig" }}
+<script type="text/javascript">
+    const mapConfig = JSON.parse(document.getElementById("mapConfig").textContent);
+    window.onload = () => {
+        loadMap(mapConfig);
+    };
+</script>
 {% endblock %}
-
-

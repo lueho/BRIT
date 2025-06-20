@@ -39,26 +39,48 @@ The Materials module is a core component of the Bioresource Inventory Tool (BRIT
 
 ```mermaid
 erDiagram
-    Material ||--o{ SampleSeries : "has"
-    Material ||--o{ Sample : "categorizes"
-    Material }o--o{ MaterialCategory : "belongs_to"
+    NamedUserCreatedObject ||--|{ BaseMaterial : "inherits"
+    NamedUserCreatedObject ||--|{ MaterialComponentGroup : "inherits"
+    NamedUserCreatedObject ||--|{ MaterialProperty : "inherits"
+    NamedUserCreatedObject ||--|{ SampleSeries : "inherits"
+    NamedUserCreatedObject ||--|{ AnalyticalMethod : "inherits"
+
+    BaseMaterial ||--o{ SampleSeries : "has"
+    BaseMaterial ||--o{ Sample : "categorizes"
+    BaseMaterial }o--o{ MaterialCategory : "belongs_to"
+    BaseMaterial ||--|{ Material : "proxy"
+    BaseMaterial ||--|{ MaterialComponent : "proxy"
     
     SampleSeries ||--o{ Sample : "contains"
     SampleSeries }o--o{ TemporalDistribution : "uses"
+    SampleSeries }o--|| Timestep : "has_default"
     
     Sample ||--o{ Composition : "has"
-    Sample }o--o{ MaterialPropertyValue : "has"
+    Sample }o--o{ MaterialPropertyValue : "has_properties"
     Sample }o--o{ Source : "references"
+    Sample }o--|| Timestep : "belongs_to"
+    Sample }o--|| SampleSeries : "belongs_to"
     
     Composition ||--o{ WeightShare : "contains"
     Composition }o--|| MaterialComponentGroup : "belongs_to"
     Composition }o--|| MaterialComponent : "fractions_of"
+    Composition }o--o{ TemporalDistribution : "has"
     
     WeightShare }o--|| MaterialComponent : "of"
     
     MaterialProperty ||--o{ MaterialPropertyValue : "defines"
     
     AnalyticalMethod }o--o{ Source : "references"
+    
+    MaterialCategory {
+        string name
+    }
+    
+    BaseMaterial {
+        string name
+        string type
+        Owner owner
+    }
     
     Material {
         string name
@@ -72,25 +94,37 @@ erDiagram
     
     MaterialComponentGroup {
         string name
+        Owner owner
     }
     
     SampleSeries {
         string name
         boolean publish
-        boolean standard
+        Material material
+        TemporalDistribution temporal_distribution
+        Timestep default_timestep
     }
     
     Sample {
         string name
+        Material material
         datetime datetime
         string location
+        SampleSeries series
+        Timestep timestep
+        ImageField image
     }
     
     Composition {
+        Sample sample
+        MaterialComponentGroup group
+        MaterialComponent fractions_of
         int order
     }
     
     WeightShare {
+        MaterialComponent component
+        Composition composition
         decimal average
         decimal standard_deviation
     }
@@ -101,6 +135,7 @@ erDiagram
     }
     
     MaterialPropertyValue {
+        MaterialProperty property
         float average
         float standard_deviation
     }
@@ -111,6 +146,7 @@ erDiagram
         string standard
         string instrument_type
         string lower_detection_limit
+        URL ontology_uri
     }
 ```
 

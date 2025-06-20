@@ -1,24 +1,25 @@
-from datetime import date, timedelta
+from datetime import date
 
 import celery
 from django.core.exceptions import ValidationError
 from django.core.validators import RegexValidator
-from django.db import models
+from django.db import models, transaction
 from django.db.models import Count, Q, Sum
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
+from django.urls import reverse
 from django.utils import timezone
 
 from bibliography.models import Source
-from distributions.models import Period, TemporalDistribution, Timestep
-from maps.models import Catchment, GeoPolygon
+from distributions.models import Period, TemporalDistribution
+from maps.models import Catchment
 from materials.models import Material, MaterialCategory, Sample, SampleSeries
-from users.models import get_default_owner
-from utils.models import (
+from utils.object_management.models import (
     NamedUserCreatedObject,
     UserCreatedObject,
     UserCreatedObjectManager,
     UserCreatedObjectQuerySet,
+    get_default_owner,
 )
 from utils.properties.models import PropertyValue
 
@@ -537,10 +538,50 @@ class Collection(NamedUserCreatedObject):
         super().clean()
 
     def add_predecessor(self, predecessor):
+        """
+        Link *predecessor* to the current collection.
+
+        The predecessor remains valid until this collection is published.
+        Updating of ``valid_until`` is deferred to :meth:`approve`.
+        """
         if not self.predecessors.filter(id=predecessor.id).exists():
             self.predecessors.add(predecessor)
-            predecessor.valid_until = self.valid_from - timedelta(days=1)
-            predecessor.save()
+
+    def approve(self, user=None):
+        """
+        Publish the collection and archive predecessors, with concurrency check.
+
+        Implements review-stage concurrency control:
+        - For each predecessor, checks:
+            - If predecessor.version_etag != self.branched_from_predecessor_etag, raises ValidationError.
+            - If any other published successor exists, raises ValidationError.
+        - Only after all checks, proceeds to publish self and archive predecessors.
+        """
+
+        with transaction.atomic():
+            for predecessor in self.predecessors.all():
+                published_successors = predecessor.successors.filter(
+                    publication_status="published"
+                ).exclude(pk=self.pk)
+                if published_successors.exists():
+                    raise ValidationError(
+                        "Another version based on this predecessor has already been published."
+                    )
+
+            super().approve(user=user)
+
+            for predecessor in self.predecessors.all():
+                if predecessor.publication_status != "archived":
+                    predecessor.publication_status = "archived"
+                    predecessor.save(update_fields=["publication_status"])
+
+    @classmethod
+    def public_map_url(cls):
+        return reverse("WasteCollection")
+
+    @classmethod
+    def private_map_url(cls):
+        return reverse("WasteCollection-owned")
 
     def __str__(self):
         return self.name

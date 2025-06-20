@@ -1,24 +1,35 @@
-from django_filters import CharFilter, ModelChoiceFilter
+from django_filters import ModelChoiceFilter
+from django_tomselect.forms import TomSelectConfig
+from django_tomselect.widgets import TomSelectModelWidget
 
 from maps.models import Catchment
-from utils.filters import CrispyAutocompleteFilterSet
-from utils.widgets import BSListSelect2, BSModelSelect2
+from utils.filters import UserCreatedObjectScopedFilterSet
+
 from .models import Scenario
 
 
-class ScenarioFilterSet(CrispyAutocompleteFilterSet):
-    name = CharFilter(
-        field_name='name',
-        lookup_expr='icontains',
-        widget=BSListSelect2(url='scenario-name-autocomplete'),
-        label='Scenario Name'
+class ScenarioFilterSet(UserCreatedObjectScopedFilterSet):
+    name = ModelChoiceFilter(
+        queryset=Scenario.objects.all(),
+        field_name="name",
+        label="Name",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(
+                url="scenario-autocomplete",
+                label_field="name",
+            ),
+        ),
     )
     catchment = ModelChoiceFilter(
         queryset=Catchment.objects.all(),
-        widget=BSModelSelect2(url='catchment-autocomplete'),
-        label='Catchment'
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(
+                url="catchment-autocomplete",
+                label_field="name",
+            ),
+        ),
     )
 
     class Meta:
         model = Scenario
-        fields = ['name', 'catchment']
+        fields = ["scope", "name", "catchment"]

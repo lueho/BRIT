@@ -1,47 +1,70 @@
 "use strict";
-$(function() {
-    $(".numeric-slider-range").each(function() {
-        const slider = $(this);
-        const sliderId = slider.attr("id");
-        const minInput = $("#" + sliderId + "_min");
-        const maxInput = $("#" + sliderId + "_max");
-        const textDisplay = $("#" + sliderId + "_text");
-        const unit = slider.data("unit");
 
-        slider.slider({
-            range: true,
-            min: 0,
-            max: 100,
-            slide: (event, ui) => {
-                minInput.val(ui.values[0]);
-                maxInput.val(ui.values[1]);
-                textDisplay.text(ui.values[0] + `${unit} - ` + ui.values[1] + `${unit}`);
-            },
-            create: () => {
-                minInput.val(slider.data("cur_min"));
-                maxInput.val(slider.data("cur_max"));
-                slider.slider("option", "step", slider.data("step"));
-                slider.slider("option", 'min', slider.data("range_min"));
-                slider.slider("option", 'max', slider.data("range_max"));
-                slider.slider("option", 'values', [slider.data("cur_min"), slider.data("cur_max")]);
-            }
-        });
+// Format number based on the specified format
+function formatNumber(value, format, step) {
+  // Convert to number first
+  const numValue = Number(value);
+
+  // Handle different format options
+  switch (format) {
+    case 'integer':
+      return Math.round(numValue).toString();
+    case 'float-1':
+      return numValue.toFixed(1);
+    case 'float-2':
+      return numValue.toFixed(2);
+    case 'auto':
+    default:
+      // Auto-detect based on step size
+      if (step === 1 || step % 1 === 0) {
+        // Integer step, show as integer
+        return Math.round(numValue).toString();
+      } else if (step < 0.1) {
+        // Very small steps, show 2 decimal places
+        return numValue.toFixed(2);
+      } else {
+        // Medium steps, show 1 decimal place
+        return numValue.toFixed(1);
+      }
+  }
+}
+
+// Initialize sliders on DOMContentLoaded
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.numeric-slider-range').forEach(sliderElem => {
+    const sliderId = sliderElem.id;
+    const minInput = document.getElementById(`${sliderId}_min`);
+    const maxInput = document.getElementById(`${sliderId}_max`);
+    const textDisplay = document.getElementById(`${sliderId}_text`);
+    const unit = sliderElem.dataset.unit || '';
+    const rangeMin = Number(sliderElem.dataset.range_min);
+    const rangeMax = Number(sliderElem.dataset.range_max);
+    const step = Number(sliderElem.dataset.step) || 1;
+    const startMin = Number(sliderElem.dataset.cur_min) || rangeMin;
+    const startMax = Number(sliderElem.dataset.cur_max) || rangeMax;
+    const numberFormat = sliderElem.dataset.number_format || 'auto';
+
+    noUiSlider.create(sliderElem, {
+      start: [startMin, startMax],
+      connect: true,
+      range: { min: rangeMin, max: rangeMax },
+      step
     });
-    // const checkboxIncludeUnknown = $(".checkbox-include-unknown");
-    // checkboxIncludeUnknown.each(function() {
-    //     const checkbox = $(this);
-    //     const formRow = checkbox.closest(".form-row");
-    //     const slider = formRow.find(".numeric-slider-range");
-    //     const isNullInput = $(`#${slider.attr("id")}_is_null`);
-    //     isNullInput.val(slider.data("cur_is_null"));
-    //     checkbox.prop('checked', isNullInput.val() === "true");
-    // });
-    // checkboxIncludeUnknown.on('click', function() {
-    //     const checkbox = $(this);
-    //     const formRow = checkbox.closest(".form-row");
-    //     const sliderId = formRow.find(".numeric-slider-range").attr("id");
-    //     const isNullInput = $(`#${sliderId}_is_null`);
-    //
-    //     isNullInput.val(checkbox.is(':checked'));
-    // });
+
+    sliderElem.noUiSlider.on('update', values => {
+      const [val0, val1] = values;
+      // Store raw values in hidden inputs
+      if (minInput) minInput.value = val0;
+      if (maxInput) maxInput.value = val1;
+
+      // Format the values for display
+      const formattedMin = formatNumber(val0, numberFormat, step);
+      const formattedMax = formatNumber(val1, numberFormat, step);
+
+      // Update display text with formatted values
+      if (textDisplay) {
+        textDisplay.textContent = `${formattedMin}${unit} - ${formattedMax}${unit}`;
+      }
+    });
+  });
 });

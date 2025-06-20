@@ -21,8 +21,8 @@
                     <div class="card-header"><b>
                         {% block map_card_header %}{{ map_title }}{% endblock %}
                     </b></div>
-                    <div class="card-body p-0 vh-75" style="position: relative;">
-                        <div id="map-overlay" style="display: none">
+                    <div class="card-body p-0 vh-75 position-relative">
+                        <div id="map-overlay" class="d-none">
                             <div class="overlay-content">
                                 <p>This dataset is large. Loading it completely can take a while. Please choose filter parameters first.</p>
                             </div>
@@ -41,14 +41,14 @@
                 <div class="accordion">
                     {% block filter_form_card %}
                         <div class="card shadow">
-                            <div class="card-header" role="button" data-toggle="collapse" href="#filter-card-body"
+                            <div class="card-header" role="button" data-bs-toggle="collapse" href="#filter-card-body"
                                  aria-expanded="true" aria-controls="filter-card-body">
                                 <b>Filter</b>
                             </div>
                             <div class="card-body collapse show" id="filter-card-body">
 
                                 {% block filter_form %}
-                                    <form method="GET">
+                                    <form method="get">
                                         {% crispy filter.form %}
                                     </form>
                                 {% endblock filter_form %}
@@ -68,7 +68,7 @@
                         <div class="card shadow">
                             <div class="card-header"
                                  role="button"
-                                 data-toggle="collapse"
+                                 data-bs-toggle="collapse"
                                  href="#info-card-body"
                                  aria-expanded="true"
                                  aria-controls="info-card-body">
@@ -103,11 +103,6 @@
 
 {% block javascript %}
     {{ block.super }}
-    {# For filters that use forms with autocomplete fields, the inclusion of form media is suppressed #}
-    {# by the form helper. It needs to be included after loading jquery.js and before select2-bootstrap4.css #}
-    {# See AutoCompleteMixin class in utils/forms.#}
-    {{ filter.form.media }}
-    <link rel="stylesheet" href="{% static 'lib/select2-bootstrap-theme/select2-bootstrap4.min.css' %}">
     <script src="{% static 'js/filter_utils.min.js' %}"></script>
     <script src="{% static 'js/maps.min.js' %}"></script>
 
@@ -119,5 +114,3 @@
         };
     </script>
 {% endblock %}
-
-

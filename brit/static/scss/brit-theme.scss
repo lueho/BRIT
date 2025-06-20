@@ -1,0 +1,61 @@
+// Custom theme as described here: https://getbootstrap.com/docs/5.3/customize/sass/
+
+// 1. Include functions first (so you can manipulate colors, SVGs, calc, etc)
+@import "../lib/bootstrap/scss/functions";
+
+// 2. Include any default variable overrides here
+@import "variables/colors.scss";
+@import "variables/navigation.scss";
+@import "variables/spacing.scss";
+
+// 3. Include remainder of required Bootstrap stylesheets (including any separate color mode stylesheets)
+@import "../lib/bootstrap/scss/variables";
+@import "../lib/bootstrap/scss/variables-dark";
+
+// 4. Include any default map overrides here
+@import "theme-colors";
+
+// 5. Include remainder of required part
+@import "../lib/bootstrap/scss/maps";
+@import "../lib/bootstrap/scss/mixins";
+@import "../lib/bootstrap/scss/root";
+
+// 6. Include any other optional stylesheet partials as desired; list below is not inclusive of all available stylesheets
+@import "../lib/bootstrap/scss/utilities";
+@import "../lib/bootstrap/scss/reboot";
+@import "../lib/bootstrap/scss/type";
+@import "../lib/bootstrap/scss/images";
+@import "../lib/bootstrap/scss/containers";
+@import "../lib/bootstrap/scss/grid";
+@import "../lib/bootstrap/scss/helpers";
+@import "../lib/bootstrap/scss/buttons";
+
+// 7. Optionally include utilities API last to generate classes based on the Sass map in `_utilities.scss`
+@import "../lib/bootstrap/scss/utilities/api";
+
+// 8. Add additional custom code here
+@import "global";
+@import "components/cards";
+@import "components/typography";
+@import "components/links";
+@import "components/tables";
+@import "components/form-controls";
+@import "components/badges";
+@import "components/alerts";
+@import "components/buttons";
+@import "components/list-groups";
+@import "components/progress-bars";
+@import "components/sliders";
+
+@import "layout/authentication";
+@import "layout/dashboard-default";
+@import "layout/dashboard-fixed";
+@import "layout/error";
+
+@import "navigation/nav";
+@import "navigation/topnav";
+@import "navigation/sidenav/sidenav";
+@import "navigation/sidenav/sidenav-dark";
+@import "navigation/sidenav/sidenav-light";
+
+@import "sidebar-brand";

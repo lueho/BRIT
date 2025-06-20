@@ -1,0 +1,28 @@
+// Card styling
+.card {
+  overflow: visible !important; // Ensure dropdowns are not clipped by card boundaries
+  border-color: rgba($secondary, 0.3);
+
+  .card-header {
+    background-color: rgba($secondary, 0.1);
+    border-bottom: none;
+    color: $primary;
+    font-weight: 600;
+
+    a {
+      text-decoration: none;
+    }
+  }
+
+  &.card-highlight {
+    border-left: 4px solid $primary;
+  }
+
+  &.card-feature {
+    background-color: rgba($light, 0.4);
+
+    .card-header {
+      background-color: rgba($light, 0.7);
+    }
+  }
+}

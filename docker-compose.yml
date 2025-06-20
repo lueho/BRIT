@@ -1,6 +1,7 @@
 networks:
   full:
 
+
 services:
   db:
     image: "postgis/postgis:15-3.4"

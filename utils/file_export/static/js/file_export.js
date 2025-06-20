@@ -139,7 +139,7 @@ function initExportHandlers() {
     const formatItems = document.querySelectorAll('.export-format-item');
     if (formatItems) {
         formatItems.forEach(item => {
-            item.addEventListener('click', function() {
+            item.addEventListener('click', function () {
                 const format = this.dataset.format;
                 export_to_file(this, format);
             });
@@ -207,7 +207,7 @@ function formatDownloadLink(downloadUrl, format) {
     }
 
     elements.link.classList.remove("disabled");
-    elements.wrapper.onclick = function(e) {
+    elements.wrapper.onclick = function (e) {
         e.preventDefault();
         e.stopPropagation();
         window.location.href = downloadUrl;
@@ -233,7 +233,7 @@ function resetExportLink(format) {
 
     elements.link.classList.remove("disabled");
 
-    elements.wrapper.onclick = function(e) {
+    elements.wrapper.onclick = function (e) {
         e.preventDefault();
         e.stopPropagation();
         export_to_file(elements.wrapper, format);
@@ -271,9 +271,13 @@ function unlockCustomElements() {
 }
 
 // Attach event handler to initialize export handlers when the modal is shown.
-// Assumes that jQuery is loaded and Bootstrap's modal events are in use.
-document.addEventListener('DOMContentLoaded', function() {
-    $(document).on('shown.bs.modal', '#modal', function() {
-        initExportHandlers();
+// Uses vanilla JavaScript with Bootstrap 5 modal events.
+document.addEventListener('DOMContentLoaded', function () {
+    // Listen for Bootstrap modal shown event on the document
+    document.addEventListener('shown.bs.modal', function (event) {
+        // Check if the event target is the modal we're interested in
+        if (event.target && event.target.id === 'modal') {
+            initExportHandlers();
+        }
     });
 });

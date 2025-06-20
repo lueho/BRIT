@@ -2,7 +2,7 @@
 {% load crispy_forms_tags %}
 
 {% block map_card_footer %}
-    <a class="mr-3 text-nowrap"
+    <a class="me-3 text-nowrap"
        href="javascript:void(0)"
        id="link-regions-as-list"
        data-href-template="/maps/regions/"
@@ -11,7 +11,7 @@
         View as list
     </a>
     {% if 'maps.add_region' in perms %}
-        <a class="mr-3 text-nowrap"
+        <a class="me-3 text-nowrap"
            href="{% url 'region-create' %}">
             <i class="fa fa-fw fa-plus"></i>
             Create region

@@ -1,5 +1,6 @@
 {% load static %}
 {% load cookie_consent_tags %}
+{% load django_tomselect %}
 
 <!DOCTYPE html>
 <html lang="en">
@@ -9,47 +10,52 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
     <meta name="description" content="The Bioresource Information Tool (BRIT) provides information about sources, quantities and properties of residue-based bioresources.">
+    <meta name="keywords" content="{% block meta_keywords %}{% endblock meta_keywords %}">
     <meta name="author" content="Phillipp Lüssenhop">
     {% block meta %}{% endblock meta %}
 
     <title>{% block title %}BRIT | Bioresource Information Tool{% endblock title %}</title>
     {% include 'partials/_analytics.html' %}
-
-    <link rel="icon" href="{% static 'img/favicon.ico' %}" type="image/x-icon">
-
+    <!-- Bootstrap CSS from CDN (base styles) -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    
+    <!-- DataTables and other plugins -->
+    <link href="https://cdn.jsdelivr.net/npm/simple-datatables@latest/dist/style.css" rel="stylesheet" />
+    
     <!-- Custom fonts for this template-->
-    <link href="{% static 'lib/fontawesome-free/css/all.min.css' %}" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css">
     <link href="https://fonts.googleapis.com/css?family=Nunito" rel="stylesheet">
-
-    <!-- Custom styles for this template-->
-    <link href="{% static 'css/sb-admin-2.min.css' %}" rel="stylesheet">
-    <link href="{% static 'lib/jquery-ui/css/jquery-ui.min.css' %}" rel="stylesheet">
-    <link href="{% static 'lib/jquery-ui/css/jquery-ui.structure.min.css' %}" rel="stylesheet">
-    <link href="{% static 'lib/jquery-ui/css/jquery-ui.theme.min.css' %}" rel="stylesheet">
-    <link href="{% static 'lib/bootstrap4-toggle/css/bootstrap4-toggle.min.css' %}" rel="stylesheet">
-    <link href="{% static 'css/brit.min.css' %}" rel="stylesheet">
-
+    
+    <!-- Our custom theme (must be loaded AFTER Bootstrap to override styles) -->
+    <link href="{% static 'css/brit-theme.css' %}" rel="stylesheet">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/js/all.min.js" crossorigin="anonymous"></script>
+    <link rel="icon" href="{% static 'img/favicon.ico' %}" type="image/x-icon">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.8.1/nouislider.min.css">
+    {% tomselect_media %}
     {% block style_sheets %}{% endblock style_sheets %}
-
-    <style>{% block style %}{% endblock style %}</style>
-
 </head>
 
+<body class="sb-nav-fixed">
 
-<body id="page-top">
-
-<div id="wrapper">
-    {% include 'partials/_sidebar.html' %}
-    <div id="content-wrapper" class="d-flex flex-column">
-        <div id="content">
-            {% include 'partials/_topbar.html' %}
-            <div class="container-fluid">
-                {% block content %}{% endblock content %}
-            </div>
+    {% include "partials/_topbar.html" %}
+    <div id="layoutSidenav">
+        <div id="layoutSidenav_nav">
+            {% include "partials/_sidebar.html" %}
         </div>
-        {% include 'partials/_footer.html' %}
+        <div id="layoutSidenav_content">
+            <main>
+                <div class="container-fluid p-4">
+                    <h1>Bioresource Information Tool</h1>
+                    <!-- <ol class="breadcrumb my-4">
+                        <li class="breadcrumb-item active">Breadcrumbs</li>
+                    </ol> -->
+                    {% block content %}{% endblock content %}
+                </div>
+            </main>
+            {% include "partials/_footer.html" %}
+        </div>
     </div>
-</div>
 
 <!-- Scroll to Top Button-->
 <a class="scroll-to-top rounded" href="#page-top">
@@ -63,142 +69,29 @@
         <div class="modal-content">
             <div class="modal-header">
                 <h5 class="modal-title" id="exampleModalLabel">Ready to Leave?</h5>
-                <button class="close" type="button" data-dismiss="modal" aria-label="Close">
-                    <span aria-hidden="true">×</span>
-                </button>
+                <button class="btn-close" type="button" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body">Select "Logout" below if you are ready to end your current session.</div>
             <div class="modal-footer">
-                <button class="btn btn-secondary" type="button" data-dismiss="modal">Cancel</button>
+                <button class="btn btn-secondary" type="button" data-bs-dismiss="modal">Cancel</button>
                 <a class="btn btn-primary" href="{% url 'auth_logout' %}">Logout</a>
             </div>
         </div>
     </div>
 </div>
 
-<!-- Modal Container -->
-<div class="modal fade" tabindex="-1" role="dialog" id="modal">
-    <div class="modal-dialog" role="document">
-        <div class="modal-content"></div>
-    </div>
-</div>
+{% include 'includes/modal_container.html' %}
 
-<script src="{% static 'lib/jquery/jquery.min.js' %}"></script>
-<script src="{% static 'lib/jquery-ui/js/jquery-ui.min.js' %}"></script>
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.8.0/Chart.min.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/simple-datatables@latest" crossorigin="anonymous"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/noUiSlider/15.8.1/nouislider.min.js"></script>
+<script src="{% static 'js/bootstrap5.modal.forms.min.js' %}"></script>
+<script src="{% static 'js/modal_links.js' %}"></script>
+<script src="{% static 'js/sidebar.min.js' %}"></script>
+<script src="{% static 'js/logout.min.js' %}"></script>
 
-<!-- Bootstrap core JavaScript-->
-<script src="{% static 'lib/bootstrap/js/bootstrap.bundle.min.js' %}"></script>
-
-<!-- Core plugin JavaScript-->
-<script src="{% static 'lib/jquery-easing/jquery.easing.min.js' %}"></script>
-
-<!-- Custom scripts for all pages-->
-<script src="{% static 'js/sb-admin-2.min.js' %}"></script>
-<script src="{% static 'js/jquery.bootstrap.modal.forms.js' %}"></script>
-<script src="{% static 'lib/bootstrap4-toggle/js/bootstrap4-toggle.min.js' %}"></script>
-<script type="text/javascript" src={% static "cookie_consent/cookiebar.js" %}></script>
-
-<!-- Page level plugins -->
-<script src="{% static 'lib/chart.js/Chart.min.js' %}"></script>
-
-{% block javascript %}
-    <script type="text/javascript">
-
-        $(document).ready(function() {
-
-            $("#sidebarToggle").click();
-
-            $(".modal-link").each(function() {
-                $(this).modalForm({
-                    formURL: $(this).attr("href"),
-                    errorClass: ".is-invalid"
-                });
-                $(this).attr("href", "javascript:void(0)");
-            });
-        });
-
-    </script>
-
-    <script type="{% js_type_for_cookie_consent request "social" "*:.google.com" %}" data-varname="social">
-        (function() {
-          var po = document.createElement('script'); po.type = 'text/javascript'; po.async = true;
-          po.src = 'https://apis.google.com/js/plusone.js';
-          var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
-        })();
-    </script>
-
-    {% if request|cookie_consent_enabled %}
-        {% not_accepted_or_declined_cookie_groups request as cookie_groups %}
-
-        {% if cookie_groups %}
-            {% url "cookie_consent_cookie_group_list" as url_cookies %}
-            {% cookie_consent_accept_url cookie_groups as url_accept %}
-            {% cookie_consent_decline_url cookie_groups as url_decline %}
-            <script type="text/javascript">
-                const cookie_groups = [];
-                {% for cookie_group in cookie_groups %}
-                    cookie_groups.push("{{ cookie_group.varname }}");
-                {% endfor %}
-
-                function ready(fn) {
-                    if (document.readyState !== 'loading') {
-                        fn();
-                    } else if (document.addEventListener) {
-                        document.addEventListener('DOMContentLoaded', fn);
-                    } else {
-                        document.attachEvent('onreadystatechange', function() {
-                            if (document.readyState !== 'loading') {
-                                fn();
-                            }
-                        });
-                    }
-                }
-
-                ready(function() {
-                    showCookieBar({
-                        content: '<div class="fixed-bottom cookie-bar p-4"><div class="bg-secondary text-white border w-100 mw-100" role="alert" data-autohide="false"><div class="p-4 d-flex flex-column"><h4>Cookies</h4><p>This site requires cookies to function properly. On top of the essential cookies, we would also like to use Google Analytics to learn about how this site is used. Please let us know if you accept this. Press "Config" for more detailed options.</p><div class="ml-auto"><a href="{{ url_accept }}" class="cc-cookie-accept btn btn-light mr-3">Accept</a><a href="{{ url_decline }}" class="cc-cookie-decline btn btn-outline-light mr-3">Decline</a><a href="{{ url_cookies }}" class="btn btn-outline-light">Config</a></div></div></div></div>',
-                        cookie_groups: cookie_groups,
-                        cookie_decline: "{% get_decline_cookie_groups_cookie_string request cookie_groups %}",
-                        beforeDeclined: function() {
-                            document.cookie = "{% get_decline_cookie_groups_cookie_string request cookie_groups %}";
-                        }
-                    });
-                });
-            </script>
-        {% endif %}
-    {% endif %}
-
-    <script>
-        document.addEventListener("DOMContentLoaded", function() {
-            const logoutLink = document.getElementById('logoutLink');
-
-            if (logoutLink) {
-                logoutLink.addEventListener('click', function(event) {
-                    event.preventDefault(); // Prevent the default link behavior
-
-                    // Make an AJAX POST request to log the user out
-                    fetch("{% url 'auth_logout' %}", {
-                        method: "POST",
-                        headers: {
-                            'X-CSRFToken': '{{ csrf_token }}',
-                        }
-                    }).then(response => {
-                        if (response.ok) {
-                            // Reload the current page if the logout was successful
-                            window.location.reload();
-                        } else {
-                            // If the reload might result in a 403, redirect to the start page
-                            window.location.href = "/";
-                        }
-                    }).catch(() => {
-                        // Handle network or other errors
-                        window.location.href = "/";
-                    });
-                });
-            }
-        });
-    </script>
-{% endblock javascript %}
+{% block javascript %}{% endblock %}
 
 {% block form_media %}
     {#    Due to compatibility issues between django-crispy-forms and django-autocomplete-light, this block is needed to #}

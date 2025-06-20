@@ -41,7 +41,7 @@
     {% endblock back_button %}
     {% block list_link %}
         {% if object.list_url %}
-            <a href="{{ object.list_url }}" class="ml-3">
+            <a href="{{ object.list_url }}" class="ms-3">
                 <i class="fas fa-fw fa-list">
                 </i> see all
             </a>
@@ -50,7 +50,7 @@
     {% if user == object.owner or user.is_staff %}
         {% block update_link %}
             {% if object.update_url %}
-                <a href="{{ object.update_url }}" class="ml-3">
+                <a href="{{ object.update_url }}" class="ms-3">
                     <i class="fas fa-fw fa-edit">
                     </i> edit
                 </a>
@@ -58,7 +58,7 @@
         {% endblock update_link %}
         {% block delete_link %}
             {% if object.modal_delete_url %}
-                <a href="{{ object.modal_delete_url }}" class="modal-link ml-3">
+                <a href="{{ object.modal_delete_url }}" class="modal-link ms-3">
                     <i class="fas fa-fw fa-trash">
                     </i> delete
                 </a>

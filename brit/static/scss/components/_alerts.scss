@@ -1,0 +1,18 @@
+// Alert styles
+.alert-primary {
+  border-color: rgba($primary, 0.3);
+  background-color: rgba($primary, 0.1);
+  color: $primary;
+}
+
+.alert-secondary {
+  border-color: rgba($secondary, 0.3);
+  background-color: rgba($secondary, 0.1);
+  color: $success;
+}
+
+.alert-success {
+  border-color: rgba($success, 0.3);
+  background-color: rgba($success, 0.1);
+  color: $success;
+}

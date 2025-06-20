@@ -24,7 +24,7 @@
     <div class="card-footer d-flex">
         <div class="dropdown">
             <button class="btn btn-secondary dropdown-toggle" type="button" id="navigateDropdown"
-                    data-toggle="dropdown" aria-expanded="false">
+                    data-bs-toggle="dropdown" aria-expanded="false">
                 Navigate
             </button>
             <div class="dropdown-menu" aria-labelledby="navigateDropdown">
@@ -40,8 +40,8 @@
         </div>
         {% if user == object.owner or user.is_staff %}
             <div class="dropdown">
-                <button class="btn btn-secondary dropdown-toggle ml-3" type="button" id="editDropdown"
-                        data-toggle="dropdown" aria-expanded="false">
+                <button class="btn btn-secondary dropdown-toggle ms-3" type="button" id="editDropdown"
+                        data-bs-toggle="dropdown" aria-expanded="false">
                     Options
                 </button>
                 <div class="dropdown-menu" aria-labelledby="editDropdown">

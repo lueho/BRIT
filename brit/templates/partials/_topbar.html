@@ -1,62 +1,25 @@
-{% load static %}
-
-<nav class="navbar navbar-expand navbar-light bg-white topbar mb-4 static-top shadow">
-    <!-- Sidebar Toggle (Topbar) -->
-    <button id="sidebarToggleTop" class="btn btn-link d-md-none rounded-circle mr-3">
-        <i class="fa fa-bars"></i>
-    </button>
-
-    <h1 class="d-none d-sm-block d-lg-none">
-        BRIT
-    </h1>
-    <h1 class="d-none d-sm-none d-lg-block">
-        Bioresource Information Tool
-    </h1>
-
-    <!-- Topbar Navbar -->
-    <ul class="navbar-nav ml-auto">
-
-
-        <div class="topbar-divider d-none d-sm-block"></div>
-
-        <!-- Nav Item - User Information -->
-        {% if user.is_authenticated %}
-            <li class="nav-item dropdown no-arrow">
-                <a class="nav-link dropdown-toggle" href="#" id="userDropdown" role="button" data-toggle="dropdown"
-                   aria-haspopup="true" aria-expanded="false">
-                    <span class="mr-2 d-none d-lg-inline text-gray-600 small">{{ user.username }}</span>
-                    <img class="img-profile rounded-circle" src="{% static 'img/profile_placeholder.svg' %}">
-                </a>
-                <!-- Dropdown - User Information -->
-                <div class="dropdown-menu dropdown-menu-right shadow animated--grow-in" aria-labelledby="userDropdown">
-                    <a class="dropdown-item" href="{% url 'user_profile' %}" id="userProfileLink">
-                        <i class="fas fa-user fa-sm fa-fw mr-2 text-gray-400"></i>
-                        Profile
-                    </a>
-{#                    <a class="dropdown-item" href="#">#}
-{#                        <i class="fas fa-cogs fa-sm fa-fw mr-2 text-gray-400"></i>#}
-{#                        Settings#}
-{#                    </a>#}
-                    <div class="dropdown-divider"></div>
-                    <a class="dropdown-item" href="#" id="logoutLink">
-                        <i class="fas fa-sign-out-alt fa-sm fa-fw mr-2 text-gray-400"></i>
-                        Logout
-                    </a>
-                </div>
-            </li>
-        {% else %}
-            <li class="nav-item">
-                <a class="nav-link" href="{% url 'auth_login' %}">
-                    <i class="fas fa-sign-in-alt fa-sm fa-fw mr-1"></i>
-                    <span class="d-none d-lg-inline">Login</span>
-                </a>
-            </li>
-            <li class="nav-item">
-                <a class="nav-link" href="{% url 'registration_register' %}">
-                    <i class="fas fa-user-plus fa-sm fa-fw mr-1"></i>
-                    <span class="d-none d-lg-inline">Register</span>
-                </a>
-            </li>
-        {% endif %}
+<nav class="sb-topnav navbar navbar-expand topnav-brand-sage">
+    <a class="navbar-brand ps-3" href="{% url 'home' %}" title="Bioresource Information Tool">BRIT</a>
+    <button class="order-1 order-lg-0 me-4 me-lg-0" id="sidebarToggle"><i class="fas fa-bars"></i></button>
+    <ul class="navbar-nav ms-auto me-3 me-lg-4">
+        <li class="nav-item dropdown">
+            <a class="nav-link dropdown-toggle" id="navbarDropdown" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="fas fa-user fa-fw"></i></a>
+            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
+                {% if user.is_authenticated %}
+                <li>
+                    <h6 class="dropdown-header">
+                        Signed in as:<br>
+                        <span class="fw-semibold">{{ user.username }}</span>
+                    </h6>
+                </li>
+                <li><a class="dropdown-item" href="{% url 'user_profile' %}">Profile</a></li>
+                <li><hr class="dropdown-divider" /></li>
+                <li><a class="dropdown-item" href="#" id="logoutLink" data-logout-url="{% url 'auth_logout' %}" data-csrf-token="{{ csrf_token }}">Logout</a></li>
+                {% else %}
+                <li><a class="dropdown-item" href="{% url 'auth_login' %}?next={{ request.path }}">Login</a></li>
+                <li><a class="dropdown-item" href="{% url 'registration_register' %}?next={{ request.path }}">Register</a></li>
+                {% endif %}
+            </ul>
+        </li>
     </ul>
 </nav>

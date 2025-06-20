@@ -95,11 +95,11 @@ function featureClickHandler(e, featureGroup) {
 }
 
 function createFeatureLayerBindings(featuresLayer) {
-    featuresLayer.bindTooltip(function(layer) {
+    featuresLayer.bindTooltip(function (layer) {
         return layer.feature.properties.catchment.toString();
     });
 
-    featuresLayer.bindPopup(function(layer) {
+    featuresLayer.bindPopup(function (layer) {
         return layer.feature.properties.catchment.toString();
     });
 
@@ -109,7 +109,7 @@ function createFeatureLayerBindings(featuresLayer) {
 function scrollToSummaries() {
     const importantInfoElement = document.getElementById("filter_result_card");
     if (importantInfoElement) {
-        importantInfoElement.scrollIntoView({behavior: 'smooth', block: 'start'});
+        importantInfoElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
 }
 
@@ -155,8 +155,9 @@ function updateUrls(feature_id) {
     try {
         const delete_button = document.getElementById('btn-collection-delete');
         const delete_url = delete_button.dataset.hrefTemplate.replace('__pk__', feature_id.toString()) + '?' + params.toString();
-        $('#btn-collection-delete').modalForm({
-            formURL: delete_url, errorClass: ".is-invalid"
+        modalForm(delete_button, {
+            formURL: delete_url,
+            errorClass: ".is-invalid"
         });
     } catch (error) {
         console.warn(`Delete button not updated: ${error}`);
@@ -165,6 +166,17 @@ function updateUrls(feature_id) {
 
 function addDetailViewButton() {
 
+}
+
+function clickedPrivateMapButton() {
+    const privateMapLink = document.getElementById('link-map-private');
+    window.location.href = privateMapLink.dataset.hrefTemplate + '?' + parseFilterParameters().toString();
+}
+
+function clickedPublicMapButton() {
+    const publicMapLink = document.getElementById('link-map-public');
+    console.log(publicMapLink.dataset.hrefTemplate);
+    window.location.href = publicMapLink.dataset.hrefTemplate + '?' + parseFilterParameters().toString();
 }
 
 function clickedListButton() {

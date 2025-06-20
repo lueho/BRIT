@@ -93,7 +93,7 @@
     {% if object.url and request.user == object.owner %}
         <span id="check_url" class="text-nowrap" style="display: inline-block; width: 7em">
             <a href="javascript:void(0)"
-               class="check-url-btn ml-3"
+               class="check-url-btn ms-3"
                data-pk="{{ object.pk }}"
                data-source-check-url="{% url 'source-check-url' object.pk %}"
                data-progress-url-template="{% url 'source-check-url-progress' 'task_id' %}">

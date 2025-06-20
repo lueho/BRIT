@@ -1,0 +1,140 @@
+// 
+// Topnav
+// 
+
+.sb-topnav {
+  padding-left: 0;
+  height: $topnav-base-height;
+  z-index: $zindex-topnav;
+
+  .navbar-brand {
+    width: $sidenav-base-width;
+    padding-left: $navbar-padding-x;
+    padding-right: $navbar-padding-x;
+    margin: 0;
+  }
+
+  &.navbar-dark {
+    #sidebarToggle {
+      color: $topnav-dark-toggler-color;
+    }
+  }
+
+  &.navbar-light {
+    #sidebarToggle {
+      color: $topnav-light-toggler-color;
+    }
+  }
+
+  // Custom brand-specific// Topbar Navbar - Enhanced for professional look
+  &.topnav-brand-sage {
+    background-color: $secondary; // Sage green background
+    border-bottom: 1px solid rgba($success, 0.2);
+    box-shadow: 0 0.15rem 0.25rem 0 rgba(58, 59, 69, 0.1);
+
+    // Enhanced sidebar toggle button
+    #sidebarToggle {
+      color: $success;
+      background-color: rgba(255, 255, 255, 0.2);
+      border-radius: 0.25rem;
+      padding: 0.375rem 0.75rem;
+      transition: all 0.2s ease-in-out;
+      border: 1px solid rgba($success, 0.3);
+
+      &:hover,
+      &:focus {
+        color: #fff;
+        background-color: $success;
+        box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.1);
+        transform: translateY(-1px);
+      }
+
+      &:active {
+        transform: translateY(0);
+        box-shadow: none;
+      }
+    }
+
+    .nav-link {
+      color: $success; // Deep pine for better contrast
+      font-weight: 500;
+
+      &:hover,
+      &:focus {
+        color: darken($success, 10%);
+      }
+
+      &.active {
+        color: darken($success, 15%);
+        font-weight: 600;
+      }
+
+      // Icons in topbar
+      .fa,
+      .fas,
+      .far,
+      .fab {
+        color: $success;
+
+        &:hover {
+          color: darken($success, 10%);
+        }
+      }
+    }
+
+    // Search box styling
+    .input-group {
+      .form-control {
+        border-color: lighten($secondary, 10%);
+        background-color: lighten($secondary, 15%);
+        color: $success;
+
+        &::placeholder {
+          color: rgba($success, 0.6);
+        }
+
+        &:focus {
+          border-color: $success;
+          background-color: #fff;
+        }
+      }
+
+      .input-group-text {
+        background-color: $success;
+        border-color: $success;
+        color: #fff;
+      }
+    }
+
+    // Dropdown styling for user menu
+    .dropdown-menu {
+      border-color: rgba($success, 0.2);
+
+      .dropdown-item {
+        color: $primary;
+
+        &:hover,
+        &:active {
+          background-color: rgba($secondary, 0.2);
+          color: $success;
+        }
+
+        &.active {
+          background-color: rgba($secondary, 0.4);
+        }
+      }
+
+      .dropdown-divider {
+        border-color: rgba($success, 0.1);
+      }
+    }
+
+    // User info area
+    .dropdown-user {
+      .dropdown-header {
+        color: $success;
+        font-weight: 600;
+      }
+    }
+  }
+}

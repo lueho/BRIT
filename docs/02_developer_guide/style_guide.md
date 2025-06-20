@@ -17,6 +17,7 @@ This document outlines the coding and documentation conventions for the BRIT pro
 - Name templates with the pattern `<app>/<model>_<action>.html` (e.g., `maps/location_list.html`).
 - Use plural for app names (e.g., `users`, `materials`).
 - Place static files in the app’s `static/<app>/` directory.
+- **All ForeignKey fields with a default must use fetch-only helpers from `utils.py`, never from `models.py`, and never create objects.** See the [canonical note](../../notes/default_objects_and_initial_data_review.md) and [MADR](../../notes/02_design_decisions/2025-05-16_default_objects_and_initial_data.madr.md).
 
 ## JavaScript
 - Use ES6 syntax and features.
@@ -27,7 +28,7 @@ This document outlines the coding and documentation conventions for the BRIT pro
 
 ## HTML & CSS
 - Use semantic HTML5 elements.
-- Use Bootstrap 4 classes for layout and components.
+- Use Bootstrap 5 classes for layout and components.
 - Place custom styles in `static/css/` and scope them to avoid conflicts.
 - Use BEM naming for custom CSS classes.
 

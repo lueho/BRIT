@@ -1,124 +1,192 @@
 {% extends 'filtered_list.html' %}
+{% load i18n %}
 {% load static %}
 {% load crispy_forms_tags %}
 {% load file_export_tags %}
+{% load moderation_tags %}
 
 {% block title %}BRIT | Household waste collections{% endblock %}
 
-{% block list_card_header %}<strong>Collections</strong>{% endblock %}
+{% block list_card_header %}
+<strong>
+    {% if list_type == 'private' %}
+    My Collections
+    {% else %}
+    Collections
+    {% endif %}
+</strong>
+{% endblock %}
 
 {% block list_table %}
-    <table class="table table-responsive-stack">
+<div class="table-responsive">
+    <table class="table modern-table">
         <thead>
-        <tr>
-            <th>Id</th>
-            <th>Catchment</th>
-            <th>Collector</th>
-            <th>Category</th>
-            <th>Collection system</th>
-            {% if list_type == 'private' %}
-                <th>Public</th>
-            {% endif %}
-        </tr>
+            <tr>
+                <th>Collection</th>
+                <th class="actions-column">{% if list_type == 'private' %}Status/Actions{% else %}Actions{% endif %}</th>
+            </tr>
         </thead>
         <tbody>
-        {% for object in object_list %}
+            {% for object in object_list %}
             <tr>
-                <td data-label="Id"><a href="{{ object.get_absolute_url }}">{{ object.id }}</a></td>
-                <td data-label="Catchment">
-                    <a href="{{ object.catchment.get_absolute_url }}">{{ object.catchment }}</a>
+                <td data-label="Collection" class="ps-3">
+                    <a href="{{ object.get_absolute_url }}" class="collection-link">
+                        <strong class="d-block">{{ object.catchment.region.name }} - {{ object.waste_stream.category }} collection</strong>
+                        <span class="text-muted small">
+                            {{ object.collector }} · {{ object.collection_system }} · {{ object.valid_from.year }}
+                        </span>
+                    </a>
                 </td>
-                <td data-label="Collector">
-                    <a href="{{ object.collector.get_absolute_url }}">{{ object.collector }}</a>
+                <td class="actions-column mobile-no-label">
+                    <div class="action-container d-flex align-items-center justify-content-end">
+                        {% if list_type == 'private' %}
+                        <div class="status-badge-container">
+                            {% include 'object_management/review_status_badge.html' with object=object %}
+                        </div>
+                        {% endif %}
+                        <div class="dropdown d-inline-block ms-auto d-none d-md-inline-block">
+                        <button class="btn btn-sm btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">⋮</button>
+                        <div class="dropdown-menu dropdown-menu-end">
+                            <a class="dropdown-item" href="{{ object.get_absolute_url }}">
+                                <i class="fas fa-eye"></i> View details
+                            </a>
+                            {% if user == object.owner or user.is_staff %}
+                            <a class="dropdown-item" href="{% url 'collection-update' object.id %}">
+                                <i class="fas fa-edit"></i> Edit
+                            </a>
+                            {% endif %}
+                            {% if user == object.owner or user.is_staff %}
+                            <a class="dropdown-item modal-link" href="{% url 'collection-delete-modal' object.id %}">
+                                <i class="fas fa-trash"></i> Delete
+                            </a>
+                            {% endif %}
+                            
+                            <div class="dropdown-divider"></div>
+                            <!-- Workflow actions -->
+                            {% if object.publication_status == object.STATUS_PUBLISHED %}
+                                {% if user.is_staff or perms.can_moderate %}
+                                <a class="dropdown-item modal-link" href="{% url 'collection-archive-modal' object.id %}">
+                                    <i class="fas fa-archive"></i> Archive
+                                </a>
+                                {% endif %}
+                            {% endif %}
+                            
+                            {% if list_type == 'private' %}
+                                {% if object.is_private %}
+                                    {% if user == object.owner or user.is_staff %}
+                                        <form method="post" action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
+                                            {% csrf_token %}
+                                            <button type="submit" class="dropdown-item text-start text-primary">
+                                                <i class="fas fa-paper-plane"></i> Submit for Review
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                {% endif %}
+                                
+                                {% if object.is_in_review %}
+                                    {% if user == object.owner or user.is_staff %}
+                                        <form method="post" action="{% url 'object_management:withdraw_from_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
+                                            {% csrf_token %}
+                                            <button type="submit" class="dropdown-item text-start text-warning">
+                                                <i class="fas fa-undo"></i> Withdraw from Review
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                {% endif %}
+                                
+                                {% if object.is_in_review %}
+                                    {% if user.is_staff and user != object.owner or perms.can_moderate and user != object.owner %}
+                                        <form method="post" action="{% url 'object_management:approve_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
+                                            {% csrf_token %}
+                                            <button type="submit" class="dropdown-item text-start text-success">
+                                                <i class="fas fa-check"></i> Approve
+                                            </button>
+                                        </form>
+                                        <form method="post" action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
+                                            {% csrf_token %}
+                                            <button type="submit" class="dropdown-item btn-block text-start text-danger">
+                                                <i class="fas fa-times"></i> Reject
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                {% endif %}
+                            {% endif %}
+                        </div>
+                    </div>
                 </td>
-                <td data-label="Category">
-                    <a href="{{ object.waste_stream.category.get_absolute_url }}">{{ object.waste_stream.category }}</a>
-                </td>
-                <td data-label="Collection system">
-                    <a href="{{ object.collection_system.get_absolute_url }}">{{ object.collection_system }}</a>
-                </td>
-                {% if list_type == 'private' %}
-                    {% include 'partials/_publication_status_column.html' %}
-                {% endif %}
             </tr>
-        {% endfor %}
+            {% endfor %}
         </tbody>
-        <tfoot>
-        </tfoot>
     </table>
+</div>
 {% endblock list_table %}
 
 {% block list_card_navigation_dropdown_additional_links %}
-    <a class="dropdown-item"
-       href="{% url 'WasteCollection' %}?{{ request.GET.urlencode }}&load_catchment=true&load_features=true">
-        <i class="fas fa-fw fa-map"></i> View as map
-    </a>
+<a class="dropdown-item"
+    href="{% if list_type == 'private' %}{%url 'WasteCollection-owned' %}{% else %}{%url 'WasteCollection' %}{% endif %}?{{ request.GET.urlencode }}">
+    <i class="fas fa-fw fa-map"></i> View as map
+</a>
 {% endblock list_card_navigation_dropdown_additional_links %}
 
 {% block list_card_options_dropdown_additional_links %}
-    <a class="dropdown-item"
-       href="{% url 'aggregatedcollectionpropertyvalue-create' %}">
-        <i class="fas fa-fw fa-plus-circle"></i> Add property to collection group
-    </a>
-    {% if user.is_authenticated %}
-        <a class="dropdown-item modal-link"
-           href="{% export_link_modal 'collection-export' list_type=list_type %}">
-            <i class="fas fa-fw fa-file-export"></i> Export data
-        </a>
-    {% endif %}
+{% if user.is_authenticated %}
+{% if "soilcom.add_aggregatedcollectionpropertyvalue" in perms %}
+<a class="dropdown-item" href="{% url 'aggregatedcollectionpropertyvalue-create' %}">
+    <i class="fas fa-fw fa-plus-circle"></i> Add property to collection group
+</a>
+{% endif %}
+
+<a class="dropdown-item modal-link" href="{% export_link_modal 'collection-export' list_type=list_type %}">
+    <i class="fas fa-fw fa-file-export"></i> Export data
+</a>
+{% endif %}
 {% endblock list_card_options_dropdown_additional_links %}
 
 {% block filter_column %}
-    <form method="get">
-        {% crispy filter.form %}
-    </form>
-    <div class="card shadow">
-        <div class="card-header"
-             role="button"
-             data-toggle="collapse"
-             href="#learning-card-body"
-             aria-expanded="true"
-             aria-controls="learning-card-body">
-            <strong><i class="fas fa-fw fa-graduation-cap"></i> Learning material</strong>
-        </div>
-        <div class="card-body collapse" id="learning-card-body">
-            <p class="card-text">
-                To get an introduction of how the circular economy of food waste works, check out the
-                <a href="https://www.hoou.de/projects/biocycle/" target="_blank">BioCycle</a>:
-            </p>
-            <ul>
-                <li>
-                    <a href="https://www.hoou.de/projects/biocycle/" target="_blank">
-                        The BioCycle - From Resource to Waste to Resource
-                    </a>
-                </li>
-            </ul>
-            <p>
-                If you want to dig in more deeply into the food waste management, you find additional resources in the
-                Lectures for Future series "Residue and by-Product Based Bioresources" and "Sustainable Urban
-                Bioresource
-                Management" of the Hamburg Open Online University.
-                Recommended lectures for this topic:
-            </p>
-            <ul>
-                <li>
-                    <a href="https://www.hoou.de/projects/lff/pages/residue-and-by-product-based-bioresources"
-                       target="_blank">"Territorial Biowaste Management: Local Food Waste Valorisation"
-                    </a>
-                </li>
-                <li>
-                    <a href="https://www.hoou.de/projects/lff/pages/sustainable-urban-bioresource-management"
-                       target="_blank">"Biowaste Collection: Current Status and Factors Influencing Correct Sorting"
-                    </a>
-                </li>
-            </ul>
-
-
-        </div>
+<form method="get">
+    {% crispy filter.form %}
+</form>
+<div class="card shadow">
+    <div class="card-header" role="button" data-bs-toggle="collapse" data-bs-target="#learning-card-body" aria-expanded="true"
+        aria-controls="learning-card-body">
+        <strong><i class="fas fa-fw fa-graduation-cap"></i> Learning material</strong>
     </div>
+    <div class="card-body collapse" id="learning-card-body">
+        <p class="card-text">
+            To get an introduction of how the circular economy of food waste works, check out the
+            <a href="https://www.hoou.de/projects/biocycle/" target="_blank">BioCycle</a>:
+        </p>
+        <ul>
+            <li>
+                <a href="https://www.hoou.de/projects/biocycle/" target="_blank">
+                    The BioCycle - From Resource to Waste to Resource
+                </a>
+            </li>
+        </ul>
+        <p>
+            If you want to dig in more deeply into the food waste management, you find additional resources in the
+            Lectures for Future series "Residue and by-Product Based Bioresources" and "Sustainable Urban
+            Bioresource
+            Management" of the Hamburg Open Online University.
+            Recommended lectures for this topic:
+        </p>
+        <ul>
+            <li>
+                <a href="https://www.hoou.de/projects/lff/pages/residue-and-by-product-based-bioresources"
+                    target="_blank">"Territorial Biowaste Management: Local Food Waste Valorisation"
+                </a>
+            </li>
+            <li>
+                <a href="https://www.hoou.de/projects/lff/pages/sustainable-urban-bioresource-management"
+                    target="_blank">"Biowaste Collection: Current Status and Factors Influencing Correct Sorting"
+                </a>
+            </li>
+        </ul>
+    </div>
+</div>
 {% endblock filter_column %}
 
 {% block javascript %}
-    {{ block.super }}
-    <script src="{% static 'js/file_export.min.js' %}" type="text/javascript"></script>
+{{ block.super }}
+<script src="{% static 'js/file_export.min.js' %}" type="text/javascript"></script>
 {% endblock javascript %}

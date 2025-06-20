@@ -14,27 +14,29 @@ from django.forms import (
     RadioSelect,
 )
 from django.utils.translation import gettext as _
+from django_tomselect.forms import (
+    TomSelectConfig,
+    TomSelectModelChoiceField,
+    TomSelectModelMultipleChoiceField,
+)
 
 from distributions.models import TemporalDistribution, Timestep
 from materials.models import Material, Sample
-from users.models import get_default_owner
 from utils.crispy_fields import ForeignkeyField
 from utils.forms import (
-    AutoCompleteModelForm,
     CreateInlineMixin,
     M2MInlineFormSet,
     ModalModelFormMixin,
     SimpleForm,
     SimpleModelForm,
 )
-from utils.widgets import BSModelSelect2, BSModelSelect2Multiple
+from utils.object_management.models import get_default_owner
 
 from .models import (
     CONNECTION_TYPE_CHOICES,
     REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES,
     AggregatedCollectionPropertyValue,
     Collection,
-    CollectionCatchment,
     CollectionCountOptions,
     CollectionFrequency,
     CollectionPropertyValue,
@@ -49,10 +51,13 @@ from .models import (
 )
 
 
-class CollectorModelForm(AutoCompleteModelForm):
-    catchment = ModelChoiceField(
-        queryset=CollectionCatchment.objects.all(),
-        widget=BSModelSelect2(url="catchment-autocomplete"),
+class CollectorModelForm(SimpleModelForm):
+    catchment = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="catchment-autocomplete",
+            label_field="name",
+        ),
+        label="Catchment",
         required=False,
     )
 
@@ -273,7 +278,15 @@ class BaseWasteFlyerUrlFormSet(M2MInlineFormSet):
         return child_objects
 
 
-class CollectionPropertyValueModelForm(AutoCompleteModelForm):
+class CollectionPropertyValueModelForm(SimpleModelForm):
+    collection = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="collection-autocomplete",
+            label_field="name",
+        ),
+        label="Collection",
+    )
+
     class Meta:
         model = CollectionPropertyValue
         fields = (
@@ -284,12 +297,17 @@ class CollectionPropertyValueModelForm(AutoCompleteModelForm):
             "average",
             "standard_deviation",
         )
-        widgets = {
-            "collection": BSModelSelect2(url="collection-autocomplete"),
-        }
 
 
-class AggregatedCollectionPropertyValueModelForm(AutoCompleteModelForm):
+class AggregatedCollectionPropertyValueModelForm(SimpleModelForm):
+    collections = TomSelectModelMultipleChoiceField(
+        config=TomSelectConfig(
+            url="collection-autocomplete",
+            label_field="name",
+        ),
+        label="Collections",
+    )
+
     class Meta:
         model = AggregatedCollectionPropertyValue
         fields = (
@@ -300,7 +318,6 @@ class AggregatedCollectionPropertyValueModelForm(AutoCompleteModelForm):
             "average",
             "standard_deviation",
         )
-        widgets = {"collections": BSModelSelect2Multiple(url="collection-autocomplete")}
 
 
 class CollectionModelFormHelper(FormHelper):
@@ -324,19 +341,25 @@ class CollectionModelFormHelper(FormHelper):
     )
 
 
-class CollectionModelForm(CreateInlineMixin, AutoCompleteModelForm):
+class CollectionModelForm(CreateInlineMixin, SimpleModelForm):
     """
     Model form for Collection, including all collection parameters and waste stream fields.
     """
 
-    catchment = ModelChoiceField(
-        queryset=CollectionCatchment.objects.all(),
-        widget=BSModelSelect2(url="catchment-autocomplete"),
+    catchment = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="collectioncatchment-autocomplete",
+            label_field="name",
+        ),
+        label="Catchment",
         required=True,
     )
-    collector = ModelChoiceField(
-        queryset=Collector.objects.all(),
-        widget=BSModelSelect2(url="collector-autocomplete"),
+    collector = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="collector-autocomplete",
+            label_field="name",
+        ),
+        label="Collector",
         required=True,
     )
     collection_system = ModelChoiceField(
@@ -353,9 +376,11 @@ class CollectionModelForm(CreateInlineMixin, AutoCompleteModelForm):
         widget=CheckboxSelectMultiple,
         required=False,
     )
-    frequency = ModelChoiceField(
-        queryset=CollectionFrequency.objects.all(),
-        widget=BSModelSelect2(url="collectionfrequency-autocomplete"),
+    frequency = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="collectionfrequency-autocomplete",
+            label_field="name",
+        ),
         required=False,
     )
     fee_system = ModelChoiceField(queryset=FeeSystem.objects.all(), required=False)
@@ -444,9 +469,13 @@ class CollectionModelForm(CreateInlineMixin, AutoCompleteModelForm):
             return super().save(commit=False)
 
 
-class CollectionAddWasteSampleForm(AutoCompleteModelForm):
-    sample = ModelChoiceField(
-        queryset=Sample.objects.all(), widget=BSModelSelect2(url="sample-autocomplete")
+class CollectionAddWasteSampleForm(SimpleModelForm):
+    sample = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="sample-autocomplete",
+            label_field="name",
+        ),
+        label="Sample",
     )
 
     class Meta:
@@ -468,7 +497,7 @@ class CollectionRemoveWasteSampleForm(SimpleModelForm):
         )
 
 
-class CollectionAddPredecessorForm(AutoCompleteModelForm):
+class CollectionAddPredecessorForm(SimpleModelForm):
     """
     This form is used to add a predecessor to a Collection instance. A predecessor is a Collection instance that
     was replaced by the current Collection instance.
@@ -476,13 +505,14 @@ class CollectionAddPredecessorForm(AutoCompleteModelForm):
     Fields:
     predecessor: A ModelChoiceField that represents the predecessor to be added.
                  The queryset for this field is all Collection instances.
-                 The widget used is ModelSelect2 with 'collection-autocomplete' as the url,
-                 which provides autocomplete functionality.
     """
 
-    predecessor = ModelChoiceField(
-        queryset=Collection.objects.all(),
-        widget=BSModelSelect2(url="collection-autocomplete"),
+    predecessor = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="collection-autocomplete",
+            label_field="name",
+        ),
+        label="Predecessor",
     )
 
     class Meta:

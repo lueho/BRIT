@@ -3,7 +3,6 @@ from datetime import date
 from urllib.parse import urlencode
 
 from celery.result import AsyncResult
-from dal.autocomplete import Select2QuerySetView
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.db.models import Max
 from django.forms.models import model_to_dict
@@ -14,7 +13,6 @@ from django.views import View
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.generic import TemplateView
 
-import case_studies.soilcom.tasks
 from bibliography.views import (
     SourceCheckUrlView,
     SourceCreateView,
@@ -35,20 +33,23 @@ from maps.views import (
 )
 from utils.file_export.views import GenericUserCreatedObjectExportView
 from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineFormSetMixin
-from utils.views import (
+from utils.object_management.views import (
     OwnedObjectModelSelectOptionsView,
     PrivateObjectFilterView,
     PrivateObjectListView,
     PublishedObjectFilterView,
     PublishedObjectListView,
+    UserCreatedObjectAutocompleteView,
     UserCreatedObjectCreateView,
     UserCreatedObjectDetailView,
+    UserCreatedObjectModalArchiveView,
     UserCreatedObjectModalCreateView,
     UserCreatedObjectModalDeleteView,
     UserCreatedObjectModalDetailView,
     UserCreatedObjectModalUpdateView,
     UserCreatedObjectUpdateView,
 )
+
 from .filters import CollectionFilterSet, CollectorFilter, WasteFlyerFilter
 from .forms import (
     AggregatedCollectionPropertyValueModelForm,
@@ -108,7 +109,7 @@ class CollectorPublishedListView(PublishedObjectFilterView):
     dashboard_url = reverse_lazy("wastecollection-dashboard")
 
 
-class CollectorPrivateListView(PrivateObjectListView):
+class CollectorPrivateListView(PrivateObjectFilterView):
     model = Collector
     filterset_class = CollectorFilter
     dashboard_url = reverse_lazy("wastecollection-dashboard")
@@ -146,16 +147,12 @@ class CollectorModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Collector
 
 
-# ----------- Collector utilities --------------------------------------------------------------------------------------
+# ----------- Collector Utils ------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CollectorAutoCompleteView(Select2QuerySetView):
-    def get_queryset(self):
-        qs = Collector.objects.order_by("name")
-        if self.q:
-            qs = qs.filter(name__icontains=self.q)
-        return qs
+class CollectorAutocompleteView(UserCreatedObjectAutocompleteView):
+    model = Collector
 
 
 # ----------- Collection System CRUD -----------------------------------------------------------------------------------
@@ -456,6 +453,7 @@ class FrequencyCreateView(M2MInlineFormSetMixin, UserCreatedObjectCreateView):
     formset_factory_kwargs = {"extra": 0}
     relation_field_name = "seasons"
     permission_required = "soilcom.add_collectionfrequency"
+    template_name = "formsets_card.html"
 
     def get_formset_initial(self):
         return list(
@@ -499,6 +497,7 @@ class FrequencyUpdateView(M2MInlineFormSetMixin, UserCreatedObjectUpdateView):
     formset_helper_class = CollectionSeasonFormHelper
     formset_factory_kwargs = {"extra": 0}
     relation_field_name = "seasons"
+    template_name = "formsets_card.html"
 
     def get_formset_initial(self):
         initial = []
@@ -546,12 +545,8 @@ class FrequencyModalDeleteView(UserCreatedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class FrequencyAutoCompleteView(Select2QuerySetView):
-    def get_queryset(self):
-        qs = CollectionFrequency.objects.order_by("name")
-        if self.q:
-            qs = qs.filter(name__icontains=self.q)
-        return qs
+class FrequencyAutocompleteView(UserCreatedObjectAutocompleteView):
+    model = CollectionFrequency
 
 
 # ----------- CollectionPropertyValue CRUD -----------------------------------------------------------------------------
@@ -641,40 +636,39 @@ class CollectionCatchmentUpdateView(CatchmentUpdateView):
         return reverse("collectioncatchment-detail", kwargs={"pk": self.object.pk})
 
 
+class CollectionCatchmentModalDeleteView(UserCreatedObjectModalDeleteView):
+    model = CollectionCatchment
+
+    def get_success_url(self):
+        if self.object.publication_status == "published":
+            return f"{reverse('collectioncatchment-list')}?scope=published"
+        elif self.object.publication_status == "private":
+            return f"{reverse('collectioncatchment-list-owned')}?scope=private"
+
+
+# ----------- CollectionCatchment Utils -------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class CollectionCatchmentAutocompleteView(UserCreatedObjectAutocompleteView):
+    model = CollectionCatchment
+    geodataset_model_name = "WasteCollection"
+
+
 # ----------- Collection CRUD ------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CollectionCurrentPublishedListView(PublishedObjectFilterView):
+class CollectionPublishedListView(PublishedObjectFilterView):
     model = Collection
     filterset_class = CollectionFilterSet
     dashboard_url = reverse_lazy("wastecollection-dashboard")
 
-    def get_queryset(self):
-        queryset = super().get_queryset()
 
-        # Check if it's a GET request and no query parameters are present
-        # This implies that the user has just opened the page and no filtering has been applied yet.
-        if self.request.method == "GET" and not self.request.GET:
-            queryset = queryset.currently_valid()
-
-        return queryset
-
-
-class CollectionCurrentPrivateListView(PrivateObjectFilterView):
+class CollectionPrivateListView(PrivateObjectFilterView):
     model = Collection
     filterset_class = CollectionFilterSet
     dashboard_url = reverse_lazy("wastecollection-dashboard")
-
-    def get_queryset(self):
-        queryset = super().get_queryset()
-
-        # Check if it's a GET request and no query parameters are present
-        # This implies that the user has just opened the page and no filtering has been applied yet.
-        if self.request.method == "GET" and not self.request.GET:
-            queryset = queryset.currently_valid()
-
-        return queryset
 
 
 class CollectionCreateView(M2MInlineFormSetMixin, UserCreatedObjectCreateView):
@@ -854,19 +848,14 @@ class CollectionUpdateView(M2MInlineFormSetMixin, UserCreatedObjectUpdateView):
 
 class CollectionModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Collection
-    success_url = reverse_lazy("collection-list-owned")
 
 
-# ----------- Collection utils -----------------------------------------------------------------------------------------
+# ----------- Collection Utils -----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CollectionAutoCompleteView(Select2QuerySetView):
-    def get_queryset(self):
-        qs = Collection.objects.order_by("name")
-        if self.q:
-            qs = qs.filter(name__icontains=self.q)
-        return qs
+class CollectionAutocompleteView(UserCreatedObjectAutocompleteView):
+    model = Collection
 
 
 class CollectionListFileExportView(GenericUserCreatedObjectExportView):
@@ -989,6 +978,10 @@ class CollectionPredecessorsView(UserCreatedObjectUpdateView):
         return HttpResponseRedirect(self.get_success_url())
 
 
+class CollectionModalArchiveView(UserCreatedObjectModalArchiveView):
+    model = Collection
+
+
 # ----------- Maps -----------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -1031,6 +1024,13 @@ class WasteCollectionPublishedMapView(GeoDataSetPublishedFilteredMapView):
     map_title = "Household Waste Collections"
     dashboard_url = reverse_lazy("wastecollection-dashboard")
 
+    def get_filterset_kwargs(self, filterset_class=None):
+        kwargs = super().get_filterset_kwargs(filterset_class)
+        data = kwargs.get("data").copy() if kwargs.get("data") else {}
+        data["scope"] = "published"
+        kwargs["data"] = data
+        return kwargs
+
 
 class WasteCollectionPrivateMapView(GeoDataSetPrivateFilteredMapView):
     model_name = "WasteCollection"
@@ -1040,6 +1040,13 @@ class WasteCollectionPrivateMapView(GeoDataSetPrivateFilteredMapView):
     map_title = "My Household Waste Collections"
     dashboard_url = reverse_lazy("wastecollection-dashboard")
 
+    def get_filterset_kwargs(self, filterset_class=None):
+        kwargs = super().get_filterset_kwargs(filterset_class)
+        data = kwargs.get("data").copy() if kwargs.get("data") else {}
+        data["scope"] = "private"
+        kwargs["data"] = data
+        return kwargs
+
 
 @method_decorator(xframe_options_exempt, name="dispatch")
 class WasteCollectionPublishedMapIframeView(GeoDataSetPublishedFilteredMapView):
@@ -1048,3 +1055,10 @@ class WasteCollectionPublishedMapIframeView(GeoDataSetPublishedFilteredMapView):
     filterset_class = CollectionFilterSet
     features_layer_api_basename = "api-waste-collection"
     map_title = "Household Waste Collection Europe"
+
+    def get_filterset_kwargs(self, filterset_class=None):
+        kwargs = super().get_filterset_kwargs(filterset_class)
+        data = kwargs.get("data").copy() if kwargs.get("data") else {}
+        data["scope"] = "published"
+        kwargs["data"] = data
+        return kwargs

@@ -35,23 +35,23 @@
                     <div id="btn-edit-sample-series" class="collapse multi-collapse">
                         {% if user == object.owner or user.is_staff %}
                             <a href="{% url 'sampleseries-update' object.pk %}?next={{ request.path }}"
-                               class="nowrap mr-3">
+                               class="nowrap me-3">
                                 <i class="fas fa-fw fa-edit"></i> Edit
                             </a>
                             <a href="{% url 'sampleseries-duplicate' object.pk %}"
-                               class="nowrap mr-3">
+                               class="nowrap me-3">
                                 <i class="fas fa-fw fa-copy"></i> Duplicate
                             </a>
                             <a href="{% url 'sampleseries-add-distribution-modal' object.pk %}"
-                               class="modal-link nowrap mr-3">
+                               class="modal-link nowrap me-3">
                                 <i class="fas fa-fw fa-plus-circle"></i> Add distribution
                             </a>
                             <a href="{% url 'sampleseries-delete-modal' object.pk %}"
-                               class="modal-link nowrap mr-3">
+                               class="modal-link nowrap me-3">
                                 <i class="fas fa-fw fa-trash"></i> Delete
                             </a>
                         {% endif %}
-                        <a href="{% url 'materials-dashboard' %}" class="nowrap mr-3">
+                        <a href="{% url 'materials-dashboard' %}" class="nowrap me-3">
                             <i class="fas fa-fw fa-th-large"></i> Explorer
                         </a>
                     </div>

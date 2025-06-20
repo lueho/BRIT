@@ -4,132 +4,138 @@
 {% block title %}About{% endblock %}
 
 {% block content %}
-    <div class="card-deck">
-    <div class="card shadow">
-            <div class="card-header"><strong><i class="fas fa-fw fa-envelope"></i> Contact</strong></div>
-            <div class="card-body">
-                <p>Operated and maintained by:</p>
-                <address>
-                    <strong>Bioresource Management Group (BIEM)</strong><br>
-                    Hamburg University of Technology (TUHH)<br>
-                    Institute of Wastewater Management and Water Protection<br>
-                    Eißendorfer Str. 42, 21073 Hamburg, Germany<br><br>
-                    <strong>Contact:</strong> <br>Phillipp Lüssenhop<br>
-                    Email: <a href="mailto:info@bioresource-tools.net">info@bioresource-tools.net</a><br>
-                    Phone: (+49) 40 42878 4292
-                </address>
+    <div class="row row-cols-1 row-cols-md-2 row-cols-lg-3 g-4">
+        <div class="col">
+            <div class="card shadow h-100">
+                <div class="card-header"><strong><i class="fas fa-fw fa-envelope"></i> Contact</strong></div>
+                <div class="card-body">
+                    <p>Operated and maintained by:</p>
+                    <address>
+                        <strong>Bioresource Management Group (BIEM)</strong><br>
+                        Hamburg University of Technology (TUHH)<br>
+                        Institute of Wastewater Management and Water Protection<br>
+                        Eißendorfer Str. 42, 21073 Hamburg, Germany<br><br>
+                        <strong>Contact:</strong> <br>Phillipp Lüssenhop<br>
+                        Email: <a href="mailto:info@bioresource-tools.net">info@bioresource-tools.net</a><br>
+                        Phone: (+49) 40 42878 4292
+                    </address>
+                </div>
             </div>
         </div>
-        <div class="card shadow">
-            <div class="card-header"><strong><i class="fas fa-fw fa-scroll"></i> History</strong></div>
-            <div class="card-body">
-                <p>
-                    BRIT was significantly improved and extended in the SOILCOM project. The
-                    functionality of the core modules was adapted to fit the special needs of modelling the SOILCOM
-                    waste stream model. Further, the tool is extended with a completely new Household Waste Collection
-                    module and an interface with <a href="https://www.simucf.de">SimuCF</a>, a
-                    simulation tool for aerobic and anaerobic digestion processes. To find out more about the
-                    SOILCOM project and the associated partners, please visit: <a></a>
-                </p>
-                <p>
-                    <a class="d-flex align-items-center justify-content-center"
-                       href="https://northsearegion.eu/soilcom/" target="_blank">
-                        <img
-                                class="img-fluid"
-                                src="{% static 'img/soilcom_logo.png' %}"
-                                style="width: 50%"
-                                alt="Soilcom logo"
-                        >
-                    </a>
-                </p>
-                <p>
-                    <a href="https://northsearegion.eu/soilcom/" target="_blank">
-                        https://northsearegion.eu/soilcom/
-                    </a>
-                </p>
-                <p>SOILCOM is an Interreg North Sea Region project.</p>
-                <p>
-                    <a class="d-flex align-items-center justify-content-center"
-                       href="https://northsearegion.eu/" target="_blank">
-                        <img
-                                class="img-fluid"
-                                src="{% static 'img/interreg_with_soilcom_logo.png' %}"
-                                style="width: 50%"
-                                alt="Interreg with Soilcom logo"
-                        >
-                    </a>
-                </p>
-                <hr>
-                <p>
-                    The BRIT prototype was developed as part of the Decision Support Tool of the
-                    FLEXIBI project. The development in FLEXIBI included the core modules "Bibliography", "Maps",
-                    "Materials" and "Inventories" as well as models and data for the case studies "Greenhouses in
-                    Nantes" and "Roadside trees in Hamburg". To find out more about the project and all involved
-                    partners, please visit the official project website:
-                </p>
-                <a class="sidebar-brand d-flex align-items-center justify-content-center"
-                   href="http://www.flexibi-biorefineries.eu" target="_blank">
-                    <img
-                            class="img-fluid"
-                            src="{% static 'img/LOGO_Flexibi_Farbe.png' %}"
-                            style="width: 50%"
-                            alt="Flexibi logo"
-                    >
-                </a>
-                <p>
+        <div class="col">
+            <div class="card shadow h-100">
+                <div class="card-header"><strong><i class="fas fa-fw fa-scroll"></i> History</strong></div>
+                <div class="card-body">
+                    <p>
+                        BRIT was significantly improved and extended in the SOILCOM project. The
+                        functionality of the core modules was adapted to fit the special needs of modelling the SOILCOM
+                        waste stream model. Further, the tool is extended with a completely new Household Waste Collection
+                        module and an interface with <a href="https://www.simucf.de">SimuCF</a>, a
+                        simulation tool for aerobic and anaerobic digestion processes. To find out more about the
+                        SOILCOM project and the associated partners, please visit: <a></a>
+                    </p>
+                    <p>
+                        <a class="d-flex align-items-center justify-content-center"
+                           href="https://northsearegion.eu/soilcom/" target="_blank">
+                            <img
+                                    class="img-fluid"
+                                    src="{% static 'img/soilcom_logo.png' %}"
+                                    style="width: 50%"
+                                    alt="Soilcom logo"
+                            >
+                        </a>
+                    </p>
+                    <p>
+                        <a href="https://northsearegion.eu/soilcom/" target="_blank">
+                            https://northsearegion.eu/soilcom/
+                        </a>
+                    </p>
+                    <p>SOILCOM is an Interreg North Sea Region project.</p>
+                    <p>
+                        <a class="d-flex align-items-center justify-content-center"
+                           href="https://northsearegion.eu/" target="_blank">
+                            <img
+                                    class="img-fluid"
+                                    src="{% static 'img/interreg_with_soilcom_logo.png' %}"
+                                    style="width: 50%"
+                                    alt="Interreg with Soilcom logo"
+                            >
+                        </a>
+                    </p>
+                    <hr>
+                    <p>
+                        The BRIT prototype was developed as part of the Decision Support Tool of the
+                        FLEXIBI project. The development in FLEXIBI included the core modules "Bibliography", "Maps",
+                        "Materials" and "Inventories" as well as models and data for the case studies "Greenhouses in
+                        Nantes" and "Roadside trees in Hamburg". To find out more about the project and all involved
+                        partners, please visit the official project website:
+                    </p>
                     <a class="sidebar-brand d-flex align-items-center justify-content-center"
                        href="http://www.flexibi-biorefineries.eu" target="_blank">
-
-                    </a>
-                </p>
-                <p>
-                    <a href="http://www.flexibi-biorefineries.eu" target="_blank">
-                        http://www.flexibi-biorefineries.eu
-                    </a>
-                </p>
-                <p>
-                    FLEXIBI is a project of the ERA-NET
-                    <a href="https://projects.au.dk/faccesurplus/" target="_blank">FACCE SURPLUS</a>.
-                </p>
-                <p>
-                    <a class="d-flex align-items-center justify-content-center"
-                       href="https://projects.au.dk/faccesurplus/" target="_blank">
                         <img
-                                class="funding-logo"
-                                src="{% static 'img/facce-logo.png' %}"
-                                style="width: 80%"
-                                alt="Facce Surplus logo"
+                                class="img-fluid"
+                                src="{% static 'img/LOGO_Flexibi_Farbe.png' %}"
+                                style="width: 50%"
+                                alt="Flexibi logo"
                         >
                     </a>
-                </p>
+                    <p>
+                        <a class="sidebar-brand d-flex align-items-center justify-content-center"
+                           href="http://www.flexibi-biorefineries.eu" target="_blank">
 
+                        </a>
+                    </p>
+                    <p>
+                        <a href="http://www.flexibi-biorefineries.eu" target="_blank">
+                            http://www.flexibi-biorefineries.eu
+                        </a>
+                    </p>
+                    <p>
+                        FLEXIBI is a project of the ERA-NET
+                        <a href="https://projects.au.dk/faccesurplus/" target="_blank">FACCE SURPLUS</a>.
+                    </p>
+                    <p>
+                        <a class="d-flex align-items-center justify-content-center"
+                           href="https://projects.au.dk/faccesurplus/" target="_blank">
+                            <img
+                                    class="funding-logo"
+                                    src="{% static 'img/facce-logo.png' %}"
+                                    style="width: 80%"
+                                    alt="Facce Surplus logo"
+                            >
+                        </a>
+                    </p>
+
+                </div>
             </div>
         </div>
-        <div class="card shadow">
-            <div class="card-header"><strong><i class="fas fa-fw fa-coins"></i> Funding</strong></div>
-            <div class="card-body">
-                <p class="card-text">
-                    The development of the BRIT was enabled by funding from the following entities:
-                </p>
-                <p class="card-text">
-                    SOILCOM, as a project of the Interreg North Sea Region Programme has received funding from the
-                    European Union through the European Regional Development Fund.
-                </p>
-                <a href="https://northsearegion.eu/" target="_blank"><img class="w-100 m-0 p-1"
-                                                                  src="{% static 'img/interreg_with_soilcom_logo.png' %}"
-                                                                  alt="Logo of INTERREG North Sea Region SOILCOM Project">
-                                                                  </a>
-                <hr>
-                <p>
-                    The FLEXIBI has received funding from the German Federal Ministry of Education and Research.
-                </p>
-                <a href="https://www.bmbf.de/bmbf/en/home/home_node.html" target="_blank">
-                    <img
-                            class="funding-logo"
-                            src="{% static 'img/bmbf-logo.svg' %}"
-                            alt="Facce Surplus Logo"
-                    >
-                </a>
+        <div class="col">
+            <div class="card shadow h-100">
+                <div class="card-header"><strong><i class="fas fa-fw fa-coins"></i> Funding</strong></div>
+                <div class="card-body">
+                    <p class="card-text">
+                        The development of the BRIT was enabled by funding from the following entities:
+                    </p>
+                    <p class="card-text">
+                        SOILCOM, as a project of the Interreg North Sea Region Programme has received funding from the
+                        European Union through the European Regional Development Fund.
+                    </p>
+                    <a href="https://northsearegion.eu/" target="_blank"><img class="w-100 m-0 p-1"
+                                                                       src="{% static 'img/interreg_with_soilcom_logo.png' %}"
+                                                                       alt="Logo of INTERREG North Sea Region SOILCOM Project">
+                                                                       </a>
+                    <hr>
+                    <p>
+                        The FLEXIBI has received funding from the German Federal Ministry of Education and Research.
+                    </p>
+                    <a href="https://www.bmbf.de/EN/Home/home_node.html" target="_blank">
+                        <img
+                                class="funding-logo"
+                                src="{% static 'img/bmbf-logo.svg' %}"
+                                alt="Facce Surplus Logo"
+                        >
+                    </a>
+                </div>
             </div>
         </div>
     </div>

@@ -1,14 +1,15 @@
 from django.contrib.gis.db.models import PointField
-from django.db.models import CharField, ForeignKey, Model, PROTECT
+from django.db.models import PROTECT, CharField, ForeignKey, Model
 
 from maps.models import Region
-from utils.models import NamedUserCreatedObject
+from utils.object_management.models import NamedUserCreatedObject
 
 
 class Showcase(NamedUserCreatedObject):
     """
     Showcases are used in the CLOSECYCLE project to demonstrate possibilities or Territorial Biorefinery Hubs.
     """
+
     region = ForeignKey(Region, on_delete=PROTECT, null=True, blank=True)
 
 
@@ -28,4 +29,4 @@ class BiogasPlantsSweden(Model):
 
     class Meta:
         managed = False
-        db_table = 'closecycle_biogas_plants_sweden'
+        db_table = "closecycle_biogas_plants_sweden"

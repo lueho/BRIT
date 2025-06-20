@@ -1,0 +1,22 @@
+# Footer and Sidebar Footer Redesign Task
+
+- [x] Review `brit/templates/partials/_footer_old.html` for inspiration and existing content.
+- [x] Analyze current main footer (if any) and sidebar footer.
+- [x] Propose content and layout for the new main application footer.
+    - [x] Content: Full name 'Bioresource Information Tool (BRIT)', 'Bioresource Tools' initiative link, TUHH hosting info.
+    - [x] Links: Privacy, Imprint/About, Contact, TUHH, GitHub.
+    - [x] Omissions: No copyright notice, no version number.
+    - [x] Layout: Standard (not sticky), responsive (e.g., 3-column), no quick links.
+- [x] Propose content and layout for the new sidebar footer.
+    - [x] Content: 'Share Feedback' link to GitHub issues.
+    - [x] Omissions: No version number, no login status (handled by topbar).
+- [x] Discuss design ideas (alignment with overall theme, minimalism, responsiveness).
+    - [x] Topbar: Implemented `title="Bioresource Information Tool"` on BRIT brand link & `href` to `{% url 'home' %}` in `_topbar.html`.
+    - [x] Main Footer Styling: Standard, fit with current theme (e.g., `py-4 bg-light mt-auto`).
+    - [x] Sidebar Footer Styling: Consistent with sidebar theme.
+- [ ] Implement changes to the main footer partial (`brit/templates/partials/_footer.html`). (Revisiting for height reduction, content removal, and horizontal link layout on large screens)
+- [ ] Implement changes to the sidebar footer (within `brit/templates/partials/_sidebar.html`). (Revisiting for email feedback link)
+- [ ] Automated tests passed.
+- [ ] Test the display and functionality on different screen sizes (manual check).
+- [ ] Update any relevant documentation or create new ADR if architectural decisions are made.
+- [ ] Revisiting implementation based on new feedback. Previous summary may need updating.

@@ -4,6 +4,7 @@ Welcome to the BRIT User Guide. This section contains all user-facing documentat
 
 ## Recommended Reading Order
 - [How-Tos](01_user_guide/howtos.md)
+- [Developer Guide](02_developer_guide/README.md)
 
 ---
 

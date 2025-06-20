@@ -1,4 +1,10 @@
 {% extends 'simple_detail_card.html' %}
+{% load i18n %}
+{% load moderation_tags %}
+
+{% block detail_header_badge %}
+{% include 'object_management/review_status_badge.html' with object=object %}
+{% endblock %}
 
 {% block detail_body %}
     <p class="card-text">
@@ -6,11 +12,11 @@
         {{ object.name }}
     </p>
     <p class="card-text">
-        <strong>Catchment:</strong><br>
+       <strong>Catchment:</strong><br>
         <a href="{{ object.catchment.get_absolute_url }}">{{ object.catchment.name }}</a>
     </p>
     <p class="card-text">
-        <strong>Collector:</strong><br>
+         <strong>Collector:</strong><br>
         <a href="{{ object.collector.get_absolute_url }}">{{ object.collector.name }}</a>
     </p>
     <p class="card-text">
@@ -25,185 +31,280 @@
         <strong>Year:</strong><br>
         {{ object.valid_from|date:"Y" }}
     </p>
+    {% if object.connection_type %}
     <p class="card-text">
         <strong>Connection Type:</strong><br>
-        {% if object.connection_type %}
-            {% if object.connection_type == 'MANDATORY' %}Mandatory{% elif object.connection_type == 'VOLUNTARY' %}Voluntary{% elif object.connection_type == 'MANDATORY_WITH_HOME_COMPOSTER_EXCEPTION' %}Mandatory with exception for home composters{% elif object.connection_type == 'not_specified' %}Not specified{% else %}{{ object.connection_type }}{% endif %}
+        {% if object.connection_type == 'MANDATORY' %}
+        Mandatory
+        {% elif object.connection_type == 'VOLUNTARY' %}
+        Voluntary
+        {% elif object.connection_type == 'MANDATORY_WITH_HOME_COMPOSTER_EXCEPTION' %}
+        Mandatory with exception for home composters
+        {% elif object.connection_type == 'not_specified' %}
+        Not specified
         {% else %}
-            <span class="text-muted">—</span>
+        {{ object.connection_type }}
         {% endif %}
     </p>
-    {% if object.min_bin_size is not None or object.required_bin_capacity is not None or object.required_bin_capacity_reference %}
-        <p class="card-text">
-            <strong>Smallest available bin size (L):</strong><br>
-            {% if object.min_bin_size is not None %}
-                {{ object.min_bin_size }} L
+    {% endif %}
+    {% if object.min_bin_size %}
+    <p class="card-text">
+        <strong>Smallest available bin size (L):</strong><br>
+        {{ object.min_bin_size }} L
+    </p>
+    {% endif %}
+
+    {% if object.required_bin_capacity %}
+    <p class="card-text">
+        <strong>Required bin capacity:</strong><br>
+        {{ object.required_bin_capacity }} L
+        {% if object.required_bin_capacity_reference %}
+          {% if object.required_bin_capacity_reference == 'not_specified' %}
+            <span class="text-muted">(reference not specified)</span>
+          {% else %}
+            <span class="text-muted">per {{ object.required_bin_capacity_reference }}</span>
+          {% endif %}
+        {% endif %}
+    </p>
+    {% endif %}
+
+  {% if object.waste_stream.allowed_materials.exists %}
+    <p class="card-text"><strong>Allowed Materials:</strong></p>
+    <ul>
+      {% for material in object.waste_stream.allowed_materials.all %}
+        <li><a href="{{ material.get_absolute_url }}">{{ material }}</a></li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+  {% if object.waste_stream.forbidden_materials.exists %}
+    <p class="card-text"><strong>Forbidden Materials:</strong></p>
+    <ul>
+      {% for material in object.waste_stream.forbidden_materials.all %}
+        <li><a href="{{ material.get_absolute_url }}">{{ material }}</a></li>
+      {% endfor %}
+    </ul>
+{% endif %}
+
+{% if object.frequency %}
+    <p class="card-text"><strong>Frequency:</strong><br>
+        Total number of collections per season:</p>
+    <ul>
+    {% for opt in object.frequency.collectioncountoptions_set.all %}
+      <li>
+            {{ opt.season }}: Standard: {{ opt.standard }}
+        {% if opt.non_standard_options %}
+          (Options:
+          {% for non_standard_option in opt.non_standard_options %}
+            {{ non_standard_option }}{% if not forloop.last %}, {% endif %}
+            {% endfor %})
+        {% endif %}
+      </li>
+    {% endfor %}
+  </ul>
+{% endif %}
+
+{% if object.fee_system %}
+    <p class="card-text">
+        <strong>Fee System:</strong><br>
+        {{ object.fee_system.name }}
+    </p>
+{% endif %}
+
+{% if object.collectionpropertyvalue_set.exists %}
+    {% regroup object.collectionpropertyvalue_set.all by property as property_list %}
+    {% for prop in property_list %}
+    <p class="card-text"><strong>{{ prop.grouper.name|title }}:</strong></p>
+    <ul>
+        {% for val in prop.list|dictsortreversed:"year" %}
+        <li><a href="{{ val.get_absolute_url }}">
+                {% if val.standard_deviation %}
+                {{ val.average }} ± {{ val.standard_deviation }} {{ val.unit.name }} (
+            {{ val.year }})
             {% else %}
-                <span class="text-muted">—</span>
+            {{ val.average }} {{ val.unit.name }} ({{ val.year }})
             {% endif %}
-        </p>
-        <p class="card-text">
-            <strong>Required bin capacity:</strong><br>
-            {% if object.required_bin_capacity is not None %}
-                {{ object.required_bin_capacity }} L
-                {% if object.required_bin_capacity_reference %}
-                    {% if object.required_bin_capacity_reference == 'not_specified' %}
-                        <span class="text-muted">(reference not specified)</span>
-                    {% else %}
-                        <span class="text-muted">per {{ object.required_bin_capacity_reference }}</span>
-                    {% endif %}
-                {% endif %}
+        </a></li>
+        {% endfor %}
+    </ul>
+    {% endfor %}
+{% endif %}
+
+{% if object.aggregatedcollectionpropertyvalue_set.exists %}
+    {% regroup object.aggregatedcollectionpropertyvalue_set.all by property as property_list %}
+    {% for prop in property_list %}
+    <p class="card-text"><strong>{{ prop.grouper.name|title }}:</strong></p>
+    <ul>
+        {% for val in prop.list|dictsortreversed:"year" %}
+        <li><a href="{{ val.get_absolute_url }}">
+                {% if val.standard_deviation %}
+                {{ val.average }} ± {{ val.standard_deviation }} {{ val.unit.name }} (
+            {{ val.year }}) (aggregated)
             {% else %}
-                <span class="text-muted">—</span>
+            {{ val.average }} {{ val.unit.name }} ({{ val.year }}) (aggregated)
             {% endif %}
-        </p>
-    {% endif %}
-    {% if object.waste_stream.allowed_materials.exists %}
-        <p class="card-text"><strong>Allowed Materials:</strong></p>
-        <ul>
-            {% for material in object.waste_stream.allowed_materials.all %}
-                <li><a href="{{ material.get_absolute_url }}">{{ material }}</a></li>
-            {% endfor %}
-        </ul>
-    {% endif %}
-
-    {% if object.waste_stream.forbidden_materials.exists %}
-        <p class="card-text"><strong>Forbidden Materials:</strong></p>
-        <ul>
-            {% for material in object.waste_stream.forbidden_materials.all %}
-                <li><a href="{{ material.get_absolute_url }}">{{ material }}</a></li>
-            {% endfor %}
-        </ul>
-    {% endif %}
-
-    {% if object.frequency %}
-        <p class="card-text"><strong>Frequency:</strong><br>
-            Total number of collections per season:</p>
-        <ul>
-            {% for opt in object.frequency.collectioncountoptions_set.all %}
-                <li>
-                    {{ opt.season }}: Standard: {{ opt.standard }}
-                    {% if opt.non_standard_options %}
-                        (Options:
-                        {% for non_standard_option in opt.non_standard_options %}
-                            {{ non_standard_option }}{% if not forloop.last %}, {% endif %}
-                        {% endfor %})
-                    {% endif %}
-                </li>
-            {% endfor %}
-        </ul>
-    {% endif %}
-
-    {% if object.fee_system %}
-        <p class="card-text">
-            <strong>Fee System:</strong><br>
-            {{ object.fee_system.name }}
-        </p>
-    {% endif %}
-
-    {% if object.collectionpropertyvalue_set.exists %}
-        {% regroup object.collectionpropertyvalue_set.all by property as property_list %}
-        {% for prop in property_list %}
-            <p class="card-text"><strong>{{ prop.grouper.name|title }}:</strong></p>
-            <ul>
-                {% for val in prop.list|dictsortreversed:"year" %}
-                    <li><a href="{{ val.get_absolute_url }}">
-                        {% if val.standard_deviation %}
-                            {{ val.average }} ± {{ val.standard_deviation }} {{ val.unit.name }} (
-                            {{ val.year }})
-                        {% else %}
-                            {{ val.average }} {{ val.unit.name }} ({{ val.year }})
-                        {% endif %}
-                    </a></li>
-                {% endfor %}
-            </ul>
+        </a></li>
         {% endfor %}
-    {% endif %}
+    </ul>
+    {% endfor %}
+{% endif %}
 
-    {% if object.aggregatedcollectionpropertyvalue_set.exists %}
-        {% regroup object.aggregatedcollectionpropertyvalue_set.all by property as property_list %}
-        {% for prop in property_list %}
-            <p class="card-text"><strong>{{ prop.grouper.name|title }}:</strong></p>
-            <ul>
-                {% for val in prop.list|dictsortreversed:"year" %}
-                    <li><a href="{{ val.get_absolute_url }}">
-                        {% if val.standard_deviation %}
-                            {{ val.average }} ± {{ val.standard_deviation }} {{ val.unit.name }} (
-                            {{ val.year }}) (aggregated)
-                        {% else %}
-                            {{ val.average }} {{ val.unit.name }} ({{ val.year }}) (aggregated)
-                        {% endif %}
-                    </a></li>
-                {% endfor %}
-            </ul>
+{% if object.samples.exists %}
+    <p class="card-text"><strong>Samples</strong></p>
+    <ul>
+        {% for sample in object.samples.all %}
+        <li><a href="{{ sample.get_absolute_url }}">{{ sample.name }}</a></li>
         {% endfor %}
-    {% endif %}
+    </ul>
+{% endif %}
 
-    {% if object.samples.exists %}
-        <p class="card-text"><strong>Samples</strong></p>
-        <ul>
-            {% for sample in object.samples.all %}
-                <li><a href="{{ sample.get_absolute_url }}">{{ sample.name }}</a></li>
-            {% endfor %}
-        </ul>
-    {% endif %}
+{% if object.flyers.exists %}
+    <p class="card-text"><strong>Sources:</strong></p>
+    <ul>
+        {% for flyer in object.flyers.all %}
+        <li><a href="{{ flyer.url }}" target="blank">{{ flyer.url }}</a></li>
+        {% endfor %}
+    </ul>
+{% endif %}
 
-    {% if object.flyers.exists %}
-        <p class="card-text"><strong>Sources:</strong></p>
-        <ul>
-            {% for flyer in object.flyers.all %}
-                <li><a href="{{ flyer.url }}" target="blank">{{ flyer.url }}</a></li>
-            {% endfor %}
-        </ul>
-    {% endif %}
-
-    {% if object.description %}
-        <p class="card-text"><strong>Comments:</strong><br>{{ object.description }}</p>
-    {% endif %}
+{% if object.description %}
+    <p class="card-text"><strong>Comments:</strong><br>{{ object.description }}</p>
+{% endif %}
 
     <p class="card-text">
         <strong>Last update:</strong><br>
         {{ object.lastmodified_at|date:"d.m.Y" }}
     </p>
-    {% if object.predecessors.exists %}
-        <strong>Predecessors:</strong><br>
-        <ul>
-            {% for collection in object.predecessors.all %}
-                <li>
-                    <a href="{{ object.predecessors.first.get_absolute_url }}">{{ object.predecessors.first }}</a>
-                </li>
-            {% endfor %}
-        </ul>
-    {% endif %}
-    {% if object.successors.exists %}
-        <strong>Successors:</strong><br>
-        <ul>
-            {% for collection in object.successors.all %}
-                <li>
-                    <a href="{{ object.successors.first.get_absolute_url }}">{{ object.successors.first }}</a>
-                </li>
-            {% endfor %}
-        </ul>
-    {% endif %}
+{% if object.predecessors.exists %}
+    <strong>Predecessors:</strong><br>
+    <ul>
+        {% for predecessor_collection in object.predecessors.all %}
+        <li>
+            <a href="{{ predecessor_collection.get_absolute_url }}">{{ predecessor_collection }}</a>
+        </li>
+        {% endfor %}
+    </ul>
+{% endif %}
+{% if object.successors.exists %}
+    <strong>Successors:</strong><br>
+    <ul>
+        {% for  successor_collection in object.successors.all %}
+        <li>
+            <a href="{{ successor_collection.get_absolute_url }}">{{ successor_collection }}</a>
+        </li>
+        {% endfor %}
+    </ul>
+{% endif %}
 {% endblock detail_body %}
 
-{% block detail_footer %}
-    <a href="javascript:history.go(-1)"><i class="fas fa-fw fa-arrow-left"></i> back</a>
-    <a href="{% url 'collection-list' %}" class="nowrap ml-3">
-        <i class="fas fa-fw fa-list"></i> see all
-    </a>
-    {% if user == object.owner or user.is_staff %}
-        <a href="{% url 'collection-update' object.id %}" class="nowrap ml-3">
-            <i class="fas fa-fw fa-edit"></i> edit</a>
-        <a href="{% url 'collection-wastesamples' object.id %}" class="nowrap ml-3">
-            <i class="fas fa-fw fa-edit"></i> manage samples</a>
-        <a href="{% url 'collection-add-property' object.id %}" class="nowrap ml-3">
-            <i class="fas fa-fw fa-plus-circle"></i> add property</a>
-        <a href="{% url 'collection-copy' object.id %}" class="nowrap ml-3">
-            <i class="fas fa-fw fa-copy"></i> duplicate</a>
-        <a href="{% url 'collection-new-version'  object.id %}" class="nowrap ml-3">
-            <i class="fas fa-fw fa-code-branch"></i> new version</a>
-        <a href="{% url 'collection-delete-modal' object.id %}" class="nowrap modal-link ml-3">
-            <i class="fas fa-fw fa-trash"></i> delete</a>
+{% trans "Are you sure you want to submit this for review?" as submit_confirm %}
+{% trans "Are you sure you want to withdraw this from review?" as withdraw_confirm %}
+{% trans "Are you sure you want to approve this?" as approve_confirm %}
+{% trans "Are you sure you want to reject this?" as reject_confirm %}
+
+{% block detail_card_navigation_dropdown %}
+    <div class="dropdown">
+        <button class="btn btn-secondary dropdown-toggle mr-3" type="button"
+                id="collectionDetailNavigateDropdown"
+                data-bs-toggle="dropdown" aria-expanded="false">
+            Navigate
+        </button>
+        <div class="dropdown-menu" aria-labelledby="collectionDetailNavigateDropdown">
+            {% block detail_back_button %}
+                <a class="dropdown-item" href="javascript:history.go(-1)">
+                    <i class="fas fa-fw fa-arrow-left"></i> Back
+                </a>
+            {% endblock detail_back_button %}
+            {% block detail_list_link %}
+                <a class="dropdown-item" href="{% url 'collection-list' %}">
+                    <i class="fas fa-fw fa-list"></i> See all
+                </a>
+            {% endblock detail_list_link %}
+            {% block detail_card_navigation_dropdown_additional_links %}{% endblock %}
+        </div>
+    </div>
+{% endblock detail_card_navigation_dropdown %}
+
+{% block detail_card_options_dropdown %}
+    {% if user == object.owner or user.is_staff or user.is_staff or perms.can_moderate %}
+    <div class="dropdown">
+        <button class="btn btn-secondary dropdown-toggle mr-3" type="button"
+                id="collectionDetailOptionsDropdown"
+                data-bs-toggle="dropdown" aria-expanded="false">
+            Options
+        </button>
+        <div class="dropdown-menu" aria-labelledby="collectionDetailOptionsDropdown">
+            {% block detail_update_link %}
+                {% if user == object.owner or user.is_staff %}
+                <a class="dropdown-item" href="{% url 'collection-update' object.id %}">
+                    <i class="fas fa-fw fa-edit"></i> Edit
+                </a>
+                {% endif %}
+            {% endblock detail_update_link %}
+            <a class="dropdown-item" href="{% url 'collection-wastesamples' object.id %}">
+                <i class="fas fa-fw fa-edit"></i> Manage samples
+            </a>
+            <a class="dropdown-item" href="{% url 'collection-add-property' object.id %}">
+                <i class="fas fa-fw fa-plus-circle"></i> Add property
+            </a>
+            <a class="dropdown-item" href="{% url 'collection-copy' object.id %}">
+                <i class="fas fa-fw fa-copy"></i> Duplicate
+            </a>
+            <a class="dropdown-item" href="{% url 'collection-new-version' object.id %}">
+                <i class="fas fa-fw fa-code-branch"></i> New version
+            </a>
+            {% block detail_delete_link %}
+                {% if user == object.owner or user.is_staff %}
+                <a class="dropdown-item modal-link" href="{% url 'collection-delete-modal' object.id %}">
+                    <i class="fas fa-fw fa-trash"></i> Delete
+                </a>
+                {% endif %}
+            {% endblock detail_delete_link %}
+            {% if object.publication_status == object.STATUS_PUBLISHED %}
+                <a class="dropdown-item modal-link" href="{% url 'collection-archive-modal' object.id %}">
+                    <i class="fas fa-fw fa-archive"></i> Archive
+                </a>
+            {% endif %}
+            {# --- Review actions start --- #}
+            {% if object.is_private %}
+                {% if user == object.owner or user.is_staff %}
+                <form method="post" action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}" class="dropdown-item p-0 m-0 border-0 bg-transparent">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-link text-start dropdown-item" style="white-space:normal;" onclick="return confirm('{{ submit_confirm }}')">
+                        <i class="fas fa-paper-plane"></i> {% trans "Submit for Review" %}
+                    </button>
+                </form>
+                {% endif %}
+            {% endif %}
+            {% if object.is_in_review %}
+                {% if user == object.owner or user.is_staff %}
+                <form method="post" action="{% url 'object_management:withdraw_from_review' content_type_id=object|get_content_type_id object_id=object.id %}" class="dropdown-item p-0 m-0 border-0 bg-transparent">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-link text-start dropdown-item" style="white-space:normal;" onclick="return confirm('{{ withdraw_confirm }}')">
+                        <i class="fas fa-undo"></i> {% trans "Withdraw from Review" %}
+                    </button>
+                </form>
+                {% endif %}
+            {% endif %}
+            {% if object.is_in_review %}
+                {% if user.is_staff or perms.can_moderate %}
+                    <div class="dropdown-divider"></div>
+                    <form method="post" action="{% url 'object_management:approve_item' content_type_id=object|get_content_type_id object_id=object.id %}" class="dropdown-item p-0 m-0 border-0 bg-transparent">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-link text-start dropdown-item" style="white-space:normal;" onclick="return confirm('{{ approve_confirm }}')">
+                            <i class="fas fa-check"></i> {% trans "Approve" %}
+                        </button>
+                    </form>
+                    <form method="post" action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}" class="dropdown-item p-0 m-0 border-0 bg-transparent">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-link text-start dropdown-item" style="white-space:normal;" onclick="return confirm('{{ reject_confirm }}')">
+                            <i class="fas fa-times"></i> {% trans "Reject" %}
+                        </button>
+                    </form>
+                {% endif %}
+            {% endif %}
+            {# --- Review actions end --- #}
+            {% block detail_card_options_dropdown_additional_links %}{% endblock %}
+        </div>
+    </div>
     {% endif %}
-{% endblock detail_footer %}
+{% endblock detail_card_options_dropdown %}

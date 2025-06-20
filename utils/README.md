@@ -69,7 +69,7 @@ The Utils app provides several base models that can be used by other apps:
 A mixin that provides URL generation methods for CRUD operations.
 
 ```python
-from utils.models import CRUDUrlsMixin
+from utils.object_management.models import CRUDUrlsMixin
 
 class MyModel(CRUDUrlsMixin, models.Model):
     name = models.CharField(max_length=255)
@@ -86,7 +86,7 @@ class MyModel(CRUDUrlsMixin, models.Model):
 A base model for globally accessible objects.
 
 ```python
-from utils.models import GlobalObject
+from utils.object_management.models import GlobalObject
 
 class MyGlobalModel(GlobalObject):
     name = models.CharField(max_length=255)
@@ -97,7 +97,7 @@ class MyGlobalModel(GlobalObject):
 A base model for objects created by users with publication status.
 
 ```python
-from utils.models import UserCreatedObject
+from utils.object_management.models import UserCreatedObject
 
 class MyUserCreatedModel(UserCreatedObject):
     name = models.CharField(max_length=255)
@@ -108,7 +108,7 @@ class MyUserCreatedModel(UserCreatedObject):
 An extension of UserCreatedObject with a name field.
 
 ```python
-from utils.models import NamedUserCreatedObject
+from utils.object_management.models import NamedUserCreatedObject
 
 class MyNamedUserCreatedModel(NamedUserCreatedObject):
     # The name field is already provided by NamedUserCreatedObject
@@ -193,7 +193,7 @@ The Utils app provides several filter classes for use with django-filter:
 ### Creating a User-Created Model
 
 ```python
-from utils.models import NamedUserCreatedObject
+from utils.object_management.models import NamedUserCreatedObject
 
 class MyModel(NamedUserCreatedObject):
     description = models.TextField()
@@ -205,7 +205,7 @@ class MyModel(NamedUserCreatedObject):
 ### Creating CRUD Views for a User-Created Model
 
 ```python
-from utils.views import (
+from utils.object_management.views import (
     PublishedObjectListView, PrivateObjectListView,
     UserCreatedObjectCreateView, UserCreatedObjectDetailView,
     UserCreatedObjectUpdateView, UserCreatedObjectDeleteView

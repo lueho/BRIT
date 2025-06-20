@@ -1,11 +1,11 @@
-<div class="form-row">
+<div class="row g-3">
     <div class="col-12">
         <!-- Grouped Container for Slider, Label, and Checkbox -->
         <div class="slider-checkbox-group p-3 border rounded bg-light">
             <!-- Slider -->
             <div class="form-group">
                 <div
-                    class="numeric-slider-range ui-slider ui-slider-horizontal ui-slider-range"
+                    class="numeric-slider-range"
                     id="{{ widget.attrs.id }}"
                     {% include "django/forms/widgets/attrs.html" %}
                 ></div>
@@ -14,7 +14,7 @@
             <!-- Slider Value Label -->
             <div class="form-group">
                 <span
-                    class="numeric-slider-range-text font-italic"
+                    class="numeric-slider-range-text fst-italic"
                     id="{{ widget.attrs.id }}_text"
                 >
                     {{ widget.value_text }}
@@ -23,18 +23,18 @@
 
             <!-- Unknown Checkbox -->
             <div class="form-group">
-                <div class="custom-control custom-checkbox">
+                <div class="form-check">
                     <input
-                        class="checkbox-include-unknown custom-control-input"
+                        class="checkbox-include-unknown form-check-input"
                         type="checkbox"
                         id="{{ widget.attrs.id }}_unknown"
                     >
-                    <label class="custom-control-label" for="{{ widget.attrs.id }}_unknown">
+                    <label class="form-check-label" for="{{ widget.attrs.id }}_unknown">
                         Include Unknown
                     </label>
-                    <small class="form-text text-muted">
+                    <div class="form-text">
                         Selecting "Include Unknown" will add null values to your range.
-                    </small>
+                    </div>
                 </div>
             </div>
         </div>

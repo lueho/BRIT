@@ -1,0 +1,114 @@
+{% comment %}
+    Django-TomSelect formset add button - Include this to add a button that will add new form rows to a formset
+    
+    Parameters:
+    - formset_prefix: The prefix used in your formset (e.g., 'form')
+    - button_text: Text to show on the add button (default: "Add Another")
+    - button_class: CSS class for the button (default: "btn btn-secondary")
+    - container_id: ID of the container holding the formset forms (default: "form-container")
+    
+    Usage example:
+    {% include "django_tomselect/formset_add_button.html" with formset_prefix="edition" button_text="Add Another Edition" %}
+{% endcomment %}
+
+{% with button_text=button_text|default:"Add Another" %}
+{% with button_class=button_class|default:"btn btn-secondary" %}
+{% with container_id=container_id|default:"form-container" %}
+
+<button type="button" class="{{ button_class }}" id="add-{{ formset_prefix }}-form">{{ button_text }}</button>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const addButton = document.getElementById('add-{{ formset_prefix }}-form');
+        const formContainer = document.getElementById('{{ container_id }}');
+        const totalForms = document.getElementById('id_{{ formset_prefix }}-TOTAL_FORMS');
+        
+        if (addButton && formContainer && totalForms) {
+            addButton.addEventListener('click', function() {
+                const formCount = parseInt(totalForms.value);
+                
+                // If there are no existing forms, we can't clone
+                if (formContainer.children.length === 0) {
+                    console.error('Cannot add form: No template form found to clone');
+                    return;
+                }
+                
+                // Get the first form as a template
+                const firstForm = formContainer.children[0];
+                
+                // Create a new container for the cloned form
+                const container = document.createElement('div');
+                container.className = firstForm.className;
+                
+                // Clone the form structure
+                const formStructure = firstForm.cloneNode(true);
+                
+                // Update form indices in IDs and names
+                formStructure.innerHTML = formStructure.innerHTML
+                    .replace(new RegExp(`${formset_prefix}-(\\d+)`, 'g'), `{{ formset_prefix }}-${formCount}`);
+                
+                // Clear input values
+                formStructure.querySelectorAll('input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"])').forEach(input => {
+                    input.value = '';
+                });
+                
+                // Reset checkboxes and radio buttons
+                formStructure.querySelectorAll('input[type="checkbox"], input[type="radio"]').forEach(input => {
+                    input.checked = false;
+                });
+                
+                // Clear text areas
+                formStructure.querySelectorAll('textarea').forEach(textarea => {
+                    textarea.value = '';
+                });
+                
+                // Reset select elements that don't have data-tomselect attribute
+                formStructure.querySelectorAll('select:not([data-tomselect])').forEach(select => {
+                    select.selectedIndex = 0;
+                });
+                
+                // Clean up TomSelect elements
+                formStructure.querySelectorAll('select[data-tomselect]').forEach(selectElement => {
+                    // Get the original TomSelect config if available
+                    const originalId = selectElement.id.replace(new RegExp(`${formset_prefix}-${formCount}`), `{{ formset_prefix }}-0`);
+                    const originalSelect = document.getElementById(originalId);
+                    const initialConfig = window.djangoTomSelect && originalSelect ? 
+                        window.djangoTomSelect.configs.get(originalId) : null;
+                    
+                    // Remove any TomSelect wrappers
+                    const parentElement = selectElement.parentElement;
+                    parentElement.querySelectorAll('.ts-wrapper').forEach(wrapper => wrapper.remove());
+                    
+                    // Clean the select element
+                    selectElement.className = selectElement.className
+                        .replace(/\btomselected\b/g, '')
+                        .replace(/\bts-hidden-accessible\b/g, '');
+                    selectElement.style.display = '';
+                    selectElement.removeAttribute('tabindex');
+                    selectElement.removeAttribute('data-ts-hidden');
+                    
+                    // Prepare the element for TomSelect initialization
+                    if (window.djangoTomSelect && window.djangoTomSelect.prepareElement) {
+                        window.djangoTomSelect.prepareElement(selectElement);
+                    }
+                });
+                
+                // Append the clean form to the container
+                container.appendChild(formStructure);
+                formContainer.appendChild(container);
+                
+                // Update the total forms count
+                totalForms.value = formCount + 1;
+                
+                // Reinitialize TomSelect for the new form elements
+                if (window.djangoTomSelect && window.djangoTomSelect.reinitialize) {
+                    window.djangoTomSelect.reinitialize(container);
+                }
+            });
+        }
+    });
+</script>
+
+{% endwith %}
+{% endwith %}
+{% endwith %}

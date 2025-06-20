@@ -1,0 +1,25 @@
+{% load i18n %}
+{% load static %}
+<link rel="stylesheet" href="{% static 'css/review_status_badge.min.css' %}">
+
+
+{% if object.is_private %}
+<span class="review-status-badge review-status-private" title="{% trans 'Private' %}">
+    <i class="fas fa-lock"></i> {% trans "Private" %}
+</span>
+{% elif object.is_in_review %}
+<span class="review-status-badge review-status-in-review"
+    title="{% trans 'In Review' %}{% if object.submitted_at %} - {{ object.submitted_at|date:'Y-m-d H:i' }}{% endif %}">
+    <i class="fas fa-search"></i> {% trans "In Review" %}
+</span>
+{% elif object.is_published %}
+<span class="review-status-badge review-status-published"
+    title="{% trans 'Published' %}{% if object.approved_at %} - {{ object.approved_at|date:'Y-m-d H:i' }}{% endif %}">
+    <i class="fas fa-globe"></i> {% trans "Published" %}
+</span>
+{% elif object.is_archived %}
+<span class="review-status-badge review-status-archived"
+    title="{% trans 'Archived' %}{% if object.archived_at %} - {{ object.archived_at|date:'Y-m-d H:i' }}{% endif %}">
+    <i class="fas fa-archive"></i> {% trans "Archived" %}
+</span>
+{% endif %}
