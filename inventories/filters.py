@@ -10,7 +10,7 @@ from .models import Scenario
 
 class ScenarioFilterSet(UserCreatedObjectScopedFilterSet):
     name = ModelChoiceFilter(
-        queryset=Scenario.objects.none(),
+        queryset=Scenario.objects.all(),
         field_name="name",
         label="Name",
         widget=TomSelectModelWidget(
