@@ -21,7 +21,7 @@
     <div class="col-12 col-md-6 col-lg-4 mb-4">
       <div class="card shadow h-100">
         <div class="card-header">
-          <a href="{% url 'processes:type_detail' p.id %}"><strong>{{ p.name }}</strong></a>
+          <a href="{% if p.url_name %}{% url p.url_name %}{% else %}{% url 'processes:type_detail' p.id %}{% endif %}"><strong>{{ p.name }}</strong></a>
           <span class="badge badge-secondary float-end">{{ p.category }}</span>
         </div>
         <div class="card-body">
@@ -56,7 +56,7 @@
               Navigate
             </button>
             <div class="dropdown-menu" aria-labelledby="navDropdown{{ p.id }}">
-              <a class="dropdown-item" href="{% url 'processes:type_detail' p.id %}">Process details</a>
+              <a class="dropdown-item" href="{% if p.url_name %}{% url p.url_name %}{% else %}{% url 'processes:type_detail' p.id %}{% endif %}">Process details</a>
             </div>
           </div>
         </div>

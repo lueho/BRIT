@@ -1,59 +1,87 @@
 {% extends "simple_detail_card.html" %}
+{% load static %}
 
-{% block title %}{% if perms.processes.access_app_feature %}BRIT | {{ process.name }} details (Mock){% endif %}{% endblock %}
+{% block title %}{% if perms.processes.access_app_feature %}BRIT | Process Technology: {{ process.name }} (Mock){% endif %}{% endblock %}
 
-{% block detail_header %}{% if perms.processes.access_app_feature %}{{ process.name }} (Mock){% endif %}{% endblock detail_header %}
+{% block detail_header %}{% if perms.processes.access_app_feature %}Process Technology: {{ process.name }} (Mock){% endif %}{% endblock detail_header %}
 
 {% block detail_body %}
 {% if perms.processes.access_app_feature %}
-<p><strong>Name:</strong> {{ process.name }}</p>
-<p><strong>Category:</strong> {{ process.category }}</p>
-<p><strong>Mechanism:</strong> {{ process.mechanism }}</p>
-<p><strong>Temperature range:</strong> {{ process.temperature_min }} – {{ process.temperature_max }} °C</p>
-<p><strong>Yield:</strong> {{ process.yield_percentage }}%</p>
-<p><strong>Description:</strong><br>{{ process.description|safe }}</p>
-<p><strong>Input Materials:</strong>
-  <ul>
-    {% for m in process.input %}
-      <li><a href="{% url 'processes:mock_material_detail' m.id %}">{{ m.name }}</a></li>
-    {% endfor %}
-  </ul>
-</p>
-<p><strong>Output Materials:</strong>
-  <ul>
-    {% for m in process.output %}
-      <li><a href="{% url 'processes:mock_material_detail' m.id %}">{{ m.name }}</a></li>
-    {% endfor %}
-  </ul>
-</p>
-{% if process.sources %}
-    <p>
-      <strong>Sources:</strong>
-      <ul class="mb-0">
+<div class="row">
+  <div class="col-md-4 text-center mb-3 mb-md-0">
+    {% comment %} Add conditional image based on process type {% endcomment %}
+    {% if 'steam' in process.name|lower %}
+      <img src="{% static 'img/steam_reactor.jpg' %}" alt="{{ process.name }} process" class="img-fluid rounded shadow-sm">
+    {% elif 'liquor' in process.name|lower %}
+      <img src="{% static 'img/liquor_circulation_reactor.jpg' %}" alt="{{ process.name }} process" class="img-fluid rounded shadow-sm">
+    {% elif 'tube' in process.name|lower %}
+      <img src="{% static 'img/horizontal_tube_reactor.jpg' %}" alt="{{ process.name }} process" class="img-fluid rounded shadow-sm">
+    {% else %}
+      <img src="{% static 'img/processes_cover_card.png' %}" alt="{{ process.name }} process" class="img-fluid rounded shadow-sm">
+    {% endif %}
+  </div>
+
+  <div class="col-md-8">
+    <dl class="row">
+      <dt class="col-sm-3">Temperature</dt>
+      <dd class="col-sm-9">{{ process.temperature_min }} – {{ process.temperature_max }} °C</dd>
+
+      <dt class="col-sm-3">Yield</dt>
+      <dd class="col-sm-9">{{ process.yield_percentage }}%</dd>
+    </dl>
+
+    <h5 class="mt-4">Description</h5>
+    <p>{{ process.description|safe }}</p>
+
+    {% if process.info_charts %}
+    <div class="mt-4">
+        <h5>Info Charts</h5>
+        {% for chart in process.info_charts %}
+            <a href="#" class="btn btn-sm btn-outline-info mb-1">{{ chart.name }}</a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="mt-4">
+      <h5>Input Materials</h5>
+      {% for m in process.input %}
+        <a href="{% url 'processes:mock_material_detail' m.id %}" class="btn btn-sm btn-outline-primary mb-1">{{ m.name }}</a>
+      {% endfor %}
+    </div>
+
+    <div class="mt-4">
+      <h5>Output Materials</h5>
+      {% for m in process.output %}
+        <a href="{% url 'processes:mock_material_detail' m.id %}" class="btn btn-sm btn-outline-success mb-1">{{ m.name }}</a>
+      {% endfor %}
+    </div>
+
+    {% if process.sources %}
+    <div class="mt-4">
+      <h5>Literature</h5>
+      <ul class="list-unstyled mb-0">
         {% for source in process.sources %}
           <li>
             {% if source.url %}
-              <a href="{{ source.url }}" target="_blank">{{ source.title|default:source.url }}</a>
+              <a href="{{ source.url }}" target="_blank">{{ source.title|default:source.url }} <i class="fas fa-external-link-alt fa-xs"></i></a>
             {% else %}
               {{ source.title|default:source }}
             {% endif %}
           </li>
         {% endfor %}
       </ul>
-    </p>
-{% endif %}
+    </div>
+    {% endif %}
+  </div>
+</div>
 {% endif %}
 {% endblock detail_body %}
 
 {% block detail_footer %}
 {% if perms.processes.access_app_feature %}
-  <div class="dropdown mb-3">
-    <button class="btn btn-secondary dropdown-toggle me-3" type="button" id="navDropdownDetail" data-bs-toggle="dropdown" aria-expanded="false">
-      Navigate
-    </button>
-    <div class="dropdown-menu" aria-labelledby="navDropdownDetail">
-      <a class="dropdown-item" href="{% url 'processes:type_list' %}">Process List</a>
-      <a class="dropdown-item" href="{% url 'processes:dashboard' %}">Dashboard</a>
+  <div class="d-flex justify-content-end">
+    <div class="btn-group">
+      <a href="{% url 'processes:mock_process_overview' %}" class="btn btn-secondary">Back to Process Overview</a>
     </div>
   </div>
 {% endif %}
