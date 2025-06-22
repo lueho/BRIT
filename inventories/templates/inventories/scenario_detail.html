@@ -15,8 +15,8 @@
                     <div class="row mb-4">
                         <div class="col">
                             <div class="card shadow">
-                                <div class="card-header">
-                                    <b>Inventory {{ forloop.parentloop.counter }}</b>
+                                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+                                    <h5 class="mb-0">Inventory {{ forloop.parentloop.counter }}</h5>
                                 </div>
                                 <div class="card-body">
                                     <p class="card-text"><strong>Feedstock</strong>: {{ feedstock.name }}</p>
@@ -50,7 +50,7 @@
                 <div class="row">
                     <div class="col">
                         <div class="card border-left-primary border">
-                            <div class="card-header"></div>
+                            <div class="card-header bg-body-tertiary border-bottom-0 py-3"></div>
                             <div class="card-body">
                                 <a href="{% url 'add_scenario_configuration' scenario.id %}">
                                     <i class="fas fa-fw fa-plus"></i> Add inventory

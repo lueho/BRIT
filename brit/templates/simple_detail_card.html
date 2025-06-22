@@ -3,13 +3,13 @@
 {% block title %}BRIT | {{ object.name }} details{% endblock %}
 
 {% block content %}
-<div class="row mb-4">
+<div class="row my-4">
     <div class="col">
         <div class="card shadow">
-            <div class="card-header d-flex justify-content-between align-items-center">
-                <strong>
+            <div class="card-header d-flex justify-content-between align-items-center bg-body-tertiary border-bottom-0 py-3">
+                <h5 class="mb-0">
                     {% block detail_header %}{{ object.verbose_name|capfirst }} details{% endblock %}
-                </strong>
+                </h5>
                 {% block detail_header_badge %}{% endblock %}
             </div>
 
@@ -34,7 +34,7 @@
                             </button>
                             <div class="dropdown-menu" aria-labelledby="detailNavigateDropdown">
                                 {% block detail_back_button %}
-                                    <a class="dropdown-item" href="javascript:history.go(-1)">
+                                    <a class="dropdown-item" href="#" onclick="history.go(-1); return false;">
                                         <i class="fas fa-fw fa-arrow-left"></i> Back
                                     </a>
                                 {% endblock detail_back_button %}

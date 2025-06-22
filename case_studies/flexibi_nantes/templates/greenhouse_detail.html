@@ -38,7 +38,7 @@
                 {% endfor %}
                 {% if 'flexibi_nantes.add_greenhousegrowthcycle' in perms %}
                     <div class="card border-left-primary border">
-                        <div class="card-header"></div>
+                        <div class="card-header bg-body-tertiary border-bottom-0 py-3"><h5 class="mb-0">Add growth cycle</h5></div>
                         <div class="card-body">
                             <a href="{% url 'greenhousegrowthcycle-create' object.id %}?next={{ request.path }}">
                                 <i class="fas fa-fw fa-plus"></i> Add growth cycle

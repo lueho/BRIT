@@ -7,7 +7,7 @@
     <div class="row">
         <div class="col col-12 col-md-6 mb-4">
             <div class="card shadow h-100">
-                <div class="card-header"><strong>Introduction</strong></div>
+                <div class="card-header bg-body-tertiary border-bottom-0 py-3"><h5 class="mb-0">Introduction</h5></div>
                 <div class="card-body">
                     <h3 class="card-text"><strong>What is BRIT?</strong></h3>
                     <p class="card-text">
@@ -28,7 +28,7 @@
         </div>
         <div class="col d-md-block mb-4">
             <div class="card shadow h-100">
-                <div class="card-header"><b>News & Updates</b></div>
+                <div class="card-header bg-body-tertiary border-bottom-0 py-3"><h5 class="mb-0">News & Updates</h5></div>
                 <div class="card-body">
                     <h3 class="card-text"><strong>BRIT part of CLOSECYCLE Project</strong></h3>
                     <div class="row">
@@ -61,10 +61,12 @@
     <div class="row">
         <div class="col col-12 col-md-6 col-lg-3 mb-4">
             <div class="card shadow h-100">
-                <div class="card-header">
-                    <a href="{% url 'maps_list' %}">
-                        <strong><i class="fas fa-fw fa-globe-europe"></i> Maps</strong>
-                    </a>
+                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+                    <h5 class="mb-0">
+                        <a href="{% url 'maps_list' %}" class="text-decoration-none text-body">
+                            <i class="fas fa-fw fa-globe-europe"></i> Maps
+                        </a>
+                    </h5>
                 </div>
                 <div class="card-img-top">
                     <a class="d-flex align-items-center justify-content-center stretched-link"
@@ -83,10 +85,12 @@
         </div>
         <div class="col col-12 col-md-6 col-lg-3 mb-4">
             <div class="card shadow h-100">
-                <div class="card-header">
-                    <a href="{% url 'sample-list-featured' %}">
-                        <strong><i class="fas fa-fw fa-leaf"></i> Materials</strong>
-                    </a>
+                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+                    <h5 class="mb-0">
+                        <a href="{% url 'sample-list-featured' %}" class="text-decoration-none text-body">
+                            <i class="fas fa-fw fa-leaf"></i> Materials
+                        </a>
+                    </h5>
                 </div>
                 <div class="card-img">
                     <a class="d-flex align-items-center justify-content-center stretched-link"
@@ -105,10 +109,12 @@
         </div>
         <div class="col col-12 col-md-6 col-lg-3 mb-4">
             <div class="card shadow h-100">
-                <div class="card-header">
-                    <a href="{% url 'sources-list' %}">
-                        <strong><i class="fas fa-fw fa-expand-arrows-alt"></i> Sources</strong>
-                    </a>
+                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+                    <h5 class="mb-0">
+                        <a href="{% url 'sources-list' %}" class="text-decoration-none text-body">
+                            <i class="fas fa-fw fa-expand-arrows-alt"></i> Sources
+                        </a>
+                    </h5>
                 </div>
                 <div class="card-img">
                     <a class="d-flex align-items-center justify-content-center stretched-link"
@@ -127,10 +133,12 @@
         </div>
         <div class="col col-12 col-md-6 col-lg-3 mb-4">
             <div class="card shadow h-100">
-                <div class="card-header">
-                    <a href="{% url 'scenario-list' %}">
-                        <strong><i class="fas fa-fw fa-chart-bar"></i> Inventories</strong>
-                    </a>
+                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+                    <h5 class="mb-0">
+                        <a href="{% url 'scenario-list' %}" class="text-decoration-none text-body">
+                            <i class="fas fa-fw fa-chart-bar"></i> Inventories
+                        </a>
+                    </h5>
                 </div>
                 <div class="card-img-top">
                     <a class="d-flex align-items-center justify-content-center stretched-link"
@@ -152,10 +160,12 @@
     <div class="row">
         <div class="col col-12 col-md-6 col-lg-3 mb-4">
             <div class="card shadow h-100">
-                <div class="card-header">
-                    <a href="{% url 'source-list' %}">
-                        <strong><i class="fas fa-fw fa-book"></i> Bibliography</strong>
-                    </a>
+                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+                    <h5 class="mb-0">
+                        <a href="{% url 'source-list' %}" class="text-decoration-none text-body">
+                            <i class="fas fa-fw fa-book"></i> Bibliography
+                        </a>
+                    </h5>
                 </div>
                 <div class="card-img-top">
                     <a class="d-flex align-items-center justify-content-center stretched-link"
@@ -176,10 +186,12 @@
         <div class="col col-12 col-md-6 col-lg-3 mb-4">
             {% if perms.processes.access_app_feature %}
             <div class="card shadow h-100">
-                <div class="card-header">
-                    <a href="{% url 'processes:dashboard' %}">
-                        <strong><i class="fas fa-fw fa-flask"></i> Processes</strong>
-                    </a>
+                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+                    <h5 class="mb-0">
+                        <a href="{% url 'processes:dashboard' %}" class="text-decoration-none text-body">
+                            <i class="fas fa-fw fa-flask"></i> Processes
+                        </a>
+                    </h5>
                 </div>
                 <div class="card-img">
                     <a class="d-flex align-items-center justify-content-center stretched-link"

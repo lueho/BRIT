@@ -8,6 +8,11 @@ from django.views.generic import TemplateView
 MOCK_PROCESS_TYPES = [
     {
         "id": 12,
+        "owner": {
+            "username": "B. Saake",
+            "email": "bodo.saake@uni-hamburg.de",
+            "is_active": True,
+        },
         "name": "Pulping",
         "category": "Physicochemical",
         "input": [
@@ -35,6 +40,11 @@ MOCK_PROCESS_TYPES = [
     },
     {
         "id": 1,
+        "owner": {
+            "username": "B. Saake",
+            "email": "bodo.saake@uni-hamburg.de",
+            "is_active": True,
+        },
         "name": "Anaerobic Digestion",
         "category": "Biochemical",
         "input": [
@@ -67,6 +77,11 @@ MOCK_PROCESS_TYPES = [
     },
     {
         "id": 2,
+        "owner": {
+            "username": "B. Saake",
+            "email": "bodo.saake@uni-hamburg.de",
+            "is_active": True,
+        },
         "name": "Gasification",
         "category": "Thermochemical",
         "input": [
@@ -99,6 +114,11 @@ MOCK_PROCESS_TYPES = [
     },
     {
         "id": 3,
+        "owner": {
+            "username": "B. Saake",
+            "email": "bodo.saake@uni-hamburg.de",
+            "is_active": True,
+        },
         "name": "Pyrolysis",
         "category": "Thermochemical",
         "input": [
@@ -132,6 +152,11 @@ MOCK_PROCESS_TYPES = [
     },
     {
         "id": 4,
+        "owner": {
+            "username": "B. Saake",
+            "email": "bodo.saake@uni-hamburg.de",
+            "is_active": True,
+        },
         "name": "Composting",
         "category": "Biochemical",
         "input": [
@@ -161,6 +186,11 @@ MOCK_PROCESS_TYPES = [
     },
     {
         "id": 5,
+        "owner": {
+            "username": "B. Saake",
+            "email": "bodo.saake@uni-hamburg.de",
+            "is_active": True,
+        },
         "name": "Hydrothermal Processing",
         "category": "Thermochemical",
         "input": [{"name": "Wet Biomass", "id": 120}],
@@ -190,6 +220,11 @@ MOCK_PROCESS_TYPES = [
     },
     {
         "id": 6,
+        "owner": {
+            "username": "B. Saake",
+            "email": "bodo.saake@uni-hamburg.de",
+            "is_active": True,
+        },
         "name": "Torrefaction",
         "category": "Thermochemical",
         "input": [{"name": "Biomass", "id": 109}],
@@ -216,6 +251,11 @@ MOCK_PROCESS_TYPES = [
     },
     {
         "id": 7,
+        "owner": {
+            "username": "B. Saake",
+            "email": "bodo.saake@uni-hamburg.de",
+            "is_active": True,
+        },
         "name": "Steam Explosion",
         "category": "Physical",
         "input": [
@@ -242,6 +282,11 @@ MOCK_PROCESS_TYPES = [
     },
     {
         "id": 8,
+        "owner": {
+            "username": "B. Saake",
+            "email": "bodo.saake@uni-hamburg.de",
+            "is_active": True,
+        },
         "name": "Ultrasonication",
         "category": "Physical",
         "input": [{"name": "Sludge", "id": 401}],
@@ -268,6 +313,11 @@ MOCK_PROCESS_TYPES = [
     },
     {
         "id": 9,
+        "owner": {
+            "username": "B. Saake",
+            "email": "bodo.saake@uni-hamburg.de",
+            "is_active": True,
+        },
         "name": "Biocomposite Processing",
         "category": "Material",
         "input": [
@@ -297,6 +347,11 @@ MOCK_PROCESS_TYPES = [
     },
     {
         "id": 10,
+        "owner": {
+            "username": "B. Saake",
+            "email": "bodo.saake@uni-hamburg.de",
+            "is_active": True,
+        },
         "name": "Horizontal tube digester",
         "category": "Pulping",
         "input": [{"name": "Straw", "id": 102}],
@@ -322,6 +377,11 @@ MOCK_PROCESS_TYPES = [
     },
     {
         "id": 11,
+        "owner": {
+            "username": "B. Saake",
+            "email": "bodo.saake@uni-hamburg.de",
+            "is_active": True,
+        },
         "name": "Liquor circulation digesters for wood",
         "category": "Pulping",
         "input": [{"name": "High quality pulp wood", "id": 121}],

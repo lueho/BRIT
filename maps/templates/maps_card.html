@@ -1,7 +1,7 @@
 {% load static %}
 
 <div class="card shadow h-100">
-    <div class="card-header"><a class="stretched-link" href="{{ map.get_absolute_url }}"><b>{{ map.name }}</b></a></div>
+    <div class="card-header bg-body-tertiary border-bottom-0 py-3"><h5 class="mb-0"><a class="stretched-link text-decoration-none text-body" href="{{ map.get_absolute_url }}">{{ map.name }}</a></h5></div>
     <div class="card-img-top">
         <img class="w-100 m-0" src="{{ map.preview.url }}" alt="Maps Module Cover Image">
     </div>

@@ -20,9 +20,9 @@
         {% leaflet_css %}
 
         <div class="card shadow">
-            <div class="card-header"><b>
+            <div class="card-header bg-body-tertiary border-bottom-0 py-3"><h5 class="mb-0">
                     {% block map_card_header %}{{ map_title }}{% endblock %}
-                </b></div>
+                </h5></div>
             <div class="card-body p-0 vh-100" style="position: relative;">
                 <div id="map-overlay" style="display: none">
                     <div class="overlay-content">
@@ -107,9 +107,9 @@
         <div class="accordion">
             {% block filter_form_card %}
             <div class="card shadow">
-                <div class="card-header" role="button" data-bs-toggle="collapse" href="#filter-card-body"
+                <div class="card-header bg-body-tertiary border-bottom-0 py-3" role="button" data-bs-toggle="collapse" href="#filter-card-body"
                     aria-expanded="true" aria-controls="filter-card-body">
-                    <b>Filter</b>
+                    <h5 class="mb-0">Filter</h5>
                 </div>
                 <div class="card-body collapse show" id="filter-card-body">
 
@@ -131,9 +131,9 @@
 
             {% block filter_result_card %}
             <div class="card shadow">
-                <div class="card-header" role="button" data-bs-toggle="collapse" href="#info-card-body"
+                <div class="card-header bg-body-tertiary border-bottom-0 py-3" role="button" data-bs-toggle="collapse" href="#info-card-body"
                     aria-expanded="true" aria-controls="info-card-body">
-                    <b>Summary</b>
+                    <h5 class="mb-0">Summary</h5>
                 </div>
                 <div class="card-body collapse" id="info-card-body">
                     <div id="summary-container">

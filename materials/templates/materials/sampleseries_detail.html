@@ -6,7 +6,7 @@
     <div class="row mb-4">
         <div class="col col-12 col-md-6 col-lg-3">
             <div class="card shadow">
-                <div class="card-header"><strong>{{ object.material.name }}</strong></div>
+                <div class="card-header bg-body-tertiary border-bottom-0 py-3"><h5 class="mb-0">{{ object.material.name }}</h5></div>
                 {% if object.image %}
                     <div class="card-img-top">
                         <img class="w-100 m-0" src="{{ object.image.url }}" alt="Image of {{ object.material.name }}">
@@ -64,8 +64,8 @@
         {% for distribution in data.distributions %}
             <div class="col col-12 col-md-6 col-lg-3">
                 <div class="card shadow h-100">
-                    <div class="card-header">
-                        <h2 class="card-title">{{ distribution.name }}</h2>
+                    <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+                        <h5 class="mb-0">{{ distribution.name }}</h5>
                     </div>
                     <div class="card-body">
                         {% if distribution.description %}
