@@ -22,12 +22,13 @@
   </div>
 
   <div class="col-md-8">
+    <h5 class="mt-4">Parameters</h5>
     <dl class="row">
       <dt class="col-sm-3">Temperature</dt>
       <dd class="col-sm-9">{{ process.temperature_min }} – {{ process.temperature_max }} °C</dd>
 
       <dt class="col-sm-3">Yield</dt>
-      <dd class="col-sm-9">{{ process.yield_percentage }}%</dd>
+      <dd class="col-sm-9">{{ process.yield_percentage_min }} – {{ process.yield_percentage_max }}%</dd>
     </dl>
 
     <h5 class="mt-4">Description</h5>
@@ -62,10 +63,10 @@
       <ul class="list-unstyled mb-0">
         {% for source in process.sources %}
           <li>
-            {% if source.url %}
-              <a href="{{ source.url }}" target="_blank">{{ source.title|default:source.url }} <i class="fas fa-external-link-alt fa-xs"></i></a>
+            {% if source.id %}
+              <a href="{% url 'source-detail-modal' source.id %}" class="modal-link">{{ source.title }} <i class="fas fa-external-link-alt fa-xs"></i></a>
             {% else %}
-              {{ source.title|default:source }}
+              {{ source.title }}
             {% endif %}
           </li>
         {% endfor %}
@@ -81,7 +82,7 @@
 {% if perms.processes.access_app_feature %}
   <div class="d-flex justify-content-end">
     <div class="btn-group">
-      <a href="{% url 'processes:mock_process_overview' %}" class="btn btn-secondary">Back to Process Overview</a>
+      <a href="{% url 'processes:process_overview' 12 %}" class="btn btn-secondary">Back to Process Overview</a>
     </div>
   </div>
 {% endif %}

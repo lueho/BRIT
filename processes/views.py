@@ -9,21 +9,29 @@ MOCK_PROCESS_TYPES = [
     {
         "id": 12,
         "name": "Pulping",
-        "url_name": "processes:mock_process_overview",
         "category": "Physicochemical",
         "input": [
+            {"name": "Woodchips", "id": 108},
             {"name": "Straw", "id": 102},
-            {"name": "Wood Chips", "id": 108},
         ],
-        "output": [],
-        "short_description": "An overview of pulping technologies for disintegrating biomass into fibres.",
-        "description": "This is a summary page for various pulping technologies.",
-        "mechanism": "Physico-chemical or chemical reactions",
+        "output": [
+            {"name": "Brown grade fibers", "id": 206},
+            {"name": "White grade fibers", "id": 207},
+        ],
+        "short_description": "Disintegration of biomass into individual fibres suitable for paper and packaging",
+        "description": "For TBN the available lignin-containing biomass (e.g. wood and agricultural residues) is usually of lower quality compared to industrial pulpwood grades. Fibre production from these biomasses can be performed using a thermo-chemical disintegration or a chemical delignification process. In most cases, the resulting fibres contain lignin and have low brightness or a brown colour. These grades can be used for packaging papers, e.g. corrugated board, in combination with fibres from waste paper recycling. Fibres with low lignin content can be further bleached to produce white fibres with high brightness, suitable for graphic papers. In this case the technology is more complex and requires larger facilities, often not compatible with TBN.",
+        "mechanism": "physico-chemical or chemical reactions",
         "temperature_min": 130,
         "temperature_max": 190,
-        "yield_percentage": "40 - 90%",
-        "sources": [],
-        "info_charts": [],
+        "yield_percentage_min": 40,
+        "yield_percentage_max": 90,
+        "url": "/processes/types/12/overview/",
+        "links": [
+            {
+                "label": "Detail View",
+                "url": "/processes/types/12/overview/",
+            }
+        ],
     },
     {
         "id": 1,
@@ -42,7 +50,8 @@ MOCK_PROCESS_TYPES = [
         "mechanism": "Fermentation",
         "temperature_min": 20,
         "temperature_max": 65,
-        "yield_percentage": 55,
+        "yield_percentage_min": 50,
+        "yield_percentage_max": 60,
         "links": [{"label": "Detail View", "url": "/processes/detail/1"}],
         "sources": [
             {
@@ -73,7 +82,8 @@ MOCK_PROCESS_TYPES = [
         "mechanism": "Partial Oxidation",
         "temperature_min": 700,
         "temperature_max": 1500,
-        "yield_percentage": 60,
+        "yield_percentage_min": 55,
+        "yield_percentage_max": 70,
         "links": [{"label": "Detail View", "url": "/processes/detail/2"}],
         "sources": [
             {
@@ -105,7 +115,8 @@ MOCK_PROCESS_TYPES = [
         "mechanism": "Thermal Decomposition",
         "temperature_min": 400,
         "temperature_max": 700,
-        "yield_percentage": 65,
+        "yield_percentage_min": 70,
+        "yield_percentage_max": 80,
         "links": [{"label": "Detail View", "url": "/processes/detail/3"}],
         "sources": [
             {
@@ -133,7 +144,8 @@ MOCK_PROCESS_TYPES = [
         "mechanism": "Aerobic Decomposition",
         "temperature_min": 40,
         "temperature_max": 70,
-        "yield_percentage": 50,
+        "yield_percentage_min": 45,
+        "yield_percentage_max": 55,
         "links": [{"label": "Detail View", "url": "/processes/detail/4"}],
         "sources": [
             {
@@ -161,7 +173,8 @@ MOCK_PROCESS_TYPES = [
         "mechanism": "Hydrothermal Conversion",
         "temperature_min": 180,
         "temperature_max": 300,
-        "yield_percentage": 45,
+        "yield_percentage_min": 40,
+        "yield_percentage_max": 50,
         "links": [{"label": "Detail View", "url": "/processes/detail/5"}],
         "sources": [
             {
@@ -186,7 +199,8 @@ MOCK_PROCESS_TYPES = [
         "mechanism": "Mild Pyrolysis",
         "temperature_min": 200,
         "temperature_max": 320,
-        "yield_percentage": 70,
+        "yield_percentage_min": 65,
+        "yield_percentage_max": 75,
         "links": [{"label": "Detail View", "url": "/processes/detail/6"}],
         "sources": [
             {
@@ -204,21 +218,22 @@ MOCK_PROCESS_TYPES = [
         "id": 7,
         "name": "Steam Explosion",
         "category": "Physical",
-        "input": [{"name": "Lignocellulosic Biomass", "id": 301}],
-        "output": [{"name": "Exploded Biomass", "id": 305}],
-        "short_description": "Mechanical and thermal pre-treatment using high-pressure steam.",
-        "description": "Steam explosion is a pre-treatment process in which biomass is treated with high-pressure steam and then rapidly depressurized, causing the material to break apart. <a href='https://www.tech4biowaste.eu/wiki/Steam_explosion' target='_blank'>Learn more</a>.",
+        "input": [
+            {"name": "Straw", "id": 102},
+            {"name": "Wood", "id": 108},
+        ],
+        "output": [{"name": "Brown grade fibers", "id": 207}],
+        "short_description": "Simple steam reactor technology for producing brown grade fibres from wood and straw.",
+        "description": "Steam reactors are simple technology and can be used in rather small scale for wood and straw in TBN. They provide fibres with limited quality for brown grades in board and packaging production. The implementation is feasible starting at capacities of 5.000 t/a product.",
         "mechanism": "Mechanical/Thermal Pre-treatment",
-        "temperature_min": 160,
-        "temperature_max": 240,
-        "yield_percentage": 60,
+        "temperature_min": 130,
+        "temperature_max": 190,
+        "yield_percentage_min": 40,
+        "yield_percentage_max": 90,
         "links": [{"label": "Detail View", "url": "/processes/detail/7"}],
         "sources": [
-            {
-                "type": "website",
-                "title": "Tech4Biowaste: Steam Explosion",
-                "url": "https://www.tech4biowaste.eu/wiki/Steam_explosion",
-            }
+            {"title": "Hagel et al. 2021", "id": 4},
+            {"title": "Hagel et al. 2024", "id": 7194},
         ],
         "info_charts": [
             {"name": "Info Chart I", "url": "#"},
@@ -236,7 +251,8 @@ MOCK_PROCESS_TYPES = [
         "mechanism": "Ultrasound Disintegration",
         "temperature_min": 20,
         "temperature_max": 60,
-        "yield_percentage": 40,
+        "yield_percentage_min": 35,
+        "yield_percentage_max": 45,
         "links": [{"label": "Detail View", "url": "/processes/detail/8"}],
         "sources": [
             {
@@ -264,7 +280,8 @@ MOCK_PROCESS_TYPES = [
         "mechanism": "Composite Manufacturing",
         "temperature_min": 100,
         "temperature_max": 200,
-        "yield_percentage": 80,
+        "yield_percentage_min": 75,
+        "yield_percentage_max": 85,
         "links": [{"label": "Detail View", "url": "/processes/detail/9"}],
         "sources": [
             {
@@ -278,10 +295,49 @@ MOCK_PROCESS_TYPES = [
             {"name": "Info Chart II", "url": "#"},
         ],
     },
+    {
+        "id": 10,
+        "name": "Horizontal tube digester for straw",
+        "category": "Pulping",
+        "input": [{"name": "Straw", "id": 102}],
+        "output": [
+            {"name": "Brown Grade Fibres", "id": 306},
+            {"name": "White Grade Fibres", "id": 307},
+        ],
+        "short_description": "Specially designed for straw, giving higher quality fibres for brown and white grades.",
+        "description": "Horizontal tube digesters are specially designed for straw and give higher quality fibres for brown and white grades depending on process conditions. Process require larger capacity of e.g. 30.000 t/a product. Their implementation in TBN is challenging but can be an option if sufficient raw material is available. Depending on chemicals used (Na2CO3; Na2CO3+O2; NaOH) the quality is improved and bleaching can be performed.",
+        "mechanism": "Chemical Pulping",
+        "temperature_min": 130,
+        "temperature_max": 170,
+        "yield_percentage_min": 40,
+        "yield_percentage_max": 50,
+        "sources": [
+            {"title": "No. 1"},
+            {"title": "No. 2"},
+            {"title": "No. 3"},
+        ],
+        "info_charts": [{"name": "Info Chart I", "url": "#"}],
+    },
+    {
+        "id": 11,
+        "name": "Liquor circulation digesters for wood",
+        "category": "Pulping",
+        "input": [{"name": "High quality pulp wood", "id": 121}],
+        "output": [{"name": "High quality fibres", "id": 308}],
+        "short_description": "Technology for pulping of wood to fibres of highest quality by Kraft or Sulfite pulping.",
+        "description": "Liquor circulation digesters are the technology for pulping of wood to fibres of highest quality by Kraft (Sulfate) or Sulfite pulping. Factories are large and start at several 100.000 t/a and require intensive recovery cycles. These processes are not suitable for TBN networks.",
+        "mechanism": "Chemical Pulping",
+        "temperature_min": 130,
+        "temperature_max": 170,
+        "yield_percentage_min": 40,
+        "yield_percentage_max": 45,
+        "sources": [{"title": "No. 5"}],
+        "info_charts": [{"name": "Info Chart II", "url": "#"}],
+    },
 ]
 
 
-class ProcessMockDashboard(PermissionRequiredMixin, TemplateView):
+class ProcessDashboard(PermissionRequiredMixin, TemplateView):
     permission_required = "processes.access_app_feature"
     template_name = "processes/mock_dashboard.html"
 
@@ -289,9 +345,9 @@ class ProcessMockDashboard(PermissionRequiredMixin, TemplateView):
         return {"process_types": MOCK_PROCESS_TYPES}
 
 
-class ProcessOverviewMock(PermissionRequiredMixin, TemplateView):
+class ProcessOverview(PermissionRequiredMixin, TemplateView):
     permission_required = "processes.access_app_feature"
-    template_name = "processes/mock_process_overview.html"
+    template_name = "processes/process_overview.html"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -304,7 +360,7 @@ class ProcessOverviewMock(PermissionRequiredMixin, TemplateView):
         return context
 
 
-class ProcessTypeListMock(PermissionRequiredMixin, TemplateView):
+class ProcessTypeList(PermissionRequiredMixin, TemplateView):
     permission_required = "processes.access_app_feature"
     template_name = "processes/mock_type_list.html"
 
@@ -381,7 +437,7 @@ class ProcessTypeListMock(PermissionRequiredMixin, TemplateView):
         }
 
 
-class ProcessTypeDetailMock(PermissionRequiredMixin, TemplateView):
+class ProcessTypeDetail(PermissionRequiredMixin, TemplateView):
     permission_required = "processes.access_app_feature"
     template_name = "processes/mock_type_detail.html"
 
@@ -391,7 +447,7 @@ class ProcessTypeDetailMock(PermissionRequiredMixin, TemplateView):
         return {"process": process}
 
 
-class ProcessMockMaterialDetail(PermissionRequiredMixin, TemplateView):
+class ProcessMaterialDetail(PermissionRequiredMixin, TemplateView):
     permission_required = "processes.access_app_feature"
     template_name = "processes/mock_material_detail.html"
 
@@ -487,18 +543,26 @@ class ProcessMockMaterialDetail(PermissionRequiredMixin, TemplateView):
                 "related_processes": "Anaerobic Digestion",
             },
             206: {
-                "name": "Straw",
-                "category": "Agricultural Residue",
-                "description": "Stalks and stems left after grain harvest. Used as feedstock for bioenergy and soil amendment.",
-                "composition": "Cellulose, hemicellulose, silica",
-                "uses": "Bio-oil, animal bedding, compost",
+                "name": "White grade fibers",
+                "category": "Fiber",
+                "description": "High brightness fibres.",
+                "composition": "Cellulose, hemicellulose, lignin",
+                "uses": "Graphic papers",
+                "related_processes": "Pulping",
+            },
+            207: {
+                "name": "Brown grade fibers",
+                "category": "Fiber",
+                "description": "Low brightness fibres.",
+                "composition": "Cellulose, hemicellulose, lignin",
+                "uses": "Corrugated board and packaging",
                 "related_processes": "Pulping",
             },
         }
         return {"material": data.get(material_id)}
 
 
-class ProcessRunMock(PermissionRequiredMixin, TemplateView):
+class ProcessRun(PermissionRequiredMixin, TemplateView):
     permission_required = "processes.access_app_feature"
     template_name = "processes/mock_run.html"
 

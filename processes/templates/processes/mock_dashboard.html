@@ -21,7 +21,7 @@
     <div class="col-12 col-md-6 col-lg-4 mb-4">
       <div class="card shadow h-100">
         <div class="card-header">
-          <a href="{% if p.url_name %}{% url p.url_name %}{% else %}{% url 'processes:type_detail' p.id %}{% endif %}"><strong>{{ p.name }}</strong></a>
+          <a href="{% if p.url %}{{ p.url }}{% else %}{% url 'processes:type_detail' p.id %}{% endif %}"><strong>{{ p.name }}</strong></a>
           <span class="badge badge-secondary float-end">{{ p.category }}</span>
         </div>
         <div class="card-body">
@@ -31,7 +31,7 @@
           <ul class="list-unstyled mb-2">
             <li><strong>Mechanism:</strong> {{ p.mechanism }}</li>
             <li><strong>Temperature:</strong> {{ p.temperature_min }}–{{ p.temperature_max }} °C</li>
-            <li><strong>Yield:</strong> {{ p.yield_percentage }}%</li>
+            <li><strong>Yield:</strong> {{ p.yield_percentage_min }}–{{ p.yield_percentage_max }}%</li>
           </ul>
           <div class="mb-2">
             <strong>Input Materials:</strong>

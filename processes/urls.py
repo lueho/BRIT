@@ -1,25 +1,29 @@
 from django.urls import path
 
 from .views import (
-    ProcessMockDashboard,
-    ProcessMockMaterialDetail,
-    ProcessOverviewMock,
-    ProcessRunMock,
-    ProcessTypeDetailMock,
-    ProcessTypeListMock,
+    ProcessDashboard,
+    ProcessMaterialDetail,
+    ProcessOverview,
+    ProcessRun,
+    ProcessTypeDetail,
+    ProcessTypeList,
     StrawAndWoodProcessInfoView,
 )
 
 app_name = "processes"
 urlpatterns = [
-    path("mock/", ProcessMockDashboard.as_view(), name="dashboard"),
-    path("mock/overview/", ProcessOverviewMock.as_view(), name="mock_process_overview"),
-    path("types/", ProcessTypeListMock.as_view(), name="type_list"),
-    path("types/<int:pk>/", ProcessTypeDetailMock.as_view(), name="type_detail"),
-    path("types/<int:pk>/run/", ProcessRunMock.as_view(), name="run"),
+    path("dashboard/", ProcessDashboard.as_view(), name="dashboard"),
+    path("types/", ProcessTypeList.as_view(), name="type_list"),
+    path("types/<int:pk>/", ProcessTypeDetail.as_view(), name="type_detail"),
+    path(
+        "types/<int:pk>/overview/",
+        ProcessOverview.as_view(),
+        name="process_overview",
+    ),
+    path("types/<int:pk>/run/", ProcessRun.as_view(), name="run"),
     path(
         "materials/<int:pk>/",
-        ProcessMockMaterialDetail.as_view(),
+        ProcessMaterialDetail.as_view(),
         name="mock_material_detail",
     ),
     path(
