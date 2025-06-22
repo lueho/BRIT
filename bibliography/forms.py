@@ -61,6 +61,7 @@ class SourceAuthorForm(SimpleModelForm):
     author = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="author-autocomplete",
+            label_field="label",
         ),
         label="Authors",
     )
@@ -113,11 +114,14 @@ class SourceAuthorFormSet(BaseInlineFormSet):
                     saved_object = form.save(commit=True)
                     saved_objects.append(saved_object)
 
-                # Handle deletions
-                if hasattr(self, "deleted_objects"):
-                    for obj in self.deleted_objects:
-                        if obj.pk:
-                            obj.delete()
+                # Handle deletions – explicitly delete instances from forms marked for deletion
+                for form in self.forms:
+                    if (
+                        form.cleaned_data
+                        and form.cleaned_data.get("DELETE", False)
+                        and form.instance.pk
+                    ):
+                        form.instance.delete()
 
                 # Normalize positions to ensure they're sequential
                 self._normalize_positions()

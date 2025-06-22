@@ -49,6 +49,14 @@
               {% endfor %}
             </ul>
           </div>
+          {% if p.info_charts %}
+          <div class="mb-2">
+            <strong>Info Charts:</strong>
+            {% for chart in p.info_charts %}
+              <a href="{{ chart.url }}" class="btn btn-sm btn-outline-info mb-1" target="_blank">{{ chart.name }}</a>
+            {% endfor %}
+          </div>
+          {% endif %}
         </div>
         <div class="card-footer d-flex">
           <div class="dropdown">

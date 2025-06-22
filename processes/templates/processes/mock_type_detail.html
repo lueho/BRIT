@@ -38,7 +38,7 @@
     <div class="mt-4">
         <h5>Info Charts</h5>
         {% for chart in process.info_charts %}
-            <a href="#" class="btn btn-sm btn-outline-info mb-1">{{ chart.name }}</a>
+            <a href="{{ chart.url }}" class="btn btn-sm btn-outline-info mb-1"{% if chart.url|slice:'-4:' == '.pdf' %} download{% endif %}>{{ chart.name }}</a>
         {% endfor %}
     </div>
     {% endif %}

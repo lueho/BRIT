@@ -68,6 +68,21 @@
   .clickable { cursor: pointer; }
   .clickable:hover { opacity: 0.85; }
   .citation-text { fill: #2476de; font-weight: 400; cursor: pointer; user-select: none; }
+
+  /* Smooth transition for box hover */
+  .process-link rect {
+    transition: fill 0.2s ease, stroke 0.2s ease, filter 0.2s ease;
+  }
+
+  /* Hover effect: blue border, light-blue fill, subtle shadow */
+  .process-link:hover rect {
+    fill: #e8f3ff;
+    stroke: #007bff;
+    stroke-width: 3;
+    filter: drop-shadow(0 0 6px #007bff33);
+    cursor: pointer;
+  }
+
 </style>
 {% endblock %}
 
@@ -116,27 +131,35 @@
           </defs>
 
           <!-- ROW 1: Fibers -->
-          <g class="clickable" transform="translate(150, 10)">
-            <image href="{% static 'img/straw_fiber_brown_transparent.png' %}" x="0" y="0" width="150" height="92" />
-            <text x="75" y="112" text-anchor="middle" class="main-title">Brown fibers</text>
-            <text x="75" y="132" text-anchor="middle" class="sub-title">for corrugated board &amp; packaging</text>
-          </g>
-          <g class="clickable" transform="translate(600, 10)">
-            <image href="{% static 'img/straw_fiber_white_transparent.png' %}" x="0" y="0" width="150" height="92" />
-            <text x="75" y="112" text-anchor="middle" class="main-title">White fibers</text>
-            <text x="75" y="132" text-anchor="middle" class="sub-title">for graphic papers</text>
-          </g>
+          <a xlink:href="{% url 'processes:mock_material_detail' 207 %}">
+            <g class="clickable" transform="translate(150, 10)">
+              <image href="{% static 'img/straw_fiber_brown_transparent.png' %}" x="0" y="0" width="150" height="92" />
+              <text x="75" y="112" text-anchor="middle" class="main-title">Brown fibers</text>
+              <text x="75" y="132" text-anchor="middle" class="sub-title">for corrugated board &amp; packaging</text>
+            </g>
+          </a>
+          <a xlink:href="{% url 'processes:mock_material_detail' 206 %}">
+            <g class="clickable" transform="translate(600, 10)">
+              <image href="{% static 'img/straw_fiber_white_transparent.png' %}" x="0" y="0" width="150" height="92" />
+              <text x="75" y="112" text-anchor="middle" class="main-title">White fibers</text>
+              <text x="75" y="132" text-anchor="middle" class="sub-title">for graphic papers</text>
+            </g>
+          </a>
           
           <!-- ROW 2: Processes -->
-          <g transform="translate(0, 180)">
-            <rect class="diagram-box" x="0" y="0" width="413" height="60" rx="7" />
-            <text x="15" y="27" class="main-title">Steam processes</text>
-            <text x="15" y="47" class="sub-title">(steam explosion/refining)</text>
-          </g>
-          <g transform="translate(323, 200)">
+          <a xlink:href="{% url 'processes:type_detail' 7 %}">
+            <g class="clickable process-link" transform="translate(0, 180)">
+              <rect class="diagram-box" x="0" y="0" width="413" height="60" rx="7" />
+              <text x="15" y="27" class="main-title">Steam processes</text>
+              <text x="15" y="47" class="sub-title">(steam explosion/refining)</text>
+            </g>
+          </a>
+          <a xlink:href="{% url 'processes:type_detail' 10 %}">
+            <g class="clickable process-link" transform="translate(323, 200)">
               <rect class="diagram-box" x="0" y="0" width="577" height="60" rx="7" />
               <text x="15" y="35" class="main-title">Horizontal tube digester</text>
-          </g>
+            </g>
+          </a>
           
           <!-- ROW 3: Pathways -->
           <g transform="translate(0, 310)">

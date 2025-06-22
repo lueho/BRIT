@@ -61,7 +61,7 @@ MOCK_PROCESS_TYPES = [
             }
         ],
         "info_charts": [
-            {"name": "Info Chart I", "url": "#"},
+            {"name": "Info Chart I", "url": "/processes/infocards/pulping_straw/"},
             {"name": "Info Chart II", "url": "#"},
         ],
     },
@@ -93,7 +93,7 @@ MOCK_PROCESS_TYPES = [
             }
         ],
         "info_charts": [
-            {"name": "Info Chart I", "url": "#"},
+            {"name": "Info Chart I", "url": "/processes/infocards/pulping_straw/"},
             {"name": "Info Chart II", "url": "#"},
         ],
     },
@@ -126,7 +126,7 @@ MOCK_PROCESS_TYPES = [
             }
         ],
         "info_charts": [
-            {"name": "Info Chart I", "url": "#"},
+            {"name": "Info Chart I", "url": "/processes/infocards/pulping_straw/"},
             {"name": "Info Chart II", "url": "#"},
         ],
     },
@@ -155,7 +155,7 @@ MOCK_PROCESS_TYPES = [
             }
         ],
         "info_charts": [
-            {"name": "Info Chart I", "url": "#"},
+            {"name": "Info Chart I", "url": "/processes/infocards/pulping_straw/"},
             {"name": "Info Chart II", "url": "#"},
         ],
     },
@@ -184,7 +184,7 @@ MOCK_PROCESS_TYPES = [
             }
         ],
         "info_charts": [
-            {"name": "Info Chart I", "url": "#"},
+            {"name": "Info Chart I", "url": "/processes/infocards/pulping_straw/"},
             {"name": "Info Chart II", "url": "#"},
         ],
     },
@@ -210,7 +210,7 @@ MOCK_PROCESS_TYPES = [
             }
         ],
         "info_charts": [
-            {"name": "Info Chart I", "url": "#"},
+            {"name": "Info Chart I", "url": "/processes/infocards/pulping_straw/"},
             {"name": "Info Chart II", "url": "#"},
         ],
     },
@@ -236,7 +236,7 @@ MOCK_PROCESS_TYPES = [
             {"title": "Hagel et al. 2024", "id": 7194},
         ],
         "info_charts": [
-            {"name": "Info Chart I", "url": "#"},
+            {"name": "Info Chart I", "url": "/processes/infocards/pulping_straw/"},
             {"name": "Info Chart II", "url": "#"},
         ],
     },
@@ -262,7 +262,7 @@ MOCK_PROCESS_TYPES = [
             }
         ],
         "info_charts": [
-            {"name": "Info Chart I", "url": "#"},
+            {"name": "Info Chart I", "url": "/processes/infocards/pulping_straw/"},
             {"name": "Info Chart II", "url": "#"},
         ],
     },
@@ -291,13 +291,13 @@ MOCK_PROCESS_TYPES = [
             }
         ],
         "info_charts": [
-            {"name": "Info Chart I", "url": "#"},
+            {"name": "Info Chart I", "url": "/processes/infocards/pulping_straw/"},
             {"name": "Info Chart II", "url": "#"},
         ],
     },
     {
         "id": 10,
-        "name": "Horizontal tube digester for straw",
+        "name": "Horizontal tube digester",
         "category": "Pulping",
         "input": [{"name": "Straw", "id": 102}],
         "output": [
@@ -312,11 +312,13 @@ MOCK_PROCESS_TYPES = [
         "yield_percentage_min": 40,
         "yield_percentage_max": 50,
         "sources": [
-            {"title": "No. 1"},
-            {"title": "No. 2"},
-            {"title": "No. 3"},
+            {"title": "Salehi et al. 2014", "id": 7192},
+            {"title": "Steffen et al. 2024", "id": 7193},
+            {"title": "Hagel & Schütt 2024", "id": 7194},
         ],
-        "info_charts": [{"name": "Info Chart I", "url": "#"}],
+        "info_charts": [
+            {"name": "Info Chart I", "url": "/processes/infocards/pulping_straw/"}
+        ],
     },
     {
         "id": 11,
@@ -331,7 +333,7 @@ MOCK_PROCESS_TYPES = [
         "temperature_max": 170,
         "yield_percentage_min": 40,
         "yield_percentage_max": 45,
-        "sources": [{"title": "No. 5"}],
+        "sources": [{"title": "Mboowa 2024", "id": 7195}],
         "info_charts": [{"name": "Info Chart II", "url": "#"}],
     },
 ]
