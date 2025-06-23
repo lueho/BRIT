@@ -273,8 +273,6 @@ class UserCreatedObjectListMixin:
     def get_header(self):
         if self.header:
             return self.header
-        if self.model:
-            return self.model._meta.verbose_name_plural.capitalize()
         else:
             return None
 
