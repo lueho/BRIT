@@ -23,7 +23,7 @@
         <thead>
             <tr>
                 <th>Collection</th>
-                <th class="actions-column">{% if list_type == 'private' %}Status/Actions{% else %}Actions{% endif %}</th>
+                <th class="actions-column">Status/Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -39,11 +39,9 @@
                 </td>
                 <td class="actions-column mobile-no-label">
                     <div class="action-container d-flex align-items-center justify-content-end">
-                        {% if list_type == 'private' %}
                         <div class="status-badge-container">
                             {% include 'object_management/review_status_badge.html' with object=object %}
                         </div>
-                        {% endif %}
                         <div class="dropdown d-inline-block ms-auto d-none d-md-inline-block">
                         <button class="btn btn-sm btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">⋮</button>
                         <div class="dropdown-menu dropdown-menu-end">
