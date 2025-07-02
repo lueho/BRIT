@@ -65,15 +65,17 @@ class NullableRangeFilter(RangeFilter):
             QuerySet: The filtered queryset.
         """
         if not range_with_null_flag:
-            return super().filter(queryset, range_with_null_flag)
+            return queryset
         value_range, is_null = range_with_null_flag
         isnull_lookup = f"{self.field_name}__isnull"
+
+        if value_range.start is None and value_range.stop is None:
+            return queryset.filter(**{isnull_lookup: True}) if is_null else queryset
+
+        filtered_qs = super().filter(queryset, value_range)
         if is_null:
-            return (
-                super().filter(queryset, value_range)
-                | queryset.filter(**{isnull_lookup: True})
-            ).distinct()
-        return super().filter(queryset, value_range)
+            return (filtered_qs | queryset.filter(**{isnull_lookup: True})).distinct()
+        return filtered_qs
 
 
 class NullablePercentageRangeFilter(NullableRangeFilter):
