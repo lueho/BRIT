@@ -63,6 +63,20 @@ class TestNullableRangeFilter(TestCase):
         expected = DummyModel.objects.filter(id__in=[self.fifty.id, self.hundred.id])
         self.assertQuerySetEqual(result, expected, ordered=False)
 
+    def test_filter_null_only(self):
+        range_with_null_flag = (slice(None, None), True)
+        filter_ = NullableRangeFilter(field_name="test_field")
+        result = filter_.filter(DummyModel.objects.all(), range_with_null_flag)
+        expected = DummyModel.objects.filter(test_field__isnull=True)
+        self.assertQuerySetEqual(result, expected, ordered=False)
+
+    def test_filter_no_range_no_null(self):
+        range_with_null_flag = (slice(None, None), False)
+        filter_ = NullableRangeFilter(field_name="test_field")
+        result = filter_.filter(DummyModel.objects.all(), range_with_null_flag)
+        expected = DummyModel.objects.all()
+        self.assertQuerySetEqual(result, expected, ordered=False)
+
 
 class NullablePercentageRangeFilterTestCase(TestCase):
 
@@ -85,4 +99,18 @@ class NullablePercentageRangeFilterTestCase(TestCase):
         filter_ = NullablePercentageRangeFilter(field_name="test_field")
         result = filter_.filter(DummyModel.objects.all(), range_with_null_flag)
         expected = DummyModel.objects.filter(id__in=[self.fifty.id, self.hundred.id])
+        self.assertQuerySetEqual(result, expected, ordered=False)
+
+    def test_filter_null_only(self):
+        range_with_null_flag = (slice(None, None), True)
+        filter_ = NullablePercentageRangeFilter(field_name="test_field")
+        result = filter_.filter(DummyModel.objects.all(), range_with_null_flag)
+        expected = DummyModel.objects.filter(test_field__isnull=True)
+        self.assertQuerySetEqual(result, expected, ordered=False)
+
+    def test_filter_no_range_no_null(self):
+        range_with_null_flag = (slice(None, None), False)
+        filter_ = NullablePercentageRangeFilter(field_name="test_field")
+        result = filter_.filter(DummyModel.objects.all(), range_with_null_flag)
+        expected = DummyModel.objects.all()
         self.assertQuerySetEqual(result, expected, ordered=False)
