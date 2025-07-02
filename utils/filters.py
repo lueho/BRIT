@@ -66,13 +66,27 @@ class NullableRangeFilter(RangeFilter):
         """
         if not range_with_null_flag:
             return queryset
+
         value_range, is_null = range_with_null_flag
+        start = (
+            value_range.start
+            if value_range.start is not None
+            else self.default_range_min
+        )
+        stop = (
+            value_range.stop
+            if value_range.stop is not None
+            else self.default_range_max
+        )
+
+        final_range = slice(start, stop)
         isnull_lookup = f"{self.field_name}__isnull"
 
-        if value_range.start is None and value_range.stop is None:
-            return queryset.filter(**{isnull_lookup: True}) if is_null else queryset
+        if final_range.start is None and final_range.stop is None:
+            filtered_qs = queryset
+        else:
+            filtered_qs = super().filter(queryset, final_range)
 
-        filtered_qs = super().filter(queryset, value_range)
         if is_null:
             return (filtered_qs | queryset.filter(**{isnull_lookup: True})).distinct()
         return filtered_qs
@@ -98,12 +112,25 @@ class NullablePercentageRangeFilter(NullableRangeFilter):
             QuerySet: The filtered queryset.
         """
         if not percentage_range_with_null_flag:
-            return super().filter(qs, percentage_range_with_null_flag)
+            return qs
+
         percentage_range, is_null = percentage_range_with_null_flag
-        decimal_range_with_null_flag = (
-            slice(percentage_range.start / 100, percentage_range.stop / 100),
-            is_null,
+
+        start = (
+            percentage_range.start
+            if percentage_range.start is not None
+            else self.default_range_min
         )
+        stop = (
+            percentage_range.stop
+            if percentage_range.stop is not None
+            else self.default_range_max
+        )
+
+        start = start / 100 if start is not None else None
+        stop = stop / 100 if stop is not None else None
+
+        decimal_range_with_null_flag = (slice(start, stop), is_null)
         return super().filter(qs, decimal_range_with_null_flag)
 
 
