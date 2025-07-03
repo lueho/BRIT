@@ -24,7 +24,10 @@ class BaseCrispyFilterSet(FilterSet):
 
 class NullableRangeFilter(RangeFilter):
     """
-    A custom filter for Django that filters a range of values, optionally including nullable values.
+    A custom filter for Django that filters a range of values, optionally including null values. The range can be
+    specified using the `range_min`, `range_max` and `range_step` either as class attributes or as kwargs during class
+    initialization. Fallback can be set using the `default_range_min`, `default_range_max` and `default_range_step`
+    as class attributes or kwargs during class initialization.
     """
 
     field_class = NullableRangeField
@@ -52,6 +55,12 @@ class NullableRangeFilter(RangeFilter):
         )
         self.unit = kwargs.get("unit", self.unit)
 
+    def get_filter_range_min(self):
+        return self.range_min or self.default_range_min
+
+    def get_filter_range_max(self):
+        return self.range_max or self.default_range_max
+
     def filter(self, queryset, range_with_null_flag):
         """
         Filters the given queryset based on the value range and null flag.
@@ -71,12 +80,12 @@ class NullableRangeFilter(RangeFilter):
         start = (
             value_range.start
             if value_range.start is not None
-            else self.default_range_min
+            else self.get_filter_range_min()
         )
         stop = (
             value_range.stop
             if value_range.stop is not None
-            else self.default_range_max
+            else self.get_filter_range_max()
         )
 
         final_range = slice(start, stop)
@@ -119,12 +128,12 @@ class NullablePercentageRangeFilter(NullableRangeFilter):
         start = (
             percentage_range.start
             if percentage_range.start is not None
-            else self.default_range_min
+            else self.get_filter_range_min()
         )
         stop = (
             percentage_range.stop
             if percentage_range.stop is not None
-            else self.default_range_max
+            else self.get_filter_range_max()
         )
 
         start = start / 100 if start is not None else None
