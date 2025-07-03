@@ -30,15 +30,16 @@ class NullableRangeFilter(RangeFilter):
     as class attributes or kwargs during class initialization.
     """
 
+    # --- Configuration attributes (override in subclasses or via kwargs) ---
     field_class = NullableRangeField
-    range_min = None
-    range_max = None
-    range_step = None
-    default_range_min = 0
-    default_range_max = 100
-    default_range_step = 1
-    default_include_null = False
-    unit = ""
+    range_min: int | float | None = None
+    range_max: int | float | None = None
+    range_step: int | float | None = None
+    default_range_min: int | float = 0
+    default_range_max: int | float = 100
+    default_range_step: int | float = 1
+    default_include_null: bool = False
+    unit: str = ""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -61,22 +62,12 @@ class NullableRangeFilter(RangeFilter):
     def get_filter_range_max(self):
         return self.range_max or self.default_range_max
 
-    def filter(self, queryset, range_with_null_flag):
+    def _build_range_slice(self, value_range: slice) -> slice:
+        """Return a concrete ``slice`` for *value_range*.
+
+        Subclasses rarely need to override this, but advanced filters can extend it to
+        implement clamping or rounding logic.
         """
-        Filters the given queryset based on the value range and null flag.
-
-        Args:
-            queryset (QuerySet): The Django queryset to be filtered.
-            range_with_null_flag (tuple): A tuple containing a slice object with start and stop values
-                                          and a boolean flag to indicate if null values should be included.
-
-        Returns:
-            QuerySet: The filtered queryset.
-        """
-        if not range_with_null_flag:
-            return queryset
-
-        value_range, is_null = range_with_null_flag
         start = (
             value_range.start
             if value_range.start is not None
@@ -87,18 +78,36 @@ class NullableRangeFilter(RangeFilter):
             if value_range.stop is not None
             else self.get_filter_range_max()
         )
+        return slice(start, stop)
 
-        final_range = slice(start, stop)
-        isnull_lookup = f"{self.field_name}__isnull"
+    def apply_range(self, qs, value_slice: slice, include_nulls: bool):
+        """Apply *value_slice* (+ optional nulls) against ``self.field_name``.
 
-        if final_range.start is None and final_range.stop is None:
-            filtered_qs = queryset
-        else:
-            filtered_qs = super().filter(queryset, final_range)
+        Subclasses can override for complex lookups (annotations, joins, etc.).
+        """
+        filtered = qs.filter(
+            **{
+                f"{self.field_name}__gte": value_slice.start,
+                f"{self.field_name}__lte": value_slice.stop,
+            }
+        )
+        if include_nulls:
+            filtered = filtered | qs.filter(**{f"{self.field_name}__isnull": True})
+        return filtered
 
-        if is_null:
-            return (filtered_qs | queryset.filter(**{isnull_lookup: True})).distinct()
-        return filtered_qs
+    def filter(self, queryset, range_with_null_flag):
+        """Filter *queryset* according to a numeric range and an *include_nulls* flag."""
+        if not range_with_null_flag:
+            return queryset
+
+        value_slice, include_nulls = range_with_null_flag
+        value_slice = self._build_range_slice(value_slice)
+
+        # If no numeric restriction and nulls not requested → return as-is
+        if value_slice.start is None and value_slice.stop is None:
+            return queryset
+
+        return self.apply_range(queryset, value_slice, include_nulls).distinct()
 
 
 class NullablePercentageRangeFilter(NullableRangeFilter):
@@ -108,39 +117,14 @@ class NullablePercentageRangeFilter(NullableRangeFilter):
 
     field_class = NullablePercentageRangeField
 
-    def filter(self, qs, percentage_range_with_null_flag):
-        """
-        Filters the given queryset based on the percentage range and null flag.
+    def _build_range_slice(self, value_range: slice) -> slice:
+        """Convert *value_range* expressed in percent to a decimal slice (0.0 - 1.0)."""
+        base_slice = super()._build_range_slice(value_range)
+        start = None if base_slice.start is None else base_slice.start / 100
+        stop = None if base_slice.stop is None else base_slice.stop / 100
+        return slice(start, stop)
 
-        Args:
-            qs (QuerySet): The Django queryset to be filtered.
-            percentage_range_with_null_flag (tuple): A tuple containing a slice object with start and stop percentages
-                                                     and a boolean flag to indicate if null values should be included.
-
-        Returns:
-            QuerySet: The filtered queryset.
-        """
-        if not percentage_range_with_null_flag:
-            return qs
-
-        percentage_range, is_null = percentage_range_with_null_flag
-
-        start = (
-            percentage_range.start
-            if percentage_range.start is not None
-            else self.get_filter_range_min()
-        )
-        stop = (
-            percentage_range.stop
-            if percentage_range.stop is not None
-            else self.get_filter_range_max()
-        )
-
-        start = start / 100 if start is not None else None
-        stop = stop / 100 if stop is not None else None
-
-        decimal_range_with_null_flag = (slice(start, stop), is_null)
-        return super().filter(qs, decimal_range_with_null_flag)
+    #     return super().filter(queryset, (decimal_range, include_nulls))
 
 
 class UserCreatedObjectScopedFilterSet(BaseCrispyFilterSet):
