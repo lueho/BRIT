@@ -19,6 +19,11 @@ def ensure_initial_data(stdout=None):
     admin_username = os.environ.get("ADMIN_USERNAME")
     owner_username = getattr(settings, "DEFAULT_OBJECT_OWNER_USERNAME", admin_username)
 
+    if not owner_username:
+        raise RuntimeError(
+            "Neither DEFAULT_OBJECT_OWNER_USERNAME in settings nor ADMIN_USERNAME env var is set."
+        )
+
     try:
         default_owner = User.objects.get(username=owner_username)
     except User.DoesNotExist:
