@@ -25,6 +25,7 @@ from .views import (
     CatchmentRegionSummaryAPIView,
     CatchmentUpdateView,
     ClearGeojsonCacheView,
+    GeoDataSetAutocompleteView,
     GeoDataSetCreateView,
     GeoDataSetModalDeleteView,
     GeoDataSetPrivateFilterView,
@@ -89,6 +90,11 @@ urlpatterns = [
         "geodatasets/<int:pk>/delete/",
         GeoDataSetModalDeleteView.as_view(),
         name="geodataset-delete-modal",
+    ),
+    path(
+        "geodatasets/autocomplete/",
+        GeoDataSetAutocompleteView.as_view(),
+        name="geodataset-autocomplete",
     ),
     path("attributes/", AttributePublishedListView.as_view(), name="attribute-list"),
     path(

@@ -1,21 +1,12 @@
-{% extends 'base.html' %}
+{% extends 'simple_form_card.html' %}
 
-{% block content %}
-    {% load crispy_forms_tags %}
+{% block extra_post_form_content %}
+    <div id="parameterFormContainer" class=form-group></div>
+{% endblock %}
 
-    <h2>Add an algorithm to the scenario "{{ scenario.name }}"</h2>
-    <form method="post" id="configForm">
-
-        {% csrf_token %}
-        {{ form|crispy }}
-        <div id="parameterFormContainer" class=form-group></div>
-        <button type="submit" class="btn btn-primary">Save</button>
-        <a href="{{ view.get_success_url }}" class="btn btn-primary">Cancel</a>
-    </form>
-
-
-
-{% endblock content %}
+{% block cancel_button %}
+    <a href="{{ view.get_success_url }}" class="btn btn-secondary">Cancel</a>
+{% endblock %}
 
 {% block javascript %}
     {{ block.super }}
@@ -49,7 +40,7 @@
             return await response.text();
         }
 
-        async function loadGeodatasets() {
+        {% comment %} async function loadGeodatasets() {
 
             const url = "{% url 'ajax_load_geodatasets' %}";
             let args = new URLSearchParams({
@@ -60,7 +51,7 @@
 
             let response = await fetch(url + "?" + args);
             return await response.text();
-        }
+        } {% endcomment %}
 
         function setInventoryAlgorithmParameterOptions() {
             loadInventoryAlgorithmParameters()
@@ -75,14 +66,14 @@
                 .catch((err) => console.log(err))
         }
 
-        function setGeoDatasetOptions() {
+        {% comment %} function setGeoDatasetOptions() {
             loadGeodatasets()
                 .then(html => document.getElementById("id_geodataset").innerHTML = html)
                 .then(() => setInventoryAlgorithmOptions())
                 .catch((err) => console.log(err))
-        }
+        } {% endcomment %}
 
-        document.getElementById("id_feedstock").onchange = () => setGeoDatasetOptions();
+        {% comment %} document.getElementById("id_feedstock").onchange = () => setGeoDatasetOptions(); {% endcomment %}
         document.getElementById("id_geodataset").onchange = () => setInventoryAlgorithmOptions();
         document.getElementById("id_inventory_algorithm").onchange = () => setInventoryAlgorithmParameterOptions();
 

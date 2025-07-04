@@ -42,6 +42,36 @@ class ScenarioModalModelForm(ModalModelFormMixin, ScenarioModelForm):
 
 
 class ScenarioInventoryConfigurationForm(SimpleModelForm):
+    feedstock = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="sampleseries-autocomplete",
+            label_field="name",
+        ),
+        label="Feedstock",
+    )
+    geodataset = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="scenario-geodataset-autocomplete",
+            label_field="name",
+            filter_by=(
+                "feedstock",
+                "feedstock_id",
+            ),
+            exclude_by=(
+                "scenario",
+                "scenario_id",
+            ),
+        ),
+        label="Geodataset",
+    )
+    inventory_algorithm = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="inventoryalgorithm-autocomplete",
+            label_field="name",
+        ),
+        label="Inventory algorithm",
+    )
+
     class Meta:
         model = ScenarioInventoryConfiguration
         fields = (

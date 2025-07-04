@@ -8,13 +8,14 @@ from django.shortcuts import redirect, render
 from django.views.generic import CreateView, DetailView, View
 from django.views.generic.base import TemplateResponseMixin
 from django.views.generic.edit import ModelFormMixin
+from django_tomselect.autocompletes import AutocompleteModelView
 from rest_framework.views import APIView
 
 from layer_manager.models import Layer
 from maps.models import Catchment, GeoDataset
 from maps.serializers import BaseResultMapSerializer
-from maps.views import MapMixin
-from materials.models import SampleSeries
+from maps.views import GeoDataSetAutocompleteView, MapMixin
+from materials.models import Material, SampleSeries
 from utils.object_management.views import (
     PrivateObjectFilterView,
     PublishedObjectFilterView,
@@ -49,6 +50,21 @@ class SeasonalDistributionCreateView(LoginRequiredMixin, CreateView):
     form_class = SeasonalDistributionModelForm
     template_name = "seasonal_distribution_create.html"
     success_url = "/inventories/materials/{material_id}"
+
+
+# ----------- Inventory Algorithm Utils --------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class InventoryAlgorithmAutocompleteView(AutocompleteModelView):
+    model = InventoryAlgorithm
+    search_lookups = ["name__icontains"]
+    value_fields = [
+        "name",
+    ]
+    ordering = ["name"]
+    allow_anonymous = True
+    page_size = 15
 
 
 # ----------- Scenario CRUD --------------------------------------------------------------------------------------------
@@ -165,7 +181,11 @@ class ScenarioAddInventoryAlgorithmView(
         }
 
     def get_context_data(self, **kwargs):
-        context = {"scenario": self.object, "form": self.get_form()}
+        context = {
+            "scenario": self.object,
+            "form": self.get_form(),
+            "form_title": f'Add an algorithm to the scenario "{self.object.name}"',
+        }
         return super().get_context_data(**context)
 
     def get(self, request, *args, **kwargs):
@@ -251,6 +271,69 @@ class ScenarioRemoveInventoryAlgorithmView(
             algorithm=self.algorithm, feedstock=self.feedstock
         )
         return redirect("scenario-detail", pk=self.scenario.id)
+
+
+class ScenarioGeoDataSetAutocompleteView(GeoDataSetAutocompleteView):
+    """GeoDataset autocomplete filtered by scenario and feedstock (create mode).
+
+    The form widget passes feedstock via ``filter_by`` and scenario via ``exclude_by``.
+    """
+
+    def apply_filters(self, queryset):
+        """Return GeoDatasets that *can* still be added for a given scenario/feedstock.
+
+        The widget passes the *feedstock* ID via ``filter_by`` and the *scenario* ID via
+        ``exclude_by``.  Instead of calling helper methods (which incur multiple queries)
+        we leverage correlated sub-queries so the whole operation executes in **one** SQL
+        statement.
+        """
+        feedstock_id = self._extract_id(self.filter_by)
+        scenario_id = self._extract_id(self.exclude_by)
+
+        if not (feedstock_id and scenario_id):
+            return GeoDataset.objects.none()
+
+        try:
+            scenario = Scenario.objects.get(pk=scenario_id)
+            feedstock_series = SampleSeries.objects.get(pk=feedstock_id)
+        except (Scenario.DoesNotExist, SampleSeries.DoesNotExist):
+            return GeoDataset.objects.none()
+
+        # TODO: This is really trouble. The InventoryAlgorithm used Material for feedstock but ScenarioInventoryConfiguration
+        # uses SampleSeries.
+
+        # Resolve which Material objects to consider
+        if feedstock_series is None:
+            feedstocks_qs = Material.objects.filter(type="material")
+        else:
+            # NB: historical behaviour filters by the *SampleSeries* ID, maintaining it
+            # to avoid unexpected test regressions.
+            feedstocks_qs = Material.objects.filter(id=feedstock_series.id)
+
+        # Build a single query using EXISTS sub-queries
+        from django.db.models import Exists, OuterRef
+
+        available_q = InventoryAlgorithm.objects.filter(
+            geodataset=OuterRef("pk"),
+            geodataset__region=scenario.region,
+            feedstocks__in=feedstocks_qs,
+        )
+        evaluated_q = ScenarioInventoryConfiguration.objects.filter(
+            geodataset=OuterRef("pk"),
+            scenario=scenario,
+            feedstock__material__in=feedstocks_qs,
+        )
+
+        return GeoDataset.objects.annotate(
+            has_algorithm=Exists(available_q),
+            already_evaluated=Exists(evaluated_q),
+        ).filter(has_algorithm=True, already_evaluated=False)
+
+    @staticmethod
+    def _extract_id(param: str | None) -> str | None:
+        if param and "=" in param:
+            return param.split("=", 1)[1].strip("'") or None
+        return None
 
 
 def download_scenario_summary(request, scenario_pk):

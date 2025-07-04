@@ -1,6 +1,8 @@
 from django.urls import path
 
 from .views import (
+    InventoryAlgorithmAutocompleteView,
+    ScenarioGeoDataSetAutocompleteView,
     PrivateScenarioFilterView,
     PublishedScenarioFilterView,
     ResultMapAPI,
@@ -30,6 +32,16 @@ urlpatterns = [
         "materials/<int:material_pk>/<int:component_pk>/seasonal_distributions/create/",
         SeasonalDistributionCreateView.as_view(),
         name="seasonal_distribution_create",
+    ),
+    path(
+        "geodatasets/scenario-autocomplete/",
+        ScenarioGeoDataSetAutocompleteView.as_view(),
+        name="scenario-geodataset-autocomplete",
+    ),
+    path(
+        "inventory-algorithms/autocomplete/",
+        InventoryAlgorithmAutocompleteView.as_view(),
+        name="inventoryalgorithm-autocomplete",
     ),
     path("scenarios/", PublishedScenarioFilterView.as_view(), name="scenario-list"),
     path(
