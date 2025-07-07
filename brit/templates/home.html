@@ -4,10 +4,12 @@
 {% block title %}BRIT | Bioresource Information Tool{% endblock %}
 
 {% block content %}
-    <div class="row">
-        <div class="col col-12 col-md-6 mb-4">
+    <div class="row g-4 mb-4">
+        <div class="col-12 col-md-6">
             <div class="card shadow h-100">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3"><h5 class="mb-0">Introduction</h5></div>
+                <div class="card-header bg-light border-0 py-3">
+                    <h5 class="mb-0">Introduction</h5>
+                </div>
                 <div class="card-body">
                     <h3 class="card-text"><strong>What is BRIT?</strong></h3>
                     <p class="card-text">
@@ -26,53 +28,54 @@
                 </div>
             </div>
         </div>
-        <div class="col d-md-block mb-4">
+        <div class="col-12 col-md-6">
             <div class="card shadow h-100">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3"><h5 class="mb-0">News & Updates</h5></div>
-                <div class="card-body">
-                    <h3 class="card-text"><strong>BRIT part of CLOSECYCLE Project</strong></h3>
-                    <div class="row">
-                        <div class="col-12 col-lg-7 col-xl-6 order-2 order-lg-1">
-                            <p class="card-text">
-                                <a href="https://www.closecycle.eu" target="_blank">CLOSECYCLE</a> is an
-                                <a href="https://www.interregnorthsea.eu/" target="_blank">INTERREG North Sea Region</a>
-                                project, co-funded by the European Union. BRIT is part of the digital package of work
-                                package 1, serving stakeholders of Territorial Biorefinery Networks
-                                (TBN).
-                            </p>
-                            <p class="card-text">
-                                <a href="{% url 'Showcase' %}" class="btn btn-primary">CLOSECYCLE showcases</a>
-                            </p>
-                        </div>
-                        <div class="col-12 col-lg-7 col-xl-6 order-1 order-lg-2">
-                            <p class="card-text">
-                                <a href="https://www.closecycle.eu" target="_blank">
-                                    <img class="w-100 m-0 p-1"
-                                         src="{% static 'img/interreg_with_closecycle_logo.png' %}"
-                                         alt="Logo of INTERREG North Sea Region CLOSECYCLE Project">
-                                </a>
-                            </p>
-                        </div>
-                    </div>
+                <div class="card-header bg-light border-0 py-3">
+                    <h5 class="mb-0">News & Updates</h5>
                 </div>
+                <div class="card-body">
+                                <h3 class="card-text"><strong>BRIT part of CLOSECYCLE Project</strong></h3>
+                                <div class="row">
+                                    <div class="col-12 col-lg-7 col-xl-6 order-2 order-lg-1">
+                                        <p class="card-text">
+                                            <a href="https://www.closecycle.eu" target="_blank">CLOSECYCLE</a> is an
+                                            <a href="https://www.interregnorthsea.eu/" target="_blank">INTERREG North Sea Region</a>
+                                            project, co-funded by the European Union. BRIT is part of the digital package of work
+                                            package 1, serving stakeholders of Territorial Biorefinery Networks
+                                            (TBN).
+                                        </p>
+                                        <p class="card-text">
+                                            <a href="{% url 'Showcase' %}" class="btn btn-primary">CLOSECYCLE showcases</a>
+                                        </p>
+                                    </div>
+                                    <div class="col-12 col-lg-7 col-xl-6 order-1 order-lg-2">
+                                        <p class="card-text">
+                                            <a href="https://www.closecycle.eu" target="_blank">
+                                                <img class="w-100 m-0 p-1"
+                                                     src="{% static 'img/interreg_with_closecycle_logo.png' %}"
+                                                     alt="Logo of INTERREG North Sea Region CLOSECYCLE Project">
+                                            </a>
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
             </div>
         </div>
     </div>
-    <div class="row">
-        <div class="col col-12 col-md-6 col-lg-3 mb-4">
+    <div class="row g-4">
+        <!-- Maps Card -->
+        <div class="col-12 col-sm-6 col-xl-4 col-xxl-3">
             <div class="card shadow h-100">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+                <div class="card-header bg-light border-0 py-3">
                     <h5 class="mb-0">
-                        <a href="{% url 'maps_list' %}" class="text-decoration-none text-body">
-                            <i class="fas fa-fw fa-globe-europe"></i> Maps
+                        <a href="{% url 'maps_list' %}" class="text-decoration-none text-body text-decoration-underline-hover">
+                            <i class="fas fa-fw fa-globe-europe me-2"></i>Maps
                         </a>
                     </h5>
                 </div>
                 <div class="card-img-top">
-                    <a class="d-flex align-items-center justify-content-center stretched-link"
-                       href="{% url 'maps_list' %}">
-                        <img class="w-100 m-0" src="{% static 'img/maps_cover_card.png' %}"
-                             alt="Maps Module Cover Image">
+                    <a class="d-flex align-items-center justify-content-center stretched-link" href="{% url 'maps_list' %}">
+                        <img class="w-100 m-0" src="{% static 'img/maps_cover_card.png' %}" alt="Maps Module Cover Image">
                     </a>
                 </div>
                 <div class="card-body">
@@ -83,20 +86,20 @@
                 </div>
             </div>
         </div>
-        <div class="col col-12 col-md-6 col-lg-3 mb-4">
+    
+        <!-- Materials Card -->
+        <div class="col-12 col-sm-6 col-xl-4 col-xxl-3">
             <div class="card shadow h-100">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+                <div class="card-header bg-light border-0 py-3">
                     <h5 class="mb-0">
-                        <a href="{% url 'sample-list-featured' %}" class="text-decoration-none text-body">
-                            <i class="fas fa-fw fa-leaf"></i> Materials
+                        <a href="{% url 'sample-list-featured' %}" class="text-decoration-none text-body text-decoration-underline-hover">
+                            <i class="fas fa-fw fa-leaf me-2"></i>Materials
                         </a>
                     </h5>
                 </div>
                 <div class="card-img">
-                    <a class="d-flex align-items-center justify-content-center stretched-link"
-                       href="{% url 'sample-list-featured' %}">
-                        <img class="w-100 m-0" src="{% static 'img/materials_cover_card.png' %}"
-                             alt="Materials Module Cover Image">
+                    <a class="d-flex align-items-center justify-content-center stretched-link" href="{% url 'sample-list-featured' %}">
+                        <img class="w-100 m-0" src="{% static 'img/materials_cover_card.png' %}" alt="Materials Module Cover Image">
                     </a>
                 </div>
                 <div class="card-body">
@@ -107,20 +110,20 @@
                 </div>
             </div>
         </div>
-        <div class="col col-12 col-md-6 col-lg-3 mb-4">
+    
+        <!-- Sources Card -->
+        <div class="col-12 col-sm-6 col-xl-4 col-xxl-3">
             <div class="card shadow h-100">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+                <div class="card-header bg-light border-0 py-3">
                     <h5 class="mb-0">
-                        <a href="{% url 'sources-list' %}" class="text-decoration-none text-body">
-                            <i class="fas fa-fw fa-expand-arrows-alt"></i> Sources
+                        <a href="{% url 'sources-list' %}" class="text-decoration-none text-body text-decoration-underline-hover">
+                            <i class="fas fa-fw fa-expand-arrows-alt me-2"></i>Sources
                         </a>
                     </h5>
                 </div>
                 <div class="card-img">
-                    <a class="d-flex align-items-center justify-content-center stretched-link"
-                       href="{% url 'sources-list' %}">
-                        <img class="w-100 m-0 p-1" src="{% static 'img/sources_cover_card.png' %}"
-                             alt="Sources Module Cover Image">
+                    <a class="d-flex align-items-center justify-content-center stretched-link" href="{% url 'sources-list' %}">
+                        <img class="w-100 m-0 p-1" src="{% static 'img/sources_cover_card.png' %}" alt="Sources Module Cover Image">
                     </a>
                 </div>
                 <div class="card-body">
@@ -131,47 +134,44 @@
                 </div>
             </div>
         </div>
-        <div class="col col-12 col-md-6 col-lg-3 mb-4">
+    
+        <!-- Inventories Card -->
+        <div class="col-12 col-sm-6 col-xl-4 col-xxl-3">
             <div class="card shadow h-100">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+                <div class="card-header bg-light border-0 py-3">
                     <h5 class="mb-0">
-                        <a href="{% url 'scenario-list' %}" class="text-decoration-none text-body">
-                            <i class="fas fa-fw fa-chart-bar"></i> Inventories
+                        <a href="{% url 'scenario-list' %}" class="text-decoration-none text-body text-decoration-underline-hover">
+                            <i class="fas fa-fw fa-chart-bar me-2"></i>Inventories
                         </a>
                     </h5>
                 </div>
                 <div class="card-img-top">
-                    <a class="d-flex align-items-center justify-content-center stretched-link"
-                       href="{% url 'scenario-list' %}">
-                        <img class="w-100 m-0 p-1" src="{% static 'img/cover_card_inventories.png' %}"
-                             alt="Inventories Module Cover Image">
+                    <a class="d-flex align-items-center justify-content-center stretched-link" href="{% url 'scenario-list' %}">
+                        <img class="w-100 m-0 p-1" src="{% static 'img/cover_card_inventories.png' %}" alt="Inventories Module Cover Image">
                     </a>
                 </div>
                 <div class="card-body">
                     <p class="card-text">
                         Inventories are case studies about which bioresources are available in a given region.
-                        Explore
-                        ready case studies from our research projects or create your own scenarios.
+                        Explore ready case studies from our research projects or create your own scenarios.
                     </p>
                 </div>
             </div>
         </div>
-    </div>
-    <div class="row">
-        <div class="col col-12 col-md-6 col-lg-3 mb-4">
+    
+        <!-- Bibliography Card -->
+        <div class="col-12 col-sm-6 col-xl-4 col-xxl-3">
             <div class="card shadow h-100">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+                <div class="card-header bg-light border-0 py-3">
                     <h5 class="mb-0">
-                        <a href="{% url 'source-list' %}" class="text-decoration-none text-body">
-                            <i class="fas fa-fw fa-book"></i> Bibliography
+                        <a href="{% url 'source-list' %}" class="text-decoration-none text-body text-decoration-underline-hover">
+                            <i class="fas fa-fw fa-book me-2"></i>Bibliography
                         </a>
                     </h5>
                 </div>
                 <div class="card-img-top">
-                    <a class="d-flex align-items-center justify-content-center stretched-link"
-                       href="{% url 'source-list' %}">
-                        <img class="w-100 m-0" src="{% static 'img/bibliography_cover_card.png' %}"
-                             alt="Bibliography Module Cover Image">
+                    <a class="d-flex align-items-center justify-content-center stretched-link" href="{% url 'source-list' %}">
+                        <img class="w-100 m-0" src="{% static 'img/bibliography_cover_card.png' %}" alt="Bibliography Module Cover Image">
                     </a>
                 </div>
                 <div class="card-body">
@@ -183,21 +183,21 @@
                 </div>
             </div>
         </div>
-        <div class="col col-12 col-md-6 col-lg-3 mb-4">
-            {% if perms.processes.access_app_feature %}
+    
+        <!-- Processes Card (with permission check) -->
+        {% if perms.processes.access_app_feature %}
+        <div class="col-12 col-sm-6 col-xl-4 col-xxl-3">
             <div class="card shadow h-100">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+                <div class="card-header bg-light border-0 py-3">
                     <h5 class="mb-0">
-                        <a href="{% url 'processes:dashboard' %}" class="text-decoration-none text-body">
-                            <i class="fas fa-fw fa-flask"></i> Processes
+                        <a href="{% url 'processes:dashboard' %}" class="text-decoration-none text-body text-decoration-underline-hover">
+                            <i class="fas fa-fw fa-flask me-2"></i>Processes
                         </a>
                     </h5>
                 </div>
                 <div class="card-img">
-                    <a class="d-flex align-items-center justify-content-center stretched-link"
-                       href="{% url 'processes:dashboard' %}">
-                        <img class="w-100 m-0" src="{% static 'img/processes_cover_card.png' %}"
-                             alt="Processes Module Cover Image">
+                    <a class="d-flex align-items-center justify-content-center stretched-link" href="{% url 'processes:dashboard' %}">
+                        <img class="w-100 m-0" src="{% static 'img/processes_cover_card.png' %}" alt="Processes Module Cover Image">
                     </a>
                 </div>
                 <div class="card-body">
@@ -206,8 +206,7 @@
                     </p>
                 </div>
             </div>
-            {% endif %}
         </div>
+        {% endif %}
     </div>
-
 {% endblock content %}

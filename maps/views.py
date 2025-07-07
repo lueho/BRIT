@@ -680,15 +680,27 @@ class CatchmentOptionGeometryAPI(APIView):
 
     @staticmethod
     def get(request):
+        """Return GeoJSON for catchment options.
+
+        If a ``parent_id`` query parameter is provided, the endpoint returns all
+        child catchments of the parent catchment's region. Otherwise it returns
+        *all* catchments.
+        """
         qs = Catchment.objects.all()
 
-        if "parent_id" in request.query_params:
-            parent_id = request.query_params["parent_id"]
-            parent_catchment = Catchment.objects.get(id=parent_id)
+        parent_id = request.query_params.get("parent_id")
+        if parent_id is not None:
+            try:
+                parent_catchment = Catchment.objects.get(pk=parent_id)
+            except Catchment.DoesNotExist:
+                return JsonResponse(
+                    {"detail": "Parent catchment not found."}, status=404
+                )
             parent_region = parent_catchment.region
             qs = parent_region.child_catchments.all()
-            serializer = CatchmentGeoFeatureModelSerializer(qs, many=True)
-            return JsonResponse({"geoJson": serializer.data})
+
+        serializer = CatchmentGeoFeatureModelSerializer(qs, many=True)
+        return JsonResponse({"geoJson": serializer.data})
 
 
 # ----------- NutsRegions ----------------------------------------------------------------------------------------------

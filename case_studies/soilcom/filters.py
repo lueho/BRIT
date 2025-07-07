@@ -142,20 +142,18 @@ class CollectionsPerYearFilter(NullableRangeFilter):
             }
         )
 
-    def filter(self, qs, range_with_null_flag):
-        if not range_with_null_flag:
-            return qs
-        range_vals, is_null = range_with_null_flag
-        frequencies = CollectionFrequency.objects.annotate(
+    def apply_range(self, qs, value_slice: slice, include_nulls: bool):
+        """Filter collections whose related frequency has *collection_count* in range."""
+        freqs = CollectionFrequency.objects.annotate(
             collection_count=Sum("collectioncountoptions__standard")
+        ).filter(
+            collection_count__gte=value_slice.start,
+            collection_count__lte=value_slice.stop,
         )
-        frequencies = frequencies.filter(
-            collection_count__gte=range_vals.start,
-            collection_count__lte=range_vals.stop,
-        )
-        if is_null:
-            return qs.filter(Q(frequency__in=frequencies) | Q(frequency__isnull=True))
-        return qs.filter(frequency__in=frequencies)
+        filtered = qs.filter(frequency__in=freqs)
+        if include_nulls:
+            filtered = filtered | qs.filter(frequency__isnull=True)
+        return filtered
 
 
 class NullableCollectionPropertyValueRangeFilter(NullableRangeFilter):
@@ -192,33 +190,29 @@ class NullableCollectionPropertyValueRangeFilter(NullableRangeFilter):
             }
         )
 
-    def filter(self, qs, percentage_range_with_null_flag):
-        if not percentage_range_with_null_flag:
-            return qs
-        range_, is_null = percentage_range_with_null_flag
-        property_filter = Q(
-            collectionpropertyvalue__property__name=self.property_name,
-            collectionpropertyvalue__average__gt=0.0,
-        )
+    def apply_range(self, qs, value_slice: slice, include_nulls: bool):
+        """Annotate average property value and apply range/null filtering."""
         qs = qs.annotate(
-            average_collectionpropertyvalue_average=Avg(
-                "collectionpropertyvalue__average", filter=property_filter
-            )
-        )
-        if is_null:
-            qs = qs.filter(
-                Q(
-                    average_collectionpropertyvalue_average__gte=range_.start,
-                    average_collectionpropertyvalue_average__lte=range_.stop,
+            **{
+                "avg_value": Avg(
+                    "collectionpropertyvalue__average",
+                    filter=Q(
+                        collectionpropertyvalue__property__name=self.property_name,
+                        collectionpropertyvalue__average__gt=0.0,
+                    ),
                 )
-                | Q(average_collectionpropertyvalue_average__isnull=True)
-            )
-        else:
-            qs = qs.filter(
-                average_collectionpropertyvalue_average__gte=range_.start,
-                average_collectionpropertyvalue_average__lte=range_.stop,
-            )
-        return qs
+            }
+        )
+
+        filtered = qs.filter(
+            **{
+                "avg_value__gte": value_slice.start,
+                "avg_value__lte": value_slice.stop,
+            }
+        )
+        if include_nulls:
+            filtered = filtered | qs.filter(**{"avg_value__isnull": True})
+        return filtered
 
 
 class ConnectionRateFilter(NullableCollectionPropertyValueRangeFilter):

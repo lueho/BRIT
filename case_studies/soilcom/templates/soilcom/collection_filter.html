@@ -1,5 +1,4 @@
 {% extends 'filtered_list.html' %}
-{% load i18n %}
 {% load static %}
 {% load crispy_forms_tags %}
 {% load file_export_tags %}
@@ -7,23 +6,13 @@
 
 {% block title %}BRIT | Household waste collections{% endblock %}
 
-{% block list_card_header %}
-<strong>
-    {% if list_type == 'private' %}
-    My Collections
-    {% else %}
-    Collections
-    {% endif %}
-</strong>
-{% endblock %}
-
 {% block list_table %}
 <div class="table-responsive">
     <table class="table modern-table">
         <thead>
             <tr>
                 <th>Collection</th>
-                <th class="actions-column">{% if list_type == 'private' %}Status/Actions{% else %}Actions{% endif %}</th>
+                <th class="actions-column">Status/Actions</th>
             </tr>
         </thead>
         <tbody>
@@ -39,13 +28,11 @@
                 </td>
                 <td class="actions-column mobile-no-label">
                     <div class="action-container d-flex align-items-center justify-content-end">
-                        {% if list_type == 'private' %}
                         <div class="status-badge-container">
                             {% include 'object_management/review_status_badge.html' with object=object %}
                         </div>
-                        {% endif %}
-                        <div class="dropdown d-inline-block ms-auto d-none d-md-inline-block">
-                        <button class="btn btn-sm btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">⋮</button>
+                        <div class="dropdown d-inline-block ms-auto">
+                        <button class="btn btn-sm btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-container="body" aria-expanded="false"><i class="fas fa-ellipsis-v"></i></button>
                         <div class="dropdown-menu dropdown-menu-end">
                             <a class="dropdown-item" href="{{ object.get_absolute_url }}">
                                 <i class="fas fa-eye"></i> View details
@@ -104,7 +91,7 @@
                                         </form>
                                         <form method="post" action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
                                             {% csrf_token %}
-                                            <button type="submit" class="dropdown-item btn-block text-start text-danger">
+                                            <button type="submit" class="dropdown-item w-100 text-start text-danger">
                                                 <i class="fas fa-times"></i> Reject
                                             </button>
                                         </form>
@@ -147,17 +134,17 @@
     {% crispy filter.form %}
 </form>
 <div class="card shadow">
-    <div class="card-header" role="button" data-bs-toggle="collapse" data-bs-target="#learning-card-body" aria-expanded="true"
-        aria-controls="learning-card-body">
-        <strong><i class="fas fa-fw fa-graduation-cap"></i> Learning material</strong>
+    <div class="card-header py-3" role="button" data-bs-toggle="collapse" data-bs-target="#learning-card-body" aria-expanded="false"
+         aria-controls="learning-card-body">
+        <h5 class="mb-0"><i class="fas fa-fw fa-graduation-cap"></i> Learning material</h5>
     </div>
     <div class="card-body collapse" id="learning-card-body">
         <p class="card-text">
             To get an introduction of how the circular economy of food waste works, check out the
             <a href="https://www.hoou.de/projects/biocycle/" target="_blank">BioCycle</a>:
         </p>
-        <ul>
-            <li>
+        <ul class="mb-4">
+            <li class="mb-2">
                 <a href="https://www.hoou.de/projects/biocycle/" target="_blank">
                     The BioCycle - From Resource to Waste to Resource
                 </a>
@@ -170,13 +157,13 @@
             Management" of the Hamburg Open Online University.
             Recommended lectures for this topic:
         </p>
-        <ul>
-            <li>
+        <ul class="mb-3">
+            <li class="mb-2">
                 <a href="https://www.hoou.de/projects/lff/pages/residue-and-by-product-based-bioresources"
                     target="_blank">"Territorial Biowaste Management: Local Food Waste Valorisation"
                 </a>
             </li>
-            <li>
+            <li class="mb-2">
                 <a href="https://www.hoou.de/projects/lff/pages/sustainable-urban-bioresource-management"
                     target="_blank">"Biowaste Collection: Current Status and Factors Influencing Correct Sorting"
                 </a>

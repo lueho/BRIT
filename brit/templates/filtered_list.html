@@ -9,8 +9,18 @@
     <div class="row">
         <div class="col-lg-8 order-2 order-lg-1">
             <div class="card shadow">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-                    <h5 class="mb-0">{% block list_card_header %}{{ header }}{% endblock %}</h5>
+                <div class="card-header py-3">
+                    <h5 class="mb-0">
+                        {% block list_card_header %}
+                            {% if header %}
+                                {{ header }}
+                            {% elif list_type == 'private' %}
+                                My {{ object_list.model.get_verbose_name_plural }}
+                            {% else %}
+                                {{ object_list.model.get_verbose_name_plural|capfirst }}
+                            {% endif %}
+                        {% endblock %}
+                    </h5>
                 </div>
                 <div class="card-body">
                     {% block list_card_body %}
@@ -145,7 +155,7 @@
         <div class="col-lg-4 order-1 order-lg-2">
             {% block filter_column %}
             <div class="card shadow">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3" id="filterFormHeading" data-bs-toggle="collapse" data-bs-target="#filterForm"
+                <div class="card-header py-3" id="filterFormHeading" data-bs-toggle="collapse" data-bs-target="#filterForm"
                      aria-expanded="true" aria-controls="filterForm">
                     <h5 class="mb-0">{% block filter_header %}Filter{% endblock %}<span class="arrow" aria-hidden="true"></span></h5>
                 </div>

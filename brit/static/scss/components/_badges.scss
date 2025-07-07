@@ -10,11 +10,12 @@
   }
 
   &.badge-success {
-    background-color: $success;
+    background-color: darken($success, 15%);
+    color: #fff;
   }
 
   &.badge-warning {
     background-color: $warning;
-    color: $light;
+    color: darken($warning, 40%);
   }
 }
