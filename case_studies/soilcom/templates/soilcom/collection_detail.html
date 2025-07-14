@@ -225,7 +225,7 @@
 {% endblock detail_card_navigation_dropdown %}
 
 {% block detail_card_options_dropdown %}
-    {% if user == object.owner or user.is_staff or user.is_staff or perms.can_moderate %}
+    {% if user == object.owner or user.is_staff or user.is_staff or perms.can_moderate or 'soilcom.add_collection' in perms %}
     <div class="dropdown">
         <button class="btn btn-secondary dropdown-toggle mr-3" type="button"
                 id="collectionDetailOptionsDropdown"
@@ -240,18 +240,26 @@
                 </a>
                 {% endif %}
             {% endblock detail_update_link %}
+            {% if user == object.owner or user.is_staff %}
             <a class="dropdown-item" href="{% url 'collection-wastesamples' object.id %}">
                 <i class="fas fa-fw fa-edit"></i> Manage samples
             </a>
+            {% endif %}
+            {% if user == object.owner or user.is_staff %}
             <a class="dropdown-item" href="{% url 'collection-add-property' object.id %}">
                 <i class="fas fa-fw fa-plus-circle"></i> Add property
             </a>
+            {% endif %}
+            {% if 'soilcom.add_collection' in perms %}
             <a class="dropdown-item" href="{% url 'collection-copy' object.id %}">
                 <i class="fas fa-fw fa-copy"></i> Duplicate
             </a>
+            {% endif %}
+            {% if 'soilcom.add_collection' in perms %}
             <a class="dropdown-item" href="{% url 'collection-new-version' object.id %}">
                 <i class="fas fa-fw fa-code-branch"></i> New version
             </a>
+            {% endif %}
             {% block detail_delete_link %}
                 {% if user == object.owner or user.is_staff %}
                 <a class="dropdown-item modal-link" href="{% url 'collection-delete-modal' object.id %}">
