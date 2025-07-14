@@ -171,6 +171,15 @@
 {% endif %}
 
     <p class="card-text">
+        <strong>Valid from:</strong><br>
+        {{ object.valid_from|date:"d.m.Y" }}
+    </p>
+    <p class="card-text">
+        <strong>Valid until:</strong><br>
+        {{ object.valid_until|date:"d.m.Y" }}
+    </p>
+
+    <p class="card-text">
         <strong>Last update:</strong><br>
         {{ object.lastmodified_at|date:"d.m.Y" }}
     </p>
