@@ -1,11 +1,10 @@
 build:
   docker:
     web: Dockerfile
-    worker: Dockerfile
 release:
   image: web
   command:
-    - bash release-commands.sh
+    - python manage.py migrate --noinput
 run:
   web: gunicorn brit.wsgi:application --bind 0.0.0.0:$PORT --access-logfile - --error-logfile -
   worker: celery --app=brit worker --loglevel=info --logfile=- --concurrency=1
