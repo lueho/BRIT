@@ -6,7 +6,6 @@ from django.db.models import Max
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.urls import reverse
-from factory.django import mute_signals
 
 from bibliography.models import Source
 from distributions.models import TemporalDistribution, Timestep
@@ -286,20 +285,22 @@ class SampleSeries(NamedUserCreatedObject):
         return WeightShare.objects.filter(composition__sample__series=self)
 
     def duplicate(self, creator, **kwargs):
+        post_save.disconnect(sender=SampleSeries)
 
-        with mute_signals(post_save):
-            duplicate = SampleSeries.objects.create(
-                owner=creator,
-                name=kwargs.get("name", self.name),
-                material=kwargs.get("material", self.material),
-            )
+        duplicate = SampleSeries.objects.create(
+            owner=creator,
+            name=kwargs.get("name", self.name),
+            material=kwargs.get("material", self.material),
+        )
 
-            for sample in self.samples.all():
-                sample_duplicate = sample.duplicate(creator)
-                sample_duplicate.series = duplicate
-                sample_duplicate.save()
+        for sample in self.samples.all():
+            sample_duplicate = sample.duplicate(creator)
+            sample_duplicate.series = duplicate
+            sample_duplicate.save()
 
-            duplicate.temporal_distributions.set(self.temporal_distributions.all())
+        duplicate.temporal_distributions.set(self.temporal_distributions.all())
+
+        post_save.connect(sender=SampleSeries)
 
         return duplicate
 
@@ -333,13 +334,17 @@ class MaterialPropertyValue(NamedUserCreatedObject):
     standard_deviation = models.FloatField()
 
     def duplicate(self, creator):
-        with mute_signals(post_save):
-            duplicate = MaterialPropertyValue.objects.create(
-                owner=creator,
-                property=self.property,
-                average=self.average,
-                standard_deviation=self.standard_deviation,
-            )
+        post_save.disconnect(sender=MaterialPropertyValue)
+
+        duplicate = MaterialPropertyValue.objects.create(
+            owner=creator,
+            property=self.property,
+            average=self.average,
+            standard_deviation=self.standard_deviation,
+        )
+
+        post_save.connect(sender=MaterialPropertyValue)
+
         return duplicate
 
 
@@ -411,15 +416,16 @@ class Sample(NamedUserCreatedObject):
         )
 
     def duplicate(self, creator, **kwargs):
-        with mute_signals(post_save):
-            duplicate = Sample.objects.create(
-                owner=creator,
-                name=kwargs.get("name", f"{self.name} (copy)"),
-                material=kwargs.get("material", self.material),
-                series=kwargs.get("series", self.series),
-                timestep=kwargs.get("timestep", self.timestep),
-                datetime=kwargs.get("datetime", self.datetime),
-            )
+        post_save.disconnect(sender=Sample)
+        duplicate = Sample.objects.create(
+            owner=creator,
+            name=kwargs.get("name", f"{self.name} (copy)"),
+            material=kwargs.get("material", self.material),
+            series=kwargs.get("series", self.series),
+            timestep=kwargs.get("timestep", self.timestep),
+            datetime=kwargs.get("datetime", self.datetime),
+        )
+        post_save.connect(sender=Sample)
         for composition in self.compositions.all():
             duplicate_composition = composition.duplicate(creator)
             duplicate_composition.sample = duplicate
@@ -571,14 +577,15 @@ class Composition(NamedUserCreatedObject):
             self.save()
 
     def duplicate(self, creator):
-        with mute_signals(post_save):
-            duplicate = Composition.objects.create(
-                owner=creator,
-                group=self.group,
-                sample=self.sample,
-                fractions_of=self.fractions_of,
-                order=self.order,
-            )
+        post_save.disconnect(sender=Composition)
+        duplicate = Composition.objects.create(
+            owner=creator,
+            group=self.group,
+            sample=self.sample,
+            fractions_of=self.fractions_of,
+            order=self.order,
+        )
+        post_save.connect(sender=Composition)
         for share in self.shares.all():
             duplicate_share = share.duplicate(creator)
             duplicate_share.composition = duplicate

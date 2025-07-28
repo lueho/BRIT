@@ -1,9 +1,9 @@
 from celery import chord
 from django.db.models.signals import post_save
 from django.utils import timezone
-from factory.django import mute_signals
 
 from brit.celery import app
+
 from .filters import SourceFilter
 from .models import Source
 from .utils import check_url
@@ -19,8 +19,9 @@ def check_source_url(pk):
     source = Source.objects.get(pk=pk)
     source.url_valid = check_url(source.url)
     source.url_checked = timezone.now()
-    with mute_signals(post_save):
-        source.save()
+    post_save.disconnect(sender=Source)
+    source.save()
+    post_save.connect(sender=Source)
 
 
 @app.task()
