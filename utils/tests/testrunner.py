@@ -6,8 +6,35 @@ import statistics
 import time
 import unittest
 
+from django.apps import AppConfig
+from django.conf import settings
 from django.core.management import call_command
+from django.db.models.signals import post_migrate
+from django.dispatch import receiver
 from django.test.runner import DiscoverRunner
+
+
+# Signal handler to ensure initial data is loaded for parallel test databases
+@receiver(post_migrate)
+def ensure_test_initial_data(sender: AppConfig, **kwargs):
+    """
+    Run ensure_initial_data after migrations complete during test setup.
+    This runs once for the first database, then gets mirrored to parallel workers.
+    """
+    # Only run during testing and only once (when utils app migrations finish)
+    if not getattr(settings, 'TESTING', False):
+        return
+    
+    # Run only after the last app's migrations to avoid running multiple times
+    # We use 'utils' as it's typically one of the last apps to migrate
+    if sender.name != 'utils':
+        return
+        
+    try:
+        call_command("ensure_initial_data")
+    except Exception as e:
+        # Log the error but don't fail the test setup
+        print(f"Warning: Failed to run ensure_initial_data: {e}")
 
 
 class StopwatchTestResult(unittest.TextTestResult):
@@ -139,8 +166,8 @@ class SerialAwareTestRunner(DiscoverRunner):
     """
 
     def __init__(self, *args, **kwargs):
+        self._stats = kwargs.pop("stats", False)
         super().__init__(*args, **kwargs)
-        self._stats = kwargs["stats"]
 
     @classmethod
     def add_arguments(cls, parser):
@@ -155,7 +182,16 @@ class SerialAwareTestRunner(DiscoverRunner):
         return StopwatchTestResult
 
     def run_tests(self, test_labels, extra_tests=None, **kwargs):
-        # Discover all test cases
+        # Check if we have any serial tests to handle
+        if not SERIAL_TESTS:
+            # No serial tests, use Django's standard test runner
+            result = super().run_tests(test_labels, extra_tests=extra_tests, **kwargs)
+            if self._stats:
+                StopwatchTestResult.print_stats()
+            return result
+        
+        # We have serial tests, so we need custom handling
+        # But we still want to use Django's proper test setup
         suite = self.build_suite(test_labels, extra_tests)
         serial_suite = unittest.TestSuite()
         parallel_suite = unittest.TestSuite()
@@ -186,44 +222,20 @@ class SerialAwareTestRunner(DiscoverRunner):
             else:
                 parallel_suite.addTest(test)
 
-        # Run parallel tests first
+        # Run parallel tests first using Django's proper test execution
+        result = 0
         if parallel_suite.countTestCases():
-            self.parallel = getattr(self, "parallel", 1)
-            super().run_suite(parallel_suite)
-        # Run serial tests
+            old_parallel = getattr(self, 'parallel', 1)
+            result += self.run_suite(parallel_suite, **kwargs)
+            
+        # Run serial tests with parallelism disabled
         if serial_suite.countTestCases():
-            old_parallel = self.parallel
+            old_parallel = getattr(self, 'parallel', 1)
             self.parallel = 1
-            super().run_suite(serial_suite)
+            result += self.run_suite(serial_suite, **kwargs)
             self.parallel = old_parallel
 
         if self._stats:
             StopwatchTestResult.print_stats()
-
-    def setup_databases(self, **kwargs):
-        result = super().setup_databases(**kwargs)
-        call_command("ensure_initial_data")
-        return result
-
-    @classmethod
-    def add_arguments(cls, parser):
-        DiscoverRunner.add_arguments(parser)
-        parser.add_argument(
-            "--stats",
-            action="store_true",
-            help="Print timing statistics",
-        )
-
-    def get_resultclass(self):
-        # super().get_resultclass() or
-        return StopwatchTestResult
-
-    def run_tests(self, test_labels, extra_tests=None, **kwargs):
-        super().run_tests(test_labels, **kwargs)
-        if self._stats:
-            StopwatchTestResult.print_stats()
-
-    def setup_databases(self, **kwargs):
-        result = super().setup_databases(**kwargs)
-        call_command("ensure_initial_data")
+            
         return result

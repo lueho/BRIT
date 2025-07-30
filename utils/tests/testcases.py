@@ -68,7 +68,7 @@ def comparable_model_dict(instance):
     }
 
 
-class AbstractTestCases(object):
+class AbstractTestCases:
     class UserCreatedObjectCRUDViewTestCase(ABC, UserLoginTestCase):
         """
         Abstract base class for testing standard Django CRUD views, particularly
@@ -368,10 +368,7 @@ class AbstractTestCases(object):
             if self.dashboard_view:
                 self.assertContains(response, self.get_dashboard_url())
             if self.create_view:
-                if (
-                    self.model_add_permission
-                    and self.allow_create_for_any_authenticated_user
-                ):
+                if self.allow_create_for_any_authenticated_user:
                     self.assertContains(response, self.get_create_url())
                 else:
                     self.assertNotContains(response, self.get_create_url())
@@ -392,10 +389,7 @@ class AbstractTestCases(object):
             if self.dashboard_view:
                 self.assertContains(response, self.get_dashboard_url())
             if self.create_view:
-                if (
-                    self.model_add_permission
-                    and self.allow_create_for_any_authenticated_user
-                ):
+                if self.allow_create_for_any_authenticated_user:
                     self.assertContains(response, self.get_create_url())
                 else:
                     self.assertNotContains(response, self.get_create_url())
@@ -443,10 +437,7 @@ class AbstractTestCases(object):
             if self.dashboard_view:
                 self.assertIn(self.get_dashboard_url(), body)
             if self.create_view:
-                if (
-                    self.model_add_permission
-                    and self.allow_create_for_any_authenticated_user
-                ):
+                if self.allow_create_for_any_authenticated_user:
                     self.assertIn(self.get_create_url(), body)
                 else:
                     self.assertNotIn(self.get_create_url(), body)
@@ -466,10 +457,7 @@ class AbstractTestCases(object):
             if self.dashboard_view:
                 self.assertIn(self.get_dashboard_url(), body)
             if self.create_view:
-                if (
-                    self.model_add_permission
-                    and self.allow_create_for_any_authenticated_user
-                ):
+                if self.allow_create_for_any_authenticated_user:
                     self.assertIn(self.get_create_url(), body)
                 else:
                     self.assertNotIn(self.get_create_url(), body)
