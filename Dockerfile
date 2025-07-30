@@ -1,5 +1,3 @@
-# syntax=docker/dockerfile:1
-
 ####################################
 # ---------- builder --------------
 ####################################
@@ -28,9 +26,8 @@ WORKDIR /app
 # Copy dependency metadata only
 COPY pyproject.toml uv.lock* ./
 
-# Resolve & install deps into .venv with --frozen for reproducibility
-RUN --mount=type=cache,target=/root/.cache/uv \
-    if [ "$INSTALL_DEV" = "true" ]; then \
+# Resolve & install deps into .venv with --frozen for reproducibility (without BuildKit cache)
+RUN if [ "$INSTALL_DEV" = "true" ]; then \
     uv sync --locked --dev; \
     else \
     uv sync --locked --no-dev; \
