@@ -1,20 +1,24 @@
 /logs/
 /db_dump/
 /.idea/
-/.vscode/
+# /.vscode/
 /brit/settings/.env
 *.pyc
 */__pycache__/
+.env
+
+# Prevent log files with problematic names
+-
 
 # windsurf rules
 .windsurfrules
-.isort.cfg
+# .isort.cfg
 *code-workspace*
 
 /test-results/
 /.venv/
 /.devcontainer/
-/.windsurf/
+# /.windsurf/
 /site/
-.windsurf
-.vscode
+# .windsurf
+# .vscode
