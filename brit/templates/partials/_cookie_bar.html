@@ -1,12 +1,10 @@
-<script type="{% js_type_for_cookie_consent request "social" "*:.google.com" %}" data-varname="social">
-    (function() {
-      var po = document.createElement('script'); po.type = 'text/javascript'; po.async = true;
-      po.src = 'https://apis.google.com/js/plusone.js';
-      var s = document.getElementsByTagName('script')[0]; s.parentNode.insertBefore(po, s);
-    })();
-</script>
+{% load static %}
+{% load cookie_consent_tags %}
+
 
 {% if request|cookie_consent_enabled %}
+    <link href="{% static 'css/cookie-bar.css' %}" rel="stylesheet">
+    <script type="text/javascript" src="{% static 'cookie_consent/cookiebar.js' %}"></script>
     {% not_accepted_or_declined_cookie_groups request as cookie_groups %}
 
     {% if cookie_groups %}
@@ -34,8 +32,8 @@
             }
 
             ready(function() {
-                showCookieBar({
-                    content: '<div class="fixed-bottom cookie-bar p-4"><div class="bg-secondary text-white border w-100 mw-100" role="alert" data-autohide="false"><div class="p-4 d-flex flex-column"><h4>Cookies</h4><p>This site requires cookies to function properly. On top of the essential cookies, we would also like to use Google Analytics to learn about how this site is used. Please let us know if you accept this. Press "Config" for more detailed options.</p><div class="ms-auto"><a href="{{ url_accept }}" class="cc-cookie-accept btn btn-light mr-3">Accept</a><a href="{{ url_decline }}" class="cc-cookie-decline btn btn-outline-light mr-3">Decline</a><a href="{{ url_cookies }}" class="btn btn-outline-light">Config</a></div></div></div></div>',
+                legacyShowCookieBar({
+                    content: '<div class="fixed-bottom cookie-bar p-3 p-md-4" role="region" aria-label="Cookie consent banner"><div class="bg-white border shadow rounded-3 w-100 mw-100" role="alert" data-autohide="false"><div class="p-3 p-md-4"><div class="d-flex flex-column flex-lg-row align-items-center justify-content-between gap-3"><div class="flex-grow-1 mb-3 mb-lg-0"><h5 class="mb-2 text-primary">Cookie Consent</h5><p class="mb-0 text-muted small">This site requires cookies to function properly. We also use Google Analytics to understand how visitors interact with our site. Please let us know if you accept these additional cookies. Press "Config" for detailed options.</p></div><div class="d-flex flex-wrap gap-2 justify-content-center"><a href="{{ url_accept }}" class="cc-cookie-accept btn btn-primary" aria-label="Accept all cookies">Accept All</a><a href="{{ url_decline }}" class="cc-cookie-decline btn btn-outline-secondary" aria-label="Decline additional cookies">Decline</a><a href="{{ url_cookies }}" class="btn btn-outline-primary" aria-label="Configure cookie preferences">Config</a></div></div></div></div></div>',
                     cookie_groups: cookie_groups,
                     cookie_decline: "{% get_decline_cookie_groups_cookie_string request cookie_groups %}",
                     beforeDeclined: function() {
