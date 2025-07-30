@@ -9,4 +9,7 @@ release:
     - python manage.py migrate --noinput
 run:
   web: gunicorn $DJANGO_WSGI --bind 0.0.0.0:$PORT --access-logfile - --error-logfile -
-  worker: celery --app=brit worker --loglevel=info --concurrency=1
+  worker:
+    image: web
+    command:
+      - celery --app=brit worker --loglevel=info --concurrency=1
