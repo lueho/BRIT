@@ -6,7 +6,7 @@ from django.db.models import signals
 from django.http.request import MultiValueDict, QueryDict
 from django.test import TestCase
 from factory.django import mute_signals
-from mock import Mock, patch
+from unittest.mock import Mock, patch
 
 from maps.models import Region
 from ..models import (Collection, CollectionCatchment, CollectionFrequency, CollectionSystem, Collector,
