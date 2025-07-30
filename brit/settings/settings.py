@@ -61,11 +61,9 @@ INSTALLED_APPS = [
     "utils.object_management.apps.ObjectManagementConfig",
     "django.forms",
     "django_filters",
-    "debug_toolbar",
 ]
 
 MIDDLEWARE = [
-    "debug_toolbar.middleware.DebugToolbarMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",

@@ -1,4 +1,27 @@
-from .local import *
+from .settings import *
+
+SITE_ID = 1
+
+DEBUG = False
+
+TESTING = True
+
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", "testserver"]
+
+INTERNAL_IPS = ["127.0.0.1"]
+
+DATABASES["default"] = {
+    "ENGINE": "django.contrib.gis.db.backends.postgis",
+    "NAME": "test_brit_db",
+    "USER": os.environ.get("POSTGRES_USER", "postgres"),
+    "PASSWORD": os.environ.get("POSTGRES_PASSWORD", "postgres"),
+    "HOST": os.environ.get("POSTGRES_HOST", "localhost"),
+    "PORT": os.environ.get("POSTGRES_PORT", "5432"),
+    "TEST": {
+        "NAME": "test_brit_test_db",
+    },
+}
+
 
 # Whitenoise is not suitable for serving static files during tests.
 # Fall back to Django's standard setting
@@ -7,9 +30,6 @@ STORAGES["staticfiles"] = {
 }
 
 COOKIE_CONSENT_ENABLED = False
-
-APPS_REMOVED_FOR_TESTING = ("debug_toolbar",)
-INSTALLED_APPS = [app for app in INSTALLED_APPS if app not in APPS_REMOVED_FOR_TESTING]
 
 MIDDLEWARE = [
     "django.contrib.sessions.middleware.SessionMiddleware",
@@ -20,6 +40,9 @@ MIDDLEWARE = [
 ]
 
 SILENCED_SYSTEM_CHECKS = ["debug_toolbar.W001"]
+
+# Use console email backend for tests to avoid external dependencies
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
 
 # Use DB-backed sessions for parallel test safety
 SESSION_ENGINE = "django.contrib.sessions.backends.db"
@@ -48,3 +71,7 @@ LOGGING = {
         },
     },
 }
+
+CRISPY_FAIL_SILENTLY = False
+
+TEST_RUNNER = "utils.tests.testrunner.SerialAwareTestRunner"

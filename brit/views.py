@@ -57,3 +57,8 @@ def set_session(request):
 def get_session(request):
     value = request.session.get('test_key', 'Not found')
     return HttpResponse(f"Session value: {value}")
+
+
+def health_check(request):
+    """Returns a 200 OK response."""
+    return HttpResponse(status=200)
