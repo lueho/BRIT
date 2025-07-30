@@ -20,6 +20,7 @@ class ScenarioCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
     view_delete_name = "scenario-delete-modal"
 
     add_scope_query_param_to_list_urls = True
+    allow_create_for_any_authenticated_user = True
 
     create_object_data = {"name": "Test Scenario"}
     update_object_data = {"name": "Updated Test Scenario"}
