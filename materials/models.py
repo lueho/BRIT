@@ -285,7 +285,7 @@ class SampleSeries(NamedUserCreatedObject):
         return WeightShare.objects.filter(composition__sample__series=self)
 
     def duplicate(self, creator, **kwargs):
-        post_save.disconnect(sender=SampleSeries)
+        post_save.disconnect(add_default_temporal_distribution, sender=SampleSeries)
 
         duplicate = SampleSeries.objects.create(
             owner=creator,
@@ -300,7 +300,7 @@ class SampleSeries(NamedUserCreatedObject):
 
         duplicate.temporal_distributions.set(self.temporal_distributions.all())
 
-        post_save.connect(sender=SampleSeries)
+        post_save.connect(add_default_temporal_distribution, sender=SampleSeries)
 
         return duplicate
 
@@ -334,16 +334,12 @@ class MaterialPropertyValue(NamedUserCreatedObject):
     standard_deviation = models.FloatField()
 
     def duplicate(self, creator):
-        post_save.disconnect(sender=MaterialPropertyValue)
-
         duplicate = MaterialPropertyValue.objects.create(
             owner=creator,
             property=self.property,
             average=self.average,
             standard_deviation=self.standard_deviation,
         )
-
-        post_save.connect(sender=MaterialPropertyValue)
 
         return duplicate
 
@@ -416,7 +412,7 @@ class Sample(NamedUserCreatedObject):
         )
 
     def duplicate(self, creator, **kwargs):
-        post_save.disconnect(sender=Sample)
+        post_save.disconnect(add_default_composition, sender=Sample)
         duplicate = Sample.objects.create(
             owner=creator,
             name=kwargs.get("name", f"{self.name} (copy)"),
@@ -425,7 +421,7 @@ class Sample(NamedUserCreatedObject):
             timestep=kwargs.get("timestep", self.timestep),
             datetime=kwargs.get("datetime", self.datetime),
         )
-        post_save.connect(sender=Sample)
+        post_save.connect(add_default_composition, sender=Sample)
         for composition in self.compositions.all():
             duplicate_composition = composition.duplicate(creator)
             duplicate_composition.sample = duplicate
@@ -577,7 +573,7 @@ class Composition(NamedUserCreatedObject):
             self.save()
 
     def duplicate(self, creator):
-        post_save.disconnect(sender=Composition)
+        post_save.disconnect(add_next_order_value, sender=Composition)
         duplicate = Composition.objects.create(
             owner=creator,
             group=self.group,
@@ -585,7 +581,7 @@ class Composition(NamedUserCreatedObject):
             fractions_of=self.fractions_of,
             order=self.order,
         )
-        post_save.connect(sender=Composition)
+        post_save.connect(add_next_order_value, sender=Composition)
         for share in self.shares.all():
             duplicate_share = share.duplicate(creator)
             duplicate_share.composition = duplicate
