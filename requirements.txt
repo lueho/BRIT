@@ -1,36 +1,9 @@
-ambient-toolbox==12.1.9
-boto3==1.38.40
-celery==5.5.3
-crispy-bootstrap5==2025.6
-dj-database-url==2.3.0
-Django==5.2.3
-django-tomselect==2025.7.1
-django-bootstrap-modal-forms==3.0.5
-django-cookie-consent==0.8.0
-django-crispy-forms==2.4
-django-debug-toolbar==5.2.0
-django-extra-views==0.16.0
-django-geojson==4.2.0
-django-leaflet==0.32.0
-django-redis==5.4.0
-django-registration-redux==2.13
-django-storages==1.14.6
-django-tree-queries==0.20.0
-djangorestframework==3.16.0
-djangorestframework-csv==3.0.2
-djangorestframework-gis==1.2.0
-factory-boy==3.3.3
-flower==2.0.1
-gunicorn==23.0.0
-mock==5.2.0
-openpyxl==3.1.5
-Pillow==11.1.0
-psycopg2==2.9.10
-redis==6.2.0
-requests==2.32.4
-whitenoise==6.9.0
-XlsxWriter==3.2.2
-mkdocs>=1.6
-mkdocs-material>=9.5
-mkdocstrings[python]>=0.25
-tblib==3.1.0
+# This file is kept for compatibility with tools that don't support pyproject.toml
+# The authoritative dependency list is now in pyproject.toml
+#
+# To install production dependencies: uv pip install .
+# To install with dev dependencies: uv pip install .[dev]
+#
+# If you need to generate a requirements.txt from pyproject.toml:
+# uv pip compile pyproject.toml -o requirements.txt
+# uv pip compile pyproject.toml --extra dev -o requirements-dev.txt

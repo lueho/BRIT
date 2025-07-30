@@ -1,7 +1,132 @@
-[tool.black]
-line-length = 88
-target-version = ['py313']
+[project]
+name = "brit"
+version = "0.3.0"
+description = "The Bioresource Information Tool (BRIT) provides information about sources, quantities and properties of residue-based bioresources."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    # Core Django and web framework
+    "django>=5.2.4",
+    "djangorestframework>=3.16.0",
+    "djangorestframework-csv>=3.0.2",
+    "djangorestframework-gis>=1.2.0",
+    "gunicorn>=23.0.0",
+    "whitenoise>=6.9.0",
 
-[tool.isort]
-profile = "black"
-line_length = 88
+    # Database and caching
+    "dj-database-url>=3.0.1",
+    "django-redis>=6.0.0",
+    "psycopg2-binary>=2.9.0",
+
+    # Task queue
+    "celery>=5.5.3",
+    "tblib>=3.1.0",
+
+    # UI and forms
+    "django-crispy-forms>=2.4",
+    "crispy-bootstrap5>=2025.6",
+    "django-bootstrap-modal-forms>=3.0.5",
+    "django-tomselect>=2025.7.1",
+    "django-extra-views>=0.16.0",
+
+    # Geographic and mapping
+    "django-geojson>=4.2.0",
+    "django-leaflet>=0.32.0",
+
+    # User management and utilities
+    "django-registration-redux>=2.13",
+    "django-cookie-consent>=0.6.0",
+
+    # File storage and processing
+    "django-storages>=1.14.6",
+    "boto3>=1.39.13",
+    "pillow>=11.3.0",
+    "openpyxl>=3.1.5",
+    "xlsxwriter>=3.2.5",
+
+    # Utilities
+    "ambient-toolbox>=12.4.4",
+    "requests>=2.32.4",
+    "django-tree-queries>=0.20.0",
+]
+
+[dependency-groups]
+dev = [
+    # Development and debugging
+    "django-debug-toolbar>=6.0.0",
+    "django-extensions>=3.2.0",
+
+    # Testing
+    "factory-boy>=3.3.3",
+    "pytest>=7.4.0",
+    "pytest-django>=4.5.0",
+    "pytest-cov>=4.1.0",
+
+    # Code quality
+    "mypy>=1.5.0",
+
+    # Documentation
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.6.15",
+    "mkdocstrings[python]>=0.30.0",
+
+    # Monitoring
+    "flower>=2.0.1",
+]
+
+# Ruff configuration for linting and formatting
+[tool.ruff]
+line-length = 88
+target-version = "py312"
+
+# Exclude commonly ignored directories
+exclude = [
+    ".bzr",
+    ".direnv",
+    ".eggs",
+    ".git",
+    ".git-rewrite",
+    ".hg",
+    ".ipynb_checkpoints",
+    ".mypy_cache",
+    ".nox",
+    ".pants.d",
+    ".pyenv",
+    ".pytest_cache",
+    ".pytype",
+    ".ruff_cache",
+    ".svn",
+    ".tox",
+    ".venv",
+    ".vscode",
+    "__pypackages__",
+    "_build",
+    "buck-out",
+    "build",
+    "dist",
+    "node_modules",
+    "site-packages",
+    "venv",
+]
+
+[tool.ruff.lint]
+# Enable pycodestyle (E), Pyflakes (F), isort (I), and other useful rules
+select = [
+    "E",  # pycodestyle errors
+    "W",  # pycodestyle warnings  
+    "F",  # Pyflakes
+    "I",  # isort
+    "B",  # flake8-bugbear
+    "C4", # flake8-comprehensions
+    "UP", # pyupgrade
+]
+ignore = [
+    "E501", # line too long (handled by formatter)
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["brit"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"

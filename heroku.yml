@@ -1,10 +1,12 @@
 build:
   docker:
     web: Dockerfile
+  config:
+    INSTALL_DEV: false
 release:
   image: web
   command:
     - python manage.py migrate --noinput
 run:
-  web: gunicorn brit.wsgi:application --bind 0.0.0.0:$PORT --access-logfile - --error-logfile -
+  web: gunicorn $DJANGO_WSGI --bind 0.0.0.0:$PORT --access-logfile - --error-logfile -
   worker: celery --app=brit worker --loglevel=info --logfile=- --concurrency=1

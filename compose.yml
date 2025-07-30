@@ -17,14 +17,16 @@ services:
   web:
     build:
       context: .
+      args:
+        INSTALL_DEV: true
     restart: unless-stopped
     command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
     volumes:
       - ./:/app
+      - /app/.venv
     depends_on:
       - db
       - redis
-      - celery
     ports:
       - "8000:8000"
     env_file:
@@ -33,14 +35,15 @@ services:
       - full
 
   celery:
-    build:
-      context: .
+    image: brit-web
     volumes:
       - ./:/app
-    command: celery --app=brit worker --loglevel=info --logfile=logs/celery.log
+      - /app/.venv
+    command: celery --app=brit worker --loglevel=info --logfile=-
     env_file:
       - brit/settings/.env
     depends_on:
+      - web
       - redis
     networks:
       - full
@@ -65,15 +68,15 @@ services:
     profiles: [ "db_admin" ]
 
   flower:
-    build: .
+    image: brit-web
     command: celery --app=brit --broker=redis://redis:6379/0 flower
     ports:
       - "5555:5555"
     env_file:
       - brit/settings/.env
     depends_on:
+      - web
       - redis
-      - celery
     networks:
       - full
 
