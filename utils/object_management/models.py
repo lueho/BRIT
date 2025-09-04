@@ -1,6 +1,8 @@
 from ambient_toolbox.models import CommonInfo
 from django.conf import settings
 from django.contrib.auth.models import User
+from django.contrib.contenttypes.fields import GenericForeignKey
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
@@ -53,6 +55,59 @@ class GlobalObject(CRUDUrlsMixin, CommonInfo):
 
     def __str__(self):
         return self.name
+
+
+class ReviewAction(models.Model):
+    """Audit log for review workflow actions with optional moderator comments.
+
+    Uses a GenericForeignKey to attach actions (submitted, approved, rejected, withdrawn)
+    to any model participating in the review workflow.
+    """
+
+    ACTION_SUBMITTED = "submitted"
+    ACTION_APPROVED = "approved"
+    ACTION_REJECTED = "rejected"
+    ACTION_WITHDRAWN = "withdrawn"
+
+    ACTION_CHOICES = (
+        (ACTION_SUBMITTED, "Submitted"),
+        (ACTION_APPROVED, "Approved"),
+        (ACTION_REJECTED, "Rejected"),
+        (ACTION_WITHDRAWN, "Withdrawn"),
+    )
+
+    # Generic relation to the affected object
+    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
+    object_id = models.PositiveIntegerField()
+    content_object = GenericForeignKey("content_type", "object_id")
+
+    # Actor performing the action
+    user = models.ForeignKey(
+        User, on_delete=models.PROTECT, related_name="review_actions"
+    )
+
+    # What happened and the optional comment
+    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
+    comment = models.TextField(blank=True)
+
+    # Timestamp
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ["-created_at", "-id"]
+        indexes = [
+            models.Index(fields=["content_type", "object_id", "action"]),
+            models.Index(fields=["created_at"]),
+        ]
+
+    def __str__(self):
+        obj = self.content_object
+        obj_label = (
+            f"{obj._meta.app_label}.{obj._meta.model_name}:{getattr(obj, 'pk', '?')}"
+            if obj
+            else "?"
+        )
+        return f"{self.get_action_display()} by {self.user} on {obj_label}"
 
 
 class UserCreatedObjectQuerySet(models.QuerySet):
@@ -218,6 +273,46 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
     @property
     def verbose_name(self):
         return self._meta.verbose_name
+
+    # --- Review helper flags ---
+    def _get_last_review_action(self):
+        """
+        Returns the most recent ReviewAction for this object, or None.
+        """
+        from .models import ReviewAction  # local import to avoid circulars
+
+        ct = ContentType.objects.get_for_model(self.__class__)
+        return (
+            ReviewAction.objects.filter(content_type=ct, object_id=self.pk)
+            .order_by("-created_at", "-id")
+            .first()
+        )
+
+    @property
+    def is_rejected(self):
+        """
+        An object is considered rejected if it is currently private and the last
+        recorded review action was 'rejected'. This allows owners to see feedback
+        and resubmit after addressing comments.
+        """
+        if not self.is_private or not getattr(self, "pk", None):
+            return False
+        last = self._get_last_review_action()
+        return bool(last and last.action == ReviewAction.ACTION_REJECTED)
+
+    def get_last_rejection_action(self):
+        """Return the most recent 'rejected' ReviewAction for this object, or None."""
+        if not getattr(self, "pk", None):
+            return None
+        from .models import ReviewAction  # local import
+        ct = ContentType.objects.get_for_model(self.__class__)
+        return (
+            ReviewAction.objects.filter(
+                content_type=ct, object_id=self.pk, action=ReviewAction.ACTION_REJECTED
+            )
+            .order_by("-created_at", "-id")
+            .first()
+        )
 
 
 class NamedUserCreatedObject(UserCreatedObject):
