@@ -4,7 +4,7 @@ from crispy_forms.bootstrap import Accordion
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Column, Field, Layout, Row, Submit
 from django.db.models import Avg, Count, Max, Q, Sum
-from django.forms import CheckboxSelectMultiple, DateInput, HiddenInput, RadioSelect
+from django.forms import CheckboxSelectMultiple, DateInput, RadioSelect
 from django_filters import (
     BooleanFilter,
     CharFilter,
@@ -121,7 +121,6 @@ class CollectionFilterFormHelper(FormHelper):
 
 
 class CollectionsPerYearFilter(NullableRangeFilter):
-
     def set_min_max(self):
         frequencies = CollectionFrequency.objects.annotate(
             collection_count=Sum("collectioncountoptions__standard")

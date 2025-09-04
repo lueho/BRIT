@@ -427,6 +427,11 @@ urlpatterns = [
         name="collection-list-owned",
     ),
     path(
+        "collections/review/",
+        views.CollectionReviewListView.as_view(),
+        name="collection-list-review",
+    ),
+    path(
         "collections/create/",
         views.CollectionCreateView.as_view(),
         name="collection-create",

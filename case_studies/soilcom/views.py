@@ -39,6 +39,7 @@ from utils.object_management.views import (
     PrivateObjectListView,
     PublishedObjectFilterView,
     PublishedObjectListView,
+    ReviewObjectFilterView,
     UserCreatedObjectAutocompleteView,
     UserCreatedObjectCreateView,
     UserCreatedObjectDetailView,
@@ -391,7 +392,6 @@ class WasteFlyerCheckUrlView(SourceCheckUrlView):
 
 
 class WasteFlyerCheckUrlProgressView(LoginRequiredMixin, View):
-
     @staticmethod
     def get(request, task_id):
         result = AsyncResult(task_id)
@@ -419,7 +419,6 @@ class WasteFlyerListCheckUrlsView(PermissionRequiredMixin, View):
 
 
 class WasteFlyerListCheckUrlsProgressView(LoginRequiredMixin, View):
-
     @staticmethod
     def get(request, task_id):
         result = AsyncResult(task_id)
@@ -631,7 +630,6 @@ class CollectionCatchmentDetailView(CatchmentDetailView):
 
 
 class CollectionCatchmentUpdateView(CatchmentUpdateView):
-
     def get_success_url(self):
         return reverse("collectioncatchment-detail", kwargs={"pk": self.object.pk})
 
@@ -668,6 +666,13 @@ class CollectionPublishedListView(PublishedObjectFilterView):
 class CollectionPrivateListView(PrivateObjectFilterView):
     model = Collection
     filterset_class = CollectionFilterSet
+    dashboard_url = reverse_lazy("wastecollection-dashboard")
+
+
+class CollectionReviewListView(ReviewObjectFilterView):
+    model = Collection
+    filterset_class = CollectionFilterSet
+    template_name = "collection_review_filter.html"
     dashboard_url = reverse_lazy("wastecollection-dashboard")
 
 
@@ -863,7 +868,6 @@ class CollectionListFileExportView(GenericUserCreatedObjectExportView):
 
 
 class CollectionAddPropertyValueView(CollectionPropertyValueCreateView):
-
     def get_initial(self):
         initial = super().get_initial()
         initial["collection"] = self.kwargs["pk"]
@@ -876,7 +880,6 @@ class CollectionAddPropertyValueView(CollectionPropertyValueCreateView):
 class CollectionCatchmentAddAggregatedPropertyView(
     AggregatedCollectionPropertyValueCreateView
 ):
-
     def get_initial(self):
         initial = super().get_initial()
         catchment = CollectionCatchment.objects.get(pk=self.kwargs.get("pk"))
@@ -885,7 +888,6 @@ class CollectionCatchmentAddAggregatedPropertyView(
 
 
 class SelectNewlyCreatedObjectModelSelectOptionsView(OwnedObjectModelSelectOptionsView):
-
     def get_selected_object(self):
         # TODO: Improve this by adding owner to
         created_at = self.model.objects.aggregate(max_created_at=Max("created_at"))[
