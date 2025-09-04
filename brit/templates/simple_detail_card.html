@@ -1,16 +1,61 @@
 {% extends 'base.html' %}
+{% load moderation_tags %}
 
 {% block title %}BRIT | {{ object.name }} details{% endblock %}
 
 {% block content %}
+{% if object.is_rejected and request.user == object.owner %}
+<div class="row mt-4">
+    <div class="col">
+        <div class="card border-danger shadow-sm">
+            <div class="card-header bg-danger text-white">
+                <strong><i class="fas fa-times-circle"></i> Submission Rejected</strong>
+            </div>
+            <div class="card-body">
+                {% with last_rej=object.get_last_rejection_action %}
+                    {% if last_rej %}
+                        <p class="mb-2"><strong>Moderator:</strong> {{ last_rej.user }}</p>
+                        <p class="mb-2"><strong>Date:</strong> {{ last_rej.created_at|date:"Y-m-d H:i" }}</p>
+                        <p class="mb-0"><strong>Comments:</strong><br>
+                            {% if last_rej.comment %}
+                                {{ last_rej.comment|linebreaksbr }}
+                            {% else %}
+                                <span class="text-muted">No comments provided.</span>
+                            {% endif %}
+                        </p>
+                        <hr class="my-3" />
+                        <form method="post" action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url }}">
+                            {% csrf_token %}
+                            <div class="mb-2">
+                                <label for="resubmit-comment" class="form-label"><strong>Your explanation (optional)</strong></label>
+                                <textarea id="resubmit-comment" name="comment" rows="3" class="form-control" placeholder="Explain what you changed to address the feedback."></textarea>
+                            </div>
+                            <button type="submit" class="btn btn-danger">
+                                <i class="fas fa-paper-plane"></i> Resubmit for review
+                            </button>
+                        </form>
+                    {% else %}
+                        <p class="mb-0">This submission was rejected. No additional details are available.</p>
+                    {% endif %}
+                {% endwith %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
 <div class="row my-4">
     <div class="col">
         <div class="card shadow">
             <div class="card-header d-flex justify-content-between align-items-center bg-body-tertiary border-bottom-0 py-3">
-                <h5 class="mb-0">
-                    {% block detail_header %}{{ object.verbose_name|capfirst }} details{% endblock %}
-                </h5>
-                {% block detail_header_badge %}{% endblock %}
+                <div class="d-flex align-items-center gap-2">
+                    <h5 class="mb-0">
+                        {% block detail_header %}{{ object.verbose_name|capfirst }} details{% endblock %}
+                    </h5>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    {% block detail_header_badge %}{% endblock %}
+                    {% block detail_header_actions %}{% endblock %}
+                </div>
             </div>
 
             {% block detail_top_image %}{% endblock %}
@@ -72,6 +117,28 @@
                                         </a>
                                     {% endif %}
                                 {% endblock detail_delete_link %}
+                                {% if request.user.is_authenticated %}
+                                    <div class="dropdown-divider"></div>
+                                    {% if request.user == object.owner %}
+                                        {% if object.is_rejected %}
+                                            <a class="dropdown-item" href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}">
+                                                <i class="fas fa-fw fa-clipboard-check"></i> Review feedback
+                                            </a>
+                                        {% else %}
+                                            <span class="dropdown-item disabled" title="Owners cannot open the review view for their own items.">
+                                                <i class="fas fa-fw fa-clipboard-check"></i> Review view (not available for owners)
+                                            </span>
+                                        {% endif %}
+                                    {% elif request.user.is_staff %}
+                                        <a class="dropdown-item" href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}">
+                                            <i class="fas fa-fw fa-clipboard-check"></i> Review view
+                                        </a>
+                                    {% elif perms.can_moderate %}
+                                        <a class="dropdown-item" href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}">
+                                            <i class="fas fa-fw fa-clipboard-check"></i> Review view
+                                        </a>
+                                    {% endif %}
+                                {% endif %}
                                 {% block detail_card_options_dropdown_additional_links %}{% endblock %}
                             </div>
                         </div>

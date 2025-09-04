@@ -2,6 +2,7 @@
 {% load static %}
 {% load custom_tags %}
 {% load crispy_forms_tags %}
+{% load moderation_tags %}
 
 {% block title %}BRIT | {{ header }}{% endblock %}
 
@@ -24,6 +25,7 @@
                 </div>
                 <div class="card-body">
                     {% block list_card_body %}
+                    {% include 'partials/scope_switcher.html' %}
                     {% block list_table %}
                     <div class="table-responsive">
                         <table class="table modern-table">
@@ -54,6 +56,29 @@
                                             <button class="btn btn-sm btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-container="body" aria-expanded="false">⋮</button>
                                             <div class="dropdown-menu">
                                                 <a class="dropdown-item" href="{{ object.get_absolute_url }}">View</a>
+                                                {% if user.is_authenticated %}
+                                                    {% if user == object.owner %}
+                                                        {% if object.is_rejected %}
+                                                            <a class="dropdown-item" href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}">
+                                                                <i class="fas fa-clipboard-check"></i> Review feedback
+                                                            </a>
+                                                        {% else %}
+                                                            <span class="dropdown-item disabled" title="Owners cannot open the review view for their own items.">
+                                                                <i class="fas fa-clipboard-check"></i> Review view (not available for owners)
+                                                            </span>
+                                                        {% endif %}
+                                                    {% else %}
+                                                        {% if user.is_staff %}
+                                                            <a class="dropdown-item" href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}">
+                                                                <i class="fas fa-clipboard-check"></i> Review view
+                                                            </a>
+                                                        {% elif perms.can_moderate %}
+                                                            <a class="dropdown-item" href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}">
+                                                                <i class="fas fa-clipboard-check"></i> Review view
+                                                            </a>
+                                                        {% endif %}
+                                                    {% endif %}
+                                                {% endif %}
                                                 <!-- More actions can go here -->
                                             </div>
                                         </div>
