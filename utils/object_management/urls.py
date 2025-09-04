@@ -7,6 +7,11 @@ app_name = "object_management"
 urlpatterns = [
     path("review/", views.ReviewDashboardView.as_view(), name="review_dashboard"),
     path(
+        "review/detail/<int:content_type_id>/<int:object_id>/",
+        views.ReviewItemDetailView.as_view(),
+        name="review_item_detail",
+    ),
+    path(
         "approve/<int:content_type_id>/<int:object_id>/",
         views.ApproveItemView.as_view(),
         name="approve_item",

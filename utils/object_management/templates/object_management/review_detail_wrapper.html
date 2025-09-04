@@ -1,0 +1,81 @@
+{% extends base_template %}
+{% load i18n moderation_tags %}
+
+{#
+Wrapper template that renders a prominent Review card at the very top of the
+page, then defers to the model's regular detail template content.
+#}
+
+{% block content %}
+  <div class="row my-4">
+    <div class="col">
+      <div class="card shadow">
+        <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+          <h5 class="mb-0">{% trans "Review" %}</h5>
+        </div>
+        <div class="card-body">
+          {% if object.is_in_review and request.user.is_authenticated and request.user.is_staff and request.user != object.owner or object.is_in_review and request.user.is_authenticated and perms.can_moderate and request.user != object.owner %}
+            {% if review_actions %}
+              <div class="mb-3">
+                <h6 class="fw-semibold mb-2">{% trans "Previous comments and explanations" %}</h6>
+                <ul class="list-group">
+                  {% for action in review_actions %}
+                    <li class="list-group-item">
+                      <div class="d-flex justify-content-between align-items-start">
+                        <div>
+                          {% if action.action == 'rejected' %}
+                            <span class="badge bg-danger me-2"><i class="fas fa-xmark"></i> {% trans "Rejected" %}</span>
+                          {% elif action.action == 'submitted' %}
+                            <span class="badge bg-primary me-2"><i class="fas fa-paper-plane"></i> {% trans "Submitted" %}</span>
+                          {% elif action.action == 'approved' %}
+                            <span class="badge bg-success me-2"><i class="fas fa-check"></i> {% trans "Approved" %}</span>
+                          {% elif action.action == 'withdrawn' %}
+                            <span class="badge bg-secondary me-2"><i class="fas fa-arrow-left"></i> {% trans "Withdrawn" %}</span>
+                          {% endif %}
+                          <span class="text-muted small">{{ action.created_at|date:"Y-m-d H:i" }}</span>
+                        </div>
+                        <div class="small text-muted">
+                          {{ action.user }}
+                        </div>
+                      </div>
+                      {% if action.comment %}
+                        <div class="mt-2">
+                          {{ action.comment|linebreaksbr }}
+                        </div>
+                      {% endif %}
+                    </li>
+                  {% endfor %}
+                </ul>
+              </div>
+            {% endif %}
+
+            <div class="mb-3">
+              <label for="review-reject-comment" class="form-label fw-semibold">{% trans "Reviewer comment (optional)" %}</label>
+              <textarea id="review-reject-comment" name="comment" class="form-control" rows="6" form="review-reject-form" placeholder="{% trans 'Explain your decision (optional)' %}"></textarea>
+            </div>
+            <div class="btn-toolbar w-100 justify-content-between" role="toolbar" aria-label="{% trans 'Review actions' %}">
+              <div class="btn-group" role="group" aria-label="{% trans 'Negative action' %}">
+                <form id="review-reject-form" method="post" action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}" class="m-0">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-danger btn-lg">
+                    <i class="fas fa-xmark"></i> {% trans "Reject" %}
+                  </button>
+                </form>
+              </div>
+              <div class="btn-group" role="group" aria-label="{% trans 'Positive action' %}">
+                <form method="post" action="{% url 'object_management:approve_item' content_type_id=object|get_content_type_id object_id=object.id %}" class="m-0">
+                  {% csrf_token %}
+                  <button type="submit" class="btn btn-success btn-lg">
+                    <i class="fas fa-check"></i> {% trans "Approve" %}
+                  </button>
+                </form>
+              </div>
+            </div>
+          {% endif %}
+        </div>
+      </div>
+    </div>
+  </div>
+
+  {{ block.super }}
+{% endblock %}

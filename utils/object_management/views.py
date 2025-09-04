@@ -19,6 +19,7 @@ from django.core.exceptions import ImproperlyConfigured, PermissionDenied
 from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
+from django.template.loader import select_template
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.decorators import method_decorator
@@ -28,6 +29,7 @@ from django_tomselect.autocompletes import AutocompleteModelView
 from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 
 from case_studies.soilcom.models import Collection
+from utils.object_management.models import ReviewAction
 from utils.object_management.permissions import UserCreatedObjectPermission
 
 from ..forms import DynamicTableInlineFormSetHelper
@@ -68,10 +70,20 @@ class ReviewDashboardView(ListView):
             full_perm = f"{app_label}.{perm_codename}"
 
             if self.request.user.is_staff or self.request.user.has_perm(full_perm):
-                # Get items in review for this model
-                items = model_class.objects.in_review().select_related(
-                    "owner", "approved_by"
-                )
+                # Get items in review for this model, excluding current user's own items
+                try:
+                    items = (
+                        model_class.objects.in_review()
+                        .exclude(owner=self.request.user)
+                        .select_related("owner", "approved_by")
+                    )
+                except Exception:
+                    # Fallback if owner field is absent or exclude fails
+                    items = model_class.objects.in_review().select_related(
+                        "owner", "approved_by"
+                    )
+                    # Filter out in Python as a last resort
+                    items = [i for i in items if getattr(i, "owner_id", None) != self.request.user.id]
                 review_items.extend(items)
 
         # Sort by submitted_at date (newest first)
@@ -150,7 +162,12 @@ class RejectItemView(BaseReviewActionView):
     """View to reject an item that is in review."""
 
     def get_default_success_url(self, obj):
-        """Default redirect to dashboard if no 'next' parameter."""
+        """For Soilcom Collections redirect to the Collection review filter list; otherwise to dashboard."""
+        try:
+            if isinstance(obj, Collection):
+                return reverse("collection-list-review")
+        except Exception:
+            pass
         return reverse("object_management:review_dashboard")
 
     def post(self, request, *args, **kwargs):
@@ -158,12 +175,26 @@ class RejectItemView(BaseReviewActionView):
         obj = self.object
 
         # Check permissions
-        if not UserCreatedObjectPermission().has_approve_permission(request, obj):
+        if not UserCreatedObjectPermission().has_reject_permission(request, obj):
             raise PermissionDenied("You don't have permission to reject this item.")
 
         # Reject the item
         try:
             obj.reject()
+            # Store optional reviewer comment
+            comment = request.POST.get("comment", "").strip()
+            try:
+                if comment or True:  # Always create an action to log who rejected
+                    ReviewAction.objects.create(
+                        content_type=ContentType.objects.get_for_model(obj.__class__),
+                        object_id=obj.pk,
+                        user=request.user,
+                        action=ReviewAction.ACTION_REJECTED,
+                        comment=comment,
+                    )
+            except Exception as e:
+                # Don't fail the primary action because of audit log issues
+                logger.warning("Failed to create ReviewAction for rejection: %s", e)
             messages.success(
                 request,
                 f"{obj._meta.verbose_name} has been rejected and returned to private status.",
@@ -188,9 +219,25 @@ class SubmitForReviewView(BaseReviewActionView):
                 "You don't have permission to submit this item for review."
             )
 
+        # Optional explanation from owner when (re)submitting
+        comment = request.POST.get("comment", "").strip()
+
         # Submit for review
         try:
             obj.submit_for_review()
+            # Record audit action with optional comment
+            try:
+                if comment or True:  # Always create an action to log who submitted
+                    ReviewAction.objects.create(
+                        content_type=ContentType.objects.get_for_model(obj.__class__),
+                        object_id=obj.pk,
+                        user=request.user,
+                        action=ReviewAction.ACTION_SUBMITTED,
+                        comment=comment,
+                    )
+            except Exception as e:
+                logger.warning("Failed to create ReviewAction for submission: %s", e)
+
             messages.success(
                 request, f"{obj._meta.verbose_name} has been submitted for review."
             )
@@ -289,7 +336,7 @@ class UserCreatedObjectListMixin:
 
     def get_create_permission(self):
         if self.model:
-            return f'{self.model.__module__.split(".")[-2]}.add_{self.model.__name__.lower()}'
+            return f"{self.model.__module__.split('.')[-2]}.add_{self.model.__name__.lower()}"
         return None
 
     def get_list_type(self):
@@ -302,6 +349,7 @@ class UserCreatedObjectListMixin:
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        # Base context
         context.update(
             {
                 "header": self.get_header(),
@@ -311,6 +359,133 @@ class UserCreatedObjectListMixin:
                 "list_type": self.get_list_type(),
                 "private_list_owner": self.get_private_list_owner(),
                 "dashboard_url": self.get_dashboard_url(),
+            }
+        )
+
+        # Scope switcher context (urls, counts, active scope)
+        try:
+            queryset = self.get_queryset()
+            model = queryset.model
+        except Exception:
+            model = getattr(self, "model", None)
+
+        # Determine URLs from model helpers if available
+        public_url = getattr(model, "public_list_url", None)
+        private_url = getattr(model, "private_list_url", None)
+        review_url = getattr(model, "review_list_url", None)
+        if callable(public_url):
+            public_url = public_url()
+        if callable(private_url):
+            private_url = private_url()
+        if callable(review_url):
+            review_url = review_url()
+
+        # Try conventional URL names: <model>-list, <model>-list-owned, <model>-list-review
+        try:
+            model_name = model._meta.model_name if model is not None else None
+            if model_name:
+                if not public_url:
+                    try:
+                        public_url = reverse(f"{model_name}-list")
+                    except Exception:
+                        pass
+                if not private_url:
+                    try:
+                        private_url = reverse(f"{model_name}-list-owned")
+                    except Exception:
+                        pass
+                if not review_url:
+                    try:
+                        review_url = reverse(f"{model_name}-list-review")
+                    except Exception:
+                        pass
+        except Exception:
+            pass
+
+        # Fallbacks: build URLs from current path and query params with scope override
+        try:
+            req = self.request
+            base_path = req.path
+
+            def build_fallback_url(scope_value: str) -> str:
+                params = req.GET.copy()
+                # Reset pagination when switching scope
+                if "page" in params:
+                    del params["page"]
+                params["scope"] = scope_value
+                encoded = params.urlencode()
+                return f"{base_path}?{encoded}" if encoded else base_path
+
+            if not public_url:
+                public_url = build_fallback_url("published")
+            if not private_url:
+                private_url = build_fallback_url("private")
+            if not review_url:
+                review_url = build_fallback_url("review")
+        except Exception:
+            # If anything goes wrong, keep URLs as-is (may be None)
+            pass
+
+        # Compute counts conservatively; fall back to 0 on errors
+        public_count = 0
+        private_count = 0
+        review_count = 0
+        try:
+            if model is not None and hasattr(model, "objects"):
+                # Public count
+                try:
+                    public_count = model.objects.filter(publication_status="published").count()
+                except Exception:
+                    public_count = 0
+
+                # Private count (owned by current user)
+                user = self.request.user
+                try:
+                    if user and user.is_authenticated and hasattr(model, "owner"):
+                        private_count = model.objects.filter(owner=user).count()
+                except Exception:
+                    private_count = 0
+
+                # Review count (items the user can moderate)
+                try:
+                    # Prefer a custom manager/queryset method if it exists
+                    if hasattr(model.objects, "in_review"):
+                        review_qs = model.objects.in_review()
+                    else:
+                        review_qs = model.objects.filter(publication_status="review")
+
+                    # Exclude the current user's own objects from review count
+                    user = self.request.user
+                    if user and user.is_authenticated:
+                        try:
+                            review_qs = review_qs.exclude(owner=user)
+                        except Exception:
+                            pass
+
+                    # Only count if the user is a moderator for this model
+                    can_moderate = False
+                    if self.request.user and self.request.user.is_authenticated:
+                        perm_codename = f"can_moderate_{model._meta.model_name}"
+                        app_label = model._meta.app_label
+                        can_moderate = self.request.user.is_staff or self.request.user.has_perm(f"{app_label}.{perm_codename}")
+                    review_count = review_qs.count() if can_moderate else 0
+                except Exception:
+                    review_count = 0
+        except Exception:
+            pass
+
+        # Active scope from list_type (public/private/review)
+        active_scope = self.get_list_type()
+
+        context.update(
+            {
+                "active_scope": active_scope,
+                "public_url": public_url,
+                "private_url": private_url,
+                "review_url": review_url,
+                "public_count": public_count,
+                "private_count": private_count,
+                "review_count": review_count,
             }
         )
         return context
@@ -324,6 +499,10 @@ class PrivateObjectListMixin(LoginRequiredMixin, UserCreatedObjectListMixin):
     list_type = "private"
 
 
+class ReviewObjectListMixin(LoginRequiredMixin, UserCreatedObjectListMixin):
+    list_type = "review"
+
+
 class PublishedObjectFilterView(
     PublishedObjectListMixin, FilterDefaultsMixin, FilterView
 ):
@@ -335,6 +514,17 @@ class PublishedObjectFilterView(
         template_names = super().get_template_names()
         template_names.append("filtered_list.html")
         return template_names
+
+    def get_queryset(self):
+        """Exclude current user's own objects from the review list."""
+        qs = super().get_queryset()
+        user = getattr(self.request, "user", None)
+        if user and user.is_authenticated:
+            try:
+                qs = qs.exclude(owner=user)
+            except Exception:
+                pass
+        return qs
 
 
 class PrivateObjectFilterView(PrivateObjectListMixin, FilterDefaultsMixin, FilterView):
@@ -356,8 +546,26 @@ class PrivateObjectFilterView(PrivateObjectListMixin, FilterDefaultsMixin, Filte
         return template_names
 
 
-class PublishedObjectListView(PublishedObjectListMixin, ListView):
+class ReviewObjectFilterView(ReviewObjectListMixin, FilterDefaultsMixin, FilterView):
+    """
+    A view to display a list of objects owned by the currently logged-in user with default filters applied.
+    """
 
+    def get_default_filters(self):
+        """Override to set scope to 'review' for review object views."""
+        initial_values = super().get_default_filters()
+        # Override scope to 'review' for review views
+        if "scope" in self.filterset_class.base_filters:
+            initial_values["scope"] = "review"
+        return initial_values
+
+    def get_template_names(self):
+        template_names = super().get_template_names()
+        template_names.append("filtered_list.html")
+        return template_names
+
+
+class PublishedObjectListView(PublishedObjectListMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update(
@@ -365,7 +573,7 @@ class PublishedObjectListView(PublishedObjectListMixin, ListView):
                 "header": self.model._meta.verbose_name_plural.capitalize(),
                 "create_url": self.model.create_url,
                 "create_url_text": f"New {self.model._meta.verbose_name}",
-                "create_permission": f'{self.model.__module__.split(".")[-2]}.add_{self.model.__name__.lower()}',
+                "create_permission": f"{self.model.__module__.split('.')[-2]}.add_{self.model.__name__.lower()}",
             }
         )
         return context
@@ -404,7 +612,6 @@ class UserCreatedObjectReadAccessMixin(UserPassesTestMixin):
     permission_denied_message = "You do not have permission to access this object."
 
     def test_func(self):
-
         obj = self.get_object()
 
         # Ensure the object has the required fields
@@ -445,7 +652,6 @@ class UserCreatedObjectWriteAccessMixin(UserPassesTestMixin):
     permission_denied_message = "You do not have permission to access this object."
 
     def test_func(self):
-
         user = self.request.user
 
         # Authentication is required for all write operations
@@ -479,7 +685,6 @@ class UserCreatedObjectWriteAccessMixin(UserPassesTestMixin):
 
 
 class CreateUserObjectMixin(PermissionRequiredMixin, NextOrSuccessUrlMixin):
-
     def has_permission(self):
         # Staff users can always create objects
         if self.request.user.is_staff:
@@ -495,7 +700,6 @@ class CreateUserObjectMixin(PermissionRequiredMixin, NextOrSuccessUrlMixin):
 class UserCreatedObjectCreateView(
     CreateUserObjectMixin, NoFormTagMixin, SuccessMessageMixin, CreateView
 ):
-
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         model_name = "Object"
@@ -588,6 +792,96 @@ class UserCreatedObjectDetailView(UserCreatedObjectReadAccessMixin, DetailView):
             template_names = []
         template_names.append("simple_detail_card.html")
         return template_names
+
+
+class ReviewItemDetailView(UserCreatedObjectDetailView):
+    """
+    Render the regular DetailView of an object, but inject a review action bar
+    (available actions + optional reviewer comment field) at the top of the page.
+
+    Implementation strategy:
+    - Use a wrapper template that extends the object's normal detail template.
+    - Determine the base detail template via Django's default naming convention
+      (<app_label>/<model_name>_detail.html) and fall back to simple_detail_card.html.
+    - Provide the resolved base template to the wrapper via context as 'base_template'.
+    """
+
+    template_name = "object_management/review_detail_wrapper.html"
+
+    def dispatch(self, request, *args, **kwargs):
+        """Only staff or users with can_moderate_<model> may access review details.
+
+        Owners are allowed to access the page only when the item is rejected so they can read feedback.
+        """
+        obj = self.get_object()
+        model = obj.__class__
+        app_label = model._meta.app_label
+        perm_codename = f"can_moderate_{model._meta.model_name}"
+
+        # If the current user is the owner
+        if request.user.is_authenticated and hasattr(obj, "owner") and obj.owner_id == request.user.id:
+            # Allow owners to see review details only if the item was rejected
+            if getattr(obj, "is_rejected", False):
+                return super().dispatch(request, *args, **kwargs)
+            # Otherwise, owners are blocked from the review details endpoint
+            raise PermissionDenied("Moderators cannot review their own objects.")
+
+        # For non-owners, require moderator permissions
+        if not (
+            request.user.is_authenticated
+            and (request.user.is_staff or request.user.has_perm(f"{app_label}.{perm_codename}"))
+        ):
+            raise PermissionDenied("You do not have permission to access the review details page.")
+        return super().dispatch(request, *args, **kwargs)
+
+    def _resolve_base_template(self):
+        """Return the best matching base template for the object's detail view."""
+        obj = getattr(self, "object", None) or super().get_object()
+        model = obj.__class__
+        app_label = model._meta.app_label
+        model_name = model._meta.model_name
+
+        # Candidate templates following Django's DetailView default convention.
+        candidates = [
+            f"{app_label}/{model_name}_detail.html",
+            # Ultimate fallback to our generic detail card
+            "simple_detail_card.html",
+        ]
+
+        # Select the first template that exists.
+        chosen = select_template(candidates)
+        return chosen.template.name
+
+    def get_object(self, queryset=None):
+        """
+        Support generic routing by resolving the object from content type + object id
+        if provided in URL kwargs. Fallback to the default DetailView behavior.
+        """
+        content_type_id = self.kwargs.get("content_type_id")
+        object_id = self.kwargs.get("object_id")
+        if content_type_id and object_id:
+            content_type = get_object_or_404(ContentType, pk=content_type_id)
+            model_class = content_type.model_class()
+            return get_object_or_404(model_class, pk=object_id)
+        return super().get_object(queryset)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Resolve and pass the base template the wrapper should extend.
+        context["base_template"] = self._resolve_base_template()
+        context["review_mode"] = True
+        # Provide action history so reviewers can see prior comments and explanations
+        try:
+            obj = self.object
+            ct = ContentType.objects.get_for_model(obj.__class__)
+            actions = (
+                ReviewAction.objects.filter(content_type=ct, object_id=obj.pk)
+                .order_by("created_at", "id")
+            )
+        except Exception:
+            actions = []
+        context["review_actions"] = actions
+        return context
 
 
 class UserCreatedObjectModalDetailView(UserCreatedObjectReadAccessMixin, DetailView):
@@ -816,7 +1110,6 @@ class UserCreatedObjectAutocompleteView(AutocompleteModelView):
         return queryset.filter(publication_status="published")
 
     def apply_filters(self, queryset):
-
         if not self.filter_by:
             return queryset
 
