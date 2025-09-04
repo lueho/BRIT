@@ -6,7 +6,6 @@ from utils.fields import NullablePercentageRangeField, NullableRangeField
 
 
 class BaseCrispyFilterSet(FilterSet):
-
     def get_form_helper(self):
         if hasattr(self, "Meta") and hasattr(self.Meta, "form_helper"):
             return self.Meta.form_helper()
@@ -141,6 +140,7 @@ class UserCreatedObjectScopedFilterSet(BaseCrispyFilterSet):
         choices=(
             ("published", "Published"),
             ("private", "Private"),
+            ("review", "Review"),
         ),
         widget=HiddenInput(),
         method="filter_scope",
@@ -161,5 +161,7 @@ class UserCreatedObjectScopedFilterSet(BaseCrispyFilterSet):
             if user is None or not user.is_authenticated:
                 return queryset.none()
             return queryset.filter(owner=user)
+        elif value == "review":
+            return queryset.filter(publication_status="review")
         # Default / fallback: only published objects
         return queryset.filter(publication_status="published")
