@@ -276,5 +276,5 @@ TOMSELECT = {
     "PLUGINS": {
         "clear_button": {"title": "Clear Selection", "class_name": "clear-button"},
     },
-    "ENABLE_LOGGING": True,
+    "ENABLE_LOGGING": False,
 }
