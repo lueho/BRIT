@@ -31,7 +31,7 @@
                             {% include 'object_management/review_status_badge.html' with object=object %}
                         </div>
                         <div class="dropdown d-inline-block ms-auto">
-                        <button class="btn btn-sm btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-container="body" aria-expanded="false"><i class="fas fa-ellipsis-v"></i></button>
+                        <button class="btn btn-sm btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-container="body" aria-expanded="false"><i class="fas fa-ellipsis-vertical"></i></button>
                         <div class="dropdown-menu dropdown-menu-end">
                             {% if user.is_authenticated %}
                                 {% if user == object.owner %}
@@ -84,7 +84,7 @@
                                         <form method="post" action="{% url 'object_management:withdraw_from_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
                                             {% csrf_token %}
                                             <button type="submit" class="dropdown-item text-start text-warning">
-                                                <i class="fas fa-undo"></i> Withdraw from Review
+                                                <i class="fas fa-rotate-left"></i> Withdraw from Review
                                             </button>
                                         </form>
                                     {% endif %}
@@ -103,7 +103,7 @@
                                     <form method="post" action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
                                         {% csrf_token %}
                                         <button type="submit" class="dropdown-item w-100 text-start text-danger">
-                                            <i class="fas fa-times"></i> Reject
+                                            <i class="fas fa-xmark"></i> Reject
                                         </button>
                                     </form>
                                 {% endif %}

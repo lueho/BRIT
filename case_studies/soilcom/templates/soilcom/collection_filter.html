@@ -84,7 +84,7 @@
         <div class="btn-group btn-group-sm" role="group" aria-label="View toggle">
             <a class="btn btn-outline-secondary active disabled" aria-current="page" role="button" aria-pressed="true" aria-disabled="true" tabindex="-1" title="View as list" href="{{ request.get_full_path }}">List</a>
             <a class="btn btn-outline-secondary" role="button" aria-pressed="false" title="View as map"
-               href="{% if list_type == 'private' %}{{ object_list.model.private_map_url }}{% elif list_type == 'review' %}{{ object_list.model.review_map_url }}{% else %}{{ object_list.model.public_map_url }}{% endif %}?{% for key, value in request.GET.items %}{% if key != 'id' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}load_features=true">Map</a>
+               href="{% if list_type == 'private' %}{{ object_list.model.private_map_url }}{% elif list_type == 'review' %}{{ object_list.model.review_map_url }}{% else %}{{ object_list.model.public_map_url }}{% endif %}?{% for key, value in request.GET.items %}{% if key != 'scope' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope={% if list_type == 'private' %}private{% elif list_type == 'review' %}review{% else %}published{% endif %}&load_features=true">Map</a>
         </div>
         {% if user.is_authenticated %}
         <div class="btn-group btn-group-sm ms-2" role="group" aria-label="Scope toggle">
@@ -121,7 +121,7 @@
     {% for chip in chips %}
     <a class="badge rounded-pill text-bg-light border text-decoration-none" title="Remove filter"
        href="?{{ chip.remove_query }}">
-        {{ chip.text }} <i class="fas fa-times ms-1" aria-hidden="true"></i>
+        {{ chip.text }} <i class="fas fa-xmark ms-1" aria-hidden="true"></i>
         <span class="visually-hidden">Remove filter</span>
     </a>
     {% endfor %}
@@ -164,7 +164,7 @@
                             </a>
                             {% if user == object.owner or user.is_staff %}
                             <a class="dropdown-item" href="{% url 'collection-update' object.id %}">
-                                <i class="fas fa-edit"></i> Edit
+                                <i class="fas fa-pen-to-square"></i> Edit
                             </a>
                             {% endif %}
                             {# Delete: only staff may delete published objects; owners may delete private/review #}
@@ -209,7 +209,7 @@
                                         <form method="post" action="{% url 'object_management:withdraw_from_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
                                             {% csrf_token %}
                                             <button type="submit" class="dropdown-item text-start text-warning">
-                                                <i class="fas fa-undo"></i> Withdraw from Review
+                                                <i class="fas fa-rotate-left"></i> Withdraw from Review
                                             </button>
                                         </form>
                                     {% endif %}
@@ -251,7 +251,7 @@
                                         <form method="post" action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
                                             {% csrf_token %}
                                             <button type="submit" class="dropdown-item w-100 text-start text-danger">
-                                                <i class="fas fa-times"></i> Reject
+                                                <i class="fas fa-xmark"></i> Reject
                                             </button>
                                         </form>
                                     {% endif %}
@@ -277,7 +277,7 @@
 {% if user.is_authenticated %}
 {% if "soilcom.add_aggregatedcollectionpropertyvalue" in perms %}
 <a class="dropdown-item" href="{% url 'aggregatedcollectionpropertyvalue-create' %}">
-    <i class="fas fa-fw fa-plus-circle"></i> Add property to collection group
+    <i class="fas fa-fw fa-circle-plus"></i> Add property to collection group
 </a>
 {% endif %}
 

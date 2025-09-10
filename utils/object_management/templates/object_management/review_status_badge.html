@@ -5,7 +5,7 @@
 
 {% if object.is_rejected %}
 <span class="review-status-badge review-status-rejected" title="{% trans 'Rejected' %}">
-    <i class="fas fa-times-circle"></i> {% trans "Rejected" %}
+    <i class="fas fa-circle-xmark"></i> {% trans "Rejected" %}
 </span>
 {% elif object.is_private %}
 <span class="review-status-badge review-status-private" title="{% trans 'Private' %}">

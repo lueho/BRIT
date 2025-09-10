@@ -9,7 +9,7 @@
     <div class="col">
         <div class="card border-danger shadow-sm">
             <div class="card-header bg-danger text-white">
-                <strong><i class="fas fa-times-circle"></i> Submission Rejected</strong>
+                <strong><i class="fas fa-circle-xmark"></i> Submission Rejected</strong>
             </div>
             <div class="card-body">
                 {% with last_rej=object.get_last_rejection_action %}
@@ -109,7 +109,7 @@
                                 {% block detail_update_link %}
                                     {% if object.update_url %}
                                         <a class="dropdown-item" href="{{ object.update_url }}">
-                                            <i class="fas fa-fw fa-edit"></i> Edit
+                                            <i class="fas fa-fw fa-pen-to-square"></i> Edit
                                         </a>
                                     {% endif %}
                                 {% endblock detail_update_link %}
