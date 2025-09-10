@@ -113,8 +113,6 @@
     Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }} results
 </p>
 {% load custom_tags %}
-{% comment %} Active filter chips (custom only) {% endcomment %}
-{% build_filter_chips as chips %}
 {% if chips %}
 <div class="mb-2 d-flex flex-wrap gap-2">
     {% for chip in chips %}

@@ -4,7 +4,7 @@ from crispy_forms.bootstrap import Accordion
 from crispy_forms.helper import FormHelper
 from crispy_forms.layout import Column, Field, Layout, Row
 from django.db.models import Avg, Count, Max, Q, Sum
-from django.forms import CheckboxSelectMultiple, DateInput, RadioSelect
+from django.forms import CheckboxSelectMultiple, DateInput, HiddenInput, RadioSelect
 from django_filters import (
     BooleanFilter,
     CharFilter,
