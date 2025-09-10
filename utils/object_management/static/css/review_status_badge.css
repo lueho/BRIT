@@ -41,6 +41,11 @@
     color: var(--bs-success-text-emphasis);
 }
 
+.review-status-declined {
+    background-color: var(--bs-danger-bg-subtle);
+    color: var(--bs-danger-text-emphasis);
+}
+
 .review-status-archived {
     background-color: var(--bs-gray-300);
     color: var(--bs-body-color);

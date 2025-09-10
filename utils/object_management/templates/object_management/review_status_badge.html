@@ -16,6 +16,10 @@
     title="{% trans 'In Review' %}{% if object.submitted_at %} - {{ object.submitted_at|date:'Y-m-d H:i' }}{% endif %}">
     <i class="fas fa-search"></i> {% trans "In Review" %}
 </span>
+{% elif object.is_declined %}
+<span class="review-status-badge review-status-declined" title="{% trans 'Declined' %}">
+    <i class="fas fa-circle-xmark"></i> {% trans "Declined" %}
+</span>
 {% elif object.is_published %}
 <span class="review-status-badge review-status-published"
     title="{% trans 'Published' %}{% if object.approved_at %} - {{ object.approved_at|date:'Y-m-d H:i' }}{% endif %}">
