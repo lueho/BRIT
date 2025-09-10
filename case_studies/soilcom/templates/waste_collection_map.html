@@ -3,14 +3,47 @@
 {% load crispy_forms_tags %}
 {% load file_export_tags %}
 
+{% block map_card_header %}
+<div class="d-flex align-items-center justify-content-between">
+    <div class="d-flex align-items-center">
+        <span>{{ map_title }}</span>
+        <span class="text-muted small ms-2">({{ total_count }} results)</span>
+    </div>
+    <div class="d-flex align-items-center">
+        <div class="btn-group btn-group-sm" role="group" aria-label="View toggle">
+            <a class="btn btn-outline-secondary" id="link-collections-as-list"
+               href="{% if list_type == 'private' %}{{ object_list.model.private_list_url }}{% elif list_type == 'review' %}{{ object_list.model.review_list_url }}{% else %}{{ object_list.model.public_list_url }}{% endif %}?{% for key, value in request.GET.items %}{% if key != 'id' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}"
+               >List</a>
+            <a class="btn btn-outline-secondary active disabled" aria-current="page" href="#">Map</a>
+        </div>
+        {% if user.is_authenticated %}
+        <div class="btn-group btn-group-sm ms-2" role="group" aria-label="Scope toggle">
+            <a class="btn btn-outline-secondary {% if list_type == 'public' %}active disabled{% endif %}"
+               href="{{ object_list.model.public_map_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=published">
+                Published
+            </a>
+            <a class="btn btn-outline-secondary {% if list_type == 'private' %}active disabled{% endif %}"
+               href="{{ object_list.model.private_map_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=private">
+                My
+            </a>
+            {% if user.is_staff or perms.soilcom.can_moderate_collection %}
+            <a class="btn btn-outline-secondary {% if list_type == 'review' %}active disabled{% endif %}"
+               href="{{ object_list.model.review_map_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=review">
+                Review
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+ </div>
+{% endblock map_card_header %}
+
 {% block map_card_navigation_dropdown_additional_links %}
-<a class="dropdown-item" href="javascript:void(0)" id="link-collections-as-list"
-    data-href-template="{% if list_type == 'private' %}{{ object_list.model.private_list_url }}{% else %}{{ object_list.model.public_list_url }}{% endif %}"
-    onclick="clickedListLink()">
-    <i class="fa fa-fw fa-list"></i>
-    View as list
-</a>
 {% endblock map_card_navigation_dropdown_additional_links %}
+
+{% block map_card_navigation_dropdown %}{% endblock map_card_navigation_dropdown %}
+
+{% block map_card_options_dropdown %}{% endblock map_card_options_dropdown %}
 
 {% block map_card_options_dropdown_additional_links %}
 {% if user.is_authenticated %}
@@ -28,6 +61,10 @@
 {% block user_actions %}
 <form method="get">
     {% crispy filter.form %}
+    <div class="d-flex justify-content-end gap-2 mt-2 mb-3">
+        <button class="btn btn-primary submit-filter" id="filter-button" type="button" onclick="clickedFilterButton()">Filter</button>
+        <a class="btn btn-outline-secondary" href="{% if list_type == 'private' %}{{ object_list.model.private_map_url }}?scope=private{% elif list_type == 'review' %}{{ object_list.model.review_map_url }}?scope=review{% else %}{{ object_list.model.public_map_url }}?scope=published{% endif %}" aria-label="Reset filters">Reset</a>
+    </div>
 </form>
 <div class="card shadow" id="filter_result_card">
     <div class="card-header" role="button" data-bs-toggle="collapse" href="#info-card-body" aria-expanded="true"
@@ -86,7 +123,7 @@
             </div>
         </div>
 
-        {% if 'soilcom.add_collection' in perms %}
+        {% if perms.soilcom.add_collection %}
         <div class="row mt-3">
             <div class="col">
                 <div class="text-center">
@@ -98,7 +135,7 @@
         </div>
         {% endif %}
 
-        {% if 'soilcom.add_collection' in perms %}
+        {% if perms.soilcom.add_collection %}
         <div class="row mt-3">
             <div class="col">
                 <div class="text-center">

@@ -422,6 +422,11 @@ urlpatterns = [
         name="collection-list",
     ),
     path(
+        "collections/review/",
+        views.CollectionReviewFilterView.as_view(),
+        name="collection-list-review",
+    ),
+    path(
         "collections/user/",
         views.CollectionPrivateListView.as_view(),
         name="collection-list-owned",
@@ -495,6 +500,11 @@ urlpatterns = [
         "collections/map/",
         views.WasteCollectionPublishedMapView.as_view(),
         name="WasteCollection",
+    ),
+    path(
+        "collections/map/review/",
+        views.WasteCollectionReviewMapView.as_view(),
+        name="WasteCollection-review",
     ),
     path(
         "collections/map/user/",

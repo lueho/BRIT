@@ -4,10 +4,134 @@
 {% load file_export_tags %}
 {% load moderation_tags %}
 
+{% block custom_style %}
+{{ block.super }}
+<style>
+  /* Ensure the list area has enough height so row action dropdowns are not cut off on short lists */
+  .collection-list-min-height {
+    min-height: 18rem; /* ~288px provides space for dropdown menus */
+  }
+  /* Allow dropdown menus inside .table-responsive to overflow vertically on this page */
+  .collection-list-min-height .table-responsive {
+    overflow-y: visible;
+  }
+  /* Sidebar tabs: improve visual appeal and mobile behavior */
+  .sidebar-tabs {
+    gap: .5rem;
+  }
+  .sidebar-tabs .nav-link {
+    border-radius: 999px;
+    border: 1px solid var(--bs-border-color);
+    font-weight: 500;
+    padding: .25rem .75rem;
+    background-color: var(--bs-body-bg);
+    color: var(--bs-body-color);
+  }
+  .sidebar-tabs .nav-link i { margin-right: .35rem; }
+  .sidebar-tabs .nav-link:hover {
+    color: var(--bs-primary);
+    border-color: rgba(var(--bs-primary-rgb), .35);
+    background-color: rgba(var(--bs-primary-rgb), .05);
+  }
+  .sidebar-tabs .nav-link.active {
+    color: var(--bs-white);
+    background-color: var(--bs-primary);
+    border-color: var(--bs-primary);
+  }
+  .sidebar-tabs .nav-link:focus-visible { box-shadow: 0 0 0 .15rem rgba(var(--bs-primary-rgb), .25); }
+  /* On small screens keep tabs on one line with horizontal scroll */
+  @media (max-width: 991.98px) {
+    .sidebar-tabs { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  }
+  /* Learning materials visuals */
+  .resource-feature {
+    background-color: rgba(var(--bs-primary-rgb), .05);
+    border: 1px solid rgba(var(--bs-primary-rgb), .2);
+  }
+  .resource-thumb {
+    width: 72px;
+    height: 72px;
+    object-fit: cover;
+    border-radius: .5rem;
+    box-shadow: 0 2px 6px rgba(0,0,0,.08);
+  }
+  .resource-badges .badge {
+    border: 1px solid rgba(var(--bs-primary-rgb), .25);
+    background-color: rgba(var(--bs-primary-rgb), .08);
+    color: var(--bs-primary);
+    font-weight: 500;
+  }
+  .line-clamp-2 {
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  }
+</style>
+{% endblock custom_style %}
+
 {% block title %}BRIT | Household waste collections{% endblock %}
 
+{% block list_card_header %}
+<div class="d-flex align-items-center justify-content-between">
+    <span>
+        {% if header %}
+            {{ header }}
+        {% elif list_type == 'private' %}
+            My {{ object_list.model.get_verbose_name_plural }}
+        {% else %}
+            {{ object_list.model.get_verbose_name_plural|capfirst }}
+        {% endif %}
+    </span>
+    <div class="d-flex align-items-center">
+        <div class="btn-group btn-group-sm" role="group" aria-label="View toggle">
+            <a class="btn btn-outline-secondary active disabled" aria-current="page" role="button" aria-pressed="true" aria-disabled="true" tabindex="-1" title="View as list" href="{{ request.get_full_path }}">List</a>
+            <a class="btn btn-outline-secondary" role="button" aria-pressed="false" title="View as map"
+               href="{% if list_type == 'private' %}{{ object_list.model.private_map_url }}{% elif list_type == 'review' %}{{ object_list.model.review_map_url }}{% else %}{{ object_list.model.public_map_url }}{% endif %}?{% for key, value in request.GET.items %}{% if key != 'id' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}load_features=true">Map</a>
+        </div>
+        {% if user.is_authenticated %}
+        <div class="btn-group btn-group-sm ms-2" role="group" aria-label="Scope toggle">
+            <a class="btn btn-outline-secondary {% if list_type == 'public' %}active disabled{% endif %}" role="button" title="Show published items" aria-pressed="{% if list_type == 'public' %}true{% else %}false{% endif %}" {% if list_type == 'public' %}aria-disabled="true" tabindex="-1"{% endif %}
+               href="{{ object_list.model.public_list_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=published">
+                Published
+            </a>
+            <a class="btn btn-outline-secondary {% if list_type == 'private' %}active disabled{% endif %}" role="button" title="Show only my items" aria-pressed="{% if list_type == 'private' %}true{% else %}false{% endif %}" {% if list_type == 'private' %}aria-disabled="true" tabindex="-1"{% endif %}
+               href="{{ object_list.model.private_list_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=private">
+                My
+            </a>
+            {% if user.is_staff or perms.soilcom.can_moderate_collection %}
+            <a class="btn btn-outline-secondary {% if list_type == 'review' %}active disabled{% endif %}" role="button" title="Show items pending review" aria-pressed="{% if list_type == 'review' %}true{% else %}false{% endif %}" {% if list_type == 'review' %}aria-disabled="true" tabindex="-1"{% endif %}
+               href="{{ object_list.model.review_list_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=review">
+                Review
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+ </div>
+{% endblock %}
+
 {% block list_table %}
-<div class="table-responsive">
+<p class="text-muted small mb-2">
+    Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }} results
+</p>
+{% load custom_tags %}
+{% comment %} Active filter chips (custom only) {% endcomment %}
+{% build_filter_chips as chips %}
+{% if chips %}
+<div class="mb-2 d-flex flex-wrap gap-2">
+    {% for chip in chips %}
+    <a class="badge rounded-pill text-bg-light border text-decoration-none" title="Remove filter"
+       href="?{{ chip.remove_query }}">
+        {{ chip.text }} <i class="fas fa-times ms-1" aria-hidden="true"></i>
+        <span class="visually-hidden">Remove filter</span>
+    </a>
+    {% endfor %}
+    <a class="badge rounded-pill bg-secondary text-decoration-none" title="Clear all filters"
+       href="{% if list_type == 'private' %}{{ object_list.model.private_list_url }}?scope=private{% elif list_type == 'review' %}{{ object_list.model.review_list_url }}?scope=review{% else %}{{ object_list.model.public_list_url }}?scope=published{% endif %}">
+        Clear all
+    </a>
+</div>
+{% endif %}
+<div class="collection-list-min-height">
+    <div class="table-responsive">
     <table class="table modern-table">
         <thead>
             <tr>
@@ -32,7 +156,7 @@
                             {% include 'object_management/review_status_badge.html' with object=object %}
                         </div>
                         <div class="dropdown d-inline-block ms-auto">
-                        <button class="btn btn-sm btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-container="body" aria-expanded="false"><i class="fas fa-ellipsis-v"></i></button>
+                        <button class="btn btn-sm btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-container="body" aria-expanded="false" aria-label="More actions"><i class="fas fa-ellipsis-vertical"></i></button>
                         <div class="dropdown-menu dropdown-menu-end">
                             <a class="dropdown-item" href="{{ object.get_absolute_url }}">
                                 <i class="fas fa-eye"></i> View details
@@ -42,16 +166,25 @@
                                 <i class="fas fa-edit"></i> Edit
                             </a>
                             {% endif %}
-                            {% if user == object.owner or user.is_staff %}
-                            <a class="dropdown-item modal-link" href="{% url 'collection-delete-modal' object.id %}">
-                                <i class="fas fa-trash"></i> Delete
-                            </a>
+                            {# Delete: only staff may delete published objects; owners may delete private/review #}
+                            {% if object.publication_status == object.STATUS_PUBLISHED %}
+                                {% if user.is_staff %}
+                                <a class="dropdown-item modal-link" href="{% url 'collection-delete-modal' object.id %}">
+                                    <i class="fas fa-trash"></i> Delete
+                                </a>
+                                {% endif %}
+                            {% else %}
+                                {% if user == object.owner or user.is_staff %}
+                                <a class="dropdown-item modal-link" href="{% url 'collection-delete-modal' object.id %}">
+                                    <i class="fas fa-trash"></i> Delete
+                                </a>
+                                {% endif %}
                             {% endif %}
                             
                             <div class="dropdown-divider"></div>
                             <!-- Workflow actions -->
                             {% if object.publication_status == object.STATUS_PUBLISHED %}
-                                {% if user.is_staff or perms.can_moderate %}
+                                {% if user|can_moderate:object %}
                                 <a class="dropdown-item modal-link" href="{% url 'collection-archive-modal' object.id %}">
                                     <i class="fas fa-archive"></i> Archive
                                 </a>
@@ -82,7 +215,32 @@
                                 {% endif %}
                                 
                                 {% if object.is_in_review %}
-                                    {% if user.is_staff and user != object.owner or perms.can_moderate and user != object.owner %}
+                                    {% if user|can_moderate:object and user != object.owner %}
+                                        <form method="post" action="{% url 'object_management:approve_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
+                                            {% csrf_token %}
+                                            <button type="submit" class="dropdown-item text-start text-success">
+                                                <i class="fas fa-check"></i> Approve
+                                            </button>
+                                        </form>
+                                        <form method="post" action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
+                                            {% csrf_token %}
+                                            <button type="submit" class="dropdown-item w-100 text-start text-danger">
+                                                <i class="fas fa-xmark"></i> Reject
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                {% endif %}
+                            {% elif list_type == 'review' %}
+                                {% if object.is_in_review %}
+                                    {% if user == object.owner or user.is_staff %}
+                                        <form method="post" action="{% url 'object_management:withdraw_from_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
+                                            {% csrf_token %}
+                                            <button type="submit" class="dropdown-item text-start text-warning">
+                                                <i class="fas fa-rotate-left"></i> Withdraw from Review
+                                            </button>
+                                        </form>
+                                    {% endif %}
+                                    {% if user|can_moderate:object and user != object.owner %}
                                         <form method="post" action="{% url 'object_management:approve_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
                                             {% csrf_token %}
                                             <button type="submit" class="dropdown-item text-start text-success">
@@ -105,15 +263,14 @@
             {% endfor %}
         </tbody>
     </table>
+    </div>
 </div>
 {% endblock list_table %}
 
 {% block list_card_navigation_dropdown_additional_links %}
-<a class="dropdown-item"
-    href="{% if list_type == 'private' %}{%url 'WasteCollection-owned' %}{% else %}{%url 'WasteCollection' %}{% endif %}?{{ request.GET.urlencode }}">
-    <i class="fas fa-fw fa-map"></i> View as map
-</a>
 {% endblock list_card_navigation_dropdown_additional_links %}
+
+{% block list_card_navigation_dropdown %}{% endblock list_card_navigation_dropdown %}
 
 {% block list_card_options_dropdown_additional_links %}
 {% if user.is_authenticated %}
@@ -129,46 +286,65 @@
 {% endif %}
 {% endblock list_card_options_dropdown_additional_links %}
 
+{% block list_card_options_dropdown %}{% endblock list_card_options_dropdown %}
+
 {% block filter_column %}
-<form method="get">
-    {% crispy filter.form %}
-</form>
-<div class="card shadow">
-    <div class="card-header py-3" role="button" data-bs-toggle="collapse" data-bs-target="#learning-card-body" aria-expanded="false"
-         aria-controls="learning-card-body">
-        <h5 class="mb-0"><i class="fas fa-fw fa-graduation-cap"></i> Learning material</h5>
+<div class="card shadow filter-sticky">
+    <div class="card-header p-0 border-0 bg-body-tertiary">
+        <ul class="nav nav-pills sidebar-tabs px-3 pt-3 pb-2" id="sidebarTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" id="filters-tab" data-bs-toggle="tab" data-bs-target="#filters-pane" type="button" role="tab" aria-controls="filters-pane" aria-selected="true">
+                    <i class="fas fa-filter"></i> Filters
+                </button>
+            </li>
+            {% if user.is_authenticated %}
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="options-tab" data-bs-toggle="tab" data-bs-target="#options-pane" type="button" role="tab" aria-controls="options-pane" aria-selected="false">
+                    <i class="fas fa-gear"></i> Options
+                </button>
+            </li>
+            {% endif %}
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" id="learning-tab" data-bs-toggle="tab" data-bs-target="#learning-pane" type="button" role="tab" aria-controls="learning-pane" aria-selected="false">
+                    <i class="fas fa-graduation-cap"></i> Learning material
+                </button>
+            </li>
+        </ul>
     </div>
-    <div class="card-body collapse" id="learning-card-body">
-        <p class="card-text">
-            To get an introduction of how the circular economy of food waste works, check out the
-            <a href="https://www.hoou.de/projects/biocycle/" target="_blank">BioCycle</a>:
-        </p>
-        <ul class="mb-4">
-            <li class="mb-2">
-                <a href="https://www.hoou.de/projects/biocycle/" target="_blank">
-                    The BioCycle - From Resource to Waste to Resource
+    <div class="card-body">
+        <div class="tab-content">
+            <div class="tab-pane fade show active" id="filters-pane" role="tabpanel" aria-labelledby="filters-tab" tabindex="0">
+                <form method="get">
+                    {% crispy filter.form %}
+                    <div class="d-flex justify-content-end gap-2 mt-2">
+                        <button id="btn-filter" class="btn btn-primary submit-filter" type="submit">Filter</button>
+                        <a class="btn btn-outline-secondary" href="{% if list_type == 'private' %}{{ object_list.model.private_list_url }}?scope=private{% elif list_type == 'review' %}{{ object_list.model.review_list_url }}?scope=review{% else %}{{ object_list.model.public_list_url }}?scope=published{% endif %}" aria-label="Reset filters">Reset</a>
+                    </div>
+                </form>
+            </div>
+            {% if user.is_authenticated %}
+            <div class="tab-pane fade" id="options-pane" role="tabpanel" aria-labelledby="options-tab" tabindex="0">
+                {% if create_permission in perms or user.is_staff %}
+                <a class="btn btn-success w-100 mb-2" href="{{ object_list.model.create_url }}" aria-label="Create new {{ object_list.model.get_verbose_name }}">
+                    <i class="fas fa-plus"></i> Create new {{ object_list.model.get_verbose_name }}
                 </a>
-            </li>
-        </ul>
-        <p>
-            If you want to dig in more deeply into the food waste management, you find additional resources in the
-            Lectures for Future series "Residue and by-Product Based Bioresources" and "Sustainable Urban
-            Bioresource
-            Management" of the Hamburg Open Online University.
-            Recommended lectures for this topic:
-        </p>
-        <ul class="mb-3">
-            <li class="mb-2">
-                <a href="https://www.hoou.de/projects/lff/pages/residue-and-by-product-based-bioresources"
-                    target="_blank">"Territorial Biowaste Management: Local Food Waste Valorisation"
+                {% endif %}
+
+                {% if "soilcom.add_aggregatedcollectionpropertyvalue" in perms %}
+                <a class="btn btn-outline-secondary w-100 mb-2" href="{% url 'aggregatedcollectionpropertyvalue-create' %}">
+                    <i class="fas fa-circle-plus"></i> Add property to collection group
                 </a>
-            </li>
-            <li class="mb-2">
-                <a href="https://www.hoou.de/projects/lff/pages/sustainable-urban-bioresource-management"
-                    target="_blank">"Biowaste Collection: Current Status and Factors Influencing Correct Sorting"
+                {% endif %}
+
+                <a class="btn btn-outline-secondary modal-link w-100" href="{% export_link_modal 'collection-export' list_type=list_type %}">
+                    <i class="fas fa-file-export"></i> Export data
                 </a>
-            </li>
-        </ul>
+            </div>
+            {% endif %}
+            <div class="tab-pane fade" id="learning-pane" role="tabpanel" aria-labelledby="learning-tab" tabindex="0">
+                {% include 'soilcom/includes/learning_materials.html' %}
+            </div>
+        </div>
     </div>
 </div>
 {% endblock filter_column %}

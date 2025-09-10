@@ -27,10 +27,12 @@ from maps.views import (
     CatchmentDetailView,
     CatchmentUpdateView,
     GeoDataSetFormMixin,
+    GeoDataSetReviewFilteredMapView,
     GeoDataSetPrivateFilteredMapView,
     GeoDataSetPublishedFilteredMapView,
     MapMixin,
 )
+from utils.object_management.views import ReviewObjectFilterView
 from utils.file_export.views import GenericUserCreatedObjectExportView
 from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineFormSetMixin
 from utils.object_management.views import (
@@ -801,8 +803,16 @@ class CollectionCreateNewVersionView(CollectionCopyView):
             return self.render_to_response(context)
 
 
-class CollectionDetailView(UserCreatedObjectDetailView):
+class CollectionDetailView(MapMixin, UserCreatedObjectDetailView):
     model = Collection
+    features_layer_api_basename = "api-waste-collection"
+    map_title = "Collection"
+
+    def get_override_params(self):
+        params = super().get_override_params()
+        # Always load the features layer for the current object on detail pages
+        params["load_features"] = True
+        return params
 
 
 class CollectionModalDetailView(UserCreatedObjectModalDetailView):
@@ -853,6 +863,19 @@ class CollectionUpdateView(M2MInlineFormSetMixin, UserCreatedObjectUpdateView):
 
 class CollectionModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Collection
+
+
+class CollectionReviewFilterView(ReviewObjectFilterView):
+    model = Collection
+    filterset_class = CollectionFilterSet
+    dashboard_url = reverse_lazy("wastecollection-dashboard")
+
+    def get_filterset_kwargs(self, filterset_class=None):
+        kwargs = super().get_filterset_kwargs(filterset_class)
+        data = kwargs.get("data").copy() if kwargs.get("data") else {}
+        data["scope"] = "review"
+        kwargs["data"] = data
+        return kwargs
 
 
 # ----------- Collection Utils -----------------------------------------------------------------------------------------
@@ -1046,6 +1069,23 @@ class WasteCollectionPrivateMapView(GeoDataSetPrivateFilteredMapView):
         kwargs = super().get_filterset_kwargs(filterset_class)
         data = kwargs.get("data").copy() if kwargs.get("data") else {}
         data["scope"] = "private"
+        kwargs["data"] = data
+        return kwargs
+
+
+class WasteCollectionReviewMapView(GeoDataSetReviewFilteredMapView):
+    model = Collection
+    model_name = "WasteCollection"
+    template_name = "waste_collection_map.html"
+    filterset_class = CollectionFilterSet
+    features_layer_api_basename = "api-waste-collection"
+    map_title = "Collections in Review"
+    dashboard_url = reverse_lazy("wastecollection-dashboard")
+
+    def get_filterset_kwargs(self, filterset_class=None):
+        kwargs = super().get_filterset_kwargs(filterset_class)
+        data = kwargs.get("data").copy() if kwargs.get("data") else {}
+        data["scope"] = "review"
         kwargs["data"] = data
         return kwargs
 

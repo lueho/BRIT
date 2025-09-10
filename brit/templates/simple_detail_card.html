@@ -61,6 +61,9 @@
             {% block detail_top_image %}{% endblock %}
 
             <div class="card-body">
+                {% if show_review_panel %}
+                    {% include 'object_management/review_panel.html' with object=object %}
+                {% endif %}
                 {% block detail_body %}
                 <p class="card-text"><strong>Name:</strong><br>{{ object.name }}</p>
                 {% if object.description %}

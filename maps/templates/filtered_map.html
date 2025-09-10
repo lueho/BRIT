@@ -116,14 +116,16 @@
                     {% block filter_form %}
                     <form method="get">
                         {% crispy filter.form %}
+                        {% block filter_form_buttons %}
+                        <div class="d-flex justify-content-end gap-2 mt-2">
+                            <button class="btn btn-sm btn-primary submit-filter" id="filter-button" type="button" onclick="clickedFilterButton()">
+                                Filter
+                            </button>
+                            <a class="btn btn-sm btn-outline-secondary" href="{% if private_list_owner %}{{ object_list.model.private_map_url }}?scope=private{% else %}{{ object_list.model.public_map_url }}?scope=published{% endif %}" aria-label="Reset filters">Reset</a>
+                        </div>
+                        {% endblock filter_form_buttons %}
                     </form>
                     {% endblock filter_form %}
-
-                    {% block filter_form_buttons %}
-                    <button class="btn btn-primary submit-filter" id="filter-button" onclick="clickedFilterButton()">
-                        Filter
-                    </button>
-                    {% endblock filter_form_buttons %}
 
                 </div>
             </div>

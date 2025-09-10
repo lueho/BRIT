@@ -12,6 +12,11 @@ urlpatterns = [
         name="review_item_detail",
     ),
     path(
+        "comment/<int:content_type_id>/<int:object_id>/",
+        views.AddReviewCommentView.as_view(),
+        name="add_review_comment",
+    ),
+    path(
         "approve/<int:content_type_id>/<int:object_id>/",
         views.ApproveItemView.as_view(),
         name="approve_item",

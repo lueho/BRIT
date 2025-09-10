@@ -23,7 +23,7 @@ from maps.serializers import (
     NutsRegionSummarySerializer,
     RegionGeoFeatureModelSerializer,
 )
-from utils.forms import DynamicTableInlineFormSetHelper, TomSelectFormsetHelper
+from utils.forms import TomSelectFormsetHelper
 from utils.object_management.views import (
     CreateUserObjectMixin,
     OwnedObjectModelSelectOptionsView,
@@ -31,6 +31,7 @@ from utils.object_management.views import (
     PrivateObjectListView,
     PublishedObjectFilterView,
     PublishedObjectListView,
+    ReviewObjectFilterView,
     UserCreatedObjectAutocompleteView,
     UserCreatedObjectCreateView,
     UserCreatedObjectDetailView,
@@ -368,8 +369,31 @@ class FilteredMapMixin(MapMixin):
     # def get_dataset(self):
     #     return GeoDataset.objects.get(pk=self.kwargs.get('pk')) # TODO: Implement this functionality
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Ensure a fast COUNT() is used rather than evaluating the queryset
+        try:
+            total_count = self.object_list.count()
+        except Exception:
+            total_count = None
+        context.update(
+            {
+                "total_count": total_count,
+            }
+        )
+        return context
+
 
 class GeoDataSetPublishedFilteredMapView(FilteredMapMixin, PublishedObjectFilterView):
+    paginate_by = None
+
+    # TODO: Implement method to get the model, so that the create_url can be retrieved from the CRUDUrlsMixin
+    def get_create_url(self):
+        return None
+
+
+class GeoDataSetReviewFilteredMapView(FilteredMapMixin, ReviewObjectFilterView):
+    paginate_by = None
 
     # TODO: Implement method to get the model, so that the create_url can be retrieved from the CRUDUrlsMixin
     def get_create_url(self):
@@ -377,6 +401,7 @@ class GeoDataSetPublishedFilteredMapView(FilteredMapMixin, PublishedObjectFilter
 
 
 class GeoDataSetPrivateFilteredMapView(FilteredMapMixin, PrivateObjectFilterView):
+    paginate_by = None
 
     # TODO: Implement method to get the model, so that the create_url can be retrieved from the CRUDUrlsMixin
     def get_create_url(self):
@@ -829,7 +854,6 @@ class NutsRegionPedigreeAPI(APIView):
 
     @staticmethod
     def get(request):
-
         if "id" not in request.query_params:
             raise ParseError(
                 'Query parameter "id" missing. Must provide valid id of NUTS region.'
@@ -898,7 +922,6 @@ class NutsAndLauCatchmentPedigreeAPI(APIView):
 
     @staticmethod
     def get(request):
-
         if "id" not in request.query_params:
             raise ParseError(
                 'Query parameter "id" missing. Must provide valid catchment id.'
@@ -932,7 +955,7 @@ class NutsAndLauCatchmentPedigreeAPI(APIView):
             if instance.levl_code == 3:
                 qs = LauRegion.objects.filter(nuts_parent=instance)
                 serializer = LauRegionOptionSerializer(qs, many=True)
-                data[f"id_level_4"] = serializer.data
+                data["id_level_4"] = serializer.data
 
         if request.query_params["direction"] == "parents":
             for lvl in range(instance.levl_code - 1, -1, -1):
