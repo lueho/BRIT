@@ -957,8 +957,8 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
             and hasattr(obj, "owner")
             and obj.owner_id == request.user.id
         ):
-            # Allow owners to see review details only if the item was rejected
-            if getattr(obj, "is_rejected", False):
+            # Allow owners to see review details only if the item was declined
+            if getattr(obj, "is_declined", False):
                 return super().dispatch(request, *args, **kwargs)
             # Otherwise, owners are blocked from the review details endpoint
             raise PermissionDenied("Moderators cannot review their own objects.")

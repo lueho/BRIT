@@ -3,11 +3,7 @@
 <link rel="stylesheet" href="{% static 'css/review_status_badge.min.css' %}">
 
 
-{% if object.is_rejected %}
-<span class="review-status-badge review-status-rejected" title="{% trans 'Rejected' %}">
-    <i class="fas fa-circle-xmark"></i> {% trans "Rejected" %}
-</span>
-{% elif object.is_private %}
+{% if object.is_private %}
 <span class="review-status-badge review-status-private" title="{% trans 'Private' %}">
     <i class="fas fa-lock"></i> {% trans "Private" %}
 </span>

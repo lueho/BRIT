@@ -4,12 +4,12 @@
 {% block title %}BRIT | {{ object.name }} details{% endblock %}
 
 {% block content %}
-{% if object.is_rejected and request.user == object.owner %}
+{% if object.is_declined and request.user == object.owner %}
 <div class="row mt-4">
     <div class="col">
         <div class="card border-danger shadow-sm">
             <div class="card-header bg-danger text-white">
-                <strong><i class="fas fa-circle-xmark"></i> Submission Rejected</strong>
+                <strong><i class="fas fa-circle-xmark"></i> Submission Declined</strong>
             </div>
             <div class="card-body">
                 {% with last_rej=object.get_last_rejection_action %}

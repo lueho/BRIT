@@ -69,7 +69,7 @@
                                                 <a class="dropdown-item" href="{{ object.get_absolute_url }}">View</a>
                                                 {% if user.is_authenticated %}
                                                     {% if user == object.owner %}
-                                                        {% if object.is_rejected %}
+                                                        {% if object.is_declined %}
                                                             <a class="dropdown-item" href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}">
                                                                 <i class="fas fa-clipboard-check"></i> Review feedback
                                                             </a>
