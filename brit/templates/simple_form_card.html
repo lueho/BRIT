@@ -12,6 +12,9 @@
                 <div class="card-body">
                     <div id="form-container">
                         <form method="post" enctype="multipart/form-data">
+                            {% if request.GET.next %}
+                                <input type="hidden" name="next" value="{{ request.GET.next }}">
+                            {% endif %}
                             {% block extra_pre_form_content %}{% endblock %}
                             {% crispy form %}
                             {% block extra_post_form_content %}{% endblock %}

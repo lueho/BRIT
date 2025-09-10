@@ -1021,7 +1021,12 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
             ).order_by("created_at", "id")
         except Exception:
             actions = []
+        # Old variable used by wrapper; keep for compatibility
         context["review_actions"] = actions
+        # Ensure the embedded review panel in the base detail template is shown
+        context["show_review_panel"] = True
+        # The review panel expects 'review_logs'
+        context["review_logs"] = list(actions)
         return context
 
 

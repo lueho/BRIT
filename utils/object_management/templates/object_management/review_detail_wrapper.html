@@ -7,6 +7,8 @@ page, then defers to the model's regular detail template content.
 #}
 
 {% block content %}
+  {% if object.is_in_review and request.user.is_authenticated and request.user != object.owner %}
+  {% if request.user.is_staff or user|can_moderate:object %}
   <div class="row my-4">
     <div class="col">
       <div class="card shadow">
@@ -14,7 +16,6 @@ page, then defers to the model's regular detail template content.
           <h5 class="mb-0">{% trans "Review" %}</h5>
         </div>
         <div class="card-body">
-          {% if object.is_in_review and request.user.is_authenticated and request.user.is_staff and request.user != object.owner or object.is_in_review and request.user.is_authenticated and perms.can_moderate and request.user != object.owner %}
             {% if review_actions %}
               <div class="mb-3">
                 <h6 class="fw-semibold mb-2">{% trans "Previous comments and explanations" %}</h6>
@@ -30,7 +31,7 @@ page, then defers to the model's regular detail template content.
                           {% elif action.action == 'approved' %}
                             <span class="badge bg-success me-2"><i class="fas fa-check"></i> {% trans "Approved" %}</span>
                           {% elif action.action == 'withdrawn' %}
-                            <span class="badge bg-secondary me-2"><i class="fas fa-arrow-left"></i> {% trans "Withdrawn" %}</span>
+                            <span class="badge bg-secondary me-2"><i class="fas fa-rotate-left"></i> {% trans "Withdrawn" %}</span>
                           {% endif %}
                           <span class="text-muted small">{{ action.created_at|date:"Y-m-d H:i" }}</span>
                         </div>
@@ -76,6 +77,8 @@ page, then defers to the model's regular detail template content.
       </div>
     </div>
   </div>
+  {% endif %}
+  {% endif %}
 
   {{ block.super }}
 {% endblock %}
