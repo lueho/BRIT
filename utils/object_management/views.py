@@ -16,7 +16,6 @@ from django.contrib.auth.mixins import (
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.messages.views import SuccessMessageMixin
 from django.core.exceptions import ImproperlyConfigured, PermissionDenied
-from django.db import connection
 from django.db.models import Q
 from django.http import HttpResponseRedirect
 from django.shortcuts import get_object_or_404
@@ -30,7 +29,7 @@ from django_tomselect.autocompletes import AutocompleteModelView
 from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 
 from case_studies.soilcom.models import Collection
-from utils.object_management.models import ReviewAction, ReviewLog
+from utils.object_management.models import ReviewAction
 from utils.object_management.permissions import UserCreatedObjectPermission
 
 from ..forms import DynamicTableInlineFormSetHelper
@@ -84,7 +83,11 @@ class ReviewDashboardView(ListView):
                         "owner", "approved_by"
                     )
                     # Filter out in Python as a last resort
-                    items = [i for i in items if getattr(i, "owner_id", None) != self.request.user.id]
+                    items = [
+                        i
+                        for i in items
+                        if getattr(i, "owner_id", None) != self.request.user.id
+                    ]
                 review_items.extend(items)
 
         # Sort by submitted_at date (newest first)
@@ -150,8 +153,10 @@ class ApproveItemView(BaseReviewActionView):
         try:
             obj.approve(user=request.user)
             # Optional comment from moderator
-            message = (request.POST.get("comment") or request.POST.get("message") or "").strip()
-            # Legacy audit log
+            message = (
+                request.POST.get("comment") or request.POST.get("message") or ""
+            ).strip()
+            # Log approval
             try:
                 ReviewAction.objects.create(
                     content_type=ContentType.objects.get_for_model(obj.__class__),
@@ -162,18 +167,6 @@ class ApproveItemView(BaseReviewActionView):
                 )
             except Exception as e:
                 logger.warning("Failed to create ReviewAction for approval: %s", e)
-            # New structured log
-            try:
-                ReviewLog.objects.create(
-                    content_type=ContentType.objects.get_for_model(obj.__class__),
-                    object_id=obj.pk,
-                    action=ReviewLog.ACTION_APPROVE,
-                    message=message or None,
-                    actor=request.user,
-                    role=ReviewLog.ROLE_MODERATOR,
-                )
-            except Exception as e:
-                logger.warning("Failed to create ReviewLog for approval: %s", e)
             messages.success(
                 request, f"{obj._meta.verbose_name} has been approved and published."
             )
@@ -208,8 +201,10 @@ class RejectItemView(BaseReviewActionView):
         try:
             obj.reject()
             # Store optional reviewer comment (support both 'comment' and 'message')
-            message = (request.POST.get("comment") or request.POST.get("message") or "").strip()
-            # Legacy audit log
+            message = (
+                request.POST.get("comment") or request.POST.get("message") or ""
+            ).strip()
+            # Log rejection
             try:
                 ReviewAction.objects.create(
                     content_type=ContentType.objects.get_for_model(obj.__class__),
@@ -220,18 +215,6 @@ class RejectItemView(BaseReviewActionView):
                 )
             except Exception as e:
                 logger.warning("Failed to create ReviewAction for rejection: %s", e)
-            # New structured log
-            try:
-                ReviewLog.objects.create(
-                    content_type=ContentType.objects.get_for_model(obj.__class__),
-                    object_id=obj.pk,
-                    action=ReviewLog.ACTION_REJECT,
-                    message=message or None,
-                    actor=request.user,
-                    role=ReviewLog.ROLE_MODERATOR,
-                )
-            except Exception as e:
-                logger.warning("Failed to create ReviewLog for rejection: %s", e)
             messages.success(
                 request,
                 f"{obj._meta.verbose_name} has been rejected and marked as declined.",
@@ -257,18 +240,14 @@ class SubmitForReviewView(BaseReviewActionView):
             )
 
         # Optional explanation from owner when (re)submitting
-        message = (request.POST.get("comment") or request.POST.get("message") or "").strip()
+        message = (
+            request.POST.get("comment") or request.POST.get("message") or ""
+        ).strip()
 
         # Submit for review
         try:
-            previous_status = obj.publication_status
             obj.submit_for_review()
-            action = (
-                ReviewLog.ACTION_RESUBMIT
-                if previous_status == getattr(obj, "STATUS_DECLINED", "declined")
-                else ReviewLog.ACTION_SUBMIT
-            )
-            # Legacy audit log
+            # Log submission (first or re-submission both recorded as 'submitted')
             try:
                 ReviewAction.objects.create(
                     content_type=ContentType.objects.get_for_model(obj.__class__),
@@ -279,23 +258,6 @@ class SubmitForReviewView(BaseReviewActionView):
                 )
             except Exception as e:
                 logger.warning("Failed to create ReviewAction for submission: %s", e)
-
-            # New structured log
-            try:
-                ReviewLog.objects.create(
-                    content_type=ContentType.objects.get_for_model(obj.__class__),
-                    object_id=obj.pk,
-                    action=action,
-                    message=message or None,
-                    actor=request.user,
-                    role=(
-                        ReviewLog.ROLE_OWNER
-                        if obj.owner_id == request.user.id
-                        else ReviewLog.ROLE_MODERATOR
-                    ),
-                )
-            except Exception as e:
-                logger.warning("Failed to create ReviewLog for submission: %s", e)
             messages.success(
                 request, f"{obj._meta.verbose_name} has been submitted for review."
             )
@@ -324,8 +286,10 @@ class WithdrawFromReviewView(BaseReviewActionView):
             previous_status = obj.publication_status
             obj.withdraw_from_review()
             # Optional note
-            message = (request.POST.get("comment") or request.POST.get("message") or "").strip()
-            # Legacy audit log
+            message = (
+                request.POST.get("comment") or request.POST.get("message") or ""
+            ).strip()
+            # Log withdraw or set private (both mapped to 'withdrawn')
             try:
                 ReviewAction.objects.create(
                     content_type=ContentType.objects.get_for_model(obj.__class__),
@@ -336,26 +300,6 @@ class WithdrawFromReviewView(BaseReviewActionView):
                 )
             except Exception as e:
                 logger.warning("Failed to create ReviewAction for withdraw: %s", e)
-            # New structured log
-            try:
-                ReviewLog.objects.create(
-                    content_type=ContentType.objects.get_for_model(obj.__class__),
-                    object_id=obj.pk,
-                    action=(
-                        ReviewLog.ACTION_SET_PRIVATE
-                        if previous_status == getattr(obj, "STATUS_DECLINED", "declined")
-                        else ReviewLog.ACTION_WITHDRAW
-                    ),
-                    message=message or None,
-                    actor=request.user,
-                    role=(
-                        ReviewLog.ROLE_OWNER
-                        if obj.owner_id == request.user.id
-                        else ReviewLog.ROLE_MODERATOR
-                    ),
-                )
-            except Exception as e:
-                logger.warning("Failed to create ReviewLog for withdraw: %s", e)
             if previous_status == getattr(obj, "STATUS_DECLINED", "declined"):
                 messages.success(
                     request, f"{obj._meta.verbose_name} has been set to private."
@@ -539,7 +483,9 @@ class UserCreatedObjectListMixin:
             if model is not None and hasattr(model, "objects"):
                 # Public count
                 try:
-                    public_count = model.objects.filter(publication_status="published").count()
+                    public_count = model.objects.filter(
+                        publication_status="published"
+                    ).count()
                 except Exception:
                     public_count = 0
 
@@ -572,7 +518,12 @@ class UserCreatedObjectListMixin:
                     if self.request.user and self.request.user.is_authenticated:
                         perm_codename = f"can_moderate_{model._meta.model_name}"
                         app_label = model._meta.app_label
-                        can_moderate = self.request.user.is_staff or self.request.user.has_perm(f"{app_label}.{perm_codename}")
+                        can_moderate = (
+                            self.request.user.is_staff
+                            or self.request.user.has_perm(
+                                f"{app_label}.{perm_codename}"
+                            )
+                        )
                     review_count = review_qs.count() if can_moderate else 0
                 except Exception:
                     review_count = 0
@@ -602,11 +553,6 @@ class PublishedObjectListMixin(UserCreatedObjectListMixin):
 
 class PrivateObjectListMixin(LoginRequiredMixin, UserCreatedObjectListMixin):
     list_type = "private"
-
-
-class ReviewObjectListMixin(LoginRequiredMixin, UserCreatedObjectListMixin):
-    list_type = "review"
-
 
 class PublishedObjectFilterView(
     PublishedObjectListMixin, FilterDefaultsMixin, FilterView
@@ -654,13 +600,12 @@ class AddReviewCommentView(BaseReviewActionView):
             messages.error(request, "Comment cannot be empty.")
             return HttpResponseRedirect(self.get_success_url())
 
-        ReviewLog.objects.create(
+        ReviewAction.objects.create(
             content_type=ContentType.objects.get_for_model(obj.__class__),
             object_id=obj.pk,
-            action=ReviewLog.ACTION_COMMENT,
-            message=message,
-            actor=request.user,
-            role=ReviewLog.ROLE_OWNER if is_owner else ReviewLog.ROLE_MODERATOR,
+            action=ReviewAction.ACTION_COMMENT,
+            comment=message,
+            user=request.user,
         )
 
         messages.success(request, "Comment added.")
@@ -969,9 +914,7 @@ class UserCreatedObjectDetailView(UserCreatedObjectReadAccessMixin, DetailView):
         logs = []
         if show_panel:
             try:
-                # Avoid errors when the table hasn't been migrated yet
-                if ReviewLog._meta.db_table in connection.introspection.table_names():
-                    logs = list(ReviewLog.for_object(obj).select_related("actor"))
+                logs = list(ReviewAction.for_object(obj).select_related("user"))
             except Exception:
                 logs = []
 
@@ -1009,7 +952,11 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
         perm_codename = f"can_moderate_{model._meta.model_name}"
 
         # If the current user is the owner
-        if request.user.is_authenticated and hasattr(obj, "owner") and obj.owner_id == request.user.id:
+        if (
+            request.user.is_authenticated
+            and hasattr(obj, "owner")
+            and obj.owner_id == request.user.id
+        ):
             # Allow owners to see review details only if the item was rejected
             if getattr(obj, "is_rejected", False):
                 return super().dispatch(request, *args, **kwargs)
@@ -1019,9 +966,14 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
         # For non-owners, require moderator permissions
         if not (
             request.user.is_authenticated
-            and (request.user.is_staff or request.user.has_perm(f"{app_label}.{perm_codename}"))
+            and (
+                request.user.is_staff
+                or request.user.has_perm(f"{app_label}.{perm_codename}")
+            )
         ):
-            raise PermissionDenied("You do not have permission to access the review details page.")
+            raise PermissionDenied(
+                "You do not have permission to access the review details page."
+            )
         return super().dispatch(request, *args, **kwargs)
 
     def _resolve_base_template(self):
@@ -1064,10 +1016,9 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
         try:
             obj = self.object
             ct = ContentType.objects.get_for_model(obj.__class__)
-            actions = (
-                ReviewAction.objects.filter(content_type=ct, object_id=obj.pk)
-                .order_by("created_at", "id")
-            )
+            actions = ReviewAction.objects.filter(
+                content_type=ct, object_id=obj.pk
+            ).order_by("created_at", "id")
         except Exception:
             actions = []
         context["review_actions"] = actions

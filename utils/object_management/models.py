@@ -69,12 +69,14 @@ class ReviewAction(models.Model):
     ACTION_APPROVED = "approved"
     ACTION_REJECTED = "rejected"
     ACTION_WITHDRAWN = "withdrawn"
+    ACTION_COMMENT = "comment"
 
     ACTION_CHOICES = (
         (ACTION_SUBMITTED, "Submitted"),
         (ACTION_APPROVED, "Approved"),
         (ACTION_REJECTED, "Rejected"),
         (ACTION_WITHDRAWN, "Withdrawn"),
+        (ACTION_COMMENT, "Comment"),
     )
 
     # Generic relation to the affected object
@@ -110,74 +112,14 @@ class ReviewAction(models.Model):
         )
         return f"{self.get_action_display()} by {self.user} on {obj_label}"
 
-
-class ReviewLog(models.Model):
-    """
-    Tracks review actions and comments for any UserCreatedObject via GenericForeignKey.
-
-    action:
-      - comment: free-text comment by owner or moderator
-      - submit: submitted for review
-      - resubmit: resubmitted after being declined/private
-      - withdraw: withdrawn from review
-      - set_private: explicitly set a declined item back to private
-      - approve: approved and published
-      - reject: rejected and marked as declined
-    """
-
-    ACTION_COMMENT = "comment"
-    ACTION_SUBMIT = "submit"
-    ACTION_RESUBMIT = "resubmit"
-    ACTION_WITHDRAW = "withdraw"
-    ACTION_SET_PRIVATE = "set_private"
-    ACTION_APPROVE = "approve"
-    ACTION_REJECT = "reject"
-
-    ROLE_OWNER = "owner"
-    ROLE_MODERATOR = "moderator"
-    ROLE_SYSTEM = "system"
-
-    ACTION_CHOICES = (
-        (ACTION_COMMENT, "Comment"),
-        (ACTION_SUBMIT, "Submitted for review"),
-        (ACTION_RESUBMIT, "Resubmitted for review"),
-        (ACTION_WITHDRAW, "Withdrawn from review"),
-        (ACTION_SET_PRIVATE, "Set to private"),
-        (ACTION_APPROVE, "Approved"),
-        (ACTION_REJECT, "Rejected"),
-    )
-
-    ROLE_CHOICES = (
-        (ROLE_OWNER, "Owner"),
-        (ROLE_MODERATOR, "Moderator"),
-        (ROLE_SYSTEM, "System"),
-    )
-
-    content_type = models.ForeignKey(ContentType, on_delete=models.CASCADE)
-    object_id = models.PositiveIntegerField()
-    content_object = GenericForeignKey("content_type", "object_id")
-
-    action = models.CharField(max_length=20, choices=ACTION_CHOICES)
-    message = models.TextField(blank=True, null=True)
-    actor = models.ForeignKey(User, on_delete=models.PROTECT, related_name="+")
-    role = models.CharField(max_length=12, choices=ROLE_CHOICES, default=ROLE_SYSTEM)
-    created_at = models.DateTimeField(auto_now_add=True)
-
-    class Meta:
-        ordering = ["created_at", "id"]
-        indexes = [
-            models.Index(fields=["content_type", "object_id", "created_at"]),
-        ]
-
-    def __str__(self):
-        return f"{self.get_action_display()} by {self.actor} on {self.created_at:%Y-%m-%d %H:%M}"
-
     @classmethod
     def for_object(cls, obj):
         return cls.objects.filter(
             content_type=ContentType.objects.get_for_model(obj.__class__),
             object_id=obj.pk,
         )
+
+
 
 
 class UserCreatedObjectQuerySet(models.QuerySet):

@@ -16,13 +16,12 @@
               <div class="d-flex justify-content-between">
                 <div>
                   <span class="badge bg-light text-dark me-2">{{ log.get_action_display }}</span>
-                  <strong>{{ log.actor }}</strong>
-                  {% if log.role %}<span class="text-muted">({{ log.get_role_display }})</span>{% endif %}
+                  <strong>{{ log.user }}</strong>
                 </div>
                 <small class="text-muted">{{ log.created_at|date:"Y-m-d H:i" }}</small>
               </div>
-              {% if log.message %}
-                <div class="mt-1">{{ log.message|linebreaksbr }}</div>
+              {% if log.comment %}
+                <div class="mt-1">{{ log.comment|linebreaksbr }}</div>
               {% endif %}
             </li>
           {% endfor %}
