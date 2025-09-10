@@ -108,6 +108,9 @@
  </div>
 {% endblock %}
 
+{# Hide the base template's scope switcher; we use the header switcher on this page #}
+{% block scope_switcher %}{% endblock %}
+
 {% block list_table %}
 <p class="text-muted small mb-2">
     Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }} results

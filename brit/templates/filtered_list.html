@@ -36,7 +36,7 @@
                 </div>
                 <div class="card-body">
                     {% block list_card_body %}
-                    {% include 'partials/scope_switcher.html' %}
+                    {% block scope_switcher %}{% include 'partials/scope_switcher.html' %}{% endblock %}
                     {% block list_table %}
                     <div class="table-responsive">
                         <table class="table modern-table">
