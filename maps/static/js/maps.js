@@ -64,7 +64,7 @@ function initializeDB() {
         request.onupgradeneeded = event => {
             const db = event.target.result;
             if (!db.objectStoreNames.contains('geojson')) {
-                const geojsonStore = db.createObjectStore('geojson', {keyPath: 'url'});
+                const geojsonStore = db.createObjectStore('geojson', { keyPath: 'url' });
                 geojsonStore.createIndex('timestamp', 'timestamp'); // Add index for efficient cleanup
             }
         };
@@ -391,7 +391,7 @@ function buildUrl(base, params) {
 
 async function fetchRegionGeometry(params) {
     validateParams(params, ['id']);
-    const url = buildUrl(mapConfig.regionLayerGeometriesUrl, {id: params.id});
+    const url = buildUrl(mapConfig.regionLayerGeometriesUrl, { id: params.id });
     const normalizedUrl = normalizeUrl(url);
 
     try {
@@ -412,7 +412,7 @@ async function fetchRegionGeometry(params) {
 
 async function fetchCatchmentGeometry(params) {
     validateParams(params, ['id']);
-    const url = buildUrl(mapConfig.catchmentLayerGeometriesUrl, {id: params.id});
+    const url = buildUrl(mapConfig.catchmentLayerGeometriesUrl, { id: params.id });
     const normalizedUrl = normalizeUrl(url);
 
     try {
@@ -434,7 +434,7 @@ async function fetchCatchmentGeometry(params) {
 async function fetchFeatureGeometries(params) {
     hideMapOverlay();
     // Use featuresId if set; otherwise, use provided params.
-    const finalParams = mapConfig.featuresId ? {id: mapConfig.featuresId} : params;
+    const finalParams = mapConfig.featuresId ? { id: mapConfig.featuresId } : params;
     const url = buildUrl(mapConfig.featuresLayerGeometriesUrl, finalParams);
 
     // Generate a normalized key to use for caching
@@ -511,7 +511,7 @@ function removeExistingLayer(layer) {
 }
 
 function initializeRenderers() {
-    const paddedRenderer = L.canvas({padding: 0.5});
+    const paddedRenderer = L.canvas({ padding: 0.5 });
 
     regionLayerStyle = mapConfig.regionLayerStyle;
     regionLayerStyle.renderer = paddedRenderer;
@@ -555,7 +555,7 @@ function renderCatchment(geoJson) {
 }
 
 function createFeatureLayerBindings(layer) {
-    layer.on('click', async function(event) {
+    layer.on('click', async function (event) {
         await clickedFeature(event);
     });
 }
@@ -589,9 +589,9 @@ function renderFeatures(geoJson) {
 
 function adjustMapBounds() {
     const layerPriorities = [
-        {key: 'region', layer: regionLayer},
-        {key: 'catchment', layer: catchmentLayer},
-        {key: 'features', layer: featuresLayer}
+        { key: 'region', layer: regionLayer },
+        { key: 'catchment', layer: catchmentLayer },
+        { key: 'features', layer: featuresLayer }
     ];
 
     const preferredIndex = layerPriorities.findIndex(item => item.key === mapConfig.adjustBoundsToLayer);
@@ -605,7 +605,7 @@ function adjustMapBounds() {
         ...layerPriorities.slice(0, preferredIndex)
     ];
 
-    for (const {key, layer} of orderedPriorities) {
+    for (const { key, layer } of orderedPriorities) {
         if (layer && layer.getBounds) {
             try {
                 const bounds = layer.getBounds();
@@ -674,7 +674,7 @@ function renderSummaryContainer(summary, summary_container) {
             if (Array.isArray(value)) {
                 const ul = document.createElement('ul');
                 summaryValueElement.appendChild(ul);
-                value.forEach(function(item) {
+                value.forEach(function (item) {
                     const li = document.createElement('li');
                     if (item && typeof item === 'object' && 'url' in item && 'name' in item) {
                         const a = document.createElement('a');
@@ -944,18 +944,55 @@ function getFeaturesLayerFilterParameters() {
     }
 }
 
+// Override filter utility hooks: disable/enable filter inputs during map loading
+function lockCustomElements() {
+    try {
+        const form = document.querySelector('form');
+        if (!form) return;
+        const elements = form.querySelectorAll('input, select, textarea, button');
+        elements.forEach(el => {
+            // submit-filter buttons are handled by lockFilter()
+            if (!el.classList.contains('submit-filter')) {
+                el.dataset.prevDisabled = el.disabled ? '1' : '0';
+                el.disabled = true;
+            }
+        });
+    } catch (e) {
+        console.warn('Failed to lock custom elements:', e);
+    }
+}
+
+function unlockCustomElements() {
+    try {
+        const form = document.querySelector('form');
+        if (!form) return;
+        const elements = form.querySelectorAll('input, select, textarea, button');
+        elements.forEach(el => {
+            if (!el.classList.contains('submit-filter')) {
+                // Only re-enable if we disabled it
+                if (el.dataset.prevDisabled === '0') {
+                    el.disabled = false;
+                }
+                delete el.dataset.prevDisabled;
+            }
+        });
+    } catch (e) {
+        console.warn('Failed to unlock custom elements:', e);
+    }
+}
+
 function loadLayers() {
     const filterParameters = getFeaturesLayerFilterParameters();
     const promises = [];
 
     const region_id = filterParameters.get('region') || (mapConfig.loadRegion ? mapConfig.regionId : null);
     if (region_id) {
-        promises.push(fetchRegionGeometry({id: region_id}));
+        promises.push(fetchRegionGeometry({ id: region_id }));
     }
 
     const catchment_id = filterParameters.get('catchment') || (mapConfig.loadCatchment ? mapConfig.catchmentId : null);
     if (catchment_id) {
-        promises.push(fetchCatchmentGeometry({id: catchment_id}));
+        promises.push(fetchCatchmentGeometry({ id: catchment_id }));
     }
 
     if (mapConfig.loadFeatures === true) {
@@ -992,6 +1029,6 @@ function resetFeatureStyles(featureGroup) {
     featureGroup.bringToBack();
 }
 
-window.addEventListener("map:init", function(event) {
+window.addEventListener("map:init", function (event) {
     map = event.detail.map;
 });

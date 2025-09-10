@@ -6,6 +6,17 @@
 
 {% block title %}BRIT | {{ header }}{% endblock %}
 
+{% block custom_style %}
+<style>
+@media (min-width: 992px) {
+  .filter-sticky {
+    position: sticky;
+    top: 1rem;
+  }
+}
+</style>
+{% endblock custom_style %}
+
 {% block content %}
     <div class="row">
         <div class="col-lg-8 order-2 order-lg-1">
@@ -127,13 +138,13 @@
                             {% block list_card_footer_list_link %}
                             {% if private_list_owner %}
                             <a class="dropdown-item"
-                                href="{{ object_list.model.public_list_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=published">
+                                href="{{ object_list.model.public_list_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=published">
                                 <i class="fas fa-fw fa-list"></i>
                                 Published {{ object_list.model.get_verbose_name_plural }}
                             </a>
                             {% elif user.is_authenticated %}
                             <a class="dropdown-item"
-                                href="{{ object_list.model.private_list_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=private">
+                                href="{{ object_list.model.private_list_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=private">
                                 <i class="fas fa-fw fa-list"></i>
                                 My {{ object_list.model.get_verbose_name_plural }}
                             </a>
@@ -142,10 +153,16 @@
                             {% block list_card_footer_dashboard_link %}
                             {% if dashboard_url %}
                             <a class="dropdown-item" href="{{ dashboard_url }}">
-                                <i class="fas fa-fw fa-th-large"></i> Explorer
+                                <i class="fas fa-fw fa-table-cells-large"></i> Explorer
                             </a>
                             {% endif %}
                             {% endblock list_card_footer_dashboard_link %}
+                            {% if user.is_staff and object_list.model.review_list_url %}
+                            <a class="dropdown-item"
+                               href="{{ object_list.model.review_list_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=review">
+                                <i class="fas fa-fw fa-list-check"></i> In review {{ object_list.model.get_verbose_name_plural }}
+                            </a>
+                            {% endif %}
                             {% block list_card_navigation_dropdown_additional_links %}{% endblock %}
                         </div>
                     </div>
@@ -179,8 +196,8 @@
         </div>
         <div class="col-lg-4 order-1 order-lg-2">
             {% block filter_column %}
-            <div class="card shadow">
-                <div class="card-header py-3" id="filterFormHeading" data-bs-toggle="collapse" data-bs-target="#filterForm"
+            <div class="card shadow filter-sticky">
+                <div class="card-header bg-body-tertiary border-bottom-0 py-3" id="filterFormHeading" data-bs-toggle="collapse" data-bs-target="#filterForm"
                      aria-expanded="true" aria-controls="filterForm">
                     <h5 class="mb-0">{% block filter_header %}Filter{% endblock %}<span class="arrow" aria-hidden="true"></span></h5>
                 </div>
@@ -189,9 +206,12 @@
                         {% block filter_body %}
                         <form method="get">
                             {% crispy filter.form %}
-                            <button id="btn-filter" class="btn btn-primary submit-filter" type="submit">
-                                Filter
-                            </button>
+                            <div class="d-flex justify-content-end gap-2 mt-2">
+                                <button id="btn-filter" class="btn btn-sm btn-primary submit-filter" type="submit">
+                                    Filter
+                                </button>
+                                <a class="btn btn-sm btn-outline-secondary" href="{% if list_type == 'private' %}{{ object_list.model.private_list_url }}?scope=private{% else %}{{ object_list.model.public_list_url }}?scope=published{% endif %}" aria-label="Reset filters">Reset</a>
+                            </div>
                         </form>
                         {% endblock %}
                     </div>
@@ -209,4 +229,5 @@
 {% block javascript %}
 {{ block.super }}
 <script src="{% static 'js/filter_utils.min.js' %}" type="text/javascript"></script>
+<script src="{% static 'js/filter_form_cleanup.js' %}" type="text/javascript"></script>
 {% endblock %}

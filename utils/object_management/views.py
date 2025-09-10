@@ -83,7 +83,11 @@ class ReviewDashboardView(ListView):
                         "owner", "approved_by"
                     )
                     # Filter out in Python as a last resort
-                    items = [i for i in items if getattr(i, "owner_id", None) != self.request.user.id]
+                    items = [
+                        i
+                        for i in items
+                        if getattr(i, "owner_id", None) != self.request.user.id
+                    ]
                 review_items.extend(items)
 
         # Sort by submitted_at date (newest first)
@@ -124,7 +128,7 @@ class BaseReviewActionView(NextOrSuccessUrlMixin, View):
 
     def get_success_url(self):
         """Override to support both 'next' parameter and fallback to object URL."""
-        next_url = self.request.GET.get("next")
+        next_url = self.request.GET.get("next") or self.request.POST.get("next")
         if next_url:
             return next_url
         return self.get_default_success_url(self.object)
@@ -148,6 +152,21 @@ class ApproveItemView(BaseReviewActionView):
         # Approve the item
         try:
             obj.approve(user=request.user)
+            # Optional comment from moderator
+            message = (
+                request.POST.get("comment") or request.POST.get("message") or ""
+            ).strip()
+            # Log approval
+            try:
+                ReviewAction.objects.create(
+                    content_type=ContentType.objects.get_for_model(obj.__class__),
+                    object_id=obj.pk,
+                    user=request.user,
+                    action=ReviewAction.ACTION_APPROVED,
+                    comment=message,
+                )
+            except Exception as e:
+                logger.warning("Failed to create ReviewAction for approval: %s", e)
             messages.success(
                 request, f"{obj._meta.verbose_name} has been approved and published."
             )
@@ -181,23 +200,24 @@ class RejectItemView(BaseReviewActionView):
         # Reject the item
         try:
             obj.reject()
-            # Store optional reviewer comment
-            comment = request.POST.get("comment", "").strip()
+            # Store optional reviewer comment (support both 'comment' and 'message')
+            message = (
+                request.POST.get("comment") or request.POST.get("message") or ""
+            ).strip()
+            # Log rejection
             try:
-                if comment or True:  # Always create an action to log who rejected
-                    ReviewAction.objects.create(
-                        content_type=ContentType.objects.get_for_model(obj.__class__),
-                        object_id=obj.pk,
-                        user=request.user,
-                        action=ReviewAction.ACTION_REJECTED,
-                        comment=comment,
-                    )
+                ReviewAction.objects.create(
+                    content_type=ContentType.objects.get_for_model(obj.__class__),
+                    object_id=obj.pk,
+                    user=request.user,
+                    action=ReviewAction.ACTION_REJECTED,
+                    comment=message,
+                )
             except Exception as e:
-                # Don't fail the primary action because of audit log issues
                 logger.warning("Failed to create ReviewAction for rejection: %s", e)
             messages.success(
                 request,
-                f"{obj._meta.verbose_name} has been rejected and returned to private status.",
+                f"{obj._meta.verbose_name} has been rejected and marked as declined.",
             )
         except Exception as e:
             messages.error(request, f"Error rejecting item: {str(e)}")
@@ -220,24 +240,24 @@ class SubmitForReviewView(BaseReviewActionView):
             )
 
         # Optional explanation from owner when (re)submitting
-        comment = request.POST.get("comment", "").strip()
+        message = (
+            request.POST.get("comment") or request.POST.get("message") or ""
+        ).strip()
 
         # Submit for review
         try:
             obj.submit_for_review()
-            # Record audit action with optional comment
+            # Log submission (first or re-submission both recorded as 'submitted')
             try:
-                if comment or True:  # Always create an action to log who submitted
-                    ReviewAction.objects.create(
-                        content_type=ContentType.objects.get_for_model(obj.__class__),
-                        object_id=obj.pk,
-                        user=request.user,
-                        action=ReviewAction.ACTION_SUBMITTED,
-                        comment=comment,
-                    )
+                ReviewAction.objects.create(
+                    content_type=ContentType.objects.get_for_model(obj.__class__),
+                    object_id=obj.pk,
+                    user=request.user,
+                    action=ReviewAction.ACTION_SUBMITTED,
+                    comment=message,
+                )
             except Exception as e:
                 logger.warning("Failed to create ReviewAction for submission: %s", e)
-
             messages.success(
                 request, f"{obj._meta.verbose_name} has been submitted for review."
             )
@@ -261,12 +281,33 @@ class WithdrawFromReviewView(BaseReviewActionView):
                 "You don't have permission to withdraw this item from review."
             )
 
-        # Withdraw from review
+        # Withdraw from review or set declined to private
         try:
+            previous_status = obj.publication_status
             obj.withdraw_from_review()
-            messages.success(
-                request, f"{obj._meta.verbose_name} has been withdrawn from review."
-            )
+            # Optional note
+            message = (
+                request.POST.get("comment") or request.POST.get("message") or ""
+            ).strip()
+            # Log withdraw or set private (both mapped to 'withdrawn')
+            try:
+                ReviewAction.objects.create(
+                    content_type=ContentType.objects.get_for_model(obj.__class__),
+                    object_id=obj.pk,
+                    user=request.user,
+                    action=ReviewAction.ACTION_WITHDRAWN,
+                    comment=message,
+                )
+            except Exception as e:
+                logger.warning("Failed to create ReviewAction for withdraw: %s", e)
+            if previous_status == getattr(obj, "STATUS_DECLINED", "declined"):
+                messages.success(
+                    request, f"{obj._meta.verbose_name} has been set to private."
+                )
+            else:
+                messages.success(
+                    request, f"{obj._meta.verbose_name} has been withdrawn from review."
+                )
         except Exception as e:
             messages.error(request, f"Error withdrawing from review: {str(e)}")
 
@@ -312,10 +353,18 @@ class UserCreatedObjectListMixin:
 
         queryset = queryset.filter(**query_params)
 
-        if hasattr(queryset.model, "name"):
-            return queryset.order_by("name")
+        # If an OrderingFilter already set an explicit order, do not override it
+        try:
+            has_explicit_order = bool(queryset.query.order_by)
+        except Exception:
+            has_explicit_order = False
 
-        return queryset.order_by("id")
+        if not has_explicit_order:
+            if hasattr(queryset.model, "name"):
+                return queryset.order_by("name")
+            return queryset.order_by("id")
+
+        return queryset
 
     def get_header(self):
         if self.header:
@@ -434,7 +483,9 @@ class UserCreatedObjectListMixin:
             if model is not None and hasattr(model, "objects"):
                 # Public count
                 try:
-                    public_count = model.objects.filter(publication_status="published").count()
+                    public_count = model.objects.filter(
+                        publication_status="published"
+                    ).count()
                 except Exception:
                     public_count = 0
 
@@ -467,7 +518,12 @@ class UserCreatedObjectListMixin:
                     if self.request.user and self.request.user.is_authenticated:
                         perm_codename = f"can_moderate_{model._meta.model_name}"
                         app_label = model._meta.app_label
-                        can_moderate = self.request.user.is_staff or self.request.user.has_perm(f"{app_label}.{perm_codename}")
+                        can_moderate = (
+                            self.request.user.is_staff
+                            or self.request.user.has_perm(
+                                f"{app_label}.{perm_codename}"
+                            )
+                        )
                     review_count = review_qs.count() if can_moderate else 0
                 except Exception:
                     review_count = 0
@@ -498,11 +554,6 @@ class PublishedObjectListMixin(UserCreatedObjectListMixin):
 class PrivateObjectListMixin(LoginRequiredMixin, UserCreatedObjectListMixin):
     list_type = "private"
 
-
-class ReviewObjectListMixin(LoginRequiredMixin, UserCreatedObjectListMixin):
-    list_type = "review"
-
-
 class PublishedObjectFilterView(
     PublishedObjectListMixin, FilterDefaultsMixin, FilterView
 ):
@@ -527,6 +578,85 @@ class PublishedObjectFilterView(
         return qs
 
 
+class AddReviewCommentView(BaseReviewActionView):
+    """Add a free-text review comment linked to an object."""
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object(request, *args, **kwargs)
+        obj = self.object
+
+        # Must be authenticated
+        if not request.user.is_authenticated:
+            raise PermissionDenied("Authentication required.")
+
+        # Authorization: owners can always comment on their own objects; moderators too
+        is_owner = obj.owner_id == request.user.id
+        can_moderate = UserCreatedObjectPermission()._is_moderator(request.user, obj)
+        if not (is_owner or can_moderate or request.user.is_staff):
+            raise PermissionDenied("You don't have permission to comment on this item.")
+
+        message = (request.POST.get("message") or "").strip()
+        if not message:
+            messages.error(request, "Comment cannot be empty.")
+            return HttpResponseRedirect(self.get_success_url())
+
+        ReviewAction.objects.create(
+            content_type=ContentType.objects.get_for_model(obj.__class__),
+            object_id=obj.pk,
+            action=ReviewAction.ACTION_COMMENT,
+            comment=message,
+            user=request.user,
+        )
+
+        messages.success(request, "Comment added.")
+        return HttpResponseRedirect(self.get_success_url())
+
+
+class ReviewObjectListMixin(
+    LoginRequiredMixin, UserPassesTestMixin, UserCreatedObjectListMixin
+):
+    """List mixin to show objects under review to moderators/staff.
+
+    - Restricts access to users who are staff or hold the per‑model
+      `can_moderate_<modelname>` permission.
+    - Sets `list_type` to 'review' for templates.
+    - Filters queryset to only items reviewable by the user.
+    """
+
+    list_type = "review"
+
+    def test_func(self):
+        model = getattr(self, "model", None)
+        if model is None:
+            raise ImproperlyConfigured("ReviewObjectListMixin requires a 'model'.")
+        user = self.request.user
+        if not user.is_authenticated:
+            return False
+        app_label = model._meta.app_label
+        model_name = model._meta.model_name
+        perm_codename = f"can_moderate_{model_name}"
+        return user.is_staff or user.has_perm(f"{app_label}.{perm_codename}")
+
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        return queryset.reviewable_by_user(self.request.user)
+
+
+class ReviewObjectFilterView(ReviewObjectListMixin, FilterDefaultsMixin, FilterView):
+    """Filter view for review scope; applies default scope='review' and uses filtered_list template."""
+
+    def get_default_filters(self):
+        initial_values = super().get_default_filters()
+        if "scope" in self.filterset_class.base_filters:
+            initial_values["scope"] = "review"
+        return initial_values
+
+    def get_template_names(self):
+        template_names = super().get_template_names()
+        template_names.append("filtered_list.html")
+        return template_names
+
+
 class PrivateObjectFilterView(PrivateObjectListMixin, FilterDefaultsMixin, FilterView):
     """
     A view to display a list of objects owned by the currently logged-in user with default filters applied.
@@ -538,25 +668,6 @@ class PrivateObjectFilterView(PrivateObjectListMixin, FilterDefaultsMixin, Filte
         # Override scope to 'private' for private views
         if "scope" in self.filterset_class.base_filters:
             initial_values["scope"] = "private"
-        return initial_values
-
-    def get_template_names(self):
-        template_names = super().get_template_names()
-        template_names.append("filtered_list.html")
-        return template_names
-
-
-class ReviewObjectFilterView(ReviewObjectListMixin, FilterDefaultsMixin, FilterView):
-    """
-    A view to display a list of objects owned by the currently logged-in user with default filters applied.
-    """
-
-    def get_default_filters(self):
-        """Override to set scope to 'review' for review object views."""
-        initial_values = super().get_default_filters()
-        # Override scope to 'review' for review views
-        if "scope" in self.filterset_class.base_filters:
-            initial_values["scope"] = "review"
         return initial_values
 
     def get_template_names(self):
@@ -680,7 +791,7 @@ class UserCreatedObjectWriteAccessMixin(UserPassesTestMixin):
             return False
 
         # owners can change their own objects if they are not published
-        if publication_status in ("private", "review"):
+        if publication_status in ("private", "review", "declined"):
             return owner == user
 
 
@@ -793,6 +904,28 @@ class UserCreatedObjectDetailView(UserCreatedObjectReadAccessMixin, DetailView):
         template_names.append("simple_detail_card.html")
         return template_names
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        obj = self.object
+        request = self.request
+        # Show review panel when explicitly requested via ?review=1
+        show_panel = request.GET.get("review") is not None
+
+        logs = []
+        if show_panel:
+            try:
+                logs = list(ReviewAction.for_object(obj).select_related("user"))
+            except Exception:
+                logs = []
+
+        context.update(
+            {
+                "show_review_panel": show_panel,
+                "review_logs": logs,
+            }
+        )
+        return context
+
 
 class ReviewItemDetailView(UserCreatedObjectDetailView):
     """
@@ -819,7 +952,11 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
         perm_codename = f"can_moderate_{model._meta.model_name}"
 
         # If the current user is the owner
-        if request.user.is_authenticated and hasattr(obj, "owner") and obj.owner_id == request.user.id:
+        if (
+            request.user.is_authenticated
+            and hasattr(obj, "owner")
+            and obj.owner_id == request.user.id
+        ):
             # Allow owners to see review details only if the item was rejected
             if getattr(obj, "is_rejected", False):
                 return super().dispatch(request, *args, **kwargs)
@@ -829,9 +966,14 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
         # For non-owners, require moderator permissions
         if not (
             request.user.is_authenticated
-            and (request.user.is_staff or request.user.has_perm(f"{app_label}.{perm_codename}"))
+            and (
+                request.user.is_staff
+                or request.user.has_perm(f"{app_label}.{perm_codename}")
+            )
         ):
-            raise PermissionDenied("You do not have permission to access the review details page.")
+            raise PermissionDenied(
+                "You do not have permission to access the review details page."
+            )
         return super().dispatch(request, *args, **kwargs)
 
     def _resolve_base_template(self):
@@ -874,10 +1016,9 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
         try:
             obj = self.object
             ct = ContentType.objects.get_for_model(obj.__class__)
-            actions = (
-                ReviewAction.objects.filter(content_type=ct, object_id=obj.pk)
-                .order_by("created_at", "id")
-            )
+            actions = ReviewAction.objects.filter(
+                content_type=ct, object_id=obj.pk
+            ).order_by("created_at", "id")
         except Exception:
             actions = []
         context["review_actions"] = actions
@@ -1072,6 +1213,9 @@ class UserCreatedObjectModalDeleteView(
                 elif self.object.publication_status == "review":
                     url = self.model.review_list_url()
                     return f"{url}?scope=review"
+                elif self.object.publication_status == "declined":
+                    url = self.model.private_list_url()
+                    return f"{url}?scope=private"
             else:
                 # For models without scope filtering, use standard URLs without scope params
                 if self.object.publication_status == "published":
@@ -1080,6 +1224,8 @@ class UserCreatedObjectModalDeleteView(
                     return self.model.private_list_url()
                 elif self.object.publication_status == "review":
                     return self.model.review_list_url()
+                elif self.object.publication_status == "declined":
+                    return self.model.private_list_url()
 
         # Fallback to public list without scope
         return self.model.public_list_url()

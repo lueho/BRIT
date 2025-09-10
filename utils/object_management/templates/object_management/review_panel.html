@@ -1,0 +1,109 @@
+{% load i18n %}
+{% load moderation_tags %}
+<div class="card border-0 mb-3 shadow-sm" id="review-panel">
+  <div class="card-body">
+    <div class="d-flex align-items-center justify-content-between mb-2">
+      <h5 class="mb-0"><i class="fas fa-comments me-2"></i>{% trans "Review" %}</h5>
+      <small class="text-muted">{% trans "Detail-based review panel" %}</small>
+    </div>
+
+    {# Thread #}
+    <div class="mb-3">
+      {% if review_logs %}
+        <ul class="list-unstyled mb-0">
+          {% for log in review_logs %}
+            <li class="pb-2 mb-2 border-bottom">
+              <div class="d-flex justify-content-between">
+                <div>
+                  <span class="badge bg-light text-dark me-2">{{ log.get_action_display }}</span>
+                  <strong>{{ log.user }}</strong>
+                </div>
+                <small class="text-muted">{{ log.created_at|date:"Y-m-d H:i" }}</small>
+              </div>
+              {% if log.comment %}
+                <div class="mt-1">{{ log.comment|linebreaksbr }}</div>
+              {% endif %}
+            </li>
+          {% endfor %}
+        </ul>
+      {% else %}
+        <div class="text-muted">{% trans "No review activity yet." %}</div>
+      {% endif %}
+    </div>
+
+    {# Actions #}
+    <div class="d-flex flex-wrap gap-2 align-items-start">
+      {# Comment form #}
+      {% if request.user.is_authenticated %}
+      <form method="post" action="{% url 'object_management:add_review_comment' content_type_id=object|get_content_type_id object_id=object.id %}" class="flex-grow-1">
+        {% csrf_token %}
+        <input type="hidden" name="next" value="{{ request.get_full_path }}">
+        <div class="input-group">
+          <textarea class="form-control" name="message" rows="1" placeholder="{% trans 'Add a comment for reviewers/owner...' %}"></textarea>
+          <button class="btn btn-outline-primary" type="submit"><i class="fas fa-paper-plane"></i> {% trans "Comment" %}</button>
+        </div>
+      </form>
+      {% endif %}
+
+      {# Owner actions #}
+      {% if request.user == object.owner or request.user.is_staff %}
+        {% if object.is_declined %}
+          <form method="post" action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <div class="input-group">
+              <input type="text" class="form-control" name="message" placeholder="{% trans 'Optional message to moderators' %}">
+              <button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> {% trans "Resubmit" %}</button>
+            </div>
+          </form>
+          <form method="post" action="{% url 'object_management:withdraw_from_review' content_type_id=object|get_content_type_id object_id=object.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <div class="input-group">
+              <input type="text" class="form-control" name="message" placeholder="{% trans 'Optional note' %}">
+              <button type="submit" class="btn btn-secondary"><i class="fas fa-lock"></i> {% trans "Set to Private" %}</button>
+            </div>
+          </form>
+        {% elif object.is_in_review %}
+          <form method="post" action="{% url 'object_management:withdraw_from_review' content_type_id=object|get_content_type_id object_id=object.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <div class="input-group">
+              <input type="text" class="form-control" name="message" placeholder="{% trans 'Optional note' %}">
+              <button type="submit" class="btn btn-secondary"><i class="fas fa-rotate-left"></i> {% trans "Withdraw" %}</button>
+            </div>
+          </form>
+        {% elif object.is_private %}
+          <form method="post" action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <div class="input-group">
+              <input type="text" class="form-control" name="message" placeholder="{% trans 'Optional message to moderators' %}">
+              <button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> {% trans "Submit for Review" %}</button>
+            </div>
+          </form>
+        {% endif %}
+      {% endif %}
+
+      {# Moderator actions #}
+      {% if request.user|can_moderate:object and object.is_in_review %}
+        <form method="post" action="{% url 'object_management:approve_item' content_type_id=object|get_content_type_id object_id=object.id %}">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+          <div class="input-group">
+            <input type="text" class="form-control" name="message" placeholder="{% trans 'Optional note to owner' %}">
+            <button type="submit" class="btn btn-success"><i class="fas fa-check"></i> {% trans "Approve" %}</button>
+          </div>
+        </form>
+        <form method="post" action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}">
+          {% csrf_token %}
+          <input type="hidden" name="next" value="{{ request.get_full_path }}">
+          <div class="input-group">
+            <input type="text" class="form-control" name="message" placeholder="{% trans 'Reason (required on reject preferred)' %}">
+            <button type="submit" class="btn btn-danger"><i class="fas fa-xmark"></i> {% trans "Reject" %}</button>
+          </div>
+        </form>
+      {% endif %}
+    </div>
+  </div>
+</div>

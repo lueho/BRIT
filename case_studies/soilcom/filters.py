@@ -2,9 +2,9 @@ import math
 
 from crispy_forms.bootstrap import Accordion
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Column, Field, Layout, Row, Submit
+from crispy_forms.layout import Column, Field, Layout, Row
 from django.db.models import Avg, Count, Max, Q, Sum
-from django.forms import CheckboxSelectMultiple, DateInput, RadioSelect
+from django.forms import CheckboxSelectMultiple, DateInput, HiddenInput, RadioSelect
 from django_filters import (
     BooleanFilter,
     CharFilter,
@@ -12,6 +12,7 @@ from django_filters import (
     DateFilter,
     ModelChoiceFilter,
     ModelMultipleChoiceFilter,
+    OrderingFilter,
 )
 from django_tomselect.app_settings import TomSelectConfig
 from django_tomselect.widgets import TomSelectModelWidget
@@ -84,12 +85,8 @@ class CollectionFilterFormHelper(FormHelper):
                 "collector",
                 "collection_system",
                 "waste_category",
-                Submit(
-                    "filter",
-                    "Filter",
-                    css_id="submit-id-basic-filter",
-                    css_class="submit-filter",
-                ),
+                "publication_status",
+                "ordering",
             ),
             FilterAccordionGroup(
                 "Advanced filters",
@@ -109,12 +106,6 @@ class CollectionFilterFormHelper(FormHelper):
                 RangeSliderField("spec_waste_collected"),
                 "valid_on",
                 "scope",
-                Submit(
-                    "filter",
-                    "Filter",
-                    css_id="submit-id-basic-filter",
-                    css_class="submit-filter",
-                ),
             ),
         )
     )
@@ -357,6 +348,15 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
         field_name="required_bin_capacity_reference",
         help_text="Defines the unit (person, household, property) for which the required bin capacity applies. Leave blank if not specified.",
     )
+    ordering = OrderingFilter(
+        label="Sort by",
+        choices=(
+            ("-lastmodified_at", "Last changed (newest)"),
+            ("lastmodified_at", "Last changed (oldest)"),
+            ("name", "Name (A–Z)"),
+            ("-name", "Name (Z–A)"),
+        ),
+    )
 
     class Meta:
         model = Collection
@@ -382,6 +382,7 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
             "publication_status",
             "owner",
             "scope",
+            "ordering",
         )
         # catchment_filter must always be applied first, because it grabs the initial queryset and does not filter any
         # existing queryset.
@@ -395,6 +396,27 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
         self.filters["spec_waste_collected"].set_min_max()
         self.filters["required_bin_capacity"].set_min_max()
         self.filters["min_bin_size"].set_min_max()
+
+        # Only show publication_status filter when scope is private ("My collections")
+        try:
+            scope_val = None
+            # django_filters passes data in .data (QueryDict)
+            if hasattr(self, "data") and self.data:
+                scope_val = self.data.get("scope")
+            # Fallback to initial on form if provided by view defaults
+            if not scope_val and hasattr(self.form, "initial"):
+                scope_val = self.form.initial.get("scope")
+        except Exception:
+            scope_val = None
+
+        if scope_val != "private":
+            # Hide the field visually; it will still be in the form to carry defaults if any
+            try:
+                self.filters["publication_status"].field.widget = HiddenInput()
+                self.filters["publication_status"].field.label = ""
+                self.filters["publication_status"].extra["help_text"] = ""
+            except KeyError:
+                pass
 
     @staticmethod
     def catchment_filter(queryset, _, value):

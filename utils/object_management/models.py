@@ -38,6 +38,8 @@ STATUS_CHOICES = (
     ("private", "Private"),
     ("review", "Under Review"),
     ("published", "Published"),
+    ("declined", "Declined"),
+    ("archived", "Archived"),
 )
 
 
@@ -56,7 +58,6 @@ class GlobalObject(CRUDUrlsMixin, CommonInfo):
     def __str__(self):
         return self.name
 
-
 class ReviewAction(models.Model):
     """Audit log for review workflow actions with optional moderator comments.
 
@@ -68,12 +69,14 @@ class ReviewAction(models.Model):
     ACTION_APPROVED = "approved"
     ACTION_REJECTED = "rejected"
     ACTION_WITHDRAWN = "withdrawn"
+    ACTION_COMMENT = "comment"
 
     ACTION_CHOICES = (
         (ACTION_SUBMITTED, "Submitted"),
         (ACTION_APPROVED, "Approved"),
         (ACTION_REJECTED, "Rejected"),
         (ACTION_WITHDRAWN, "Withdrawn"),
+        (ACTION_COMMENT, "Comment"),
     )
 
     # Generic relation to the affected object
@@ -108,6 +111,15 @@ class ReviewAction(models.Model):
             else "?"
         )
         return f"{self.get_action_display()} by {self.user} on {obj_label}"
+
+    @classmethod
+    def for_object(cls, obj):
+        return cls.objects.filter(
+            content_type=ContentType.objects.get_for_model(obj.__class__),
+            object_id=obj.pk,
+        )
+
+
 
 
 class UserCreatedObjectQuerySet(models.QuerySet):
@@ -168,6 +180,7 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
     STATUS_PRIVATE = "private"
     STATUS_REVIEW = "review"
     STATUS_PUBLISHED = "published"
+    STATUS_DECLINED = "declined"
     STATUS_ARCHIVED = "archived"
 
     owner = models.ForeignKey(
@@ -197,8 +210,10 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
         Submit this object for review. Transitions from private to review status.
         Sets submitted_at timestamp and clears approval fields if previously set.
         """
-        if self.publication_status != self.STATUS_PRIVATE:
-            raise ValidationError("Only private objects can be submitted for review.")
+        if self.publication_status not in (self.STATUS_PRIVATE, self.STATUS_DECLINED):
+            raise ValidationError(
+                "Only private or declined objects can be submitted for review."
+            )
         self.publication_status = self.STATUS_REVIEW
         from django.utils import timezone
 
@@ -214,8 +229,10 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
         return self.submit_for_review()
 
     def withdraw_from_review(self):
-        if self.publication_status != self.STATUS_REVIEW:
-            raise ValidationError("Only objects in review can be withdrawn.")
+        if self.publication_status not in (self.STATUS_REVIEW, self.STATUS_DECLINED):
+            raise ValidationError(
+                "Only objects in review or declined can be withdrawn to private."
+            )
         self.publication_status = self.STATUS_PRIVATE
         self.submitted_at = None
         self.save()
@@ -240,7 +257,7 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
     def reject(self):
         if self.publication_status != self.STATUS_REVIEW:
             raise ValidationError("Only objects in review can be rejected.")
-        self.publication_status = self.STATUS_PRIVATE
+        self.publication_status = self.STATUS_DECLINED
         self.submitted_at = None
         self.approved_at = None
         self.approved_by = None
@@ -265,6 +282,10 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
     @property
     def is_published(self):
         return self.publication_status == self.STATUS_PUBLISHED
+
+    @property
+    def is_declined(self):
+        return self.publication_status == self.STATUS_DECLINED
 
     @property
     def is_archived(self):
