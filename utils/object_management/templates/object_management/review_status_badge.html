@@ -13,8 +13,8 @@
     <i class="fas fa-search"></i> {% trans "In Review" %}
 </span>
 {% elif object.is_declined %}
-<span class="review-status-badge review-status-declined" title="{% trans 'Declined' %}">
-    <i class="fas fa-circle-xmark"></i> {% trans "Declined" %}
+<span class="review-status-badge review-status-declined" title="{% trans 'Rejected' %}">
+    <i class="fas fa-circle-xmark"></i> {% trans "Rejected" %}
 </span>
 {% elif object.is_published %}
 <span class="review-status-badge review-status-published"

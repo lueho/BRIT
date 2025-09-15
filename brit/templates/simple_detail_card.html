@@ -4,12 +4,12 @@
 {% block title %}BRIT | {{ object.name }} details{% endblock %}
 
 {% block content %}
-{% if object.is_declined and request.user == object.owner %}
+{% if object.is_declined and request.user == object.owner and not review_mode %}
 <div class="row mt-4">
     <div class="col">
         <div class="card border-danger shadow-sm">
             <div class="card-header bg-danger text-white">
-                <strong><i class="fas fa-circle-xmark"></i> Submission Declined</strong>
+                <strong><i class="fas fa-circle-xmark"></i> Submission Rejected</strong>
             </div>
             <div class="card-body">
                 {% with last_rej=object.get_last_rejection_action %}
@@ -47,7 +47,7 @@
     <div class="col">
         <div class="card shadow">
             <div class="card-header d-flex justify-content-between align-items-center bg-body-tertiary border-bottom-0 py-3">
-                <div class="d-flex align-items-center gap-2">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
                     <h5 class="mb-0">
                         {% block detail_header %}{{ object.verbose_name|capfirst }} details{% endblock %}
                     </h5>
@@ -108,9 +108,17 @@
                             <div class="dropdown-menu" aria-labelledby="detailOptionsDropdown">
                                 {% block detail_update_link %}
                                     {% if object.update_url %}
-                                        <a class="dropdown-item" href="{{ object.update_url }}{% if review_mode or show_review_panel %}?next={{ request.get_full_path|urlencode }}{% endif %}">
-                                            <i class="fas fa-fw fa-pen-to-square"></i> Edit
-                                        </a>
+                                        {% if request.user.is_staff %}
+                                            <a class="dropdown-item" href="{{ object.update_url }}{% if review_mode or show_review_panel %}?next={{ request.get_full_path|urlencode }}{% endif %}">
+                                                <i class="fas fa-fw fa-pen-to-square"></i> Edit
+                                            </a>
+                                        {% elif request.user == object.owner %}
+                                            {% if object.publication_status != object.STATUS_PUBLISHED %}
+                                                <a class="dropdown-item" href="{{ object.update_url }}{% if review_mode or show_review_panel %}?next={{ request.get_full_path|urlencode }}{% endif %}">
+                                                    <i class="fas fa-fw fa-pen-to-square"></i> Edit
+                                                </a>
+                                            {% endif %}
+                                        {% endif %}
                                     {% endif %}
                                 {% endblock detail_update_link %}
                                 {% block detail_delete_link %}
