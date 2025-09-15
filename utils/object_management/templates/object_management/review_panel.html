@@ -2,108 +2,186 @@
 {% load moderation_tags %}
 <div class="card border-0 mb-3 shadow-sm" id="review-panel">
   <div class="card-body">
+    {% if not review_mode %}
     <div class="d-flex align-items-center justify-content-between mb-2">
       <h5 class="mb-0"><i class="fas fa-comments me-2"></i>{% trans "Review" %}</h5>
       <small class="text-muted">{% trans "Detail-based review panel" %}</small>
     </div>
+    {% endif %}
 
-    {# Thread #}
+    {# Thread (collapsible when long) #}
     <div class="mb-3">
       {% if review_logs %}
-        <ul class="list-unstyled mb-0">
-          {% for log in review_logs %}
-            <li class="pb-2 mb-2 border-bottom">
-              <div class="d-flex justify-content-between">
-                <div>
-                  <span class="badge bg-light text-dark me-2">{{ log.get_action_display }}</span>
-                  <strong>{{ log.user }}</strong>
+        {% with review_logs|length as log_count %}
+          <ul class="list-unstyled mb-0">
+            {% for log in review_logs|slice:":3" %}
+              <li class="py-2 border-bottom border-light-subtle">
+                <div class="d-flex justify-content-between align-items-start">
+                  <div class="me-3">
+                    {% if log.action == 'submitted' %}
+                      <span class="badge rounded-pill bg-primary-subtle text-primary-emphasis me-2"><i class="fas fa-paper-plane me-1"></i> {% trans "Submitted" %}</span>
+                    {% elif log.action == 'approved' %}
+                      <span class="badge rounded-pill bg-success-subtle text-success-emphasis me-2"><i class="fas fa-check me-1"></i> {% trans "Approved" %}</span>
+                    {% elif log.action == 'rejected' %}
+                      <span class="badge rounded-pill bg-danger-subtle text-danger-emphasis me-2"><i class="fas fa-xmark me-1"></i> {% trans "Rejected" %}</span>
+                    {% elif log.action == 'withdrawn' %}
+                      <span class="badge rounded-pill bg-secondary-subtle text-secondary-emphasis me-2"><i class="fas fa-rotate-left me-1"></i> {% trans "Withdrawn" %}</span>
+                    {% else %}
+                      <span class="badge rounded-pill bg-body-secondary text-body me-2"><i class="fas fa-comment-dots me-1"></i> {{ log.get_action_display }}</span>
+                    {% endif %}
+                    <strong>{{ log.user }}</strong>
+                    {% if log.comment %}
+                      <div class="mt-1">{{ log.comment|linebreaksbr }}</div>
+                    {% endif %}
+                  </div>
+                  <small class="text-muted text-nowrap">{{ log.created_at|date:"Y-m-d H:i" }}</small>
                 </div>
-                <small class="text-muted">{{ log.created_at|date:"Y-m-d H:i" }}</small>
-              </div>
-              {% if log.comment %}
-                <div class="mt-1">{{ log.comment|linebreaksbr }}</div>
-              {% endif %}
-            </li>
-          {% endfor %}
-        </ul>
+              </li>
+            {% endfor %}
+          </ul>
+          {% if log_count > 3 %}
+            <div class="mt-2">
+              <button class="btn btn-sm btn-link" type="button"
+                      data-bs-toggle="collapse"
+                      data-bs-target="#review-logs-more-{{ object.id }}"
+                      aria-expanded="false"
+                      aria-controls="review-logs-more-{{ object.id }}">
+                {% trans "Show older comments" %} ({{ log_count|add:"-3" }})
+              </button>
+            </div>
+            <ul id="review-logs-more-{{ object.id }}" class="list-unstyled collapse mt-2">
+              {% for log in review_logs|slice:"3:" %}
+                <li class="py-2 border-bottom border-light-subtle">
+                  <div class="d-flex justify-content-between align-items-start">
+                    <div class="me-3">
+                      {% if log.action == 'submitted' %}
+                        <span class="badge rounded-pill bg-primary-subtle text-primary-emphasis me-2"><i class="fas fa-paper-plane me-1"></i> {% trans "Submitted" %}</span>
+                      {% elif log.action == 'approved' %}
+                        <span class="badge rounded-pill bg-success-subtle text-success-emphasis me-2"><i class="fas fa-check me-1"></i> {% trans "Approved" %}</span>
+                      {% elif log.action == 'rejected' %}
+                        <span class="badge rounded-pill bg-danger-subtle text-danger-emphasis me-2"><i class="fas fa-xmark me-1"></i> {% trans "Rejected" %}</span>
+                      {% elif log.action == 'withdrawn' %}
+                        <span class="badge rounded-pill bg-secondary-subtle text-secondary-emphasis me-2"><i class="fas fa-rotate-left me-1"></i> {% trans "Withdrawn" %}</span>
+                      {% else %}
+                        <span class="badge rounded-pill bg-body-secondary text-body me-2"><i class="fas fa-comment-dots me-1"></i> {{ log.get_action_display }}</span>
+                      {% endif %}
+                      <strong>{{ log.user }}</strong>
+                      {% if log.comment %}
+                        <div class="mt-1">{{ log.comment|linebreaksbr }}</div>
+                      {% endif %}
+                    </div>
+                    <small class="text-muted text-nowrap">{{ log.created_at|date:"Y-m-d H:i" }}</small>
+                  </div>
+                </li>
+              {% endfor %}
+            </ul>
+          {% endif %}
+        {% endwith %}
       {% else %}
         <div class="text-muted">{% trans "No review activity yet." %}</div>
       {% endif %}
     </div>
 
+    {# Shared message box for all actions #}
+    <div class="mb-2">
+      <label for="review-message-{{ object.id }}" class="form-label mb-1 small">{% trans "Message (optional)" %}</label>
+      <textarea id="review-message-{{ object.id }}" class="form-control form-control-sm" rows="2" placeholder="{% trans 'Write a short note or comment…' %}"></textarea>
+    </div>
+
     {# Actions #}
-    <div class="d-flex flex-wrap gap-2 align-items-start">
-      {# Comment form #}
+    <div class="btn-toolbar gap-2 flex-wrap align-items-center" role="toolbar" aria-label="Review actions">
+      {# Single comment button using the shared message box #}
       {% if request.user.is_authenticated %}
-      <form method="post" action="{% url 'object_management:add_review_comment' content_type_id=object|get_content_type_id object_id=object.id %}" class="flex-grow-1">
-        {% csrf_token %}
-        <input type="hidden" name="next" value="{{ request.get_full_path }}">
-        <div class="input-group">
-          <textarea class="form-control" name="message" rows="1" placeholder="{% trans 'Add a comment for reviewers/owner...' %}"></textarea>
-          <button class="btn btn-outline-primary" type="submit"><i class="fas fa-paper-plane"></i> {% trans "Comment" %}</button>
-        </div>
-      </form>
+        {% if request.user == object.owner %}
+          <form method="post" action="{% url 'object_management:add_review_comment' content_type_id=object|get_content_type_id object_id=object.id %}" class="m-0 btn-group align-items-center" role="group" onsubmit="return copySharedMessage(this, 'review-message-{{ object.id }}')">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <input type="hidden" name="message" value="">
+            <button class="btn btn-sm btn-outline-primary" type="submit"><i class="fas fa-paper-plane"></i> {% trans "Comment" %}</button>
+          </form>
+        {% elif request.user|can_moderate:object %}
+          <form method="post" action="{% url 'object_management:add_review_comment' content_type_id=object|get_content_type_id object_id=object.id %}" class="m-0 btn-group align-items-center" role="group" onsubmit="return copySharedMessage(this, 'review-message-{{ object.id }}')">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <input type="hidden" name="message" value="">
+            <button class="btn btn-sm btn-outline-primary" type="submit"><i class="fas fa-paper-plane"></i> {% trans "Comment" %}</button>
+          </form>
+        {% elif request.user.is_staff %}
+          <form method="post" action="{% url 'object_management:add_review_comment' content_type_id=object|get_content_type_id object_id=object.id %}" class="m-0 btn-group align-items-center" role="group" onsubmit="return copySharedMessage(this, 'review-message-{{ object.id }}')">
+            {% csrf_token %}
+            <input type="hidden" name="next" value="{{ request.get_full_path }}">
+            <input type="hidden" name="message" value="">
+            <button class="btn btn-sm btn-outline-primary" type="submit"><i class="fas fa-paper-plane"></i> {% trans "Comment" %}</button>
+          </form>
+        {% endif %}
       {% endif %}
 
-      {# Owner actions #}
-      {% if request.user == object.owner or request.user.is_staff %}
+      {# Owner actions (owners only) #}
+      {% if request.user == object.owner %}
         {% if object.is_declined %}
-          <form method="post" action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}">
+          <form method="post" action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}" class="m-0 btn-group align-items-center" role="group" onsubmit="return copySharedMessage(this, 'review-message-{{ object.id }}')">
             {% csrf_token %}
-            <input type="hidden" name="next" value="{{ request.get_full_path }}">
-            <div class="input-group">
-              <input type="text" class="form-control" name="message" placeholder="{% trans 'Optional message to moderators' %}">
-              <button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> {% trans "Resubmit" %}</button>
-            </div>
+            <input type="hidden" name="next" value="{{ object.get_absolute_url }}">
+            <input type="hidden" name="message" value="">
+            <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-paper-plane"></i> {% trans "Resubmit" %}</button>
           </form>
-          <form method="post" action="{% url 'object_management:withdraw_from_review' content_type_id=object|get_content_type_id object_id=object.id %}">
+          <form method="post" action="{% url 'object_management:withdraw_from_review' content_type_id=object|get_content_type_id object_id=object.id %}" class="m-0 btn-group align-items-center" role="group" onsubmit="return copySharedMessage(this, 'review-message-{{ object.id }}')">
             {% csrf_token %}
             <input type="hidden" name="next" value="{{ request.get_full_path }}">
-            <div class="input-group">
-              <input type="text" class="form-control" name="message" placeholder="{% trans 'Optional note' %}">
-              <button type="submit" class="btn btn-secondary"><i class="fas fa-lock"></i> {% trans "Set to Private" %}</button>
-            </div>
+            <input type="hidden" name="message" value="">
+            <button type="submit" class="btn btn-sm btn-secondary"><i class="fas fa-lock"></i> {% trans "Set to Private" %}</button>
           </form>
         {% elif object.is_in_review %}
-          <form method="post" action="{% url 'object_management:withdraw_from_review' content_type_id=object|get_content_type_id object_id=object.id %}">
+          <form method="post" action="{% url 'object_management:withdraw_from_review' content_type_id=object|get_content_type_id object_id=object.id %}" class="m-0 btn-group align-items-center" role="group" onsubmit="return copySharedMessage(this, 'review-message-{{ object.id }}')">
             {% csrf_token %}
             <input type="hidden" name="next" value="{{ request.get_full_path }}">
-            <div class="input-group">
-              <input type="text" class="form-control" name="message" placeholder="{% trans 'Optional note' %}">
-              <button type="submit" class="btn btn-secondary"><i class="fas fa-rotate-left"></i> {% trans "Withdraw" %}</button>
-            </div>
+            <input type="hidden" name="message" value="">
+            <button type="submit" class="btn btn-sm btn-secondary"><i class="fas fa-rotate-left"></i> {% trans "Withdraw" %}</button>
           </form>
         {% elif object.is_private %}
-          <form method="post" action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}">
+          <form method="post" action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}" class="m-0 btn-group align-items-center" role="group" onsubmit="return copySharedMessage(this, 'review-message-{{ object.id }}')">
             {% csrf_token %}
             <input type="hidden" name="next" value="{{ request.get_full_path }}">
-            <div class="input-group">
-              <input type="text" class="form-control" name="message" placeholder="{% trans 'Optional message to moderators' %}">
-              <button type="submit" class="btn btn-primary"><i class="fas fa-paper-plane"></i> {% trans "Submit for Review" %}</button>
-            </div>
+            <input type="hidden" name="message" value="">
+            <button type="submit" class="btn btn-sm btn-primary"><i class="fas fa-paper-plane"></i> {% trans "Submit for Review" %}</button>
           </form>
         {% endif %}
       {% endif %}
 
       {# Moderator actions #}
       {% if request.user|can_moderate:object and object.is_in_review %}
-        <form method="post" action="{% url 'object_management:approve_item' content_type_id=object|get_content_type_id object_id=object.id %}">
+        <form method="post" action="{% url 'object_management:approve_item' content_type_id=object|get_content_type_id object_id=object.id %}" class="m-0 btn-group align-items-center" role="group" onsubmit="return copySharedMessage(this, 'review-message-{{ object.id }}')">
           {% csrf_token %}
           <input type="hidden" name="next" value="{{ request.get_full_path }}">
-          <div class="input-group">
-            <input type="text" class="form-control" name="message" placeholder="{% trans 'Optional note to owner' %}">
-            <button type="submit" class="btn btn-success"><i class="fas fa-check"></i> {% trans "Approve" %}</button>
-          </div>
+          <input type="hidden" name="message" value="">
+          <button type="submit" class="btn btn-sm btn-success"><i class="fas fa-check"></i> {% trans "Approve" %}</button>
         </form>
-        <form method="post" action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}">
+        <form method="post" action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}" class="m-0 btn-group align-items-center" role="group" onsubmit="return copySharedMessage(this, 'review-message-{{ object.id }}')">
           {% csrf_token %}
           <input type="hidden" name="next" value="{{ request.get_full_path }}">
-          <div class="input-group">
-            <input type="text" class="form-control" name="message" placeholder="{% trans 'Reason (required on reject preferred)' %}">
-            <button type="submit" class="btn btn-danger"><i class="fas fa-xmark"></i> {% trans "Reject" %}</button>
-          </div>
+          <input type="hidden" name="message" value="">
+          <button type="submit" class="btn btn-sm btn-danger"><i class="fas fa-xmark"></i> {% trans "Reject" %}</button>
         </form>
       {% endif %}
     </div>
+    <script>
+      (function(){
+        window.copySharedMessage = function(form, textareaId) {
+          try {
+            var ta = document.getElementById(textareaId);
+            if (!ta) return true;
+            var hidden = form.querySelector('input[name="message"]');
+            if (!hidden) {
+              hidden = document.createElement('input');
+              hidden.type = 'hidden';
+              hidden.name = 'message';
+              form.appendChild(hidden);
+            }
+            hidden.value = ta.value;
+          } catch (e) { /* no-op */ }
+          return true;
+        }
+      })();
+    </script>
   </div>
 </div>

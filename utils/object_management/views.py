@@ -1018,7 +1018,7 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
             ct = ContentType.objects.get_for_model(obj.__class__)
             actions = ReviewAction.objects.filter(
                 content_type=ct, object_id=obj.pk
-            ).order_by("created_at", "id")
+            ).order_by("-created_at", "-id")
         except Exception:
             actions = []
         # Old variable used by wrapper; keep for compatibility
@@ -1143,7 +1143,7 @@ class UserCreatedObjectModalUpdateView(
 
 
 class UserCreatedObjectModalArchiveView(
-    UserCreatedObjectWriteAccessMixin, NextOrSuccessUrlMixin, BSModalDeleteView
+    UserPassesTestMixin, NextOrSuccessUrlMixin, BSModalDeleteView
 ):
     """
     A repurposed update view that opens up a modal to ask for confirmation, similar to
@@ -1153,6 +1153,18 @@ class UserCreatedObjectModalArchiveView(
 
     template_name = "modal_archive.html"
     success_message = "Successfully archived."
+
+    def test_func(self):
+        """
+        Allow staff and owners to archive, even if the object is published.
+        Editing published objects remains restricted elsewhere.
+        """
+        user = self.request.user
+        if not user.is_authenticated:
+            return False
+        obj = self.get_object()
+        owner = getattr(obj, "owner", None)
+        return user.is_staff or (owner == user)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
