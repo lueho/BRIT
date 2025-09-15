@@ -10,16 +10,22 @@
   <div class="btn-toolbar" role="toolbar" aria-label="Detail actions">
     <div class="btn-group me-2" role="group">
       {% if request.user.is_authenticated %}
-        {% if request.user == object.owner or request.user.is_staff %}
-          {% if object.update_url %}
-            <a class="btn btn-sm btn-primary" href="{{ object.update_url }}" title="Edit">
+        {% if object.update_url %}
+          {% if request.user.is_staff %}
+            <a class="btn btn-sm btn-primary" href="{{ object.update_url }}{% if review_mode or show_review_panel %}?next={{ request.get_full_path|urlencode }}{% endif %}" title="Edit">
               <i class="fas fa-edit"></i> <span class="d-none d-sm-inline">Edit</span>
             </a>
+          {% elif request.user == object.owner %}
+            {% if object.publication_status != object.STATUS_PUBLISHED %}
+              <a class="btn btn-sm btn-primary" href="{{ object.update_url }}{% if review_mode or show_review_panel %}?next={{ request.get_full_path|urlencode }}{% endif %}" title="Edit">
+                <i class="fas fa-edit"></i> <span class="d-none d-sm-inline">Edit</span>
+              </a>
+            {% endif %}
           {% endif %}
         {% endif %}
       {% endif %}
       {% if request.user.is_authenticated %}
-        {% if request.user == object.owner and object.is_declined %}
+        {% if request.user == object.owner and object.is_declined and not review_mode %}
           <a class="btn btn-sm btn-outline-danger" href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}" title="Review feedback">
             <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review feedback</span>
           </a>
@@ -149,7 +155,34 @@
   </div>
   {# Reject Modal kept near header to support header actions #}
   {% if object.is_in_review %}
-    {% if user.is_staff and not review_mode or perms.can_moderate and not review_mode %}
+    {% if user.is_staff %}
+      <div class="modal fade" id="rejectModal-{{ object.id }}" tabindex="-1" aria-labelledby="rejectModalLabel-{{ object.id }}" aria-hidden="true">
+        <div class="modal-dialog">
+          <div class="modal-content">
+            <div class="modal-header">
+              <h5 class="modal-title" id="rejectModalLabel-{{ object.id }}">{% trans "Reject item" %}</h5>
+              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans "Close" %}"></button>
+            </div>
+            <form method="post" action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}">
+              <div class="modal-body">
+                  {% csrf_token %}
+                  <p class="mb-3">{{ reject_confirm }}</p>
+                  <div class="mb-3">
+                    <label for="reject-comment-textarea-{{ object.id }}" class="form-label">{% trans "Review comment (optional)" %}</label>
+                    <textarea class="form-control" id="reject-comment-textarea-{{ object.id }}" name="comment" rows="4" placeholder="{% trans "Explain why this was rejected (optional)" %}"></textarea>
+                  </div>
+              </div>
+              <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+                <button type="submit" class="btn btn-danger">
+                  <i class="fas fa-times"></i> {% trans "Reject" %}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      </div>
+    {% elif perms.can_moderate %}
       <div class="modal fade" id="rejectModal-{{ object.id }}" tabindex="-1" aria-labelledby="rejectModalLabel-{{ object.id }}" aria-hidden="true">
         <div class="modal-dialog">
           <div class="modal-content">
