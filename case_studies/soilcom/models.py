@@ -583,6 +583,10 @@ class Collection(NamedUserCreatedObject):
     def private_map_url(cls):
         return reverse("WasteCollection-owned")
 
+    @classmethod
+    def review_map_url(cls):
+        return reverse("WasteCollection-review")
+
     def __str__(self):
         return self.name
 

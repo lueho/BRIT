@@ -41,6 +41,10 @@ class CRUDUrlsMixin(models.Model):
         return cls.get_url("list", suffix="-owned")
 
     @classmethod
+    def review_list_url(cls):
+        return cls.get_url("list", suffix="-review")
+
+    @classmethod
     def modal_list_url(cls):
         return cls.get_url("list", suffix="-modal")
 
