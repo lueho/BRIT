@@ -39,7 +39,7 @@ services:
     volumes:
       - ./:/app
       - /app/.venv
-    command: celery --app=brit worker --loglevel=info --logfile=-
+    command: celery --app=brit worker --loglevel=info
     env_file:
       - brit/settings/.env
     depends_on:
