@@ -1,5 +1,6 @@
 {% extends 'filtered_list.html' %}
 {% load crispy_forms_tags %}
+{% load user_created_object_tags %}
 
 {% block title %}BRIT | Maps | Regions{% endblock %}
 
@@ -11,8 +12,8 @@
         <tr>
             <th>Name</th>
             <th>Type</th>
-            {% if list_type == 'private' %}
-                <th>Public</th>
+            {% if object_list.model|is_user_created %}
+                <th class="actions-column">Status/Actions</th>
             {% endif %}
         </tr>
         </thead>
@@ -21,8 +22,10 @@
             <tr>
                 <td data-label="Name"><a href="{{ object.get_absolute_url }}">{{ object.name }}</a></td>
                 <td data-label="Country">{{ object.type }}</td>
-                {% if list_type == 'private' %}
-                    {% include 'partials/_publication_status_column.html' %}
+                {% if object_list.model|is_user_created %}
+                    <td class="actions-column mobile-no-label">
+                        {% include 'object_management/status_actions_cell.html' %}
+                    </td>
                 {% endif %}
             </tr>
         {% endfor %}
@@ -32,13 +35,7 @@
     </table>
 {% endblock list_table %}
 
-{% block list_card_footer_additional_links %}
-    {% if user.is_authenticated %}
-        <a class="nowrap" href="{% url 'region-map' %}?{{ request.GET.urlencode }}&load_features=true">
-            <i class="fa fa-fw fa-map"></i> View as map
-        </a>
-    {% endif %}
-{% endblock %}
+
 
 {% block filter_body %}
     <form method="get">

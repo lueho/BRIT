@@ -1,4 +1,5 @@
 {% extends 'simple_list_card.html' %}
+{% load user_created_object_tags %}
 
 {% block title %}BRIT | Materials | List{% endblock %}
 
@@ -9,8 +10,8 @@
             <th>Material</th>
             <th>Categories</th>
             <th>Description</th>
-            {% if list_type == 'private' %}
-                <th>Public</th>
+            {% if object_list.model|is_user_created %}
+                <th class="actions-column">Status/Actions</th>
             {% endif %}
         </tr>
         </thead>
@@ -25,8 +26,10 @@
                     {% endfor %}
                 </td>
                 <td>{{ object.description }}</td>
-                {% if list_type == 'private' %}
-                    {% include 'partials/_publication_status_column.html' %}
+                {% if object_list.model|is_user_created %}
+                    <td class="actions-column mobile-no-label">
+                        {% include 'object_management/status_actions_cell.html' %}
+                    </td>
                 {% endif %}
             </tr>
         {% endfor %}

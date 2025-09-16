@@ -1,5 +1,6 @@
 {% extends 'simple_list_card.html' %}
 {% load static %}
+{% load user_created_object_tags %}
 
 {% block title %}BRIT | Bibliography | Licences{% endblock %}
 
@@ -9,8 +10,8 @@
         <tr>
             <th>Name</th>
             <th>Reference url</th>
-            {% if list_type == 'private' %}
-                <th>Public</th>
+            {% if object_list.model|is_user_created %}
+                <th class="actions-column">Status/Actions</th>
             {% endif %}
         </tr>
         </thead>
@@ -18,8 +19,10 @@
             <tr>
                 <td><a href="{{ object.get_absolute_url }}">{{ object }}</a></td>
                 <td><a href="{{ object.reference_url }}" target="_blank">{{ object.reference_url }}</a></td>
-                {% if list_type == 'private' %}
-                    {% include 'partials/_publication_status_column.html' %}
+                {% if object_list.model|is_user_created %}
+                    <td class="actions-column mobile-no-label">
+                        {% include 'object_management/status_actions_cell.html' %}
+                    </td>
                 {% endif %}
             </tr>
         {% endfor %}

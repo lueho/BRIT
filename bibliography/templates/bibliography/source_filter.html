@@ -1,6 +1,7 @@
 {% extends 'filtered_list.html' %}
 {% load static %}
 {% load crispy_forms_tags %}
+{% load user_created_object_tags %}
 
 {% block title %}BRIT | Bibliography | Sources{% endblock %}
 
@@ -14,8 +15,8 @@
             <th>Authors/Publisher</th>
             <th>Title</th>
             <th>Type</th>
-            {% if list_type == 'private' %}
-                <th>Public</th>
+            {% if object_list.model|is_user_created %}
+                <th class="actions-column">Status/Actions</th>
             {% endif %}
         </tr>
         </thead>
@@ -41,8 +42,10 @@
                 </td>
                 <td data-label="Title"><a href="{{ object.get_absolute_url }}">{{ object.title }}</a></td>
                 <td data-label="Type">{{ object.type }}</td>
-                {% if list_type == 'private' %}
-                    {% include 'partials/_publication_status_column.html' %}
+                {% if object_list.model|is_user_created %}
+                    <td class="actions-column mobile-no-label">
+                        {% include 'object_management/status_actions_cell.html' %}
+                    </td>
                 {% endif %}
             </tr>
         {% endfor %}

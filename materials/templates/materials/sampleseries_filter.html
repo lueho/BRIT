@@ -1,5 +1,6 @@
 {% extends 'filtered_list.html' %}
 {% load crispy_forms_tags %}
+{% load user_created_object_tags %}
 
 {% block title %}BRIT | Materials | Sample Series{% endblock %}
 
@@ -12,8 +13,8 @@
             <th>ID</th>
             <th>Name</th>
             <th>Material</th>
-            {% if list_type == 'private' %}
-                <th>Public</th>
+            {% if object_list.model|is_user_created %}
+                <th class="actions-column">Status/Actions</th>
             {% endif %}
         </tr>
         </thead>
@@ -25,8 +26,10 @@
                 <td data-label="Material">
                     <a href="{% url 'material-detail' object.material.pk %}">{{ object.material.name }}</a>
                 </td>
-                {% if list_type == 'private' %}
-                    {% include 'partials/_publication_status_column.html' %}
+                {% if object_list.model|is_user_created %}
+                    <td class="actions-column mobile-no-label">
+                        {% include 'object_management/status_actions_cell.html' %}
+                    </td>
                 {% endif %}
             </tr>
         {% endfor %}

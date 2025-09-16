@@ -1,5 +1,6 @@
 {% extends 'filtered_list.html' %}
 {% load static %}
+{% load user_created_object_tags %}
 
 {% block title %}BRIT | Bibliography | Authors{% endblock %}
 
@@ -7,8 +8,8 @@
     <thead>
     <tr>
         <th>Name</th>
-        {% if list_type == 'private' %}
-            <th>Public</th>
+        {% if object_list.model|is_user_created %}
+            <th class="actions-column">Status/Actions</th>
         {% endif %}
     </tr>
     </thead>
@@ -17,8 +18,10 @@
 {% block list_table_row %}
     <tr>
         <td><a href="{{ object.get_absolute_url }}">{{ object }}</a></td>
-        {% if list_type == 'private' %}
-            {% include 'partials/_publication_status_column.html' %}
+        {% if object_list.model|is_user_created %}
+            <td class="actions-column mobile-no-label">
+                {% include 'object_management/status_actions_cell.html' %}
+            </td>
         {% endif %}
     </tr>
 {% endblock list_table_row %}

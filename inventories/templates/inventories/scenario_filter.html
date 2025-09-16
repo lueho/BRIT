@@ -1,4 +1,5 @@
 {% extends 'filtered_list.html' %}
+{% load user_created_object_tags %}
 
 {% block title %}BRIT | Inventories{% endblock %}
 
@@ -11,8 +12,8 @@
             <th>Name</th>
             <th>Catchment</th>
             <th>Description</th>
-            {% if private_list_owner %}
-                <th>Public</th>
+            {% if object_list.model|is_user_created %}
+                <th class="actions-column">Status/Actions</th>
             {% endif %}
         </tr>
         </thead>
@@ -23,15 +24,9 @@
                 <td data-label="Catchment"><a href="{{ object.catchment.get_absolute_url }}">{{ object.catchment }}</a>
                 </td>
                 <td data-label="Description">{{ object.description }}</td>
-                {% if private_list_owner %}
-                    <td data-label="Public">
-                        {% if object.publication_status == 'published' %}
-                            <i class="fas fa-fw fa-check"></i>
-                        {% elif object.publication_status == 'review' %}
-                            <i class="fas fa-fw fa-xmark"></i>
-                        {% elif object.publication_status == 'private' %}
-                            <i class="fas fa-fw fa-lock"></i>
-                        {% endif %}
+                {% if object_list.model|is_user_created %}
+                    <td class="actions-column mobile-no-label">
+                        {% include 'object_management/status_actions_cell.html' %}
                     </td>
                 {% endif %}
             </tr>

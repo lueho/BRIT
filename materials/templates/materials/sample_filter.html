@@ -1,5 +1,6 @@
 {% extends 'filtered_list.html' %}
 {% load crispy_forms_tags %}
+{% load user_created_object_tags %}
 
 {% block title %}BRIT | Materials | Samples{% endblock %}
 
@@ -12,8 +13,8 @@
             <th>Id</th>
             <th>Name</th>
             <th>Material</th>
-            {% if list_type == 'private' %}
-                <th>Public</th>
+            {% if object_list.model|is_user_created %}
+                <th class="actions-column">Status/Actions</th>
             {% endif %}
         </tr>
         </thead>
@@ -27,8 +28,10 @@
                         {{ object.material.name }}
                     </a>
                 </td>
-                {% if list_type == 'private' %}
-                    {% include 'partials/_publication_status_column.html' %}
+                {% if object_list.model|is_user_created %}
+                    <td class="actions-column mobile-no-label">
+                        {% include 'object_management/status_actions_cell.html' %}
+                    </td>
                 {% endif %}
             </tr>
         {% endfor %}
@@ -38,16 +41,18 @@
     </table>
 {% endblock list_table %}
 
-{% block list_card_footer_create_link %}
-    {% if user.is_authenticated %}
-        <a class="dropdown-item"
-           href="{{ object_list.model.create_url }}"
-           aria-label="Create new {{ object_list.model.get_verbose_name }}">
-            <i class=" fas fa-fw fa-plus"></i>
-            Create new {{ object_list.model.get_verbose_name }}
-        </a>
+{# Provide Options pane content instead of footer dropdown #}
+{% block options_pane_body %}
+    {% if create_permission in perms or user.is_staff %}
+    <a class="btn btn-success w-100 mb-2" href="{{ object_list.model.create_url }}" aria-label="Create new {{ object_list.model.get_verbose_name }}">
+        <i class="fas fa-plus"></i> Create new {{ object_list.model.get_verbose_name }}
+    </a>
     {% endif %}
-{% endblock list_card_footer_create_link %}
+{% endblock options_pane_body %}
+
+{# Hide Learning tab and pane on this page #}
+{% block learning_tab_button %}{% endblock learning_tab_button %}
+{% block learning_tab_pane %}{% endblock learning_tab_pane %}
 
 {% block filter_body %}
     <form method="get">
