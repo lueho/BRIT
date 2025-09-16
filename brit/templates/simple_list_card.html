@@ -1,15 +1,74 @@
 {% extends 'base.html' %}
+{% load moderation_tags %}
+{% load user_created_object_tags %}
 
 {% block title %}BRIT | {{ header }}{% endblock %}
 
 {% block content %}
     <div class="row">
-        <div class="col">
+        <div class="col-lg-8 order-2 order-lg-1">
             <div class="card shadow mb-3">
                 <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-                    {% block list_card_header %}
-                        <h5 class="mb-0">{{ header }}</h5>
-                    {% endblock list_card_header %}
+                    <div class="d-flex align-items-center justify-content-between">
+                        {% block list_card_header %}
+                            <h5 class="mb-0">{{ header }}</h5>
+                        {% endblock list_card_header %}
+                        <div class="d-flex align-items-center justify-content-end flex-wrap gap-2">
+                            {# View toggle (List / Map) – Map button shown only if a map URL exists for current scope #}
+                            {% if public_map_url or private_map_url or review_map_url %}
+                            <div class="btn-group btn-group-sm" role="group" aria-label="View toggle">
+                                <a class="btn btn-outline-secondary active disabled" aria-current="page" role="button" aria-pressed="true" aria-disabled="true" tabindex="-1" title="View as list" href="{{ request.get_full_path }}">List</a>
+                                {% if list_type == 'private' %}
+                                    {% with map_base=private_map_url %}
+                                        {% if map_base %}
+                                        <a class="btn btn-outline-secondary" role="button" aria-pressed="false" title="View as map"
+                                           href="{{ map_base }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=private&load_features=true">Map</a>
+                                        {% endif %}
+                                    {% endwith %}
+                                {% elif list_type == 'review' %}
+                                    {% with map_base=review_map_url %}
+                                        {% if map_base %}
+                                        <a class="btn btn-outline-secondary" role="button" aria-pressed="false" title="View as map"
+                                           href="{{ map_base }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=review&load_features=true">Map</a>
+                                        {% endif %}
+                                    {% endwith %}
+                                {% else %}
+                                    {% with map_base=public_map_url %}
+                                        {% if map_base %}
+                                        <a class="btn btn-outline-secondary" role="button" aria-pressed="false" title="View as map"
+                                           href="{{ map_base }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=published&load_features=true">Map</a>
+                                        {% endif %}
+                                    {% endwith %}
+                                {% endif %}
+                            </div>
+                            {% endif %}
+
+                            {# Scope toggle – visible for authenticated users and only for UserCreatedObject models #}
+                            {% if user.is_authenticated and object_list.model|is_user_created %}
+                            <div class="btn-group btn-group-sm" role="group" aria-label="Scope toggle">
+                                <a class="btn btn-outline-secondary {% if list_type == 'public' %}active disabled{% endif %}" role="button" title="Show published items" aria-pressed="{% if list_type == 'public' %}true{% else %}false{% endif %}" {% if list_type == 'public' %}aria-disabled="true" tabindex="-1"{% endif %}
+                                   href="{{ object_list.model.public_list_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=published">
+                                    Published
+                                </a>
+                                <a class="btn btn-outline-secondary {% if list_type == 'private' %}active disabled{% endif %}" role="button" title="Show only my items" aria-pressed="{% if list_type == 'private' %}true{% else %}false{% endif %}" {% if list_type == 'private' %}aria-disabled="true" tabindex="-1"{% endif %}
+                                   href="{{ object_list.model.private_list_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=private">
+                                    My
+                                </a>
+                                {% if user|can_moderate:object_list.model and object_list.model.review_list_url %}
+                                <a class="btn btn-outline-secondary {% if list_type == 'review' %}active disabled{% endif %}" role="button" title="Show items pending review" aria-pressed="{% if list_type == 'review' %}true{% else %}false{% endif %}" {% if list_type == 'review' %}aria-disabled="true" tabindex="-1"{% endif %}
+                                   href="{{ object_list.model.review_list_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=review">
+                                    Review
+                                </a>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                            {% if dashboard_url %}
+                            <a class="btn btn-sm btn-outline-secondary ms-2" href="{{ dashboard_url }}" title="Open Explorer (dashboard)">
+                                <i class="fas fa-table-cells-large"></i> Explorer
+                            </a>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
                 <div class="card-body overflow-auto">
                     {% block list_card_body %}
@@ -20,8 +79,8 @@
                                     <tr>
                                         <th>Name</th>
                                         <th>Description</th>
-                                        {% if list_type == 'private' %}
-                                            <th>Public</th>
+                                        {% if object_list.model|is_user_created %}
+                                            <th class="actions-column">Status/Actions</th>
                                         {% endif %}
                                     </tr>
                                     </thead>
@@ -37,8 +96,10 @@
                                                 </a>
                                             </td>
                                             <td>{{ object.description }}</td>
-                                            {% if list_type == 'private' %}
-                                                {% include 'partials/_publication_status_column.html' %}
+                                            {% if object_list.model|is_user_created %}
+                                                <td class="actions-column mobile-no-label">
+                                                    {% include 'object_management/status_actions_cell.html' %}
+                                                </td>
                                             {% endif %}
                                         </tr>
                                     {% endblock list_table_row %}
@@ -60,67 +121,51 @@
                 </div>
                 <div class="card-footer d-flex">
                     {% block list_card_footer %}
-                        {% block list_card_navigation_dropdown %}
-                            <div class="dropdown">
-                                <button class="btn btn-secondary dropdown-toggle me-3" type="button"
-                                        id="navigateDropdown"
-                                        data-bs-toggle="dropdown" aria-expanded="false">
-                                    Navigate
-                                </button>
-                                <div class="dropdown-menu" aria-labelledby="navigateDropdown">
-                                    {% block list_card_footer_list_link %}
-                                        {% if private_list_owner %}
-                                            <a class="dropdown-item"
-                                               href="{{ object_list.model.public_list_url }}">
-                                                <i class="fas fa-fw fa-list"></i>
-                                                Published {{ object_list.model.get_verbose_name_plural }}
-                                            </a>
-                                        {% elif user.is_authenticated %}
-                                            <a class="dropdown-item"
-                                               href="{{ object_list.model.private_list_url }}">
-                                                <i class="fas fa-fw fa-list"></i>
-                                                My {{ object_list.model.get_verbose_name_plural }}
-                                            </a>
-                                        {% endif %}
-                                    {% endblock list_card_footer_list_link %}
-                                    {% block list_card_footer_dashboard_link %}
-                                        {% if dashboard_url %}
-                                            <a class="dropdown-item"
-                                               href="{{ dashboard_url }}">
-                                                <i class="fas fa-fw fa-table-cells-large"></i> Explorer
-                                            </a>
-                                        {% endif %}
-                                    {% endblock list_card_footer_dashboard_link %}
-                                    {% block list_card_navigation_dropdown_additional_links %}{% endblock %}
-                                </div>
-                            </div>
-                        {% endblock list_card_navigation_dropdown %}
-                        {% block list_card_options_dropdown %}
-                            {% if user.is_authenticated %}
-                                <div class="dropdown">
-                                    <button class="btn btn-secondary dropdown-toggle me-3" type="button"
-                                            id="optionsDropdown"
-                                            data-bs-toggle="dropdown" aria-expanded="false">
-                                        Options
-                                    </button>
-                                    <div class="dropdown-menu" aria-labelledby="optionsDropdown">
-                                        {% block list_card_footer_create_link %}
-                                            {% if create_permission in perms or user.is_staff %}
-                                                <a class="dropdown-item"
-                                                   href="{{ object_list.model.create_url }}"
-                                                   aria-label="Create new {{ object_list.model.get_verbose_name }}">
-                                                    <i class=" fas fa-fw fa-plus"></i>
-                                                    Create new {{ object_list.model.get_verbose_name }}
-                                                </a>
-                                            {% endif %}
-                                        {% endblock list_card_footer_create_link %}
-                                        {% block list_card_options_dropdown_additional_links %}{% endblock %}
-                                    </div>
-                                </div>
-                            {% endif %}
-                        {% endblock list_card_options_dropdown %}
+                        {% block list_card_navigation_dropdown %}{% endblock %}
+                        {% block list_card_options_dropdown %}{% endblock %}
                         {% block list_card_footer_additional_links %}{% endblock %}
                     {% endblock list_card_footer %}
+                </div>
+            </div>
+        </div>
+        <div class="col-lg-4 order-1 order-lg-2">
+            <div class="card shadow filter-sticky">
+                <div class="card-header p-0 border-0 bg-body-tertiary">
+                    <ul class="nav nav-pills sidebar-tabs px-3 pt-3 pb-2" role="tablist">
+                        {% if user.is_authenticated %}
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active" id="options-tab" data-bs-toggle="tab" data-bs-target="#options-pane" type="button" role="tab" aria-controls="options-pane" aria-selected="true">
+                                <i class="fas fa-gear"></i> Options
+                            </button>
+                        </li>
+                        {% endif %}
+                    </ul>
+                </div>
+                <div class="card-body">
+                    <div class="tab-content">
+                        {% if user.is_authenticated %}
+                        <div class="tab-pane fade show active" id="options-pane" role="tabpanel" aria-labelledby="options-tab" tabindex="0">
+                            {% block list_card_footer_create_link %}
+                                {% if create_permission in perms or user.is_staff %}
+                                    <a class="btn btn-success w-100 mb-2"
+                                       href="{{ object_list.model.create_url }}"
+                                       aria-label="Create new {{ object_list.model.get_verbose_name }}">
+                                        <i class="fas fa-plus"></i>
+                                        Create new {{ object_list.model.get_verbose_name }}
+                                    </a>
+                                {% endif %}
+                            {% endblock list_card_footer_create_link %}
+                            {% if dashboard_url %}
+                            <a class="btn btn-outline-secondary w-100 mb-2" href="{{ dashboard_url }}">
+                                <i class="fas fa-table-cells-large"></i> Open Explorer
+                            </a>
+                            {% endif %}
+                            {# Export actions placeholder – override per list to add export buttons #}
+                            {% block list_card_export_actions %}{% endblock %}
+                            {% block list_card_options_dropdown_additional_links %}{% endblock %}
+                        </div>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
         </div>

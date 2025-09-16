@@ -20,9 +20,22 @@
         {% leaflet_css %}
 
         <div class="card shadow">
-            <div class="card-header bg-body-tertiary border-bottom-0 py-3"><h5 class="mb-0">
-                    {% block map_card_header %}{{ map_title }}{% endblock %}
-                </h5></div>
+            <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+                <div class="d-flex align-items-center justify-content-between">
+                    <h5 class="mb-0">
+                        {% block map_card_header %}{{ map_title }}{% endblock %}
+                    </h5>
+                    <div class="d-flex align-items-center justify-content-end flex-wrap gap-2">
+                        {% block map_card_header_actions %}
+                        {% if dashboard_url %}
+                        <a class="btn btn-sm btn-outline-secondary" href="{{ dashboard_url }}" title="Open Explorer (dashboard)">
+                            <i class="fas fa-table-cells-large"></i> Explorer
+                        </a>
+                        {% endif %}
+                        {% endblock %}
+                    </div>
+                </div>
+            </div>
             <div class="card-body p-0 vh-100" style="position: relative;">
                 <div id="map-overlay" style="display: none">
                     <div class="overlay-content">
@@ -35,68 +48,7 @@
                 {% leaflet_map "main" %}
             </div>
             <div class="card-footer d-flex">
-                {% block map_card_footer %}
-                {% block map_card_navigation_dropdown %}
-                <div class="dropdown">
-                    <button class="btn btn-secondary dropdown-toggle me-3" type="button" id="navigateDropdown"
-                        data-bs-toggle="dropdown" aria-expanded="false">
-                        Navigate
-                    </button>
-                    <div class="dropdown-menu" aria-labelledby="navigateDropdown">
-                        {% block map_card_footer_list_link %}
-                        {% if object_list.model|is_user_created %}
-                        {% if private_list_owner %}
-                        <a class="dropdown-item" id="link-map-public" href="javascript:void(0)"
-                            data-href-template="{{ object_list.model.public_map_url }}"
-                            onclick="clickedPublicMapButton(event)">
-                            <i class="fas fa-fw fa-map"></i>
-                            Published {{ object_list.model.get_verbose_name_plural }}
-                        </a>
-                        {% elif user.is_authenticated %}
-                        <a class="dropdown-item" id="link-map-private" href="javascript:void(0)"
-                            data-href-template="{{ object_list.model.private_map_url }}"
-                            onclick="clickedPrivateMapButton(event)">
-                            <i class="fas fa-fw fa-map"></i>
-                            My {{ object_list.model.get_verbose_name_plural }}
-                        </a>
-                        {% endif %}
-                        {% endif %}
-                        {% endblock map_card_footer_list_link %}
-                        {% block map_card_footer_dashboard_link %}
-                        {% if dashboard_url %}
-                        <a class="dropdown-item" href="{{ dashboard_url }}">
-                            <i class="fas fa-fw fa-table-cells-large"></i> Explorer
-                        </a>
-                        {% endif %}
-                        {% endblock map_card_footer_dashboard_link %}
-                        {% block map_card_navigation_dropdown_additional_links %}{% endblock %}
-                    </div>
-                </div>
-                {% endblock map_card_navigation_dropdown %}
-                {% block map_card_options_dropdown %}
-                {% if user.is_authenticated %}
-                <div class="dropdown">
-                    <button class="btn btn-secondary dropdown-toggle me-3" type="button" id="optionsDropdown"
-                        data-bs-toggle="dropdown" aria-expanded="false">
-                        Options
-                    </button>
-                    <div class="dropdown-menu" aria-labelledby="optionsDropdown">
-                        {% block map_card_footer_create_link %}
-                        {% if create_permission in perms or user.is_staff %}
-                        <a class="dropdown-item" href="{{ object_list.model.create_url }}"
-                            aria-label="Create new {{ object_list.model.get_verbose_name }}">
-                            <i class=" fas fa-fw fa-plus"></i>
-                            Create new {{ object_list.model.get_verbose_name }}
-                        </a>
-                        {% endif %}
-                        {% endblock map_card_footer_create_link %}
-                        {% block map_card_options_dropdown_additional_links %}{% endblock %}
-                    </div>
-                </div>
-                {% endif %}
-                {% endblock map_card_options_dropdown %}
-                {% block map_card_footer_additional_links %}{% endblock %}
-                {% endblock map_card_footer %}
+                {% block map_card_footer %}{% endblock %}
             </div>
         </div>
         {% endblock map_content %}
@@ -154,6 +106,19 @@
                 </div>
             </div>
             {% endblock filter_result_card %}
+            {% block options_card %}
+            {% if user.is_authenticated %}
+            <div class="card shadow">
+                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+                    <h5 class="mb-0">Options</h5>
+                </div>
+                <div class="card-body">
+                    {# Export actions placeholder – override per map to add export buttons #}
+                    {% block map_export_actions %}{% endblock %}
+                </div>
+            </div>
+            {% endif %}
+            {% endblock options_card %}
             {% block extra_cards %}{% endblock extra_cards %}
         </div>
         {% endblock user_actions %}
