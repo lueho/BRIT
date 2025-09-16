@@ -429,6 +429,29 @@ class UserCreatedObjectListMixin:
         if callable(review_url):
             review_url = review_url()
 
+        # Map URLs (if provided by model as classmethods)
+        public_map_url = None
+        private_map_url = None
+        review_map_url = None
+        try:
+            getter = getattr(model, "public_map_url", None)
+            if callable(getter):
+                public_map_url = getter()
+        except Exception:
+            public_map_url = None
+        try:
+            getter = getattr(model, "private_map_url", None)
+            if callable(getter):
+                private_map_url = getter()
+        except Exception:
+            private_map_url = None
+        try:
+            getter = getattr(model, "review_map_url", None)
+            if callable(getter):
+                review_map_url = getter()
+        except Exception:
+            review_map_url = None
+
         # Try conventional URL names: <model>-list, <model>-list-owned, <model>-list-review
         try:
             model_name = model._meta.model_name if model is not None else None
@@ -542,6 +565,10 @@ class UserCreatedObjectListMixin:
                 "public_count": public_count,
                 "private_count": private_count,
                 "review_count": review_count,
+                # Map URLs for header view toggle (may be None if model has no map views)
+                "public_map_url": public_map_url,
+                "private_map_url": private_map_url,
+                "review_map_url": review_map_url,
             }
         )
         return context
@@ -554,6 +581,7 @@ class PublishedObjectListMixin(UserCreatedObjectListMixin):
 class PrivateObjectListMixin(LoginRequiredMixin, UserCreatedObjectListMixin):
     list_type = "private"
 
+
 class PublishedObjectFilterView(
     PublishedObjectListMixin, FilterDefaultsMixin, FilterView
 ):
@@ -565,17 +593,6 @@ class PublishedObjectFilterView(
         template_names = super().get_template_names()
         template_names.append("filtered_list.html")
         return template_names
-
-    def get_queryset(self):
-        """Exclude current user's own objects from the review list."""
-        qs = super().get_queryset()
-        user = getattr(self.request, "user", None)
-        if user and user.is_authenticated:
-            try:
-                qs = qs.exclude(owner=user)
-            except Exception:
-                pass
-        return qs
 
 
 class AddReviewCommentView(BaseReviewActionView):

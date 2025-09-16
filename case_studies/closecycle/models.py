@@ -1,5 +1,6 @@
 from django.contrib.gis.db.models import PointField
 from django.db.models import PROTECT, CharField, ForeignKey, Model
+from django.urls import reverse
 
 from maps.models import Region
 from utils.object_management.models import NamedUserCreatedObject
@@ -11,6 +12,10 @@ class Showcase(NamedUserCreatedObject):
     """
 
     region = ForeignKey(Region, on_delete=PROTECT, null=True, blank=True)
+
+    @classmethod
+    def public_map_url(cls):
+        return reverse("Showcase")
 
 
 class BiogasPlantsSweden(Model):

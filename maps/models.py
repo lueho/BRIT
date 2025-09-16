@@ -357,6 +357,14 @@ class Region(NamedUserCreatedObject):
         except Region.lauregion.RelatedObjectDoesNotExist:
             return self.name
 
+    @classmethod
+    def private_map_url(cls):
+        return reverse("region-map")
+
+    @classmethod
+    def public_map_url(cls):
+        return reverse("region-map")
+
 
 @receiver(post_save, sender=Region)
 def set_country(sender, instance, created, **kwargs):
