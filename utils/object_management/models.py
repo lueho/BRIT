@@ -58,6 +58,7 @@ class GlobalObject(CRUDUrlsMixin, CommonInfo):
     def __str__(self):
         return self.name
 
+
 class ReviewAction(models.Model):
     """Audit log for review workflow actions with optional moderator comments.
 
@@ -118,8 +119,6 @@ class ReviewAction(models.Model):
             content_type=ContentType.objects.get_for_model(obj.__class__),
             object_id=obj.pk,
         )
-
-
 
 
 class UserCreatedObjectQuerySet(models.QuerySet):
@@ -326,6 +325,7 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
         if not getattr(self, "pk", None):
             return None
         from .models import ReviewAction  # local import
+
         ct = ContentType.objects.get_for_model(self.__class__)
         return (
             ReviewAction.objects.filter(

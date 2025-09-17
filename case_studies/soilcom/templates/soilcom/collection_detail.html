@@ -81,12 +81,14 @@
         </li>
         {% endif %}
         {% if object.publication_status == object.STATUS_PUBLISHED %}
+        {% if user == object.owner or user.is_staff %}
         <li><hr class="dropdown-divider"></li>
         <li>
           <a class="dropdown-item modal-link" href="{% url 'collection-archive-modal' object.id %}">
             <i class="fas fa-archive"></i> Archive
           </a>
         </li>
+        {% endif %}
         {% endif %}
         {% if request.user.is_authenticated %}
           {% if request.user == object.owner or request.user.is_staff %}
