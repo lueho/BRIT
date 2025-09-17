@@ -76,10 +76,12 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
     """
 
     id = serializers.IntegerField(label="id")
+    owner_id = serializers.IntegerField(source="owner.id", read_only=True)
     catchment = serializers.StringRelatedField()
     collector = serializers.StringRelatedField()
     collection_system = serializers.StringRelatedField()
     waste_category = serializers.CharField(source="waste_stream.category")
+    publication_status = serializers.CharField()
     connection_type = serializers.CharField(required=False, allow_null=True)
     allowed_materials = serializers.StringRelatedField(
         many=True, source="waste_stream.allowed_materials"
@@ -103,6 +105,8 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
         model = models.Collection
         fields = (
             "id",
+            "owner_id",
+            "publication_status",
             "catchment",
             "collector",
             "collection_system",
