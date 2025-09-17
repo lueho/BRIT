@@ -4,16 +4,15 @@
 {% load file_export_tags %}
 
 
-{% block map_card_navigation_dropdown %}{% endblock %}
 
-{% block map_card_options_dropdown_additional_links %}
+{% block map_export_actions %}
     {% if user.is_authenticated %}
-        <a class="dropdown-item modal-link"
-           href="{% export_link_modal 'hamburgroadsidetrees-export' list_type=list_type %}">
-            <i class="fas fa-fw fa-file-export"></i> Export data
-        </a>
+    <a class="btn btn-outline-secondary modal-link w-100 mb-2"
+       href="{% export_link_modal 'hamburgroadsidetrees-export' list_type=list_type %}">
+        <i class="fas fa-file-export"></i> Export data
+    </a>
     {% endif %}
-{% endblock map_card_options_dropdown_additional_links %}
+{% endblock map_export_actions %}
 
 {% block extra_cards %}
     <div class="card shadow">
