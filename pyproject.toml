@@ -41,7 +41,7 @@ dependencies = [
     "ambient-toolbox>=12.4.4",
     "requests>=2.32.4",
     "django-tree-queries>=0.20.0",
-    "djlint>=1.36.4",
+
 ]
 
 [dependency-groups]
@@ -58,6 +58,7 @@ dev = [
 
     # Code quality
     "mypy>=1.5.0",
+    "djlint>=1.36.4",
 
     # Documentation
     "mkdocs>=1.6.1",

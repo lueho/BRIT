@@ -1,5 +1,7 @@
 <form method="post" action="">
     {% csrf_token %}
+    {# Preserve the original 'next' redirect target across POST #}
+    <input type="hidden" name="next" value="{{ request.GET.next }}">
     <div class="modal-header">
         <h3 class="modal-title">{{ form_title }}</h3>
         <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>

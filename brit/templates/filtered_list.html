@@ -1,11 +1,11 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% load static %}
 {% load custom_tags %}
 {% load crispy_forms_tags %}
 {% load moderation_tags %}
 {% load user_created_object_tags %}
 
-{% block title %}BRIT | {{ header }}{% endblock %}
+{% block title %}BRIT | {{ header }}{% endblock title %}
 
 {% block custom_style %}{% endblock custom_style %}
 
@@ -24,7 +24,7 @@
                                 {% else %}
                                     {{ object_list.model.get_verbose_name_plural|capfirst }}
                                 {% endif %}
-                            {% endblock %}
+                            {% endblock list_card_header %}
                         </h5>
                         <div class="d-flex align-items-center justify-content-end flex-wrap gap-2">
                             {# View toggle (List / Map) – Map button shown only if a map URL exists for current scope #}
@@ -85,7 +85,6 @@
                 </div>
                 <div class="card-body">
                     {% block list_card_body %}
-                    {% block scope_switcher %}{% endblock %}
                     {% block list_table %}
                     <div class="table-responsive">
                         <table class="table modern-table">

@@ -1219,6 +1219,14 @@ class UserCreatedObjectModalDeleteView(
         return context
 
     def get_success_url(self):
+        # Respect explicit 'next' parameter from POST or GET first
+        try:
+            next_url = self.request.POST.get("next") or self.request.GET.get("next")
+            if next_url:
+                return next_url
+        except Exception:
+            pass
+
         if self.success_url:
             return self.success_url
 

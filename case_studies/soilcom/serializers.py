@@ -140,6 +140,7 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
     Creates a flat, human-readable representation of Collections, suitable for file exports.
     """
 
+
     catchment = serializers.StringRelatedField(label="Catchment")
     nuts_or_lau_id = serializers.StringRelatedField(
         source="catchment.region.nuts_or_lau_id", label="NUTS/LAU Id"

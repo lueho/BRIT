@@ -1,29 +1,42 @@
-{% extends 'simple_detail_card.html' %}
+{% extends "detail_with_options.html" %}
 {% load i18n %}
 {% load moderation_tags %}
+{% load static %}
+{% load file_export_tags %}
+
+{# Confirm texts available to all blocks #}
+{% trans "Are you sure you want to submit this for review?" as submit_confirm %}
+{% trans "Are you sure you want to withdraw this from review?" as withdraw_confirm %}
+{% trans "Are you sure you want to approve this?" as approve_confirm %}
+{% trans "Are you sure you want to reject this?" as reject_confirm %}
 
 {% block detail_header_badge %}
-{% include 'object_management/review_status_badge.html' with object=object %}
-{% endblock %}
+{% include "object_management/review_status_badge.html" with object=object %}
+{% endblock detail_header_badge %}
 
 {% block detail_header_actions %}
   <div class="btn-toolbar" role="toolbar" aria-label="Detail actions">
     <div class="btn-group me-2" role="group">
-      {% if request.user.is_authenticated %}
-        {% if object.update_url %}
-          {% if request.user.is_staff %}
-            <a class="btn btn-sm btn-primary" href="{{ object.update_url }}{% if review_mode or show_review_panel %}?next={{ request.get_full_path|urlencode }}{% endif %}" title="Edit">
-              <i class="fas fa-edit"></i> <span class="d-none d-sm-inline">Edit</span>
-            </a>
-          {% elif request.user == object.owner %}
-            {% if object.publication_status != object.STATUS_PUBLISHED %}
-              <a class="btn btn-sm btn-primary" href="{{ object.update_url }}{% if review_mode or show_review_panel %}?next={{ request.get_full_path|urlencode }}{% endif %}" title="Edit">
-                <i class="fas fa-edit"></i> <span class="d-none d-sm-inline">Edit</span>
-              </a>
-            {% endif %}
-          {% endif %}
+      {% if request.GET.back %}
+      <a class="btn btn-sm btn-outline-secondary" href="{{ request.GET.back }}" title="Back to results">
+        <i class="fas fa-arrow-left"></i> <span class="d-none d-md-inline">Back to results</span>
+      </a>
+      {% else %}
+        {% if object.list_url %}
+        <a class="btn btn-sm btn-outline-secondary" href="{{ object.list_url }}" title="List">
+          <i class="fas fa-list-ul"></i> <span class="d-none d-md-inline">List</span>
+        </a>
+        {% else %}
+        <a class="btn btn-sm btn-outline-secondary" href="{% url 'collection-list' %}" title="List">
+          <i class="fas fa-list-ul"></i> <span class="d-none d-md-inline">List</span>
+        </a>
         {% endif %}
       {% endif %}
+      <a class="btn btn-sm btn-outline-secondary" href="{% url 'wastecollection-dashboard' %}" title="Open Explorer (dashboard)">
+        <i class="fas fa-table-cells-large"></i> <span class="d-none d-md-inline">Explorer</span>
+      </a>
+    </div>
+    <div class="btn-group me-2" role="group">
       {% if request.user.is_authenticated %}
         {% if request.user == object.owner and object.is_declined and not review_mode %}
           <a class="btn btn-sm btn-outline-danger" href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}" title="Review feedback">
@@ -31,128 +44,6 @@
           </a>
         {% endif %}
       {% endif %}
-    </div>
-    <div class="btn-group" role="group">
-      <button class="btn btn-sm btn-secondary dropdown-toggle" type="button" id="detailMoreDropdown" data-bs-toggle="dropdown" aria-expanded="false" aria-label="More actions for collection">
-        <i class="fas fa-ellipsis-v"></i> <span class="d-none d-sm-inline">More</span>
-      </button>
-      <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="detailMoreDropdown">
-        <li>
-          {% if object.list_url %}
-            <a class="dropdown-item" href="{{ object.list_url }}">
-              <i class="fas fa-arrow-left"></i> Back to collections
-            </a>
-          {% else %}
-            <a class="dropdown-item" href="{% url 'collection-list' %}">
-              <i class="fas fa-arrow-left"></i> Back to collections
-            </a>
-          {% endif %}
-        </li>
-        {% if object.list_url %}
-        <li>
-          <a class="dropdown-item" href="{{ object.list_url }}">
-            <i class="fas fa-list-ul"></i> See all
-          </a>
-        </li>
-        {% endif %}
-        {% if user == object.owner or user.is_staff %}
-        <li><hr class="dropdown-divider"></li>
-        <li>
-          <a class="dropdown-item" href="{% url 'collection-wastesamples' object.id %}">
-            <i class="fas fa-edit"></i> Manage samples
-          </a>
-        </li>
-        <li>
-          <a class="dropdown-item" href="{% url 'collection-add-property' object.id %}">
-            <i class="fas fa-plus-circle"></i> Add property
-          </a>
-        </li>
-        {% endif %}
-        {% if 'soilcom.add_collection' in perms %}
-        <li>
-          <a class="dropdown-item" href="{% url 'collection-copy' object.id %}">
-            <i class="fas fa-copy"></i> Duplicate
-          </a>
-        </li>
-        <li>
-          <a class="dropdown-item" href="{% url 'collection-new-version' object.id %}">
-            <i class="fas fa-code-branch"></i> New version
-          </a>
-        </li>
-        {% endif %}
-        {% if object.publication_status == object.STATUS_PUBLISHED %}
-        {% if user == object.owner or user.is_staff %}
-        <li><hr class="dropdown-divider"></li>
-        <li>
-          <a class="dropdown-item modal-link" href="{% url 'collection-archive-modal' object.id %}">
-            <i class="fas fa-archive"></i> Archive
-          </a>
-        </li>
-        {% endif %}
-        {% endif %}
-        {% if request.user.is_authenticated %}
-          {% if request.user == object.owner or request.user.is_staff %}
-            {% if object.modal_delete_url %}
-              <li><hr class="dropdown-divider"></li>
-              <li>
-                <a class="dropdown-item modal-link" href="{{ object.modal_delete_url }}">
-                  <i class="fas fa-trash"></i> Delete
-                </a>
-              </li>
-            {% endif %}
-          {% endif %}
-        {% endif %}
-
-        {# --- Review actions start (moved from footer options) --- #}
-        {% if object.is_private %}
-          {% if user == object.owner or user.is_staff %}
-            <li><hr class="dropdown-divider"></li>
-            <li>
-              <form method="post" action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}" class="dropdown-item p-0 m-0 border-0 bg-transparent">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-link text-start dropdown-item" style="white-space:normal;" onclick="return confirm('{{ submit_confirm }}')">
-                  <i class="fas fa-paper-plane"></i> {% trans "Submit for Review" %}
-                </button>
-              </form>
-            </li>
-          {% endif %}
-        {% endif %}
-        {% if object.is_in_review %}
-          {% if user == object.owner or user.is_staff %}
-            <li>
-              <form method="post" action="{% url 'object_management:withdraw_from_review' content_type_id=object|get_content_type_id object_id=object.id %}" class="dropdown-item p-0 m-0 border-0 bg-transparent">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-link text-start dropdown-item" style="white-space:normal;" onclick="return confirm('{{ withdraw_confirm }}')">
-                  <i class="fas fa-undo"></i> {% trans "Withdraw from Review" %}
-                </button>
-              </form>
-            </li>
-          {% endif %}
-        {% endif %}
-        {% if object.is_in_review %}
-          {% if user.is_staff and not review_mode or perms.can_moderate and not review_mode %}
-            <li><hr class="dropdown-divider"></li>
-            <li>
-              <form method="post" action="{% url 'object_management:approve_item' content_type_id=object|get_content_type_id object_id=object.id %}" class="dropdown-item p-0 m-0 border-0 bg-transparent">
-                {% csrf_token %}
-                <button type="submit" class="btn btn-link text-start dropdown-item" style="white-space:normal;" onclick="return confirm('{{ approve_confirm }}')">
-                  <i class="fas fa-check"></i> {% trans "Approve" %}
-                </button>
-              </form>
-            </li>
-            <li>
-              <button type="button"
-                      class="btn btn-link text-start dropdown-item"
-                      style="white-space:normal;"
-                      data-bs-toggle="modal"
-                      data-bs-target="#rejectModal-{{ object.id }}">
-                <i class="fas fa-times"></i> {% trans "Reject" %}
-              </button>
-            </li>
-          {% endif %}
-        {% endif %}
-        {# --- Review actions end --- #}
-      </ul>
     </div>
   </div>
   {# Reject Modal kept near header to support header actions #}
@@ -165,7 +56,7 @@
               <h5 class="modal-title" id="rejectModalLabel-{{ object.id }}">{% trans "Reject item" %}</h5>
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans "Close" %}"></button>
             </div>
-            <form method="post" action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}">
+            <form method="post" action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
               <div class="modal-body">
                   {% csrf_token %}
                   <p class="mb-3">{{ reject_confirm }}</p>
@@ -177,7 +68,7 @@
               <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
                 <button type="submit" class="btn btn-danger">
-                  <i class="fas fa-times"></i> {% trans "Reject" %}
+                  <i class="fas fa-xmark"></i> {% trans "Reject" %}
                 </button>
               </div>
             </form>
@@ -192,7 +83,7 @@
               <h5 class="modal-title" id="rejectModalLabel-{{ object.id }}">{% trans "Reject item" %}</h5>
               <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans "Close" %}"></button>
             </div>
-            <form method="post" action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}">
+            <form method="post" action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
               <div class="modal-body">
                   {% csrf_token %}
                   <p class="mb-3">{{ reject_confirm }}</p>
@@ -204,7 +95,7 @@
               <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
                 <button type="submit" class="btn btn-danger">
-                  <i class="fas fa-times"></i> {% trans "Reject" %}
+                  <i class="fas fa-xmark"></i> {% trans "Reject" %}
                 </button>
               </div>
             </form>
@@ -216,10 +107,6 @@
 {% endblock %}
 
 {% block detail_body %}
-    <p class="card-text">
-        <strong>Name:</strong><br>
-        {{ object.name }}
-    </p>
     <p class="card-text">
        <strong>Catchment:</strong><br>
           <a href="{{ object.catchment.get_absolute_url }}">{{ object.catchment.name }}</a>
@@ -405,7 +292,7 @@
     {% if object.successors.exists %}
     <strong>Successors:</strong><br>
     <ul>
-        {% for  successor_collection in object.successors.all %}
+        {% for successor_collection in object.successors.all %}
         <li>
             <a href="{{ successor_collection.get_absolute_url }}">{{ successor_collection }}</a>
         </li>
@@ -414,11 +301,124 @@
     {% endif %}
 {% endblock detail_body %}
 
-{% trans "Are you sure you want to submit this for review?" as submit_confirm %}
-{% trans "Are you sure you want to withdraw this from review?" as withdraw_confirm %}
-{% trans "Are you sure you want to approve this?" as approve_confirm %}
-{% trans "Are you sure you want to reject this?" as reject_confirm %}
+{# Options for the integrated right column (new base) #}
+{% block options_pane %}
+  {# CRUD #}
+  {% if object.update_url and not object.is_archived %}
+    {% if request.user.is_staff %}
+      <a class="btn btn-primary w-100 mb-2" href="{{ object.update_url }}?next={{ request.get_full_path|urlencode }}">
+        <i class="fas fa-pen-to-square"></i> Edit
+      </a>
+    {% elif request.user == object.owner and object.publication_status != object.STATUS_PUBLISHED %}
+      <a class="btn btn-primary w-100 mb-2" href="{{ object.update_url }}?next={{ request.get_full_path|urlencode }}">
+        <i class="fas fa-pen-to-square"></i> Edit
+      </a>
+    {% endif %}
+  {% endif %}
 
-{% block detail_card_navigation_dropdown %}{% endblock detail_card_navigation_dropdown %}
+  {% if request.user.is_authenticated %}
+    {% if not object.is_archived %}
+      {% if request.user == object.owner or request.user.is_staff %}
+        <a class="btn btn-outline-secondary w-100 mb-2" href="{% url 'collection-wastesamples' object.id %}">
+          <i class="fas fa-pen-to-square"></i> Manage samples
+        </a>
+        <a class="btn btn-outline-secondary w-100 mb-2" href="{% url 'collection-add-property' object.id %}">
+          <i class="fas fa-circle-plus"></i> Add property
+        </a>
+      {% endif %}
+    {% endif %}
+  {% endif %}
 
-{% block detail_card_options_dropdown %}{% endblock detail_card_options_dropdown %}
+  {% if 'soilcom.add_collection' in perms %}
+    <a class="btn btn-outline-secondary w-100 mb-2" href="{% url 'collection-copy' object.id %}">
+      <i class="fas fa-copy"></i> Duplicate
+    </a>
+    <a class="btn btn-outline-secondary w-100 mb-2" href="{% url 'collection-new-version' object.id %}">
+      <i class="fas fa-code-branch"></i> New version
+    </a>
+  {% endif %}
+
+  {% if object.publication_status == object.STATUS_PUBLISHED %}
+    {% if request.user == object.owner or request.user.is_staff %}
+      <a class="btn btn-outline-secondary modal-link w-100 mb-2" href="{% url 'collection-archive-modal' object.id %}">
+        <i class="fas fa-archive"></i> Archive
+      </a>
+    {% endif %}
+  {% endif %}
+
+  {# Delete with published vs private rules (hidden for archived objects) #}
+  {% if object.modal_delete_url and not object.is_archived %}
+    {% if object.publication_status == object.STATUS_PUBLISHED %}
+      {% if request.user.is_staff %}
+        <a class="btn btn-outline-danger modal-link w-100 mb-2" href="{{ object.modal_delete_url }}{% if request.GET.back %}?next={{ request.GET.back|urlencode }}{% endif %}">
+          <i class="fas fa-trash"></i> Delete
+        </a>
+      {% endif %}
+    {% else %}
+      {% if request.user == object.owner or request.user.is_staff %}
+        <a class="btn btn-outline-danger modal-link w-100 mb-2" href="{{ object.modal_delete_url }}{% if request.GET.back %}?next={{ request.GET.back|urlencode }}{% endif %}">
+          <i class="fas fa-trash"></i> Delete
+        </a>
+      {% endif %}
+    {% endif %}
+  {% endif %}
+
+  {# Review workflow #}
+  {% if object.is_private %}
+    {% if request.user == object.owner or request.user.is_staff %}
+      <form method="post" action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0 mb-2">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline-primary w-100" onclick="return confirm('{{ submit_confirm }}')">
+          <i class="fas fa-paper-plane"></i> {% trans "Submit for Review" %}
+        </button>
+      </form>
+    {% endif %}
+  {% endif %}
+
+  {% if object.is_in_review %}
+    {% if request.user == object.owner or request.user.is_staff %}
+      <form method="post" action="{% url 'object_management:withdraw_from_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0 mb-2">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline-warning w-100" onclick="return confirm('{{ withdraw_confirm }}')">
+          <i class="fas fa-rotate-left"></i> {% trans "Withdraw from Review" %}
+        </button>
+      </form>
+    {% endif %}
+    {% if request.user.is_staff or perms.can_moderate %}
+      <form method="post" action="{% url 'object_management:approve_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0 mb-2">
+        {% csrf_token %}
+        <button type="submit" class="btn btn-outline-success w-100" onclick="return confirm('{{ approve_confirm }}')">
+          <i class="fas fa-check"></i> {% trans "Approve" %}
+        </button>
+      </form>
+      <button type="button" class="btn btn-outline-danger w-100" data-bs-toggle="modal" data-bs-target="#rejectModal-{{ object.id }}">
+        <i class="fas fa-xmark"></i> {% trans "Reject" %}
+      </button>
+    {% endif %}
+  {% endif %}
+
+  {# Export #}
+  {% if request.user.is_authenticated %}
+    {% if object.publication_status == object.STATUS_PUBLISHED %}
+      <a class="btn btn-outline-secondary modal-link w-100" href="{% export_link_modal 'collection-export' list_type='public' %}">
+        <i class="fas fa-file-export"></i> Export data
+      </a>
+    {% elif request.user == object.owner or request.user.is_staff %}
+      <a class="btn btn-outline-secondary modal-link w-100" href="{% export_link_modal 'collection-export' list_type='private' %}">
+        <i class="fas fa-file-export"></i> Export data
+      </a>
+    {% endif %}
+  {% endif %}
+{% endblock options_pane %}
+
+{# Learning tab content (new base) #}
+{% block learning_content %}
+  {% include "soilcom/includes/learning_materials.html" %}
+{% endblock learning_content %}
+
+{# Legacy block preserved but disabled #}
+{% block second_row %}{% endblock second_row %}
+
+{% block detail_with_options_scripts %}
+  <script src="{% static 'js/file_export.min.js' %}" type="text/javascript"></script>
+{% endblock detail_with_options_scripts %}

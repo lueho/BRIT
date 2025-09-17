@@ -61,6 +61,55 @@ const fieldConfig = {
     }
 };
 
+// --- UI helpers ---
+function britEnableBtn(el) {
+    if (!el) return;
+    el.classList.remove('disabled');
+    el.removeAttribute('aria-disabled');
+    el.removeAttribute('tabindex');
+    if (el.title && el.title.indexOf('Select a collection') !== -1) {
+        el.removeAttribute('title');
+    }
+}
+
+function britDisableBtn(el, title) {
+    if (!el) return;
+    el.classList.add('disabled');
+    el.setAttribute('aria-disabled', 'true');
+    el.setAttribute('tabindex', '-1');
+    if (title) el.setAttribute('title', title);
+}
+
+function getScope() {
+    const params = new URLSearchParams(window.location.search);
+    return (params.get('scope') || 'published').toLowerCase();
+}
+
+function getContextFlag(flag) {
+    // Read flags rendered as data-* attributes in the template (no JS in template)
+    try {
+        const ctx = document.getElementById('map-context');
+        if (!ctx) return null;
+        const value = ctx.dataset[flag];
+        if (value === undefined) return null;
+        if (value === 'true') return true;
+        if (value === 'false') return false;
+        return value;
+    } catch (_) {
+        return null;
+    }
+}
+
+function isStaffUser() {
+    const flag = getContextFlag('isStaff');
+    return flag === true; // default to false if not provided
+}
+
+function hideSelectionHint() {
+    const hint = document.getElementById('map-actions-hint');
+    if (hint) hint.classList.add('d-none');
+}
+
 function featureClickHandler(e, featureGroup) {
     resetFeatureStyles(featureGroup);
 
@@ -114,10 +163,19 @@ function scrollToSummaries() {
 }
 
 function updateUrls(feature_id) {
-    const filter_params = parseFilterParameters();
-    filter_params.append('load_features', 'true');
+    // Build next URL as the current page with current filters and load_features=true
+    let filter_params;
+    try {
+        filter_params = parseFilterParameters();
+    } catch (_) {
+        filter_params = new URLSearchParams(window.location.search);
+    }
+    filter_params.set('load_features', 'true');
+    // Preserve scope from current URL so we return to the same view (published/private/review)
+    try { filter_params.set('scope', getScope()); } catch (_) { }
+    const nextTarget = window.location.pathname + '?' + filter_params.toString();
     const params = new URLSearchParams();
-    params.append('next', '/waste_collection/collections/map/?' + filter_params.toString());
+    params.set('next', nextTarget);
 
     try {
         const create_button = document.getElementById('btn-collection-create');
@@ -162,6 +220,10 @@ function updateUrls(feature_id) {
     } catch (error) {
         console.warn(`Delete button not updated: ${error}`);
     }
+
+    // Always enable Copy once a feature is selected
+    try { britEnableBtn(document.getElementById('btn-collection-copy')); } catch (_) { }
+    hideSelectionHint();
 }
 
 function addDetailViewButton() {
@@ -192,3 +254,37 @@ function clickedListLink() {
 function adaptMapConfig() {
     mapConfig.layerOrder = ['features', 'region', 'catchment'];
 }
+
+// --- Permission-driven enable/disable of actions on selection ---
+(function hookRenderFeatureDetails() {
+    // Keep original renderer
+    const original = typeof window.renderFeatureDetails === 'function' ? window.renderFeatureDetails : null;
+
+    window.renderFeatureDetails = function (data) {
+        try { if (original) original(data); } catch (e) { console.warn('Original renderFeatureDetails failed:', e); }
+
+        try {
+            const status = String(data && data.publication_status || '').toLowerCase();
+            const scope = getScope();
+            const staff = isStaffUser();
+
+            // Rules:
+            // - Staff: can edit/delete any
+            // - Non-staff: only when in private scope (owner-only dataset) AND item is not published
+            const canModify = staff || (scope === 'private' && status !== 'published');
+
+            const updateBtn = document.getElementById('btn-collection-update');
+            const delBtn = document.getElementById('btn-collection-delete');
+
+            if (canModify) {
+                britEnableBtn(updateBtn);
+                britEnableBtn(delBtn);
+            } else {
+                britDisableBtn(updateBtn, 'Select a permitted collection (private/review) or be staff');
+                britDisableBtn(delBtn, 'Select a permitted collection (private/review) or be staff');
+            }
+        } catch (e) {
+            console.warn('Failed to toggle Edit/Delete availability:', e);
+        }
+    };
+})();

@@ -15,7 +15,7 @@
             {% for object in object_list %}
             <tr>
                 <td data-label="Collection" class="ps-3">
-                    <a href="{{ object.get_absolute_url }}" class="collection-link">
+                    <a href="{{ object.get_absolute_url }}?back={{ request.get_full_path|urlencode }}" class="collection-link">
                         <strong class="d-block">{{ object.catchment.region.name }} - {{ object.waste_stream.category }} collection</strong>
                         <span class="text-muted small">
                             {{ object.collector }} · {{ object.collection_system }} · {{ object.valid_from.year }}
