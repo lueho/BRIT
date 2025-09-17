@@ -91,12 +91,6 @@
                     <i class="fas fa-file-export"></i> Export data
                 </a>
 
-                {% if dashboard_url %}
-                <a class="btn btn-outline-secondary w-100 mt-2" href="{{ dashboard_url }}">
-                    <i class="fas fa-table-cells-large"></i> Open Explorer
-                </a>
-                {% endif %}
-
                 <p id="map-actions-hint" class="text-muted small mb-2">Select a collection on the map to enable actions.</p>
 
                 {% if perms.soilcom.add_collection %}
@@ -124,7 +118,7 @@
             </div>
             {% endif %}
             <div class="tab-pane fade" id="learning-pane" role="tabpanel" aria-labelledby="learning-tab" tabindex="0">
-                {% include 'soilcom/includes/learning_materials.html' %}
+                {% include "soilcom/includes/learning_materials.html" %}
             </div>
         </div>
     </div>
@@ -156,7 +150,7 @@
         </div>
     </div>
 </div>
-{# Options and Learning are now provided as tabs above #}
+<div id="map-context" data-is-staff="{{ user.is_staff|yesno:'true,false' }}" data-dv="{{ dataset_version }}" hidden></div>
 {% endblock user_actions %}
  
 
@@ -166,78 +160,33 @@
 <script src="{% static 'js/waste_collection_map.min.js' %}"></script>
 <script src="{% static 'js/file_export.min.js' %}"></script>
 <script>
-  // After loading the map scripts, override updateUrls to (1) call original and (2) enable action buttons
-  (function() {
-    const originalUpdateUrls = window.updateUrls;
-    window.updateUrls = function(feature_id) {
-      try { originalUpdateUrls && originalUpdateUrls(feature_id); } catch (e) { console.warn('Original updateUrls failed:', e); }
+  (function () {
+    function getDatasetVersion() {
+      try {
+        var ctx = document.getElementById('map-context');
+        if (!ctx) return null;
+        var dv = ctx.dataset.dv;
+        return dv || null;
+      } catch (_) { return null; }
+    }
 
-      // Determine current scope from URL or template context
-      const urlObj = new URL(window.location.href);
-      let scope = urlObj.searchParams.get('scope');
-      if (!scope) {
-        const listType = "{{ list_type }}";
-        scope = listType === 'private' ? 'private' : (listType === 'review' ? 'review' : 'published');
+    var original = typeof window.getFeaturesLayerFilterParameters === 'function'
+      ? window.getFeaturesLayerFilterParameters
+      : null;
+
+    window.getFeaturesLayerFilterParameters = function () {
+      var params;
+      try {
+        params = original ? original() : new URLSearchParams(window.location.search);
+      } catch (_) {
+        params = new URLSearchParams(window.location.search);
       }
-
-      // Build a proper 'next' URL including scope and load_features, targeting the correct map route per scope
-      let filter_params;
-      try { filter_params = parseFilterParameters(); } catch (e) { filter_params = new URLSearchParams(); }
-      try { filter_params.set('scope', scope); } catch (e) { /* ignore */ }
-      try { filter_params.set('load_features', 'true'); } catch (e) { /* ignore */ }
-      const baseMapUrl = scope === 'private'
-          ? "{{ object_list.model.private_map_url }}"
-          : (scope === 'review' ? "{{ object_list.model.review_map_url }}" : "{{ object_list.model.public_map_url }}");
-      const nextTarget = baseMapUrl + '?' + filter_params.toString();
-
-      // Helper to set ?next=… on a link built from a data-href-template
-      const setNextOnLink = (el, hrefTemplate) => {
-        if (!el || !hrefTemplate) return;
-        const u = new URL(hrefTemplate, window.location.origin);
-        u.searchParams.set('next', nextTarget);
-        el.setAttribute('href', u.pathname + '?' + u.searchParams.toString());
-      };
-
       try {
-        const createBtn = document.getElementById('btn-collection-create');
-        if (createBtn) setNextOnLink(createBtn, createBtn.dataset.hrefTemplate);
-      } catch (e) { /* optional */ }
-
-      try {
-        const updateBtn = document.getElementById('btn-collection-update');
-        if (updateBtn) setNextOnLink(updateBtn, updateBtn.dataset.hrefTemplate.replace('__pk__', feature_id.toString()));
-      } catch (e) { /* optional */ }
-
-      try {
-        const copyBtn = document.getElementById('btn-collection-copy');
-        if (copyBtn) setNextOnLink(copyBtn, copyBtn.dataset.hrefTemplate.replace('__pk__', feature_id.toString()));
-      } catch (e) { /* optional */ }
-
-      // Rebind delete modal with scoped next URL
-      try {
-        const delBtn = document.getElementById('btn-collection-delete');
-        if (delBtn) {
-          const delU = new URL(delBtn.dataset.hrefTemplate.replace('__pk__', feature_id.toString()), window.location.origin);
-          delU.searchParams.set('next', nextTarget);
-          modalForm(delBtn, { formURL: delU.pathname + '?' + delU.searchParams.toString(), errorClass: ".is-invalid" });
-        }
-      } catch (e) { /* optional */ }
-
-      const enable = (el) => {
-        if (!el) return;
-        el.classList.remove('disabled');
-        el.removeAttribute('aria-disabled');
-        el.removeAttribute('tabindex');
-        if (el.title && el.title.indexOf('Select a collection') !== -1) {
-          el.removeAttribute('title');
-        }
-      };
-
-      // Only enable the Copy action here. Let the base script decide if Edit/Delete are allowed
-      // based on selected feature ownership/publication status/permissions.
-      try { enable(document.getElementById('btn-collection-copy')); } catch(e) { /* optional */ }
-      try { const hint = document.getElementById('map-actions-hint'); if (hint) hint.classList.add('d-none'); } catch(e) { /* optional */ }
+        var dv = getDatasetVersion();
+        if (dv) params.set('dv', dv);
+      } catch (_) { /* ignore */ }
+      return params;
     };
   })();
-  </script>
+</script>
 {% endblock javascript %}

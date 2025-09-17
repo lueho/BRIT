@@ -4,7 +4,7 @@ from urllib.parse import urlencode
 
 from celery.result import AsyncResult
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.db.models import Max
+from django.db.models import Max, Min, Q, Count
 from django.forms.models import model_to_dict
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse, reverse_lazy
@@ -12,6 +12,7 @@ from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.generic import TemplateView
+import hashlib
 
 from bibliography.views import (
     SourceCheckUrlView,
@@ -1011,6 +1012,74 @@ class CollectionModalArchiveView(UserCreatedObjectModalArchiveView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+class SoilcomDatasetVersionMixin:
+    """
+    Provides a stable dataset version (dv) string for caching purposes.
+
+    The dv changes only when data visible for the current map scope changes.
+    It's computed from a scope-appropriate queryset using:
+    - COUNT(*)
+    - MAX(lastmodified_at)
+    - MIN(id)
+    - MAX(id)
+
+    The dv is then exposed to templates via context as "dataset_version".
+    """
+
+    dv_scope = None  # 'published' | 'private' | 'review' (optional override per view)
+
+    def get_dv_scope(self):
+        # Prefer explicit per-view scope, then URL param, finally default to 'published'
+        return (
+            getattr(self, "dv_scope", None)
+            or self.request.GET.get("scope")
+            or "published"
+        )
+
+    def _dv_queryset(self):
+        scope = self.get_dv_scope()
+        user = getattr(self.request, "user", None)
+        qs = Collection.objects.all()
+
+        if scope == "published":
+            qs = qs.filter(publication_status="published")
+        elif scope == "private":
+            if user and user.is_authenticated and not user.is_staff:
+                qs = qs.filter(owner=user)
+            else:
+                # Staff users on private scope: default to all (matches current staff behavior)
+                qs = qs
+        elif scope == "review":
+            if user and user.is_authenticated and not user.is_staff:
+                qs = qs.filter(Q(owner=user) | Q(publication_status="review"))
+            else:
+                # Staff: restrict dv to items in review to reflect the view's intent
+                qs = qs.filter(publication_status="review")
+        return qs
+
+    def get_dataset_version(self) -> str:
+        qs = self._dv_queryset()
+        agg = qs.aggregate(
+            cnt=Count("pk"),
+            max_mod=Max("lastmodified_at"),
+            min_id=Min("pk"),
+            max_id=Max("pk"),
+        )
+        scope = self.get_dv_scope()
+        cnt = agg.get("cnt") or 0
+        max_mod = agg.get("max_mod")
+        ts = int(max_mod.timestamp()) if max_mod else 0
+        min_id = agg.get("min_id") or 0
+        max_id = agg.get("max_id") or 0
+        base = f"{scope}:{cnt}:{ts}:{min_id}:{max_id}"
+        return hashlib.sha1(base.encode("utf-8")).hexdigest()[:12]
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["dataset_version"] = self.get_dataset_version()
+        return ctx
+
+
 # TODO: This is out of use - Decide to fix or remove
 class CatchmentSelectView(GeoDataSetFormMixin, MapMixin, TemplateView):
     template_name = "waste_collection_catchment_list.html"
@@ -1041,13 +1110,14 @@ class CatchmentSelectView(GeoDataSetFormMixin, MapMixin, TemplateView):
         return self.request.GET.get("region")
 
 
-class WasteCollectionPublishedMapView(GeoDataSetPublishedFilteredMapView):
+class WasteCollectionPublishedMapView(SoilcomDatasetVersionMixin, GeoDataSetPublishedFilteredMapView):
     model_name = "WasteCollection"
     template_name = "waste_collection_map.html"
     filterset_class = CollectionFilterSet
     features_layer_api_basename = "api-waste-collection"
     map_title = "Household Waste Collections"
     dashboard_url = reverse_lazy("wastecollection-dashboard")
+    dv_scope = "published"
 
     def get_filterset_kwargs(self, filterset_class=None):
         kwargs = super().get_filterset_kwargs(filterset_class)
@@ -1057,13 +1127,14 @@ class WasteCollectionPublishedMapView(GeoDataSetPublishedFilteredMapView):
         return kwargs
 
 
-class WasteCollectionPrivateMapView(GeoDataSetPrivateFilteredMapView):
+class WasteCollectionPrivateMapView(SoilcomDatasetVersionMixin, GeoDataSetPrivateFilteredMapView):
     model_name = "WasteCollection"
     template_name = "waste_collection_map.html"
     filterset_class = CollectionFilterSet
     features_layer_api_basename = "api-waste-collection"
     map_title = "My Household Waste Collections"
     dashboard_url = reverse_lazy("wastecollection-dashboard")
+    dv_scope = "private"
 
     def get_filterset_kwargs(self, filterset_class=None):
         kwargs = super().get_filterset_kwargs(filterset_class)
@@ -1073,7 +1144,7 @@ class WasteCollectionPrivateMapView(GeoDataSetPrivateFilteredMapView):
         return kwargs
 
 
-class WasteCollectionReviewMapView(GeoDataSetReviewFilteredMapView):
+class WasteCollectionReviewMapView(SoilcomDatasetVersionMixin, GeoDataSetReviewFilteredMapView):
     model = Collection
     model_name = "WasteCollection"
     template_name = "waste_collection_map.html"
@@ -1081,6 +1152,7 @@ class WasteCollectionReviewMapView(GeoDataSetReviewFilteredMapView):
     features_layer_api_basename = "api-waste-collection"
     map_title = "Collections in Review"
     dashboard_url = reverse_lazy("wastecollection-dashboard")
+    dv_scope = "review"
 
     def get_filterset_kwargs(self, filterset_class=None):
         kwargs = super().get_filterset_kwargs(filterset_class)
@@ -1091,12 +1163,13 @@ class WasteCollectionReviewMapView(GeoDataSetReviewFilteredMapView):
 
 
 @method_decorator(xframe_options_exempt, name="dispatch")
-class WasteCollectionPublishedMapIframeView(GeoDataSetPublishedFilteredMapView):
+class WasteCollectionPublishedMapIframeView(SoilcomDatasetVersionMixin, GeoDataSetPublishedFilteredMapView):
     model_name = "WasteCollection"
     template_name = "waste_collection_map_iframe.html"
     filterset_class = CollectionFilterSet
     features_layer_api_basename = "api-waste-collection"
     map_title = "Household Waste Collection Europe"
+    dv_scope = "published"
 
     def get_filterset_kwargs(self, filterset_class=None):
         kwargs = super().get_filterset_kwargs(filterset_class)

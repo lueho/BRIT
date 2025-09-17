@@ -1,8 +1,8 @@
-{% extends 'filtered_map_iframe.html' %}
+{% extends "filtered_map_iframe.html" %}
 {% load static %}
 {% load crispy_forms_tags %}
 
-{% block map_card_footer %}{% endblock %}
+{% block map_card_footer %}{% endblock map_card_footer %}
 
 {% block user_actions %}
     <form method="get">
@@ -36,16 +36,47 @@
                 <a id="btn-collection-detail"
                    class="btn btn-primary w-75 d-none"
                    data-href-template="/waste_collection/collections/__pk__/"
-                   href="javascript:void(0)">
+                   href="#" role="button">
                     Full Details
                 </a>
             </div>
         </div>
     </div>
+    <div id="map-context" data-dv="{{ dataset_version }}" hidden></div>
 {% endblock user_actions %}
 
 {% block javascript %}
     {{ block.super }}
     <script src="{% static 'lib/turf-inside/inside.min.js' %}"></script>
     <script src="{% static 'js/waste_collection_map.min.js' %}"></script>
+    <script>
+      (function () {
+        function getDatasetVersion() {
+          try {
+            var ctx = document.getElementById('map-context');
+            if (!ctx) return null;
+            var dv = ctx.dataset.dv;
+            return dv || null;
+          } catch (_) { return null; }
+        }
+
+        var original = typeof window.getFeaturesLayerFilterParameters === 'function'
+          ? window.getFeaturesLayerFilterParameters
+          : null;
+
+        window.getFeaturesLayerFilterParameters = function () {
+          var params;
+          try {
+            params = original ? original() : new URLSearchParams(window.location.search);
+          } catch (_) {
+            params = new URLSearchParams(window.location.search);
+          }
+          try {
+            var dv = getDatasetVersion();
+            if (dv) params.set('dv', dv);
+          } catch (_) { /* ignore */ }
+          return params;
+        };
+      })();
+    </script>
 {% endblock javascript %}
