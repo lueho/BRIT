@@ -1,26 +1,24 @@
 {% load static %}
 {% load crispy_forms_tags %}
 {% load crispy_forms_filters %}
-
 <div class="modal-header">
-    <h5 class="modal-title">{{ form_title }}</h5>
-    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+  <h5 class="modal-title">{{ form_title }}</h5>
+  <button type="button"
+          class="btn-close"
+          data-bs-dismiss="modal"
+          aria-label="Close"></button>
 </div>
-
 <div class="modal-body">
-    <form method="post" id="modal-form">
-        {% csrf_token %}
-        {% crispy form form_helper %}
-
-        {% for formset in inlines %}
-            {% crispy formset inline_helper %}
-        {% endfor %}
-    </form>
+  <form method="post" id="modal-form">
+    {% csrf_token %}
+    {% crispy form form_helper %}
+    {% for formset in inlines %}
+      {% crispy formset inline_helper %}
+    {% endfor %}
+  </form>
 </div>
-
 <div class="modal-footer">
-    <button type="button" class="btn btn-default" data-bs-dismiss="modal">Close</button>
-    <button type="submit" class="submit-btn btn btn-primary" form="modal-form">{{ submit_button_text }}</button>
+  <button type="button" class="btn btn-default" data-bs-dismiss="modal">Close</button>
+  <button type="submit" class="submit-btn btn btn-primary" form="modal-form">{{ submit_button_text }}</button>
 </div>
-
 <script src="{% static 'js/formset.min.js' %}"></script>

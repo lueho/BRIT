@@ -1,48 +1,46 @@
 {% load i18n %}
 {% load cookie_consent_tags %}
-
-
 <p class="card-text">{{ cookie_group.description }}</p>
 <p class="card-text">The following cookies belong to this group:</p>
 {% for cookie in cookie_group.cookie_set.all %}
-    <p class="card-text"><strong>{{ cookie.name }}{% if cookie.domain %}({{ cookie.domain }}){% endif %}:</strong></p>
-    {% if cookie.description %}
-        <p class="card-text">{{ cookie.description }}</p>
-    {% endif %}
+  <p class="card-text">
+    <strong>{{ cookie.name }}
+      {% if cookie.domain %}({{ cookie.domain }}){% endif %}
+    :</strong>
+  </p>
+  {% if cookie.description %}<p class="card-text">{{ cookie.description }}</p>{% endif %}
 {% endfor %}
-
 {% if not cookie_group.is_required %}
-    <p class="card-text">
-        <strong>Your current choice:</strong>
-        {% if request|cookie_group_accepted:cookie_group.varname %}
-            <span class="cookie-consent-accepted">{% trans "Accepted" %}</span>
-        {% elif request|cookie_group_declined:cookie_group.varname %}
-            <span class="cookie-consent-declined">{% trans "Declined" %}</span>
-        {% else %}
-            <span class="cookie-consent-no-choice">{% trans "None" %}</span>
-        {% endif %}
-    </p>
-
-    <div class="cookie-group-form">
-
-        {% if not request|cookie_group_accepted:cookie_group.varname %}
-            <div class="float-start me-3">
-                <form class="cookie-consent-accept"
-                      action="{% url "cookie_consent_accept" cookie_group.varname %}"
-                      method="POST">
-                    {% csrf_token %}
-                    <input type="submit" class="btn btn-primary" value="{% trans "Accept" %}">
-                </form>
-            </div>
-        {% endif %}
-        {% if not request|cookie_group_declined:cookie_group.varname %}
-            <div class="float-start me-3">
-                <form class="cookie-consent-decline"
-                      action="{% url "cookie_consent_decline" cookie_group.varname %}" method="POST">
-                    {% csrf_token %}
-                    <input type="submit" class="btn btn-danger" value="{% trans "Decline" %}">
-                </form>
-            </div>
-        {% endif %}
-    </div>
+  <p class="card-text">
+    <strong>Your current choice:</strong>
+    {% if request|cookie_group_accepted:cookie_group.varname %}
+      <span class="cookie-consent-accepted">{% trans "Accepted" %}</span>
+    {% elif request|cookie_group_declined:cookie_group.varname %}
+      <span class="cookie-consent-declined">{% trans "Declined" %}</span>
+    {% else %}
+      <span class="cookie-consent-no-choice">{% trans "None" %}</span>
+    {% endif %}
+  </p>
+  <div class="cookie-group-form">
+    {% if not request|cookie_group_accepted:cookie_group.varname %}
+      <div class="float-start me-3">
+        <form class="cookie-consent-accept"
+              action="{% url "cookie_consent_accept" cookie_group.varname %}"
+              method="POST">
+          {% csrf_token %}
+          <input type="submit" class="btn btn-primary" value="{% trans "Accept" %}">
+        </form>
+      </div>
+    {% endif %}
+    {% if not request|cookie_group_declined:cookie_group.varname %}
+      <div class="float-start me-3">
+        <form class="cookie-consent-decline"
+              action="{% url "cookie_consent_decline" cookie_group.varname %}"
+              method="POST">
+          {% csrf_token %}
+          <input type="submit" class="btn btn-danger" value="{% trans "Decline" %}">
+        </form>
+      </div>
+    {% endif %}
+  </div>
 {% endif %}

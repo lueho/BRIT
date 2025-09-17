@@ -222,3 +222,135 @@ class UserCreatedObjectPermission(permissions.BasePermission):
             and obj.publication_status == UserCreatedObject.STATUS_REVIEW
             and obj.owner != request.user  # Four eyes principle: can't reject own objects
         )
+
+
+# Centralized object policy for templates and views
+def get_object_policy(user, obj, request=None, review_mode=False):
+    """
+    Compute a unified policy dictionary for the given object and user.
+
+    This is the single source of truth for button visibility in templates and
+    should mirror backend permission checks. Review workflow permissions are
+    delegated (when appropriate) to UserCreatedObjectPermission to ensure
+    consistency with backend behavior.
+
+    Returned dict keys (booleans unless noted):
+      - is_authenticated, is_owner, is_staff, is_moderator
+      - is_private, is_in_review, is_published, is_declined, is_archived
+      - can_edit, can_manage_samples, can_add_property
+      - can_duplicate, can_new_version
+      - can_archive, can_delete
+      - can_submit_review, can_withdraw_review, can_approve, can_reject
+      - can_export, export_list_type ('public'|'private'|None)
+      - can_view_review_feedback
+    """
+    perm = UserCreatedObjectPermission()
+
+    # Basic identity flags
+    is_authenticated = bool(user and getattr(user, "is_authenticated", False))
+    is_staff = bool(getattr(user, "is_staff", False))
+    is_owner = bool(
+        is_authenticated and getattr(obj, "owner_id", None) == getattr(user, "id", None)
+    )
+
+    # Publication status helpers (use convenience properties if available)
+    is_private = bool(getattr(obj, "is_private", False))
+    is_in_review = bool(getattr(obj, "is_in_review", False))
+    is_published = bool(getattr(obj, "is_published", False))
+    is_declined = bool(getattr(obj, "is_declined", False))
+    is_archived = bool(getattr(obj, "is_archived", False))
+
+    # Moderator rights (per-model 'can_moderate_<modelname>' or staff)
+    try:
+        is_moderator = perm._is_moderator(user, obj)
+    except Exception:
+        is_moderator = False
+
+    # Ensure we have a request-like object for permission helpers
+    if request is None:
+        class _R:
+            pass
+        request = _R()
+        request.user = user
+
+    # Review workflow permissions
+    # Submit/withdraw must mirror view logic (owners OR staff may act when status matches)
+    # Allow resubmission from 'declined' and withdrawing to private when declined as well
+    can_submit_review = bool(
+        is_authenticated and (is_owner or is_staff) and (is_private or is_declined)
+    )
+    can_withdraw_review = bool(
+        is_authenticated and (is_owner or is_staff) and (is_in_review or is_declined)
+    )
+    # Approve/Reject via permission helper (four eyes, moderator)
+    can_approve = bool(perm.has_approve_permission(request, obj)) if is_authenticated else False
+    can_reject = bool(perm.has_reject_permission(request, obj)) if is_authenticated else False
+
+    # CRUD-like actions
+    has_update_url = bool(getattr(obj, "update_url", None))
+    # Support both modal and direct delete URLs across templates
+    has_delete_url = bool(
+        getattr(obj, "modal_delete_url", None) or getattr(obj, "delete_url", None)
+    )
+
+    # Edit: staff always; owners if not published; never when archived
+    can_edit = has_update_url and not is_archived and (is_staff or (is_owner and not is_published))
+
+    # Delete:
+    # - Published: staff only
+    # - Private/Review/Declined: owner or staff
+    can_delete = has_delete_url and not is_archived and (
+        (is_published and is_staff) or (not is_published and (is_owner or is_staff))
+    )
+
+    # Archive: only when published; owner, staff, or moderator (publication_status change)
+    can_archive = is_published and (is_owner or is_staff or is_moderator)
+
+    # Object-specific management helpers
+    can_manage_samples = (is_owner or is_staff) and not is_archived
+    can_add_property = (is_owner or is_staff) and not is_archived
+
+    # Duplicate/New version: require model add permission
+    can_duplicate = False
+    try:
+        model = obj.__class__
+        app_label = model._meta.app_label
+        model_name = model._meta.model_name
+        add_perm = f"{app_label}.add_{model_name}"
+        can_duplicate = is_authenticated and user.has_perm(add_perm)
+    except Exception:
+        can_duplicate = False
+    can_new_version = can_duplicate
+
+    # Export: authenticated users may export published; owners/staff may export private
+    can_export = is_authenticated and (is_published or is_owner or is_staff)
+    export_list_type = "public" if is_published else ("private" if (is_owner or is_staff) else None)
+
+    # Review feedback visibility (declined and owner, outside explicit review mode UIs)
+    can_view_review_feedback = is_owner and is_declined and (not bool(review_mode))
+
+    return {
+        "is_authenticated": is_authenticated,
+        "is_owner": is_owner,
+        "is_staff": is_staff,
+        "is_moderator": is_moderator,
+        "is_private": is_private,
+        "is_in_review": is_in_review,
+        "is_published": is_published,
+        "is_declined": is_declined,
+        "is_archived": is_archived,
+        "can_edit": can_edit,
+        "can_manage_samples": can_manage_samples,
+        "can_add_property": can_add_property,
+        "can_duplicate": can_duplicate,
+        "can_new_version": can_new_version,
+        "can_archive": can_archive,
+        "can_delete": can_delete,
+        "can_submit_review": can_submit_review,
+        "can_withdraw_review": can_withdraw_review,
+        "can_approve": can_approve,
+        "can_reject": can_reject,
+        "can_export": can_export,
+        "export_list_type": export_list_type,
+        "can_view_review_feedback": can_view_review_feedback,
+    }

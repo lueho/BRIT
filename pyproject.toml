@@ -125,3 +125,18 @@ known-first-party = ["brit"]
 [tool.ruff.format]
 quote-style = "double"
 indent-style = "space"
+
+
+[tool.djlint]
+profile = "django"
+indent = 2
+max_line_length = 120
+use_gitignore = true
+
+# Which files to include / skip (adjust to your tree)
+include = "(templates|**/templates)/**/*.(html|jinja|jinja2|j2|njk|nunjucks|twig|hbs|mustache)"
+exclude = "(node_modules|.venv|dist|build|.git|static)"
+
+# Example: silence/enable specific rules as you like
+# ignore = ["H006","H021"]
+# include = []

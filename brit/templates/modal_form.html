@@ -1,20 +1,20 @@
 {% load crispy_forms_tags %}
 {% load crispy_forms_filters %}
-
 <div class="modal-header">
-    <h5 class="modal-title">{{ modal_title }}</h5>
-    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+  <h5 class="modal-title">{{ modal_title }}</h5>
+  <button type="button"
+          class="btn-close"
+          data-bs-dismiss="modal"
+          aria-label="Close"></button>
 </div>
-
 <div class="modal-body">
-    <form id="modal-form" method="post" enctype="multipart/form-data">
-        {% crispy form %}
-    </form>
+  <form id="modal-form" method="post" enctype="multipart/form-data">
+    {% crispy form %}
+  </form>
 </div>
-
 <div class="modal-footer">
-    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
-    {% block submit_button %}
-        <button type="submit" class="submit-btn btn btn-primary" form="modal-form">{{ submit_button_text }}</button>
-    {% endblock %}
+  <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+  {% block submit_button %}
+    <button type="submit" class="submit-btn btn btn-primary" form="modal-form">{{ submit_button_text }}</button>
+  {% endblock %}
 </div>

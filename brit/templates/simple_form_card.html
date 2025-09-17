@@ -2,36 +2,38 @@
 {% load static %}
 {% load crispy_forms_tags %}
 {% load crispy_forms_filters %}
-
 {% block content %}
-
-    <div class="row">
-        <div class="col">
-            <div class="card shadow">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3"><h5 class="mb-0">{{ form_title }}</h5></div>
-                <div class="card-body">
-                    <div id="form-container">
-                        <form method="post" enctype="multipart/form-data">
-                            {% if request.GET.next %}
-                                <input type="hidden" name="next" value="{{ request.GET.next }}">
-                            {% endif %}
-                            {% block extra_pre_form_content %}{% endblock %}
-                            {% crispy form %}
-                            {% block extra_post_form_content %}{% endblock %}
-                            {% block submit_button %}
-                                <input type="submit" name="submit" value="Save" class="btn btn-primary"
-                                       id="submit-id-submit">
-                            {% endblock %}
-                            {% block cancel_button %}{% endblock %}
-                        </form>
-                    </div>
-                </div>
-                <div class="card-footer">{% block card_footer %}{% endblock %}</div>
-            </div>
+  <div class="row">
+    <div class="col">
+      <div class="card shadow">
+        <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+          <h5 class="mb-0">{{ form_title }}</h5>
         </div>
+        <div class="card-body">
+          <div id="form-container">
+            <form method="post" enctype="multipart/form-data">
+              {% if request.GET.next %}<input type="hidden" name="next" value="{{ request.GET.next }}">{% endif %}
+              {% block extra_pre_form_content %}{% endblock %}
+              {% crispy form %}
+              {% block extra_post_form_content %}{% endblock %}
+              {% block submit_button %}
+                <input type="submit"
+                       name="submit"
+                       value="Save"
+                       class="btn btn-primary"
+                       id="submit-id-submit">
+              {% endblock %}
+              {% block cancel_button %}{% endblock %}
+            </form>
+          </div>
+        </div>
+        <div class="card-footer">
+          {% block card_footer %}{% endblock %}
+        </div>
+      </div>
     </div>
+  </div>
 {% endblock %}
-
 {% block form_media %}
-    {{ form.media }}
+  {{ form.media }}
 {% endblock form_media %}

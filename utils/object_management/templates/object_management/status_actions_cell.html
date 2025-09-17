@@ -1,10 +1,12 @@
 {% load custom_tags %}
 {% load moderation_tags %}
 
+{% object_policy object as policy %}
+
 {# Generic status + actions cell for UserCreatedObject rows #}
 <div class="action-container d-flex align-items-center justify-content-end">
   <div class="status-badge-container">
-    {% include 'object_management/review_status_badge.html' with object=object %}
+    {% include "object_management/review_status_badge.html" with object=object %}
   </div>
 
   <div class="dropdown d-inline-block ms-auto">
@@ -17,75 +19,63 @@
       </a>
 
       {# Review feedback link for owners of declined items #}
-      {% if user == object.owner and object.is_declined %}
+      {% if policy.can_view_review_feedback %}
         <a class="dropdown-item" href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
           <i class="fas fa-clipboard-check"></i> Review feedback
         </a>
       {% endif %}
 
       {# Review view for moderators in review scope (avoid showing for owners) #}
-      {% if list_type == 'review' and user|can_moderate:object and user != object.owner %}
-        <a class="dropdown-item" href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
-          <i class="fas fa-clipboard-check"></i> Review view
-        </a>
-      {% endif %}
-
-      {# Edit (if update_url exists) - staff always; owner only if not published #}
-      {% if object.update_url %}
-        {% if user.is_staff %}
-          <a class="dropdown-item" href="{{ object.update_url }}">
-            <i class="fas fa-pen-to-square"></i> Edit
-          </a>
-        {% elif user == object.owner and not object.is_published %}
-          <a class="dropdown-item" href="{{ object.update_url }}">
-            <i class="fas fa-pen-to-square"></i> Edit
+      {% if list_type == 'review' %}
+        {% if policy.is_moderator and not policy.is_owner %}
+          <a class="dropdown-item" href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
+            <i class="fas fa-clipboard-check"></i> Review view
           </a>
         {% endif %}
       {% endif %}
 
-      {# Delete if allowed and delete_url exists: staff may delete published; owners may delete private/review #}
-      {% if object.delete_url %}
-        {% if object.is_published %}
-          {% if user.is_staff %}
-            <a class="dropdown-item modal-link" href="{{ object.delete_url }}">
-              <i class="fas fa-trash"></i> Delete
-            </a>
-          {% endif %}
-        {% else %}
-          {% if user == object.owner or user.is_staff %}
-            <a class="dropdown-item modal-link" href="{{ object.delete_url }}">
-              <i class="fas fa-trash"></i> Delete
-            </a>
-          {% endif %}
+      {# Edit via policy #}
+      {% if policy.can_edit %}
+        <a class="dropdown-item" href="{{ object.update_url }}">
+          <i class="fas fa-pen-to-square"></i> Edit
+        </a>
+      {% endif %}
+
+      {# Delete via policy (supports modal_delete_url or delete_url) #}
+      {% if policy.can_delete %}
+        {% if object.modal_delete_url %}
+          <a class="dropdown-item modal-link" href="{{ object.modal_delete_url }}">
+            <i class="fas fa-trash"></i> Delete
+          </a>
+        {% elif object.delete_url %}
+          <a class="dropdown-item modal-link" href="{{ object.delete_url }}">
+            <i class="fas fa-trash"></i> Delete
+          </a>
         {% endif %}
       {% endif %}
 
       <div class="dropdown-divider"></div>
-      {# Workflow actions #}
-      {% if object.is_published %}
-        {% if user|can_moderate:object or user == object.owner or user.is_staff %}
-          {% if object.archive_url %}
-            <a class="dropdown-item modal-link" href="{{ object.archive_url }}">
-              <i class="fas fa-archive"></i> Archive
-            </a>
-          {% endif %}
+      {# Workflow actions: Archive #}
+      {% if policy.can_archive %}
+        {% if object.archive_url %}
+          <a class="dropdown-item modal-link" href="{{ object.archive_url }}">
+            <i class="fas fa-archive"></i> Archive
+          </a>
         {% endif %}
       {% endif %}
 
       {% if list_type == 'private' %}
-        {% if object.is_private or object.is_declined %}
-          {% if user == object.owner or user.is_staff %}
-            <form method="post" action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
-              {% csrf_token %}
-              <button type="submit" class="dropdown-item text-start text-primary">
-                <i class="fas fa-paper-plane"></i> Submit for Review
-              </button>
-            </form>
-          {% endif %}
+        {% if policy.can_submit_review %}
+          <form method="post" action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
+            {% csrf_token %}
+            <button type="submit" class="dropdown-item text-start text-primary">
+              <i class="fas fa-paper-plane"></i> Submit for Review
+            </button>
+          </form>
         {% endif %}
 
-        {% if object.is_in_review %}
-          {% if user == object.owner or user.is_staff %}
+        {% if policy.is_in_review %}
+          {% if policy.can_withdraw_review %}
             <form method="post" action="{% url 'object_management:withdraw_from_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
               {% csrf_token %}
               <button type="submit" class="dropdown-item text-start text-warning">
@@ -94,13 +84,15 @@
             </form>
           {% endif %}
 
-          {% if user|can_moderate:object and user != object.owner %}
+          {% if policy.can_approve %}
             <form method="post" action="{% url 'object_management:approve_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
               {% csrf_token %}
               <button type="submit" class="dropdown-item text-start text-success">
                 <i class="fas fa-check"></i> Approve
               </button>
             </form>
+          {% endif %}
+          {% if policy.can_reject %}
             <form method="post" action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
               {% csrf_token %}
               <button type="submit" class="dropdown-item w-100 text-start text-danger">
@@ -111,8 +103,8 @@
         {% endif %}
 
       {% elif list_type == 'review' %}
-        {% if object.is_in_review %}
-          {% if user == object.owner or user.is_staff %}
+        {% if policy.is_in_review %}
+          {% if policy.can_withdraw_review %}
             <form method="post" action="{% url 'object_management:withdraw_from_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
               {% csrf_token %}
               <button type="submit" class="dropdown-item text-start text-warning">
@@ -120,13 +112,15 @@
               </button>
             </form>
           {% endif %}
-          {% if user|can_moderate:object and user != object.owner %}
+          {% if policy.can_approve %}
             <form method="post" action="{% url 'object_management:approve_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
               {% csrf_token %}
               <button type="submit" class="dropdown-item text-start text-success">
                 <i class="fas fa-check"></i> Approve
               </button>
             </form>
+          {% endif %}
+          {% if policy.can_reject %}
             <form method="post" action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
               {% csrf_token %}
               <button type="submit" class="dropdown-item w-100 text-start text-danger">

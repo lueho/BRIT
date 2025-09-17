@@ -1,7 +1,6 @@
 {% extends 'simple_form_card.html' %}
 {% load static %}
 {% load crispy_forms_tags %}
-
 {#
     Unified template that can handle:
     - A single formset rendered after the main form (legacy "form_and_formset.html" use-case, context var: formset)
@@ -11,50 +10,39 @@
       * formset         – single inline/formset (optional)
       * inlines         – list/qs of formsets (optional)
 #}
-
 {% block extra_pre_form_content %}
-    {# Render multiple inlines *before* the main form #}
-    {% if inlines %}
-        {% with helper=formset_helper %}
-            {% for inline in inlines %}
-                {% crispy inline helper %}
-            {% endfor %}
-        {% endwith %}
-    {% endif %}
+  {# Render multiple inlines *before* the main form #}
+  {% if inlines %}
+    {% with helper=formset_helper %}
+      {% for inline in inlines %}
+        {% crispy inline helper %}
+      {% endfor %}
+    {% endwith %}
+  {% endif %}
 {% endblock extra_pre_form_content %}
-
 {% block extra_post_form_content %}
-    {# Render a single formset *after* the main form #}
-    {% if formset %}
-        {% if formset_helper and formset_helper.formset_type == 'tomselect' %}
-            {% include 'bootstrap5/formset_tomselect.html' with formset=formset helper=formset_helper %}
-        {% else %}
-            {% include 'bootstrap5/formset_base.html' with formset=formset helper=formset_helper %}
-        {% endif %}
+  {# Render a single formset *after* the main form #}
+  {% if formset %}
+    {% if formset_helper and formset_helper.formset_type == 'tomselect' %}
+      {% include 'bootstrap5/formset_tomselect.html' with formset=formset helper=formset_helper %}
+    {% else %}
+      {% include 'bootstrap5/formset_base.html' with formset=formset helper=formset_helper %}
     {% endif %}
+  {% endif %}
 {% endblock extra_post_form_content %}
-
 {% block head_extras %}
-    {{ block.super }}
-    <link href="{% static 'css/formset.css' %}" rel="stylesheet">
+  {{ block.super }}
+  <link href="{% static 'css/formset.css' %}" rel="stylesheet">
 {% endblock head_extras %}
-
 {% block javascript %}
-    {{ block.super }}
-    <script type="text/javascript">
-        console.log("formsets_card.js loaded")
-    </script>
-    <script src="{% static 'js/formset.js' %}"></script>
+  {{ block.super }}
+  <script type="text/javascript">console.log("formsets_card.js loaded")</script>
+  <script src="{% static 'js/formset.js' %}"></script>
 {% endblock javascript %}
-
 {% block form_media %}
-    {{ block.super }}
-    {% if formset %}
-        {{ formset.media }}
-    {% endif %}
-    {% if inlines %}
-        {% for inline in inlines %}
-            {{ inline.media }}
-        {% endfor %}
-    {% endif %}
+  {{ block.super }}
+  {% if formset %}{{ formset.media }}{% endif %}
+  {% if inlines %}
+    {% for inline in inlines %}{{ inline.media }}{% endfor %}
+  {% endif %}
 {% endblock form_media %}

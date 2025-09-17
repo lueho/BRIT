@@ -1,161 +1,164 @@
 {% extends 'base.html' %}
 {% load static %}
-
 {% block title %}BRIT | Learning Material{% endblock %}
-
 {% block content %}
-    <div class="row">
-        <div class="col col-12 col-md-6 mb-4">
-            <div class="card shadow h-100">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-                    <h5 class="mb-0"><i class="fas fa-fw fa-graduation-cap"></i> Learning Material</h5>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">On this page, you can find a collection of learning material about
-                        bioresources,
-                        bioresource management and the bioeconomy. The learning material was prepared by the
-                        <a href="https://www.tuhh.de/aww/forschung/biem/" target="_blank">
-                            Management Group (BIEM)
-                        </a>
-                        of the
-                        <a href="https://www.tuhh.de/" target="_blank">
-                            Hamburg University of Technology
-                        </a>
-                        in cooperation with the
-                        <a href="https://www.hoou.de/" target="_blank">
-                            Hamburg Open Online University (HOOU)
-                        </a>.
-                    </p>
-                </div>
-            </div>
+  <div class="row">
+    <div class="col col-12 col-md-6 mb-4">
+      <div class="card shadow h-100">
+        <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+          <h5 class="mb-0">
+            <i class="fas fa-fw fa-graduation-cap"></i> Learning Material
+          </h5>
         </div>
-
-        <div class="col col-12 col-md-6 mb-4">
-            <div class="card shadow h-100">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-                    <h5 class="mb-0">
-                        <span class="svg-icon-header">
-                            <!-- Logo icon of Hamburg Open Online University -->
-                            <svg viewBox="0 0 53.26 25.845" xmlns="http://www.w3.org/2000/svg" style="height: 1em; width: auto; fill: currentColor; vertical-align: -0.125em; stroke: currentColor; stroke-width: 0.2;">
-                                <path d="m50.091,8.614v5.125c0,.722-.259,1.468-1.37,1.468-1.099,0-1.382-.746-1.382-1.468v-5.125h-1.261C44.299,3.709,39.593.195,34.082.195c-4.367,0-8.228,2.206-10.529,5.563-1.276-.779-2.774-1.228-4.374-1.228-4.643,0-8.421,3.778-8.421,8.421s3.778,8.421,8.421,8.421c1.601,0,3.099-.449,4.374-1.228,2.3,3.356,6.161,5.563,10.529,5.563,5.594,0,10.359-3.62,12.075-8.641.632.348,1.466.574,2.558.574,3.623,0,4.398-2.46,4.398-3.623v-5.404h-3.022Zm-30.913,12.356c-4.421,0-8.019-3.597-8.019-8.019s3.597-8.019,8.019-8.019c1.519,0,2.94.424,4.152,1.161-.579.905-1.047,1.888-1.385,2.929-.77-.481-1.711-.761-2.766-.761-2.908,0-4.929,2.1-4.929,4.69s2.022,4.69,4.929,4.69c1.056,0,1.996-.281,2.766-.761.338,1.041.806,2.024,1.385,2.929-1.212.736-2.633,1.161-4.152,1.161Zm1.859-8.019c0,1.075-.674,1.946-1.859,1.946s-1.859-.871-1.859-1.946.676-1.946,1.859-1.946,1.859.871,1.859,1.946Zm1.259,3.686c1.131-.859,1.811-2.19,1.811-3.686s-.68-2.827-1.811-3.686c.329-1.051.795-2.041,1.377-2.951,2.125,1.444,3.523,3.88,3.523,6.637s-1.398,5.193-3.523,6.637c-.582-.91-1.048-1.9-1.377-2.951Zm11.785,8.661c-4.223,0-7.957-2.132-10.185-5.375,2.233-1.516,3.703-4.075,3.703-6.972s-1.47-5.456-3.703-6.972c2.227-3.243,5.961-5.375,10.185-5.375,5.282,0,9.8,3.335,11.56,8.01h-1.325v5.395c0,.736.318,2.008,1.483,2.834-1.634,4.907-6.269,8.455-11.718,8.455Z"></path>
-                                <path d="m34.082,8.261c-2.908,0-4.929,2.1-4.929,4.69s2.022,4.69,4.929,4.69c2.893,0,4.93-2.1,4.93-4.69s-2.037-4.69-4.93-4.69Zm0,6.636c-1.183,0-1.859-.871-1.859-1.946s.676-1.946,1.859-1.946,1.859.871,1.859,1.946-.674,1.946-1.859,1.946Z"></path>
-                                <polygon
-                                        points="6.005 11.753 3.085 11.753 3.085 8.614 .147 8.614 .147 17.242 3.085 17.242 3.085 14.321 6.005 14.321 6.005 17.242 8.943 17.242 8.943 8.614 6.005 8.614 6.005 11.753"></polygon>
-                            </svg> The Hamburg Open Online University
-                        </span>
-                    </h5>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        The
-                        <a href="https://www.hoou.de/" target="_blank">
-                            Hamburg Open Online University (HOOU)
-                        </a>
-                        is a joint project of the Hamburg universities and
-                        the Hamburg University of Applied Sciences. The aim of the HOOU is to make the knowledge of
-                        Hamburg's universities available to the general public and to develop new forms of teaching
-                        and learning. The HOOU is funded by the Free and Hanseatic City of Hamburg.
-                    </p>
-                </div>
-            </div>
+        <div class="card-body">
+          <p class="card-text">
+            On this page, you can find a collection of learning material about
+            bioresources,
+            bioresource management and the bioeconomy. The learning material was prepared by the
+            <a href="https://www.tuhh.de/aww/forschung/biem/" target="_blank">Management Group (BIEM)</a>
+            of the
+            <a href="https://www.tuhh.de/" target="_blank">Hamburg University of Technology</a>
+            in cooperation with the
+            <a href="https://www.hoou.de/" target="_blank">Hamburg Open Online University (HOOU)</a>.
+          </p>
         </div>
+      </div>
     </div>
-
-    <div class="row">
-        <div class="col col-12 col-md-6 col-lg-3 mb-4">
-            <div class="card shadow h-100">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3"><h5 class="mb-0">BioCycle</h5></div>
-                <div class="card-img-top">
-                    <a class="d-flex align-items-center justify-content-center"
-                       href="https://www.hoou.de/projects/biocycle/"
-                       target="_blank">
-                        <img class="w-100 m-0" src="{% static 'img/biocycle.png' %}" alt="BioCycle Course Overview">
-                    </a>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        <a href="https://www.hoou.de/projects/biocycle/" target="_blank">The BioCycle</a>
-                        is an introduction to the concepts of circular economy following the complete cycle of food
-                        waste. This is the perfect start if you want to start using the
-                        <a href="{% url 'sources-list' %}">
-                            Household Waste Collection
-                        </a>
-                        module.
-                    </p>
-                    <ul>
-                        <li>
-                            <a href="https://www.hoou.de/projects/biocycle/" target="_blank">
-                                The BioCycle: From Resource to Waste to Resource
-                            </a>
-                        </li>
-                    </ul>
-                </div>
-            </div>
+    <div class="col col-12 col-md-6 mb-4">
+      <div class="card shadow h-100">
+        <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+          <h5 class="mb-0">
+            <span class="svg-icon-header">
+              <!-- Logo icon of Hamburg Open Online University -->
+              <svg viewBox="0 0 53.26 25.845"
+                   xmlns="http://www.w3.org/2000/svg"
+                   style="height: 1em;
+                          width: auto;
+                          fill: currentColor;
+                          vertical-align: -0.125em;
+                          stroke: currentColor;
+                          stroke-width: 0.2">
+                <path d="m50.091,8.614v5.125c0,.722-.259,1.468-1.37,1.468-1.099,0-1.382-.746-1.382-1.468v-5.125h-1.261C44.299,3.709,39.593.195,34.082.195c-4.367,0-8.228,2.206-10.529,5.563-1.276-.779-2.774-1.228-4.374-1.228-4.643,0-8.421,3.778-8.421,8.421s3.778,8.421,8.421,8.421c1.601,0,3.099-.449,4.374-1.228,2.3,3.356,6.161,5.563,10.529,5.563,5.594,0,10.359-3.62,12.075-8.641.632.348,1.466.574,2.558.574,3.623,0,4.398-2.46,4.398-3.623v-5.404h-3.022Zm-30.913,12.356c-4.421,0-8.019-3.597-8.019-8.019s3.597-8.019,8.019-8.019c1.519,0,2.94.424,4.152,1.161-.579.905-1.047,1.888-1.385,2.929-.77-.481-1.711-.761-2.766-.761-2.908,0-4.929,2.1-4.929,4.69s2.022,4.69,4.929,4.69c1.056,0,1.996-.281,2.766-.761.338,1.041.806,2.024,1.385,2.929-1.212.736-2.633,1.161-4.152,1.161Zm1.859-8.019c0,1.075-.674,1.946-1.859,1.946s-1.859-.871-1.859-1.946.676-1.946,1.859-1.946,1.859.871,1.859,1.946Zm1.259,3.686c1.131-.859,1.811-2.19,1.811-3.686s-.68-2.827-1.811-3.686c.329-1.051.795-2.041,1.377-2.951,2.125,1.444,3.523,3.88,3.523,6.637s-1.398,5.193-3.523,6.637c-.582-.91-1.048-1.9-1.377-2.951Zm11.785,8.661c-4.223,0-7.957-2.132-10.185-5.375,2.233-1.516,3.703-4.075,3.703-6.972s-1.47-5.456-3.703-6.972c2.227-3.243,5.961-5.375,10.185-5.375,5.282,0,9.8,3.335,11.56,8.01h-1.325v5.395c0,.736.318,2.008,1.483,2.834-1.634,4.907-6.269,8.455-11.718,8.455Z">
+                </path>
+                <path d="m34.082,8.261c-2.908,0-4.929,2.1-4.929,4.69s2.022,4.69,4.929,4.69c2.893,0,4.93-2.1,4.93-4.69s-2.037-4.69-4.93-4.69Zm0,6.636c-1.183,0-1.859-.871-1.859-1.946s.676-1.946,1.859-1.946,1.859.871,1.859,1.946-.674,1.946-1.859,1.946Z">
+                </path>
+                <polygon points="6.005 11.753 3.085 11.753 3.085 8.614 .147 8.614 .147 17.242 3.085 17.242 3.085 14.321 6.005 14.321 6.005 17.242 8.943 17.242 8.943 8.614 6.005 8.614 6.005 11.753"></polygon>
+              </svg>
+              The Hamburg Open Online University
+            </span>
+          </h5>
         </div>
-        <div class="col col-12 col-md-6 col-lg-3 mb-4">
-            <div class="card shadow h-100">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3"><h5 class="mb-0">Lectures For Future</h5></div>
-                <div class="card-img-top">
-                    <a class="d-flex align-items-center justify-content-center"
-                       href="https://www.hoou.de/projects/lff/pages/lectures-for-future-project-introduction"
-                       target="_blank">
-                        <img class="w-100 m-0" src="{% static 'img/lff_cover.png' %}"
-                             alt="Lectures For Future Cover Image">
-                    </a>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        The
-                        <a href="https://www.hoou.de/projects/lff/pages/lectures-for-future-project-introduction"
-                           target="_blank">
-                            Lectures for Future
-                        </a>
-                        are a series of interactive lectures in English language on the topic of sustainability.
-                        The lectures are made by scientists from Hamburg's universities and are aimed at the general
-                        public.
-                    </p>
-                    <ul>
-                        <li><a href="https://www.hoou.de/projects/lff/pages/residue-and-by-product-based-bioresources"
-                               target="_blank">Residue and by-Product Based Bioresources</a>
-                        </li>
-                        <li><a href="https://www.hoou.de/projects/lff/pages/sustainable-urban-bioresource-management"
-                               target="_blank">Sustainable Urban Bioresource Management</a>
-                        </li>
-                    </ul>
-                </div>
-            </div>
+        <div class="card-body">
+          <p class="card-text">
+            The
+            <a href="https://www.hoou.de/" target="_blank">Hamburg Open Online University (HOOU)</a>
+            is a joint project of the Hamburg universities and
+            the Hamburg University of Applied Sciences. The aim of the HOOU is to make the knowledge of
+            Hamburg's universities available to the general public and to develop new forms of teaching
+            and learning. The HOOU is funded by the Free and Hanseatic City of Hamburg.
+          </p>
         </div>
-        <div class="col col-12 col-md-6 col-lg-3 mb-4">
-            <div class="card shadow h-100">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3"><h5 class="mb-0">BRIT Quests</h5></div>
-                <div class="card-img-top">
-                    <a class="d-flex align-items-center justify-content-center"
-                       href="https://learn.hoou.de/course/view.php?id=695"
-                       target="_blank">
-                        <img class="w-100 m-0" src="{% static 'img/brit_quests.png' %}"
-                             alt="BRIT Quests">
-                    </a>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        <a href="https://learn.hoou.de/course/view.php?id=695"
-                           target="_blank">
-                            BRIT Quests
-                        </a>
-                        is a course provides a series of quests that bring the user from simple exercises to complex
-                        inventories step by step to gain proficiency in identifying bioresources and planning their use
-                        in a local context using the Bioresource Information Tool.
-                    </p>
-                    <ul>
-                        <li><a href="https://learn.hoou.de/course/view.php?id=695"
-                               target="_blank">BRIT Quests</a>
-                        </li>
-                        <li><a href="https://learn.hoou.de/course/view.php?id=921"
-                               target="_blank">Science Briefly Explained - Bioresource Management</a>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-        </div>
+      </div>
     </div>
+  </div>
+  <div class="row">
+    <div class="col col-12 col-md-6 col-lg-3 mb-4">
+      <div class="card shadow h-100">
+        <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+          <h5 class="mb-0">BioCycle</h5>
+        </div>
+        <div class="card-img-top">
+          <a class="d-flex align-items-center justify-content-center"
+             href="https://www.hoou.de/projects/biocycle/"
+             target="_blank">
+            <img class="w-100 m-0"
+                 src="{% static 'img/biocycle.png' %}"
+                 alt="BioCycle Course Overview">
+          </a>
+        </div>
+        <div class="card-body">
+          <p class="card-text">
+            <a href="https://www.hoou.de/projects/biocycle/" target="_blank">The BioCycle</a>
+            is an introduction to the concepts of circular economy following the complete cycle of food
+            waste. This is the perfect start if you want to start using the
+            <a href="{% url 'sources-list' %}">Household Waste Collection</a>
+            module.
+          </p>
+          <ul>
+            <li>
+              <a href="https://www.hoou.de/projects/biocycle/" target="_blank">The BioCycle: From Resource to Waste to Resource</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="col col-12 col-md-6 col-lg-3 mb-4">
+      <div class="card shadow h-100">
+        <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+          <h5 class="mb-0">Lectures For Future</h5>
+        </div>
+        <div class="card-img-top">
+          <a class="d-flex align-items-center justify-content-center"
+             href="https://www.hoou.de/projects/lff/pages/lectures-for-future-project-introduction"
+             target="_blank">
+            <img class="w-100 m-0"
+                 src="{% static 'img/lff_cover.png' %}"
+                 alt="Lectures For Future Cover Image">
+          </a>
+        </div>
+        <div class="card-body">
+          <p class="card-text">
+            The
+            <a href="https://www.hoou.de/projects/lff/pages/lectures-for-future-project-introduction"
+               target="_blank">Lectures for Future</a>
+            are a series of interactive lectures in English language on the topic of sustainability.
+            The lectures are made by scientists from Hamburg's universities and are aimed at the general
+            public.
+          </p>
+          <ul>
+            <li>
+              <a href="https://www.hoou.de/projects/lff/pages/residue-and-by-product-based-bioresources"
+                 target="_blank">Residue and by-Product Based Bioresources</a>
+            </li>
+            <li>
+              <a href="https://www.hoou.de/projects/lff/pages/sustainable-urban-bioresource-management"
+                 target="_blank">Sustainable Urban Bioresource Management</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+    <div class="col col-12 col-md-6 col-lg-3 mb-4">
+      <div class="card shadow h-100">
+        <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+          <h5 class="mb-0">BRIT Quests</h5>
+        </div>
+        <div class="card-img-top">
+          <a class="d-flex align-items-center justify-content-center"
+             href="https://learn.hoou.de/course/view.php?id=695"
+             target="_blank">
+            <img class="w-100 m-0"
+                 src="{% static 'img/brit_quests.png' %}"
+                 alt="BRIT Quests">
+          </a>
+        </div>
+        <div class="card-body">
+          <p class="card-text">
+            <a href="https://learn.hoou.de/course/view.php?id=695" target="_blank">BRIT Quests</a>
+            is a course provides a series of quests that bring the user from simple exercises to complex
+            inventories step by step to gain proficiency in identifying bioresources and planning their use
+            in a local context using the Bioresource Information Tool.
+          </p>
+          <ul>
+            <li>
+              <a href="https://learn.hoou.de/course/view.php?id=695" target="_blank">BRIT Quests</a>
+            </li>
+            <li>
+              <a href="https://learn.hoou.de/course/view.php?id=921" target="_blank">Science Briefly Explained - Bioresource Management</a>
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
 {% endblock content %}

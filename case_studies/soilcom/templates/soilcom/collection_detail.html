@@ -10,6 +10,8 @@
 {% trans "Are you sure you want to approve this?" as approve_confirm %}
 {% trans "Are you sure you want to reject this?" as reject_confirm %}
 
+{% object_policy object review_mode=review_mode as policy %}
+
 {% block detail_header_badge %}
 {% include "object_management/review_status_badge.html" with object=object %}
 {% endblock detail_header_badge %}
@@ -37,74 +39,43 @@
       </a>
     </div>
     <div class="btn-group me-2" role="group">
-      {% if request.user.is_authenticated %}
-        {% if request.user == object.owner and object.is_declined and not review_mode %}
-          <a class="btn btn-sm btn-outline-danger" href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}" title="Review feedback">
-            <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review feedback</span>
-          </a>
-        {% endif %}
+      {% if policy.can_view_review_feedback %}
+        <a class="btn btn-sm btn-outline-danger" href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}" title="Review feedback">
+          <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review feedback</span>
+        </a>
       {% endif %}
     </div>
   </div>
   {# Reject Modal kept near header to support header actions #}
-  {% if object.is_in_review %}
-    {% if user.is_staff %}
-      <div class="modal fade" id="rejectModal-{{ object.id }}" tabindex="-1" aria-labelledby="rejectModalLabel-{{ object.id }}" aria-hidden="true">
-        <div class="modal-dialog">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h5 class="modal-title" id="rejectModalLabel-{{ object.id }}">{% trans "Reject item" %}</h5>
-              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans "Close" %}"></button>
-            </div>
-            <form method="post" action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
-              <div class="modal-body">
-                  {% csrf_token %}
-                  <p class="mb-3">{{ reject_confirm }}</p>
-                  <div class="mb-3">
-                    <label for="reject-comment-textarea-{{ object.id }}" class="form-label">{% trans "Review comment (optional)" %}</label>
-                    <textarea class="form-control" id="reject-comment-textarea-{{ object.id }}" name="comment" rows="4" placeholder="{% trans "Explain why this was rejected (optional)" %}"></textarea>
-                  </div>
-              </div>
-              <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
-                <button type="submit" class="btn btn-danger">
-                  <i class="fas fa-xmark"></i> {% trans "Reject" %}
-                </button>
-              </div>
-            </form>
+  {% if object.is_in_review and policy.can_reject %}
+    <div class="modal fade" id="rejectModal-{{ object.id }}" tabindex="-1" aria-labelledby="rejectModalLabel-{{ object.id }}" aria-hidden="true">
+      <div class="modal-dialog">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="rejectModalLabel-{{ object.id }}">{% trans "Reject item" %}</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans "Close" %}"></button>
           </div>
+          <form method="post" action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
+            <div class="modal-body">
+                {% csrf_token %}
+                <p class="mb-3">{{ reject_confirm }}</p>
+                <div class="mb-3">
+                  <label for="reject-comment-textarea-{{ object.id }}" class="form-label">{% trans "Review comment (optional)" %}</label>
+                  <textarea class="form-control" id="reject-comment-textarea-{{ object.id }}" name="comment" rows="4" placeholder="{% trans "Explain why this was rejected (optional)" %}"></textarea>
+                </div>
+            </div>
+            <div class="modal-footer">
+              <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+              <button type="submit" class="btn btn-danger">
+                <i class="fas fa-xmark"></i> {% trans "Reject" %}
+              </button>
+            </div>
+          </form>
         </div>
       </div>
-    {% elif perms.can_moderate %}
-      <div class="modal fade" id="rejectModal-{{ object.id }}" tabindex="-1" aria-labelledby="rejectModalLabel-{{ object.id }}" aria-hidden="true">
-        <div class="modal-dialog">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h5 class="modal-title" id="rejectModalLabel-{{ object.id }}">{% trans "Reject item" %}</h5>
-              <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans "Close" %}"></button>
-            </div>
-            <form method="post" action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
-              <div class="modal-body">
-                  {% csrf_token %}
-                  <p class="mb-3">{{ reject_confirm }}</p>
-                  <div class="mb-3">
-                    <label for="reject-comment-textarea-{{ object.id }}" class="form-label">{% trans "Review comment (optional)" %}</label>
-                    <textarea class="form-control" id="reject-comment-textarea-{{ object.id }}" name="comment" rows="4" placeholder="{% trans "Explain why this was rejected (optional)" %}"></textarea>
-                  </div>
-              </div>
-              <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
-                <button type="submit" class="btn btn-danger">
-                  <i class="fas fa-xmark"></i> {% trans "Reject" %}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      </div>
-    {% endif %}
+    </div>
   {% endif %}
-{% endblock %}
+{% endblock detail_header_actions %}
 
 {% block detail_body %}
     <p class="card-text">
@@ -304,32 +275,24 @@
 {# Options for the integrated right column (new base) #}
 {% block options_pane %}
   {# CRUD #}
-  {% if object.update_url and not object.is_archived %}
-    {% if request.user.is_staff %}
-      <a class="btn btn-primary w-100 mb-2" href="{{ object.update_url }}?next={{ request.get_full_path|urlencode }}">
-        <i class="fas fa-pen-to-square"></i> Edit
-      </a>
-    {% elif request.user == object.owner and object.publication_status != object.STATUS_PUBLISHED %}
-      <a class="btn btn-primary w-100 mb-2" href="{{ object.update_url }}?next={{ request.get_full_path|urlencode }}">
-        <i class="fas fa-pen-to-square"></i> Edit
-      </a>
-    {% endif %}
+  {% if policy.can_edit %}
+    <a class="btn btn-primary w-100 mb-2" href="{{ object.update_url }}?next={{ request.get_full_path|urlencode }}">
+      <i class="fas fa-pen-to-square"></i> Edit
+    </a>
   {% endif %}
 
-  {% if request.user.is_authenticated %}
-    {% if not object.is_archived %}
-      {% if request.user == object.owner or request.user.is_staff %}
-        <a class="btn btn-outline-secondary w-100 mb-2" href="{% url 'collection-wastesamples' object.id %}">
-          <i class="fas fa-pen-to-square"></i> Manage samples
-        </a>
-        <a class="btn btn-outline-secondary w-100 mb-2" href="{% url 'collection-add-property' object.id %}">
-          <i class="fas fa-circle-plus"></i> Add property
-        </a>
-      {% endif %}
-    {% endif %}
+  {% if policy.can_manage_samples %}
+    <a class="btn btn-outline-secondary w-100 mb-2" href="{% url 'collection-wastesamples' object.id %}">
+      <i class="fas fa-pen-to-square"></i> Manage samples
+    </a>
+  {% endif %}
+  {% if policy.can_add_property %}
+    <a class="btn btn-outline-secondary w-100 mb-2" href="{% url 'collection-add-property' object.id %}">
+      <i class="fas fa-circle-plus"></i> Add property
+    </a>
   {% endif %}
 
-  {% if 'soilcom.add_collection' in perms %}
+  {% if policy.can_duplicate %}
     <a class="btn btn-outline-secondary w-100 mb-2" href="{% url 'collection-copy' object.id %}">
       <i class="fas fa-copy"></i> Duplicate
     </a>
@@ -338,45 +301,31 @@
     </a>
   {% endif %}
 
-  {% if object.publication_status == object.STATUS_PUBLISHED %}
-    {% if request.user == object.owner or request.user.is_staff %}
-      <a class="btn btn-outline-secondary modal-link w-100 mb-2" href="{% url 'collection-archive-modal' object.id %}">
-        <i class="fas fa-archive"></i> Archive
-      </a>
-    {% endif %}
+  {% if policy.can_archive %}
+    <a class="btn btn-outline-secondary modal-link w-100 mb-2" href="{% url 'collection-archive-modal' object.id %}">
+      <i class="fas fa-archive"></i> Archive
+    </a>
   {% endif %}
 
-  {# Delete with published vs private rules (hidden for archived objects) #}
-  {% if object.modal_delete_url and not object.is_archived %}
-    {% if object.publication_status == object.STATUS_PUBLISHED %}
-      {% if request.user.is_staff %}
-        <a class="btn btn-outline-danger modal-link w-100 mb-2" href="{{ object.modal_delete_url }}{% if request.GET.back %}?next={{ request.GET.back|urlencode }}{% endif %}">
-          <i class="fas fa-trash"></i> Delete
-        </a>
-      {% endif %}
-    {% else %}
-      {% if request.user == object.owner or request.user.is_staff %}
-        <a class="btn btn-outline-danger modal-link w-100 mb-2" href="{{ object.modal_delete_url }}{% if request.GET.back %}?next={{ request.GET.back|urlencode }}{% endif %}">
-          <i class="fas fa-trash"></i> Delete
-        </a>
-      {% endif %}
-    {% endif %}
+  {# Delete #}
+  {% if policy.can_delete %}
+    <a class="btn btn-outline-danger modal-link w-100 mb-2" href="{{ object.modal_delete_url }}{% if request.GET.back %}?next={{ request.GET.back|urlencode }}{% endif %}">
+      <i class="fas fa-trash"></i> Delete
+    </a>
   {% endif %}
 
   {# Review workflow #}
-  {% if object.is_private %}
-    {% if request.user == object.owner or request.user.is_staff %}
-      <form method="post" action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0 mb-2">
-        {% csrf_token %}
-        <button type="submit" class="btn btn-outline-primary w-100" onclick="return confirm('{{ submit_confirm }}')">
-          <i class="fas fa-paper-plane"></i> {% trans "Submit for Review" %}
-        </button>
-      </form>
-    {% endif %}
+  {% if policy.can_submit_review %}
+    <form method="post" action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0 mb-2">
+      {% csrf_token %}
+      <button type="submit" class="btn btn-outline-primary w-100" onclick="return confirm('{{ submit_confirm }}')">
+        <i class="fas fa-paper-plane"></i> {% trans "Submit for Review" %}
+      </button>
+    </form>
   {% endif %}
 
   {% if object.is_in_review %}
-    {% if request.user == object.owner or request.user.is_staff %}
+    {% if policy.can_withdraw_review %}
       <form method="post" action="{% url 'object_management:withdraw_from_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0 mb-2">
         {% csrf_token %}
         <button type="submit" class="btn btn-outline-warning w-100" onclick="return confirm('{{ withdraw_confirm }}')">
@@ -384,13 +333,15 @@
         </button>
       </form>
     {% endif %}
-    {% if request.user.is_staff or perms.can_moderate %}
+    {% if policy.can_approve %}
       <form method="post" action="{% url 'object_management:approve_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0 mb-2">
         {% csrf_token %}
         <button type="submit" class="btn btn-outline-success w-100" onclick="return confirm('{{ approve_confirm }}')">
           <i class="fas fa-check"></i> {% trans "Approve" %}
         </button>
       </form>
+    {% endif %}
+    {% if policy.can_reject %}
       <button type="button" class="btn btn-outline-danger w-100" data-bs-toggle="modal" data-bs-target="#rejectModal-{{ object.id }}">
         <i class="fas fa-xmark"></i> {% trans "Reject" %}
       </button>
@@ -398,16 +349,10 @@
   {% endif %}
 
   {# Export #}
-  {% if request.user.is_authenticated %}
-    {% if object.publication_status == object.STATUS_PUBLISHED %}
-      <a class="btn btn-outline-secondary modal-link w-100" href="{% export_link_modal 'collection-export' list_type='public' %}">
-        <i class="fas fa-file-export"></i> Export data
-      </a>
-    {% elif request.user == object.owner or request.user.is_staff %}
-      <a class="btn btn-outline-secondary modal-link w-100" href="{% export_link_modal 'collection-export' list_type='private' %}">
-        <i class="fas fa-file-export"></i> Export data
-      </a>
-    {% endif %}
+  {% if policy.can_export %}
+    <a class="btn btn-outline-secondary modal-link w-100" href="{% export_link_modal 'collection-export' list_type=policy.export_list_type %}">
+      <i class="fas fa-file-export"></i> Export data
+    </a>
   {% endif %}
 {% endblock options_pane %}
 

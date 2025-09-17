@@ -1,17 +1,15 @@
 {% load static %}
 {% load cookie_consent_tags %}
-
-
 {% if request|cookie_consent_enabled %}
-    <link href="{% static 'css/cookie-bar.css' %}" rel="stylesheet">
-    <script type="text/javascript" src="{% static 'cookie_consent/cookiebar.js' %}"></script>
-    {% not_accepted_or_declined_cookie_groups request as cookie_groups %}
-
-    {% if cookie_groups %}
-        {% url "cookie_consent_cookie_group_list" as url_cookies %}
-        {% cookie_consent_accept_url cookie_groups as url_accept %}
-        {% cookie_consent_decline_url cookie_groups as url_decline %}
-        <script type="text/javascript">
+  <link href="{% static 'css/cookie-bar.css' %}" rel="stylesheet">
+  <script type="text/javascript"
+          src="{% static 'cookie_consent/cookiebar.js' %}"></script>
+  {% not_accepted_or_declined_cookie_groups request as cookie_groups %}
+  {% if cookie_groups %}
+    {% url "cookie_consent_cookie_group_list" as url_cookies %}
+    {% cookie_consent_accept_url cookie_groups as url_accept %}
+    {% cookie_consent_decline_url cookie_groups as url_decline %}
+    <script type="text/javascript">
             const cookie_groups = [];
             {% for cookie_group in cookie_groups %}
                 cookie_groups.push("{{ cookie_group.varname }}");
@@ -41,6 +39,6 @@
                     }
                 });
             });
-        </script>
-    {% endif %}
+    </script>
+  {% endif %}
 {% endif %}

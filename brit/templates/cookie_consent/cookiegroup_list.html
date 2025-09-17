@@ -1,19 +1,19 @@
 {% extends "base.html" %}
-
-{% block title %}BRIT | Cookies{% endblock %}
-
+{% block title %}
+  BRIT | Cookies
+{% endblock title %}
 {% block content %}
-    <div class="row">
-        {% for cookie_group in object_list %}
-            <div class="col col-12 col-md-6 col-lg-3 mt-4">
-                <div class="card shadow h-100">
-                    <div class="card-header bg-body-tertiary border-bottom-0 py-3"><h5 class="mb-0">{{ cookie_group.name }}</h5></div>
-                    <div class="card-body">
-                        {% include "cookie_consent/_cookie_group.html" %}
-                    </div>
-                    <div class="card-footer"></div>
-                </div>
-            </div>
-        {% endfor %}
-    </div>
+  <div class="row">
+    {% for cookie_group in object_list %}
+      <div class="col col-12 col-md-6 col-lg-3 mt-4">
+        <div class="card shadow h-100">
+          <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+            <h5 class="mb-0">{{ cookie_group.name }}</h5>
+          </div>
+          <div class="card-body">{% include "cookie_consent/_cookie_group.html" %}</div>
+          <div class="card-footer"></div>
+        </div>
+      </div>
+    {% endfor %}
+  </div>
 {% endblock content %}

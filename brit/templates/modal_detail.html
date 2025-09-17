@@ -1,21 +1,26 @@
 {% load custom_tags %}
-
 <div class="modal-header">
-    <h5 class="modal-title">{{ object|verbose_name }} Detail</h5>
-    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+  <h5 class="modal-title">{{ object|verbose_name }} Detail</h5>
+  <button type="button"
+          class="btn-close"
+          data-bs-dismiss="modal"
+          aria-label="Close"></button>
 </div>
 <div class="modal-body">
-    <p class="card-text"><strong>Name:</strong><br>{{ object.name }}</p>
-    {% if object.description %}
-        <p class="card-text"><strong>Description:</strong><br>{{ object.description }}</p>
-    {% endif %}
+  <p class="card-text">
+    <strong>Name:</strong>
+    <br>
+    {{ object.name }}
+  </p>
+  {% if object.description %}
+    <p class="card-text">
+      <strong>Description:</strong>
+      <br>
+      {{ object.description }}
+    </p>
+  {% endif %}
 </div>
-
 <div class="modal-footer">
-    <a href="{{ object.get_absolute_url }}" class="btn btn-primary">More</a>
-    <button type="button" class="btn btn-default" data-bs-dismiss="modal">Close</button>
+  <a href="{{ object.get_absolute_url }}" class="btn btn-primary">More</a>
+  <button type="button" class="btn btn-default" data-bs-dismiss="modal">Close</button>
 </div>
-
-
-
-

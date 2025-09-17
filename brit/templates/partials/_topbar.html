@@ -1,25 +1,52 @@
 <nav class="sb-topnav navbar navbar-expand topnav-brand-sage">
-    <a class="navbar-brand ps-3" href="{% url 'home' %}" title="Bioresource Information Tool">BRIT</a>
-    <button class="order-1 order-lg-0 me-4 me-lg-0" id="sidebarToggle"><i class="fas fa-bars"></i></button>
-    <ul class="navbar-nav ms-auto me-3 me-lg-4">
-        <li class="nav-item dropdown">
-            <a class="nav-link dropdown-toggle" id="navbarDropdown" href="#" role="button" data-bs-toggle="dropdown" aria-expanded="false"><i class="fas fa-user fa-fw"></i></a>
-            <ul class="dropdown-menu dropdown-menu-end" aria-labelledby="navbarDropdown">
-                {% if user.is_authenticated %}
-                <li>
-                    <h6 class="dropdown-header">
-                        Signed in as:<br>
-                        <span class="fw-semibold">{{ user.username }}</span>
-                    </h6>
-                </li>
-                <li><a class="dropdown-item" href="{% url 'user_profile' %}">Profile</a></li>
-                <li><hr class="dropdown-divider" /></li>
-                <li><a class="dropdown-item" href="#" id="logoutLink" data-logout-url="{% url 'auth_logout' %}" data-csrf-token="{{ csrf_token }}">Logout</a></li>
-                {% else %}
-                <li><a class="dropdown-item" href="{% url 'auth_login' %}?next={{ request.path }}">Login</a></li>
-                <li><a class="dropdown-item" href="{% url 'registration_register' %}?next={{ request.path }}">Register</a></li>
-                {% endif %}
-            </ul>
-        </li>
-    </ul>
+  <a class="navbar-brand ps-3"
+     href="{% url 'home' %}"
+     title="Bioresource Information Tool">BRIT</a>
+  <button class="order-1 order-lg-0 me-4 me-lg-0" id="sidebarToggle">
+    <i class="fas fa-bars"></i>
+  </button>
+  <ul class="navbar-nav ms-auto me-3 me-lg-4">
+    <li class="nav-item dropdown">
+      <a class="nav-link dropdown-toggle"
+         id="navbarDropdown"
+         href="#"
+         role="button"
+         data-bs-toggle="dropdown"
+         aria-expanded="false"><i class="fas fa-user fa-fw"></i></a>
+      <ul class="dropdown-menu dropdown-menu-end"
+          aria-labelledby="navbarDropdown">
+        {% if user.is_authenticated %}
+          <li>
+            <h6 class="dropdown-header">
+              Signed in as:
+              <br>
+              <span class="fw-semibold">{{ user.username }}</span>
+            </h6>
+          </li>
+          <li>
+            <a class="dropdown-item" href="{% url 'user_profile' %}">Profile</a>
+          </li>
+          <li>
+            <hr class="dropdown-divider" />
+          </li>
+          <li>
+            <a class="dropdown-item"
+               href="#"
+               id="logoutLink"
+               data-logout-url="{% url 'auth_logout' %}"
+               data-csrf-token="{{ csrf_token }}">Logout</a>
+          </li>
+        {% else %}
+          <li>
+            <a class="dropdown-item"
+               href="{% url 'auth_login' %}?next={{ request.path }}">Login</a>
+          </li>
+          <li>
+            <a class="dropdown-item"
+               href="{% url 'registration_register' %}?next={{ request.path }}">Register</a>
+          </li>
+        {% endif %}
+      </ul>
+    </li>
+  </ul>
 </nav>

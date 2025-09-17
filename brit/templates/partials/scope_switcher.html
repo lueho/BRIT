@@ -9,32 +9,32 @@ Visibility rules:
 - Private tab only for authenticated users
 - Review tab only for staff or users with perms.can_moderate
 {% endcomment %}
-
 <div class="mb-3">
   <ul class="nav nav-pills align-items-center gap-2">
     <li class="nav-item">
-      <a class="nav-link {% if active_scope == 'public' %}active{% endif %}" href="{{ public_url }}">
+      <a class="nav-link {% if active_scope == 'public' %}active{% endif %}"
+         href="{{ public_url }}">
         Published
         <span class="badge text-bg-secondary ms-1">{{ public_count|default:0 }}</span>
       </a>
     </li>
-
     {% if user.is_authenticated %}
-    <li class="nav-item">
-      <a class="nav-link {% if active_scope == 'private' %}active{% endif %}" href="{{ private_url }}">
-        Private
-        <span class="badge text-bg-secondary ms-1">{{ private_count|default:0 }}</span>
-      </a>
-    </li>
+      <li class="nav-item">
+        <a class="nav-link {% if active_scope == 'private' %}active{% endif %}"
+           href="{{ private_url }}">
+          Private
+          <span class="badge text-bg-secondary ms-1">{{ private_count|default:0 }}</span>
+        </a>
+      </li>
     {% endif %}
-
     {% if user.is_authenticated and user.is_staff or user.is_authenticated and perms.can_moderate %}
-    <li class="nav-item ms-auto ms-md-0">
-      <a class="nav-link {% if active_scope == 'review' %}active{% endif %}" href="{{ review_url }}">
-        Review
-        <span class="badge text-bg-secondary ms-1">{{ review_count|default:0 }}</span>
-      </a>
-    </li>
+      <li class="nav-item ms-auto ms-md-0">
+        <a class="nav-link {% if active_scope == 'review' %}active{% endif %}"
+           href="{{ review_url }}">
+          Review
+          <span class="badge text-bg-secondary ms-1">{{ review_count|default:0 }}</span>
+        </a>
+      </li>
     {% endif %}
   </ul>
 </div>

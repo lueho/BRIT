@@ -1,72 +1,93 @@
-{% extends 'base.html' %}
-
-{% block title %}BRIT | Privacy Policy{% endblock %}
-
+{% extends "base.html" %}
+{% block title %}
+  BRIT | Privacy Policy
+{% endblock title %}
 {% block content %}
-
-    <div class="row row-cols-1 row-cols-md-2 g-4">
-        <div class="col">
-            <div class="card shadow h-100">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3"><h5 class="mb-0"><i class="fas fa-fw fa-user-shield"></i> Privacy Policy</h5></div>
-                <div class="card-body">
-                    <p class="card-text">
-                        BRIT is a platform for information about bioresources and does not generate any profit from
-                        collecting user data or placing adds. We, therefore, respect your privacy and try to minimize
-                        the storage of personal data to a minimum required to operate the site.
-                    </p>
-                    <p class="card-text"><strong>Personal data:</strong></p>
-                    <p class="card-text">
-                        You can use this site without giving us any information about your personal data. However, we
-                        need to manage access rights to ensure that only eligible persons can edit data provided on
-                        this site. If you want to edit or store data, you need an account. The only required information
-                        is a valid e-mail address and a unique username. This information is exclusively used to manage
-                        your account (e.g. reset your password, if you forgot yours). We will not contact you in any
-                        way for newsletters etc. None of the data will be shared with third parties.
-                    </p>
-                    <p class="card-text">
-                        If you e-mail us, your e-mail address and any information that you include in the
-                        message will be stored and only used to process your request. Information will only be passed on
-                        to third parties, if it is required for processing your request and only the necessary extent.
-                    </p>
-                    <p class="card-text"><strong>Cookies:</strong></p>
-                    <p class="card-text">
-                        For the proper functioning, this site requires the usage of some mandatory cookies.
-                        Additionally, we would like to use cookies for analysing the site usage and performance.
-                        Non-essential cookies are only used with your active consent. For detailed information have a
-                        look <a href="{% url 'cookie_consent_cookie_group_list' %}">here</a>
-                    </p>
-                    <p class="card-text"><strong>Transparency, modification and deletion of data:</strong></p>
-                    <p class="card-text">
-                        If you want to have detailed information about your stored personal data or want us to
-                        modify or delete any of it, please contact us through the above contact data.
-                    </p>
-                </div>
-                <div class="card-footer"></div>
-            </div>
+  <div class="row row-cols-1 row-cols-md-2 g-4">
+    <div class="col">
+      <div class="card shadow h-100">
+        <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+          <h5 class="mb-0">
+            <i class="fas fa-fw fa-user-shield"></i> Privacy Policy
+          </h5>
         </div>
-        <div class="col">
-            <div class="card shadow h-100">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3"><h5 class="mb-0"><i class="fas fa-fw fa-envelope"></i> Contact</h5></div>
-                <div class="card-body">
-                    <p class="card-text">This tool is operated and maintained by:</p>
-                    <p class="card-text"><strong>Bioresource Management Group (BIEM)</strong></p>
-                    <p class="card-text">based at:</p>
-                    <p class="card-text">
-                        Hamburg University of Technology (TUHH)<br>
-                        Institute of Wastewater Management and Water Protection<br>
-                        Eißendorfer Str. 42<br>
-                        21073 Hamburg, Germany
-                    </p>
-                    <p class="card-text"><b>Contact:</b></p>
-                    <p class="card-text">
-                        Phillipp Lüssenhop<br>
-                        info@bioresource-tools.net<br>
-                        Phone: (+49) 40 42878 4292
-                    </p>
-                </div>
-                <div class="card-footer"></div>
-            </div>
+        <div class="card-body">
+          <p class="card-text">
+            BRIT is a platform for information about bioresources and does not generate any profit from
+            collecting user data or placing adds. We, therefore, respect your privacy and try to minimize
+            the storage of personal data to a minimum required to operate the site.
+          </p>
+          <p class="card-text">
+            <strong>Personal data:</strong>
+          </p>
+          <p class="card-text">
+            You can use this site without giving us any information about your personal data. However, we
+            need to manage access rights to ensure that only eligible persons can edit data provided on
+            this site. If you want to edit or store data, you need an account. The only required information
+            is a valid e-mail address and a unique username. This information is exclusively used to manage
+            your account (e.g. reset your password, if you forgot yours). We will not contact you in any
+            way for newsletters etc. None of the data will be shared with third parties.
+          </p>
+          <p class="card-text">
+            If you e-mail us, your e-mail address and any information that you include in the
+            message will be stored and only used to process your request. Information will only be passed on
+            to third parties, if it is required for processing your request and only the necessary extent.
+          </p>
+          <p class="card-text">
+            <strong>Cookies:</strong>
+          </p>
+          <p class="card-text">
+            For the proper functioning, this site requires the usage of some mandatory cookies.
+            Additionally, we would like to use cookies for analysing the site usage and performance.
+            Non-essential cookies are only used with your active consent. For detailed information have a
+            look <a href="{% url 'cookie_consent_cookie_group_list' %}">here</a>
+          </p>
+          <p class="card-text">
+            <strong>Transparency, modification and deletion of data:</strong>
+          </p>
+          <p class="card-text">
+            If you want to have detailed information about your stored personal data or want us to
+            modify or delete any of it, please contact us through the above contact data.
+          </p>
         </div>
+        <div class="card-footer"></div>
+      </div>
     </div>
-
+    <div class="col">
+      <div class="card shadow h-100">
+        <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+          <h5 class="mb-0">
+            <i class="fas fa-fw fa-envelope"></i> Contact
+          </h5>
+        </div>
+        <div class="card-body">
+          <p class="card-text">This tool is operated and maintained by:</p>
+          <p class="card-text">
+            <strong>Bioresource Management Group (BIEM)</strong>
+          </p>
+          <p class="card-text">based at:</p>
+          <p class="card-text">
+            Hamburg University of Technology (TUHH)
+            <br>
+            Institute of Wastewater Management and Water Protection
+            <br>
+            Eißendorfer Str. 42
+            <br>
+            21073 Hamburg, Germany
+          </p>
+          <p class="card-text">
+            <b>Contact:</b>
+          </p>
+          <p class="card-text">
+            Phillipp Lüssenhop
+            <br>
+            info@bioresource-tools.net
+            <br>
+            Phone: (+49) 40 42878 4292
+          </p>
+        </div>
+        <div class="card-footer"></div>
+      </div>
+    </div>
+  </div>
 {% endblock content %}

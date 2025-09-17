@@ -39,3 +39,28 @@ def can_moderate(user, obj):
         return user.has_perm(f"{app_label}.{perm_codename}")
     except Exception:
         return False
+
+
+@register.simple_tag(takes_context=True)
+def object_policy(context, obj, review_mode=False):
+    """
+    Return a unified policy dict for the given object.
+
+    Usage in templates:
+        {% object_policy object as policy %}
+        {% if policy.can_edit %} ... {% endif %}
+
+    Optional parameter `review_mode` allows templates rendered in review contexts
+    to hide owner-only feedback hints.
+    """
+    try:
+        request = context.get("request")
+        user = getattr(request, "user", None) or context.get("user")
+        # Local import to avoid circular imports at app load
+        from utils.object_management.permissions import (
+            get_object_policy as _get_object_policy,
+        )
+
+        return _get_object_policy(user, obj, request=request, review_mode=review_mode)
+    except Exception:
+        return {}

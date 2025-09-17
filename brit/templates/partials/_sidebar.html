@@ -1,55 +1,84 @@
 <nav class="sb-sidenav accordion sb-sidenav-light" id="sidenavAccordion">
-    <div class="sb-sidenav-menu">
-        <div class="nav">
-            <a class="nav-link" href="{% url 'home' %}">
-                <div class="sb-nav-link-icon"><i class="fas fa-tachometer-alt"></i></div>
-                Home
-            </a>
-            <div class="sb-sidenav-menu-heading">Tools</div>
-            <a class="nav-link {% if '/maps/' in request.path %}active{% endif %}" href="{% url 'maps_list' %}">
-                <div class="sb-nav-link-icon"><i class="fas fa-globe-europe"></i></div>
-                Maps
-            </a>
-            <a class="nav-link {% if '/materials/' in request.path %}active{% endif %}" href="{% url 'sample-list-featured' %}">
-                <div class="sb-nav-link-icon"><i class="fas fa-leaf"></i></div>
-                Materials
-            </a>
-            <a class="nav-link {% if '/sources/' in request.path %}active{% endif %}" href="{% url 'sources-list' %}">
-                <div class="sb-nav-link-icon"><i class="fas fa-expand-arrows-alt"></i></div>
-                Sources
-            </a>
-            {% if perms.processes.access_app_feature %}
-            <a class="nav-link {% if '/processes/' in request.path %}active{% endif %}" href="{% url 'processes:dashboard' %}">
-                <div class="sb-nav-link-icon"><i class="fas fa-flask"></i></div>
-                Processes
-            </a>
-            {% endif %}
-            <a class="nav-link {% if '/inventories/' in request.path %}active{% endif %}" href="{% url 'scenario-list' %}">
-                <div class="sb-nav-link-icon"><i class="fas fa-chart-bar"></i></div>
-                Inventories
-            </a>
-            <a class="nav-link {% if '/bibliography/' in request.path %}active{% endif %}" href="{% url 'source-list' %}">
-                <div class="sb-nav-link-icon"><i class="fas fa-book"></i></div>
-                Bibliography
-            </a>
-            <div class="sb-sidenav-menu-heading">Sites</div>
-            <a class="nav-link {% if '/learning/' in request.path %}active{% endif %}" href="{% url 'learning' %}">
-                <div class="sb-nav-link-icon"><i class="fas fa-graduation-cap"></i></div>
-                Learning
-            </a>
-            <a class="nav-link {% if '/about/' in request.path %}active{% endif %}" href="{% url 'about' %}">
-                <div class="sb-nav-link-icon"><i class="fas fa-info-circle"></i></div>
-                About
-            </a>
-            <a class="nav-link {% if '/privacy_policy/' in request.path %}active{% endif %}" href="{% url 'privacypolicy' %}">
-                <div class="sb-nav-link-icon"><i class="fas fa-shield-alt"></i></div>
-                Privacy Policy
-            </a>
+  <div class="sb-sidenav-menu">
+    <div class="nav">
+      <a class="nav-link" href="{% url 'home' %}">
+        <div class="sb-nav-link-icon">
+          <i class="fas fa-tachometer-alt"></i>
         </div>
-    </div>
-    <div class="sb-sidenav-footer">
-        <div class="small">
-            <a href="mailto:info@bioresource-tools.net">Contact / Feedback</a>
+        Home
+      </a>
+      <div class="sb-sidenav-menu-heading">Tools</div>
+      <a class="nav-link {% if '/maps/' in request.path %}active{% endif %}"
+         href="{% url 'maps_list' %}">
+        <div class="sb-nav-link-icon">
+          <i class="fas fa-globe-europe"></i>
         </div>
+        Maps
+      </a>
+      <a class="nav-link {% if '/materials/' in request.path %}active{% endif %}"
+         href="{% url 'sample-list-featured' %}">
+        <div class="sb-nav-link-icon">
+          <i class="fas fa-leaf"></i>
+        </div>
+        Materials
+      </a>
+      <a class="nav-link {% if '/sources/' in request.path %}active{% endif %}"
+         href="{% url 'sources-list' %}">
+        <div class="sb-nav-link-icon">
+          <i class="fas fa-expand-arrows-alt"></i>
+        </div>
+        Sources
+      </a>
+      {% if perms.processes.access_app_feature %}
+        <a class="nav-link {% if '/processes/' in request.path %}active{% endif %}"
+           href="{% url 'processes:dashboard' %}">
+          <div class="sb-nav-link-icon">
+            <i class="fas fa-flask"></i>
+          </div>
+          Processes
+        </a>
+      {% endif %}
+      <a class="nav-link {% if '/inventories/' in request.path %}active{% endif %}"
+         href="{% url 'scenario-list' %}">
+        <div class="sb-nav-link-icon">
+          <i class="fas fa-chart-bar"></i>
+        </div>
+        Inventories
+      </a>
+      <a class="nav-link {% if '/bibliography/' in request.path %}active{% endif %}"
+         href="{% url 'source-list' %}">
+        <div class="sb-nav-link-icon">
+          <i class="fas fa-book"></i>
+        </div>
+        Bibliography
+      </a>
+      <div class="sb-sidenav-menu-heading">Sites</div>
+      <a class="nav-link {% if '/learning/' in request.path %}active{% endif %}"
+         href="{% url 'learning' %}">
+        <div class="sb-nav-link-icon">
+          <i class="fas fa-graduation-cap"></i>
+        </div>
+        Learning
+      </a>
+      <a class="nav-link {% if '/about/' in request.path %}active{% endif %}"
+         href="{% url 'about' %}">
+        <div class="sb-nav-link-icon">
+          <i class="fas fa-info-circle"></i>
+        </div>
+        About
+      </a>
+      <a class="nav-link {% if '/privacy_policy/' in request.path %}active{% endif %}"
+         href="{% url 'privacypolicy' %}">
+        <div class="sb-nav-link-icon">
+          <i class="fas fa-shield-alt"></i>
+        </div>
+        Privacy Policy
+      </a>
     </div>
+  </div>
+  <div class="sb-sidenav-footer">
+    <div class="small">
+      <a href="mailto:info@bioresource-tools.net">Contact / Feedback</a>
+    </div>
+  </div>
 </nav>
