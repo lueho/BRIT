@@ -45,10 +45,12 @@
                     Options
                 </button>
                 <div class="dropdown-menu" aria-labelledby="editDropdown">
-                    <a class="dropdown-item"
-                       href="{% url 'scenario-update' object.id %}?next={{ request.path }}">
-                        <i class="fas fa-fw fa-edit"></i> Edit
-                    </a>
+                    {% if user.is_staff or not object.is_published %}
+                        <a class="dropdown-item"
+                           href="{% url 'scenario-update' object.id %}?next={{ request.path }}">
+                            <i class="fas fa-fw fa-edit"></i> Edit
+                        </a>
+                    {% endif %}
                     <a class="dropdown-item"
                        href="{% url 'download_scenario_summary' object.id %}">
                         <i class="fas fa-fw fa-file-download"></i> Download definition file

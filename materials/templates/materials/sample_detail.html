@@ -94,10 +94,19 @@
                                 Options
                             </button>
                             <div class="dropdown-menu" aria-labelledby="editDropdown">
-                                <a class="dropdown-item"
-                                   href="{% url 'sample-update' object.id %}?next={{ request.path }}">
-                                    <i class="fas fa-edit"></i> Edit
-                                </a>
+                                {% if object.update_url %}
+                                    {% if user.is_staff %}
+                                        <a class="dropdown-item" href="{% url 'sample-update' object.id %}">
+                                            <i class="fas fa-pen-to-square"></i> Edit
+                                        </a>
+                                    {% elif user == object.owner %}
+                                        {% if object.publication_status != object.STATUS_PUBLISHED %}
+                                            <a class="dropdown-item" href="{% url 'sample-update' object.id %}">
+                                                <i class="fas fa-pen-to-square"></i> Edit
+                                            </a>
+                                        {% endif %}
+                                    {% endif %}
+                                {% endif %}
                                 <a class="dropdown-item" href="{% url 'sample-duplicate' object.id %}">
                                     <i class="fas fa-fw fa-copy"></i> Duplicate
                                 </a>

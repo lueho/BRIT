@@ -14,13 +14,13 @@ from django.test import RequestFactory, TestCase
 from django.urls import reverse
 from factory.django import mute_signals
 
-from case_studies.soilcom.models import MaterialCategory  # soilcom.MaterialCategory
 from case_studies.soilcom.models import (
     Collection,
     CollectionCatchment,
     CollectionPropertyValue,
     CollectionSystem,
     Collector,
+    MaterialCategory,  # soilcom.MaterialCategory
     WasteCategory,
     WasteComponent,
     WasteFlyer,
@@ -186,7 +186,7 @@ class WasteComponentCRUDViewsTestCase(
     def create_published_object(cls):
         # This method is overridden to give another name to the published object because of the unique name constraint
         data = cls.create_object_data.copy()
-        data["name"] = f'{data["name"]} (published)'
+        data["name"] = f"{data['name']} (published)"
         data["publication_status"] = "published"
         data.update(cls.related_objects)
         return cls.model.objects.create(owner=cls.owner_user, **data)
@@ -234,31 +234,31 @@ class WasteFlyerCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
     def test_list_unpublished_contains_check_urls_button_for_authenticated_owner(self):
         self.client.force_login(self.owner_user)
         response = self.client.get(reverse("wasteflyer-list-owned"), follow=True)
-        self.assertContains(response, "check urls")
+        self.assertContains(response, "Check URLs")
 
     def test_list_published_contains_check_urls_button_for_staff_user(self):
         self.client.force_login(self.staff_user)
         response = self.client.get(reverse("wasteflyer-list"), follow=True)
-        self.assertContains(response, "check urls")
+        self.assertContains(response, "Check URLs")
 
     def test_detail_view_unpublished_contains_check_url_button_for_owner(self):
         self.client.force_login(self.owner_user)
         response = self.client.get(self.get_detail_url(self.unpublished_object.pk))
-        self.assertContains(response, "check url")
+        self.assertContains(response, "Check URLs")
 
     def test_detail_view_published_contains_check_url_button_for_owner(self):
         self.client.force_login(self.owner_user)
         response = self.client.get(self.get_detail_url(self.published_object.pk))
-        self.assertContains(response, "check url")
+        self.assertContains(response, "Check URLs")
 
     def test_detail_view_published_doesnt_contain_check_url_button_for_anonymous(self):
         response = self.client.get(self.get_detail_url(self.published_object.pk))
-        self.assertNotContains(response, "check url")
+        self.assertNotContains(response, "Check URLs")
 
     def test_detail_view_published_doesnt_contain_check_url_button_for_non_owner(self):
         self.client.force_login(self.non_owner_user)
         response = self.client.get(self.get_detail_url(self.published_object.pk))
-        self.assertNotContains(response, "check url")
+        self.assertNotContains(response, "Check URLs")
 
 
 # ----------- Collection Frequency CRUD --------------------------------------------------------------------------------
@@ -1501,7 +1501,6 @@ class CollectionCreateNewVersionViewTestCase(ViewWithPermissionsTestCase):
 
 
 class CollectionAutocompleteViewTestCase(ViewWithPermissionsTestCase):
-
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
@@ -1923,12 +1922,12 @@ class WasteCollectionPublishedMapViewTestCase(ViewWithPermissionsTestCase):
     def test_create_collection_option_visible_for_member(self):
         self.client.force_login(self.member)
         response = self.client.get(self.url, follow=True)
-        self.assertContains(response, "Add new collection")
+        self.assertContains(response, self.collection.create_url)
 
     def test_create_collection_option_not_available_for_outsider(self):
         self.client.force_login(self.outsider)
         response = self.client.get(self.url, follow=True)
-        self.assertNotContains(response, "Add new collection")
+        self.assertNotContains(response, self.collection.create_url)
 
     def test_copy_collection_option_visible_for_member(self):
         self.client.force_login(self.member)
@@ -1967,7 +1966,6 @@ class WasteCollectionPublishedMapViewTestCase(ViewWithPermissionsTestCase):
 
 
 class CollectionReviewProcessWithPredecessorsTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         # Ensure a MaterialCategory (materials.models) for "Biowaste component" exists

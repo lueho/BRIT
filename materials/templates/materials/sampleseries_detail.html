@@ -33,11 +33,22 @@
                 </div>
                 <div class="card-footer">
                     <div id="btn-edit-sample-series" class="collapse multi-collapse">
+                        {% if object.update_url %}
+                                    {% if user.is_staff %}
+                                    <a href="{% url 'sampleseries-update' object.pk %}?next={{ request.path }}"
+                                    class="nowrap me-3">
+                                     <i class="fas fa-fw fa-edit"></i> Edit
+                                 </a>
+                                    {% elif user == object.owner %}
+                                        {% if object.publication_status != object.STATUS_PUBLISHED %}
+                                        <a href="{% url 'sampleseries-update' object.pk %}?next={{ request.path }}"
+                                        class="nowrap me-3">
+                                         <i class="fas fa-fw fa-edit"></i> Edit
+                                     </a>
+                                        {% endif %}
+                                    {% endif %}
+                                {% endif %}
                         {% if user == object.owner or user.is_staff %}
-                            <a href="{% url 'sampleseries-update' object.pk %}?next={{ request.path }}"
-                               class="nowrap me-3">
-                                <i class="fas fa-fw fa-edit"></i> Edit
-                            </a>
                             <a href="{% url 'sampleseries-duplicate' object.pk %}"
                                class="nowrap me-3">
                                 <i class="fas fa-fw fa-copy"></i> Duplicate

@@ -31,9 +31,11 @@
                                 </div>
                                 <div class="card-footer">
                                     {% if request.user == object.owner %}
-                                        <a href="{% url 'scenario_update_config' scenario.id algo.id %}" class="me-3">
-                                            <i class="fas fa-fw fa-edit"></i> Edit
-                                        </a>
+                                        {% if not object.is_published %}
+                                            <a href="{% url 'scenario_update_config' scenario.id algo.id %}" class="me-3">
+                                                <i class="fas fa-fw fa-edit"></i> Edit
+                                            </a>
+                                        {% endif %}
                                         <a href="{% url 'remove_algorithm_from_scenario' scenario.id feedstock.id algo.id %}"
                                            class="me-3">
                                             <i class="fas fa-fw fa-trash"></i> Remove from configuration
