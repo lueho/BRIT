@@ -1,6 +1,10 @@
-from django.core.exceptions import ImproperlyConfigured
-from rest_framework import permissions
+import logging
+from types import SimpleNamespace
 from rest_framework import exceptions as drf_exceptions
+from rest_framework import permissions
+
+
+logger = logging.getLogger(__name__)
 
 
 class GlobalObjectPermission(permissions.BasePermission):
@@ -161,6 +165,10 @@ class UserCreatedObjectPermission(permissions.BasePermission):
         app_label = obj._meta.app_label
         return user.is_staff or user.has_perm(f"{app_label}.{perm_codename}")
 
+    # Public wrapper to avoid using private method in other modules/templates
+    def is_moderator(self, user, obj):  # pragma: no cover - thin wrapper
+        return self._is_moderator(user, obj)
+
     def has_submit_permission(self, request, obj):
         """
         Check if the user can submit an object for review.
@@ -204,7 +212,8 @@ class UserCreatedObjectPermission(permissions.BasePermission):
         return (
             self._is_moderator(request.user, obj)
             and obj.publication_status == UserCreatedObject.STATUS_REVIEW
-            and obj.owner != request.user  # Four eyes principle: can't approve own objects
+            and obj.owner
+            != request.user  # Four eyes principle: can't approve own objects
         )
 
     def has_reject_permission(self, request, obj):
@@ -220,7 +229,8 @@ class UserCreatedObjectPermission(permissions.BasePermission):
         return (
             self._is_moderator(request.user, obj)
             and obj.publication_status == UserCreatedObject.STATUS_REVIEW
-            and obj.owner != request.user  # Four eyes principle: can't reject own objects
+            and obj.owner
+            != request.user  # Four eyes principle: can't reject own objects
         )
 
 
@@ -262,29 +272,39 @@ def get_object_policy(user, obj, request=None, review_mode=False):
 
     # Moderator rights (per-model 'can_moderate_<modelname>' or staff)
     try:
-        is_moderator = perm._is_moderator(user, obj)
+        is_moderator = is_staff or perm.is_moderator(user, obj)
     except Exception:
-        is_moderator = False
+        logger.exception(
+            "Failed checking moderator permission in get_object_policy", exc_info=True
+        )
+        is_moderator = is_staff  # safer default
 
     # Ensure we have a request-like object for permission helpers
     if request is None:
-        class _R:
-            pass
-        request = _R()
-        request.user = user
+        request = SimpleNamespace(user=user)
 
     # Review workflow permissions
     # Submit/withdraw must mirror view logic (owners OR staff may act when status matches)
     # Allow resubmission from 'declined' and withdrawing to private when declined as well
     can_submit_review = bool(
-        is_authenticated and (is_owner or is_staff) and (is_private or is_declined)
+        is_authenticated
+        and not is_archived
+        and (is_owner or is_staff)
+        and (is_private or is_declined)
     )
     can_withdraw_review = bool(
-        is_authenticated and (is_owner or is_staff) and (is_in_review or is_declined)
+        is_authenticated
+        and not is_archived
+        and (is_owner or is_staff)
+        and (is_in_review or is_declined)
     )
     # Approve/Reject via permission helper (four eyes, moderator)
-    can_approve = bool(perm.has_approve_permission(request, obj)) if is_authenticated else False
-    can_reject = bool(perm.has_reject_permission(request, obj)) if is_authenticated else False
+    can_approve = (
+        bool(perm.has_approve_permission(request, obj)) if is_authenticated else False
+    )
+    can_reject = (
+        bool(perm.has_reject_permission(request, obj)) if is_authenticated else False
+    )
 
     # CRUD-like actions
     has_update_url = bool(getattr(obj, "update_url", None))
@@ -294,21 +314,36 @@ def get_object_policy(user, obj, request=None, review_mode=False):
     )
 
     # Edit: staff always; owners if not published; never when archived
-    can_edit = has_update_url and not is_archived and (is_staff or (is_owner and not is_published))
-
-    # Delete:
-    # - Published: staff only
-    # - Private/Review/Declined: owner or staff
-    can_delete = has_delete_url and not is_archived and (
-        (is_published and is_staff) or (not is_published and (is_owner or is_staff))
+    can_edit = (
+        has_update_url
+        and not is_archived
+        and (is_staff or (is_owner and not is_published))
     )
 
-    # Archive: only when published; owner, staff, or moderator (publication_status change)
-    can_archive = is_published and (is_owner or is_staff or is_moderator)
+    # Delete:
+    # - Archived: staff-only special case (optional "Archive → Delete")
+    # - Published: staff only
+    # - Private/Review/Declined: owner or staff
+    can_delete = has_delete_url and (
+        (is_archived and is_staff)
+        or (
+            (not is_archived)
+            and (
+                (is_published and is_staff)
+                or (not is_published and (is_owner or is_staff))
+            )
+        )
+    )
+
+    # Archive: only when published; not already archived; owner, staff, or moderator
+    can_archive = (
+        is_published and not is_archived and (is_owner or is_staff or is_moderator)
+    )
 
     # Object-specific management helpers
-    can_manage_samples = (is_owner or is_staff) and not is_archived
-    can_add_property = (is_owner or is_staff) and not is_archived
+    # If published objects shouldn't mutate, gate with not is_published
+    can_manage_samples = (is_owner or is_staff) and not is_archived and not is_published
+    can_add_property = (is_owner or is_staff) and not is_archived and not is_published
 
     # Duplicate/New version: require model add permission
     can_duplicate = False
@@ -319,12 +354,20 @@ def get_object_policy(user, obj, request=None, review_mode=False):
         add_perm = f"{app_label}.add_{model_name}"
         can_duplicate = is_authenticated and user.has_perm(add_perm)
     except Exception:
+        logger.exception(
+            "Failed checking add permission in get_object_policy", exc_info=True
+        )
         can_duplicate = False
-    can_new_version = can_duplicate
+    # New version usually requires ownership/staff, published state, and not archived
+    can_new_version = (
+        can_duplicate and (is_owner or is_staff) and is_published and not is_archived
+    )
 
-    # Export: authenticated users may export published; owners/staff may export private
-    can_export = is_authenticated and (is_published or is_owner or is_staff)
-    export_list_type = "public" if is_published else ("private" if (is_owner or is_staff) else None)
+    # Export: allow anonymous export of public; private export requires auth and ownership/staff
+    can_export = is_published or (is_authenticated and (is_owner or is_staff))
+    export_list_type = (
+        "public" if is_published else ("private" if (is_owner or is_staff) else None)
+    )
 
     # Review feedback visibility (declined and owner, outside explicit review mode UIs)
     can_view_review_feedback = is_owner and is_declined and (not bool(review_mode))

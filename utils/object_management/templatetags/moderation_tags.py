@@ -1,3 +1,4 @@
+import logging
 from django import template
 from django.contrib.contenttypes.models import ContentType
 
@@ -22,23 +23,22 @@ def can_moderate(user, obj):
             ...
         {% endif %}
 
-    Mirrors logic from `UserCreatedObjectPermission._is_moderator`:
-    - staff users can always moderate
-    - otherwise requires app_label.can_moderate_<modelname>
+    Delegates to `UserCreatedObjectPermission.is_moderator` to keep parity
+    with backend checks. Falls back to staff on unexpected errors.
     """
+    logger = logging.getLogger(__name__)
     try:
+        # Local import to avoid app loading issues
+        from utils.object_management.permissions import UserCreatedObjectPermission
+
         if not user or not getattr(user, "is_authenticated", False):
             return False
         if getattr(user, "is_staff", False):
             return True
-        model_name = getattr(getattr(obj, "_meta", None), "model_name", None)
-        app_label = getattr(getattr(obj, "_meta", None), "app_label", None)
-        if not model_name or not app_label:
-            return False
-        perm_codename = f"can_moderate_{model_name}"
-        return user.has_perm(f"{app_label}.{perm_codename}")
+        return UserCreatedObjectPermission().is_moderator(user, obj)
     except Exception:
-        return False
+        logger.exception("Error in can_moderate templatetag", exc_info=True)
+        return bool(getattr(user, "is_staff", False))
 
 
 @register.simple_tag(takes_context=True)
