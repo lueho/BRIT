@@ -12,42 +12,36 @@ dependencies = [
     "djangorestframework-gis>=1.2.0",
     "gunicorn>=23.0.0",
     "whitenoise>=6.9.0",
-
     # Database and caching
     "dj-database-url>=3.0.1",
     "django-redis>=6.0.0",
     "psycopg2-binary>=2.9.0",
-
     # Task queue
     "celery>=5.5.3",
     "tblib>=3.1.0",
-
     # UI and forms
     "django-crispy-forms>=2.4",
     "crispy-bootstrap5>=2025.6",
     "django-bootstrap-modal-forms>=3.0.5",
     "django-tomselect>=2025.7.1",
     "django-extra-views>=0.16.0",
-
     # Geographic and mapping
     "django-geojson>=4.2.0",
     "django-leaflet>=0.32.0",
-
     # User management and utilities
     "django-registration-redux>=2.13",
     "django-cookie-consent>=0.6.0",
-
     # File storage and processing
     "django-storages>=1.14.6",
     "boto3>=1.39.13",
     "pillow>=11.3.0",
     "openpyxl>=3.1.5",
     "xlsxwriter>=3.2.5",
-
     # Utilities
     "ambient-toolbox>=12.4.4",
     "requests>=2.32.4",
     "django-tree-queries>=0.20.0",
+    "djlint>=1.36.4",
 ]
 
 [dependency-groups]
