@@ -244,12 +244,12 @@ class WasteFlyerCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
     def test_detail_view_unpublished_contains_check_url_button_for_owner(self):
         self.client.force_login(self.owner_user)
         response = self.client.get(self.get_detail_url(self.unpublished_object.pk))
-        self.assertContains(response, "Check URLs")
+        self.assertContains(response, "check url")
 
     def test_detail_view_published_contains_check_url_button_for_owner(self):
         self.client.force_login(self.owner_user)
         response = self.client.get(self.get_detail_url(self.published_object.pk))
-        self.assertContains(response, "Check URLs")
+        self.assertContains(response, "check url")
 
     def test_detail_view_published_doesnt_contain_check_url_button_for_anonymous(self):
         response = self.client.get(self.get_detail_url(self.published_object.pk))
@@ -1922,12 +1922,12 @@ class WasteCollectionPublishedMapViewTestCase(ViewWithPermissionsTestCase):
     def test_create_collection_option_visible_for_member(self):
         self.client.force_login(self.member)
         response = self.client.get(self.url, follow=True)
-        self.assertContains(response, self.collection.create_url)
+        self.assertContains(response, Collection.create_url())
 
     def test_create_collection_option_not_available_for_outsider(self):
         self.client.force_login(self.outsider)
         response = self.client.get(self.url, follow=True)
-        self.assertNotContains(response, self.collection.create_url)
+        self.assertNotContains(response, Collection.create_url())
 
     def test_copy_collection_option_visible_for_member(self):
         self.client.force_login(self.member)
@@ -1952,12 +1952,12 @@ class WasteCollectionPublishedMapViewTestCase(ViewWithPermissionsTestCase):
     def test_collection_dashboard_option_visible_for_member(self):
         self.client.force_login(self.member)
         response = self.client.get(self.url, follow=True)
-        self.assertContains(response, "Waste collection explorer")
+        self.assertContains(response, reverse("wastecollection-dashboard"))
 
     def test_collection_dashboard_option_not_available_for_outsider(self):
         self.client.force_login(self.outsider)
         response = self.client.get(self.url, follow=True)
-        self.assertContains(response, "Waste collection explorer")
+        self.assertContains(response, reverse("wastecollection-dashboard"))
 
     def test_range_slider_static_files_are_embedded(self):
         self.client.force_login(self.member)
