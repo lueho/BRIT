@@ -89,7 +89,7 @@ class ReviewWorkflowModelTests(TestCase):
 
         # Check state after rejection
         self.assertEqual(
-            self.collection.publication_status, UserCreatedObject.STATUS_PRIVATE
+            self.collection.publication_status, UserCreatedObject.STATUS_DECLINED
         )
         self.assertIsNone(self.collection.submitted_at)
         self.assertIsNone(self.collection.approved_at)

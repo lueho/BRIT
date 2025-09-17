@@ -195,7 +195,7 @@ class ReviewWorkflowViewTests(TestCase):
         # Refresh from database
         self.review_collection.refresh_from_db()
         self.assertEqual(
-            self.review_collection.publication_status, UserCreatedObject.STATUS_PRIVATE
+            self.review_collection.publication_status, UserCreatedObject.STATUS_DECLINED
         )
 
         # Regular user should not be able to reject any object
@@ -252,7 +252,6 @@ class MockFilterView(FilterDefaultsMixin, FilterView):
 
 
 class FilterDefaultsMixinTest(TestCase):
-
     def setUp(self):
         self.factory = RequestFactory()
 
@@ -270,7 +269,6 @@ class FilterDefaultsMixinTest(TestCase):
 
 
 class PublishedObjectsFilterViewTestCase(TestCase):
-
     def setUp(self):
         self.factory = RequestFactory()
         self.view = PublishedObjectFilterView()

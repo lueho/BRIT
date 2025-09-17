@@ -707,7 +707,7 @@ class AbstractTestCases:
             response = self.client.get(url)
             self.assertEqual(response.status_code, 200)
             if self.update_view:
-                self.assertContains(
+                self.assertNotContains(
                     response, self.get_update_url(self.published_object.pk)
                 )
             if self.delete_view:
