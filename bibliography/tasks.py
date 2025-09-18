@@ -1,5 +1,4 @@
 from celery import chord
-from django.db.models.signals import post_save
 from django.utils import timezone
 
 from brit.celery import app
@@ -18,10 +17,8 @@ def task_check_url(url):
 def check_source_url(pk):
     source = Source.objects.get(pk=pk)
     source.url_valid = check_url(source.url)
-    source.url_checked = timezone.now()
-    post_save.disconnect(sender=Source)
+    source.url_checked = timezone.localdate()
     source.save()
-    post_save.connect(sender=Source)
 
 
 @app.task()

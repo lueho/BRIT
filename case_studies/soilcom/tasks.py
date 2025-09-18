@@ -1,5 +1,4 @@
 from celery import chord
-from django.db.models.signals import post_save
 from django.utils import timezone
 
 from bibliography.utils import check_url
@@ -14,10 +13,8 @@ from .models import WasteFlyer
 def check_wasteflyer_url(pk):
     flyer = WasteFlyer.objects.get(pk=pk)
     flyer.url_valid = check_url(flyer.url)
-    flyer.url_checked = timezone.now()
-    post_save.disconnect(sender=WasteFlyer)
+    flyer.url_checked = timezone.localdate()
     flyer.save()
-    post_save.connect(sender=WasteFlyer)
     return True
 
 
