@@ -1,0 +1,22 @@
+{% load i18n %}
+<div class="modal-header">
+  <h5 class="modal-title">{% trans "Withdraw item from review" %}</h5>
+  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans "Close" %}"></button>
+</div>
+<form method="post" action="{% url 'object_management:withdraw_from_review' content_type_id=object|get_content_type_id object_id=object.id %}">
+  <div class="modal-body">
+    {% csrf_token %}
+    {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
+    <p class="mb-3">{% trans "Are you sure you want to withdraw this from review?" %}</p>
+    <div class="mb-3">
+      <label for="withdraw-comment-textarea-{{ object.id }}" class="form-label">{% trans "Review comment (optional)" %}</label>
+      <textarea class="form-control" id="withdraw-comment-textarea-{{ object.id }}" name="comment" rows="3" placeholder="{% trans "Add a short note (optional)" %}"></textarea>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+    <button type="submit" class="btn btn-warning">
+      <i class="fas fa-rotate-left"></i> {% trans "Withdraw from Review" %}
+    </button>
+  </div>
+</form>

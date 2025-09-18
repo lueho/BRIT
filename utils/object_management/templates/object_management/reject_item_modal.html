@@ -1,0 +1,22 @@
+{% load i18n %}
+<div class="modal-header">
+  <h5 class="modal-title">{% trans "Reject item" %}</h5>
+  <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="{% trans "Close" %}"></button>
+</div>
+<form method="post" action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}">
+  <div class="modal-body">
+    {% csrf_token %}
+    {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
+    <p class="mb-3">{% trans "Are you sure you want to reject this?" %}</p>
+    <div class="mb-3">
+      <label for="reject-comment-textarea-{{ object.id }}" class="form-label">{% trans "Review comment (optional)" %}</label>
+      <textarea class="form-control" id="reject-comment-textarea-{{ object.id }}" name="comment" rows="4" placeholder="{% trans "Explain why this was rejected (optional)" %}"></textarea>
+    </div>
+  </div>
+  <div class="modal-footer">
+    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">{% trans "Cancel" %}</button>
+    <button type="submit" class="btn btn-danger">
+      <i class="fas fa-xmark"></i> {% trans "Reject" %}
+    </button>
+  </div>
+</form>

@@ -18,7 +18,7 @@ from django.contrib.messages.views import SuccessMessageMixin
 from django.core.exceptions import ImproperlyConfigured, PermissionDenied
 from django.db.models import Q
 from django.http import HttpResponseRedirect
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, render
 from django.template.loader import select_template
 from django.urls import reverse
 from django.utils import timezone
@@ -177,6 +177,93 @@ class ApproveItemView(BaseReviewActionView):
         return HttpResponseRedirect(self.get_success_url())
 
 
+class BaseReviewActionModalView(UserPassesTestMixin, View):
+    """Base modal view to render confirmation dialogs for review actions.
+
+    Uses the shared modal container (#modal) via django-bootstrap-modal-forms.
+    Subclasses must set template_name and implement test_func() for permission checks.
+    """
+
+    template_name: str = ""
+
+    def get_object(self, request, *args, **kwargs):
+        content_type_id = kwargs.get("content_type_id")
+        object_id = kwargs.get("object_id")
+        content_type = get_object_or_404(ContentType, pk=content_type_id)
+        model_class = content_type.model_class()
+        return get_object_or_404(model_class, pk=object_id)
+
+    def get(self, request, *args, **kwargs):
+        obj = self.get_object(request, *args, **kwargs)
+        # Keep the object for test_func convenience in subclasses
+        self.object = obj
+        context = {
+            "object": obj,
+            # Pass through 'next' if provided in the opener link; templates will append it to the form action
+            "next_url": request.GET.get("next"),
+        }
+        return render(request, self.template_name, context)
+
+
+class SubmitForReviewModalView(BaseReviewActionModalView):
+    template_name = "object_management/submit_for_review_modal.html"
+
+    def test_func(self):
+        obj = getattr(self, "object", None)
+        if obj is None:
+            try:
+                obj = self.get_object(self.request, **self.kwargs)
+            except Exception:
+                return False
+        user = self.request.user
+        return user.is_authenticated and (user.is_staff or getattr(obj, "owner_id", None) == getattr(user, "id", None))
+
+
+class WithdrawFromReviewModalView(BaseReviewActionModalView):
+    template_name = "object_management/withdraw_from_review_modal.html"
+
+    def test_func(self):
+        obj = getattr(self, "object", None)
+        if obj is None:
+            try:
+                obj = self.get_object(self.request, **self.kwargs)
+            except Exception:
+                return False
+        user = self.request.user
+        return user.is_authenticated and (user.is_staff or getattr(obj, "owner_id", None) == getattr(user, "id", None))
+
+
+class ApproveItemModalView(BaseReviewActionModalView):
+    template_name = "object_management/approve_item_modal.html"
+
+    def test_func(self):
+        obj = getattr(self, "object", None)
+        if obj is None:
+            try:
+                obj = self.get_object(self.request, **self.kwargs)
+            except Exception:
+                return False
+        try:
+            return UserCreatedObjectPermission().has_approve_permission(self.request, obj)
+        except Exception:
+            return False
+
+
+class RejectItemModalView(BaseReviewActionModalView):
+    template_name = "object_management/reject_item_modal.html"
+
+    def test_func(self):
+        obj = getattr(self, "object", None)
+        if obj is None:
+            try:
+                obj = self.get_object(self.request, **self.kwargs)
+            except Exception:
+                return False
+        try:
+            return UserCreatedObjectPermission().has_reject_permission(self.request, obj)
+        except Exception:
+            return False
+
 class RejectItemView(BaseReviewActionView):
     """View to reject an item that is in review."""
 
@@ -270,6 +357,23 @@ class SubmitForReviewView(BaseReviewActionView):
 
 class WithdrawFromReviewView(BaseReviewActionView):
     """View to withdraw an item from review."""
+
+    def get_success_url(self):
+        """Owners should land on the object's detail page after withdrawal.
+
+        If the actor is the owner, redirect to the object's absolute URL to avoid
+        sending them back to the review detail (which would 403 after becoming private).
+        Staff members keep the base behavior (honor 'next' or default).
+        """
+        try:
+            obj = getattr(self, "object", None)
+            user = getattr(self, "request", None) and self.request.user
+            if obj is not None and user and getattr(user, "is_authenticated", False):
+                if getattr(obj, "owner_id", None) == getattr(user, "id", None):
+                    return obj.get_absolute_url()
+        except Exception:
+            pass
+        return super().get_success_url()
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object(request, *args, **kwargs)
@@ -953,15 +1057,40 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
     - Use a wrapper template that extends the object's normal detail template.
     - Determine the base detail template via Django's default naming convention
       (<app_label>/<model_name>_detail.html) and fall back to simple_detail_card.html.
-    - Provide the resolved base template to the wrapper via context as 'base_template'.
+     - Provide the resolved base template to the wrapper via context as 'base_template'.
     """
 
     template_name = "object_management/review_detail_wrapper.html"
 
-    def dispatch(self, request, *args, **kwargs):
-        """Only staff or users with can_moderate_<model> may access review details.
+    def test_func(self):
+        """Allow access for staff and moderators; owners when in review or declined.
 
-        Owners are allowed to access the page only when the item is rejected so they can read feedback.
+        This overrides the default read-access mixin so that non-staff moderators who
+        hold the dynamic per-model permission (can_moderate_<model>) may access the
+        review detail view. Owners are permitted to access the review view while their
+        item is in review (to read and add comments) and when declined (to read feedback).
+        """
+        user = getattr(self, "request", None) and self.request.user
+        if not user or not getattr(user, "is_authenticated", False):
+            return False
+
+        obj = self.get_object()
+        # Owners: allowed when object is in review (to comment) or declined (to read feedback)
+        if getattr(obj, "owner_id", None) == getattr(user, "id", None):
+            return bool(getattr(obj, "is_in_review", False) or getattr(obj, "is_declined", False))
+
+        # Moderators/staff: allowed
+        app_label = obj._meta.app_label
+        perm_codename = f"can_moderate_{obj._meta.model_name}"
+        return bool(
+            getattr(user, "is_staff", False)
+            or user.has_perm(f"{app_label}.{perm_codename}")
+        )
+
+    def dispatch(self, request, *args, **kwargs):
+        """Authorize review details for moderators/staff and for owners in review/declined.
+
+        Owners can access while the item is in review (for commenting) and when declined (to read feedback).
         """
         obj = self.get_object()
         model = obj.__class__
@@ -974,11 +1103,11 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
             and hasattr(obj, "owner")
             and obj.owner_id == request.user.id
         ):
-            # Allow owners to see review details only if the item was declined
-            if getattr(obj, "is_declined", False):
+            # Allow owners for objects in review (to comment) and declined (to read feedback)
+            if bool(getattr(obj, "is_in_review", False) or getattr(obj, "is_declined", False)):
                 return super().dispatch(request, *args, **kwargs)
             # Otherwise, owners are blocked from the review details endpoint
-            raise PermissionDenied("Moderators cannot review their own objects.")
+            raise PermissionDenied("Owners can only access review details while the item is in review or declined.")
 
         # For non-owners, require moderator permissions
         if not (
