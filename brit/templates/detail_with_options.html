@@ -5,60 +5,7 @@
   BRIT | {{ object.name }} details
 {% endblock title %}
 {% block content %}
-  {# Optional rejection alert shown above the card #}
-  {% object_policy object review_mode=review_mode as policy %}
-  {% if policy.can_view_review_feedback %}
-    <div class="row mt-4">
-      <div class="col">
-        <div class="card border-danger shadow-sm">
-          <div class="card-header bg-danger text-white">
-            <strong><i class="fas fa-circle-xmark"></i> {% trans "Submission Rejected" %}</strong>
-          </div>
-          <div class="card-body">
-            {% with last_rej=object.get_last_rejection_action %}
-              {% if last_rej %}
-                <p class="mb-2">
-                  <strong>{% trans "Moderator" %}:</strong> {{ last_rej.user }}
-                </p>
-                <p class="mb-2">
-                  <strong>{% trans "Date" %}:</strong> {{ last_rej.created_at|date:"Y-m-d H:i" }}
-                </p>
-                <p class="mb-0">
-                  <strong>{% trans "Comments" %}:</strong>
-                  <br>
-                  {% if last_rej.comment %}
-                    {{ last_rej.comment|linebreaksbr }}
-                  {% else %}
-                    <span class="text-muted">{% trans "No comments provided." %}</span>
-                  {% endif %}
-                </p>
-                <hr class="my-3" />
-                <form method="post"
-                      action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url }}">
-                  {% csrf_token %}
-                  <div class="mb-2">
-                    <label for="resubmit-comment" class="form-label">
-                      <strong>{% trans "Your explanation (optional)" %}</strong>
-                    </label>
-                    <textarea id="resubmit-comment"
-                              name="comment"
-                              rows="3"
-                              class="form-control"
-                              placeholder="{% trans "Explain what you changed to address the feedback." %}"></textarea>
-                  </div>
-                  <button type="submit" class="btn btn-danger">
-                    <i class="fas fa-paper-plane"></i> {% trans "Resubmit for review" %}
-                  </button>
-                </form>
-              {% else %}
-                <p class="mb-0">{% trans "This submission was rejected. No additional details are available." %}</p>
-              {% endif %}
-            {% endwith %}
-          </div>
-        </div>
-      </div>
-    </div>
-  {% endif %}
+  {# Obsolete rejection card removed: owners of declined items are redirected to the review feedback view #}
   <div class="row my-4">
     <div class="col-lg-8">
       <div class="card shadow">
@@ -89,6 +36,13 @@
               <br>
               {{ object.name }}
             </p>
+            {% if object.owner %}
+              <p class="card-text">
+                <strong>{% trans "Owner" %}:</strong>
+                <br>
+                {{ object.owner.username|default:object.owner }}
+              </p>
+            {% endif %}
             {% if object.description %}
               <p class="card-text">
                 <strong>{% trans "Description" %}:</strong>
@@ -156,11 +110,23 @@
                  aria-labelledby="options-tab"
                  tabindex="0">
               {% block options_pane %}
+                {% object_policy object as policy %}
                 {% block options_primary_actions %}
                 {% endblock options_primary_actions %}
                 {% block options_secondary_actions %}
                 {% endblock options_secondary_actions %}
                 {% block options_review_actions %}
+                  {# Owner: show Submit for Review when the object is private #}
+                  {% if policy.is_private and policy.can_submit_review %}
+                    <form method="post"
+                          action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}"
+                          class="mb-2">
+                      {% csrf_token %}
+                      <button type="submit" class="btn btn-primary w-100">
+                        <i class="fas fa-paper-plane"></i> Submit for Review
+                      </button>
+                    </form>
+                  {% endif %}
                 {% endblock options_review_actions %}
                 {% block options_export %}
                 {% endblock options_export %}

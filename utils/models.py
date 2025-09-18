@@ -87,6 +87,15 @@ class CRUDUrlsMixin(models.Model):
     def modal_delete_url(self):
         return self.get_url("delete", suffix="-modal", pk=self.pk)
 
+    @property
+    def archive_url(self):
+        """
+        Optional archive modal URL for models that implement an archive action.
+        Follows the naming convention '<model>-archive-modal'. Returns None if
+        the URL name is not defined for the model.
+        """
+        return self.get_url("archive", suffix="-modal", pk=self.pk)
+
     @classmethod
     def get_verbose_name(cls):
         return cls._meta.verbose_name

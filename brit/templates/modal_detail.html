@@ -1,4 +1,5 @@
 {% load custom_tags %}
+{% load moderation_tags %}
 <div class="modal-header">
   <h5 class="modal-title">{{ object|verbose_name }} Detail</h5>
   <button type="button"
@@ -21,6 +22,6 @@
   {% endif %}
 </div>
 <div class="modal-footer">
-  <a href="{{ object.get_absolute_url }}" class="btn btn-primary">More</a>
+  <a href="{% detail_or_review_url object True %}" class="btn btn-primary">More</a>
   <button type="button" class="btn btn-default" data-bs-dismiss="modal">Close</button>
 </div>

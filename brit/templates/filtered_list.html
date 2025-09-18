@@ -130,9 +130,9 @@
                     {% for object in object_list %}
                       {% block list_table_row %}
                         <tr tabindex="0"
-                            onclick="window.location='{{ object.get_absolute_url }}'">
+                            onclick="window.location='{% detail_or_review_url object %}'">
                           <td data-label="Name">
-                            <a href="{{ object.get_absolute_url }}">{{ object.name }}</a>
+                            <a href="{% detail_or_review_url object %}">{{ object.name }}</a>
                           </td>
                           <td data-label="Description">{{ object.description }}</td>
                           {% if object_list.model|is_user_created %}
