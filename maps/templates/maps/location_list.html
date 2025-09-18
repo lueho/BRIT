@@ -1,6 +1,7 @@
 {% extends 'simple_list_card.html' %}
 {% load static %}
 {% load user_created_object_tags %}
+{% load moderation_tags %}
 
 {% block title %}BRIT | Maps | Locations{% endblock %}
 
@@ -18,7 +19,7 @@
         </thead>
         {% for object in object_list %}
             <tr>
-                <td><a href="{{ object.get_absolute_url }}">{{ object.name }}</a></td>
+                <td><a href="{% detail_or_review_url object %}">{{ object.name }}</a></td>
                 <td>{{ object.address }}</td>
                 <td>{{ object.description }}</td>
                 {% if object_list.model|is_user_created %}

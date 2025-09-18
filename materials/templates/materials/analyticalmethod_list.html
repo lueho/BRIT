@@ -1,5 +1,6 @@
 {% extends 'simple_list_card.html' %}
 {% load user_created_object_tags %}
+{% load moderation_tags %}
 
 {% block list_table_head %}
     <thead>
@@ -17,7 +18,7 @@
 {% block list_table_row %}
     <tr>
         <td>
-            <a href="{{ object.get_absolute_url }}"
+            <a href="{% detail_or_review_url object %}"
                aria-label="View details of {{ object.name }}">
                 {{ object.name }}
             </a>

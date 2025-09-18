@@ -2,6 +2,7 @@
 {% load static %}
 {% load crispy_forms_tags %}
 {% load user_created_object_tags %}
+{% load moderation_tags %}
 
 {% block title %}BRIT | Bibliography | Sources{% endblock %}
 
@@ -22,7 +23,7 @@
         </thead>
         {% for object in object_list %}
             <tr>
-                <td data-label="Abbreviation"><a href="{{ object.get_absolute_url }}">{{ object.abbreviation }}</a></td>
+                <td data-label="Abbreviation"><a href="{% detail_or_review_url object %}">{{ object.abbreviation }}</a></td>
                 <td data-label="Authors/Publisher">
                     {% if object.ordered_authors.exists %}
                         {% if object.authors.count > 2 %}
@@ -40,7 +41,7 @@
                         {{ object.publisher }}
                     {% endif %}
                 </td>
-                <td data-label="Title"><a href="{{ object.get_absolute_url }}">{{ object.title }}</a></td>
+                <td data-label="Title"><a href="{% detail_or_review_url object %}">{{ object.title }}</a></td>
                 <td data-label="Type">{{ object.type }}</td>
                 {% if object_list.model|is_user_created %}
                     <td class="actions-column mobile-no-label">

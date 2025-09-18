@@ -1,5 +1,6 @@
 {% extends 'simple_list_card.html' %}
 {% load user_created_object_tags %}
+{% load moderation_tags %}
 
 {% block title %}BRIT | CLOSECYCLE Showcases{% endblock %}
 
@@ -19,7 +20,7 @@
         {% for object in object_list %}
             <tr>
                 <td>
-                    <a href="{{ object.get_absolute_url }}">{{ object.name }}</a>
+                    <a href="{% detail_or_review_url object %}">{{ object.name }}</a>
                 </td>
                 <td>
                     <a href="{{ object.region.get_absolute_url }}">{{ object.region.name }}</a>

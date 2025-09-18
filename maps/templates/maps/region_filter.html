@@ -1,6 +1,7 @@
 {% extends 'filtered_list.html' %}
 {% load crispy_forms_tags %}
 {% load user_created_object_tags %}
+{% load moderation_tags %}
 
 {% block title %}BRIT | Maps | Regions{% endblock %}
 
@@ -20,7 +21,7 @@
         <tbody>
         {% for object in object_list %}
             <tr>
-                <td data-label="Name"><a href="{{ object.get_absolute_url }}">{{ object.name }}</a></td>
+                <td data-label="Name"><a href="{% detail_or_review_url object %}">{{ object.name }}</a></td>
                 <td data-label="Country">{{ object.type }}</td>
                 {% if object_list.model|is_user_created %}
                     <td class="actions-column mobile-no-label">

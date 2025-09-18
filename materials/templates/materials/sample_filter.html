@@ -1,6 +1,7 @@
 {% extends 'filtered_list.html' %}
 {% load crispy_forms_tags %}
 {% load user_created_object_tags %}
+{% load moderation_tags %}
 
 {% block title %}BRIT | Materials | Samples{% endblock %}
 
@@ -21,7 +22,7 @@
         <tbody>
         {% for object in object_list %}
             <tr>
-                <td data-label="Id"><a href="{{ object.get_absolute_url }}">{{ object.id }}</a></td>
+                <td data-label="Id"><a href="{% detail_or_review_url object %}">{{ object.id }}</a></td>
                 <td data-label="Name"><a href="{% url 'sample-detail' object.pk %}">{{ object.name }}</a></td>
                 <td data-label="Material">
                     <a href="{% url 'material-detail' object.material.pk %}">

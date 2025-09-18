@@ -2,118 +2,134 @@
 {% load moderation_tags %}
 
 {% block list_table %}
-<div class="table-responsive">
-    <table class="table modern-table">
-        <thead>
-            <tr>
-                <th>Collection</th>
-                <th>Owner</th>
-                <th class="actions-column">Status/Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for object in object_list %}
-            <tr>
-                <td data-label="Collection" class="ps-3">
-                    <a href="{{ object.get_absolute_url }}?back={{ request.get_full_path|urlencode }}" class="collection-link">
-                        <strong class="d-block">{{ object.catchment.region.name }} - {{ object.waste_stream.category }} collection</strong>
-                        <span class="text-muted small">
-                            {{ object.collector }} · {{ object.collection_system }} · {{ object.valid_from.year }}
-                        </span>
-                    </a>
-                </td>
-                <td data-label="Owner">
-                    {{ object.owner }}
-                </td>
-                <td class="actions-column mobile-no-label">
-                    <div class="action-container d-flex align-items-center justify-content-end">
-                        <div class="status-badge-container">
-                            {% include 'object_management/review_status_badge.html' with object=object %}
-                        </div>
-                        <div class="dropdown d-inline-block ms-auto">
-                        <button class="btn btn-sm btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-container="body" aria-expanded="false"><i class="fas fa-ellipsis-vertical"></i></button>
-                        <div class="dropdown-menu dropdown-menu-end">
-                            {% if user.is_authenticated %}
-                                {% if user == object.owner %}
-                                    {% if object.is_declined %}
-                                        <a class="dropdown-item" href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}">
-                                            <i class="fas fa-clipboard-check"></i> Review feedback
-                                        </a>
-                                    {% else %}
-                                        <span class="dropdown-item disabled" title="Owners cannot open the review view for their own items.">
-                                            <i class="fas fa-clipboard-check"></i> Review details (not available for owners)
-                                        </span>
-                                    {% endif %}
-                                {% elif user.is_staff %}
-                                    <a class="dropdown-item" href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}">
-                                        <i class="fas fa-clipboard-check"></i> Review details
-                                    </a>
-                                {% elif perms.can_moderate %}
-                                    <a class="dropdown-item" href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}">
-                                        <i class="fas fa-clipboard-check"></i> Review details
-                                    </a>
-                                {% endif %}
-                            {% endif %}
-                            {# Conditional divider: only show if any workflow actions will be rendered #}
-                            {% if object.publication_status == object.STATUS_PUBLISHED and user.is_authenticated and user.is_staff or object.publication_status == object.STATUS_PUBLISHED and user.is_authenticated and perms.can_moderate or list_type == 'private' and object.is_private and user.is_authenticated and user == object.owner or list_type == 'private' and object.is_private and user.is_authenticated and user.is_staff or list_type == 'private' and object.is_in_review and user.is_authenticated and user == object.owner or list_type == 'private' and object.is_in_review and user.is_authenticated and user.is_staff or object.is_in_review and user.is_authenticated and user.is_staff and user != object.owner or object.is_in_review and user.is_authenticated and perms.can_moderate and user != object.owner %}
-                            <div class="dropdown-divider"></div>
-                            {% endif %}
-                            <!-- Workflow actions -->
-                            {% if object.publication_status == object.STATUS_PUBLISHED %}
-                                {% if user.is_staff or perms.can_moderate %}
-                                <a class="dropdown-item modal-link" href="{% url 'collection-archive-modal' object.id %}">
-                                    <i class="fas fa-archive"></i> Archive
-                                </a>
-                                {% endif %}
-                            {% endif %}
-                            
-                            {% if list_type == 'private' %}
-                                {% if object.is_private %}
-                                    {% if user == object.owner or user.is_staff %}
-                                        <form method="post" action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
-                                            {% csrf_token %}
-                                            <button type="submit" class="dropdown-item text-start text-primary">
-                                                <i class="fas fa-paper-plane"></i> Submit for Review
-                                            </button>
-                                        </form>
-                                    {% endif %}
-                                {% endif %}
-                                
-                                {% if object.is_in_review %}
-                                    {% if user == object.owner or user.is_staff %}
-                                        <form method="post" action="{% url 'object_management:withdraw_from_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
-                                            {% csrf_token %}
-                                            <button type="submit" class="dropdown-item text-start text-warning">
-                                                <i class="fas fa-rotate-left"></i> Withdraw from Review
-                                            </button>
-                                        </form>
-                                    {% endif %}
-                                {% endif %}
-                            {% endif %}
+    <div class="table-responsive">
+        <table class="table modern-table">
+            <thead>
+                <tr>
+                    <th>Collection</th>
+                    <th>Owner</th>
+                    <th class="actions-column">Status/Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for object in object_list %}
+                    <tr>
+                        <td data-label="Collection" class="ps-3">
+                            <a href="{% detail_or_review_url object True %}" class="collection-link">
+                                <strong class="d-block">{{ object.catchment.region.name }} - {{ object.waste_stream.category }} collection</strong>
+                                <span class="text-muted small">
+                                    {{ object.collector }} · {{ object.collection_system }} · {{ object.valid_from.year }}
+                                </span>
+                            </a>
+                        </td>
+                        <td data-label="Owner">{{ object.owner }}</td>
+                        <td class="actions-column mobile-no-label">
+                            <div class="action-container d-flex align-items-center justify-content-end">
+                                <div class="status-badge-container">{% include "object_management/review_status_badge.html" with object=object %}</div>
+                                <div class="dropdown d-inline-block ms-auto">
+                                    <button class="btn btn-sm btn-secondary dropdown-toggle"
+                                            type="button"
+                                            data-bs-toggle="dropdown"
+                                            data-bs-container="body"
+                                            aria-expanded="false">
+                                        <i class="fas fa-ellipsis-vertical"></i>
+                                    </button>
+                                    <div class="dropdown-menu dropdown-menu-end">
+                                        {% if user.is_authenticated %}
+                                            {% if user == object.owner %}
+                                                {% if object.is_declined %}
+                                                    <a class="dropdown-item"
+                                                       href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}">
+                                                        <i class="fas fa-clipboard-check"></i> Review feedback
+                                                    </a>
+                                                {% else %}
+                                                    <span class="dropdown-item disabled"
+                                                          title="Owners cannot open the review view for their own items.">
+                                                        <i class="fas fa-clipboard-check"></i> Review details (not available for owners)
+                                                    </span>
+                                                {% endif %}
+                                            {% elif user.is_staff %}
+                                                <a class="dropdown-item"
+                                                   href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}">
+                                                    <i class="fas fa-clipboard-check"></i> Review details
+                                                </a>
+                                            {% elif perms.can_moderate %}
+                                                <a class="dropdown-item"
+                                                   href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}">
+                                                    <i class="fas fa-clipboard-check"></i> Review details
+                                                </a>
+                                            {% endif %}
+                                        {% endif %}
+                                        {# Conditional divider: only show if any workflow actions will be rendered #}
+                                        {% if object.publication_status == object.STATUS_PUBLISHED and user.is_authenticated and user.is_staff or object.publication_status == object.STATUS_PUBLISHED and user.is_authenticated and perms.can_moderate or list_type == 'private' and object.is_private and user.is_authenticated and user == object.owner or list_type == 'private' and object.is_private and user.is_authenticated and user.is_staff or list_type == 'private' and object.is_in_review and user.is_authenticated and user == object.owner or list_type == 'private' and object.is_in_review and user.is_authenticated and user.is_staff or object.is_in_review and user.is_authenticated and user.is_staff and user != object.owner or object.is_in_review and user.is_authenticated and perms.can_moderate and user != object.owner %}
+                                            <div class="dropdown-divider"></div>
+                                        {% endif %}
+                                        <!-- Workflow actions -->
+                                        {% if object.publication_status == object.STATUS_PUBLISHED %}
+                                            {% if user.is_staff or perms.can_moderate %}
+                                                <a class="dropdown-item modal-link"
+                                                   href="{% url 'collection-archive-modal' object.id %}">
+                                                    <i class="fas fa-archive"></i> Archive
+                                                </a>
+                                            {% endif %}
+                                        {% endif %}
 
-                            {# Moderator shortcuts for items in review #}
-                            {% if object.is_in_review %}
-                                {% if user.is_staff and user != object.owner or perms.can_moderate and user != object.owner %}
-                                    <form method="post" action="{% url 'object_management:approve_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
-                                        {% csrf_token %}
-                                        <button type="submit" class="dropdown-item text-start text-success">
-                                            <i class="fas fa-check"></i> Approve
-                                        </button>
-                                    </form>
-                                    <form method="post" action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
-                                        {% csrf_token %}
-                                        <button type="submit" class="dropdown-item w-100 text-start text-danger">
-                                            <i class="fas fa-xmark"></i> Reject
-                                        </button>
-                                    </form>
-                                {% endif %}
-                            {% endif %}
-                        </div>
-                    </div>
-                </td>
-            </tr>
-            {% endfor %}
-        </tbody>
-    </table>
-</div>
+                                        {% if list_type == 'private' %}
+                                            {% if object.is_private %}
+                                                {% if user == object.owner or user.is_staff %}
+                                                    <form method="post"
+                                                          action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
+                                                          class="m-0 p-0">
+                                                        {% csrf_token %}
+                                                        <button type="submit" class="dropdown-item text-start text-primary">
+                                                            <i class="fas fa-paper-plane"></i> Submit for Review
+                                                        </button>
+                                                    </form>
+                                                {% endif %}
+                                            {% endif %}
+
+                                            {% if object.is_in_review %}
+                                                {% if user == object.owner or user.is_staff %}
+                                                    <form method="post"
+                                                          action="{% url 'object_management:withdraw_from_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
+                                                          class="m-0 p-0">
+                                                        {% csrf_token %}
+                                                        <button type="submit" class="dropdown-item text-start text-warning">
+                                                            <i class="fas fa-rotate-left"></i> Withdraw from Review
+                                                        </button>
+                                                    </form>
+                                                {% endif %}
+                                            {% endif %}
+                                        {% endif %}
+
+                                        {# Moderator shortcuts for items in review #}
+                                        {% if object.is_in_review %}
+                                            {% if user.is_staff and user != object.owner or perms.can_moderate and user != object.owner %}
+                                                <form method="post"
+                                                      action="{% url 'object_management:approve_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
+                                                      class="m-0 p-0">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="dropdown-item text-start text-success">
+                                                        <i class="fas fa-check"></i> Approve
+                                                    </button>
+                                                </form>
+                                                <form method="post"
+                                                      action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
+                                                      class="m-0 p-0">
+                                                    {% csrf_token %}
+                                                    <button type="submit" class="dropdown-item w-100 text-start text-danger">
+                                                        <i class="fas fa-xmark"></i> Reject
+                                                    </button>
+                                                </form>
+                                            {% endif %}
+                                        {% endif %}
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
 {% endblock list_table %}

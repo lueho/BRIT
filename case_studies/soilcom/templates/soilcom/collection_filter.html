@@ -4,228 +4,102 @@
 {% load file_export_tags %}
 {% load moderation_tags %}
 
-{# Page-specific custom_style removed — using shared CSS from static/css/filtered-list.css #}
-
-{% block title %}BRIT | Household waste collections{% endblock title %}
-
-{% block list_card_header %}
-    {% if header %}
-        {{ header }}
-    {% elif list_type == 'private' %}
-        My {{ object_list.model.get_verbose_name_plural }}
-    {% else %}
-        {{ object_list.model.get_verbose_name_plural|capfirst }}
-    {% endif %}
-{% endblock list_card_header %}
+{% block title %}
+    BRIT | Household waste collections
+{% endblock title %}
 
 {% block list_table %}
-<p class="text-muted small mb-2">
-    Showing {{ page_obj.start_index }}-{{ page_obj.end_index }} of {{ page_obj.paginator.count }} results
-</p>
-{% load custom_tags %}
-{% if chips %}
-<div class="mb-2 d-flex flex-wrap gap-2">
-    {% for chip in chips %}
-    <a class="badge rounded-pill text-bg-light border text-decoration-none" title="Remove filter"
-       href="?{{ chip.remove_query }}">
-        {{ chip.text }} <i class="fas fa-xmark ms-1" aria-hidden="true"></i>
-        <span class="visually-hidden">Remove filter</span>
-    </a>
-    {% endfor %}
-    <a class="badge rounded-pill bg-secondary text-decoration-none" title="Clear all filters"
-       href="{% if list_type == 'private' %}{{ object_list.model.private_list_url }}?scope=private{% elif list_type == 'review' %}{{ object_list.model.review_list_url }}?scope=review{% else %}{{ object_list.model.public_list_url }}?scope=published{% endif %}">
-        Clear all
-    </a>
-</div>
-{% endif %}
-<div class="collection-list-min-height">
-    <div class="table-responsive">
-    <table class="table modern-table">
-        <thead>
-            <tr>
-                <th>Collection</th>
-                <th class="actions-column">Status/Actions</th>
-            </tr>
-        </thead>
-        <tbody>
-            {% for object in object_list %}
-            <tr>
-                <td data-label="Collection" class="ps-3">
-                    <a href="{{ object.get_absolute_url }}?back={{ request.get_full_path|urlencode }}" class="collection-link">
-                        <strong class="d-block">{{ object.catchment.region.name }} - {{ object.waste_stream.category }} collection</strong>
-                        <span class="text-muted small">
-                            {{ object.collector }} · {{ object.collection_system }} · {{ object.valid_from.year }}
-                        </span>
-                    </a>
-                </td>
-                <td class="actions-column mobile-no-label">
-                    <div class="action-container d-flex align-items-center justify-content-end">
-                        <div class="status-badge-container">
-                            {% include 'object_management/review_status_badge.html' with object=object %}
-                        </div>
-                        <div class="dropdown d-inline-block ms-auto">
-                        <button class="btn btn-sm btn-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" data-bs-container="body" aria-expanded="false" aria-label="More actions"><i class="fas fa-ellipsis-vertical"></i></button>
-                        <div class="dropdown-menu dropdown-menu-end">
-                            <a class="dropdown-item" href="{{ object.get_absolute_url }}?back={{ request.get_full_path|urlencode }}">
-                                <i class="fas fa-eye"></i> View details
-                            </a>
-                            {% if user == object.owner and object.is_declined %}
-                            <a class="dropdown-item" href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
-                                <i class="fas fa-clipboard-check"></i> Review feedback
-                            </a>
-                            {% endif %}
-                            {% if list_type == 'review' and user|can_moderate:object and user != object.owner %}
-                            <a class="dropdown-item" href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
-                                <i class="fas fa-clipboard-check"></i> Review view
-                            </a>
-                            {% endif %}
-                            {% if object.update_url %}
-                                {% if user.is_staff %}
-                                    <a class="dropdown-item" href="{% url 'collection-update' object.id %}?next={{ request.get_full_path|urlencode }}">
-                                        <i class="fas fa-pen-to-square"></i> Edit
-                                    </a>
-                                {% elif user == object.owner %}
-                                    {% if object.publication_status != object.STATUS_PUBLISHED %}
-                                        <a class="dropdown-item" href="{% url 'collection-update' object.id %}?next={{ request.get_full_path|urlencode }}">
-                                            <i class="fas fa-pen-to-square"></i> Edit
-                                        </a>
-                                    {% endif %}
-                                {% endif %}
-                            {% endif %}
-                            {# Delete: only staff may delete published objects; owners may delete private/review #}
-                            {% if object.publication_status == object.STATUS_PUBLISHED %}
-                                {% if user.is_staff %}
-                                <a class="dropdown-item modal-link" href="{% url 'collection-delete-modal' object.id %}">
-                                    <i class="fas fa-trash"></i> Delete
-                                </a>
-                                {% endif %}
-                            {% else %}
-                                {% if user == object.owner or user.is_staff %}
-                                <a class="dropdown-item modal-link" href="{% url 'collection-delete-modal' object.id %}">
-                                    <i class="fas fa-trash"></i> Delete
-                                </a>
-                                {% endif %}
-                            {% endif %}
-                            
-                            <div class="dropdown-divider"></div>
-                            <!-- Workflow actions -->
-                            {% if object.publication_status == object.STATUS_PUBLISHED %}
-                                {% if user|can_moderate:object or user == object.owner or user.is_staff %}
-                                <a class="dropdown-item modal-link" href="{% url 'collection-archive-modal' object.id %}">
-                                    <i class="fas fa-archive"></i> Archive
-                                </a>
-                                {% endif %}
-                            {% endif %}
-                            
-                            {% if list_type == 'private' %}
-                                {% if object.is_private or object.is_declined %}
-                                    {% if user == object.owner or user.is_staff %}
-                                        <form method="post" action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
-                                            {% csrf_token %}
-                                            <button type="submit" class="dropdown-item text-start text-primary">
-                                                <i class="fas fa-paper-plane"></i> Submit for Review
-                                            </button>
-                                        </form>
-                                    {% endif %}
-                                {% endif %}
-                                
-                                {% if object.is_in_review %}
-                                    {% if user == object.owner or user.is_staff %}
-                                        <form method="post" action="{% url 'object_management:withdraw_from_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
-                                            {% csrf_token %}
-                                            <button type="submit" class="dropdown-item text-start text-warning">
-                                                <i class="fas fa-rotate-left"></i> Withdraw from Review
-                                            </button>
-                                        </form>
-                                    {% endif %}
-                                {% endif %}
-                                
-                                {% if object.is_in_review %}
-                                    {% if user|can_moderate:object and user != object.owner %}
-                                        <form method="post" action="{% url 'object_management:approve_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
-                                            {% csrf_token %}
-                                            <button type="submit" class="dropdown-item text-start text-success">
-                                                <i class="fas fa-check"></i> Approve
-                                            </button>
-                                        </form>
-                                        <form method="post" action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
-                                            {% csrf_token %}
-                                            <button type="submit" class="dropdown-item w-100 text-start text-danger">
-                                                <i class="fas fa-xmark"></i> Reject
-                                            </button>
-                                        </form>
-                                    {% endif %}
-                                {% endif %}
-                            {% elif list_type == 'review' %}
-                                {% if object.is_in_review %}
-                                    {% if user == object.owner or user.is_staff %}
-                                        <form method="post" action="{% url 'object_management:withdraw_from_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
-                                            {% csrf_token %}
-                                            <button type="submit" class="dropdown-item text-start text-warning">
-                                                <i class="fas fa-rotate-left"></i> Withdraw from Review
-                                            </button>
-                                        </form>
-                                    {% endif %}
-                                    {% if user|can_moderate:object and user != object.owner %}
-                                        <form method="post" action="{% url 'object_management:approve_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
-                                            {% csrf_token %}
-                                            <button type="submit" class="dropdown-item text-start text-success">
-                                                <i class="fas fa-check"></i> Approve
-                                            </button>
-                                        </form>
-                                        <form method="post" action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
-                                            {% csrf_token %}
-                                            <button type="submit" class="dropdown-item w-100 text-start text-danger">
-                                                <i class="fas fa-xmark"></i> Reject
-                                            </button>
-                                        </form>
-                                    {% endif %}
-                                {% endif %}
-                            {% endif %}
-                        </div>
-                    </div>
-                </td>
-            </tr>
+    <p class="text-muted small mb-2">
+        Showing {{ page_obj.start_index }}-{{ page_obj.end_index }} of {{ page_obj.paginator.count }} results
+    </p>
+    {% load custom_tags %}
+    {% if chips %}
+        <div class="mb-2 d-flex flex-wrap gap-2">
+            {% for chip in chips %}
+                <a class="badge rounded-pill text-bg-light border text-decoration-none"
+                   title="Remove filter"
+                   href="?{{ chip.remove_query }}">
+                    {{ chip.text }} <i class="fas fa-xmark ms-1" aria-hidden="true"></i>
+                    <span class="visually-hidden">Remove filter</span>
+                </a>
             {% endfor %}
-        </tbody>
-    </table>
+            <a class="badge rounded-pill bg-secondary text-decoration-none"
+               title="Clear all filters"
+               href="{% if list_type == 'private' %}{{ object_list.model.private_list_url }}?scope=private{% elif list_type == 'review' %}{{ object_list.model.review_list_url }}?scope=review{% else %}{{ object_list.model.public_list_url }}?scope=published{% endif %}">
+                Clear all
+            </a>
+        </div>
+    {% endif %}
+    <div class="collection-list-min-height">
+        <div class="table-responsive">
+            <table class="table modern-table">
+                <thead>
+                    <tr>
+                        <th>Collection</th>
+                        <th class="actions-column">Status/Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for object in object_list %}
+                        <tr>
+                            <td data-label="Collection" class="ps-3">
+                                <a href="{% detail_or_review_url object %}" class="collection-link">
+                                    <strong class="d-block">{{ object.catchment.region.name }} - {{ object.waste_stream.category }} collection</strong>
+                                    <span class="text-muted small">
+                                        {{ object.collector }} · {{ object.collection_system }} · {{ object.valid_from.year }}
+                                    </span>
+                                </a>
+                            </td>
+                            <td class="actions-column mobile-no-label">
+                                {% include "object_management/status_actions_cell.html" %}
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
     </div>
-</div>
 {% endblock list_table %}
 
 {% block filters_pane_body %}
-<form method="get">
-    {% crispy filter.form %}
-    <div class="d-flex justify-content-end gap-2 mt-2">
-        <button id="btn-filter" class="btn btn-primary submit-filter" type="submit">Filter</button>
-        <a class="btn btn-outline-secondary" href="{% if list_type == 'private' %}{{ object_list.model.private_list_url }}?scope=private{% elif list_type == 'review' %}{{ object_list.model.review_list_url }}?scope=review{% else %}{{ object_list.model.public_list_url }}?scope=published{% endif %}" aria-label="Reset filters">Reset</a>
-    </div>
-</form>
+    <form method="get">
+        {% crispy filter.form %}
+        <div class="d-flex justify-content-end gap-2 mt-2">
+            <button id="btn-filter" class="btn btn-primary submit-filter" type="submit">Filter</button>
+            <a class="btn btn-outline-secondary"
+               href="{% if list_type == 'private' %}{{ object_list.model.private_list_url }}?scope=private{% elif list_type == 'review' %}{{ object_list.model.review_list_url }}?scope=review{% else %}{{ object_list.model.public_list_url }}?scope=published{% endif %}"
+               aria-label="Reset filters">Reset</a>
+        </div>
+    </form>
 {% endblock filters_pane_body %}
 
 {% block options_pane_body %}
-{% if create_permission in perms or user.is_staff %}
-<a class="btn btn-success w-100 mb-2" href="{{ object_list.model.create_url }}" aria-label="Create new {{ object_list.model.get_verbose_name }}">
-    <i class="fas fa-plus"></i> Create new {{ object_list.model.get_verbose_name }}
-</a>
-{% endif %}
+    {% if create_permission in perms or user.is_staff %}
+        <a class="btn btn-success w-100 mb-2"
+           href="{{ object_list.model.create_url }}"
+           aria-label="Create new {{ object_list.model.get_verbose_name }}">
+            <i class="fas fa-plus"></i> Create new {{ object_list.model.get_verbose_name }}
+        </a>
+    {% endif %}
 
-{% if "soilcom.add_aggregatedcollectionpropertyvalue" in perms %}
-<a class="btn btn-outline-secondary w-100 mb-2" href="{% url 'aggregatedcollectionpropertyvalue-create' %}">
-    <i class="fas fa-circle-plus"></i> Add property to collection group
-</a>
-{% endif %}
+    {% if "soilcom.add_aggregatedcollectionpropertyvalue" in perms %}
+        <a class="btn btn-outline-secondary w-100 mb-2"
+           href="{% url 'aggregatedcollectionpropertyvalue-create' %}">
+            <i class="fas fa-circle-plus"></i> Add property to collection group
+        </a>
+    {% endif %}
 
-<a class="btn btn-outline-secondary modal-link w-100" href="{% export_link_modal 'collection-export' list_type=list_type %}">
-    <i class="fas fa-file-export"></i> Export data
-</a>
+    <a class="btn btn-outline-secondary modal-link w-100"
+       href="{% export_link_modal 'collection-export' list_type=list_type %}">
+        <i class="fas fa-file-export"></i> Export data
+    </a>
 {% endblock options_pane_body %}
 
 {% block learning_pane_body %}
-{% include 'soilcom/includes/learning_materials.html' %}
+    {% include "soilcom/includes/learning_materials.html" %}
 {% endblock learning_pane_body %}
 
 {% block javascript %}
-{{ block.super }}
-<script src="{% static 'js/file_export.min.js' %}" type="text/javascript"></script>
+    {{ block.super }}
+    <script src="{% static 'js/file_export.min.js' %}" type="text/javascript"></script>
 {% endblock javascript %}

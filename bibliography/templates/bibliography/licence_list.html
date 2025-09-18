@@ -1,6 +1,7 @@
 {% extends 'simple_list_card.html' %}
 {% load static %}
 {% load user_created_object_tags %}
+{% load moderation_tags %}
 
 {% block title %}BRIT | Bibliography | Licences{% endblock %}
 
@@ -17,7 +18,7 @@
         </thead>
         {% for object in object_list %}
             <tr>
-                <td><a href="{{ object.get_absolute_url }}">{{ object }}</a></td>
+                <td><a href="{% detail_or_review_url object %}">{{ object }}</a></td>
                 <td><a href="{{ object.reference_url }}" target="_blank">{{ object.reference_url }}</a></td>
                 {% if object_list.model|is_user_created %}
                     <td class="actions-column mobile-no-label">

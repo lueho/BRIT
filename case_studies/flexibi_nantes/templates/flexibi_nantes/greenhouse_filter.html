@@ -2,6 +2,7 @@
 {% load static %}
 {% load crispy_forms_tags %}
 {% load user_created_object_tags %}
+{% load moderation_tags %}
 
 {% block title %}BRIT | Greenhouse types{% endblock %}
 
@@ -28,7 +29,7 @@
         <tbody>
         {% for object in object_list %}
             <tr>
-                <td data-label="Id"><a href="{{ object.get_absolute_url }}">{{ object.id }}</a></td>
+                <td data-label="Id"><a href="{% detail_or_review_url object %}">{{ object.id }}</a></td>
                 <td data-label="Name">{{ object.name }}</td>
                 <td data-label="Heated">{{ object.heated }}</td>
                 <td data-label="Lighting">{{ object.lighted }}</td>
