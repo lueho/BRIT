@@ -1,4 +1,5 @@
 from .settings import *
+import os
 
 SITE_ID = 1
 
@@ -24,3 +25,24 @@ DATABASES["default"] = {
 MIDDLEWARE.insert(0, "debug_toolbar.middleware.DebugToolbarMiddleware")
 
 CRISPY_FAIL_SILENTLY = False
+
+# Development logging: emit our app logs to console
+LOGGING = {
+    "version": 1,
+    "disable_existing_loggers": False,
+    "handlers": {
+        "console": {
+            "class": "logging.StreamHandler",
+        },
+    },
+    "loggers": {
+        # Django core
+        "django": {"handlers": ["console"], "level": "INFO"},
+        # Our packages
+        "utils.object_management": {
+            "handlers": ["console"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
+    },
+}
