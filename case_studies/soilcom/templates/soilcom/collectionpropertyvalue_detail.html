@@ -1,23 +1,42 @@
-{% extends 'simple_detail_card.html' %}
+{% extends "simple_detail_card.html" %}
 
 {% block detail_body %}
     <p class="card-text">
-        <strong>Collection:</strong><br>
+        <strong>Collection:</strong>
+        <br>
         <a href="{{ object.collection.get_absolute_url }}">{{ object.collection }}</a>
     </p>
-    <p class="card-text"><strong>Property:</strong><br>{{ object.property }}</p>
-    <p class="card-text"><strong>Year:</strong><br>{{ object.year }}</p>
+    <p class="card-text">
+        <strong>Property:</strong>
+        <br>
+        {{ object.property }}
+    </p>
+    <p class="card-text">
+        <strong>Year:</strong>
+        <br>
+        {{ object.year }}
+    </p>
     {% if object.standard_deviation %}
-        <p class="card-text"><strong>Value:</strong><br>{{ object.average }}
-            ± {{ object.standard_deviation }} {{ object.unit }}</p>
+        <p class="card-text">
+            <strong>Value:</strong>
+            <br>
+            {{ object.average }}
+            ± {{ object.standard_deviation }} {{ object.unit }}
+        </p>
     {% else %}
-        <p class="card-text"><strong>Value:</strong><br>{{ object.average }} {{ object.unit }}</p>
+        <p class="card-text">
+            <strong>Value:</strong>
+            <br>
+            {{ object.average }} {{ object.unit }}
+        </p>
     {% endif %}
-{% endblock %}
+{% endblock detail_body %}
 
 {% block detail_footer %}
     {% block back_button %}
-        <a href="javascript:history.go(-1)" class="nowrap">
+        <a href="{{ object.collection.get_absolute_url }}"
+           onclick="history.back(); return false;"
+           class="nowrap">
             <i class="fas fa-fw fa-arrow-left">
             </i> back
         </a>
@@ -48,5 +67,6 @@
             {% endif %}
         {% endblock delete_link %}
     {% endif %}
-    {% block additional_footer_links %}{% endblock %}
+    {% block additional_footer_links %}
+    {% endblock additional_footer_links %}
 {% endblock detail_footer %}

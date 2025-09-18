@@ -34,7 +34,7 @@
 
 {% block detail_footer %}
     {% block back_button %}
-        <a href="javascript:history.go(-1)" class="nowrap">
+        <a href="{{ object.list_url|default:object.get_absolute_url }}" onclick="history.back(); return false;" class="nowrap">
             <i class="fas fa-fw fa-arrow-left">
             </i> back
         </a>
