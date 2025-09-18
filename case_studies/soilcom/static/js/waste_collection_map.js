@@ -22,11 +22,19 @@ const fieldConfig = {
     },
     allowed_materials: {
         include: true,
-        format: (value) => formatList(value, ', ')
+        format: (value) => {
+            if (!value) return '';
+            const str = Array.isArray(value) ? value.join(', ') : value;
+            return formatList(str, ', ');
+        }
     },
     forbidden_materials: {
         include: true,
-        format: (value) => formatList(value, ', ')
+        format: (value) => {
+            if (!value) return '';
+            const str = Array.isArray(value) ? value.join(', ') : value;
+            return formatList(str, ', ');
+        }
     },
     fee_system: {
         include: true,
@@ -105,14 +113,85 @@ function isStaffUser() {
     return flag === true; // default to false if not provided
 }
 
+function getCurrentUserId() {
+    try {
+        const ctx = document.getElementById('map-context');
+        if (!ctx) return null;
+        const uid = ctx.dataset.userId;
+        if (!uid) return null;
+        const parsed = parseInt(uid, 10);
+        return Number.isNaN(parsed) ? null : parsed;
+    } catch (_) {
+        return null;
+    }
+}
+
 function hideSelectionHint() {
     const hint = document.getElementById('map-actions-hint');
     if (hint) hint.classList.add('d-none');
 }
 
+// --- Selection helpers used by featureClickHandler ---
+let __wc_lastSelectedLayer = null;
+
+function resetFeatureStyles(featureGroup) {
+    try {
+        if (!featureGroup) return;
+        featureGroup.eachLayer(layer => {
+            if (layer && typeof layer.setStyle === 'function' && typeof featuresLayerStyle === 'object') {
+                layer.setStyle(featuresLayerStyle);
+            }
+        });
+        __wc_lastSelectedLayer = null;
+    } catch (_) { /* ignore styling errors */ }
+}
+
+function selectFeature(layer) {
+    try {
+        if (!layer) return;
+        // Reset previously selected (if any)
+        if (__wc_lastSelectedLayer && typeof __wc_lastSelectedLayer.setStyle === 'function' && typeof featuresLayerStyle === 'object') {
+            __wc_lastSelectedLayer.setStyle(featuresLayerStyle);
+        }
+        __wc_lastSelectedLayer = layer;
+        // Apply a highlighted style to the current selection
+        if (typeof layer.setStyle === 'function') {
+            const highlight = Object.assign({}, featuresLayerStyle || {}, {
+                color: '#FF6600',
+                weight: (featuresLayerStyle && typeof featuresLayerStyle.weight === 'number')
+                    ? Math.max(1, featuresLayerStyle.weight + 2)
+                    : 4,
+                fillOpacity: (featuresLayerStyle && typeof featuresLayerStyle.fillOpacity === 'number')
+                    ? Math.min(1, featuresLayerStyle.fillOpacity + 0.1)
+                    : 0.6
+            });
+            layer.setStyle(highlight);
+        }
+    } catch (_) { /* ignore styling errors */ }
+}
+
 function featureClickHandler(e, featureGroup) {
     resetFeatureStyles(featureGroup);
 
+    // Prefer the exact clicked layer if Leaflet provides it
+    if (e && e.layer && e.layer.feature) {
+        const layer = e.layer;
+        selectFeature(layer);
+        const props = layer.feature.properties || {};
+        if (props.id != null) {
+            getFeatureDetails(props.id);
+        }
+        try {
+            const catchment = props.catchment;
+            const waste_category = props.waste_category;
+            const collection_system = props.collection_system;
+            const html = `<a href="javascript:void(0)" onclick="getFeatureDetails(${props.id})">${waste_category} - ${collection_system}</a>`;
+            map.openPopup(`<strong>${catchment}</strong><br/>${html}`, e.latlng, { offset: L.point(0, -24) });
+        } catch (_) { /* ignore */ }
+        return;
+    }
+
+    // Fallback: detect polygons under the click
     const intersectingFeatures = new Set();
 
     featureGroup.eachLayer(layer => {
@@ -128,7 +207,18 @@ function featureClickHandler(e, featureGroup) {
     let catchment = "No features found";
     let html = "";
 
-    if (intersectingFeatures.size) {
+    if (intersectingFeatures.size === 1) {
+        const layer = [...intersectingFeatures][0];
+        selectFeature(layer);
+        const fid = layer.feature.properties.id;
+        if (fid != null) {
+            getFeatureDetails(fid);
+        }
+        catchment = layer.feature.properties.catchment;
+        const waste_category = layer.feature.properties.waste_category;
+        const collection_system = layer.feature.properties.collection_system;
+        html = `<a href="javascript:void(0)" onclick="getFeatureDetails(${fid})">${waste_category} - ${collection_system}</a>`;
+    } else if (intersectingFeatures.size > 1) {
         catchment = [...intersectingFeatures][0].feature.properties.catchment;
         html = [...intersectingFeatures].map(feature => {
             const waste_category = feature.feature.properties.waste_category;
@@ -213,10 +303,22 @@ function updateUrls(feature_id) {
     try {
         const delete_button = document.getElementById('btn-collection-delete');
         const delete_url = delete_button.dataset.hrefTemplate.replace('__pk__', feature_id.toString()) + '?' + params.toString();
-        modalForm(delete_button, {
-            formURL: delete_url,
-            errorClass: ".is-invalid"
-        });
+        // Set the href so modal_links.js can read it; then rebind
+        delete_button.setAttribute('href', delete_url);
+        // Allow re-bind by removing the guard class
+        try { delete_button.classList.remove('bmf-bound'); } catch (_) { }
+        // Prefer global rewire helper; fallback to direct binding
+        try {
+            if (typeof window.wireModalLinks === 'function') {
+                window.wireModalLinks();
+            } else if (typeof window.modalForm === 'function') {
+                window.modalForm(delete_button, {
+                    formURL: delete_url,
+                    modalID: '#modal',
+                    errorClass: '.is-invalid'
+                });
+            }
+        } catch (_) { /* ignore */ }
     } catch (error) {
         console.warn(`Delete button not updated: ${error}`);
     }
@@ -255,6 +357,75 @@ function adaptMapConfig() {
     mapConfig.layerOrder = ['features', 'region', 'catchment'];
 }
 
+// --- Ensure dataset version (dv) travels with feature layer filter params ---
+(function hookFeaturesLayerFilterParams() {
+    function getDatasetVersion() {
+        try {
+            const ctx = document.getElementById('map-context');
+            if (!ctx) return null;
+            const dv = ctx.dataset.dv;
+            return dv || null;
+        } catch (_) { return null; }
+    }
+
+    const original = typeof window.getFeaturesLayerFilterParameters === 'function'
+        ? window.getFeaturesLayerFilterParameters
+        : null;
+
+    window.getFeaturesLayerFilterParameters = function () {
+        let params;
+        try {
+            params = original ? original() : new URLSearchParams(window.location.search);
+        } catch (_) {
+            params = new URLSearchParams(window.location.search);
+        }
+        try {
+            const dv = getDatasetVersion();
+            if (dv) params.set('dv', dv);
+        } catch (_) { /* ignore */ }
+        return params;
+    };
+})();
+
+// --- Ensure detail fetch includes current scope so owners can retrieve private items ---
+(function hookFetchFeatureDetails() {
+    const prevFetch = typeof window.fetchFeatureDetails === 'function' ? window.fetchFeatureDetails : null;
+    window.fetchFeatureDetails = async function (feature) {
+        try {
+            // Try to reproduce maps.js behavior but add scope query
+            let featureId = typeof feature === 'object' ? (feature.id || (feature.properties && feature.properties.id)) : feature;
+            featureId = String(featureId);
+            if (!Number.isInteger(parseInt(featureId))) {
+                console.warn('Invalid feature id:', featureId);
+                if (prevFetch) return prevFetch(feature);
+                return Promise.reject(new Error('Invalid feature id'));
+            }
+
+            const base = (window.mapConfig && window.mapConfig.featuresLayerDetailsUrlTemplate) || '';
+            if (!base) {
+                if (prevFetch) return prevFetch(feature);
+                return Promise.reject(new Error('Missing details URL template'));
+            }
+            let url = base + featureId + '/';
+            try {
+                const scope = (typeof window.getScope === 'function')
+                    ? window.getScope()
+                    : (new URLSearchParams(window.location.search).get('scope') || 'published');
+                const sep = url.indexOf('?') === -1 ? '?' : '&';
+                url = url + sep + 'scope=' + encodeURIComponent(scope);
+            } catch (_) { /* ignore */ }
+
+            const response = await fetch(url);
+            if (!response.ok) throw new Error('HTTP ' + response.status);
+            return await response.json();
+        } catch (e) {
+            console.warn('fetchFeatureDetails override failed, delegating to original:', e);
+            if (prevFetch) return prevFetch(feature);
+            throw e;
+        }
+    };
+})();
+
 // --- Permission-driven enable/disable of actions on selection ---
 (function hookRenderFeatureDetails() {
     // Keep original renderer
@@ -265,23 +436,28 @@ function adaptMapConfig() {
 
         try {
             const status = String(data && data.publication_status || '').toLowerCase();
-            const scope = getScope();
             const staff = isStaffUser();
+            const ownerId = (data && data.owner_id != null) ? String(data.owner_id) : null;
+            const currentUserId = getCurrentUserId();
+            const isOwner = !!(ownerId && currentUserId != null && String(currentUserId) === ownerId);
 
-            // Rules:
-            // - Staff: can edit/delete any
-            // - Non-staff: only when in private scope (owner-only dataset) AND item is not published
-            const canModify = staff || (scope === 'private' && status !== 'published');
+            const isPublished = status === 'published';
+            const isArchived = status === 'archived';
+
+            // Align with utils/object_management/permissions.get_object_policy
+            const canEdit = !isArchived && (staff || (isOwner && !isPublished));
+            const canDelete = (isArchived && staff) || (!isArchived && ((isPublished && staff) || (!isPublished && (isOwner || staff))));
 
             const updateBtn = document.getElementById('btn-collection-update');
             const delBtn = document.getElementById('btn-collection-delete');
 
-            if (canModify) {
-                britEnableBtn(updateBtn);
-                britEnableBtn(delBtn);
-            } else {
-                britDisableBtn(updateBtn, 'Select a permitted collection (private/review) or be staff');
-                britDisableBtn(delBtn, 'Select a permitted collection (private/review) or be staff');
+            if (updateBtn) {
+                if (canEdit) { britEnableBtn(updateBtn); }
+                else { britDisableBtn(updateBtn, 'You do not have permission to edit this item.'); }
+            }
+            if (delBtn) {
+                if (canDelete) { britEnableBtn(delBtn); }
+                else { britDisableBtn(delBtn, 'You do not have permission to delete this item.'); }
             }
         } catch (e) {
             console.warn('Failed to toggle Edit/Delete availability:', e);
