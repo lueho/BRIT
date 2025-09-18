@@ -1,10 +1,12 @@
+import hashlib
 import json
 from datetime import date
 from urllib.parse import urlencode
 
 from celery.result import AsyncResult
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.db.models import Max, Min, Q, Count
+from django.core.exceptions import PermissionDenied
+from django.db.models import Count, Max, Min, Q
 from django.forms.models import model_to_dict
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse, reverse_lazy
@@ -12,7 +14,6 @@ from django.utils.decorators import method_decorator
 from django.views import View
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.generic import TemplateView
-import hashlib
 
 from bibliography.views import (
     SourceCheckUrlView,
@@ -28,12 +29,11 @@ from maps.views import (
     CatchmentDetailView,
     CatchmentUpdateView,
     GeoDataSetFormMixin,
-    GeoDataSetReviewFilteredMapView,
     GeoDataSetPrivateFilteredMapView,
     GeoDataSetPublishedFilteredMapView,
+    GeoDataSetReviewFilteredMapView,
     MapMixin,
 )
-from utils.object_management.views import ReviewObjectFilterView
 from utils.file_export.views import GenericUserCreatedObjectExportView
 from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineFormSetMixin
 from utils.object_management.views import (
@@ -900,6 +900,19 @@ class CollectionAddPropertyValueView(CollectionPropertyValueCreateView):
     def get_success_url(self):
         return reverse("collection-detail", kwargs={"pk": self.kwargs["pk"]})
 
+    def form_valid(self, form):
+        """
+        Enforce that the new property value is attached to the parent Collection
+        referenced in the URL, regardless of any submitted form value.
+        """
+        try:
+            collection = Collection.objects.get(pk=self.kwargs.get("pk"))
+        except Collection.DoesNotExist:
+            # Treat missing parent as forbidden action in this specialized route
+            raise PermissionDenied("Invalid parent collection.")
+        form.instance.collection = collection
+        return super().form_valid(form)
+
 
 class CollectionCatchmentAddAggregatedPropertyView(
     AggregatedCollectionPropertyValueCreateView
@@ -1110,7 +1123,9 @@ class CatchmentSelectView(GeoDataSetFormMixin, MapMixin, TemplateView):
         return self.request.GET.get("region")
 
 
-class WasteCollectionPublishedMapView(SoilcomDatasetVersionMixin, GeoDataSetPublishedFilteredMapView):
+class WasteCollectionPublishedMapView(
+    SoilcomDatasetVersionMixin, GeoDataSetPublishedFilteredMapView
+):
     model_name = "WasteCollection"
     template_name = "waste_collection_map.html"
     filterset_class = CollectionFilterSet
@@ -1127,7 +1142,9 @@ class WasteCollectionPublishedMapView(SoilcomDatasetVersionMixin, GeoDataSetPubl
         return kwargs
 
 
-class WasteCollectionPrivateMapView(SoilcomDatasetVersionMixin, GeoDataSetPrivateFilteredMapView):
+class WasteCollectionPrivateMapView(
+    SoilcomDatasetVersionMixin, GeoDataSetPrivateFilteredMapView
+):
     model_name = "WasteCollection"
     template_name = "waste_collection_map.html"
     filterset_class = CollectionFilterSet
@@ -1144,7 +1161,9 @@ class WasteCollectionPrivateMapView(SoilcomDatasetVersionMixin, GeoDataSetPrivat
         return kwargs
 
 
-class WasteCollectionReviewMapView(SoilcomDatasetVersionMixin, GeoDataSetReviewFilteredMapView):
+class WasteCollectionReviewMapView(
+    SoilcomDatasetVersionMixin, GeoDataSetReviewFilteredMapView
+):
     model = Collection
     model_name = "WasteCollection"
     template_name = "waste_collection_map.html"
@@ -1163,7 +1182,9 @@ class WasteCollectionReviewMapView(SoilcomDatasetVersionMixin, GeoDataSetReviewF
 
 
 @method_decorator(xframe_options_exempt, name="dispatch")
-class WasteCollectionPublishedMapIframeView(SoilcomDatasetVersionMixin, GeoDataSetPublishedFilteredMapView):
+class WasteCollectionPublishedMapIframeView(
+    SoilcomDatasetVersionMixin, GeoDataSetPublishedFilteredMapView
+):
     model_name = "WasteCollection"
     template_name = "waste_collection_map_iframe.html"
     filterset_class = CollectionFilterSet
