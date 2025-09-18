@@ -1,8 +1,8 @@
 import logging
 from types import SimpleNamespace
+
 from rest_framework import exceptions as drf_exceptions
 from rest_framework import permissions
-
 
 logger = logging.getLogger(__name__)
 
@@ -269,6 +269,22 @@ def get_object_policy(user, obj, request=None, review_mode=False):
     is_published = bool(getattr(obj, "is_published", False))
     is_declined = bool(getattr(obj, "is_declined", False))
     is_archived = bool(getattr(obj, "is_archived", False))
+    # Fallbacks using raw publication_status if convenience properties are unavailable
+    try:
+        _status = getattr(obj, "publication_status", None)
+        if _status is not None:
+            if not is_private and _status == "private":
+                is_private = True
+            if not is_in_review and _status == "review":
+                is_in_review = True
+            if not is_published and _status == "published":
+                is_published = True
+            if not is_declined and _status == "declined":
+                is_declined = True
+            if not is_archived and _status == "archived":
+                is_archived = True
+    except Exception:
+        pass
 
     # Moderator rights (per-model 'can_moderate_<modelname>' or staff)
     try:
@@ -283,9 +299,27 @@ def get_object_policy(user, obj, request=None, review_mode=False):
     if request is None:
         request = SimpleNamespace(user=user)
 
+    logger.debug(
+        "Entering get_object_policy for obj=%s user=%s",
+        getattr(obj, "pk", None),
+        getattr(user, "id", None),
+    )
+
     # Review workflow permissions
     # Submit/withdraw must mirror view logic (owners OR staff may act when status matches)
-    # Allow resubmission from 'declined' and withdrawing to private when declined as well
+    # Allow resubmission from 'declined' and first submission from 'private'
+    logger.debug(
+        "get_object_policy status: auth=%s archived=%s owner=%s staff=%s private=%s declined=%s in_review=%s obj=%s user=%s",
+        is_authenticated,
+        is_archived,
+        is_owner,
+        is_staff,
+        is_private,
+        is_declined,
+        is_in_review,
+        getattr(obj, "pk", None),
+        getattr(user, "id", None),
+    )
     can_submit_review = bool(
         is_authenticated
         and not is_archived
@@ -306,6 +340,12 @@ def get_object_policy(user, obj, request=None, review_mode=False):
         bool(perm.has_reject_permission(request, obj)) if is_authenticated else False
     )
 
+    logger.debug(
+        "get_object_policy actions: can_submit=%s can_withdraw=%s moderator=%s",
+        can_submit_review,
+        can_withdraw_review,
+        is_moderator,
+    )
     # CRUD-like actions
     has_update_url = bool(getattr(obj, "update_url", None))
     # Support both modal and direct delete URLs across templates
