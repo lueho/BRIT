@@ -1,21 +1,24 @@
-{% extends 'simple_detail_card.html' %}
+{% extends "simple_detail_card.html" %}
 
 {% block detail_body %}
     <p class="card-text">
-        <strong>Name:</strong><br>
+        <strong>Name:</strong>
+        <br>
         {{ object.name }}
     </p>
     {% if object.categories.exists %}
         <p class="card-text">
-        <strong>Categories:</strong><br>
+            <strong>Categories:</strong>
+        </p>
         {% for category in object.categories.all %}
             <a href="{{ category.get_absolute_url }}">{{ category.name }}</a>
-            {% if not forloop.last %}, {% endif %}
+            {% if not forloop.last %},{% endif %}
         {% endfor %}
     {% endif %}
     {% if object.description %}
         <p class="card-text">
-            <strong>Description:</strong><br>
+            <strong>Description:</strong>
+            <br>
             {{ object.description }}
         </p>
     {% endif %}

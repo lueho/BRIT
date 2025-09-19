@@ -1,13 +1,17 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 
-{% block title %}BRIT | Waste Collection{% endblock %}
+{% block title %}
+    BRIT | Waste Collection
+{% endblock title %}
 
 {% block content %}
 
     <div class="row">
         <div class="col col-12 col-md-6">
             <div class="card shadow h-100">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3"><h5 class="mb-0">Materials</h5></div>
+                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+                    <h5 class="mb-0">Materials</h5>
+                </div>
                 <div class="card-body">
                     <p class="card-text">
                         This is a database for heterogeneous bioresources, also referred to as materials in this
@@ -19,8 +23,7 @@
                         Components of each group must add up to 100%.
                     </p>
                 </div>
-                <div class="card-footer">
-                </div>
+                <div class="card-footer"></div>
             </div>
         </div>
     </div>
@@ -30,7 +33,10 @@
         <div class="col col-12 col-md-6 col-lg-3 mt-4">
             <div class="card shadow h-100">
                 <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-                    <h5 class="mb-0"><a href="{% url 'material-list' %}" class="stretched-link text-decoration-none text-body">Materials</a></h5>
+                    <h5 class="mb-0">
+                        <a href="{% url 'material-list' %}"
+                           class="stretched-link text-decoration-none text-body">Materials</a>
+                    </h5>
                 </div>
                 <div class="card-body">
                     <p class="card-text">
@@ -46,7 +52,10 @@
         <div class="col col-12 col-md-6 col-lg-3 mt-4">
             <div class="card shadow h-100">
                 <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-                    <h5 class="mb-0"><a href="{% url 'materialcategory-list' %}" class="stretched-link text-decoration-none text-body">Material Categories</a></h5>
+                    <h5 class="mb-0">
+                        <a href="{% url 'materialcategory-list' %}"
+                           class="stretched-link text-decoration-none text-body">Material Categories</a>
+                    </h5>
                 </div>
                 <div class="card-body">
                     <p class="card-text">
@@ -62,7 +71,10 @@
         <div class="col col-12 col-md-6 col-lg-3 mt-4">
             <div class="card shadow h-100">
                 <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-                    <h5 class="mb-0"><a href="{% url 'analyticalmethod-list' %}" class="stretched-link text-decoration-none text-body">Analytical Methods</a></h5>
+                    <h5 class="mb-0">
+                        <a href="{% url 'analyticalmethod-list' %}"
+                           class="stretched-link text-decoration-none text-body">Analytical Methods</a>
+                    </h5>
                 </div>
                 <div class="card-body">
                     <p class="card-text">
@@ -79,7 +91,10 @@
         <div class="col col-12 col-md-6 col-lg-3 mt-4">
             <div class="card shadow h-100">
                 <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-                    <h5 class="mb-0"><a href="{% url 'sampleseries-list' %}" class="stretched-link text-decoration-none text-body">Sample Series</a></h5>
+                    <h5 class="mb-0">
+                        <a href="{% url 'sampleseries-list' %}"
+                           class="stretched-link text-decoration-none text-body">Sample Series</a>
+                    </h5>
                 </div>
                 <div class="card-body">
                     <p class="card-text">
@@ -96,7 +111,10 @@
         <div class="col col-12 col-md-6 col-lg-3 mt-4">
             <div class="card shadow h-100">
                 <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-                    <h5 class="mb-0"><a href="{% url 'sample-list' %}" class="stretched-link text-decoration-none text-body">Samples</a></h5>
+                    <h5 class="mb-0">
+                        <a href="{% url 'sample-list' %}"
+                           class="stretched-link text-decoration-none text-body">Samples</a>
+                    </h5>
                 </div>
                 <div class="card-body">
                     <p class="card-text">
@@ -114,7 +132,10 @@
         <div class="col col-12 col-md-6 col-lg-3 mt-4">
             <div class="card shadow h-100">
                 <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-                    <h5 class="mb-0"><a href="{% url 'materialcomponentgroup-list' %}" class="stretched-link text-decoration-none text-body">Component Group</a></h5>
+                    <h5 class="mb-0">
+                        <a href="{% url 'materialcomponentgroup-list' %}"
+                           class="stretched-link text-decoration-none text-body">Component Group</a>
+                    </h5>
                 </div>
                 <div class="card-body">
                     <p class="card-text">
@@ -124,14 +145,18 @@
                     </p>
                 </div>
                 <div class="card-footer">
-                    <a href="{% url 'materialcomponentgroup-list' %}" class="btn btn-primary">View Component Groups</a>
+                    <a href="{% url 'materialcomponentgroup-list' %}"
+                       class="btn btn-primary">View Component Groups</a>
                 </div>
             </div>
         </div>
         <div class="col col-12 col-md-6 col-lg-3 mt-4">
             <div class="card shadow h-100">
                 <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-                    <h5 class="mb-0"><a href="{% url 'materialcomponent-list' %}" class="stretched-link text-decoration-none text-body">Material Component</a></h5>
+                    <h5 class="mb-0">
+                        <a href="{% url 'materialcomponent-list' %}"
+                           class="stretched-link text-decoration-none text-body">Material Component</a>
+                    </h5>
                 </div>
                 <div class="card-body">
                     <p class="card-text">
@@ -149,7 +174,10 @@
         <div class="col col-12 col-md-6 col-lg-3 mt-4">
             <div class="card shadow h-100">
                 <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-                    <h5 class="mb-0"><a href="{% url 'materialproperty-list' %}" class="stretched-link text-decoration-none text-body">Material Properties</a></h5>
+                    <h5 class="mb-0">
+                        <a href="{% url 'materialproperty-list' %}"
+                           class="stretched-link text-decoration-none text-body">Material Properties</a>
+                    </h5>
                 </div>
                 <div class="card-body">
                     <p class="card-text">

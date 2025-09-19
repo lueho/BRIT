@@ -1,12 +1,14 @@
-{% extends 'simple_detail_card.html' %}
+{% extends "simple_detail_card.html" %}
 
 {% block detail_body %}
     <p class="card-text">
-        <strong>Name:</strong><br>
+        <strong>Name:</strong>
+        <br>
         {{ object.name }}
     </p>
     <p class="card-text">
-        <strong>Technique:</strong><br>
+        <strong>Technique:</strong>
+        <br>
         {% if object.technique %}
             {{ object.technique }}
         {% else %}
@@ -14,7 +16,8 @@
         {% endif %}
     </p>
     <p class="card-text">
-        <strong>Standard:</strong><br>
+        <strong>Standard:</strong>
+        <br>
         {% if object.standard %}
             {{ object.standard }}
         {% else %}
@@ -22,7 +25,8 @@
         {% endif %}
     </p>
     <p class="card-text">
-        <strong>Detection limit:</strong><br>
+        <strong>Detection limit:</strong>
+        <br>
         {% if object.lower_detection_limit %}
             {{ object.lower_detection_limit }}
         {% else %}
@@ -31,7 +35,8 @@
     </p>
     {% if object.description %}
         <p class="card-text">
-            <strong>Description:</strong><br>
+            <strong>Description:</strong>
+            <br>
             {{ object.description }}
         </p>
     {% endif %}
@@ -41,7 +46,9 @@
         </p>
         <ul>
             {% for source in object.sources.all %}
-                <li><a href="{% url 'source-detail' source.pk %}">{{ source.abbreviation }}</a></li>
+                <li>
+                    <a href="{% url 'source-detail' source.pk %}">{{ source.abbreviation }}</a>
+                </li>
             {% endfor %}
         </ul>
     {% endif %}

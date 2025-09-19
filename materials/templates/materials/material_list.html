@@ -1,38 +1,38 @@
-{% extends 'simple_list_card.html' %}
+{% extends "simple_list_card.html" %}
 {% load user_created_object_tags %}
 
-{% block title %}BRIT | Materials | List{% endblock %}
+{% block title %}
+    BRIT | Materials | List
+{% endblock title %}
 
 {% block list_table %}
     <table class="table">
         <thead>
-        <tr>
-            <th>Material</th>
-            <th>Categories</th>
-            <th>Description</th>
-            {% if object_list.model|is_user_created %}
-                <th class="actions-column">Status/Actions</th>
-            {% endif %}
-        </tr>
+            <tr>
+                <th>Material</th>
+                <th>Categories</th>
+                <th>Description</th>
+                {% if object_list.model|is_user_created %}<th class="actions-column">Status/Actions</th>{% endif %}
+            </tr>
         </thead>
         <tbody>
-        {% for object in object_list %}
-            <tr>
-                <td><a href="{% url 'material-detail' object.pk %}">{{ object.name }}</a></td>
-                <td>
-                    {% for category in object.categories.all %}
-                        <a href="{% url 'materialcategory-detail' category.pk %}">{{ category }}</a>
-                        {% if not forloop.last %},{% endif %}
-                    {% endfor %}
-                </td>
-                <td>{{ object.description }}</td>
-                {% if object_list.model|is_user_created %}
-                    <td class="actions-column mobile-no-label">
-                        {% include 'object_management/status_actions_cell.html' %}
+            {% for object in object_list %}
+                <tr>
+                    <td>
+                        <a href="{% url 'material-detail' object.pk %}">{{ object.name }}</a>
                     </td>
-                {% endif %}
-            </tr>
-        {% endfor %}
+                    <td>
+                        {% for category in object.categories.all %}
+                            <a href="{% url 'materialcategory-detail' category.pk %}">{{ category }}</a>
+                            {% if not forloop.last %},{% endif %}
+                        {% endfor %}
+                    </td>
+                    <td>{{ object.description }}</td>
+                    {% if object_list.model|is_user_created %}
+                        <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
+                    {% endif %}
+                </tr>
+            {% endfor %}
         </tbody>
     </table>
 {% endblock list_table %}

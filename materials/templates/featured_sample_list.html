@@ -1,14 +1,20 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% load static %}
 
-{% block title %}BRIT | Material Samples{% endblock title %}
+{% block title %}
+    BRIT | Material Samples
+{% endblock title %}
 
 {% block content %}
 
     <div class="row">
         <div class="col col-12 col-md-6 mb-4">
             <div class="card shadow h-100">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3"><h5 class="mb-0"><i class="fas fa-fw fa-leaf"></i> Materials</h5></div>
+                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+                    <h5 class="mb-0">
+                        <i class="fas fa-fw fa-leaf"></i> Materials
+                    </h5>
+                </div>
                 <div class="card-body">
                     <p class="card-text">
                         BRIT Materials is a module to define and analyze heterogeneous materials from biogeneous
@@ -32,7 +38,9 @@
         <div class="col col-12 col-md-6 mb-4">
             <div class="card shadow h-100">
                 <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-                    <h5 class="mb-0"><i class="fas fa-fw fa-graduation-cap"></i> Learning Material</h5>
+                    <h5 class="mb-0">
+                        <i class="fas fa-fw fa-graduation-cap"></i> Learning Material
+                    </h5>
                 </div>
                 <div class="card-body">
                     <p class="card-text">
@@ -43,23 +51,17 @@
                     <ul>
                         <li>
                             <a href="https://www.hoou.de/projects/lff/pages/residue-and-by-product-based-bioresources"
-                               target="_blank">"Residue and By-Product Based Bioresources"
-                            </a>
+                               target="_blank">"Residue and By-Product Based Bioresources"</a>
                         </li>
                         <li>
                             <a href="https://www.hoou.de/projects/lff/pages/sustainable-urban-bioresource-management"
-                               target="_blank">"Sustainable Urban Bioresource Management
-                            </a>
+                               target="_blank">"Sustainable Urban Bioresource Management</a>
                         </li>
                     </ul>
-                    <p class="card-text">
-                        An in depth short track course on the circular economy of food waste:
-                    </p>
+                    <p class="card-text">An in depth short track course on the circular economy of food waste:</p>
                     <ul>
                         <li>
-                            <a href="https://www.hoou.de/projects/biocycle/" target="_blank">
-                                The BioCycle - From Resource to Waste to Resource.
-                            </a>
+                            <a href="https://www.hoou.de/projects/biocycle/" target="_blank">The BioCycle - From Resource to Waste to Resource.</a>
                         </li>
                     </ul>
                 </div>
@@ -69,9 +71,7 @@
     <div class="row">
 
         {% for object in object_list %}
-            <div class="col col-12 col-md-6 col-lg-3 mb-4">
-                {% include 'material_card.html' %}
-            </div>
+            <div class="col col-12 col-md-6 col-lg-3 mb-4">{% include "material_card.html" %}</div>
         {% endfor %}
 
     </div>

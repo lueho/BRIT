@@ -1,59 +1,61 @@
-{% extends 'filtered_list.html' %}
+{% extends "filtered_list.html" %}
 {% load crispy_forms_tags %}
 {% load user_created_object_tags %}
 {% load moderation_tags %}
 
-{% block title %}BRIT | Materials | Samples{% endblock %}
+{% block title %}
+    BRIT | Materials | Samples
+{% endblock title %}
 
-{% block list_card_header %}<strong>Samples</strong>{% endblock %}
+{% block list_card_header %}
+    <strong>Samples</strong>
+{% endblock list_card_header %}
 
 {% block list_table %}
     <table class="table table-responsive-stack">
         <thead>
-        <tr>
-            <th>Id</th>
-            <th>Name</th>
-            <th>Material</th>
-            {% if object_list.model|is_user_created %}
-                <th class="actions-column">Status/Actions</th>
-            {% endif %}
-        </tr>
+            <tr>
+                <th>Id</th>
+                <th>Name</th>
+                <th>Material</th>
+                {% if object_list.model|is_user_created %}<th class="actions-column">Status/Actions</th>{% endif %}
+            </tr>
         </thead>
         <tbody>
-        {% for object in object_list %}
-            <tr>
-                <td data-label="Id"><a href="{% detail_or_review_url object %}">{{ object.id }}</a></td>
-                <td data-label="Name"><a href="{% url 'sample-detail' object.pk %}">{{ object.name }}</a></td>
-                <td data-label="Material">
-                    <a href="{% url 'material-detail' object.material.pk %}">
-                        {{ object.material.name }}
-                    </a>
-                </td>
-                {% if object_list.model|is_user_created %}
-                    <td class="actions-column mobile-no-label">
-                        {% include 'object_management/status_actions_cell.html' %}
+            {% for object in object_list %}
+                <tr>
+                    <td data-label="Id">
+                        <a href="{% detail_or_review_url object %}">{{ object.id }}</a>
                     </td>
-                {% endif %}
-            </tr>
-        {% endfor %}
+                    <td data-label="Name">
+                        <a href="{% url 'sample-detail' object.pk %}">{{ object.name }}</a>
+                    </td>
+                    <td data-label="Material">
+                        <a href="{% url 'material-detail' object.material.pk %}">{{ object.material.name }}</a>
+                    </td>
+                    {% if object_list.model|is_user_created %}
+                        <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
+                    {% endif %}
+                </tr>
+            {% endfor %}
         </tbody>
-        <tfoot>
-        </tfoot>
     </table>
 {% endblock list_table %}
 
-{# Provide Options pane content instead of footer dropdown #}
 {% block options_pane_body %}
     {% if create_permission in perms or user.is_staff %}
-    <a class="btn btn-success w-100 mb-2" href="{{ object_list.model.create_url }}" aria-label="Create new {{ object_list.model.get_verbose_name }}">
-        <i class="fas fa-plus"></i> Create new {{ object_list.model.get_verbose_name }}
-    </a>
+        <a class="btn btn-success w-100 mb-2"
+           href="{{ object_list.model.create_url }}"
+           aria-label="Create new {{ object_list.model.get_verbose_name }}">
+            <i class="fas fa-plus"></i> Create new {{ object_list.model.get_verbose_name }}
+        </a>
     {% endif %}
 {% endblock options_pane_body %}
 
-{# Hide Learning tab and pane on this page #}
-{% block learning_tab_button %}{% endblock learning_tab_button %}
-{% block learning_tab_pane %}{% endblock learning_tab_pane %}
+{% block learning_tab_button %}
+{% endblock learning_tab_button %}
+{% block learning_tab_pane %}
+{% endblock learning_tab_pane %}
 
 {% block filter_body %}
     <form method="get">

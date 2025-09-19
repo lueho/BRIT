@@ -1,42 +1,44 @@
-{% extends 'filtered_list.html' %}
+{% extends "filtered_list.html" %}
 {% load crispy_forms_tags %}
 {% load user_created_object_tags %}
 {% load moderation_tags %}
 
-{% block title %}BRIT | Materials | Sample Series{% endblock %}
+{% block title %}
+    BRIT | Materials | Sample Series
+{% endblock title %}
 
-{% block list_card_header %}<strong>Sample Series</strong>{% endblock %}
+{% block list_card_header %}
+    <strong>Sample Series</strong>
+{% endblock list_card_header %}
 
 {% block list_table %}
     <table class="table table-responsive-stack">
         <thead>
-        <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>Material</th>
-            {% if object_list.model|is_user_created %}
-                <th class="actions-column">Status/Actions</th>
-            {% endif %}
-        </tr>
+            <tr>
+                <th>ID</th>
+                <th>Name</th>
+                <th>Material</th>
+                {% if object_list.model|is_user_created %}<th class="actions-column">Status/Actions</th>{% endif %}
+            </tr>
         </thead>
         <tbody>
-        {% for object in object_list %}
-            <tr>
-                <td data-label="Id"><a href="{% detail_or_review_url object %}">{{ object.id }}</a></td>
-                <td data-label="Name"><a href="{% url 'sampleseries-detail' object.pk %}">{{ object.name }}</a></td>
-                <td data-label="Material">
-                    <a href="{% url 'material-detail' object.material.pk %}">{{ object.material.name }}</a>
-                </td>
-                {% if object_list.model|is_user_created %}
-                    <td class="actions-column mobile-no-label">
-                        {% include 'object_management/status_actions_cell.html' %}
+            {% for object in object_list %}
+                <tr>
+                    <td data-label="Id">
+                        <a href="{% detail_or_review_url object %}">{{ object.id }}</a>
                     </td>
-                {% endif %}
-            </tr>
-        {% endfor %}
+                    <td data-label="Name">
+                        <a href="{% url 'sampleseries-detail' object.pk %}">{{ object.name }}</a>
+                    </td>
+                    <td data-label="Material">
+                        <a href="{% url 'material-detail' object.material.pk %}">{{ object.material.name }}</a>
+                    </td>
+                    {% if object_list.model|is_user_created %}
+                        <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
+                    {% endif %}
+                </tr>
+            {% endfor %}
         </tbody>
-        <tfoot>
-        </tfoot>
     </table>
 {% endblock list_table %}
 

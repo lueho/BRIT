@@ -1,5 +1,5 @@
 {% extends base_template %}
-{% load i18n moderation_tags %}
+{% load moderation_tags %}
 
 {#
 Wrapper template that renders a prominent Review card at the very top of the
@@ -8,4 +8,4 @@ page, then defers to the model's regular detail template content.
 
 {% block content %}
   {{ block.super }}
-{% endblock %}
+{% endblock content %}
