@@ -1,15 +1,17 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% load static %}
+{% load moderation_tags %}
 
 {% block content %}
 
+    {% object_policy object as policy %}
     <div class="row mb-4">
         <div class="col col-12 col-md-6 col-lg-3">
             <div class="card shadow">
                 <div class="card-header bg-body-tertiary border-bottom-0 py-3"><h5 class="mb-0">{{ object.material.name }}</h5></div>
                 {% if object.image %}
                     <div class="card-img-top">
-                        <img class="w-100 m-0" src="{{ object.image.url }}" alt="Image of {{ object.material.name }}">
+                        <img class="w-100 m-0" src="{{ object.image.url }}" alt="Image of {{ object.material.name }}" width="100%" height="auto">
                     </div>
                 {% endif %}
                 <div class="card-body">
@@ -33,37 +35,62 @@
                 </div>
                 <div class="card-footer">
                     <div id="btn-edit-sample-series" class="collapse multi-collapse">
-                        {% if object.update_url %}
-                                    {% if user.is_staff %}
-                                    <a href="{% url 'sampleseries-update' object.pk %}?next={{ request.path }}"
-                                    class="nowrap me-3">
-                                     <i class="fas fa-fw fa-edit"></i> Edit
-                                 </a>
-                                    {% elif user == object.owner %}
-                                        {% if object.publication_status != object.STATUS_PUBLISHED %}
-                                        <a href="{% url 'sampleseries-update' object.pk %}?next={{ request.path }}"
-                                        class="nowrap me-3">
-                                         <i class="fas fa-fw fa-edit"></i> Edit
-                                     </a>
-                                        {% endif %}
-                                    {% endif %}
-                                {% endif %}
-                        {% if user == object.owner or user.is_staff %}
-                            <a href="{% url 'sampleseries-duplicate' object.pk %}"
-                               class="nowrap me-3">
-                                <i class="fas fa-fw fa-copy"></i> Duplicate
+                        {# Edit: staff always; owners only when not published; not archived #}
+                        {% if policy.is_staff %}
+                          <a href="{% url 'sampleseries-update' object.pk %}?next={{ request.path }}" class="nowrap me-3">
+                            <i class="fas fa-fw fa-pen-to-square"></i> Edit
+                          </a>
+                        {% elif policy.is_owner %}
+                          {% if not policy.is_published %}
+                            {% if not policy.is_archived %}
+                              <a href="{% url 'sampleseries-update' object.pk %}?next={{ request.path }}" class="nowrap me-3">
+                                <i class="fas fa-fw fa-pen-to-square"></i> Edit
+                              </a>
+                            {% endif %}
+                          {% endif %}
+                        {% endif %}
+
+                        {# Duplicate: user must have add permission for model #}
+                        {% if policy.is_authenticated %}
+                          {% if policy.can_duplicate %}
+                            <a href="{% url 'sampleseries-duplicate' object.pk %}" class="nowrap me-3">
+                              <i class="fas fa-fw fa-copy"></i> Duplicate
                             </a>
-                            <a href="{% url 'sampleseries-add-distribution-modal' object.pk %}"
-                               class="modal-link nowrap me-3">
-                                <i class="fas fa-fw fa-plus-circle"></i> Add distribution
+                          {% endif %}
+                        {% endif %}
+
+                        {# Add distribution: manage samples allowed for owner/staff when not published/archived #}
+                        {% if policy.can_manage_samples %}
+                          <a href="{% url 'sampleseries-add-distribution-modal' object.pk %}"
+                             class="modal-link nowrap me-3">
+                            <i class="fas fa-fw fa-circle-plus"></i> Add distribution
+                          </a>
+                        {% endif %}
+
+                        {# Delete: follow centralized policy rules (minus URL attribute requirement) #}
+                        {% if policy.is_archived %}
+                          {% if policy.is_staff %}
+                            <a href="{% url 'sampleseries-delete-modal' object.pk %}" class="modal-link nowrap me-3">
+                              <i class="fas fa-fw fa-trash"></i> Delete
                             </a>
-                            <a href="{% url 'sampleseries-delete-modal' object.pk %}"
-                               class="modal-link nowrap me-3">
+                          {% endif %}
+                        {% else %}
+                          {% if policy.is_published %}
+                            {% if policy.is_staff %}
+                              <a href="{% url 'sampleseries-delete-modal' object.pk %}" class="modal-link nowrap me-3">
                                 <i class="fas fa-fw fa-trash"></i> Delete
-                            </a>
+                              </a>
+                            {% endif %}
+                          {% else %}
+                            {% if policy.is_owner or policy.is_staff %}
+                              <a href="{% url 'sampleseries-delete-modal' object.pk %}" class="modal-link nowrap me-3">
+                                <i class="fas fa-fw fa-trash"></i> Delete
+                              </a>
+                            {% endif %}
+                          {% endif %}
                         {% endif %}
                         <a href="{% url 'materials-dashboard' %}" class="nowrap me-3">
-                            <i class="fas fa-fw fa-th-large"></i> Explorer
+                            <i class="fas fa-fw fa-table-cells-large"></i> Explorer
                         </a>
                     </div>
                 </div>

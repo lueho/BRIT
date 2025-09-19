@@ -63,19 +63,25 @@
            title="Review feedback">
           <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review feedback</span>
         </a>
+      {% elif policy.is_in_review %}
+        {% if policy.is_owner or policy.is_staff or policy.is_moderator %}
+          <a class="btn btn-sm btn-outline-secondary"
+             href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
+             title="Review view">
+            <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review view</span>
+          </a>
+        {% endif %}
       {% endif %}
     </div>
   </div>
   {# Reject handled via global modal scaffold (modal-link in options pane) #}
-  {% endblock detail_header_actions %}
+{% endblock detail_header_actions %}
 {% block detail_top_image %}
   {% if not review_mode %}
-    <div class="card-img-top" style="height: 240px;">
-      {% leaflet_map "main" %}
-    </div>
+    <div class="card-img-top" style="height: 240px;">{% leaflet_map "main" %}</div>
   {% endif %}
 {% endblock detail_top_image %}
- 
+
 {% block detail_body %}
   <p class="card-text">
     <strong>Catchment:</strong>
@@ -382,6 +388,16 @@
     </a>
   {% endif %}
 
+  {# Navigate to Review view if currently in review #}
+  {% if policy.is_in_review and not review_mode %}
+    {% if policy.is_owner or policy.is_staff or policy.is_moderator %}
+      <a class="btn btn-outline-secondary w-100 mb-2"
+         href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
+        <i class="fas fa-clipboard-check"></i> Review view
+      </a>
+    {% endif %}
+  {% endif %}
+
   {# Review workflow #}
   {% if policy.can_submit_review %}
     <a class="btn btn-outline-primary w-100 mb-2 modal-link"
@@ -393,7 +409,7 @@
   {% if object.is_in_review %}
     {% if policy.can_withdraw_review %}
       <a class="btn btn-outline-warning w-100 mb-2 modal-link"
-         href="{% url 'object_management:withdraw_from_review_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
+         href="{% url 'object_management:withdraw_from_review_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={% if review_mode %}{{ object.get_absolute_url }}{% else %}{{ request.get_full_path|urlencode }}{% endif %}">
         <i class="fas fa-rotate-left"></i> {% trans "Withdraw from Review" %}
       </a>
     {% endif %}

@@ -6,6 +6,25 @@ Wrapper template that renders a prominent Review card at the very top of the
 page, then defers to the model's regular detail template content.
 #}
 
+{% block detail_header_actions %}
+  {{ block.super }}
+  <div class="btn-group ms-2" role="group">
+    {% if request.GET.next %}
+      <a class="btn btn-sm btn-outline-secondary"
+         href="{{ request.GET.next }}"
+         title="Back to details">
+        <i class="fas fa-file-lines"></i> <span class="d-none d-sm-inline">Back to details</span>
+      </a>
+    {% else %}
+      <a class="btn btn-sm btn-outline-secondary"
+         href="{{ object.get_absolute_url }}"
+         title="Back to details">
+        <i class="fas fa-file-lines"></i> <span class="d-none d-sm-inline">Back to details</span>
+      </a>
+    {% endif %}
+  </div>
+{% endblock detail_header_actions %}
+
 {% block content %}
   {{ block.super }}
 {% endblock content %}

@@ -2,117 +2,134 @@
 
 This document outlines the permission system for UserCreatedObject models across both class-based views and viewsets.
 
-## Architecture Overview
+## Single source of truth
 
-BRIT uses a dual architecture for handling UserCreatedObject models:
+All permission checks and button visibility are centralized in `utils/object_management/permissions.py`:
 
-1. **Django Class-Based Views**: Used for template-rendered HTML responses
-2. **Django REST Framework ViewSets**: Used for API endpoints returning JSON
+- `UserCreatedObjectPermission` — backend permission class used by DRF and enforced in CBVs via mixins and explicit checks.
+- `get_object_policy(user, obj, request=None, review_mode=False)` — computes a unified policy dict consumed by templates and views for button visibility and UI behavior.
 
-Both systems should enforce the same permission rules and publication workflow, ensuring consistent behavior regardless of the interface.
+Templates should consume the policy via templatetags in `utils/object_management/templatetags/moderation_tags.py`:
 
-## Core Permission Concepts
+- `{% object_policy object as policy %}` returns the policy dict.
+- `{{ user|can_moderate:object }}` checks per‑model moderator rights.
 
-### Publication Status
+Avoid ad‑hoc permission logic elsewhere; do not reimplement checks in views or templates.
 
-UserCreatedObjects have a `publication_status` field with possible values:
+## Roles and states
 
-- `private`: Only visible to the owner and staff
-- `review`: In review process - visible to owner, moderators and staff
-- `published`: Publicly visible to all users
-- `archived`: Historical version - visible to owner and staff
+- Anonymous — not authenticated.
+- Authenticated — logged in but neither owner, moderator, nor staff.
+- Owner — `obj.owner == request.user`.
+- Moderator — per‑model permission `can_moderate_<model>` or staff.
+- Staff — `is_staff=True`.
 
-### Permission Rules
+Publication states (`obj.publication_status` and convenience flags):
 
-| Action | Object Status | Anonymous Users | Regular Users | Object Owners | Moderators/Staff |
-|--------|---------------|-----------------|---------------|---------------|------------------|
-| View   | published     | ✅              | ✅            | ✅            | ✅               |
-| View   | review        | ❌              | ❌            | ✅            | ✅               |
-| View   | private       | ❌              | ❌            | ✅            | ✅               |
-| View   | archived      | ❌              | ❌            | ✅            | ✅               |
-| Create | N/A           | ❌              | ✅ (with permission) | ✅ (with permission) | ✅               |
-| Edit   | published     | ❌              | ❌            | ❌            | ✅               |
-| Edit   | review        | ❌              | ❌            | ✅            | ✅               |
-| Edit   | private       | ❌              | ❌            | ✅            | ❌               |
-| Edit   | archived      | ❌              | ❌            | ❌            | ✅               |
+- `private`, `review`, `published`, `declined`, `archived`.
 
-### Review Workflow Actions
+## Read access (views vs API)
 
-| Action              | Allowed Users                    | Requirements                       |
-|---------------------|----------------------------------|-----------------------------------|
-| register_for_review | Object owner                     | Object is 'private'               |
-| withdraw_from_review| Object owner                     | Object is 'review'                |
-| approve             | Moderators                       | Object is 'review'                |
-| reject              | Moderators                       | Object is 'review'                |
-| archive             | Moderators/Owner (if published)  | Object is 'published'             |
+### HTML Class‑Based Views (CBVs)
 
-## Implementation for Class-Based Views
+Source: `UserCreatedObjectReadAccessMixin.test_func()` in `utils/object_management/views.py`.
 
-### Mixins
+| Object state | Anonymous | Authenticated (not owner/staff) | Owner | Staff |
+|--------------|-----------|---------------------------------|-------|-------|
+| published    | ✅        | ✅                              | ✅    | ✅    |
+| review       | ❌        | ❌                              | ✅    | ✅    |
+| private      | ❌        | ❌                              | ✅    | ✅    |
+| declined     | ❌        | ❌                              | ✅    | ✅    |
+| archived     | ❌        | ❌                              | ✅    | ✅    |
 
-1. **UserCreatedObjectReadAccessMixin**: Controls read access to objects
-   - Published objects: accessible to all users
-   - Unpublished objects: only accessible to owners and staff
+Note: Non‑staff moderators (users with `can_moderate_<model>`) can access the dedicated review UI, see “Review UI access” below, but not the regular detail view of private/declined items via this mixin.
 
-2. **UserCreatedObjectWriteAccessMixin**: Controls write access to objects
-   - Published objects: only staff can edit
-   - Review/Private objects: only owners can edit
+### Django REST Framework (API, safe methods)
 
-3. **CreateUserObjectMixin**: Controls object creation
-   - Staff can always create objects
-   - Regular users must have appropriate model permission
+Source: `UserCreatedObjectPermission._check_safe_permissions()` in `utils/object_management/permissions.py`.
 
-### Standard Views
+| Object state | Anonymous | Authenticated (not owner/moderator/staff) | Owner | Moderator/Staff |
+|--------------|-----------|-------------------------------------------|-------|------------------|
+| published    | ✅        | ✅                                        | ✅    | ✅               |
+| review       | ❌        | ❌                                        | ✅    | ✅               |
+| private      | ❌        | ❌                                        | ✅    | ✅               |
+| archived     | ❌        | ❌                                        | ✅    | ✅               |
 
-- **UserCreatedObjectCreateView**: Object creation with owner assignment
-- **UserCreatedObjectDetailView**: Object viewing with permission checks
-- **UserCreatedObjectUpdateView**: Object editing with permission checks
-- **UserCreatedObjectDeleteView**: Object deletion with permission checks
+Notes:
 
-## Implementation for ViewSets
+- “declined” is not explicitly handled in the API safe‑method checker and currently defaults to deny; use the Review UI for owner feedback visibility. If API read‑access to declined objects is required, extend `_check_safe_permissions()` accordingly (treat declined like private).
 
-### Permission Classes
+## Actions and conditions
 
-1. **UserCreatedObjectPermission**: 
-   - Handles safe methods (GET, HEAD, OPTIONS)
-   - Handles object-level permissions based on ownership and publication status
-   - Controls workflow actions (register_for_review, approve, etc.)
-   - **CRITICAL BUG (to be fixed)**: Currently allows any authenticated user to create objects without checking model permissions
+Source: `get_object_policy()` and `UserCreatedObjectPermission` helpers. Conditions below describe who can see/use actions in the UI and who will pass backend checks.
 
-### ViewSet Classes
+| Action | Who | Conditions |
+|-------|-----|------------|
+| Create | Staff | Always |
+| Create | Authenticated user | Must have `add_<model>` permission on the model |
+| Edit | Owner | Not archived AND not published |
+| Edit | Staff | Not archived |
+| Edit | Moderator | Only allowed to change `publication_status` via PUT/PATCH; cannot modify other fields; cannot edit private objects when not owner |
+| Delete | Owner | Object is not archived AND not published OR is declined/review/private, and a delete URL is provided |
+| Delete | Staff | Any state (published and archived included), if a delete URL is provided |
+| Archive | Owner, Moderator, or Staff | Object is published and not archived |
+| Duplicate | Authenticated user | Must have `add_<model>` permission |
+| New version | Owner or Staff | Requires Duplicate permission AND object is published AND not archived |
+| Manage samples | Owner or Staff | Not published AND not archived |
+| Add property | Owner or Staff | Not published AND not archived |
+| Export | Anyone | Public objects always exportable; private export requires authenticated owner or staff |
+| Submit for review | Owner or Staff | State is `private` or `declined`; not archived |
+| Withdraw from review | Owner or Staff | State is `review` or `declined`; not archived |
+| Approve | Moderator (not owner) | Four‑eyes principle; state is `review` |
+| Reject | Moderator (not owner) | Four‑eyes principle; state is `review` |
+| View review feedback | Owner | `declined` state and not in review_mode (handled by `can_view_review_feedback`) |
 
-1. **UserCreatedObjectViewSet**:
-   - Applies UserCreatedObjectPermission
-   - Filters queryset based on authentication and publication status
-   - Provides review workflow actions as DRF actions
-   - Sets owner automatically on object creation
+Notes:
 
-### GeoJSON Support (Planned)
+- Moderator = per‑model `can_moderate_<model>` permission or staff, see `_is_moderator()`.
+- Four‑eyes principle: Approvers must not be the object owner.
+- Archive nuances: The UI policy (`get_object_policy`) and the CBV modal (`UserCreatedObjectModalArchiveView`) allow owners to archive published objects. The DRF `archive` action enforces `UserCreatedObjectPermission`, which currently denies owners modifying published objects; moderators/staff should use the API for archival.
 
-A **GeoJSONMixin** will provide geospatial functionality for UserCreatedObject viewsets:
-   - Respects the same permission model as UserCreatedObjectViewSet
-   - Supports scope-based filtering (private/published)
-   - Configurable serializer class
+## Review UI access
 
-## Required Fixes
+Source: `utils/object_management/views.py:ReviewItemDetailView`.
 
-1. **UserCreatedObjectPermission** needs to be updated to check model permissions for the 'create' action:
-   ```python
-   # In has_permission method:
-   if getattr(view, 'action', None) == 'create':
-       # Get model from viewset
-       model = view.get_queryset().model
-       app_label = model._meta.app_label
-       model_name = model._meta.model_name
-       # Check if user has 'add' permission
-       return (request.user and request.user.is_authenticated and 
-               request.user.has_perm(f'{app_label}.add_{model_name}'))
-   ```
+- Staff and per‑model moderators (`can_moderate_<model>`) can access any item’s review detail page.
+- Owners can access the review detail page only while the item is in `review` (to comment) or `declined` (to read feedback).
+- Others are not allowed.
 
-## Best Practices
+## DRF viewsets and actions
 
-1. **Consistency**: Always use the appropriate mixin/viewset for UserCreatedObject models
-2. **Permissions**: Ensure users have proper model permissions via Django admin
-3. **Testing**: Test all permission combinations (anonymous, authenticated, owner, staff)
-4. **Error Messages**: Provide clear error messages for permission failures
-5. **Documentation**: Update this document when permission logic changes
+Source: `utils/object_management/viewsets.py`.
+
+- `UserCreatedObjectViewSet` uses `UserCreatedObjectPermission` as its base `permission_classes`.
+- Actions provided: `register_for_review` (same policy as submit), `withdraw_from_review`, `approve`, `reject`, `archive`.
+- Object creation assigns `owner=self.request.user` and requires `add_<model>` permission per `UserCreatedObjectPermission.has_permission`.
+
+All API endpoints are expected to mirror the rules above; if you add new endpoints, delegate checks to `UserCreatedObjectPermission` or the specific helper methods.
+
+## Per‑model moderator permission
+
+Moderation rights are granted via `can_moderate_<model>` permissions created and distributed automatically (post‑migrate) to the configured moderators group. See `utils/object_management/signals.py` and `settings.REVIEW_MODERATORS_GROUP_NAME` (defaults to `moderators`). Staff users always qualify as moderators.
+
+## Using the policy in templates
+
+Example:
+
+```django
+{% object_policy object as policy %}
+
+{% if policy.can_submit_review %}
+  <a href="{{ object.submit_for_review_url }}" class="btn btn-primary">Submit for review</a>
+{% endif %}
+
+{% if user|can_moderate:object and policy.can_approve %}
+  <a href="{{ object.approve_url }}" class="btn btn-success">Approve</a>
+{% endif %}
+```
+
+## Best practices
+
+- Always consult `get_object_policy()` for UI decisions and button visibility.
+- In views, rely on `UserCreatedObjectPermission` and dedicated helpers (`has_submit_permission`, `has_withdraw_permission`, `has_approve_permission`, `has_reject_permission`).
+- Do not duplicate permission logic in templates or views.

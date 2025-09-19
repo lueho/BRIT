@@ -105,7 +105,7 @@
       {% elif list_type == 'review' %}
         {% if policy.is_in_review %}
           {% if policy.can_withdraw_review %}
-            <form method="post" action="{% url 'object_management:withdraw_from_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}" class="m-0 p-0">
+            <form method="post" action="{% url 'object_management:withdraw_from_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={% if policy.is_owner %}{{ object.get_absolute_url }}{% else %}{{ request.get_full_path|urlencode }}{% endif %}" class="m-0 p-0">
               {% csrf_token %}
               <button type="submit" class="dropdown-item text-start text-warning">
                 <i class="fas fa-rotate-left"></i> Withdraw from Review

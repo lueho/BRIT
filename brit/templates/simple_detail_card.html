@@ -4,7 +4,8 @@
   BRIT | {{ object.name }} details
 {% endblock title %}
 {% block content %}
-  {% if object.is_declined and request.user == object.owner and not review_mode %}
+  {% object_policy object review_mode=review_mode as policy %}
+  {% if policy.can_view_review_feedback %}
     <div class="row mt-4">
       <div class="col">
         <div class="card border-danger shadow-sm">
@@ -30,23 +31,25 @@
                   {% endif %}
                 </p>
                 <hr class="my-3" />
-                <form method="post"
-                      action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url }}">
-                  {% csrf_token %}
-                  <div class="mb-2">
-                    <label for="resubmit-comment" class="form-label">
-                      <strong>Your explanation (optional)</strong>
-                    </label>
-                    <textarea id="resubmit-comment"
-                              name="comment"
-                              rows="3"
-                              class="form-control"
-                              placeholder="Explain what you changed to address the feedback."></textarea>
-                  </div>
-                  <button type="submit" class="btn btn-danger">
-                    <i class="fas fa-paper-plane"></i> Resubmit for review
-                  </button>
-                </form>
+                {% if policy.can_submit_review %}
+                  <form method="post"
+                        action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url }}">
+                    {% csrf_token %}
+                    <div class="mb-2">
+                      <label for="resubmit-comment" class="form-label">
+                        <strong>Your explanation (optional)</strong>
+                      </label>
+                      <textarea id="resubmit-comment"
+                                name="comment"
+                                rows="3"
+                                class="form-control"
+                                placeholder="Explain what you changed to address the feedback."></textarea>
+                    </div>
+                    <button type="submit" class="btn btn-danger">
+                      <i class="fas fa-paper-plane"></i> Resubmit for review
+                    </button>
+                  </form>
+                {% endif %}
               {% else %}
                 <p class="mb-0">This submission was rejected. No additional details are available.</p>
               {% endif %}
@@ -151,34 +154,30 @@
                       {% endif %}
                     {% endblock detail_update_link %}
                     {% block detail_delete_link %}
-                      {% if object.modal_delete_url %}
+                      {% if policy.can_delete %}
                         <a class="dropdown-item modal-link" href="{{ object.modal_delete_url }}">
                           <i class="fas fa-fw fa-trash"></i> Delete
                         </a>
                       {% endif %}
                     {% endblock detail_delete_link %}
                     {% if request.user.is_authenticated %}
+                      {% object_policy object as policy %}
                       <div class="dropdown-divider"></div>
-                      {% if request.user == object.owner %}
-                        {% if object.is_declined %}
+                      {% if policy.is_owner %}
+                        {% if policy.is_declined or policy.is_in_review %}
                           <a class="dropdown-item"
-                             href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}">
-                            <i class="fas fa-fw fa-clipboard-check"></i> Review feedback
+                             href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
+                            <i class="fas fa-fw fa-clipboard-check"></i>
+                            {% if policy.is_declined %}
+                              Review feedback
+                            {% else %}
+                              Review view
+                            {% endif %}
                           </a>
-                        {% else %}
-                          <span class="dropdown-item disabled"
-                                title="Owners cannot open the review view for their own items.">
-                            <i class="fas fa-fw fa-clipboard-check"></i> Review view (not available for owners)
-                          </span>
                         {% endif %}
-                      {% elif request.user.is_staff %}
+                      {% elif policy.is_staff or policy.is_moderator %}
                         <a class="dropdown-item"
-                           href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}">
-                          <i class="fas fa-fw fa-clipboard-check"></i> Review view
-                        </a>
-                      {% elif perms.can_moderate %}
-                        <a class="dropdown-item"
-                           href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}">
+                           href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
                           <i class="fas fa-fw fa-clipboard-check"></i> Review view
                         </a>
                       {% endif %}

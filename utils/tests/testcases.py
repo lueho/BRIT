@@ -711,7 +711,7 @@ class AbstractTestCases:
                     response, self.get_update_url(self.published_object.pk)
                 )
             if self.delete_view:
-                self.assertContains(
+                self.assertNotContains(
                     response, self.get_delete_url(self.published_object.pk)
                 )
 

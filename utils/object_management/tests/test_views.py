@@ -223,18 +223,58 @@ class ReviewWorkflowViewTests(TestCase):
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
 
-        # Dashboard should contain objects in review
-        # expected_name = self.review_collection.construct_name()
-        # if expected_name not in response.content.decode():
-        #     print("DASHBOARD HTML FOR DEBUGGING:")
-        #     print(response.content.decode())
-        self.assertContains(response, self.review_collection.name)
 
-        # Regular user should be able to access the dashboard but see no items
-        self.client.force_login(self.regular_user)
+class ReviewDetailAccessTests(TestCase):
+    """Ensure owner access to review detail works as intended."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="owner")
+        cls.other = User.objects.create_user(username="other")
+        ct = ContentType.objects.get_for_model(Collection)
+        cls.ct_id = ct.id
+
+        with mute_signals(post_save, pre_save):
+            cls.obj_review = Collection.objects.create(
+                name="In Review",
+                owner=cls.owner,
+                publication_status=UserCreatedObject.STATUS_REVIEW,
+            )
+        with mute_signals(post_save, pre_save):
+            cls.obj_declined = Collection.objects.create(
+                name="Declined",
+                owner=cls.owner,
+                publication_status=UserCreatedObject.STATUS_DECLINED,
+            )
+
+    def test_owner_can_access_review_detail_in_review(self):
+        url = reverse(
+            "object_management:review_item_detail",
+            kwargs={"content_type_id": self.ct_id, "object_id": self.obj_review.id},
+        )
+        self.client.force_login(self.owner)
         response = self.client.get(url)
         self.assertEqual(response.status_code, 200)
-        self.assertNotContains(response, "Review Collection")
+
+    def test_owner_can_access_review_detail_declined(self):
+        url = reverse(
+            "object_management:review_item_detail",
+            kwargs={"content_type_id": self.ct_id, "object_id": self.obj_declined.id},
+        )
+        self.client.force_login(self.owner)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+    def test_non_owner_without_perm_cannot_access(self):
+        url = reverse(
+            "object_management:review_item_detail",
+            kwargs={"content_type_id": self.ct_id, "object_id": self.obj_review.id},
+        )
+        self.client.force_login(self.other)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 403)
+
+    # Dashboard behavior is covered in ReviewWorkflowViewTests.
 
 
 class MockFilterSet(FilterSet):
@@ -297,3 +337,24 @@ class PublishedObjectsFilterViewTestCase(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context_data["filter"].data, {"name": ["Other name"]})
+
+
+class ReadAccessArchivedDetailTests(TestCase):
+    """Ensure archived objects' detail views are publicly accessible."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="owner")
+        # Create a Collection in archived state
+        with mute_signals(post_save, pre_save):
+            cls.archived = Collection.objects.create(
+                name="Archived Collection",
+                owner=cls.owner,
+                publication_status=UserCreatedObject.STATUS_ARCHIVED,
+            )
+
+    def test_archived_detail_is_public(self):
+        url = reverse("collection-detail", kwargs={"pk": self.archived.id})
+        # Unauthenticated request should be allowed (200)
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)

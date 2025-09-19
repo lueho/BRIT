@@ -1,16 +1,32 @@
-{% extends 'geo_detail_card.html' %}
+{% extends "geo_detail_card.html" %}
 
-{% block title %}BRIT | CLOSECYCLE Showcase {{ object.name }}{% endblock %}
+{% block title %}
+    BRIT | CLOSECYCLE Showcase {{ object.name }}
+{% endblock title %}
 
-{% block detail_header %}Showcase: {{ object.name }}{% endblock %}
+{% block detail_header %}
+    Showcase: {{ object.name }}
+{% endblock detail_header %}
 
 {% block detail_body %}
-    <p class="card-text"><strong>Name:</strong><br>{{ object.name }}</p>
+    <p class="card-text">
+        <strong>Name:</strong>
+        <br>
+        {{ object.name }}
+    </p>
     {% if object.country %}
-        <p class="card-text"><strong>Country:</strong><br>{{ object.country }}</p>
+        <p class="card-text">
+            <strong>Country:</strong>
+            <br>
+            {{ object.country }}
+        </p>
     {% endif %}
     {% if object.description %}
-        <p class="card-text"><strong>Description:</strong><br>{{ object.description }}</p>
+        <p class="card-text">
+            <strong>Description:</strong>
+            <br>
+            {{ object.description }}
+        </p>
     {% endif %}
     {% block additional_details %}
         {% if involved_processes %}
@@ -19,10 +35,10 @@
             <ul>
                 {% for proc in involved_processes %}
                     <li>
-                        <a href="/processes/types/{{ proc.id }}/">{{ proc.name }}</a>
+                        <a href="{% url 'processes:type_detail' proc.id %}">{{ proc.name }}</a>
                     </li>
                 {% endfor %}
             </ul>
         {% endif %}
-    {% endblock %}
-{% endblock %}
+    {% endblock additional_details %}
+{% endblock detail_body %}

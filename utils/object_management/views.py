@@ -4,6 +4,7 @@ from urllib.parse import unquote
 from bootstrap_modal_forms.generic import (
     BSModalCreateView,
     BSModalDeleteView,
+    BSModalReadView,
     BSModalUpdateView,
 )
 from django.contrib import messages
@@ -18,7 +19,7 @@ from django.contrib.messages.views import SuccessMessageMixin
 from django.core.exceptions import ImproperlyConfigured, PermissionDenied
 from django.db.models import Q
 from django.http import HttpResponseRedirect
-from django.shortcuts import get_object_or_404, render
+from django.shortcuts import get_object_or_404
 from django.template.loader import select_template
 from django.urls import reverse
 from django.utils import timezone
@@ -100,7 +101,7 @@ class ReviewDashboardView(ListView):
         return context
 
 
-class BaseReviewActionView(LoginRequiredMixin, NextOrSuccessUrlMixin, View):
+class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
     """Base view for all review workflow actions.
 
     Provides common functionality for review actions including:
@@ -109,71 +110,188 @@ class BaseReviewActionView(LoginRequiredMixin, NextOrSuccessUrlMixin, View):
     - Success URL determination (respecting 'next' parameter)
     """
 
-    def get_object(self, request, *args, **kwargs):
-        """Get the object being reviewed based on content type and ID."""
-        content_type_id = kwargs.get("content_type_id")
-        object_id = kwargs.get("object_id")
+    permission_method: str | None = None
+    permission_denied_message: str = "You don't have permission to perform this action."
+
+    def get_object(self, request=None, *args, **kwargs):
+        """Get the object being reviewed based on content type and ID.
+
+        Accepts an optional request and varargs for compatibility with callers.
+        Resolves IDs from self.kwargs so subclasses (including modal views)
+        don't need to override this method.
+        """
+        content_type_id = self.kwargs.get("content_type_id")
+        object_id = self.kwargs.get("object_id")
 
         content_type = get_object_or_404(ContentType, pk=content_type_id)
         model_class = content_type.model_class()
         return get_object_or_404(model_class, pk=object_id)
 
-    def get_default_success_url(self, obj):
-        """Default URL to redirect to if no 'next' parameter is provided."""
-        return obj.get_absolute_url()
-
     def get_success_url(self):
         """Override to support both 'next' parameter and fallback to object URL."""
-        next_url = self.request.GET.get("next") or self.request.POST.get("next")
+        next_url = self.request.POST.get("next") or self.request.GET.get("next")
         if next_url:
             return next_url
-        return self.get_default_success_url(self.object)
+        return self.object.get_absolute_url()
+
+    def has_action_permission(self, request, obj) -> bool:
+        try:
+            perm = UserCreatedObjectPermission()
+            checker = getattr(perm, str(self.permission_method), None)
+            return bool(checker(request, obj)) if callable(checker) else False
+        except Exception:
+            return False
+
+    def test_func(self):  # type: ignore[override]
+        try:
+            obj = self.get_object()
+        except Exception:
+            return False
+        return self.has_action_permission(self.request, obj)
+
+    def ensure_permission(self, request, obj):
+        if not self.has_action_permission(request, obj):
+            raise PermissionDenied(self.permission_denied_message)
+
+    # ---- Generic review action helpers ----
+    # Subclasses should set these and can override the hooks below
+    action_attr_name: str | None = (
+        None  # e.g., 'approve', 'reject', 'submit_for_review', 'withdraw_from_review'
+    )
+    review_action = None  # e.g., ReviewAction.ACTION_APPROVED
+
+    def get_action_kwargs(self, request, obj) -> dict:
+        """Hook to pass kwargs to the model action.
+
+        Default: no kwargs. The approve flow receives the acting user via
+        handle_review_action_post(), which injects user=request.user only when
+        action_attr_name == 'approve'.
+        """
+        return {}
+
+    def _get_comment(self, request) -> str:
+        return (
+            request.POST.get("comment") or request.POST.get("message") or ""
+        ).strip()
+
+    def get_success_message(self, obj, previous_status=None) -> str:
+        """Hook to customize the success message after the action."""
+        return f"{obj._meta.verbose_name} has been updated."
+
+    def handle_review_action_post(self, request, *args, **kwargs):
+        """Shared POST flow for all review actions."""
+        # Resolve object for both modal and non-modal views
+        try:
+            self.object = self.get_object(request, *args, **kwargs)
+        except TypeError:
+            # Modal get_object may not accept request param
+            self.object = self.get_object()
+
+        # Centralized permission check
+        self.ensure_permission(request, self.object)
+
+        comment = self._get_comment(request)
+
+        # Perform the model action
+        try:
+            previous_status = getattr(self.object, "publication_status", None)
+            if not self.action_attr_name:
+                raise ImproperlyConfigured("action_attr_name must be set on the view")
+            action_callable = getattr(self.object, self.action_attr_name, None)
+            if not callable(action_callable):
+                raise ImproperlyConfigured(
+                    f"Object has no callable '{self.action_attr_name}' method"
+                )
+            action_kwargs = dict(self.get_action_kwargs(request, self.object) or {})
+            if self.action_attr_name == "approve" and "user" not in action_kwargs:
+                action_kwargs["user"] = request.user
+            action_callable(**action_kwargs)
+
+            # Fallback: if approve() did not set approved_by for any reason, set it here
+            if (
+                self.action_attr_name == "approve"
+                and getattr(self.object, "approved_by_id", None) is None
+            ):
+                try:
+                    self.object.approved_by = request.user
+                    self.object.save(update_fields=["approved_by"])
+                except Exception:
+                    pass
+
+            # Log review action
+            try:
+                ReviewAction.objects.create(
+                    content_type=ContentType.objects.get_for_model(
+                        self.object.__class__
+                    ),
+                    object_id=self.object.pk,
+                    user=request.user,
+                    action=self.review_action,
+                    comment=comment,
+                )
+            except Exception as e:
+                logger.warning(
+                    "Failed to create ReviewAction for %s: %s", self.action_attr_name, e
+                )
+
+            # Success message
+            try:
+                messages.success(
+                    request, self.get_success_message(self.object, previous_status)
+                )
+            except Exception:
+                pass
+        except Exception as e:
+            messages.error(request, f"Error performing action: {str(e)}")
+
+        return HttpResponseRedirect(self.get_success_url())
+
+    # Default POST handler for all review action views (modal and non‑modal)
+    def post(self, request, *args, **kwargs):  # type: ignore[override]
+        return self.handle_review_action_post(request, *args, **kwargs)
+
+
+class SubmitForReviewView(BaseReviewActionView):
+    """View to submit an item for review."""
+
+    permission_method = "has_submit_permission"
+    permission_denied_message = (
+        "You don't have permission to submit this item for review."
+    )
+    action_attr_name = "submit_for_review"
+    review_action = ReviewAction.ACTION_SUBMITTED
+
+
+class WithdrawFromReviewView(BaseReviewActionView):
+    """View to withdraw an item from review."""
+
+    permission_method = "has_withdraw_permission"
+    permission_denied_message = (
+        "You don't have permission to withdraw this item from review."
+    )
+    action_attr_name = "withdraw_from_review"
+    review_action = ReviewAction.ACTION_WITHDRAWN
 
 
 class ApproveItemView(BaseReviewActionView):
     """View to approve an item that is in review."""
 
-    def get_default_success_url(self, obj):
-        """Default redirect to dashboard if no 'next' parameter."""
-        return reverse("object_management:review_dashboard")
-
-    def post(self, request, *args, **kwargs):
-        self.object = self.get_object(request, *args, **kwargs)
-        obj = self.object
-
-        # Check permissions
-        if not UserCreatedObjectPermission().has_approve_permission(request, obj):
-            raise PermissionDenied("You don't have permission to approve this item.")
-
-        # Approve the item
-        try:
-            obj.approve(user=request.user)
-            # Optional comment from moderator
-            message = (
-                request.POST.get("comment") or request.POST.get("message") or ""
-            ).strip()
-            # Log approval
-            try:
-                ReviewAction.objects.create(
-                    content_type=ContentType.objects.get_for_model(obj.__class__),
-                    object_id=obj.pk,
-                    user=request.user,
-                    action=ReviewAction.ACTION_APPROVED,
-                    comment=message,
-                )
-            except Exception as e:
-                logger.warning("Failed to create ReviewAction for approval: %s", e)
-            messages.success(
-                request, f"{obj._meta.verbose_name} has been approved and published."
-            )
-        except Exception as e:
-            messages.error(request, f"Error approving item: {str(e)}")
-
-        # Redirect using the success URL (handles 'next' parameter)
-        return HttpResponseRedirect(self.get_success_url())
+    permission_method = "has_approve_permission"
+    permission_denied_message = "You don't have permission to approve this item."
+    action_attr_name = "approve"
+    review_action = ReviewAction.ACTION_APPROVED
 
 
-class BaseReviewActionModalView(UserPassesTestMixin, View):
+class RejectItemView(BaseReviewActionView):
+    """View to reject an item that is in review."""
+
+    permission_method = "has_reject_permission"
+    permission_denied_message = "You don't have permission to reject this item."
+    action_attr_name = "reject"
+    review_action = ReviewAction.ACTION_REJECTED
+
+
+class BaseReviewActionModalView(BaseReviewActionView, BSModalReadView):
     """Base modal view to render confirmation dialogs for review actions.
 
     Uses the shared modal container (#modal) via django-bootstrap-modal-forms.
@@ -182,237 +300,83 @@ class BaseReviewActionModalView(UserPassesTestMixin, View):
 
     template_name: str = ""
 
-    def get_object(self, request, *args, **kwargs):
-        content_type_id = kwargs.get("content_type_id")
-        object_id = kwargs.get("object_id")
-        content_type = get_object_or_404(ContentType, pk=content_type_id)
-        model_class = content_type.model_class()
-        return get_object_or_404(model_class, pk=object_id)
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        # Pass through 'next' if provided in the opener link; templates will append it to the form action
+        context["next_url"] = self.request.GET.get("next")
+        return context
 
-    def get(self, request, *args, **kwargs):
-        obj = self.get_object(request, *args, **kwargs)
-        # Keep the object for test_func convenience in subclasses
-        self.object = obj
-        context = {
-            "object": obj,
-            # Pass through 'next' if provided in the opener link; templates will append it to the form action
-            "next_url": request.GET.get("next"),
-        }
-        return render(request, self.template_name, context)
+    def post(self, request, *args, **kwargs):  # type: ignore[override]
+        """Preflight handling for django-bootstrap-modal-forms.
+
+        The plugin first sends an AJAX POST to validate the form. We must not
+        perform the action on that request; instead, respond with 204 so the
+        plugin submits the real (non-AJAX) POST, on which we execute the action
+        and redirect to success_url/next.
+        """
+        # Detect AJAX request as used by the package (X-Requested-With)
+        try:
+            is_ajax = request.headers.get("x-requested-with") == "XMLHttpRequest"
+        except Exception:
+            is_ajax = False
+
+        if is_ajax:
+            # Optional: enforce permission early to fail fast in the modal
+            try:
+                obj = self.get_object()
+                self.ensure_permission(request, obj)
+            except PermissionDenied:
+                # Return 403; the plugin will keep the modal open (no redirect)
+                from django.http import HttpResponseForbidden
+
+                return HttpResponseForbidden(self.permission_denied_message)
+            # Valid preflight – let the plugin proceed with real submit
+            from django.http import HttpResponse
+
+            return HttpResponse(status=204)
+
+        # Non-AJAX: perform the action and redirect
+        return super().post(request, *args, **kwargs)
 
 
 class SubmitForReviewModalView(BaseReviewActionModalView):
     template_name = "object_management/submit_for_review_modal.html"
 
-    def test_func(self):
-        obj = getattr(self, "object", None)
-        if obj is None:
-            try:
-                obj = self.get_object(self.request, **self.kwargs)
-            except Exception:
-                return False
-        user = self.request.user
-        return user.is_authenticated and (user.is_staff or getattr(obj, "owner_id", None) == getattr(user, "id", None))
+    permission_method = "has_submit_permission"
+    permission_denied_message = (
+        "You don't have permission to submit this item for review."
+    )
+    action_attr_name = "submit_for_review"
+    review_action = ReviewAction.ACTION_SUBMITTED
 
 
 class WithdrawFromReviewModalView(BaseReviewActionModalView):
     template_name = "object_management/withdraw_from_review_modal.html"
 
-    def test_func(self):
-        obj = getattr(self, "object", None)
-        if obj is None:
-            try:
-                obj = self.get_object(self.request, **self.kwargs)
-            except Exception:
-                return False
-        user = self.request.user
-        return user.is_authenticated and (user.is_staff or getattr(obj, "owner_id", None) == getattr(user, "id", None))
+    permission_method = "has_withdraw_permission"
+    permission_denied_message = (
+        "You don't have permission to withdraw this item from review."
+    )
+    action_attr_name = "withdraw_from_review"
+    review_action = ReviewAction.ACTION_WITHDRAWN
 
 
 class ApproveItemModalView(BaseReviewActionModalView):
     template_name = "object_management/approve_item_modal.html"
 
-    def test_func(self):
-        obj = getattr(self, "object", None)
-        if obj is None:
-            try:
-                obj = self.get_object(self.request, **self.kwargs)
-            except Exception:
-                return False
-        try:
-            return UserCreatedObjectPermission().has_approve_permission(self.request, obj)
-        except Exception:
-            return False
+    permission_method = "has_approve_permission"
+    permission_denied_message = "You don't have permission to approve this item."
+    action_attr_name = "approve"
+    review_action = ReviewAction.ACTION_APPROVED
 
 
 class RejectItemModalView(BaseReviewActionModalView):
     template_name = "object_management/reject_item_modal.html"
 
-    def test_func(self):
-        obj = getattr(self, "object", None)
-        if obj is None:
-            try:
-                obj = self.get_object(self.request, **self.kwargs)
-            except Exception:
-                return False
-        try:
-            return UserCreatedObjectPermission().has_reject_permission(self.request, obj)
-        except Exception:
-            return False
-
-class RejectItemView(BaseReviewActionView):
-    """View to reject an item that is in review."""
-
-    def get_default_success_url(self, obj):
-        """For Soilcom Collections redirect to the Collection review filter list; otherwise to dashboard."""
-        try:
-            if isinstance(obj, Collection):
-                return reverse("collection-list-review")
-        except Exception:
-            pass
-        return reverse("object_management:review_dashboard")
-
-    def post(self, request, *args, **kwargs):
-        self.object = self.get_object(request, *args, **kwargs)
-        obj = self.object
-
-        # Check permissions
-        if not UserCreatedObjectPermission().has_reject_permission(request, obj):
-            raise PermissionDenied("You don't have permission to reject this item.")
-
-        # Reject the item
-        try:
-            obj.reject()
-            # Store optional reviewer comment (support both 'comment' and 'message')
-            message = (
-                request.POST.get("comment") or request.POST.get("message") or ""
-            ).strip()
-            # Log rejection
-            try:
-                ReviewAction.objects.create(
-                    content_type=ContentType.objects.get_for_model(obj.__class__),
-                    object_id=obj.pk,
-                    user=request.user,
-                    action=ReviewAction.ACTION_REJECTED,
-                    comment=message,
-                )
-            except Exception as e:
-                logger.warning("Failed to create ReviewAction for rejection: %s", e)
-            messages.success(
-                request,
-                f"{obj._meta.verbose_name} has been rejected and marked as declined.",
-            )
-        except Exception as e:
-            messages.error(request, f"Error rejecting item: {str(e)}")
-
-        # Redirect using the success URL (handles 'next' parameter)
-        return HttpResponseRedirect(self.get_success_url())
-
-
-class SubmitForReviewView(BaseReviewActionView):
-    """View to submit an item for review."""
-
-    def post(self, request, *args, **kwargs):
-        self.object = self.get_object(request, *args, **kwargs)
-        obj = self.object
-
-        # Check permissions (must be owner)
-        if obj.owner != request.user and not request.user.is_staff:
-            raise PermissionDenied(
-                "You don't have permission to submit this item for review."
-            )
-
-        # Optional explanation from owner when (re)submitting
-        message = (
-            request.POST.get("comment") or request.POST.get("message") or ""
-        ).strip()
-
-        # Submit for review
-        try:
-            obj.submit_for_review()
-            # Log submission (first or re-submission both recorded as 'submitted')
-            try:
-                ReviewAction.objects.create(
-                    content_type=ContentType.objects.get_for_model(obj.__class__),
-                    object_id=obj.pk,
-                    user=request.user,
-                    action=ReviewAction.ACTION_SUBMITTED,
-                    comment=message,
-                )
-            except Exception as e:
-                logger.warning("Failed to create ReviewAction for submission: %s", e)
-            messages.success(
-                request, f"{obj._meta.verbose_name} has been submitted for review."
-            )
-        except Exception as e:
-            messages.error(request, f"Error submitting for review: {str(e)}")
-
-        # Redirect using the success URL (handles 'next' parameter)
-        return HttpResponseRedirect(self.get_success_url())
-
-
-class WithdrawFromReviewView(BaseReviewActionView):
-    """View to withdraw an item from review."""
-
-    def get_success_url(self):
-        """Owners should land on the object's detail page after withdrawal.
-
-        If the actor is the owner, redirect to the object's absolute URL to avoid
-        sending them back to the review detail (which would 403 after becoming private).
-        Staff members keep the base behavior (honor 'next' or default).
-        """
-        try:
-            obj = getattr(self, "object", None)
-            user = getattr(self, "request", None) and self.request.user
-            if obj is not None and user and getattr(user, "is_authenticated", False):
-                if getattr(obj, "owner_id", None) == getattr(user, "id", None):
-                    return obj.get_absolute_url()
-        except Exception:
-            pass
-        return super().get_success_url()
-
-    def post(self, request, *args, **kwargs):
-        self.object = self.get_object(request, *args, **kwargs)
-        obj = self.object
-
-        # Check permissions (must be owner)
-        if obj.owner != request.user and not request.user.is_staff:
-            raise PermissionDenied(
-                "You don't have permission to withdraw this item from review."
-            )
-
-        # Withdraw from review or set declined to private
-        try:
-            previous_status = obj.publication_status
-            obj.withdraw_from_review()
-            # Optional note
-            message = (
-                request.POST.get("comment") or request.POST.get("message") or ""
-            ).strip()
-            # Log withdraw or set private (both mapped to 'withdrawn')
-            try:
-                ReviewAction.objects.create(
-                    content_type=ContentType.objects.get_for_model(obj.__class__),
-                    object_id=obj.pk,
-                    user=request.user,
-                    action=ReviewAction.ACTION_WITHDRAWN,
-                    comment=message,
-                )
-            except Exception as e:
-                logger.warning("Failed to create ReviewAction for withdraw: %s", e)
-            if previous_status == getattr(obj, "STATUS_DECLINED", "declined"):
-                messages.success(
-                    request, f"{obj._meta.verbose_name} has been set to private."
-                )
-            else:
-                messages.success(
-                    request, f"{obj._meta.verbose_name} has been withdrawn from review."
-                )
-        except Exception as e:
-            messages.error(request, f"Error withdrawing from review: {str(e)}")
-
-        # Redirect using the success URL (handles 'next' parameter)
-        return HttpResponseRedirect(self.get_success_url())
+    permission_method = "has_reject_permission"
+    permission_denied_message = "You don't have permission to reject this item."
+    action_attr_name = "reject"
+    review_action = ReviewAction.ACTION_REJECTED
 
 
 class UserOwnsObjectMixin(UserPassesTestMixin):
@@ -708,7 +672,7 @@ class AddReviewCommentView(BaseReviewActionView):
 
         # Authorization: owners can always comment on their own objects; moderators too
         is_owner = obj.owner_id == request.user.id
-        can_moderate = UserCreatedObjectPermission()._is_moderator(request.user, obj)
+        can_moderate = UserCreatedObjectPermission().is_moderator(request.user, obj)
         if not (is_owner or can_moderate or request.user.is_staff):
             raise PermissionDenied("You don't have permission to comment on this item.")
 
@@ -854,8 +818,12 @@ class UserCreatedObjectReadAccessMixin(UserPassesTestMixin):
         owner = getattr(obj, self.owner_field)
         user = self.request.user
 
-        if publication_status == self.published_status:
-            # Published: accessible to all
+        # Published or Archived: accessible to all
+        if (
+            publication_status == self.published_status
+            or getattr(obj, "is_archived", False)
+            or publication_status == "archived"
+        ):
             return True
         else:
             if user.is_authenticated:
@@ -1073,7 +1041,10 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
         obj = self.get_object()
         # Owners: allowed when object is in review (to comment) or declined (to read feedback)
         if getattr(obj, "owner_id", None) == getattr(user, "id", None):
-            return bool(getattr(obj, "is_in_review", False) or getattr(obj, "is_declined", False))
+            return bool(
+                getattr(obj, "is_in_review", False)
+                or getattr(obj, "is_declined", False)
+            )
 
         # Moderators/staff: allowed
         app_label = obj._meta.app_label
@@ -1100,10 +1071,15 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
             and obj.owner_id == request.user.id
         ):
             # Allow owners for objects in review (to comment) and declined (to read feedback)
-            if bool(getattr(obj, "is_in_review", False) or getattr(obj, "is_declined", False)):
+            if bool(
+                getattr(obj, "is_in_review", False)
+                or getattr(obj, "is_declined", False)
+            ):
                 return super().dispatch(request, *args, **kwargs)
             # Otherwise, owners are blocked from the review details endpoint
-            raise PermissionDenied("Owners can only access review details while the item is in review or declined.")
+            raise PermissionDenied(
+                "Owners can only access review details while the item is in review or declined."
+            )
 
         # For non-owners, require moderator permissions
         if not (
@@ -1172,7 +1148,9 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
         return context
 
 
-class UserCreatedObjectModalDetailView(UserCreatedObjectReadAccessMixin, DetailView):
+class UserCreatedObjectModalDetailView(
+    UserCreatedObjectReadAccessMixin, BSModalReadView
+):
     template_name_suffix = "_detail_modal"
 
     def get_context_data(self, **kwargs):
@@ -1297,16 +1275,13 @@ class UserCreatedObjectModalArchiveView(
     success_message = "Successfully archived."
 
     def test_func(self):
-        """
-        Allow staff and owners to archive, even if the object is published.
-        Editing published objects remains restricted elsewhere.
-        """
-        user = self.request.user
-        if not user.is_authenticated:
+        """Centralized permission check via UserCreatedObjectPermission.has_archive_permission."""
+        try:
+            obj = self.get_object()
+        except Exception:
             return False
-        obj = self.get_object()
-        owner = getattr(obj, "owner", None)
-        return user.is_staff or (owner == user)
+        perm = UserCreatedObjectPermission()
+        return bool(perm.has_archive_permission(self.request, obj))
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

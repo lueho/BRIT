@@ -21,6 +21,48 @@
             {% block detail_header_badge %}
             {% endblock detail_header_badge %}
             {% block detail_header_actions %}
+              {% object_policy object as policy %}
+              {% if policy.can_view_review_feedback %}
+                <a class="btn btn-sm btn-outline-danger"
+                   href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
+                   title="Review feedback">
+                  <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review feedback</span>
+                </a>
+              {% else %}
+                {% if policy.is_in_review %}
+                  {% if policy.is_owner %}
+                    <a class="btn btn-sm btn-outline-secondary"
+                       href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
+                       title="Review view">
+                      <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review view</span>
+                    </a>
+                  {% else %}
+                    {% if policy.is_staff %}
+                      <a class="btn btn-sm btn-outline-secondary"
+                         href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
+                         title="Review view">
+                        <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review view</span>
+                      </a>
+                    {% else %}
+                      {% if policy.is_moderator %}
+                        <a class="btn btn-sm btn-outline-secondary"
+                           href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
+                           title="Review view">
+                          <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review view</span>
+                        </a>
+                      {% endif %}
+                    {% endif %}
+                  {% endif %}
+                {% elif policy.is_declined %}
+                  {% if policy.is_staff or policy.is_moderator %}
+                    <a class="btn btn-sm btn-outline-secondary"
+                       href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
+                       title="Review view">
+                      <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review view</span>
+                    </a>
+                  {% endif %}
+                {% endif %}
+              {% endif %}
             {% endblock detail_header_actions %}
           </div>
         </div>
@@ -126,6 +168,22 @@
                         <i class="fas fa-paper-plane"></i> Submit for Review
                       </button>
                     </form>
+                  {% endif %}
+                  {# Link to open the Review view when item is in review #}
+                  {% if policy.is_in_review and not review_mode %}
+                    {% if policy.is_owner %}
+                      <a class="btn btn-outline-secondary w-100 mb-2"
+                         href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
+                        <i class="fas fa-clipboard-check"></i> Review view
+                      </a>
+                    {% else %}
+                      {% if policy.is_staff or policy.is_moderator %}
+                        <a class="btn btn-outline-secondary w-100 mb-2"
+                           href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
+                          <i class="fas fa-clipboard-check"></i> Review view
+                        </a>
+                      {% endif %}
+                    {% endif %}
                   {% endif %}
                 {% endblock options_review_actions %}
                 {% block options_export %}

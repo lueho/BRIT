@@ -172,31 +172,49 @@ class UserCreatedObjectPermission(permissions.BasePermission):
     def has_submit_permission(self, request, obj):
         """
         Check if the user can submit an object for review.
-        Only owners can submit their private objects.
+        Owners or staff can submit when the object is private (first submission)
+        or declined (re‑submission). Archived objects cannot be submitted.
         """
         from .models import UserCreatedObject
 
         if not request.user or not request.user.is_authenticated:
             return False
 
+        status = getattr(obj, "publication_status", None)
+        if status == getattr(UserCreatedObject, "STATUS_ARCHIVED", "archived"):
+            return False
+
+        allowed_statuses = {
+            getattr(UserCreatedObject, "STATUS_PRIVATE", "private"),
+            getattr(UserCreatedObject, "STATUS_DECLINED", "declined"),
+        }
         return (
-            obj.owner == request.user
-            and obj.publication_status == UserCreatedObject.STATUS_PRIVATE
+            (obj.owner == request.user or getattr(request.user, "is_staff", False))
+            and status in allowed_statuses
         )
 
     def has_withdraw_permission(self, request, obj):
         """
         Check if the user can withdraw an object from review.
-        Only owners can withdraw their objects from review.
+        Owners or staff can withdraw when the object is in review or declined.
+        Archived objects cannot be withdrawn.
         """
         from .models import UserCreatedObject
 
         if not request.user or not request.user.is_authenticated:
             return False
 
+        status = getattr(obj, "publication_status", None)
+        if status == getattr(UserCreatedObject, "STATUS_ARCHIVED", "archived"):
+            return False
+
+        allowed_statuses = {
+            getattr(UserCreatedObject, "STATUS_REVIEW", "review"),
+            getattr(UserCreatedObject, "STATUS_DECLINED", "declined"),
+        }
         return (
-            obj.owner == request.user
-            and obj.publication_status == UserCreatedObject.STATUS_REVIEW
+            (obj.owner == request.user or getattr(request.user, "is_staff", False))
+            and status in allowed_statuses
         )
 
     def has_approve_permission(self, request, obj):
@@ -231,6 +249,39 @@ class UserCreatedObjectPermission(permissions.BasePermission):
             and obj.publication_status == UserCreatedObject.STATUS_REVIEW
             and obj.owner
             != request.user  # Four eyes principle: can't reject own objects
+        )
+
+    def has_archive_permission(self, request, obj):
+        """
+        Check if the user can archive an object.
+
+        Policy aligned with get_object_policy.can_archive:
+        - Object must be published (not already archived)
+        - User must be owner, staff, or moderator for the model
+        """
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        try:
+            from .models import UserCreatedObject
+
+            is_published = getattr(obj, "publication_status", None) == getattr(
+                UserCreatedObject, "STATUS_PUBLISHED", "published"
+            )
+            is_archived = getattr(obj, "publication_status", None) == getattr(
+                UserCreatedObject, "STATUS_ARCHIVED", "archived"
+            )
+        except Exception:
+            # Fail-closed if model does not define statuses
+            return False
+
+        if not is_published or is_archived:
+            return False
+
+        # Owner, staff, or moderator
+        is_owner = getattr(obj, "owner_id", None) == getattr(request.user, "id", None)
+        return is_owner or getattr(request.user, "is_staff", False) or self._is_moderator(
+            request.user, obj
         )
 
 
@@ -305,9 +356,7 @@ def get_object_policy(user, obj, request=None, review_mode=False):
         getattr(user, "id", None),
     )
 
-    # Review workflow permissions
-    # Submit/withdraw must mirror view logic (owners OR staff may act when status matches)
-    # Allow resubmission from 'declined' and first submission from 'private'
+    # Review workflow permissions (delegate to centralized helpers)
     logger.debug(
         "get_object_policy status: auth=%s archived=%s owner=%s staff=%s private=%s declined=%s in_review=%s obj=%s user=%s",
         is_authenticated,
@@ -320,17 +369,11 @@ def get_object_policy(user, obj, request=None, review_mode=False):
         getattr(obj, "pk", None),
         getattr(user, "id", None),
     )
-    can_submit_review = bool(
-        is_authenticated
-        and not is_archived
-        and (is_owner or is_staff)
-        and (is_private or is_declined)
+    can_submit_review = (
+        bool(perm.has_submit_permission(request, obj)) if is_authenticated else False
     )
-    can_withdraw_review = bool(
-        is_authenticated
-        and not is_archived
-        and (is_owner or is_staff)
-        and (is_in_review or is_declined)
+    can_withdraw_review = (
+        bool(perm.has_withdraw_permission(request, obj)) if is_authenticated else False
     )
     # Approve/Reject via permission helper (four eyes, moderator)
     can_approve = (

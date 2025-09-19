@@ -1947,7 +1947,14 @@ class WasteCollectionPublishedMapViewTestCase(ViewWithPermissionsTestCase):
     def test_update_collection_option_not_available_for_outsider(self):
         self.client.force_login(self.outsider)
         response = self.client.get(self.url, follow=True)
-        self.assertNotContains(response, "Edit selected collection")
+        # Button is present for authenticated users but is disabled for outsiders
+        self.assertContains(response, 'id="btn-collection-update"')
+        self.assertContains(response, "Edit selected collection")
+        self.assertContains(
+            response, 'class="btn btn-outline-secondary disabled w-100 mt-2"'
+        )
+        self.assertContains(response, 'aria-disabled="true"')
+        self.assertContains(response, 'href="#"')
 
     def test_collection_dashboard_option_visible_for_member(self):
         self.client.force_login(self.member)

@@ -69,8 +69,7 @@ const fieldConfig = {
     }
 };
 
-// --- UI helpers ---
-function britEnableBtn(el) {
+function enableBtn(el) {
     if (!el) return;
     el.classList.remove('disabled');
     el.removeAttribute('aria-disabled');
@@ -80,7 +79,7 @@ function britEnableBtn(el) {
     }
 }
 
-function britDisableBtn(el, title) {
+function disableBtn(el, title) {
     if (!el) return;
     el.classList.add('disabled');
     el.setAttribute('aria-disabled', 'true');
@@ -324,7 +323,7 @@ function updateUrls(feature_id) {
     }
 
     // Always enable Copy once a feature is selected
-    try { britEnableBtn(document.getElementById('btn-collection-copy')); } catch (_) { }
+    try { enableBtn(document.getElementById('btn-collection-copy')); } catch (_) { }
     hideSelectionHint();
 }
 
@@ -452,12 +451,12 @@ function adaptMapConfig() {
             const delBtn = document.getElementById('btn-collection-delete');
 
             if (updateBtn) {
-                if (canEdit) { britEnableBtn(updateBtn); }
-                else { britDisableBtn(updateBtn, 'You do not have permission to edit this item.'); }
+                if (canEdit) { enableBtn(updateBtn); }
+                else { disableBtn(updateBtn, 'You do not have permission to edit this item.'); }
             }
             if (delBtn) {
-                if (canDelete) { britEnableBtn(delBtn); }
-                else { britDisableBtn(delBtn, 'You do not have permission to delete this item.'); }
+                if (canDelete) { enableBtn(delBtn); }
+                else { disableBtn(delBtn, 'You do not have permission to delete this item.'); }
             }
         } catch (e) {
             console.warn('Failed to toggle Edit/Delete availability:', e);
