@@ -1,6 +1,8 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 {% load moderation_tags %}
-{% block title %}BRIT | {{ object.name }} details{% endblock %}
+{% block title %}
+  BRIT | {{ object.name }} details
+{% endblock title %}
 {% block content %}
   {% if object.is_declined and request.user == object.owner and not review_mode %}
     <div class="row mt-4">
@@ -60,18 +62,23 @@
         <div class="card-header d-flex justify-content-between align-items-center bg-body-tertiary border-bottom-0 py-3">
           <div class="d-flex align-items-center gap-2 flex-wrap">
             <h5 class="mb-0">
-              {% block detail_header %}{{ object.verbose_name|capfirst }} details{% endblock %}
+              {% block detail_header %}
+                {{ object.verbose_name|capfirst }} details
+              {% endblock detail_header %}
             </h5>
           </div>
           <div class="d-flex align-items-center gap-2">
-            {% block detail_header_badge %}{% endblock %}
-            {% block detail_header_actions %}{% endblock %}
+            {% block detail_header_badge %}
+            {% endblock detail_header_badge %}
+            {% block detail_header_actions %}
+            {% endblock detail_header_actions %}
           </div>
         </div>
-        {% block detail_top_image %}{% endblock %}
+        {% block detail_top_image %}
+        {% endblock detail_top_image %}
         <div class="card-body">
           {% if show_review_panel %}
-            {% include 'object_management/review_panel.html' with object=object %}
+            {% include "object_management/review_panel.html" with object=object %}
           {% endif %}
           {% block detail_body %}
             <p class="card-text">
@@ -112,7 +119,8 @@
                       </a>
                     {% endif %}
                   {% endblock detail_list_link %}
-                  {% block detail_card_navigation_dropdown_additional_links %}{% endblock %}
+                  {% block detail_card_navigation_dropdown_additional_links %}
+                  {% endblock detail_card_navigation_dropdown_additional_links %}
                 </div>
               </div>
             {% endblock detail_card_navigation_dropdown %}
@@ -175,18 +183,21 @@
                         </a>
                       {% endif %}
                     {% endif %}
-                    {% block detail_card_options_dropdown_additional_links %}{% endblock %}
+                    {% block detail_card_options_dropdown_additional_links %}
+                    {% endblock detail_card_options_dropdown_additional_links %}
                   </div>
                 </div>
               {% endif %}
             {% endblock detail_card_options_dropdown %}
-            {% block additional_footer_links %}{% endblock %}
+            {% block additional_footer_links %}
+            {% endblock additional_footer_links %}
           {% endblock detail_card_footer %}
         </div>
       </div>
     </div>
   </div>
   <div class="row mb-4">
-    {% block second_row %}{% endblock %}
+    {% block second_row %}
+    {% endblock second_row %}
   </div>
-{% endblock %}
+{% endblock content %}
