@@ -100,7 +100,7 @@ class ReviewDashboardView(ListView):
         return context
 
 
-class BaseReviewActionView(NextOrSuccessUrlMixin, View):
+class BaseReviewActionView(LoginRequiredMixin, NextOrSuccessUrlMixin, View):
     """Base view for all review workflow actions.
 
     Provides common functionality for review actions including:
@@ -108,10 +108,6 @@ class BaseReviewActionView(NextOrSuccessUrlMixin, View):
     - Object retrieval from ContentType and ID
     - Success URL determination (respecting 'next' parameter)
     """
-
-    @method_decorator(login_required)
-    def dispatch(self, *args, **kwargs):
-        return super().dispatch(*args, **kwargs)
 
     def get_object(self, request, *args, **kwargs):
         """Get the object being reviewed based on content type and ID."""
