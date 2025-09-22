@@ -68,6 +68,26 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
             # See user's own objects and published objects
             return queryset.filter(Q(owner=user) | Q(publication_status="published"))
 
+    def get_object(self):
+        """
+        Retrieve a single object by primary key without applying scope-based list filters,
+        then enforce object-level permissions.
+
+        Rationale: list-scoped filtering (e.g., scope=private) should not cause 404 on
+        detail views when the user has permission to view the object. The object-level
+        permission check performed by check_object_permissions will gate access
+        appropriately (published: anyone; private/review/archived: owner/moderator/staff).
+        """
+        from django.shortcuts import get_object_or_404
+
+        base_qs = self.queryset
+        lookup_url_kwarg = self.lookup_url_kwarg or self.lookup_field
+        lookup_value = self.kwargs.get(lookup_url_kwarg)
+        obj = get_object_or_404(base_qs, **{self.lookup_field: lookup_value})
+        # Enforce object-level permissions after fetching from the base queryset
+        self.check_object_permissions(self.request, obj)
+        return obj
+
     def perform_create(self, serializer):
         serializer.save(owner=self.request.user)
 

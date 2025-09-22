@@ -795,7 +795,8 @@ class UserCreatedObjectReadAccessMixin(UserPassesTestMixin):
     A Mixin to control access to objects based on 'publication_status' and 'owner'.
 
     - Published objects ('publication_status' == 'published') are accessible to all users.
-    - Unpublished objects are only accessible to their owners.
+    - Unpublished objects are accessible to their owners, staff, or moderators
+      (users with the per‑model permission `can_moderate_<model>`).
     """
 
     publication_status_field = "publication_status"
@@ -827,8 +828,13 @@ class UserCreatedObjectReadAccessMixin(UserPassesTestMixin):
             return True
         else:
             if user.is_authenticated:
-                # Private: accessible only to the owner and staff
-                return owner == user or user.is_staff
+                # Private/Review/Declined: accessible to owner, staff, or moderators
+                try:
+                    perm = UserCreatedObjectPermission()
+                    is_moderator = perm.is_moderator(user, obj)
+                except Exception:
+                    is_moderator = False
+                return owner == user or user.is_staff or is_moderator
             else:
                 # Private: not accessible for unauthenticated users
                 return False
