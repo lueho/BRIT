@@ -121,7 +121,6 @@ dependencies = [
     { name = "djangorestframework" },
     { name = "djangorestframework-csv" },
     { name = "djangorestframework-gis" },
-    { name = "djlint" },
     { name = "gunicorn" },
     { name = "openpyxl" },
     { name = "pillow" },
@@ -136,6 +135,7 @@ dependencies = [
 dev = [
     { name = "django-debug-toolbar" },
     { name = "django-extensions" },
+    { name = "djlint" },
     { name = "factory-boy" },
     { name = "flower" },
     { name = "mkdocs" },
@@ -169,7 +169,6 @@ requires-dist = [
     { name = "djangorestframework", specifier = ">=3.16.0" },
     { name = "djangorestframework-csv", specifier = ">=3.0.2" },
     { name = "djangorestframework-gis", specifier = ">=1.2.0" },
-    { name = "djlint", specifier = ">=1.36.4" },
     { name = "gunicorn", specifier = ">=23.0.0" },
     { name = "openpyxl", specifier = ">=3.1.5" },
     { name = "pillow", specifier = ">=11.3.0" },
@@ -184,6 +183,7 @@ requires-dist = [
 dev = [
     { name = "django-debug-toolbar", specifier = ">=6.0.0" },
     { name = "django-extensions", specifier = ">=3.2.0" },
+    { name = "djlint", specifier = ">=1.36.4" },
     { name = "factory-boy", specifier = ">=3.3.3" },
     { name = "flower", specifier = ">=2.0.1" },
     { name = "mkdocs", specifier = ">=1.6.1" },
