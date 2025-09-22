@@ -212,6 +212,12 @@
            data-href-template="/waste_collection/collections/__pk__/"
            href="#">Full Details</a>
       </div>
+      <div class="text-center mt-2">
+        <button id="btn-clear-selection"
+                type="button"
+                class="btn btn-outline-secondary w-75 d-none"
+                onclick="clearSelection()">Clear selection</button>
+      </div>
     </div>
   </div>
   <div id="map-context"
@@ -224,6 +230,6 @@
 {% block javascript %}
   {{ block.super }}
   <script src="{% static 'lib/turf-inside/inside.min.js' %}"></script>
-  <script src="{% static 'js/waste_collection_map.js' %}"></script>
+  <script src="{% static 'js/waste_collection_map.min.js' %}"></script>
   <script src="{% static 'js/file_export.min.js' %}"></script>
 {% endblock javascript %}

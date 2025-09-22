@@ -1,10 +1,12 @@
 from collections import OrderedDict
 
+from django.urls import reverse
 from rest_framework import serializers
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from maps.models import GeoPolygon
 from materials.models import Material
+from utils.object_management.permissions import get_object_policy
 from utils.properties.models import Property
 from utils.serializers import FieldLabelModelSerializer
 
@@ -100,6 +102,8 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
         source="description", required=False, allow_blank=True
     )
     sources = serializers.SerializerMethodField()
+    policy = serializers.SerializerMethodField()
+    actions = serializers.SerializerMethodField()
 
     class Meta:
         model = models.Collection
@@ -123,6 +127,8 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
             "valid_until",
             "comments",
             "sources",
+            "policy",
+            "actions",
         )
 
     def get_sources(self, obj):
@@ -134,12 +140,37 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
             data["sources"] = []
         return data
 
+    def get_policy(self, obj):
+        request = self.context.get("request")
+        user = getattr(request, "user", None)
+        try:
+            policy = get_object_policy(user=user, obj=obj, request=request)
+        except Exception:
+            # Fail-closed minimal policy
+            policy = {
+                "can_edit": False,
+                "can_delete": False,
+                "can_duplicate": False,
+            }
+        # Return policy as-is to keep a single source of truth for key names
+        return policy
+
+    def get_actions(self, obj):
+        try:
+            return {
+                "detail_url": reverse("collection-detail", kwargs={"pk": obj.pk}),
+                "update_url": reverse("collection-update", kwargs={"pk": obj.pk}),
+                "copy_url": reverse("collection-copy", kwargs={"pk": obj.pk}),
+                "delete_url": reverse("collection-delete-modal", kwargs={"pk": obj.pk}),
+            }
+        except Exception:
+            return {}
+
 
 class CollectionFlatSerializer(serializers.ModelSerializer):
     """
     Creates a flat, human-readable representation of Collections, suitable for file exports.
     """
-
 
     catchment = serializers.StringRelatedField(label="Catchment")
     nuts_or_lau_id = serializers.StringRelatedField(
@@ -264,7 +295,6 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
 
         additional_properties = ["specific waste collected", "Connection rate"]
         for property_name in additional_properties:
-
             # Add your custom fields at the desired position
             specific_property = Property.objects.filter(name=property_name).first()
             if specific_property:
@@ -273,7 +303,7 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
                 )
                 for value in collection_values:
                     column_name = (
-                        f'{property_name.lower().replace(" ", "_")}_{value.year}'
+                        f"{property_name.lower().replace(' ', '_')}_{value.year}"
                     )
                     ordered_representation[column_name] = value.average
 
@@ -286,7 +316,7 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
                     )
                     for value in aggregated_values:
                         column_name = (
-                            f'{property_name.lower().replace(" ", "_")}_{value.year}'
+                            f"{property_name.lower().replace(' ', '_')}_{value.year}"
                         )
                         ordered_representation[column_name] = value.average
                         # Mark this as an aggregated value

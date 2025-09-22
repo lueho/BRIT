@@ -4,46 +4,52 @@
 {% leaflet_css %}
 
 <div class="card shadow mb-4">
-    <div class="card-header bg-body-tertiary border-bottom-0 py-3"><h5 class="mb-0">{{ object.name }}</h5></div>
-    <div class="card-img-top">
-        {% leaflet_map "main" %}
+    <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+        <h5 class="mb-0">{{ object.name }}</h5>
     </div>
+    <div class="card-img-top">{% leaflet_map "main" %}</div>
     <div class="card-body">
         {% if object.description %}
-            <p class="card-text"><strong>Description:</strong><br>{{ object.description }}</p>
+            <p class="card-text">
+                <strong>Description:</strong>
+                <br>
+                {{ object.description }}
+            </p>
         {% endif %}
         <p class="card-text" id="region" data-region-id="{{ object.region.id }}">
             <strong>Region:</strong>
             <a href="{% url 'region-detail' object.region.id %}">{{ object.region.name }}</a>
         </p>
-        <p class="card-text" id="catchment" data-catchment-id="{{ object.catchment.id }}">
+        <p class="card-text"
+           id="catchment"
+           data-catchment-id="{{ object.catchment.id }}">
             <strong>Catchment</strong>:
             <a href="{% url 'catchment-detail' object.catchment.pk %}">{{ object.catchment.name }}</a>
         </p>
     </div>
     <div class="card-footer d-flex">
         <div class="dropdown">
-            <button class="btn btn-secondary dropdown-toggle" type="button" id="navigateDropdown"
-                    data-bs-toggle="dropdown" aria-expanded="false">
-                Navigate
-            </button>
+            <button class="btn btn-secondary dropdown-toggle"
+                    type="button"
+                    id="navigateDropdown"
+                    data-bs-toggle="dropdown"
+                    aria-expanded="false">Navigate</button>
             <div class="dropdown-menu" aria-labelledby="navigateDropdown">
-                <a class="dropdown-item"
-                   href="{% url 'scenario-list' %}">
+                <a class="dropdown-item" href="{% url 'scenario-list' %}">
                     <i class="fas fa-fw fa-list"></i> Public Scenarios
                 </a>
-                <a class="dropdown-item"
-                   href="{% url 'scenario-list-owned' %}">
+                <a class="dropdown-item" href="{% url 'scenario-list-owned' %}">
                     <i class="fas fa-fw fa-list"></i> My Scenarios
                 </a>
             </div>
         </div>
         {% if user == object.owner or user.is_staff %}
             <div class="dropdown">
-                <button class="btn btn-secondary dropdown-toggle ms-3" type="button" id="editDropdown"
-                        data-bs-toggle="dropdown" aria-expanded="false">
-                    Options
-                </button>
+                <button class="btn btn-secondary dropdown-toggle ms-3"
+                        type="button"
+                        id="editDropdown"
+                        data-bs-toggle="dropdown"
+                        aria-expanded="false">Options</button>
                 <div class="dropdown-menu" aria-labelledby="editDropdown">
                     {% if user.is_staff or not object.is_published %}
                         <a class="dropdown-item"
@@ -55,17 +61,19 @@
                        href="{% url 'download_scenario_summary' object.id %}">
                         <i class="fas fa-fw fa-file-download"></i> Download definition file
                     </a>
-                    <a class="dropdown-item modal-link"
-                       href="{% url 'scenario-delete-modal' object.pk %}">
-                        <i class="fas fa-fw fa-trash"></i> Delete
-                    </a>
+                    {% if user.is_staff or not object.is_published %}
+                        <a class="dropdown-item modal-link"
+                           href="{% url 'scenario-delete-modal' object.pk %}">
+                            <i class="fas fa-fw fa-trash"></i> Delete
+                        </a>
+                    {% endif %}
                 </div>
             </div>
         {% endif %}
     </div>
 </div>
 
-<script src="{% static 'js/maps.js' %}"></script>
+<script src="{% static 'js/maps.min.js' %}"></script>
 {{ map_config|json_script:"mapConfig" }}
 <script type="text/javascript">
     const mapConfig = JSON.parse(document.getElementById("mapConfig").textContent);

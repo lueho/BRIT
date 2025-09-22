@@ -50,6 +50,23 @@
           </a>
         {% endif %}
       {% endif %}
+      {# Map link: prefer returning to filtered map via ?next=, otherwise go to public map filtered by feature id #}
+      {% if request.GET.next %}
+        <a class="btn btn-sm btn-outline-secondary"
+           href="{{ request.GET.next }}"
+           title="Map">
+          <i class="fas fa-map"></i> <span class="d-none d-md-inline">Map</span>
+        </a>
+      {% else %}
+        {# Derive scope from publication_status when possible #}
+        {% with scope=object.publication_status %}
+          <a class="btn btn-sm btn-outline-secondary"
+             href="{% url 'WasteCollection' %}?id={{ object.id }}&load_features=true{% if scope %}&scope={{ scope }}{% endif %}"
+             title="Map">
+            <i class="fas fa-map"></i> <span class="d-none d-md-inline">Map</span>
+          </a>
+        {% endwith %}
+      {% endif %}
       <a class="btn btn-sm btn-outline-secondary"
          href="{% url 'wastecollection-dashboard' %}"
          title="Open Explorer (dashboard)">
