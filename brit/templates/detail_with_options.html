@@ -154,6 +154,33 @@
               {% block options_pane %}
                 {% object_policy object as policy %}
                 {% block options_primary_actions %}
+                  {# Generic Edit button: staff always; owners if not published; never when archived #}
+                  {% if policy.can_edit %}
+                    {% if object.update_url %}
+                      <a class="btn btn-outline-primary w-100 mb-2"
+                         href="{{ object.update_url }}?next={{ request.get_full_path|urlencode }}">
+                        <i class="fas fa-pen-to-square"></i> {% trans "Edit" %}
+                      </a>
+                    {% endif %}
+                  {% endif %}
+
+                  {# Generic Delete button: published → staff only; private/review/declined → owner or staff; archived → staff #}
+                  {% if policy.can_delete %}
+                    {% if object.delete_url %}
+                      <a class="btn btn-outline-danger w-100 mb-2"
+                         href="{{ object.delete_url }}?next={{ request.get_full_path|urlencode }}">
+                        <i class="fas fa-trash"></i> {% trans "Delete" %}
+                      </a>
+                    {% else %}
+                      {% if object.modal_delete_url %}
+                        <a class="btn btn-outline-danger w-100 mb-2 modal-link"
+                           href="{{ object.modal_delete_url }}?next={{ request.get_full_path|urlencode }}">
+                          <i class="fas fa-trash"></i> {% trans "Delete" %}
+                        </a>
+                      {% endif %}
+                    {% endif %}
+                  {% endif %}
+
                 {% endblock options_primary_actions %}
                 {% block options_secondary_actions %}
                 {% endblock options_secondary_actions %}
@@ -210,7 +237,6 @@
   <div class="row mb-4">
     {% block second_row %}
     {% endblock second_row %}
-    {# Optional extra row for child templates, mirroring simple_detail_card.html #}
   </div>
 {% endblock content %}
 {% block javascript %}
