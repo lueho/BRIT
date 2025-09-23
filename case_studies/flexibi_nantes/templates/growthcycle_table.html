@@ -1,3 +1,4 @@
+{% load moderation_tags %}
 <table class="table">
     <thead>
     <tr>
@@ -16,14 +17,17 @@
     {% endfor %}
     </tbody>
     <tfoot>
-    {% if request.user == object.owner %}
+    {% if growth_cycle %}
+        {% object_policy growth_cycle as cycle_policy %}
+    {% endif %}
+    {% if cycle_policy.can_edit %}
         <tr>
             <td></td>
             {% for timestep in growth_cycle.growthtimestepset_set.all %}
                 <td>
                     <a href="{% url 'greenhousegrowthcycle-timestep-update-modal' pk=timestep.id %}"
                        class="modal-link">
-                        <i class="fas fa-fw fa-edit"></i>
+                        <i class="fas fa-fw fa-pen-to-square"></i>
                     </a>
                 </td>
             {% endfor %}
