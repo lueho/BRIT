@@ -1,108 +1,141 @@
-{% extends 'simple_detail_card.html' %}
+{% extends "detail_with_options.html" %}
 {% load static %}
+{% load moderation_tags %}
+
+{% object_policy object as policy %}
 
 {% block style_sheets %}
-    <link rel="stylesheet" href="{% static 'css/sources.min.css' %}">{% endblock style_sheets %}
+    <link rel="stylesheet" href="{% static 'css/sources.min.css' %}">
+{% endblock style_sheets %}
 
 {% block detail_body %}
     {% if object.abbreviation %}
-        <p class="card-text"><strong>Abbreviation:</strong><br>
+        <p class="card-text">
+            <strong>Abbreviation:</strong>
+            <br>
             {{ object.abbreviation }}
         </p>
     {% endif %}
     {% if object.ordered_authors.exists %}
-        <p class="card-text"><strong>Authors:</strong><br>
+        <p class="card-text">
+            <strong>Authors:</strong>
+            <br>
             {% for author in object.authors_ordered %}
-                <a href="{% url 'author-detail' author.pk %}">
-                    {{ author.abbreviated_full_name }}
-                </a>{% if not forloop.last %};{% endif %}
+                <a href="{% url 'author-detail' author.pk %}">{{ author.abbreviated_full_name }}</a>
+                {% if not forloop.last %};{% endif %}
             {% endfor %}
         </p>
     {% endif %}
     {% if object.title %}
-        <p class="card-text"><strong>Title:</strong><br>
+        <p class="card-text">
+            <strong>Title:</strong>
+            <br>
             {{ object.title }}
         </p>
     {% endif %}
     {% if object.type %}
-        <p class="card-text"><strong>Type:</strong><br>
+        <p class="card-text">
+            <strong>Type:</strong>
+            <br>
             {{ object.type }}
         </p>
     {% endif %}
     {% if object.publisher %}
-        <p class="card-text"><strong>Publisher:</strong><br>
+        <p class="card-text">
+            <strong>Publisher:</strong>
+            <br>
             {{ object.publisher }}
         </p>
     {% endif %}
     {% if object.journal %}
-        <p class="card-text"><strong>Journal:</strong><br>
+        <p class="card-text">
+            <strong>Journal:</strong>
+            <br>
             {{ object.journal }}
         </p>
     {% endif %}
     {% if object.issue %}
-        <p class="card-text"><strong>Issue:</strong><br>
+        <p class="card-text">
+            <strong>Issue:</strong>
+            <br>
             {{ object.issue }}
         </p>
     {% endif %}
     {% if object.year %}
-        <p class="card-text"><strong>Year:</strong><br>
+        <p class="card-text">
+            <strong>Year:</strong>
+            <br>
             {{ object.year }}
         </p>
     {% endif %}
     {% if object.licence %}
-        <p class="card-text"><strong>Licence:</strong><br>
+        <p class="card-text">
+            <strong>Licence:</strong>
+            <br>
             <a href="{{ object.licence.url }}">{{ object.licence.name }}</a>
         </p>
     {% endif %}
     {% if object.attributions %}
-        <p class="card-text"><strong>Attributions:</strong><br>
+        <p class="card-text">
+            <strong>Attributions:</strong>
+            <br>
             {{ object.attributions }}
         </p>
     {% endif %}
     {% if object.url %}
-        <p class="card-text"><strong>Url:</strong><br>
+        <p class="card-text">
+            <strong>Url:</strong>
+            <br>
             <a href="{{ object.url }}" target="_blank">{{ object.url }}</a>
         </p>
     {% endif %}
     {% if object.url_valid %}
-        <p class="card-text"><strong>Url valid:</strong><br>
+        <p class="card-text">
+            <strong>Url valid:</strong>
+            <br>
             {{ object.url_valid }}
-            {% if object.url_checked %}
-                ({{ object.url_checked }})
-            {% endif %}
+            {% if object.url_checked %}({{ object.url_checked }}){% endif %}
         </p>
     {% endif %}
     {% if object.last_accessed %}
-        <p class="card-text"><strong>Last accessed:</strong><br>
+        <p class="card-text">
+            <strong>Last accessed:</strong>
+            <br>
             {{ object.last_accessed }}
         </p>
     {% endif %}
     {% if object.doi %}
-        <p class="card-text"><strong>DOI:</strong><br>
+        <p class="card-text">
+            <strong>DOI:</strong>
+            <br>
             <a href="https://doi.org/{{ object.doi }}" target="_blank">{{ object.doi }}</a>
         </p>
     {% endif %}
     {% if object.abstract %}
-        <p class="card-text"><strong>Abstract:</strong><br>
+        <p class="card-text">
+            <strong>Abstract:</strong>
+            <br>
             {{ object.abstract }}
         </p>
     {% endif %}
 {% endblock detail_body %}
 
-{% block additional_footer_links %}
-    {% if object.url and request.user == object.owner %}
-        <span id="check_url" class="text-nowrap" style="display: inline-block; width: 7em">
+{% block options_primary_actions %}
+    {{ block.super }}
+    {% block url_check_action %}
+        {% object_policy object as policy %}
+        {% if object.url and policy.is_owner %}
             <a href="javascript:void(0)"
-               class="check-url-btn ms-3"
+               class="check-url-btn btn btn-outline-success w-100 mb-2"
                data-pk="{{ object.pk }}"
                data-source-check-url="{% url 'source-check-url' object.pk %}"
                data-progress-url-template="{% url 'source-check-url-progress' 'task_id' %}">
-                <i class="fas fa-fw fa-check-circle"></i>
+                <i class="fas fa-fw fa-circle-check"></i>
                 <span>check url</span>
             </a>
-        </span>
-    {% endif %}
-{% endblock additional_footer_links %}
+        {% endif %}
+    {% endblock url_check_action %}
+{% endblock options_primary_actions %}
 
 {% block javascript %}
     {{ block.super }}
