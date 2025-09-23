@@ -1,6 +1,5 @@
 {% extends "detail_with_options.html" %}
 {% load moderation_tags %}
-
 {% block detail_header_primary_actions %}
     <div class="btn-group me-2" role="group">
         {% with back_url=request.GET.back %}
@@ -30,7 +29,6 @@
     </div>
     {{ block.super }}
 {% endblock detail_header_primary_actions %}
-
 {% block detail_body %}
     <p class="card-text">
         <strong>Name:</strong>
@@ -79,6 +77,5 @@
         </a>
     {% endif %}
 {% endblock detail_body %}
-
 {% block detail_card_footer %}
 {% endblock detail_card_footer %}

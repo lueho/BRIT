@@ -1,9 +1,7 @@
 {% extends "detail_with_options.html" %}
-
 {% block detail_body %}
     {% include "growthcycle_table.html" %}
 {% endblock detail_body %}
-
 {% block detail_header_primary_actions %}
     <div class="btn-group me-2" role="group">
         {% with back_url=request.GET.back %}
@@ -25,6 +23,5 @@
     </div>
     {{ block.super }}
 {% endblock detail_header_primary_actions %}
-
 {% block detail_card_footer %}
 {% endblock detail_card_footer %}

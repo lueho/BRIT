@@ -1,19 +1,15 @@
 {% extends "detail_with_options.html" %}
 {% load static %}
 {% load moderation_tags %}
-
 {% object_policy object as policy %}
-
 {% block style_sheets %}
     {{ block.super }}
     <link rel="stylesheet"
           href="{% static 'soilcom/css/collection_detail.css' %}">
 {% endblock style_sheets %}
-
 {% block detail_header_badge %}
     {% include "object_management/review_status_badge.html" with object=object %}
 {% endblock detail_header_badge %}
-
 {% block detail_header_actions %}
     <div class="btn-toolbar" role="toolbar" aria-label="Detail actions">
         <div class="btn-group me-2" role="group">
@@ -55,7 +51,6 @@
         {{ block.super }}
     </div>
 {% endblock detail_header_actions %}
-
 {% block detail_body %}
     <p class="card-text">
         <strong>Collections:</strong>
@@ -99,7 +94,6 @@
             {% for source in object.sources.all %}
                 <li>
                     {% if source.type == "waste_flyer" %}
-                        {# Waste flyer: Keep full href, but compact visible label for better UX #}
                         <i class="fas fa-file-alt text-muted"></i>
                         <span class="badge bg-secondary text-white me-2">Waste Flyer</span>
                         <a href="{{ source.url }}"
@@ -111,7 +105,6 @@
                         </a>
                         {% if "web.archive.org" in source.url %}<span class="badge text-bg-light border ms-2">Archived</span>{% endif %}
                     {% else %}
-                        {# Regular bibliographic source #}
                         <a href="{{ source.get_absolute_url }}">{{ source.abbreviation }}</a>
                         {% if source.title %}- {{ source.title }}{% endif %}
                         {% if source.year %}({{ source.year }}){% endif %}
@@ -133,7 +126,6 @@
         </ul>
     {% endif %}
 {% endblock detail_body %}
-
 {% block detail_with_options_scripts %}
     <script src="{% static 'js/source_url_display.js' %}" type="text/javascript"></script>
 {% endblock detail_with_options_scripts %}
