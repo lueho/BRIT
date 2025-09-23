@@ -126,14 +126,14 @@
         {% object_policy object as policy %}
         {% if object.url %}
             {% if policy.is_owner or policy.is_moderator or policy.is_staff %}
-            <button type="button"
-                    class="check-url-btn btn btn-outline-success w-100 mb-2"
-                    data-pk="{{ object.pk }}"
-                    data-source-check-url="{% url 'source-check-url' object.pk %}"
-                    data-progress-url-template="{% url 'source-check-url-progress' 'task_id' %}">
-                <i class="fas fa-fw fa-circle-check"></i>
-                <span>check url</span>
-            </button>
+                <button type="button"
+                        class="check-url-btn btn btn-outline-success w-100 mb-2"
+                        data-pk="{{ object.pk }}"
+                        data-source-check-url="{% url 'source-check-url' object.pk %}"
+                        data-progress-url-template="{% url 'source-check-url-progress' 'task_id' %}">
+                    <i class="fas fa-fw fa-circle-check"></i>
+                    <span>check url</span>
+                </button>
             {% endif %}
         {% endif %}
     {% endblock url_check_action %}

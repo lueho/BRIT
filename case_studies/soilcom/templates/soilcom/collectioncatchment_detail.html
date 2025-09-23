@@ -1,19 +1,27 @@
-{% extends 'maps/catchment_detail.html' %}
+{% extends "maps/catchment_detail.html" %}
 
 {% block additional_details %}
-    <p class="card-text"><strong>Current collections:</strong></p>
+    <p class="card-text">
+        <strong>Current collections:</strong>
+    </p>
     <ul>
-    {% for collection in object.downstream_collections.currently_valid %}
-        <li><a href="{% url 'collection-detail' collection.pk %}">{{ collection.name }}</a></li>
-    {% endfor %}
+        {% for collection in object.downstream_collections.currently_valid %}
+            <li>
+                <a href="{% url 'collection-detail' collection.pk %}">{{ collection.name }}</a>
+            </li>
+        {% endfor %}
     </ul>
-    <p class="card-text"><strong>Archived collections:</strong></p>
+    <p class="card-text">
+        <strong>Archived collections:</strong>
+    </p>
     <ul>
-    {% for collection in object.downstream_collections.archived %}
-        <li><a href="{% url 'collection-detail' collection.pk %}">{{ collection.name }}</a></li>
-    {% endfor %}
+        {% for collection in object.downstream_collections.archived %}
+            <li>
+                <a href="{% url 'collection-detail' collection.pk %}">{{ collection.name }}</a>
+            </li>
+        {% endfor %}
     </ul>
-{% endblock %}
+{% endblock additional_details %}
 
 {% block detail_footer %}
     {{ block.super }}
@@ -22,4 +30,4 @@
             <i class="fas fa-fw fa-plus-circle"></i> add property
         </a>
     {% endif %}
-{% endblock %}
+{% endblock detail_footer %}
