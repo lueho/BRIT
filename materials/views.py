@@ -14,6 +14,7 @@ from extra_views import UpdateWithInlinesView
 
 from distributions.models import TemporalDistribution
 from distributions.plots import DoughnutChart
+from utils.object_management.permissions import get_object_policy
 from utils.object_management.views import (
     PrivateObjectFilterView,
     PrivateObjectListView,
@@ -605,10 +606,12 @@ class SampleModalAddPropertyView(UserPassesTestMixin, UserCreatedObjectModalCrea
         return HttpResponseRedirect(self.get_success_url())
 
     def test_func(self):
-        if not self.request.user.is_authenticated:
+        try:
+            sample = Sample.objects.get(pk=self.kwargs.get("pk"))
+        except Sample.DoesNotExist:
             return False
-        sample = Sample.objects.get(pk=self.kwargs.get("pk"))
-        return self.request.user == sample.owner
+        policy = get_object_policy(self.request.user, sample, request=self.request)
+        return policy["can_add_property"]
 
     def get_success_url(self):
         return reverse("sample-detail", kwargs={"pk": self.kwargs.get("pk")})

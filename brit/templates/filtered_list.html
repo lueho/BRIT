@@ -74,11 +74,11 @@
               {# Scope toggle – visible for authenticated users and only for UserCreatedObject models #}
               {% if user.is_authenticated and object_list.model|is_user_created %}
                 <div class="btn-group btn-group-sm" role="group" aria-label="Scope toggle">
-                  <a class="btn btn-outline-secondary {% if list_type == 'public' %}active disabled{% endif %}"
+                  <a class="btn btn-outline-secondary {% if list_type == 'published' %}active disabled{% endif %}"
                      role="button"
                      title="Show published items"
-                     aria-pressed="{% if list_type == 'public' %}true{% else %}false{% endif %}"
-                     {% if list_type == 'public' %}aria-disabled="true" tabindex="-1"{% endif %}
+                     aria-pressed="{% if list_type == 'published' %}true{% else %}false{% endif %}"
+                     {% if list_type == 'published' %}aria-disabled="true" tabindex="-1"{% endif %}
                      href="{{ object_list.model.public_list_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=published">
                     Published
                   </a>

@@ -25,7 +25,7 @@
   </div>
   {% if user.is_authenticated %}
     <div class="btn-group btn-group-sm" role="group" aria-label="Scope toggle">
-      <a class="btn btn-outline-secondary {% if list_type == 'public' %}active disabled{% endif %}"
+      <a class="btn btn-outline-secondary {% if list_type == 'published' %}active disabled{% endif %}"
          href="{{ object_list.model.public_map_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=published">
         Published
       </a>
