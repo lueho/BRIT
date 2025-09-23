@@ -1,8 +1,10 @@
 {% extends 'base.html' %}
+{% load moderation_tags %}
 
 {% block title %}BRIT | Inventories | {{ object.name }}{% endblock %}
 
 {% block content %}
+    {% object_policy object as policy %}
 
     <div class="row mb-4">
         <div class="col col-12 col-lg-3">
@@ -30,8 +32,8 @@
                                     </ul>
                                 </div>
                                 <div class="card-footer">
-                                    {% if request.user == object.owner %}
-                                        {% if not object.is_published %}
+                                    {% if policy.can_edit %}
+                                        {% if not policy.is_published %}
                                             <a href="{% url 'scenario_update_config' scenario.id algo.id %}" class="me-3">
                                                 <i class="fas fa-fw fa-edit"></i> Edit
                                             </a>
@@ -48,7 +50,7 @@
                 {% endfor %}
             {% endfor %}
 
-            {% if request.user == object.owner %}
+            {% if policy.can_edit %}
                 <div class="row">
                     <div class="col">
                         <div class="card border-left-primary border">

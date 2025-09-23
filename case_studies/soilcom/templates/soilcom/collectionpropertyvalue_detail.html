@@ -1,4 +1,7 @@
-{% extends "simple_detail_card.html" %}
+{% extends "detail_with_options.html" %}
+{% load moderation_tags %}
+
+{% object_policy object as policy %}
 
 {% block detail_body %}
     <p class="card-text">
@@ -49,9 +52,9 @@
             </a>
         {% endif %}
     {% endblock list_link %}
-    {% if request.user == object.owner or user.is_staff %}
+    {% if policy.can_edit or policy.can_delete %}
         {% block update_link %}
-            {% if object.update_url %}
+            {% if policy.can_edit and object.update_url %}
                 <a href="{{ object.update_url }}" class="ms-3">
                     <i class="fas fa-fw fa-edit">
                     </i> edit
@@ -59,7 +62,7 @@
             {% endif %}
         {% endblock update_link %}
         {% block delete_link %}
-            {% if object.modal_delete_url %}
+            {% if policy.can_delete and object.modal_delete_url %}
                 <a href="{{ object.modal_delete_url }}" class="modal-link ms-3">
                     <i class="fas fa-fw fa-trash">
                     </i> delete

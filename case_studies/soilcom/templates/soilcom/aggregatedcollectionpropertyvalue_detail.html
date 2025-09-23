@@ -1,19 +1,38 @@
-{% extends 'simple_detail_card.html' %}
+{% extends "detail_with_options.html" %}
 
 {% block detail_body %}
-    <p class="card-text"><strong>Collections:</strong><br></p>
+    <p class="card-text">
+        <strong>Collections:</strong>
+        <br>
+    </p>
     <ul>
         {% for collection in object.collections.all %}
-            <li><a href="{{ collection.get_absolute_url }}">{{ collection }}</a></li>
+            <li>
+                <a href="{{ collection.get_absolute_url }}">{{ collection }}</a>
+            </li>
         {% endfor %}
     </ul>
-    <p class="card-text"><strong>Property:</strong><br>{{ object.property }}</p>
-    <p class="card-text"><strong>Year:</strong><br>{{ object.year }}</p>
+    <p class="card-text">
+        <strong>Property:</strong>
+        <br>
+        {{ object.property }}
+    </p>
+    <p class="card-text">
+        <strong>Year:</strong>
+        <br>
+        {{ object.year }}
+    </p>
     {% if object.standard_deviation %}
-        <p class="card-text"><strong>Value:</strong><br>
+        <p class="card-text">
+            <strong>Value:</strong>
+            <br>
             {{ object.average }} ± {{ object.standard_deviation }} {{ object.unit }}
         </p>
     {% else %}
-        <p class="card-text"><strong>Value:</strong><br>{{ object.average }} {{ object.unit }}</p>
+        <p class="card-text">
+            <strong>Value:</strong>
+            <br>
+            {{ object.average }} {{ object.unit }}
+        </p>
     {% endif %}
-{% endblock %}
+{% endblock detail_body %}

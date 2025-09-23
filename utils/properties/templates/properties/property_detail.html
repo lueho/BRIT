@@ -1,11 +1,23 @@
-{% extends 'simple_detail_card.html' %}
+{% extends "detail_with_options.html" %}
 
 {% block detail_body %}
-    <p class="card-text"><strong>Name:</strong><br>{{ object.name }}</p>
+    <p class="card-text">
+        <strong>Name:</strong>
+        <br>
+        {{ object.name }}
+    </p>
     {% if object.description %}
-        <p class="card-text"><strong>Description:</strong><br>{{ object.description }}</p>
+        <p class="card-text">
+            <strong>Description:</strong>
+            <br>
+            {{ object.description }}
+        </p>
     {% endif %}
     {% if object.allowed_units.exists %}
-        <p class="card-text"><strong>Allowed Units:</strong><br>{{ object.allowed_units.all|join:', ' }}</p>
+        <p class="card-text">
+            <strong>Allowed Units:</strong>
+            <br>
+            {{ object.allowed_units.all|join:', ' }}
+        </p>
     {% endif %}
-{% endblock %}
+{% endblock detail_body %}

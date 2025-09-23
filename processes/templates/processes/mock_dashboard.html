@@ -1,68 +1,88 @@
 {% extends "base.html" %}
 
-{% block title %}BRIT | Processes Dashboard (Mock){% endblock %}
+{% block title %}
+  BRIT | Processes Dashboard (Mock)
+{% endblock title %}
 
 {% block content %}
-{% if perms.processes.access_app_feature %}
-<div class="row">
-  <div class="col-12 mb-4">
-    <div class="card shadow h-100">
-      <div class="card-header bg-body-tertiary border-bottom-0 py-3"><h5 class="mb-0"><i class="fas fa-fw fa-flask"></i> Processes</h5></div>
-      <div class="card-body">
-        <p class="card-text">
-          This module allows you to explore and compare different material-conversion processes. Select a process to view its compatible input and output materials, technical parameters, and links to user-story-driven actions.
-        </p>
+  {% if perms.processes.access_app_feature %}
+    <div class="row">
+      <div class="col-12 mb-4">
+        <div class="card shadow h-100">
+          <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+            <h5 class="mb-0">
+              <i class="fas fa-fw fa-flask"></i> Processes
+            </h5>
+          </div>
+          <div class="card-body">
+            <p class="card-text">
+              This module allows you to explore and compare different material-conversion processes. Select a process to view its compatible input and output materials, technical parameters, and links to user-story-driven actions.
+            </p>
+          </div>
+        </div>
       </div>
     </div>
-  </div>
-</div>
-<div class="row">
-  {% for p in process_types %}
-    <div class="col-12 col-md-6 col-lg-4 mb-4">
-      <div class="card shadow h-100">
-        <div class="card-header bg-body-tertiary border-bottom-0 py-3 d-flex justify-content-between align-items-center">
-          <h5 class="mb-0"><a href="{% if p.url %}{{ p.url }}{% else %}{% url 'processes:type_detail' p.id %}{% endif %}" class="text-decoration-none text-body">{{ p.name }}</a></h5>
-          <span class="badge bg-secondary">{{ p.category }}</span>
-        </div>
-        <div class="card-body">
-          <p class="card-text">
-            {{ p.short_description }}
-          </p>
-          <ul class="list-unstyled mb-2">
-            <li><strong>Mechanism:</strong> {{ p.mechanism }}</li>
-            <li><strong>Temperature:</strong> {{ p.temperature_min }}–{{ p.temperature_max }} °C</li>
-            <li><strong>Yield:</strong> {{ p.yield_percentage_min }}–{{ p.yield_percentage_max }}%</li>
-          </ul>
-          <div class="mb-2">
-            <strong>Input Materials:</strong>
-            <ul>
-              {% for m in p.input %}
-                <li><a href="{% url 'processes:mock_material_detail' m.id %}">{{ m.name }}</a></li>
-              {% endfor %}
-            </ul>
-          </div>
-          <div class="mb-2">
-            <strong>Output Materials:</strong>
-            <ul>
-              {% for m in p.output %}
-                <li><a href="{% url 'processes:mock_material_detail' m.id %}">{{ m.name }}</a></li>
-              {% endfor %}
-            </ul>
-          </div>
-        </div>
-        <div class="card-footer d-flex">
-          <div class="dropdown">
-            <button class="btn btn-secondary dropdown-toggle me-3" type="button" id="navDropdown{{ p.id }}" data-bs-toggle="dropdown" aria-expanded="false">
-              Navigate
-            </button>
-            <div class="dropdown-menu" aria-labelledby="navDropdown{{ p.id }}">
-              <a class="dropdown-item" href="{% if p.url_name %}{% url p.url_name %}{% else %}{% url 'processes:type_detail' p.id %}{% endif %}">Process details</a>
+    <div class="row">
+      {% for p in process_types %}
+        <div class="col-12 col-md-6 col-lg-4 mb-4">
+          <div class="card shadow h-100">
+            <div class="card-header bg-body-tertiary border-bottom-0 py-3 d-flex justify-content-between align-items-center">
+              <h5 class="mb-0">
+                <a href="{% if p.url %}{{ p.url }}{% else %}{% url 'processes:type_detail' p.id %}{% endif %}"
+                   class="text-decoration-none text-body">{{ p.name }}</a>
+              </h5>
+              <span class="badge bg-secondary">{{ p.category }}</span>
+            </div>
+            <div class="card-body">
+              <p class="card-text">{{ p.short_description }}</p>
+              <ul class="list-unstyled mb-2">
+                <li>
+                  <strong>Mechanism:</strong> {{ p.mechanism }}
+                </li>
+                <li>
+                  <strong>Temperature:</strong> {{ p.temperature_min }}–{{ p.temperature_max }} °C
+                </li>
+                <li>
+                  <strong>Yield:</strong> {{ p.yield_percentage_min }}–{{ p.yield_percentage_max }}%
+                </li>
+              </ul>
+              <div class="mb-2">
+                <strong>Input Materials:</strong>
+                <ul>
+                  {% for m in p.input %}
+                    <li>
+                      <a href="{% url 'processes:mock_material_detail' m.id %}">{{ m.name }}</a>
+                    </li>
+                  {% endfor %}
+                </ul>
+              </div>
+              <div class="mb-2">
+                <strong>Output Materials:</strong>
+                <ul>
+                  {% for m in p.output %}
+                    <li>
+                      <a href="{% url 'processes:mock_material_detail' m.id %}">{{ m.name }}</a>
+                    </li>
+                  {% endfor %}
+                </ul>
+              </div>
+            </div>
+            <div class="card-footer d-flex">
+              <div class="dropdown">
+                <button class="btn btn-secondary dropdown-toggle me-3"
+                        type="button"
+                        id="navDropdown{{ p.id }}"
+                        data-bs-toggle="dropdown"
+                        aria-expanded="false">Navigate</button>
+                <div class="dropdown-menu" aria-labelledby="navDropdown{{ p.id }}">
+                  <a class="dropdown-item"
+                     href="{% if p.url_name %}{% url p.url_name %}{% else %}{% url 'processes:type_detail' p.id %}{% endif %}">Process details</a>
+                </div>
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      {% endfor %}
     </div>
-  {% endfor %}
-</div>
-{% endif %}
+  {% endif %}
 {% endblock content %}

@@ -1,40 +1,59 @@
-{% extends 'simple_detail_card.html' %}
+{% extends "detail_with_options.html" %}
 
 {% block detail_body %}
-    <p class="card-text"><strong>Name:</strong><br>{{ object.name }}</p>
     <p class="card-text">
-        <strong>Website:</strong><br>
+        <strong>Name:</strong>
+        <br>
+        {{ object.name }}
+    </p>
+    <p class="card-text">
+        <strong>Website:</strong>
+        <br>
         <a href="{{ object.website }}" target="blank">{{ object.website }}</a>
     </p>
     {% if object.catchment %}
-        <p class="card-text"><strong>Catchment:</strong><br>
+        <p class="card-text">
+            <strong>Catchment:</strong>
+            <br>
             <a href="{% url 'collectioncatchment-detail' object.catchment.pk %}">{{ object.catchment }}</a>
         </p>
     {% endif %}
     {% if object.comments %}
-        <p class="card-text"><strong>Comments:</strong><br>{{ object.description }}</p>
+        <p class="card-text">
+            <strong>Comments:</strong>
+            <br>
+            {{ object.description }}
+        </p>
     {% endif %}
-    <p class="card-text"><strong>Collections:</strong>
-        {% if object.collection_set.exists %}
-            </p>
-            <ul>
-                {% for collection in object.collection_set.all %}
-                    <li><a href="{{ collection.get_absolute_url }}">{{ collection.name }}</a></li>
-                {% endfor %}
-            </ul>
-        {% else %}
-            <br>No collections so far</p>
-        {% endif %}
+    <p class="card-text">
+        <strong>Collections:</strong>
+    </p>
+    {% if object.collection_set.exists %}
+        <ul>
+            {% for collection in object.collection_set.all %}
+                <li>
+                    <a href="{{ collection.get_absolute_url }}">{{ collection.name }}</a>
+                </li>
+            {% endfor %}
+        </ul>
+    {% else %}
+        <p class="card-text">
+            <br>
+            No collections so far
+        </p>
+    {% endif %}
     {% if 'soilcom.add_collection' in perms %}
         <a href="{% url 'collection-create' %}?collector={{ object.pk }}">
             <i class="fas fa-fw fa-plus"></i> Create a new collection for this collector
         </a>
     {% endif %}
-{% endblock %}
+{% endblock detail_body %}
 
 {% block detail_footer %}
     {% block back_button %}
-        <a href="{{ object.list_url|default:object.get_absolute_url }}" onclick="history.back(); return false;" class="nowrap">
+        <a href="{{ object.list_url|default:object.get_absolute_url }}"
+           onclick="history.back(); return false;"
+           class="nowrap">
             <i class="fas fa-fw fa-arrow-left">
             </i> back
         </a>
@@ -65,5 +84,6 @@
             {% endif %}
         {% endblock delete_link %}
     {% endif %}
-    {% block additional_footer_links %}{% endblock %}
+    {% block additional_footer_links %}
+    {% endblock additional_footer_links %}
 {% endblock detail_footer %}

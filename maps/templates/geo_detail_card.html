@@ -1,4 +1,4 @@
-{% extends 'simple_detail_card.html' %}
+{% extends "detail_with_options.html" %}
 {% load static %}
 {% load leaflet_tags %}
 
@@ -6,9 +6,11 @@
     {{ block.super }}
     {% leaflet_js %}
     {% leaflet_css %}
-{% endblock %}
+{% endblock style_sheets %}
 
-{% block detail_top_image %}<div class="card-img-top">{% leaflet_map "main" %}</div>{% endblock %}
+{% block detail_top_image %}
+    <div class="card-img-top">{% leaflet_map "main" %}</div>
+{% endblock detail_top_image %}
 
 {% block javascript %}
     {{ block.super }}

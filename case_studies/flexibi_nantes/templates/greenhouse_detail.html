@@ -1,12 +1,23 @@
-{% extends 'simple_detail_card.html' %}
+{% extends "detail_with_options.html" %}
+{% load moderation_tags %}
 
-{% block detail_header %}Configuration of Greenhouse: {{ object.name }}{% endblock detail_header %}
+{% block detail_header %}
+    Configuration of Greenhouse: {{ object.name }}
+{% endblock detail_header %}
 
 {% block detail_body %}
-    <p class="card-text"><strong>Heating:</strong> {{ object.heated }}    </p>
-    <p class="card-text"><strong>Lighting:</strong> {{ object.lighted }}    </p>
-    <p class="card-text"><strong>Aboveground:</strong> {{ object.above_ground }}    </p>
-    <p class="card-text"><strong>High-wire:</strong> {{ object.high_wire }}    </p>
+    <p class="card-text">
+        <strong>Heating:</strong> {{ object.heated }}
+    </p>
+    <p class="card-text">
+        <strong>Lighting:</strong> {{ object.lighted }}
+    </p>
+    <p class="card-text">
+        <strong>Aboveground:</strong> {{ object.above_ground }}
+    </p>
+    <p class="card-text">
+        <strong>High-wire:</strong> {{ object.high_wire }}
+    </p>
 {% endblock detail_body %}
 
 {% block second_row %}
@@ -17,16 +28,14 @@
             </div>
             <div class="card-body">
                 {% for growth_cycle, content in growth_cycles.items %}
+                    {% object_policy growth_cycle as cycle_policy %}
                     <div class="card border-left-primary border shadow mb-2">
                         <div class="card-header">
-                            <h6 class="m-0 fw-bold text-primary">
-                                {{ growth_cycle.cycle_number }}: {{ content.culture.name }}</h6>
+                            <h6 class="m-0 fw-bold text-primary">{{ growth_cycle.cycle_number }}: {{ content.culture.name }}</h6>
                         </div>
-                        <div class="card-body">
-                            {% include 'growthcycle_table.html' with table_data=content.table %}
-                        </div>
+                        <div class="card-body">{% include "growthcycle_table.html" with table_data=content.table %}</div>
                         <div class="card-footer">
-                            {% if request.user == growth_cycle.owner %}
+                            {% if cycle_policy.can_delete %}
                                 <a href="javascript:void(0);"
                                    class="modal-link"
                                    data-link="{% url 'greenhousegrowthcycle-delete-modal' growth_cycle.id %}?next={{ request.path }}">
@@ -38,7 +47,9 @@
                 {% endfor %}
                 {% if 'flexibi_nantes.add_greenhousegrowthcycle' in perms %}
                     <div class="card border-left-primary border">
-                        <div class="card-header bg-body-tertiary border-bottom-0 py-3"><h5 class="mb-0">Add growth cycle</h5></div>
+                        <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+                            <h5 class="mb-0">Add growth cycle</h5>
+                        </div>
                         <div class="card-body">
                             <a href="{% url 'greenhousegrowthcycle-create' object.id %}?next={{ request.path }}">
                                 <i class="fas fa-fw fa-plus"></i> Add growth cycle
