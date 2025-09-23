@@ -59,7 +59,9 @@ def _safe_policy_fallback(user, obj, review_mode=False, error_message=None):
     except Exception:
         pass
 
-    export_list_type = "public" if is_published else ("private" if (is_owner or is_staff) else None)
+    export_list_type = (
+        "published" if (is_published or is_archived) else ("private" if (is_owner or is_staff) else None)
+    )
 
     policy = {
         "is_authenticated": is_authenticated,
@@ -83,7 +85,7 @@ def _safe_policy_fallback(user, obj, review_mode=False, error_message=None):
         "can_withdraw_review": False,
         "can_approve": False,
         "can_reject": False,
-        "can_export": is_published or (is_authenticated and (is_owner or is_staff)),
+        "can_export": (is_published or is_archived) or (is_authenticated and (is_owner or is_staff)),
         "export_list_type": export_list_type,
         "can_view_review_feedback": bool(is_owner and is_declined and not bool(review_mode)),
         # Fallback marker

@@ -1,7 +1,7 @@
 {% comment %}
-Reusable scope switcher for Public / Private / Review.
+Reusable scope switcher for Published / Private / Review.
 Expected context:
-- active_scope: 'public' | 'private' | 'review'
+- active_scope: 'published' | 'private' | 'review'
 - public_url, private_url, review_url: URLs for the three scopes
 - public_count, private_count, review_count: integers (optional; default to 0 if missing)
 - user: request.user (implicitly available)
@@ -12,7 +12,7 @@ Visibility rules:
 <div class="mb-3">
   <ul class="nav nav-pills align-items-center gap-2">
     <li class="nav-item">
-      <a class="nav-link {% if active_scope == 'public' %}active{% endif %}"
+      <a class="nav-link {% if active_scope == 'published' %}active{% endif %}"
          href="{{ public_url }}">
         Published
         <span class="badge text-bg-secondary ms-1">{{ public_count|default:0 }}</span>

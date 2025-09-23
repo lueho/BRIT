@@ -184,7 +184,6 @@ class CollectionSystemModalCreateView(UserCreatedObjectModalCreateView):
 
 
 class CollectionSystemDetailView(UserCreatedObjectDetailView):
-    template_name = "simple_detail_card.html"
     model = CollectionSystem
 
 
@@ -907,9 +906,8 @@ class CollectionAddPropertyValueView(CollectionPropertyValueCreateView):
         """
         try:
             collection = Collection.objects.get(pk=self.kwargs.get("pk"))
-        except Collection.DoesNotExist:
-            # Treat missing parent as forbidden action in this specialized route
-            raise PermissionDenied("Invalid parent collection.")
+        except Collection.DoesNotExist as err:
+            raise PermissionDenied("Invalid parent collection.") from err
         form.instance.collection = collection
         return super().form_valid(form)
 
@@ -951,6 +949,7 @@ class CollectionFrequencyOptions(SelectNewlyCreatedObjectModelSelectOptionsView)
 class WasteCategoryOptions(SelectNewlyCreatedObjectModelSelectOptionsView):
     model = WasteCategory
     permission_required = "soilcom.view_wastecategory"
+    template_name = "detail_with_options.html"
 
 
 class CollectionWasteSamplesView(UserCreatedObjectUpdateView):

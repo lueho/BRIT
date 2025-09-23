@@ -7,6 +7,8 @@ from django.http import HttpResponse
 from django.views import View
 from django.views.generic import TemplateView
 
+from utils.object_management.permissions import build_scope_filter_params
+
 logger = logging.getLogger(__name__)
 
 
@@ -33,12 +35,9 @@ class FilteredListFileExportView(LoginRequiredMixin, View):
             Dictionary of processed filter parameters
         """
         params.pop("page", None)
-        list_type = params.pop("list_type", ["public"])[0]
+        list_type = params.pop("list_type", ["published"])[0]
 
-        if list_type == "private":
-            params["owner"] = [request.user.pk]
-        else:
-            params["publication_status"] = ["published"]
+        params.update(build_scope_filter_params(list_type, request.user))
         return params
 
     def get_export_context(self, request, params):
@@ -47,7 +46,7 @@ class FilteredListFileExportView(LoginRequiredMixin, View):
         """
         context = {
             "user_id": request.user.pk,
-            "list_type": params.get("list_type", ["public"])[0],
+            "list_type": params.get("list_type", ["published"])[0],
         }
         return context
 

@@ -1,6 +1,6 @@
 from urllib.parse import urlencode
 
-from django.contrib.auth.models import Permission, User
+from django.contrib.auth.models import AnonymousUser, Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.db.models.signals import post_save, pre_save
 from django.http import HttpResponseRedirect
@@ -311,19 +311,23 @@ class FilterDefaultsMixinTest(TestCase):
 class PublishedObjectsFilterViewTestCase(TestCase):
     def setUp(self):
         self.factory = RequestFactory()
-        self.view = PublishedObjectFilterView()
-        self.view.filterset_class = MockFilterSet
-        self.view.model = self.view.filterset_class.Meta.model
+        # Prepare a callable view that behaves like a URL-dispatched CBV
+        self.view_callable = PublishedObjectFilterView.as_view(
+            filterset_class=MockFilterSet,
+            model=MockFilterSet.Meta.model,
+        )
 
     def test_initial_filter_values_extraction(self):
+        # Instantiate a view instance just to call get_default_filters()
+        view = PublishedObjectFilterView()
+        view.filterset_class = MockFilterSet
         expected_initial_values = {"name": "Initial name"}
-        self.assertEqual(self.view.get_default_filters(), expected_initial_values)
+        self.assertEqual(view.get_default_filters(), expected_initial_values)
 
     def test_get_with_empty_query_parameters(self):
         request = self.factory.get("/")
-        self.view.request = request
-        self.view.kwargs = {}
-        response = self.view.get(request)
+        request.user = AnonymousUser()
+        response = self.view_callable(request)
 
         self.assertEqual(response.status_code, 302)
         redirect_url = response.url
@@ -331,16 +335,15 @@ class PublishedObjectsFilterViewTestCase(TestCase):
 
     def test_get_with_query_parameters(self):
         request = self.factory.get("/?name=Other+name")
-        self.view.request = request
-        self.view.kwargs = {}
-        response = self.view.get(request)
+        request.user = AnonymousUser()
+        response = self.view_callable(request)
 
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.context_data["filter"].data, {"name": ["Other name"]})
 
 
 class ReadAccessArchivedDetailTests(TestCase):
-    """Ensure archived objects' detail views are publicly accessible."""
+    """Ensure archived objects' detail views are NOT publicly accessible."""
 
     @classmethod
     def setUpTestData(cls):
@@ -353,8 +356,8 @@ class ReadAccessArchivedDetailTests(TestCase):
                 publication_status=UserCreatedObject.STATUS_ARCHIVED,
             )
 
-    def test_archived_detail_is_public(self):
+    def test_archived_detail_is_not_public(self):
         url = reverse("collection-detail", kwargs={"pk": self.archived.id})
-        # Unauthenticated request should be allowed (200)
+        # Unauthenticated request should be redirected to login (302)
         response = self.client.get(url)
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 302)
