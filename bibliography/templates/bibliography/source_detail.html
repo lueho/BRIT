@@ -1,13 +1,10 @@
 {% extends "detail_with_options.html" %}
 {% load static %}
 {% load moderation_tags %}
-
 {% object_policy object as policy %}
-
 {% block style_sheets %}
     <link rel="stylesheet" href="{% static 'css/sources.min.css' %}">
 {% endblock style_sheets %}
-
 {% block detail_body %}
     {% if object.abbreviation %}
         <p class="card-text">
@@ -119,7 +116,6 @@
         </p>
     {% endif %}
 {% endblock detail_body %}
-
 {% block options_primary_actions %}
     {{ block.super }}
     {% block url_check_action %}
@@ -138,7 +134,6 @@
         {% endif %}
     {% endblock url_check_action %}
 {% endblock options_primary_actions %}
-
 {% block javascript %}
     {{ block.super }}
     <script src="{% static 'js/sources.min.js' %}"></script>

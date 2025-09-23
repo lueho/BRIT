@@ -1,6 +1,5 @@
 {% extends "bibliography/source_detail.html" %}
 {% load moderation_tags %}
-
 {% block detail_body %}
     <p class="card-text">
         <strong>Url:</strong>
@@ -25,7 +24,6 @@
         {% endfor %}
     </p>
 {% endblock detail_body %}
-
 {% block url_check_action %}
     {% object_policy object as policy %}
     {% if object.url %}
