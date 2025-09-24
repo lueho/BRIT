@@ -1,5 +1,5 @@
 import logging
-from urllib.parse import unquote
+from urllib.parse import unquote, urlencode
 
 from bootstrap_modal_forms.generic import (
     BSModalCreateView,
@@ -20,6 +20,7 @@ from django.core.exceptions import (
     ImproperlyConfigured,
     ObjectDoesNotExist,
     PermissionDenied,
+    ValidationError,
 )
 from django.http import Http404, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
@@ -27,7 +28,9 @@ from django.template.loader import select_template
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.decorators import method_decorator
-from django.views.generic import CreateView, DetailView, ListView, UpdateView, View
+from django.utils.safestring import mark_safe
+from django.utils.translation import gettext_lazy as _
+from django.views.generic import CreateView, DetailView, ListView, TemplateView, UpdateView, View
 from django_filters.views import FilterView
 from django_tomselect.autocompletes import AutocompleteModelView
 from extra_views import CreateWithInlinesView, UpdateWithInlinesView
@@ -42,6 +45,7 @@ from utils.object_management.permissions import (
     get_object_policy,
     user_is_moderator_for_model,
 )
+from utils.object_management.publication import prepublish_check
 
 from ..forms import DynamicTableInlineFormSetHelper
 from ..views import (
@@ -246,6 +250,30 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
                 )
             except Exception:
                 pass
+        except ValidationError as exc:
+            checklist_url = reverse(
+                "object_management:publication_checklist",
+                kwargs={
+                    "content_type_id": ContentType.objects.get_for_model(
+                        self.object.__class__
+                    ).pk,
+                    "object_id": self.object.pk,
+                },
+            )
+            next_url = self.request.POST.get("next") or self.request.GET.get("next")
+            if next_url:
+                checklist_url = f"{checklist_url}?{urlencode({'next': next_url})}"
+            messages.error(request, str(exc))
+            messages.info(
+                request,
+                mark_safe(
+                    _(
+                        "Review unresolved dependencies in the <a href=\"%(url)s\">publication checklist</a>."
+                    )
+                    % {"url": checklist_url}
+                ),
+            )
+            return HttpResponseRedirect(checklist_url)
         except Exception as e:
             messages.error(request, f"Error performing action: {str(e)}")
 
@@ -285,31 +313,6 @@ class ApproveItemView(BaseReviewActionView):
     permission_denied_message = "You don't have permission to approve this item."
     action_attr_name = "approve"
     review_action = ReviewAction.ACTION_APPROVED
-
-
-class RejectItemView(BaseReviewActionView):
-    """View to reject an item that is in review."""
-
-    permission_method = "has_reject_permission"
-    permission_denied_message = "You don't have permission to reject this item."
-    action_attr_name = "reject"
-    review_action = ReviewAction.ACTION_REJECTED
-
-
-class BaseReviewActionModalView(BaseReviewActionView, BSModalReadView):
-    """Base modal view to render confirmation dialogs for review actions.
-
-    Uses the shared modal container (#modal) via django-bootstrap-modal-forms.
-    Subclasses must set template_name and implement test_func() for permission checks.
-    """
-
-    template_name: str = ""
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        # Pass through 'next' if provided in the opener link; templates will append it to the form action
-        context["next_url"] = self.request.GET.get("next")
-        return context
 
     def post(self, request, *args, **kwargs):  # type: ignore[override]
         """Preflight handling for django-bootstrap-modal-forms.

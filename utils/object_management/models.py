@@ -6,8 +6,10 @@ from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.db.models import Q
+from django.utils.translation import gettext_lazy as _
 
 from ..models import CRUDUrlsMixin
+from .publication import cascade_publication_status, prepublish_check
 
 
 def get_default_owner():
@@ -209,6 +211,10 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
         Submit this object for review. Transitions from private to review status.
         Sets submitted_at timestamp and clears approval fields if previously set.
         """
+        report = prepublish_check(self, target_status=self.STATUS_REVIEW)
+        if report.has_blocking():
+            message = report.format_blocking_message(self, _("submit for review"))
+            raise ValidationError(message)
         if self.publication_status not in (self.STATUS_PRIVATE, self.STATUS_DECLINED):
             raise ValidationError(
                 "Only private or declined objects can be submitted for review."
@@ -220,6 +226,7 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
         self.approved_at = None
         self.approved_by = None
         self.save()
+        cascade_publication_status(self, self.STATUS_REVIEW)
         # TODO: Implement notification to moderators
         return True
 
@@ -235,6 +242,7 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
         self.publication_status = self.STATUS_PRIVATE
         self.submitted_at = None
         self.save()
+        cascade_publication_status(self, self.STATUS_PRIVATE)
         # TODO: Implement notification to moderators
 
     def approve(self, user=None):
@@ -242,6 +250,10 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
         Approve this object, transitioning from review to published.
         Sets approved_at and approved_by.
         """
+        report = prepublish_check(self, target_status=self.STATUS_PUBLISHED)
+        if report.has_blocking():
+            message = report.format_blocking_message(self, _("approve"))
+            raise ValidationError(message)
         if self.publication_status != self.STATUS_REVIEW:
             raise ValidationError("Only objects in review can be approved.")
         self.publication_status = self.STATUS_PUBLISHED
@@ -251,6 +263,7 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
         if user is not None:
             self.approved_by = user
         self.save()
+        cascade_publication_status(self, self.STATUS_PUBLISHED, acting_user=user)
         # TODO: Implement notification to the owner
 
     def reject(self):
@@ -261,6 +274,7 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
         self.approved_at = None
         self.approved_by = None
         self.save()
+        cascade_publication_status(self, self.STATUS_DECLINED)
         # TODO: Implement notification to the owner
 
     def archive(self):
@@ -268,6 +282,7 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
             raise ValidationError("Only published objects can be archived.")
         self.publication_status = self.STATUS_ARCHIVED
         self.save()
+        cascade_publication_status(self, self.STATUS_ARCHIVED)
         # TODO: Implement notification to the owner
 
     @property

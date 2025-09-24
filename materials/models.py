@@ -385,6 +385,29 @@ class Sample(NamedUserCreatedObject):
     sources = models.ManyToManyField(Source)
     properties = models.ManyToManyField(MaterialPropertyValue)
 
+    def _visible_queryset(self, manager):
+        queryset = manager.all()
+        if not self.is_published:
+            return queryset
+        model = getattr(queryset, "model", None)
+        if model is None or not hasattr(model, "STATUS_PUBLISHED"):
+            return queryset
+        return queryset.filter(
+            publication_status=getattr(model, "STATUS_PUBLISHED", "published")
+        )
+
+    @property
+    def visible_sources(self):
+        return self._visible_queryset(self.sources)
+
+    @property
+    def visible_properties(self):
+        return self._visible_queryset(self.properties)
+
+    @property
+    def visible_compositions(self):
+        return self._visible_queryset(self.compositions)
+
     @property
     def group_ids(self):
         """
@@ -588,6 +611,14 @@ class Composition(NamedUserCreatedObject):
             duplicate_share.save()
 
         return duplicate
+
+    def visible_shares(self):
+        shares = self.shares.all()
+        if self.is_published:
+            shares = shares.filter(
+                publication_status=getattr(WeightShare, "STATUS_PUBLISHED", "published")
+            )
+        return shares
 
     def get_absolute_url(self):
         return self.sample.get_absolute_url()

@@ -22,14 +22,19 @@ class CompositionModelSerializer(ModelSerializer):
 
     def get_shares(salf, obj):
         """
-        Gets the weight shares of the given composition in default order but takes cares that the "Other" element
+        Gets the weight shares of the given composition in default order but takes care that the "Other" element
         is last in the list, regardless of the previous order.
         """
         other = MaterialComponent.objects.other()
-        shares = WeightShareModelSerializer(obj.shares.exclude(component=other), many=True).data
-        other_qs = obj.shares.filter(component=other)
+        shares_qs = obj.visible_shares()
+        shares = WeightShareModelSerializer(
+            shares_qs.exclude(component=other), many=True
+        ).data
+        other_qs = shares_qs.filter(component=other)
         if other_qs.exists():
-            shares.append(WeightShareModelSerializer(obj.shares.filter(component=other), many=True).data[0])
+            shares.append(
+                WeightShareModelSerializer(other_qs, many=True).data[0]
+            )
         return shares
 
     class Meta:
@@ -53,28 +58,40 @@ class CompositionDoughnutChartSerializer(ModelSerializer):
 
     def get_shares(self, obj):
         other = MaterialComponent.objects.other()
-        shares = WeightShareModelSerializer(obj.shares.exclude(component=other), many=True).data
-        other_qs = obj.shares.filter(component=other)
+        shares_qs = obj.visible_shares()
+        shares = WeightShareModelSerializer(
+            shares_qs.exclude(component=other), many=True
+        ).data
+        other_qs = shares_qs.filter(component=other)
         if other_qs.exists():
-            shares.append(WeightShareModelSerializer(obj.shares.filter(component=other), many=True).data[0])
+            shares.append(
+                WeightShareModelSerializer(other_qs, many=True).data[0]
+            )
         return shares
 
     def get_labels(self, obj):
         other = MaterialComponent.objects.other()
-        labels = [share.component.name for share in obj.shares.exclude(component=other)]
-        other_qs = obj.shares.filter(component=other)
+        shares_qs = obj.visible_shares()
+        labels = [
+            share.component.name
+            for share in shares_qs.exclude(component=other)
+        ]
+        other_qs = shares_qs.filter(component=other)
         if other_qs.exists():
             labels.append('Other')
         return labels
 
     def get_data(self, obj):
         other = MaterialComponent.objects.other()
+        shares_qs = obj.visible_shares()
         data = [{
             'label': 'Fraction',
             'unit': '%',
-            'data': [share.average for share in obj.shares.exclude(component=other)]
+            'data': [
+                share.average for share in shares_qs.exclude(component=other)
+            ]
         }]
-        other_qs = obj.shares.filter(component=other)
+        other_qs = shares_qs.filter(component=other)
         if other_qs.exists():
             data[0]['data'].append(other_qs.first().average)
         return data
@@ -143,6 +160,20 @@ class SampleModelSerializer(ModelSerializer):
         fields = (
             'name', 'material', 'material_name', 'material_url', 'series', 'series_name', 'series_url', 'timestep',
             'datetime', 'image', 'compositions', 'properties', 'sources', 'description')
+
+    def to_representation(self, instance):
+        data = super().to_representation(instance)
+        if getattr(instance, "is_published", False):
+            data['compositions'] = CompositionModelSerializer(
+                instance.visible_compositions, many=True
+            ).data
+            data['properties'] = MaterialPropertyValueModelSerializer(
+                instance.visible_properties, many=True
+            ).data
+            data['sources'] = SourceAbbreviationSerializer(
+                instance.visible_sources, many=True
+            ).data
+        return data
 
 
 # ----------- API ------------------------------------------------------------------------------------------------------
