@@ -90,6 +90,55 @@ Notes:
 - Four‑eyes principle: Approvers must not be the object owner.
 - Archive nuances: The UI policy (`get_object_policy`) and the CBV modal (`UserCreatedObjectModalArchiveView`) allow owners to archive published objects. The DRF `archive` action enforces `UserCreatedObjectPermission`, which currently denies owners modifying published objects; moderators/staff should use the API for archival.
 
+## Publication dependency checks
+
+Source: `utils/object_management/publication.py`.
+
+- **Registry** — Declare dependencies for `UserCreatedObject` subclasses via `REGISTRY`. For example, `Sample` lists `material`, `series`, `timestep`, and `sources` as published requirements; `Composition` cascades the status of its `shares`.
+- **`prepublish_check(obj, target_status=None)`** — Returns a report containing blocking dependencies (items that must be published) and `needs_sync` children (objects that will be adjusted to the new status). `UserCreatedObject.submit_for_review()` and `.approve()` invoke this and raise `ValidationError` when the report has blocking items.
+- **`cascade_publication_status(obj, target_status, acting_user=None)`** — Applies a new status to related objects listed in the registry's `follows_parent` rules whenever workflow transitions occur (submit, approve, reject, withdraw, archive).
+
+### Adding dependencies for a model
+
+Register a new model in `REGISTRY` with `DependencyConfig`:
+
+```python
+REGISTRY[("materials", "sample")] = DependencyConfig(
+    requires_published=(
+        RelationRule("material"),
+        RelationRule("sources"),
+    ),
+    follows_parent=(RelationRule("properties"),),
+)
+```
+
+- Use `optional=True` for nullable relations (`series`, `timestep`).
+- `requires_published` items must expose `publication_status` or be inherently safe.
+- `follows_parent` items will be cascaded to the parent's new status.
+
+## Publication checklist UI
+
+Source: `utils/object_management/views.py:PublicationChecklistView` and template `utils/object_management/templates/object_management/publication_checklist.html`.
+
+- Triggered automatically when `submit_for_review()` or `approve()` raises a `ValidationError` due to unresolved dependencies.
+- Accessible at `object_management:publication_checklist` with the target object; permissions mirror `get_object_policy` (owner, staff, moderators).
+- Shows:
+  - **Blocking dependencies** — items the user must publish/replace before continuing.
+  - **Sync issues** — children that will be auto-aligned via `cascade_publication_status()`.
+- Provides action buttons posting directly to the review workflow endpoints with a `next` parameter back to the source page.
+
+### Rendering safe related data
+
+- Use the helpers on model instances when serializing or rendering public pages:
+  - `Sample.visible_sources`, `Sample.visible_properties`, `Sample.visible_compositions`
+  - `Composition.visible_shares`
+- The logic returns all related objects while the parent is unpublished, and filters to published ones once the parent is public, preventing data leakage.
+
+### Testing
+
+- Run the publication checklist by attempting to submit or approve objects with missing dependencies to ensure blocking messages appear.
+- Ensure public detail views (e.g., `materials/templates/materials/sample_detail.html`) render only visible related data.
+
 ## Review UI access
 
 Source: `utils/object_management/views.py:ReviewItemDetailView`.

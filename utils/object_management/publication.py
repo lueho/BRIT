@@ -126,12 +126,12 @@ def _resolve_related(obj: object, rule: RelationRule) -> Iterator[object]:
     value = getattr(obj, rule.accessor, None)
     if value is None:
         return iter(())
+    if hasattr(value, "all"):
+        return (item for item in value.all())
     if callable(value):  # support properties returning callables
         value = value()
     if value is None:
         return iter(())
-    if hasattr(value, "all"):
-        return (item for item in value.all())
     if isinstance(value, (list, tuple, set)):
         return (item for item in value)
     return iter((value,))

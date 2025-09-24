@@ -28,12 +28,12 @@ class CompositionModelSerializer(ModelSerializer):
         other = MaterialComponent.objects.other()
         shares_qs = obj.visible_shares()
         shares = WeightShareModelSerializer(
-            shares_qs.exclude(component=other), many=True
+            shares_qs.exclude(component=other), many=True, context=self.context
         ).data
         other_qs = shares_qs.filter(component=other)
         if other_qs.exists():
             shares.append(
-                WeightShareModelSerializer(other_qs, many=True).data[0]
+                WeightShareModelSerializer(other_qs, many=True, context=self.context).data[0]
             )
         return shares
 
@@ -60,12 +60,12 @@ class CompositionDoughnutChartSerializer(ModelSerializer):
         other = MaterialComponent.objects.other()
         shares_qs = obj.visible_shares()
         shares = WeightShareModelSerializer(
-            shares_qs.exclude(component=other), many=True
+            shares_qs.exclude(component=other), many=True, context=self.context
         ).data
         other_qs = shares_qs.filter(component=other)
         if other_qs.exists():
             shares.append(
-                WeightShareModelSerializer(other_qs, many=True).data[0]
+                WeightShareModelSerializer(other_qs, many=True, context=self.context).data[0]
             )
         return shares
 
@@ -164,14 +164,15 @@ class SampleModelSerializer(ModelSerializer):
     def to_representation(self, instance):
         data = super().to_representation(instance)
         if getattr(instance, "is_published", False):
+            context = getattr(self, "context", {})
             data['compositions'] = CompositionModelSerializer(
-                instance.visible_compositions, many=True
+                instance.visible_compositions, many=True, context=context
             ).data
             data['properties'] = MaterialPropertyValueModelSerializer(
-                instance.visible_properties, many=True
+                instance.visible_properties, many=True, context=context
             ).data
             data['sources'] = SourceAbbreviationSerializer(
-                instance.visible_sources, many=True
+                instance.visible_sources, many=True, context=context
             ).data
         return data
 

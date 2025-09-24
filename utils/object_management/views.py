@@ -347,6 +347,57 @@ class ApproveItemView(BaseReviewActionView):
         return super().post(request, *args, **kwargs)
 
 
+class RejectItemView(BaseReviewActionView):
+    """View to reject an item that is in review."""
+
+    permission_method = "has_reject_permission"
+    permission_denied_message = "You don't have permission to reject this item."
+    action_attr_name = "reject"
+    review_action = ReviewAction.ACTION_REJECTED
+
+
+class BaseReviewActionModalView(BaseReviewActionView, BSModalReadView):
+    """Base modal view to render confirmation dialogs for review actions.
+
+    Uses the shared modal container (#modal) via django-bootstrap-modal-forms.
+    Subclasses must set template_name and implement test_func() for permission checks.
+    """
+
+    template_name: str = ""
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["next_url"] = self.request.GET.get("next")
+        return context
+
+    def post(self, request, *args, **kwargs):  # type: ignore[override]
+        """Preflight handling for django-bootstrap-modal-forms.
+
+        The plugin first sends an AJAX POST to validate the form. We must not
+        perform the action on that request; instead, respond with 204 so the
+        plugin submits the real (non-AJAX) POST, on which we execute the action
+        and redirect to success_url/next.
+        """
+        try:
+            is_ajax = request.headers.get("x-requested-with") == "XMLHttpRequest"
+        except Exception:
+            is_ajax = False
+
+        if is_ajax:
+            try:
+                obj = self.get_object()
+                self.ensure_permission(request, obj)
+            except PermissionDenied:
+                from django.http import HttpResponseForbidden
+
+                return HttpResponseForbidden(self.permission_denied_message)
+            from django.http import HttpResponse
+
+            return HttpResponse(status=204)
+
+        return super().post(request, *args, **kwargs)
+
+
 class SubmitForReviewModalView(BaseReviewActionModalView):
     template_name = "object_management/submit_for_review_modal.html"
 

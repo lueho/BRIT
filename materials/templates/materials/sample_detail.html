@@ -16,7 +16,11 @@
                 </div>
                 {% if object.image %}
                     <div class="card-img-top">
-                        <img class="w-100 m-0" src="{{ object.image.url }}" alt="Image of sample">
+                        <img class="w-100 m-0"
+                             src="{{ object.image.url }}"
+                             alt="Image of sample"
+                             width="600"
+                             height="400">
                     </div>
                 {% endif %}
                 <div class="card-body">
@@ -183,14 +187,14 @@
                         <a href="{% url 'sample-add-property' object.id %}">
                             <i class="fas fa-fw fa-plus"></i> Add property
                         </a>
-                        <a class="ms-3"
-                           href="javascript:void(0);"
-                           data-bs-toggle="collapse"
-                           data-bs-target=".remove-property"
-                           aria-expanded="false"
-                           aria-controls="remove-property">
+                        <button class="btn btn-link ms-3 p-0 text-decoration-none"
+                                type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target=".remove-property"
+                                aria-expanded="false"
+                                aria-controls="remove-property">
                             <i class="fas fa-fw fa-minus"></i> Remove properties
-                        </a>
+                        </button>
                     {% endif %}
                 </div>
             </div>
@@ -254,7 +258,6 @@
                                         </tr>
                                     {% endfor %}
                                 </tbody>
-                                <tfoot></tfoot>
                             </table>
 
                         </div>

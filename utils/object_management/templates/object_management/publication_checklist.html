@@ -92,30 +92,51 @@
                                 <a class="btn btn-sm btn-outline-primary" href="{{ object.update_url }}">Edit object</a>
                             </li>
                         {% endif %}
+
                         {% if policy.can_submit_review %}
                             <li class="mb-2">
-                                <a class="btn btn-sm btn-outline-primary"
-                                   href="{{ object.submit_for_review_url }}">Submit for review</a>
+                                <form method="post"
+                                      action="{% url 'object_management:submit_for_review' content_type_id=object|get_content_type_id object_id=object.id %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ back_url }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-primary">Submit for review</button>
+                                </form>
                             </li>
                         {% endif %}
+
                         {% if policy.can_withdraw_review %}
                             <li class="mb-2">
-                                <a class="btn btn-sm btn-outline-secondary"
-                                   href="{{ object.withdraw_from_review_url }}">Withdraw from review</a>
+                                <form method="post"
+                                      action="{% url 'object_management:withdraw_from_review' content_type_id=object|get_content_type_id object_id=object.id %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ back_url }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-secondary">Withdraw from review</button>
+                                </form>
                             </li>
                         {% endif %}
+
                         {% if policy.can_approve %}
                             <li class="mb-2">
-                                <a class="btn btn-sm btn-success"
-                                   href="{{ object.approve_url }}">Approve</a>
+                                <form method="post"
+                                      action="{% url 'object_management:approve_item' content_type_id=object|get_content_type_id object_id=object.id %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ back_url }}">
+                                    <button type="submit" class="btn btn-sm btn-success">Approve</button>
+                                </form>
                             </li>
                         {% endif %}
+
                         {% if policy.can_reject %}
                             <li class="mb-2">
-                                <a class="btn btn-sm btn-danger"
-                                   href="{{ object.reject_url }}">Reject</a>
+                                <form method="post"
+                                      action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="next" value="{{ back_url }}">
+                                    <button type="submit" class="btn btn-sm btn-danger">Reject</button>
+                                </form>
                             </li>
                         {% endif %}
+
                         {% if not policy.can_edit and not policy.can_submit_review and not policy.can_withdraw_review and not policy.can_approve and not policy.can_reject %}
                             <li class="text-muted">No direct actions available.</li>
                         {% endif %}
