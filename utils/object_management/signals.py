@@ -27,7 +27,6 @@ def _iter_user_created_models():
                     isinstance(model, type)
                     and issubclass(model, UserCreatedObject)
                     and not model._meta.abstract
-                    and not model._meta.proxy
                 ):
                     yield model
             except Exception:
@@ -60,7 +59,9 @@ def ensure_moderation_permissions(sender, **kwargs):
         try:
             model_name = model._meta.model_name
             app_label = model._meta.app_label
-            content_type = ContentType.objects.get_for_model(model)
+            content_type = ContentType.objects.get_for_model(
+                model, for_concrete_model=False
+            )
             codename = f"can_moderate_{model_name}"
             perm_name = f"Can moderate {model._meta.verbose_name_plural}"
 

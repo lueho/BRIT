@@ -2,28 +2,42 @@
 {% load moderation_tags %}
 
 {% block detail_body %}
-    <p class="card-text"><strong>Url:</strong><br>
+    <p class="card-text">
+        <strong>Url:</strong>
+        <br>
         <a href="{{ object.url }}">{{ object.url }}</a>
     </p>
-    <p class="card-text"><strong>Url valid:</strong><br>{{ object.url_valid }} {% if object.url_checked %}(last checked:
-        {{ object.url_checked|date:'d.m.Y' }}){% endif %}</p>
-    <p class="card-text"><strong>Collections:</strong><br>
+    <p class="card-text">
+        <strong>Url valid:</strong>
+        <br>
+        {{ object.url_valid }}
+        {% if object.url_checked %}
+            (last checked:
+            {{ object.url_checked|date:'d.m.Y' }})
+        {% endif %}
+    </p>
+    <p class="card-text">
+        <strong>Collections:</strong>
+        <br>
         {% for collection in object.collections.all %}
-            <a href="{% url "collection-detail" collection.pk %}">{{ collection.name }}</a><br>
+            <a href="{% url "collection-detail" collection.pk %}">{{ collection.name }}</a>
+            <br>
         {% endfor %}
     </p>
 {% endblock detail_body %}
 
 {% block url_check_action %}
     {% object_policy object as policy %}
-    {% if object.url and policy.is_owner %}
-        <a href="javascript:void(0)"
-           class="check-url-btn btn btn-outline-success w-100 mb-2"
-           data-pk="{{ object.pk }}"
-           data-source-check-url="{% url "wasteflyer-check-url" object.pk %}"
-           data-progress-url-template="{% url "wasteflyer-check-url-progress" "task_id" %}">
-            <i class="fas fa-fw fa-circle-check"></i>
-            <span>check url</span>
-        </a>
+    {% if object.url %}
+        {% if policy.is_owner or policy.is_moderator or policy.is_staff %}
+            <button type="button"
+                    class="check-url-btn btn btn-outline-success w-100 mb-2"
+                    data-pk="{{ object.pk }}"
+                    data-source-check-url="{% url "wasteflyer-check-url" object.pk %}"
+                    data-progress-url-template="{% url "wasteflyer-check-url-progress" "task_id" %}">
+                <i class="fas fa-fw fa-circle-check"></i>
+                <span>check url</span>
+            </button>
+        {% endif %}
     {% endif %}
 {% endblock url_check_action %}

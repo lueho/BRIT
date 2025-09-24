@@ -2,12 +2,14 @@ import json
 
 from celery.result import AsyncResult
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse
 from django.urls import reverse_lazy
 from django.views import View
 from django.views.generic import TemplateView
 
 from utils.forms import TomSelectFormsetHelper
+from utils.object_management.permissions import get_object_policy
 from utils.object_management.views import (
     PrivateObjectFilterView,
     PrivateObjectListView,
@@ -233,13 +235,20 @@ class SourceModalDeleteView(UserCreatedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class SourceCheckUrlView(PermissionRequiredMixin, View):
+class SourceCheckUrlView(LoginRequiredMixin, View):
     object = None
     model = Source
-    permission_required = "bibliography.change_source"
 
     def get(self, request, *args, **kwargs):
         self.object = self.model.objects.get(pk=kwargs.get("pk"))
+        policy = get_object_policy(request.user, self.object, request=request)
+        if not (
+            policy.get("is_owner")
+            or policy.get("is_staff")
+            or policy.get("is_moderator")
+        ):
+            raise PermissionDenied
+
         task = check_source_url.delay(self.object.pk)
         response_data = {"task_id": task.task_id}
         return HttpResponse(json.dumps(response_data), content_type="application/json")
