@@ -68,8 +68,50 @@ class InventoryAlgorithmAutocompleteView(AutocompleteModelView):
     page_size = 15
 
 
-# ----------- Scenario CRUD --------------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------------------------
+class ScenarioInventoryAlgorithmAutocompleteView(InventoryAlgorithmAutocompleteView):
+    def hook_queryset(self, queryset):
+        scenario_id = self.request.GET.get("scenario")
+        feedstock_id = self.request.GET.get("feedstock")
+        geodataset_id = self.request.GET.get("geodataset")
+
+        if not (scenario_id and feedstock_id and geodataset_id):
+            return InventoryAlgorithm.objects.none()
+
+        try:
+            scenario = Scenario.objects.get(pk=scenario_id)
+            feedstock_series = SampleSeries.objects.select_related("material").get(
+                pk=feedstock_id
+            )
+            geodataset = GeoDataset.objects.get(pk=geodataset_id)
+        except (
+            Scenario.DoesNotExist,
+            SampleSeries.DoesNotExist,
+            GeoDataset.DoesNotExist,
+        ):
+            return InventoryAlgorithm.objects.none()
+
+        algorithms = InventoryAlgorithm.objects.filter(
+            geodataset=geodataset,
+            feedstocks=feedstock_series.material,
+        )
+
+        existing_ids = ScenarioInventoryConfiguration.objects.filter(
+            scenario=scenario,
+            feedstock=feedstock_series,
+            geodataset=geodataset,
+        ).values_list("inventory_algorithm_id", flat=True)
+
+        mode = self.request.GET.get("options", "")
+        if mode == "create":
+            algorithms = algorithms.exclude(id__in=existing_ids)
+        elif mode == "update":
+            current_id = self.request.GET.get("current_algorithm")
+            if current_id:
+                algorithms = algorithms | InventoryAlgorithm.objects.filter(
+                    id=current_id
+                )
+
+        return algorithms.distinct()
 
 
 class PublishedScenarioFilterView(PublishedObjectFilterView):
@@ -271,7 +313,9 @@ class ScenarioRemoveInventoryAlgorithmView(
             self.scenario = Scenario.objects.get(id=self.kwargs.get("scenario_pk"))
         except Scenario.DoesNotExist:
             return False
-        policy = get_object_policy(self.request.user, self.scenario, request=self.request)
+        policy = get_object_policy(
+            self.request.user, self.scenario, request=self.request
+        )
         return policy["can_edit"]
 
     def get(self, request, *args, **kwargs):
@@ -354,7 +398,7 @@ def download_scenario_summary(request, scenario_pk):
     scenario = Scenario.objects.get(id=scenario_pk)
     with io.StringIO(json.dumps(scenario.summary_dict(), indent=4)) as file:
         response = HttpResponse(file, content_type="application/json")
-        response["Content-Disposition"] = "attachment; filename=%s" % file_name
+        response["Content-Disposition"] = f"attachment; filename={file_name}"
         return response
 
 
@@ -372,57 +416,6 @@ def load_catchment_options(request):
             "catchment_dropdown_list_options.html",
             {"catchments": Catchment.objects.none()},
         )
-
-
-def load_geodataset_options(request):
-    scenario = Scenario.objects.get(id=request.GET.get("scenario"))
-    if request.GET.get("feedstock"):
-        feedstock = SampleSeries.objects.get(id=request.GET.get("feedstock"))
-        if request.GET.get("options") == "create":
-            geodatasets = scenario.remaining_geodataset_options(
-                feedstock=feedstock.material
-            )
-        elif request.GET.get("options") == "update":
-            current = GeoDataset.objects.filter(
-                id=request.GET.get("current_geodataset")
-            )
-            geodatasets = scenario.remaining_geodataset_options(
-                feedstock=feedstock.material
-            ).union(current)
-        else:
-            geodatasets = scenario.available_geodatasets()
-    else:
-        geodatasets = GeoDataset.objects.none()
-    return render(
-        request, "geodataset_dropdown_list_options.html", {"geodatasets": geodatasets}
-    )
-
-
-def load_algorithm_options(request):
-    scenario = Scenario.objects.get(id=request.GET.get("scenario"))
-    if request.GET.get("feedstock") and request.GET.get("geodataset"):
-        feedstock = SampleSeries.objects.get(id=request.GET.get("feedstock"))
-        geodataset = GeoDataset.objects.get(id=request.GET.get("geodataset"))
-        if request.GET.get("options") == "create":
-            algorithms = scenario.remaining_inventory_algorithm_options(
-                feedstock, geodataset
-            )
-        elif request.GET.get("options") == "update":
-            current_algorithm = InventoryAlgorithm.objects.filter(
-                id=request.GET.get("current_inventory_algorithm"),
-                feedstock=feedstock.material,
-                geodataset=geodataset,
-            )
-            algorithms = scenario.remaining_inventory_algorithm_options(
-                feedstock, geodataset
-            ).union(current_algorithm)
-        else:
-            algorithms = scenario.available_inventory_algorithms()
-    else:
-        algorithms = InventoryAlgorithm.objects.none()
-    return render(
-        request, "algorithm_dropdown_list_options.html", {"algorithms": algorithms}
-    )
 
 
 def load_parameter_options(request):

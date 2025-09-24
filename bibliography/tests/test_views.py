@@ -1,14 +1,13 @@
-from unittest.mock import Mock, patch
-
 from django.contrib.auth.models import Permission
+from django.contrib.contenttypes.models import ContentType
 from django.db.models.signals import post_save
 from django.urls import reverse
 from factory.django import mute_signals
 
+from utils.object_management.models import User
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 
 from ..models import Author, Licence, Source, SourceAuthor, check_url_valid
-from utils.object_management.models import User
 
 
 def setUpModule():
@@ -50,7 +49,6 @@ class AuthorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
 
 
 class AuthorAutoCompleteViewTestCase(ViewWithPermissionsTestCase):
-
     def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse("author-autocomplete"))
         self.assertEqual(response.status_code, 200)
@@ -153,6 +151,14 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
 
     @classmethod
     def setUpTestData(cls):
+        content_type = ContentType.objects.get_for_model(
+            Source, for_concrete_model=False
+        )
+        Permission.objects.get_or_create(
+            content_type=content_type,
+            codename="can_moderate_source",
+            defaults={"name": "Can moderate sources"},
+        )
         super().setUpTestData()
 
         moderator = User.objects.create(username="moderator")
@@ -229,7 +235,9 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         response = self.client.get(self.get_detail_url(self.published_object.pk))
         self.assertContains(response, "check url")
 
-    def test_detail_view_published_doesnt_contain_check_url_button_for_unprivileged_non_owner(self):
+    def test_detail_view_published_doesnt_contain_check_url_button_for_unprivileged_non_owner(
+        self,
+    ):
         self.client.force_login(self.non_owner_user)
         response = self.client.get(self.get_detail_url(self.published_object.pk))
         self.assertNotContains(response, "check url")
@@ -292,6 +300,7 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         }
         update_data.update(update_related_post_data)
         response = self.client.post(update_url, update_data, follow=True)
+        self.assertEqual(response.status_code, 200)
         source.refresh_from_db()
         self.assertEqual(source.sourceauthors.count(), 2)
         author_ids = set(source.sourceauthors.values_list("author_id", flat=True))
@@ -305,6 +314,14 @@ class SourceCheckUrlViewTestCase(ViewWithPermissionsTestCase):
 
     @classmethod
     def setUpTestData(cls):
+        content_type = ContentType.objects.get_for_model(
+            Source, for_concrete_model=False
+        )
+        Permission.objects.get_or_create(
+            content_type=content_type,
+            codename="can_moderate_source",
+            defaults={"name": "Can moderate sources"},
+        )
         super().setUpTestData()
         with mute_signals(post_save):
             cls.source = Source.objects.create(
