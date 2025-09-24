@@ -387,6 +387,60 @@ class RejectItemModalView(BaseReviewActionModalView):
     review_action = ReviewAction.ACTION_REJECTED
 
 
+class PublicationChecklistView(LoginRequiredMixin, UserPassesTestMixin, TemplateView):
+    """Display dependency readiness for publishing user-created objects."""
+
+    template_name = "object_management/publication_checklist.html"
+    permission_denied_message = "You do not have access to this publication checklist."
+
+    def dispatch(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_object(self):
+        if hasattr(self, "_object"):
+            return self._object
+        content_type = get_object_or_404(
+            ContentType, pk=self.kwargs.get("content_type_id")
+        )
+        model_class = content_type.model_class()
+        self._object = get_object_or_404(model_class, pk=self.kwargs.get("object_id"))
+        return self._object
+
+    def test_func(self):
+        obj = getattr(self, "object", None) or self.get_object()
+        policy = get_object_policy(self.request.user, obj, request=self.request)
+        return policy["is_owner"] or policy["is_staff"] or policy["is_moderator"]
+
+    def get_target_status(self, obj):
+        requested = self.request.GET.get("target")
+        if requested:
+            return requested
+        return getattr(obj, "STATUS_PUBLISHED", "published")
+
+    def get_next_url(self, obj):
+        return self.request.GET.get("next") or obj.get_absolute_url()
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        obj = self.object
+        target_status = self.get_target_status(obj)
+        report = prepublish_check(obj, target_status=target_status)
+        policy = get_object_policy(self.request.user, obj, request=self.request)
+        context.update(
+            {
+                "object": obj,
+                "policy": policy,
+                "report": report,
+                "blocking_issues": report.blocking,
+                "sync_issues": report.needs_sync,
+                "target_status": target_status,
+                "back_url": self.get_next_url(obj),
+            }
+        )
+        return context
+
+
 class UserOwnsObjectMixin(UserPassesTestMixin):
     """
     All models that have access restrictions specific to a user contain a field named 'owner'. This mixin prevents

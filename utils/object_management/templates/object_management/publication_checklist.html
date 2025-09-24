@@ -1,0 +1,127 @@
+{% extends "base.html" %}
+{% load moderation_tags %}
+
+{% block title %}
+    Publication checklist
+{% endblock title %}
+
+{% block breadcrumbs %}
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ object.get_absolute_url }}">{{ object }}</a></li>
+            <li class="breadcrumb-item active" aria-current="page">Publication checklist</li>
+        </ol>
+    </nav>
+{% endblock breadcrumbs %}
+
+{% block content %}
+    {% object_policy object as policy %}
+
+    <div class="row">
+        <div class="col-12 col-lg-8 mt-3">
+            <div class="card shadow-sm">
+                <div class="card-header bg-body-tertiary">
+                    <h5 class="mb-0">Dependency status</h5>
+                </div>
+                <div class="card-body">
+                    <p class="mb-1"><strong>Object:</strong> {{ object }}</p>
+                    <p class="mb-1"><strong>Target status:</strong> {{ target_status|title }}</p>
+                    <p class="mb-3 text-muted small">
+                        Resolve all blocking dependencies before submitting or approving this object.
+                    </p>
+
+                    {% if blocking_issues %}
+                        <div class="alert alert-danger" role="alert">
+                            <h6 class="alert-heading mb-2">Blocking dependencies</h6>
+                            <p class="mb-2">The following items must be published (or replaced) before continuing:</p>
+                            <ul class="mb-0">
+                                {% for issue in blocking_issues %}
+                                    <li>
+                                        {{ issue.describe }}
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% else %}
+                        <div class="alert alert-success" role="alert">
+                            All required dependencies are ready.
+                        </div>
+                    {% endif %}
+
+                    {% if sync_issues %}
+                        <div class="alert alert-warning" role="alert">
+                            <h6 class="alert-heading mb-2">Items requiring status sync</h6>
+                            <p class="mb-2">These related objects will be updated automatically once the action completes:</p>
+                            <ul class="mb-0">
+                                {% for issue in sync_issues %}
+                                    <li>
+                                        {{ issue.describe }}
+                                    </li>
+                                {% endfor %}
+                            </ul>
+                        </div>
+                    {% endif %}
+                </div>
+                <div class="card-footer d-flex justify-content-between">
+                    <a class="btn btn-outline-secondary" href="{{ back_url }}">Back</a>
+                    {% if blocking_issues %}
+                        <span class="text-muted small align-self-center">
+                            Submit again once dependencies are resolved.
+                        </span>
+                    {% else %}
+                        <span class="text-success small align-self-center">
+                            Ready to proceed.
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-lg-4 mt-3">
+            <div class="card shadow-sm">
+                <div class="card-header bg-body-tertiary">
+                    <h5 class="mb-0">Actions</h5>
+                </div>
+                <div class="card-body">
+                    <p class="small text-muted mb-3">
+                        Use the links below to resolve dependencies. Only actions you are permitted to perform are shown.
+                    </p>
+                    <ul class="list-unstyled mb-0">
+                        {% if policy.can_edit %}
+                            <li class="mb-2">
+                                <a class="btn btn-sm btn-outline-primary" href="{{ object.update_url }}">Edit object</a>
+                            </li>
+                        {% endif %}
+                        {% if policy.can_submit_review %}
+                            <li class="mb-2">
+                                <a class="btn btn-sm btn-outline-primary"
+                                   href="{{ object.submit_for_review_url }}">Submit for review</a>
+                            </li>
+                        {% endif %}
+                        {% if policy.can_withdraw_review %}
+                            <li class="mb-2">
+                                <a class="btn btn-sm btn-outline-secondary"
+                                   href="{{ object.withdraw_from_review_url }}">Withdraw from review</a>
+                            </li>
+                        {% endif %}
+                        {% if policy.can_approve %}
+                            <li class="mb-2">
+                                <a class="btn btn-sm btn-success"
+                                   href="{{ object.approve_url }}">Approve</a>
+                            </li>
+                        {% endif %}
+                        {% if policy.can_reject %}
+                            <li class="mb-2">
+                                <a class="btn btn-sm btn-danger"
+                                   href="{{ object.reject_url }}">Reject</a>
+                            </li>
+                        {% endif %}
+                        {% if not policy.can_edit and not policy.can_submit_review and not policy.can_withdraw_review and not policy.can_approve and not policy.can_reject %}
+                            <li class="text-muted">No direct actions available.</li>
+                        {% endif %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock content %}

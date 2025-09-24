@@ -513,7 +513,7 @@ class SampleDetailView(UserCreatedObjectDetailView):
             self.object, context={"request": self.request}
         ).data
         charts = {}
-        for composition in self.object.compositions.all():
+        for composition in self.object.visible_compositions:
             chart_data = CompositionDoughnutChartSerializer(composition).data
             chart = DoughnutChart(**chart_data)
             charts[f"composition-chart-{composition.id}"] = chart.as_dict()
