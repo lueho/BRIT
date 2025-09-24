@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from typing import Iterable, Iterator, Optional, Sequence
 
 from django.apps import apps
+from django.db.models import QuerySet
 from django.utils.translation import gettext_lazy as _
 
 
@@ -127,7 +128,7 @@ def _resolve_related(obj: object, rule: RelationRule) -> Iterator[object]:
     if value is None:
         return iter(())
     if hasattr(value, "all"):
-        return (item for item in value.all())
+        return value.all()
     if callable(value):  # support properties returning callables
         value = value()
     if value is None:
@@ -149,20 +150,36 @@ def prepublish_check(obj: object, target_status: Optional[str] = None) -> Prepub
         return report
 
     for rule in config.requires_published:
-        related_iter = list(_resolve_related(obj, rule))
-        if not related_iter:
-            if rule.optional:
+        related_iterable = _resolve_related(obj, rule)
+        if isinstance(related_iterable, QuerySet):
+            if not related_iterable.exists():
+                if not rule.optional:
+                    report.blocking.append(
+                        DependencyIssue(
+                            rule=rule,
+                            related_object=None,
+                            reason=str(_("missing reference")),
+                            missing=True,
+                        )
+                    )
                 continue
-            report.blocking.append(
-                DependencyIssue(
-                    rule=rule,
-                    related_object=None,
-                    reason=str(_("missing reference")),
-                    missing=True,
-                )
-            )
-            continue
-        for related in related_iter:
+            iterator = related_iterable.iterator()
+        else:
+            related_list = list(related_iterable)
+            if not related_list:
+                if not rule.optional:
+                    report.blocking.append(
+                        DependencyIssue(
+                            rule=rule,
+                            related_object=None,
+                            reason=str(_("missing reference")),
+                            missing=True,
+                        )
+                    )
+                continue
+            iterator = iter(related_list)
+
+        for related in iterator:
             if related is None:
                 report.blocking.append(
                     DependencyIssue(
@@ -235,25 +252,45 @@ def _apply_status_change(child: object, target_status: str, acting_user: Optiona
     # Import lazily to avoid circular dependencies
     from django.utils import timezone
 
-    setattr(child, "publication_status", target_status)
+    update_fields: list[str] = []
+
+    if getattr(child, "publication_status", None) != target_status:
+        setattr(child, "publication_status", target_status)
+        update_fields.append("publication_status")
+
     if hasattr(child, "submitted_at"):
         if target_status == getattr(child, "STATUS_REVIEW", "review"):
             child.submitted_at = timezone.now()
+            update_fields.append("submitted_at")
         elif target_status in {
             getattr(child, "STATUS_PRIVATE", "private"),
             getattr(child, "STATUS_DECLINED", "declined"),
         }:
-            child.submitted_at = None
+            if getattr(child, "submitted_at", None) is not None:
+                child.submitted_at = None
+                update_fields.append("submitted_at")
     if hasattr(child, "approved_at"):
         if target_status == getattr(child, "STATUS_PUBLISHED", "published"):
             child.approved_at = timezone.now()
+            if "approved_at" not in update_fields:
+                update_fields.append("approved_at")
             if hasattr(child, "approved_by") and acting_user is not None:
-                child.approved_by = acting_user
+                if getattr(child, "approved_by", None) != acting_user:
+                    child.approved_by = acting_user
+                    update_fields.append("approved_by")
         else:
-            child.approved_at = None
-            if hasattr(child, "approved_by"):
+            cleared = False
+            if getattr(child, "approved_at", None) is not None:
+                child.approved_at = None
+                update_fields.append("approved_at")
+                cleared = True
+            if hasattr(child, "approved_by") and getattr(child, "approved_by", None) is not None:
                 child.approved_by = None
-    child.save()
+                update_fields.append("approved_by")
+                cleared = True
+
+    if update_fields:
+        child.save(update_fields=list(dict.fromkeys(update_fields)))
 
 
 def get_model_config(app_label: str, model_name: str) -> Optional[DependencyConfig]:

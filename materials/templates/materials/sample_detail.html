@@ -247,7 +247,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for share in composition.shares %}
+                                    {% for share in composition.visible_shares %}
                                         <tr>
                                             <td>
                                                 <a href="{% url 'materialcomponent-detail-modal' share.component %}"

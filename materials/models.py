@@ -612,6 +612,7 @@ class Composition(NamedUserCreatedObject):
 
         return duplicate
 
+    @property
     def visible_shares(self):
         shares = self.shares.all()
         if self.is_published:

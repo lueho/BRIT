@@ -284,6 +284,30 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
         return self.handle_review_action_post(request, *args, **kwargs)
 
 
+    # ---- Ajax preflight helper ----
+    def _handle_modal_preflight(self, request):
+        """Return HttpResponse when request is the bootstrap-modal-forms preflight, else None."""
+        try:
+            is_ajax = request.headers.get("x-requested-with") == "XMLHttpRequest"
+        except Exception:
+            is_ajax = False
+
+        if not is_ajax:
+            return None
+
+        try:
+            obj = self.get_object()
+            self.ensure_permission(request, obj)
+        except PermissionDenied:
+            from django.http import HttpResponseForbidden
+
+            return HttpResponseForbidden(self.permission_denied_message)
+
+        from django.http import HttpResponse
+
+        return HttpResponse(status=204)
+
+
 class SubmitForReviewView(BaseReviewActionView):
     """View to submit an item for review."""
 
@@ -322,27 +346,9 @@ class ApproveItemView(BaseReviewActionView):
         plugin submits the real (non-AJAX) POST, on which we execute the action
         and redirect to success_url/next.
         """
-        # Detect AJAX request as used by the package (X-Requested-With)
-        try:
-            is_ajax = request.headers.get("x-requested-with") == "XMLHttpRequest"
-        except Exception:
-            is_ajax = False
-
-        if is_ajax:
-            # Optional: enforce permission early to fail fast in the modal
-            try:
-                obj = self.get_object()
-                self.ensure_permission(request, obj)
-            except PermissionDenied:
-                # Return 403; the plugin will keep the modal open (no redirect)
-                from django.http import HttpResponseForbidden
-
-                return HttpResponseForbidden(self.permission_denied_message)
-            # Valid preflight – let the plugin proceed with real submit
-            from django.http import HttpResponse
-
-            return HttpResponse(status=204)
-
+        preflight_response = self._handle_modal_preflight(request)
+        if preflight_response is not None:
+            return preflight_response
         # Non-AJAX: perform the action and redirect
         return super().post(request, *args, **kwargs)
 
@@ -378,22 +384,9 @@ class BaseReviewActionModalView(BaseReviewActionView, BSModalReadView):
         plugin submits the real (non-AJAX) POST, on which we execute the action
         and redirect to success_url/next.
         """
-        try:
-            is_ajax = request.headers.get("x-requested-with") == "XMLHttpRequest"
-        except Exception:
-            is_ajax = False
-
-        if is_ajax:
-            try:
-                obj = self.get_object()
-                self.ensure_permission(request, obj)
-            except PermissionDenied:
-                from django.http import HttpResponseForbidden
-
-                return HttpResponseForbidden(self.permission_denied_message)
-            from django.http import HttpResponse
-
-            return HttpResponse(status=204)
+        preflight_response = self._handle_modal_preflight(request)
+        if preflight_response is not None:
+            return preflight_response
 
         return super().post(request, *args, **kwargs)
 

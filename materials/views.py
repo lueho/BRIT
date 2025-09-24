@@ -506,6 +506,17 @@ class SampleModalCreateView(UserCreatedObjectModalCreateView):
 
 class SampleDetailView(UserCreatedObjectDetailView):
     model = Sample
+    queryset = (
+        Sample.objects.select_related("material", "series", "timestep")
+        .prefetch_related(
+            "sources",
+            "properties",
+            "properties__property",
+            "compositions__group",
+            "compositions__shares",
+            "compositions__shares__component",
+        )
+    )
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
