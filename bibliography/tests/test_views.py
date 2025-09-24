@@ -1,5 +1,6 @@
 from unittest.mock import Mock, patch
 
+from django.contrib.auth.models import Permission
 from django.db.models.signals import post_save
 from django.urls import reverse
 from factory.django import mute_signals
@@ -7,6 +8,7 @@ from factory.django import mute_signals
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 
 from ..models import Author, Licence, Source, SourceAuthor, check_url_valid
+from utils.object_management.models import User
 
 
 def setUpModule():
@@ -112,13 +114,13 @@ class LicenceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
     update_object_data = {"name": "Updated Test Licence"}
 
 
-# ----------- Source CRUD ----------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 
 class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Source
-    model_add_permission = "add_source"
+
+    view_dashboard_name = "bibliography-dashboard"
 
     modal_detail_view = True
     modal_create_view = True
@@ -131,38 +133,45 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
     view_detail_name = "source-detail"
     view_modal_detail_name = "source-detail-modal"
     view_update_name = "source-update"
+    view_modal_update_name = "source-update-modal"
     view_delete_name = "source-delete-modal"
 
     allow_create_for_any_authenticated_user = True
 
     create_object_data = {
-        "abbreviation": "TS1",
-        "type": "article",
-        "title": "Test Source",
-        "url": "https://www.test-url.org",
+        "title": "Test source",
+        "abbreviation": "TEST",
+        "type": "website",
+        "url": "https://example.com",
     }
     update_object_data = {
-        "abbreviation": "TS1",
-        "type": "article",
-        "title": "Updated Test Source",
-        "url": "https://www.updated-url.org",
+        "title": "Updated source",
+        "abbreviation": "UPD",
+        "type": "website",
+        "url": "https://example.org",
     }
 
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        author_1_data = {
-            "last_names": "Test Author",
-            "first_names": "One",
-            "publication_status": "published",
-        }
-        author_2_data = {
-            "last_names": "Test Author",
-            "first_names": "Two",
-            "publication_status": "published",
-        }
-        author_1 = Author.objects.create(**author_1_data)
-        author_2 = Author.objects.create(**author_2_data)
+
+        moderator = User.objects.create(username="moderator")
+        moderator.user_permissions.add(
+            Permission.objects.get(codename="can_moderate_source")
+        )
+        cls.util_objects["moderator"] = moderator
+
+        author_1 = Author.objects.create(
+            last_names="Test Author",
+            first_names="One",
+            publication_status="published",
+        )
+        author_2 = Author.objects.create(
+            last_names="Test Author",
+            first_names="Two",
+            publication_status="published",
+        )
+
         cls.source_author_1 = SourceAuthor.objects.create(
             source=cls.published_object,
             author=author_1,
@@ -210,7 +219,17 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         response = self.client.get(self.get_detail_url(self.published_object.pk))
         self.assertNotContains(response, "check url")
 
-    def test_detail_view_published_doesnt_contain_check_url_button_for_non_owner(self):
+    def test_detail_view_published_contains_check_url_button_for_staff(self):
+        self.client.force_login(self.staff_user)
+        response = self.client.get(self.get_detail_url(self.published_object.pk))
+        self.assertContains(response, "check url")
+
+    def test_detail_view_published_contains_check_url_button_for_moderator(self):
+        self.client.force_login(self.util_objects["moderator"])
+        response = self.client.get(self.get_detail_url(self.published_object.pk))
+        self.assertContains(response, "check url")
+
+    def test_detail_view_published_doesnt_contain_check_url_button_for_unprivileged_non_owner(self):
         self.client.force_login(self.non_owner_user)
         response = self.client.get(self.get_detail_url(self.published_object.pk))
         self.assertNotContains(response, "check url")
@@ -282,7 +301,7 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
 
 
 class SourceCheckUrlViewTestCase(ViewWithPermissionsTestCase):
-    member_permissions = ["change_source"]
+    member_permissions = ["can_moderate_source"]
 
     @classmethod
     def setUpTestData(cls):
@@ -292,6 +311,7 @@ class SourceCheckUrlViewTestCase(ViewWithPermissionsTestCase):
                 title="Test Source from the Web",
                 abbreviation="WORKING",
                 url="https://httpbin.org/status/200",
+                owner=cls.owner,
             )
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
@@ -311,7 +331,21 @@ class SourceCheckUrlViewTestCase(ViewWithPermissionsTestCase):
         )
         self.assertEqual(response.status_code, 403)
 
-    def test_get_http_200_ok_for_members(self):
+    def test_get_http_200_ok_for_owner(self):
+        self.client.force_login(self.owner)
+        response = self.client.get(
+            reverse("source-check-url", kwargs={"pk": self.source.pk})
+        )
+        self.assertEqual(200, response.status_code)
+
+    def test_get_http_200_ok_for_staff(self):
+        self.client.force_login(self.staff)
+        response = self.client.get(
+            reverse("source-check-url", kwargs={"pk": self.source.pk})
+        )
+        self.assertEqual(200, response.status_code)
+
+    def test_get_http_200_ok_for_moderator(self):
         self.client.force_login(self.member)
         response = self.client.get(
             reverse("source-check-url", kwargs={"pk": self.source.pk})
