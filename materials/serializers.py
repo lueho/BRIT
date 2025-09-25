@@ -26,14 +26,14 @@ class CompositionModelSerializer(ModelSerializer):
         is last in the list, regardless of the previous order.
         """
         other = MaterialComponent.objects.other()
-        shares_qs = obj.visible_shares()
+        shares_qs = obj.visible_shares
         shares = WeightShareModelSerializer(
-            shares_qs.exclude(component=other), many=True, context=self.context
+            shares_qs.exclude(component=other), many=True, context=salf.context
         ).data
         other_qs = shares_qs.filter(component=other)
         if other_qs.exists():
             shares.append(
-                WeightShareModelSerializer(other_qs, many=True, context=self.context).data[0]
+                WeightShareModelSerializer(other_qs, many=True, context=salf.context).data[0]
             )
         return shares
 
@@ -58,7 +58,7 @@ class CompositionDoughnutChartSerializer(ModelSerializer):
 
     def get_shares(self, obj):
         other = MaterialComponent.objects.other()
-        shares_qs = obj.visible_shares()
+        shares_qs = obj.visible_shares
         shares = WeightShareModelSerializer(
             shares_qs.exclude(component=other), many=True, context=self.context
         ).data
@@ -71,7 +71,7 @@ class CompositionDoughnutChartSerializer(ModelSerializer):
 
     def get_labels(self, obj):
         other = MaterialComponent.objects.other()
-        shares_qs = obj.visible_shares()
+        shares_qs = obj.visible_shares
         labels = [
             share.component.name
             for share in shares_qs.exclude(component=other)
@@ -83,7 +83,7 @@ class CompositionDoughnutChartSerializer(ModelSerializer):
 
     def get_data(self, obj):
         other = MaterialComponent.objects.other()
-        shares_qs = obj.visible_shares()
+        shares_qs = obj.visible_shares
         data = [{
             'label': 'Fraction',
             'unit': '%',
