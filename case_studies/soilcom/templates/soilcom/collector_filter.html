@@ -1,50 +1,59 @@
-{% extends 'filtered_list.html' %}
+{% extends "filtered_list.html" %}
 {% load crispy_forms_tags %}
 {% load moderation_tags %}
+{% load user_created_object_tags %}
 
-{% block title %}BRIT | Waste collecting entities{% endblock %}
+{% block title %}
+    BRIT | Waste collecting entities
+{% endblock title %}
 
-{% block list_card_header %}<strong>Collectors</strong>{% endblock %}
+{% block list_card_header %}
+    <strong>Collectors</strong>
+{% endblock list_card_header %}
 
-{% block list_table %}
-    <table class="table table-responsive-stack">
-        <thead>
+{% block list_table_head %}
+    <thead>
         <tr>
             <th>Name</th>
             <th>Catchment</th>
+            {% if object_list.model|is_user_created %}<th class="actions-column">Status/Actions</th>{% endif %}
         </tr>
-        </thead>
-        <tbody>
-        {% for object in object_list %}
-            <tr>
-                <td data-label="Name"><a href="{% detail_or_review_url object %}">{{ object.name }}</a></td>
-                <td data-label="Catchment">{{ object.catchment }}</td>
-            </tr>
-        {% endfor %}
-        </tbody>
-        <tfoot>
-        </tfoot>
-    </table>
-{% endblock list_table %}
+    </thead>
+{% endblock list_table_head %}
 
-{% block list_footer %}
+{% block list_table_row %}
+    <tr tabindex="0"
+        onclick="window.location='{% detail_or_review_url object %}'">
+        <td data-label="Name">
+            <a href="{% detail_or_review_url object %}">{{ object.name }}</a>
+        </td>
+        <td data-label="Catchment">
+            {% if object.catchment %}
+                <a href="{% url 'collectioncatchment-detail' object.catchment.pk %}">{{ object.catchment }}</a>
+            {% else %}
+                <span class="text-muted">—</span>
+            {% endif %}
+        </td>
+        {% if object_list.model|is_user_created %}
+            <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
+        {% endif %}
+    </tr>
+{% endblock list_table_row %}
+
+{% block list_card_footer_create_link %}
     {% if 'soilcom.add_collector' in perms %}
-        <a class="mr-2 text-nowrap" href="{% url 'collector-create' %}?next={{ request.get_full_path|urlencode }}">
-            <i class="fa fa-fw fa-plus"></i>
-            <span>Add new collector</span>
+        <a class="btn btn-success w-100 mb-2"
+           href="{% url 'collector-create' %}?next={{ request.get_full_path|urlencode }}">
+            <i class="fas fa-plus"></i> Create new collector
         </a>
     {% endif %}
-    {% if 'soilcom.change_collector' in perms %}
-        <a class="mr-2 text-nowrap" href="{% url 'wastecollection-dashboard' %}">
-            <i class="fas fa-fw fa-th-large"></i>
-            <span>Explorer</span>
-        </a>
-    {% endif %}
-{% endblock list_footer %}
+{% endblock list_card_footer_create_link %}
 
-{% block filter_body %}
-    <form method="get">
-        {% crispy filter.form %}
-        <button id="btn-filter" class="btn btn-primary" type="submit">Filter</button>
-    </form>
-{% endblock filter_body %}
+{% block list_card_options_dropdown_additional_links %}
+    {% if 'soilcom.change_collector' in perms %}
+        <a class="btn btn-outline-secondary w-100"
+           href="{% url 'wastecollection-dashboard' %}">
+            <i class="fas fa-table-cells-large"></i> Open Explorer
+        </a>
+    {% endif %}
+{% endblock list_card_options_dropdown_additional_links %}

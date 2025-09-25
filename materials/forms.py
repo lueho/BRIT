@@ -1,12 +1,11 @@
 from decimal import ROUND_HALF_UP, Decimal
 
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import HTML, Field, Layout, Row
+from crispy_forms.layout import Field, Layout, Row
 from django.core.exceptions import ValidationError
 from django.forms import (
     DateTimeInput,
     DecimalField,
-    HiddenInput,
     ModelChoiceField,
     NumberInput,
     Widget,
@@ -176,9 +175,9 @@ class SampleModelForm(SimpleModelForm):
             label_field="label",
         ),
         attrs={"class": "form-control mb-3"},
-        label="Single Select",
+        label="Sources",
         required=False,
-        help_text="Example of single select with autocomplete and clear button.",
+        help_text="Optional: Select multiple sources if applicable.",
     )
 
     class Meta:
@@ -208,7 +207,6 @@ class SampleModalModelForm(ModalModelFormMixin, SampleModelForm):
 
 
 class CompositionModelForm(SimpleModelForm):
-
     class Meta:
         model = Composition
         fields = ("group", "sample", "fractions_of")
@@ -394,7 +392,6 @@ class WeightShareInlineForm(WeightShareModelForm):
 
 
 class WeightShareInlineFormset(BaseInlineFormSet):
-
     def clean(self):
         super().clean()
 

@@ -30,6 +30,21 @@ This document provides a summary of the core and sub-applications in the BRIT pr
 - Encapsulates individual case studies as separate Django apps.
 - Each case study may have its own models, views, and admin.
 
+### layer_manager
+- Manages metadata and registration of map layers.
+
+### sources
+- Bibliographic sources and related metadata.
+
+### interfaces.simucf
+- Integration interfaces for external systems (e.g., simulation frameworks).
+
+### utils.file_export
+- Generic export framework for `UserCreatedObject` models (CSV/XLSX), registry based.
+
+### utils.properties
+- Shared property and unit utilities across apps.
+
 ## Application Structure Guidelines
 - Each app should have its own `models.py`, `views.py`, `admin.py`, `tests/`, and `templates/` as needed.
 - Place reusable logic in `utils/` or app-specific helpers.

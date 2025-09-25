@@ -1,17 +1,22 @@
 site_name: BRIT Documentation
 
 nav:
-  - Home: 01_user_guide/README.md
+  - Home: index.md
   - 01_user_guide:
       - User Guide: 01_user_guide/README.md
       - How-tos: 01_user_guide/howtos.md
       - Exporting User-Created Objects: 01_user_guide/file_export.md
   - Developer Guide:
       - Overview: 02_developer_guide/README.md
+      - Local Setup: 02_developer_guide/local_setup.md
+      - Testing: 02_developer_guide/testing.md
       - Guidelines: 02_developer_guide/guidelines.md
       - Style Guide: 02_developer_guide/style_guide.md
       - Applications: 02_developer_guide/applications.md
+      - UserCreatedObject Permissions: 02_developer_guide/user_created_objects.md
       - API: 02_developer_guide/api.md
+      - Initial Data Management: 02_developer_guide/initial_data_management.md
+      - Excel Import (Admin): 02_developer_guide/excel_import.md
       - Architecture:
           - Overview: 02_developer_guide/architecture.md
           - Data Flow: 02_developer_guide/architecture/data_flow.md

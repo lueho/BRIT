@@ -5,7 +5,7 @@ This document outlines the coding and documentation conventions for the BRIT pro
 ## Python Code
 - Follow [PEP 8](https://www.python.org/dev/peps/pep-0008/) for all Python code.
 - Use 4 spaces per indentation level.
-- Maximum line length: 120 characters.
+- Maximum line length: 88 characters (configured via Ruff in `pyproject.toml`).
 - Use meaningful variable and function names.
 - Add docstrings to all public classes, methods, and functions.
 - Group imports in the following order: standard library, third-party, local imports. Separate each group with a blank line.
@@ -17,12 +17,12 @@ This document outlines the coding and documentation conventions for the BRIT pro
 - Name templates with the pattern `<app>/<model>_<action>.html` (e.g., `maps/location_list.html`).
 - Use plural for app names (e.g., `users`, `materials`).
 - Place static files in the app’s `static/<app>/` directory.
-- **All ForeignKey fields with a default must use fetch-only helpers from `utils.py`, never from `models.py`, and never create objects.** See the [canonical note](../../notes/default_objects_and_initial_data_review.md) and [MADR](../../notes/02_design_decisions/2025-05-16_default_objects_and_initial_data.madr.md).
+ - **All ForeignKey fields with a default must use fetch-only helpers from `utils.py`, never from `models.py`, and never create objects.** See the ADR [Canonical Pattern for Default Objects and Initial Data](../04_design_decisions/2025-05-16_default_objects_and_initial_data.madr.md).
 
 ## JavaScript
 - Use ES6 syntax and features.
 - Prefer vanilla JS; only use jQuery when required by dependencies.
-- Use `const` and `let` instead of `var`.
+- Use `const` and `let` instead of `var`. 
 - Use descriptive function and variable names.
 - Keep JS files under 200 lines; split into modules if needed.
 
@@ -42,6 +42,10 @@ This document outlines the coding and documentation conventions for the BRIT pro
 - Write descriptive commit messages (imperative mood, e.g., "Add user login form").
 - Rebase and squash commits before merging to main.
 - Reference issues or tasks in commit messages where applicable.
+
+## Tooling
+- Python linting/formatting: Ruff (see `pyproject.toml`).
+- Django template linting/formatting: djlint (see `pyproject.toml`).
 
 ---
 

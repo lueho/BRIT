@@ -50,12 +50,19 @@ urlpatterns = [
         name="collectioncatchment-add-aggregatedpropertyvalue",
     ),
     path(
-        "collectors/", views.CollectorPublishedListView.as_view(), name="collector-list"
+        "collectors/",
+        views.CollectorPublishedListView.as_view(),
+        name="collector-list",
     ),
     path(
         "collectors/user/",
         views.CollectorPrivateListView.as_view(),
         name="collector-list-owned",
+    ),
+    path(
+        "collectors/review/",
+        views.CollectorReviewFilterView.as_view(),
+        name="collector-list-review",
     ),
     path(
         "collectors/create/",
@@ -430,11 +437,6 @@ urlpatterns = [
         "collections/user/",
         views.CollectionPrivateListView.as_view(),
         name="collection-list-owned",
-    ),
-    path(
-        "collections/review/",
-        views.CollectionReviewListView.as_view(),
-        name="collection-list-review",
     ),
     path(
         "collections/create/",

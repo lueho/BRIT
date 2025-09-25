@@ -774,17 +774,15 @@ class PublishedObjectFilterView(
 class AddReviewCommentView(BaseReviewActionView):
     """Add a free-text review comment linked to an object."""
 
+    permission_method = "has_comment_permission"
+    permission_denied_message = "You don't have permission to comment on this item."
+
     def post(self, request, *args, **kwargs):
         self.object = self.get_object(request, *args, **kwargs)
         obj = self.object
 
-        # Must be authenticated
-        if not request.user.is_authenticated:
-            raise PermissionDenied("Authentication required.")
-
-        policy = get_object_policy(request.user, obj, request=request)
-        if not (policy["is_owner"] or policy["is_staff"] or policy["is_moderator"]):
-            raise PermissionDenied("You don't have permission to comment on this item.")
+        # Ensure centralized permission check passes (auth + owner/staff/moderator)
+        self.ensure_permission(request, obj)
 
         message = (request.POST.get("message") or "").strip()
         if not message:
@@ -1141,12 +1139,13 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
     template_name = "object_management/review_detail_wrapper.html"
 
     def test_func(self):
-        """Allow access for staff and moderators; owners when in review or declined.
+        """Allow access for staff and moderators; owners when private, in review, or declined.
 
         This overrides the default read-access mixin so that non-staff moderators who
         hold the dynamic per-model permission (can_moderate_<model>) may access the
         review detail view. Owners are permitted to access the review view while their
-        item is in review (to read and add comments) and when declined (to read feedback).
+        item is private (for preview), in review (to read and add comments), and when
+        declined (to read feedback).
         """
         user = getattr(self, "request", None) and self.request.user
         if not user or not getattr(user, "is_authenticated", False):
@@ -1156,23 +1155,32 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
         policy = get_object_policy(user, obj, request=self.request)
 
         if policy["is_owner"]:
-            return policy["is_in_review"] or policy["is_declined"]
+            return (
+                policy["is_private"]
+                or policy["is_in_review"]
+                or policy["is_declined"]
+            )
 
         return user_is_moderator_for_model(user, obj.__class__)
 
     def dispatch(self, request, *args, **kwargs):
-        """Authorize review details for moderators/staff and for owners in review/declined.
+        """Authorize review details for moderators/staff and for owners in private/review/declined.
 
-        Owners can access while the item is in review (for commenting) and when declined (to read feedback).
+        Owners can access while the item is private (for preview), in review (for commenting),
+        and when declined (to read feedback).
         """
         obj = self.get_object()
         policy = get_object_policy(request.user, obj, request=request)
 
         if policy["is_owner"]:
-            if policy["is_in_review"] or policy["is_declined"]:
+            if (
+                policy["is_private"]
+                or policy["is_in_review"]
+                or policy["is_declined"]
+            ):
                 return super().dispatch(request, *args, **kwargs)
             raise PermissionDenied(
-                "Owners can only access review details while the item is in review or declined."
+                "Owners can only access review details while the item is private, in review, or declined."
             )
 
         if not user_is_moderator_for_model(request.user, obj.__class__):

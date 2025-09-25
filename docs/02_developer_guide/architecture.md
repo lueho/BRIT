@@ -34,15 +34,14 @@ This document provides a high-level overview of the BRIT system architecture, it
     - `components/`: For styling custom components or overriding Bootstrap component styles.
     - `layout/`: For global layout styles (e.g., page structure, authentication pages).
     - `navigation/`: For styling navigation elements like topnav and sidenav.
-  - The project uses the Live Sass Compiler extension for Visual Studio Code, which automatically compiles `brit-theme.scss` to `brit-theme.css` upon changes.
 - **Modular Apps:** Each domain is a separate Django app.
 - **Reusable Utilities:** Shared logic in `utils/`.
 - **Class-Based Views:** Preferred for clarity and extensibility.
 - **Signals:** Used for decoupled event handling.
-- **Canonical Initial Data & Default Objects:** All initial data and ForeignKey defaults are managed via fetch-only helpers in `utils.py` and per-app `ensure_initial_data()`. See the [canonical note](../../notes/default_objects_and_initial_data_review.md) and [MADR](../../notes/02_design_decisions/2025-05-16_default_objects_and_initial_data.madr.md).
+ - **Canonical Initial Data & Default Objects:** All initial data and ForeignKey defaults are managed via fetch-only helpers in `utils.py` and per-app `ensure_initial_data()`. See the ADR [Canonical Pattern for Default Objects and Initial Data](../04_design_decisions/2025-05-16_default_objects_and_initial_data.madr.md).
 
 ---
 
-*For detailed data flow, see [architecture/data_flow.md](architecture/data_flow.md). For deployment, see [architecture/deployment.md](architecture/deployment.md).*
+*For detailed data flow, see [architecture/data_flow.md](architecture/data_flow.md). For deployment, see [architecture/deployment.md](architecture/deployment.md).* 
 
 _Last updated: 2025-05-02_

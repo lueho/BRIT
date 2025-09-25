@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterator, Sequence
 from dataclasses import dataclass, field
-from typing import Iterable, Iterator, Optional, Sequence
 
 from django.apps import apps
 from django.db.models import QuerySet
@@ -15,7 +15,7 @@ class RelationRule:
     """Descriptor for a related set of objects accessed via attribute name."""
 
     accessor: str
-    label: Optional[str] = None
+    label: str | None = None
     optional: bool = False
 
     def get_label(self) -> str:
@@ -35,7 +35,7 @@ class DependencyIssue:
     """Represents a dependency that violates publication expectations."""
 
     rule: RelationRule
-    related_object: Optional[object]
+    related_object: object | None
     reason: str
     missing: bool = False
 
@@ -44,7 +44,9 @@ class DependencyIssue:
         if self.missing or self.related_object is None:
             obj_label = str(_("missing value"))
         else:
-            obj_label = getattr(self.related_object, "name", None) or str(self.related_object)
+            obj_label = getattr(self.related_object, "name", None) or str(
+                self.related_object
+            )
         return f"{label}: {obj_label} ({self.reason})"
 
 
@@ -59,8 +61,9 @@ class PrepublishReport:
         return bool(self.blocking)
 
     def format_blocking_message(self, obj: object, action: str) -> str:
-        header = _("Cannot {action} {object}." ).format(
-            action=action, object=getattr(obj, "_meta", None) and obj._meta.verbose_name or obj
+        header = _("Cannot {action} {object}.").format(
+            action=action,
+            object=getattr(obj, "_meta", None) and obj._meta.verbose_name or obj,
         )
         if not self.blocking:
             return header
@@ -110,15 +113,41 @@ REGISTRY: dict[tuple[str, str], DependencyConfig] = {
     ("materials", "materialcomponentgroup"): DependencyConfig(),
     ("materials", "materialcomponent"): DependencyConfig(),
     ("distributions", "timestep"): DependencyConfig(
-        requires_published=(RelationRule("distribution", label="temporal distribution"),),
+        requires_published=(
+            RelationRule("distribution", label="temporal distribution"),
+        ),
     ),
     ("bibliography", "source"): DependencyConfig(
         requires_published=(RelationRule("licence", label="licence", optional=True),),
     ),
+    # soilcom (case studies) --------------------------------------------------
+    ("soilcom", "collection"): DependencyConfig(
+        requires_published=(RelationRule("collector", label="collector"),),
+        follows_parent=(
+            RelationRule(
+                "collectionpropertyvalue_set", label="collection property value"
+            ),
+        ),
+    ),
+    ("soilcom", "wastestream"): DependencyConfig(
+        requires_published=(
+            RelationRule("category", label="waste category"),
+            RelationRule("allowed_materials", label="allowed material", optional=True),
+            RelationRule(
+                "forbidden_materials", label="forbidden material", optional=True
+            ),
+            RelationRule("composition", label="composition series", optional=True),
+        ),
+    ),
+    ("soilcom", "collector"): DependencyConfig(
+        requires_published=(RelationRule("catchment", label="catchment"),),
+    ),
+    ("soilcom", "collectionsystem"): DependencyConfig(),
+    ("soilcom", "feesystem"): DependencyConfig(),
 }
 
 
-def get_config_for_object(obj: object) -> Optional[DependencyConfig]:
+def get_config_for_object(obj: object) -> DependencyConfig | None:
     key = _registry_key_from_obj(obj)
     return REGISTRY.get(key)
 
@@ -143,7 +172,7 @@ def _is_published(candidate: object) -> bool:
     return status == getattr(candidate, "STATUS_PUBLISHED", "published")
 
 
-def prepublish_check(obj: object, target_status: Optional[str] = None) -> PrepublishReport:
+def prepublish_check(obj: object, target_status: str | None = None) -> PrepublishReport:
     config = get_config_for_object(obj)
     report = PrepublishReport()
     if not config:
@@ -193,6 +222,16 @@ def prepublish_check(obj: object, target_status: Optional[str] = None) -> Prepub
             status = getattr(related, "publication_status", None)
             if status is None:
                 continue
+            # When submitting for review for soilcom.Collection, allow private/declined dependencies;
+            # enforce full published dependencies at publish time.
+            if target_status == getattr(obj, "STATUS_REVIEW", "review"):
+                try:
+                    key = _registry_key_from_obj(obj)
+                except Exception:
+                    key = (None, None)
+                if key == ("soilcom", "collection"):
+                    # Only missing references are blocking for submit
+                    continue
             if not _is_published(related):
                 status_label = getattr(related, "get_publication_status_display", None)
                 if callable(status_label):
@@ -213,7 +252,9 @@ def prepublish_check(obj: object, target_status: Optional[str] = None) -> Prepub
                     continue
                 if status != target_status:
                     report.needs_sync.append(
-                        DependencyIssue(rule=rule, related_object=related, reason=status)
+                        DependencyIssue(
+                            rule=rule, related_object=related, reason=status
+                        )
                     )
     return report
 
@@ -221,8 +262,8 @@ def prepublish_check(obj: object, target_status: Optional[str] = None) -> Prepub
 def cascade_publication_status(
     obj: object,
     target_status: str,
-    acting_user: Optional[object] = None,
-    visited: Optional[set[tuple[str, str, int]]] = None,
+    acting_user: object | None = None,
+    visited: set[tuple[str, str, int]] | None = None,
 ) -> None:
     config = get_config_for_object(obj)
     if not config:
@@ -248,14 +289,16 @@ def cascade_publication_status(
             cascade_publication_status(related, target_status, acting_user, visited)
 
 
-def _apply_status_change(child: object, target_status: str, acting_user: Optional[object]) -> None:
+def _apply_status_change(
+    child: object, target_status: str, acting_user: object | None
+) -> None:
     # Import lazily to avoid circular dependencies
     from django.utils import timezone
 
     update_fields: list[str] = []
 
     if getattr(child, "publication_status", None) != target_status:
-        setattr(child, "publication_status", target_status)
+        child.publication_status = target_status
         update_fields.append("publication_status")
 
     if hasattr(child, "submitted_at"):
@@ -284,7 +327,10 @@ def _apply_status_change(child: object, target_status: str, acting_user: Optiona
                 child.approved_at = None
                 update_fields.append("approved_at")
                 cleared = True
-            if hasattr(child, "approved_by") and getattr(child, "approved_by", None) is not None:
+            if (
+                hasattr(child, "approved_by")
+                and getattr(child, "approved_by", None) is not None
+            ):
                 child.approved_by = None
                 update_fields.append("approved_by")
                 cleared = True
@@ -293,7 +339,7 @@ def _apply_status_change(child: object, target_status: str, acting_user: Optiona
         child.save(update_fields=list(dict.fromkeys(update_fields)))
 
 
-def get_model_config(app_label: str, model_name: str) -> Optional[DependencyConfig]:
+def get_model_config(app_label: str, model_name: str) -> DependencyConfig | None:
     model = apps.get_model(app_label, model_name)
     if model is None:
         return None

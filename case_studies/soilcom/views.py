@@ -119,6 +119,12 @@ class CollectorPrivateListView(PrivateObjectFilterView):
     dashboard_url = reverse_lazy("wastecollection-dashboard")
 
 
+class CollectorReviewFilterView(ReviewObjectFilterView):
+    model = Collector
+    filterset_class = CollectorFilter
+    dashboard_url = reverse_lazy("wastecollection-dashboard")
+
+
 class CollectorCreateView(UserCreatedObjectCreateView):
     form_class = CollectorModelForm
     permission_required = "soilcom.add_collector"

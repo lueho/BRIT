@@ -1,342 +1,420 @@
-{% extends "base.html" %}
+{% extends "detail_with_options.html" %}
 {% load static %}
 {% load moderation_tags %}
 
-{% block title %}
-    BRIT | Sample Detail
-{% endblock title %}
+{% block detail_header %}
+    {{ object.name }}
+{% endblock detail_header %}
 
-{% block content %}
+{% block detail_header_badge %}
+    {% include "object_management/review_status_badge.html" with object=object %}
+{% endblock detail_header_badge %}
+
+{% block detail_header_actions %}
     {% object_policy object as policy %}
-    <div class="row">
-        <div class="col col-12 col-md-6 col-lg-3 mt-4">
-            <div class="card shadow h-100">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-                    <h5 class="mb-0">Sample Details</h5>
-                </div>
-                {% if object.image %}
-                    <div class="card-img-top">
-                        <img class="w-100 m-0"
-                             src="{{ object.image.url }}"
-                             alt="Image of sample"
-                             width="600"
-                             height="400">
-                    </div>
+    <div class="btn-toolbar" role="toolbar" aria-label="Sample detail actions">
+        <div class="btn-group me-2" role="group">
+            {% if request.GET.back %}
+                <a class="btn btn-sm btn-outline-secondary"
+                   href="{{ request.GET.back }}"
+                   title="Back">
+                    <i class="fas fa-arrow-left"></i> <span class="d-none d-md-inline">Back</span>
+                </a>
+            {% endif %}
+            <a class="btn btn-sm btn-outline-secondary"
+               href="{% url 'sample-list' %}"
+               title="Public samples">
+                <i class="fas fa-list-ul"></i> <span class="d-none d-md-inline">Public samples</span>
+            </a>
+            <a class="btn btn-sm btn-outline-secondary"
+               href="{% url 'sample-list-owned' %}"
+               title="My samples">
+                <i class="fas fa-user"></i> <span class="d-none d-md-inline">My samples</span>
+            </a>
+            <a class="btn btn-sm btn-outline-secondary"
+               href="{% url 'materials-dashboard' %}"
+               title="Explorer">
+                <i class="fas fa-table-cells-large"></i> <span class="d-none d-md-inline">Explorer</span>
+            </a>
+        </div>
+        <div class="btn-group" role="group">
+            {% if policy.can_view_review_feedback %}
+                <a class="btn btn-sm btn-outline-danger"
+                   href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
+                   title="Review feedback">
+                    <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review feedback</span>
+                </a>
+            {% elif policy.is_in_review %}
+                {% if policy.is_owner or policy.is_staff or policy.is_moderator %}
+                    <a class="btn btn-sm btn-outline-secondary"
+                       href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
+                       title="Review view">
+                        <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review view</span>
+                    </a>
                 {% endif %}
-                <div class="card-body">
-                    <p class="card-text">
-                        <strong>Name:</strong>
-                        <br>
-                        {{ object.name }}
-                    </p>
-                    <p class="card-text">
-                        <b>Material:</b>
-                        <br>
-                        <a href="{% url 'material-detail-modal' object.material.pk %}"
-                           class="modal-link">{{ object.material.name }}</a>
-                    </p>
-
-                    {% if object.series %}
-                        <p class="card-text">
-                            <b>Series:</b>
-                            <br>
-                            <a href="{% url 'sampleseries-detail-modal' object.series.pk %}"
-                               class="modal-link">{{ object.series.name }}</a>
-                        </p>
-                    {% endif %}
-
-                    {% if data.timestep %}
-                        <p class="card-text">
-                            <b>Timestep:</b>
-                            <br>
-                            {{ data.timestep }}
-                        </p>
-                    {% endif %}
-
-                    {% if data.datetime %}
-                        <p class="card-text">
-                            <b>Date/Time:</b>
-                            <br>
-                            {{ data.datetime }}
-                        </p>
-                    {% endif %}
-
-                    {% if data.description %}
-                        <p class="card-text">
-                            <b>Description:</b>
-                            <br>
-                            {{ object.description }}
-                        </p>
-                    {% endif %}
-
-                    {% if data.sources %}
-                        <p class="card-text">
-                            <b>Sources:</b>
-                            <br>
-                            {% for source in object.visible_sources %}
-                                <a href="{% url 'source-detail-modal' source.pk %}" class="modal-link">
-                                    {{ source.abbreviation }}
-                                    {% if not forloop.last %},{% endif %}
-                                </a>
-                            {% endfor %}
-                        </p>
-                    {% endif %}
-                </div>
-                <div class="card-footer d-flex">
-                    <div class="dropdown">
-                        <button class="btn btn-secondary dropdown-toggle"
-                                type="button"
-                                id="navigateDropdown"
-                                data-bs-toggle="dropdown"
-                                aria-expanded="false">Navigate</button>
-                        <div class="dropdown-menu" aria-labelledby="navigateDropdown">
-                            <a class="dropdown-item" href="{% url 'sample-list' %}">
-                                <i class="fas fa-fw fa-list"></i> Public Samples
-                            </a>
-                            <a class="dropdown-item" href="{% url 'sample-list-owned' %}">
-                                <i class="fas fa-fw fa-list"></i> My Samples
-                            </a>
-                            <a class="dropdown-item" href="{% url 'materials-dashboard' %}">
-                                <i class="fas fa-fw fa-table-cells-large"></i> Explorer
-                            </a>
-                        </div>
-                    </div>
-                    {% if policy.can_edit or policy.can_delete or policy.can_duplicate or policy.is_owner or policy.is_staff or policy.is_moderator %}
-                        <div class="dropdown">
-                            <button class="btn btn-secondary dropdown-toggle ms-3"
-                                    type="button"
-                                    id="editDropdown"
-                                    data-bs-toggle="dropdown"
-                                    aria-expanded="false">Options</button>
-                            <div class="dropdown-menu" aria-labelledby="editDropdown">
-                                {% if policy.can_edit %}
-                                    <a class="dropdown-item" href="{% url 'sample-update' object.id %}">
-                                        <i class="fas fa-pen-to-square"></i> Edit
-                                    </a>
-                                {% endif %}
-                                {% if policy.is_owner and policy.is_in_review %}
-                                    <a class="dropdown-item"
-                                       href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
-                                        <i class="fas fa-fw fa-clipboard-check"></i> Review view
-                                    </a>
-                                {% endif %}
-                                {% if policy.can_duplicate %}
-                                    <a class="dropdown-item" href="{% url 'sample-duplicate' object.id %}">
-                                        <i class="fas fa-fw fa-copy"></i> Duplicate
-                                    </a>
-                                {% endif %}
-                                {% if policy.can_delete %}
-                                    <a class="dropdown-item modal-link"
-                                       href="{% url 'sample-delete-modal' object.pk %}">
-                                        <i class="fas fa-fw fa-trash"></i> Delete
-                                    </a>
-                                {% endif %}
-                            </div>
-                        </div>
-                    {% endif %}
-                    {% if policy.is_owner and policy.is_in_review %}
-                        <a class="btn btn-outline-secondary ms-3"
-                           href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
-                            <i class="fas fa-clipboard-check"></i> Review view
-                        </a>
-                    {% endif %}
-                </div>
-            </div>
-        </div>
-
-        <div class="col col-12 col-md-6 col-lg-3 mt-4">
-            <div class="card shadow h-100">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-                    <h5 class="mb-0">Properties</h5>
-                </div>
-                <div class="card-body">
-                    <table class="table">
-                        <thead>
-                            <tr>
-                                <th>Property</th>
-                                <th>Value</th>
-                                {% if policy.can_add_property %}<th class="remove-property collapse multi-collapse">Remove</th>{% endif %}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {% for property in object.visible_properties %}
-                                <tr>
-                                    <td>
-                                        <a href="{% url 'materialproperty-detail-modal' property.property.pk %}"
-                                           class="modal-link">{{ property.property.name }}</a>
-                                    </td>
-                                    <td>
-                                        {{ property.average }}
-                                        ± {{ property.standard_deviation }} {{ property.property.unit }}
-                                    </td>
-                                    {% if policy.can_add_property %}
-                                        <td class="remove-property collapse multi-collapse">
-                                            <a href="{% url 'materialpropertyvalue-delete-modal' property.id %}?next={{ request.path }}"
-                                               class="modal-link">
-                                                <i class="fas fa-fw fa-trash"></i>
-                                            </a>
-                                        </td>
-                                    {% endif %}
-                                </tr>
-                            {% endfor %}
-                        </tbody>
-                    </table>
-                </div>
-                <div class="card-footer">
-                    {% if policy.can_add_property %}
-                        <a href="{% url 'sample-add-property' object.id %}">
-                            <i class="fas fa-fw fa-plus"></i> Add property
-                        </a>
-                        <button class="btn btn-link ms-3 p-0 text-decoration-none"
-                                type="button"
-                                data-bs-toggle="collapse"
-                                data-bs-target=".remove-property"
-                                aria-expanded="false"
-                                aria-controls="remove-property">
-                            <i class="fas fa-fw fa-minus"></i> Remove properties
-                        </button>
-                    {% endif %}
-                </div>
-            </div>
+            {% endif %}
         </div>
     </div>
+{% endblock detail_header_actions %}
 
-    <div class="row">
-        {% for composition in data.compositions %}
-            <div class="col col-12 col-md-6 col-lg-3 mt-4">
-                <div class="card shadow mt-3 h-100 tab-card">
-                    <div class="card-header tab-card-header bg-body-tertiary border-bottom-0 py-3">
-                        <h5 class="mb-0">
-                            <a href="{% url 'materialcomponentgroup-detail-modal' composition.group %}"
-                               class="modal-link text-decoration-none text-body">{{ composition.group_name }}</a>
-                        </h5>
-                        <ul class="nav nav-tabs card-header-tabs"
-                            id="composition-tabs-{{ composition.id }}"
-                            role="tablist">
-                            <li class="nav-item">
-                                <a class="nav-link active"
-                                   id="composition-table-tab-{{ composition.id }}"
-                                   data-bs-toggle="tab"
-                                   href="#composition-table-{{ composition.id }}-tab"
-                                   role="tab"
-                                   aria-controls="composition-table-{{ composition.id }}-tab"
-                                   aria-selected="true">Table</a>
-                            </li>
-                            <li class="nav-item">
-                                <a class="nav-link"
-                                   id="composition-chart-tab-{{ composition.id }}"
-                                   data-bs-toggle="tab"
-                                   href="#composition-chart-{{ composition.id }}-tab"
-                                   role="tab"
-                                   aria-controls="composition-chart-{{ composition.id }}-tab"
-                                   aria-selected="false">Chart</a>
-                            </li>
-                        </ul>
-                    </div>
-                    <div class="card-body tab-content"
-                         id="composition-tabs-{{ group_settings.id }}-content">
-                        <div class="tab-pane fade show active"
-                             id="composition-table-{{ composition.id }}-tab"
-                             role="tabpanel"
-                             aria-labelledby="composition-table-tab-{{ composition.id }}">
-                            <table class="table">
-                                <thead>
-                                    <tr>
-                                        <th>Component</th>
-                                        <th>Share</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for share in composition.visible_shares %}
-                                        <tr>
-                                            <td>
-                                                <a href="{% url 'materialcomponent-detail-modal' share.component %}"
-                                                   class="modal-link">{{ share.component_name }}</a>
-                                            </td>
-                                            {# <td>{{ share.average }} ± {{ share.standard_deviation }} %</td>#}
-                                            <td>{{ share.as_percentage }}</td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-
-                        </div>
-                        <div class="tab-pane fade p-0"
-                             id="composition-chart-{{ composition.id }}-tab"
-                             role="tabpanel"
-                             aria-labelledby="composition-chart-tab-{{ composition.id }}">
-                            <div id="composition-chart-{{ composition.id }}"></div>
-                        </div>
-                        <b>Shares of:</b> {{ composition.fractions_of_name }}
-                    </div>
-                    <div class="card-footer d-flex">
-                        {% if policy.can_manage_samples %}
-                            <a id="move-group-{{ composition.id }}-left"
-                               href="{% url 'composition-order-down' composition.id %}?next={{ request.path }}"
-                               class="me-3 nowrap">
-                                <i class="fas fa-fw fa-arrow-left"></i>
-                            </a>
-                            <a id="edit-group-{{ composition.id }}"
-                               href="{% url 'composition-update' composition.id %}?next={{ request.path }}"
-                               class="me-3 nowrap">
-                                <i class="fas fa-fw fa-pen-to-square"></i> Edit
-                            </a>
-                            <a id="remove-group-{{ composition.id }}"
-                               href="{% url 'composition-delete-modal' composition.id %}?next={{ request.path }}"
-                               class="me-3 nowrap modal-link">
-                                <i class="fas fa-fw fa-trash"></i> Delete
-                            </a>
-                            <a id="move-group-{{ composition.id }}-right"
-                               href="{% url 'composition-order-up' composition.id %}?next={{ request.path }}"
-                               class="ms-auto nowrap">
-                                <i class="fas fa-fw fa-arrow-right"></i>
-                            </a>
-                        {% endif %}
-                    </div>
-                </div>
-            </div>
-        {% endfor %}
-    </div>
-    {% if policy.can_manage_samples %}
-        <div id="add-component-group">
-            <div class="row">
-                <div class="col mt-4">
-                    <div class="card border-left-primary border">
-                        <div class="card-header bg-body-tertiary border-bottom-0 py-3"></div>
-                        <div class="card-body">
-                            <a href="{% url 'sample-add-composition' object.id %}?next={{ request.path }}">
-                                <i class="fas fa-fw fa-plus"></i> Add composition
-                            </a>
-                        </div>
-                        <div class="card-footer"></div>
-                    </div>
-                </div>
-            </div>
+{% block detail_top_image %}
+    {% if object.image %}
+        <div class="card-img-top">
+            <img class="w-100 m-0"
+                 src="{{ object.image.url }}"
+                 alt="Image of {{ object.name }}"
+                 width="{{ object.image.width }}"
+                 height="{{ object.image.height }}">
         </div>
     {% endif %}
+{% endblock detail_top_image %}
 
-{% endblock content %}
+{% block detail_body %}
+    {% object_policy object as policy %}
+    <div class="row gy-3">
+        <div class="col-12 col-lg-6">
+            <p class="card-text mb-2">
+                <strong>Material:</strong>
+                <br>
+                <a href="{% url 'material-detail-modal' object.material.pk %}"
+                   class="modal-link">{{ object.material.name }}</a>
+            </p>
+            {% if object.series %}
+                <p class="card-text mb-2">
+                    <strong>Series:</strong>
+                    <br>
+                    <a href="{% url 'sampleseries-detail-modal' object.series.pk %}"
+                       class="modal-link">{{ object.series.name }}</a>
+                </p>
+            {% endif %}
+            {% if data.timestep %}
+                <p class="card-text mb-2">
+                    <strong>Timestep:</strong>
+                    <br>
+                    {{ data.timestep }}
+                </p>
+            {% endif %}
+            {% if data.datetime %}
+                <p class="card-text mb-2">
+                    <strong>Date/Time:</strong>
+                    <br>
+                    {{ data.datetime }}
+                </p>
+            {% endif %}
+        </div>
+        <div class="col-12 col-lg-6">
+            {% if data.description %}
+                <p class="card-text mb-2">
+                    <strong>Description:</strong>
+                    <br>
+                    {{ object.description }}
+                </p>
+            {% endif %}
+            {% if data.sources %}
+                <p class="card-text mb-2">
+                    <strong>Sources:</strong>
+                    <br>
+                    {% for source in object.visible_sources %}
+                        <a href="{% url 'source-detail-modal' source.pk %}" class="modal-link">
+                            {{ source.abbreviation }}
+                            {% if not forloop.last %},{% endif %}
+                        </a>
+                    {% endfor %}
+                </p>
+            {% endif %}
+            {% if object.owner %}
+                <p class="card-text mb-2">
+                    <strong>Owner:</strong>
+                    <br>
+                    {{ object.owner.username|default:object.owner }}
+                </p>
+            {% endif %}
+        </div>
+    </div>
+{% endblock detail_body %}
 
-{% block javascript %}
-    {{ block.super }}
+{% block options_pane %}
+    {% object_policy object as policy %}
+    {% if policy.can_edit %}
+        <a class="btn btn-primary w-100 mb-2"
+           href="{% url 'sample-update' object.id %}?next={{ request.get_full_path|urlencode }}">
+            <i class="fas fa-pen-to-square"></i> Edit
+        </a>
+    {% endif %}
+
+    {% if policy.can_add_property %}
+        <a class="btn btn-outline-secondary w-100 mb-2"
+           href="{% url 'sample-add-property' object.id %}?next={{ request.get_full_path|urlencode }}">
+            <i class="fas fa-circle-plus"></i> Add property
+        </a>
+    {% endif %}
+
+    {% if policy.can_manage_samples %}
+        <a class="btn btn-outline-secondary w-100 mb-2"
+           href="{% url 'sample-add-composition' object.id %}?next={{ request.get_full_path|urlencode }}">
+            <i class="fas fa-circle-plus"></i> Add composition
+        </a>
+    {% endif %}
+
+    {% if policy.can_duplicate %}
+        <a class="btn btn-outline-secondary w-100 mb-2"
+           href="{% url 'sample-duplicate' object.id %}">
+            <i class="fas fa-copy"></i> Duplicate
+        </a>
+    {% endif %}
+
+    {% if policy.can_delete %}
+        <a class="btn btn-outline-danger modal-link w-100 mb-2"
+           href="{% url 'sample-delete-modal' object.pk %}?next={{ request.get_full_path|urlencode }}">
+            <i class="fas fa-trash"></i> Delete
+        </a>
+    {% endif %}
+
+    {% if policy.is_in_review and not review_mode %}
+        {% if policy.is_owner or policy.is_staff or policy.is_moderator %}
+            <a class="btn btn-outline-secondary w-100 mb-2"
+               href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
+                <i class="fas fa-clipboard-check"></i> Review view
+            </a>
+        {% endif %}
+    {% endif %}
+
+    {% if policy.can_submit_review %}
+        <a class="btn btn-outline-primary w-100 mb-2 modal-link"
+           href="{% url 'object_management:submit_for_review_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}">
+            <i class="fas fa-paper-plane"></i> Submit for review
+        </a>
+    {% endif %}
+
+    {% if policy.is_in_review %}
+        {% if policy.can_withdraw_review %}
+            <a class="btn btn-outline-warning w-100 mb-2 modal-link"
+               href="{% url 'object_management:withdraw_from_review_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
+                <i class="fas fa-rotate-left"></i> Withdraw from review
+            </a>
+        {% endif %}
+        {% if policy.can_approve %}
+            <a class="btn btn-outline-success w-100 mb-2 modal-link"
+               href="{% url 'object_management:approve_item_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
+                <i class="fas fa-check"></i> Approve
+            </a>
+        {% endif %}
+        {% if policy.can_reject %}
+            <a class="btn btn-outline-danger w-100 modal-link"
+               href="{% url 'object_management:reject_item_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
+                <i class="fas fa-xmark"></i> Reject
+            </a>
+        {% endif %}
+    {% endif %}
+{% endblock options_pane %}
+
+{% block second_row %}
+    <div class="col-12">
+        <div class="row row-cols-1 row-cols-lg-2 g-4">
+            <div class="col">
+                <div class="card shadow h-100">
+                    <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+                        <h5 class="mb-0">Properties</h5>
+                    </div>
+                    <div class="card-body">
+                        {% if object.visible_properties|length %}
+                            <div class="table-responsive">
+                                <table class="table mb-0">
+                                    <thead>
+                                        <tr>
+                                            <th>Property</th>
+                                            <th>Value</th>
+                                            {% if policy.can_add_property %}<th class="remove-property collapse multi-collapse">Remove</th>{% endif %}
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for property in object.visible_properties %}
+                                            <tr>
+                                                <td>
+                                                    <a href="{% url 'materialproperty-detail-modal' property.property.pk %}"
+                                                       class="modal-link">{{ property.property.name }}</a>
+                                                </td>
+                                                <td>
+                                                    {{ property.average }}
+                                                    ± {{ property.standard_deviation }} {{ property.property.unit }}
+                                                </td>
+                                                {% if policy.can_add_property %}
+                                                    <td class="remove-property collapse multi-collapse">
+                                                        <a href="{% url 'materialpropertyvalue-delete-modal' property.id %}?next={{ request.path }}"
+                                                           class="modal-link">
+                                                            <i class="fas fa-trash"></i>
+                                                        </a>
+                                                    </td>
+                                                {% endif %}
+                                            </tr>
+                                        {% empty %}
+                                            <tr>
+                                                <td colspan="3" class="text-muted">No properties available.</td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <p class="text-muted mb-0">No properties available.</p>
+                        {% endif %}
+                    </div>
+                    {% if policy.can_add_property %}
+                        <div class="card-footer d-flex flex-wrap gap-3 align-items-center">
+                            <a class="text-decoration-none"
+                               href="{% url 'sample-add-property' object.id %}?next={{ request.path }}">
+                                <i class="fas fa-circle-plus"></i> Add property
+                            </a>
+                            <button class="btn btn-link p-0 text-decoration-none"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target=".remove-property"
+                                    aria-expanded="false"
+                                    aria-controls="remove-property">
+                                <i class="fas fa-minus"></i> Toggle remove
+                            </button>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col">
+                {% if data.timestep and charts %}{# Reserve space to keep columns balanced even when compositions absent #}{% endif %}
+            </div>
+        </div>
+        {% if data.compositions %}
+            <div class="row row-cols-1 row-cols-lg-2 g-4 mt-1">
+                {% for composition in data.compositions %}
+                    <div class="col">
+                        <div class="card shadow h-100 tab-card">
+                            <div class="card-header tab-card-header bg-body-tertiary border-bottom-0 py-3">
+                                <h5 class="mb-0">
+                                    <a href="{% url 'materialcomponentgroup-detail-modal' composition.group %}"
+                                       class="modal-link text-decoration-none text-body">{{ composition.group_name }}</a>
+                                </h5>
+                                <ul class="nav nav-tabs card-header-tabs"
+                                    id="composition-tabs-{{ composition.id }}"
+                                    role="tablist">
+                                    <li class="nav-item">
+                                        <a class="nav-link active"
+                                           id="composition-table-tab-{{ composition.id }}"
+                                           data-bs-toggle="tab"
+                                           href="#composition-table-{{ composition.id }}-tab"
+                                           role="tab"
+                                           aria-controls="composition-table-{{ composition.id }}-tab"
+                                           aria-selected="true">Table</a>
+                                    </li>
+                                    <li class="nav-item">
+                                        <a class="nav-link"
+                                           id="composition-chart-tab-{{ composition.id }}"
+                                           data-bs-toggle="tab"
+                                           href="#composition-chart-{{ composition.id }}-tab"
+                                           role="tab"
+                                           aria-controls="composition-chart-{{ composition.id }}-tab"
+                                           aria-selected="false">Chart</a>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="card-body tab-content"
+                                 id="composition-tabs-{{ composition.id }}-content">
+                                <div class="tab-pane fade show active"
+                                     id="composition-table-{{ composition.id }}-tab"
+                                     role="tabpanel"
+                                     aria-labelledby="composition-table-tab-{{ composition.id }}">
+                                    <div class="table-responsive">
+                                        <table class="table mb-0">
+                                            <thead>
+                                                <tr>
+                                                    <th>Component</th>
+                                                    <th>Share</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {% for share in composition.visible_shares %}
+                                                    <tr>
+                                                        <td>
+                                                            <a href="{% url 'materialcomponent-detail-modal' share.component %}"
+                                                               class="modal-link">{{ share.component_name }}</a>
+                                                        </td>
+                                                        <td>{{ share.as_percentage }}</td>
+                                                    </tr>
+                                                {% empty %}
+                                                    <tr>
+                                                        <td colspan="2" class="text-muted">No shares available.</td>
+                                                    </tr>
+                                                {% endfor %}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                                <div class="tab-pane fade p-0"
+                                     id="composition-chart-{{ composition.id }}-tab"
+                                     role="tabpanel"
+                                     aria-labelledby="composition-chart-tab-{{ composition.id }}">
+                                    <div id="composition-chart-{{ composition.id }}"></div>
+                                </div>
+                                <p class="mt-3 mb-0">
+                                    <strong>Shares of:</strong> {{ composition.fractions_of_name }}
+                                </p>
+                            </div>
+                            {% if policy.can_manage_samples %}
+                                <div class="card-footer d-flex flex-wrap align-items-center gap-3">
+                                    <a id="move-group-{{ composition.id }}-left"
+                                       href="{% url 'composition-order-down' composition.id %}?next={{ request.path }}"
+                                       class="text-decoration-none">
+                                        <i class="fas fa-arrow-left"></i>
+                                    </a>
+                                    <a id="edit-group-{{ composition.id }}"
+                                       href="{% url 'composition-update' composition.id %}?next={{ request.path }}"
+                                       class="text-decoration-none">
+                                        <i class="fas fa-pen-to-square"></i> Edit
+                                    </a>
+                                    <a id="remove-group-{{ composition.id }}"
+                                       href="{% url 'composition-delete-modal' composition.id %}?next={{ request.path }}"
+                                       class="text-decoration-none modal-link">
+                                        <i class="fas fa-trash"></i> Delete
+                                    </a>
+                                    <a id="move-group-{{ composition.id }}-right"
+                                       href="{% url 'composition-order-up' composition.id %}?next={{ request.path }}"
+                                       class="ms-auto text-decoration-none">
+                                        <i class="fas fa-arrow-right"></i>
+                                    </a>
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        {% else %}
+            <p class="text-muted mt-4">No compositions available.</p>
+        {% endif %}
+        {% if policy.can_manage_samples %}
+            <div class="mt-4">
+                <a class="btn btn-outline-primary"
+                   href="{% url 'sample-add-composition' object.id %}?next={{ request.path }}">
+                    <i class="fas fa-circle-plus"></i> Add composition
+                </a>
+            </div>
+        {% endif %}
+    </div>
+{% endblock second_row %}
+
+{% block detail_with_options_scripts %}
     {{ charts|json_script:"charts" }}
-
     <script>
-
-        const charts = JSON.parse(document.getElementById("charts").textContent);
-
-        Object.keys(charts).forEach(key => {
-            let container = document.getElementById(key);
-            if (container) {
-                let canvas = document.createElement('canvas');
-                canvas.setAttribute('id', key + '-canvas');
-                container.appendChild(canvas);
-                new Chart(canvas.getContext('2d'), charts[key]);
-            } else {
-                console.error('Chart container not found:', key);
-            }
-        });
-
+    const chartsConfigElement = document.getElementById("charts");
+    if (chartsConfigElement) {
+      const charts = JSON.parse(chartsConfigElement.textContent);
+      Object.keys(charts).forEach((key) => {
+        const container = document.getElementById(key);
+        if (!container) {
+          console.warn("Chart container not found:", key);
+          return;
+        }
+        const canvas = document.createElement("canvas");
+        canvas.setAttribute("id", `${key}-canvas`);
+        container.appendChild(canvas);
+        new Chart(canvas.getContext("2d"), charts[key]);
+      });
+    }
     </script>
-
-{% endblock javascript %}
+{% endblock detail_with_options_scripts %}

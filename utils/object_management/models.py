@@ -250,12 +250,12 @@ class UserCreatedObject(CRUDUrlsMixin, CommonInfo):
         Approve this object, transitioning from review to published.
         Sets approved_at and approved_by.
         """
+        if self.publication_status != self.STATUS_REVIEW:
+            raise ValidationError("Only objects in review can be approved.")
         report = prepublish_check(self, target_status=self.STATUS_PUBLISHED)
         if report.has_blocking():
             message = report.format_blocking_message(self, _("approve"))
             raise ValidationError(message)
-        if self.publication_status != self.STATUS_REVIEW:
-            raise ValidationError("Only objects in review can be approved.")
         self.publication_status = self.STATUS_PUBLISHED
         from django.utils import timezone
 

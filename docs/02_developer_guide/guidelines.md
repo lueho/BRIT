@@ -3,17 +3,15 @@
 ## Build & Configuration
 
 - Use Docker Compose for all environments (dev, test, prod).
-- Manage environment variables in `.env` (never committed).
+- Manage environment variables via environment variables. For development only, use `brit/settings/.env` (never commit real secrets); ship an `.env.example` with placeholders.
 - PostgreSQL with PostGIS and Redis are required.
 - Run migrations and collectstatic as part of deployment.
 
 ## Initial Data & Default Objects
 
-- All initial data creation is centralized in per-app, idempotent `ensure_initial_data()` functions (never in migrations). See [Initial Data Management](initial_data_management.md).
-- For deep design rationale, see [Default Objects & Initial Data ADRs](../04_design_decisions/2025-05-16_default_objects_and_initial_data.madr.md).
+- All initial data creation is centralized in per-app, idempotent `ensure_initial_data()` functions (never in migrations). See [Initial Data Management](initial_data_management.md) and the ADR [Default Objects & Initial Data](../04_design_decisions/2025-05-16_default_objects_and_initial_data.madr.md).
 - All ForeignKey defaults must use fetch-only helpers from their app's `utils.py` (never from `models.py`).
-- These helpers only fetch, never create, and raise if missing. See the [canonical note](../../notes/default_objects_and_initial_data_review.md) and [MADR](../../notes/02_design_decisions/2025-05-16_default_objects_and_initial_data.madr.md) for details.
-- This pattern is required for all new development and enforced by code review.
+- These helpers only fetch, never create, and raise if missing. This pattern is required for all new development and enforced by code review.
 
 ## Creating a Superuser
 ```sh
@@ -42,47 +40,41 @@ The project is configured for deployment on Heroku:
 ## Testing Information
 
 ### Running Tests
-Run tests inside Docker containers using the `run` command:
+Run tests inside the Docker container using `exec` and the test settings module:
 
 ```sh
-# Run all tests
-docker compose run web python manage.py test
+# Run all tests (parallel, no prompts, keep DB)
+docker compose exec web python manage.py test \
+  --keepdb \
+  --no-input \
+  --parallel 4 \
+  --settings=brit.settings.testrunner
 
 # Run tests for a specific app
-docker compose run web python manage.py test utils
+docker compose exec web python manage.py test utils \
+  --keepdb --no-input --settings=brit.settings.testrunner
 
 # Run a specific test class
-docker compose run web python manage.py test utils.tests.test_example.ExampleTestCase
+docker compose exec web python manage.py test utils.tests.test_example.ExampleTestCase \
+  --keepdb --no-input --settings=brit.settings.testrunner
 
 # Run a specific test method
-docker compose run web python manage.py test utils.tests.test_example.ExampleTestCase.test_addition
+docker compose exec web python manage.py test utils.tests.test_example.ExampleTestCase.test_addition \
+  --keepdb --no-input --settings=brit.settings.testrunner
 ```
 
-Use `--noinput` to prevent prompts and `--keepdb` to speed up tests when no DB changes have occurred:
-
-```sh
-# Run tests with --noinput and --keepdb
-docker compose run web python manage.py test --noinput --keepdb
-
-# Run tests for a specific app with flags
-docker compose run web python manage.py test utils --noinput --keepdb
-```
+Use `--no-input` to prevent prompts and `--keepdb` to speed up tests when no DB changes have occurred.
 
 ### Test Configuration
 
-- Uses a custom test runner: `brit/settings/testrunner.py`.
-- Static files are served using Django's StaticFilesStorage.
-- Cookie consent is disabled during tests.
-- Tests use local settings with test-specific overrides.
+- Settings module: `brit/settings/testrunner.py` (sets `TESTING=True`, configures DB, sessions, middleware).
+- Test runner class: `utils/tests/testrunner.py:SerialAwareTestRunner` (supports `@serial_test` and post-migrate `ensure_initial_data`).
+- Static files use Django's `StaticFilesStorage` during tests; cookie consent is disabled.
 
-To use the test runner settings:
+Always pass the settings explicitly:
 
 ```sh
-# Run tests with test runner settings
-DJANGO_SETTINGS_MODULE=brit.settings.testrunner python manage.py test
-
-# Or with Docker
-docker compose run -e DJANGO_SETTINGS_MODULE=brit.settings.testrunner web python manage.py test
+docker compose exec web python manage.py test --settings=brit.settings.testrunner
 ```
 
 ### Writing Tests
@@ -114,10 +106,11 @@ class ExampleTestCase(TestCase):
    - Use `mute_signals` to prevent unwanted signals.
 
 ## Code Style
-- Follow PEP 8.
+- Follow PEP 8 and enforce via Ruff.
 - Use 4 spaces for indentation.
-- Max line length: 120 characters.
-- Use docstrings for all classes and methods.
+- Max line length: 88 characters (Ruff config in `pyproject.toml`).
+- Use docstrings for public classes and methods.
+- Template style via `djlint` (see `pyproject.toml`).
 
 ## Project Structure
 - Organized into multiple Django apps:
@@ -128,6 +121,7 @@ class ExampleTestCase(TestCase):
   - `materials`: Material definitions
   - `distributions`: Temporal/spatial distributions
   - `users`: User management
+  - `layer_manager`, `sources`, `interfaces.simucf`, `utils.file_export`, `utils.properties`
 
 ## Key Components
 1. **GIS Integration:**
@@ -140,5 +134,4 @@ class ExampleTestCase(TestCase):
    - Views inherit from `UserCreatedObjectCreateView`, etc.
 4. **Frontend:**
    - Bootstrap 5 for UI; Crispy Forms for forms; Bootstrap Modal Forms for dialogs.
-   - Planned upgrade to Bootstrap 5.
-   - Long-term goal: phase out jQuery; write new code with this in mind.
+   - Long-term goal: phase out jQuery; write new JS without jQuery unless required by dependencies.

@@ -49,22 +49,18 @@ dev = [
     # Development and debugging
     "django-debug-toolbar>=6.0.0",
     "django-extensions>=3.2.0",
-
     # Testing
     "factory-boy>=3.3.3",
     "pytest>=7.4.0",
     "pytest-django>=4.5.0",
     "pytest-cov>=4.1.0",
-
     # Code quality
     "mypy>=1.5.0",
     "djlint>=1.36.4",
-
     # Documentation
     "mkdocs>=1.6.1",
     "mkdocs-material>=9.6.15",
     "mkdocstrings[python]>=0.30.0",
-
     # Monitoring
     "flower>=2.0.1",
 ]

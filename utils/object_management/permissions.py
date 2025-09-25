@@ -253,6 +253,15 @@ class UserCreatedObjectPermission(permissions.BasePermission):
             != request.user  # Four eyes principle: can't reject own objects
         )
 
+    def has_comment_permission(self, request, obj):
+        """Check if the user can leave review comments on the object."""
+
+        if not request.user or not request.user.is_authenticated:
+            return False
+
+        is_owner = getattr(obj, "owner_id", None) == getattr(request.user, "id", None)
+        return bool(is_owner or getattr(request.user, "is_staff", False) or self._is_moderator(request.user, obj))
+
     def has_archive_permission(self, request, obj):
         """
         Check if the user can archive an object.

@@ -137,20 +137,19 @@ Source: `utils/object_management/views.py:PublicationChecklistView` and template
 ### Testing
 
 - Run the publication checklist by attempting to submit or approve objects with missing dependencies to ensure blocking messages appear.
-- Ensure public detail views (e.g., `materials/templates/materials/sample_detail.html`) render only visible related data.
 
 ## Review UI access
 
 Source: `utils/object_management/views.py:ReviewItemDetailView`.
 
-- Staff and per‑model moderators (`can_moderate_<model>`) can access any item’s review detail page.
-- Owners can access the review detail page only while the item is in `review` (to comment) or `declined` (to read feedback).
+- Staff and per-model moderators (`can_moderate_<model>`) can access any item’s review detail page.
+- Owners can access the review detail page while the item is `private` (for preview prior to submission), in `review` (to comment), or `declined` (to read feedback).
 - Others are not allowed.
 
 ## DRF viewsets and actions
 
 Source: `utils/object_management/viewsets.py`.
-
+{{ ... }}
 - `UserCreatedObjectViewSet` uses `UserCreatedObjectPermission` as its base `permission_classes`.
 - Actions provided: `register_for_review` (same policy as submit), `withdraw_from_review`, `approve`, `reject`, `archive`.
 - Object creation assigns `owner=self.request.user` and requires `add_<model>` permission per `UserCreatedObjectPermission.has_permission`.

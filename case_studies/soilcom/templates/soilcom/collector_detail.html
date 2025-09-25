@@ -1,5 +1,9 @@
 {% extends "detail_with_options.html" %}
 
+{% block detail_header_badge %}
+    {% include "object_management/review_status_badge.html" with object=object %}
+{% endblock detail_header_badge %}
+
 {% block detail_body %}
     <p class="card-text">
         <strong>Name:</strong>
