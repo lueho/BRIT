@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from collections.abc import Iterator, Sequence
+from collections.abc import Callable, Iterator, Sequence
 from dataclasses import dataclass, field
 
 from django.apps import apps
@@ -38,6 +38,7 @@ class DependencyIssue:
     related_object: object | None
     reason: str
     missing: bool = False
+    status: str | None = None
 
     def describe(self) -> str:
         label = self.rule.get_label().capitalize()
@@ -48,6 +49,16 @@ class DependencyIssue:
                 self.related_object
             )
         return f"{label}: {obj_label} ({self.reason})"
+
+
+@dataclass
+class PromotionResult:
+    promoted: list[object] = field(default_factory=list)
+    skipped: list[object] = field(default_factory=list)
+
+    def extend(self, other: PromotionResult) -> None:
+        self.promoted.extend(other.promoted)
+        self.skipped.extend(other.skipped)
 
 
 @dataclass
@@ -122,7 +133,15 @@ REGISTRY: dict[tuple[str, str], DependencyConfig] = {
     ),
     # soilcom (case studies) --------------------------------------------------
     ("soilcom", "collection"): DependencyConfig(
-        requires_published=(RelationRule("collector", label="collector"),),
+        requires_published=(
+            RelationRule("collector", label="collector", optional=True),
+            RelationRule("catchment", label="catchment", optional=True),
+            RelationRule("collection_system", label="collection system", optional=True),
+            RelationRule("waste_stream", label="waste stream", optional=True),
+            RelationRule("frequency", label="collection frequency", optional=True),
+            RelationRule("fee_system", label="fee system", optional=True),
+            RelationRule("sources", label="source", optional=True),
+        ),
         follows_parent=(
             RelationRule(
                 "collectionpropertyvalue_set", label="collection property value"
@@ -189,6 +208,7 @@ def prepublish_check(obj: object, target_status: str | None = None) -> Prepublis
                             related_object=None,
                             reason=str(_("missing reference")),
                             missing=True,
+                            status=None,
                         )
                     )
                 continue
@@ -203,6 +223,7 @@ def prepublish_check(obj: object, target_status: str | None = None) -> Prepublis
                             related_object=None,
                             reason=str(_("missing reference")),
                             missing=True,
+                            status=None,
                         )
                     )
                 continue
@@ -216,22 +237,13 @@ def prepublish_check(obj: object, target_status: str | None = None) -> Prepublis
                         related_object=None,
                         reason=str(_("missing reference")),
                         missing=True,
+                        status=None,
                     )
                 )
                 continue
             status = getattr(related, "publication_status", None)
             if status is None:
                 continue
-            # When submitting for review for soilcom.Collection, allow private/declined dependencies;
-            # enforce full published dependencies at publish time.
-            if target_status == getattr(obj, "STATUS_REVIEW", "review"):
-                try:
-                    key = _registry_key_from_obj(obj)
-                except Exception:
-                    key = (None, None)
-                if key == ("soilcom", "collection"):
-                    # Only missing references are blocking for submit
-                    continue
             if not _is_published(related):
                 status_label = getattr(related, "get_publication_status_display", None)
                 if callable(status_label):
@@ -239,7 +251,12 @@ def prepublish_check(obj: object, target_status: str | None = None) -> Prepublis
                 else:
                     reason = status
                 report.blocking.append(
-                    DependencyIssue(rule=rule, related_object=related, reason=reason)
+                    DependencyIssue(
+                        rule=rule,
+                        related_object=related,
+                        reason=reason,
+                        status=status,
+                    )
                 )
 
     if target_status:
@@ -253,7 +270,10 @@ def prepublish_check(obj: object, target_status: str | None = None) -> Prepublis
                 if status != target_status:
                     report.needs_sync.append(
                         DependencyIssue(
-                            rule=rule, related_object=related, reason=status
+                            rule=rule,
+                            related_object=related,
+                            reason=status,
+                            status=status,
                         )
                     )
     return report
@@ -289,6 +309,63 @@ def cascade_publication_status(
             cascade_publication_status(related, target_status, acting_user, visited)
 
 
+def promote_dependencies_to_review(
+    obj: object,
+    acting_user: object | None = None,
+    visited: set[tuple[str, str, int]] | None = None,
+    should_promote: Callable[[object], bool] | None = None,
+) -> PromotionResult:
+    """Set private/declined required dependencies to review status recursively."""
+
+    config = get_config_for_object(obj)
+    if not config:
+        return PromotionResult()
+
+    if visited is None:
+        visited = set()
+
+    result = PromotionResult()
+
+    for rule in config.requires_published:
+        for related in _resolve_related(obj, rule):
+            if related is None:
+                continue
+
+            meta = getattr(related, "_meta", None)
+            pk = getattr(related, "pk", None)
+            if meta and pk is not None:
+                node = (meta.app_label, meta.model_name, pk)
+                if node in visited:
+                    continue
+                visited.add(node)
+
+            status = getattr(related, "publication_status", None)
+            if status is None:
+                continue
+
+            if should_promote and not should_promote(related):
+                result.skipped.append(related)
+                continue
+
+            review_status = getattr(related, "STATUS_REVIEW", "review")
+            private_status = getattr(related, "STATUS_PRIVATE", "private")
+            declined_status = getattr(related, "STATUS_DECLINED", "declined")
+
+            if status in {private_status, declined_status} and review_status is not None:
+                _apply_status_change(related, review_status, acting_user)
+                result.promoted.append(related)
+
+            child_result = promote_dependencies_to_review(
+                related,
+                acting_user,
+                visited,
+                should_promote=should_promote,
+            )
+            result.extend(child_result)
+
+    return result
+
+
 def _apply_status_change(
     child: object, target_status: str, acting_user: object | None
 ) -> None:
@@ -322,18 +399,15 @@ def _apply_status_change(
                     child.approved_by = acting_user
                     update_fields.append("approved_by")
         else:
-            cleared = False
             if getattr(child, "approved_at", None) is not None:
                 child.approved_at = None
                 update_fields.append("approved_at")
-                cleared = True
             if (
                 hasattr(child, "approved_by")
                 and getattr(child, "approved_by", None) is not None
             ):
                 child.approved_by = None
                 update_fields.append("approved_by")
-                cleared = True
 
     if update_fields:
         child.save(update_fields=list(dict.fromkeys(update_fields)))

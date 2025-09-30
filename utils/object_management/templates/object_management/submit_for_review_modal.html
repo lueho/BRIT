@@ -12,6 +12,29 @@
     {% csrf_token %}
     {% if next_url %}<input type="hidden" name="next" value="{{ next_url }}">{% endif %}
     <p class="mb-3">Are you sure you want to submit this for review?</p>
+
+    {% if has_blocking_dependencies %}
+      <div class="alert alert-warning">
+        <h6 class="alert-heading">Dependencies need attention</h6>
+        <p class="mb-2">The following related items must be moved to review or published before this submission can proceed:</p>
+        <ul class="mb-2">
+          {% for issue in blocking_dependencies %}
+            <li>{{ issue.describe }}</li>
+          {% endfor %}
+        </ul>
+        <div class="form-check">
+          <input class="form-check-input"
+                 type="checkbox"
+                 value="1"
+                 id="id-cascade-dependencies"
+                 name="cascade_dependencies">
+          <label class="form-check-label" for="id-cascade-dependencies">
+            Move eligible related items to review automatically.
+          </label>
+        </div>
+      </div>
+    {% endif %}
+
     <div class="mb-3">
       <label for="submit-comment-textarea-{{ object.id }}" class="form-label">Review comment (optional)</label>
       <textarea class="form-control"

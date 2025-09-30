@@ -45,7 +45,10 @@ from utils.object_management.permissions import (
     get_object_policy,
     user_is_moderator_for_model,
 )
-from utils.object_management.publication import prepublish_check
+from utils.object_management.publication import (
+    prepublish_check,
+    promote_dependencies_to_review,
+)
 
 from ..forms import DynamicTableInlineFormSetHelper
 from ..views import (
@@ -198,6 +201,57 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
 
         # Centralized permission check
         self.ensure_permission(request, self.object)
+
+        promotion_result = None
+        if (
+            self.action_attr_name == "submit_for_review"
+            and request.POST.get("cascade_dependencies")
+        ):
+
+            def should_promote_dependency(dependency) -> bool:
+                if not hasattr(dependency, "publication_status"):
+                    return False
+                submit_method = getattr(dependency, "submit_for_review", None)
+                if not callable(submit_method):
+                    return False
+                policy = get_object_policy(
+                    request.user, dependency, request=request
+                )
+                return bool(policy.get("can_submit_review"))
+
+            promotion_result = promote_dependencies_to_review(
+                self.object,
+                acting_user=request.user,
+                should_promote=should_promote_dependency,
+            )
+            if promotion_result.promoted:
+                count = len(promotion_result.promoted)
+                messages.info(
+                    request,
+                    _(
+                        "Moved %(count)s related object%(plural)s to review status."
+                    )
+                    % {"count": count, "plural": "" if count == 1 else "s"},
+                )
+            if promotion_result and promotion_result.skipped:
+                count = len(promotion_result.skipped)
+                sample_names = ", ".join(
+                    str(obj) for obj in promotion_result.skipped[:3]
+                )
+                if count > 3:
+                    sample_names += " …"
+                messages.warning(
+                    request,
+                    _(
+                        "Unable to update %(count)s related object%(plural)s. "
+                        "Check permissions for: %(names)s."
+                    )
+                    % {
+                        "count": count,
+                        "plural": "" if count == 1 else "s",
+                        "names": sample_names,
+                    },
+                )
 
         comment = self._get_comment(request)
 
@@ -400,6 +454,21 @@ class SubmitForReviewModalView(BaseReviewActionModalView):
     )
     action_attr_name = "submit_for_review"
     review_action = ReviewAction.ACTION_SUBMITTED
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        obj = context.get("object") or self.get_object()
+        target_status = getattr(obj, "STATUS_REVIEW", "review")
+        report = prepublish_check(obj, target_status=target_status)
+        context.update(
+            {
+                "prepublish_report": report,
+                "blocking_dependencies": report.blocking,
+                "needs_sync_dependencies": report.needs_sync,
+                "has_blocking_dependencies": bool(report.blocking),
+            }
+        )
+        return context
 
 
 class WithdrawFromReviewModalView(BaseReviewActionModalView):
