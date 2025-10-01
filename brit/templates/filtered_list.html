@@ -190,20 +190,18 @@
                 </button>
               </li>
               {% block options_tab_button %}
-                {% if user.is_authenticated %}
-                  <li class="nav-item" role="presentation">
-                    <button class="nav-link"
-                            id="options-tab"
-                            data-bs-toggle="tab"
-                            data-bs-target="#options-pane"
-                            type="button"
-                            role="tab"
-                            aria-controls="options-pane"
-                            aria-selected="false">
-                      <i class="fas fa-gear"></i> Options
-                    </button>
-                  </li>
-                {% endif %}
+                <li class="nav-item" role="presentation">
+                  <button class="nav-link"
+                          id="options-tab"
+                          data-bs-toggle="tab"
+                          data-bs-target="#options-pane"
+                          type="button"
+                          role="tab"
+                          aria-controls="options-pane"
+                          aria-selected="false">
+                    <i class="fas fa-gear"></i> Options
+                  </button>
+                </li>
               {% endblock options_tab_button %}
               {% block learning_tab_button %}
                 <li class="nav-item" role="presentation">
@@ -245,36 +243,39 @@
                 {% endblock filters_pane_body %}
               </div>
               {% block options_tab_pane %}
-                {% if user.is_authenticated %}
-                  <div class="tab-pane fade"
-                       id="options-pane"
-                       role="tabpanel"
-                       aria-labelledby="options-tab"
-                       tabindex="0">
-                    {% block options_pane_body %}
-                      {% block list_card_footer_create_link %}
-                        {% if create_permission in perms or user.is_staff %}
-                          <a class="btn btn-success w-100 mb-2"
-                             href="{{ object_list.model.create_url }}"
-                             aria-label="Create new {{ object_list.model.get_verbose_name }}">
-                            <i class="fas fa-plus"></i> Create new {{ object_list.model.get_verbose_name }}
-                          </a>
-                        {% endif %}
-                      {% endblock list_card_footer_create_link %}
-                      {% if dashboard_url %}
-                        <a class="btn btn-outline-secondary w-100 mb-2"
-                           href="{{ dashboard_url }}">
-                          <i class="fas fa-table-cells-large"></i> Open Explorer
+                <div class="tab-pane fade"
+                     id="options-pane"
+                     role="tabpanel"
+                     aria-labelledby="options-tab"
+                     tabindex="0">
+                  {% block options_pane_body %}
+                    {% block list_card_footer_create_link %}
+                      {% if create_permission in perms or user.is_staff %}
+                        <a class="btn btn-success w-100 mb-2"
+                           href="{{ object_list.model.create_url }}"
+                           aria-label="Create new {{ object_list.model.get_verbose_name }}">
+                          <i class="fas fa-plus"></i> Create new {{ object_list.model.get_verbose_name }}
                         </a>
                       {% endif %}
-                      {# Export actions placeholder – override per list to add export buttons #}
-                      {% block list_card_export_actions %}
-                      {% endblock list_card_export_actions %}
-                      {% block list_card_options_dropdown_additional_links %}
-                      {% endblock list_card_options_dropdown_additional_links %}
-                    {% endblock options_pane_body %}
-                  </div>
-                {% endif %}
+                    {% endblock list_card_footer_create_link %}
+                    {% if dashboard_url %}
+                      <a class="btn btn-outline-secondary w-100 mb-2"
+                         href="{{ dashboard_url }}">
+                        <i class="fas fa-table-cells-large"></i> Open Explorer
+                      </a>
+                    {% endif %}
+                    {# Export actions placeholder – override per list to add export buttons #}
+                    {% block list_card_export_actions %}
+                    {% endblock list_card_export_actions %}
+                    {% block list_card_options_dropdown_additional_links %}
+                    {% endblock list_card_options_dropdown_additional_links %}
+                    {% if not user.is_authenticated %}
+                      <p class="text-muted small mt-3 mb-0">
+                        Log in to enable export and additional options.
+                      </p>
+                    {% endif %}
+                  {% endblock options_pane_body %}
+                </div>
               {% endblock options_tab_pane %}
               {% block learning_tab_pane %}
                 <div class="tab-pane fade"
