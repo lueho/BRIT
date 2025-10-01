@@ -1,6 +1,6 @@
 import hashlib
 import json
-from datetime import date
+from datetime import date, timedelta
 from urllib.parse import urlencode
 
 from celery.result import AsyncResult
@@ -780,6 +780,10 @@ class CollectionCreateNewVersionView(CollectionCopyView):
                 ],
             }
         )
+        if self.object.valid_until:
+            initial["valid_from"] = self.object.valid_until + timedelta(days=1)
+        else:
+            initial["valid_from"] = None
         self.predecessor = self.object
         self.object = None
         return initial
