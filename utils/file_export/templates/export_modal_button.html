@@ -1,0 +1,17 @@
+{% load static %}
+<a id="{{ button_id }}"
+   class="{{ button_classes }}{% if not export_disabled %} modal-link{% else %} disabled{% endif %}"
+   {% if export_disabled %}
+     href="#"
+     aria-disabled="true"
+     tabindex="-1"
+   {% else %}
+     href="{{ modal_href }}"
+     data-modal-url="{{ modal_href }}"
+   {% endif %}>
+  <i class="{{ icon_class }}"></i>
+  {{ button_text }}
+</a>
+{% if export_disabled %}
+  <p class="{{ hint_classes }}">{{ hint_text }}</p>
+{% endif %}

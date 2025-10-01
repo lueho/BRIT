@@ -107,17 +107,15 @@
             </div>
             {% endblock filter_result_card %}
             {% block options_card %}
-            {% if user.is_authenticated %}
             <div class="card shadow">
                 <div class="card-header bg-body-tertiary border-bottom-0 py-3">
                     <h5 class="mb-0">Options</h5>
                 </div>
                 <div class="card-body">
                     {# Export actions placeholder – override per map to add export buttons #}
-                    {% block map_export_actions %}{% endblock %}
+                    {% block map_export_actions %}{% endblock map_export_actions %}
                 </div>
             </div>
-            {% endif %}
             {% endblock options_card %}
             {% block extra_cards %}{% endblock extra_cards %}
         </div>

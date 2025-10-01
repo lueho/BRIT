@@ -62,20 +62,18 @@
             <i class="fas fa-filter"></i> Filters
           </button>
         </li>
-        {% if user.is_authenticated %}
-          <li class="nav-item" role="presentation">
-            <button class="nav-link"
-                    id="options-tab"
-                    data-bs-toggle="tab"
-                    data-bs-target="#options-pane"
-                    type="button"
-                    role="tab"
-                    aria-controls="options-pane"
-                    aria-selected="false">
-              <i class="fas fa-gear"></i> Options
-            </button>
-          </li>
-        {% endif %}
+        <li class="nav-item" role="presentation">
+          <button class="nav-link"
+                  id="options-tab"
+                  data-bs-toggle="tab"
+                  data-bs-target="#options-pane"
+                  type="button"
+                  role="tab"
+                  aria-controls="options-pane"
+                  aria-selected="false">
+            <i class="fas fa-gear"></i> Options
+          </button>
+        </li>
         <li class="nav-item" role="presentation">
           <button class="nav-link"
                   id="learning-tab"
@@ -110,69 +108,64 @@
             </div>
           </form>
         </div>
-        {% if user.is_authenticated %}
-          <div class="tab-pane fade"
-               id="options-pane"
-               role="tabpanel"
-               aria-labelledby="options-tab"
-               tabindex="0">
-            {% if perms.soilcom.add_collection or user.is_staff %}
-              <a id="btn-collection-create"
-                 class="btn btn-success w-100 mb-2"
-                 href="{{ object_list.model.create_url }}"
-                 data-href-template="{{ object_list.model.create_url }}"
-                 aria-label="Add new {{ object_list.model.get_verbose_name }}">
-                <i class="fas fa-plus"></i> Create new {{ object_list.model.get_verbose_name }}
-              </a>
-            {% endif %}
-
-            {% if "soilcom.add_aggregatedcollectionpropertyvalue" in perms %}
-              <a class="btn btn-outline-secondary w-100 mb-2"
-                 href="{% url 'aggregatedcollectionpropertyvalue-create' %}">
-                <i class="fas fa-circle-plus"></i> Add property to collection group
-              </a>
-            {% endif %}
-
-            <a class="btn btn-outline-secondary modal-link w-100"
-               href="{% export_link_modal 'collection-export' list_type=list_type %}">
-              <i class="fas fa-file-export"></i> Export data
+        <div class="tab-pane fade"
+             id="options-pane"
+             role="tabpanel"
+             aria-labelledby="options-tab"
+             tabindex="0">
+          {% if perms.soilcom.add_collection or user.is_staff %}
+            <a id="btn-collection-create"
+               class="btn btn-success w-100 mb-2"
+               href="{{ object_list.model.create_url }}"
+               data-href-template="{{ object_list.model.create_url }}"
+               aria-label="Add new {{ object_list.model.get_verbose_name }}">
+              <i class="fas fa-plus"></i> Create new {{ object_list.model.get_verbose_name }}
             </a>
+          {% endif %}
 
-            <p id="map-actions-hint" class="text-muted small mb-2">Select a collection on the map to enable actions.</p>
+          {% if "soilcom.add_aggregatedcollectionpropertyvalue" in perms %}
+            <a class="btn btn-outline-secondary w-100 mb-2"
+               href="{% url 'aggregatedcollectionpropertyvalue-create' %}">
+              <i class="fas fa-circle-plus"></i> Add property to collection group
+            </a>
+          {% endif %}
 
-            {% if perms.soilcom.add_collection %}
-              <a id="btn-collection-copy"
-                 class="btn btn-outline-secondary disabled w-100 mt-3"
-                 data-href-template="/waste_collection/collections/__pk__/copy/"
-                 href="#"
-                 role="button"
-                 aria-disabled="true"
-                 tabindex="-1"
-                 title="Select a collection on the map first">Copy selected collection</a>
-            {% endif %}
+          {% export_modal_button "collection-export" list_type=list_type button_classes="btn btn-outline-secondary w-100" %}
 
-            {% if user.is_authenticated %}
-              <a id="btn-collection-update"
-                 class="btn btn-outline-secondary disabled w-100 mt-2"
-                 href="#"
-                 role="button"
-                 data-href-template="/waste_collection/collections/__pk__/update/"
-                 aria-disabled="true"
-                 tabindex="-1"
-                 title="Select a collection on the map first">Edit selected collection</a>
-            {% endif %}
-            {% if user.is_authenticated %}
-              <a id="btn-collection-delete"
-                 class="btn btn-danger modal-link disabled w-100 mt-2"
-                 href="#"
-                 role="button"
-                 data-href-template="/waste_collection/collections/__pk__/delete/modal/"
-                 aria-disabled="true"
-                 tabindex="-1"
-                 title="Select a collection on the map first">Delete selected collection</a>
-            {% endif %}
-          </div>
-        {% endif %}
+          <p id="map-actions-hint" class="text-muted small mb-2">Select a collection on the map to enable actions.</p>
+
+          {% if perms.soilcom.add_collection %}
+            <a id="btn-collection-copy"
+               class="btn btn-outline-secondary disabled w-100 mt-3"
+               data-href-template="/waste_collection/collections/__pk__/copy/"
+               href="#"
+               role="button"
+               aria-disabled="true"
+               tabindex="-1"
+               title="Select a collection on the map first">Copy selected collection</a>
+          {% endif %}
+
+          {% if user.is_authenticated %}
+            <a id="btn-collection-update"
+               class="btn btn-outline-secondary disabled w-100 mt-2"
+               href="#"
+               role="button"
+               data-href-template="/waste_collection/collections/__pk__/update/"
+               aria-disabled="true"
+               tabindex="-1"
+               title="Select a collection on the map first">Edit selected collection</a>
+          {% endif %}
+          {% if user.is_authenticated %}
+            <a id="btn-collection-delete"
+               class="btn btn-danger modal-link disabled w-100 mt-2"
+               href="#"
+               role="button"
+               data-href-template="/waste_collection/collections/__pk__/delete/modal/"
+               aria-disabled="true"
+               tabindex="-1"
+               title="Select a collection on the map first">Delete selected collection</a>
+          {% endif %}
+        </div>
         <div class="tab-pane fade"
              id="learning-pane"
              role="tabpanel"
