@@ -222,7 +222,7 @@ class RequiredBinCapacityRangeFilter(NullableRangeFilter):
 
     default_range_min = 0
     default_range_max = 1000
-    default_range_step = 1
+    default_range_step = 0.1
     default_include_null = True
     unit = "L"
 
@@ -250,7 +250,7 @@ class RequiredBinCapacityRangeFilter(NullableRangeFilter):
 class MinBinSizeRangeFilter(NullableRangeFilter):
     default_range_min = 0
     default_range_max = 2000
-    default_range_step = 1
+    default_range_step = 0.1
     default_include_null = True
     unit = "L"
 
