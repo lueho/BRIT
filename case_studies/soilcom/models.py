@@ -2,7 +2,7 @@ from datetime import date
 
 import celery
 from django.core.exceptions import ValidationError
-from django.core.validators import RegexValidator
+from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models, transaction
 from django.db.models import Count, Q, Sum
 from django.db.models.signals import post_save, pre_save
@@ -483,17 +483,23 @@ class Collection(NamedUserCreatedObject):
         help_text="Indicates whether connection to the collection system is mandatory, voluntary, or not specified. Leave blank for never set; select 'not specified' for explicit user choice.",
     )
 
-    min_bin_size = models.PositiveIntegerField(
+    min_bin_size = models.DecimalField(
         blank=True,
         null=True,
         verbose_name="Smallest available bin size (L)",
         help_text="Smallest physical bin size that the collector provides for this collection. Exceprions may apply (e.g. for home composters)",
+        max_digits=8,
+        decimal_places=1,
+        validators=[MinValueValidator(0)],
     )
-    required_bin_capacity = models.PositiveIntegerField(
+    required_bin_capacity = models.DecimalField(
         blank=True,
         null=True,
         verbose_name="Required bin capacity per unit (L)",
         help_text="Minimum total bin capacity that must be supplied per reference unit (see field below).",
+        max_digits=8,
+        decimal_places=1,
+        validators=[MinValueValidator(0)],
     )
     required_bin_capacity_reference = models.CharField(
         max_length=16,
