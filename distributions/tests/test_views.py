@@ -14,14 +14,14 @@ class AuthorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
 
     model = Timestep
 
-    view_modal_detail_name = 'timestep-detail-modal'
+    view_modal_detail_name = "timestep-detail-modal"
 
     @classmethod
     def create_published_object(cls):
         data = {
-            'name': 'Published Test Timestep',
-            'order': 1,
-            'publication_status': 'published',
+            "name": "Published Test Timestep",
+            "order": 1,
+            "publication_status": "published",
         }
         data.update(cls.related_objects)
         return cls.model.objects.create(owner=cls.owner_user, **data)
@@ -29,9 +29,9 @@ class AuthorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
     @classmethod
     def create_unpublished_object(cls):
         data = {
-            'name': 'Private Test Timestep',
-            'order': 1,
-            'publication_status': 'private',
+            "name": "Private Test Timestep",
+            "order": 1,
+            "publication_status": "private",
         }
         data.update(cls.related_objects)
         return cls.model.objects.create(owner=cls.owner_user, **data)
@@ -39,5 +39,7 @@ class AuthorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
     @classmethod
     def create_related_objects(cls):
         return {
-            'distribution': TemporalDistribution.objects.create(name='Test Temporal Distribution'),
+            "distribution": TemporalDistribution.objects.create(
+                name="Test Temporal Distribution", publication_status="published"
+            ),
         }

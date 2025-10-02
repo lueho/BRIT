@@ -9,16 +9,20 @@ class ShowCaseCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
 
     model = Showcase
 
-    view_create_name = 'showcase-create'
-    view_published_list_name = 'showcase-list'
-    view_private_list_name = 'showcase-list-owned'
-    view_detail_name = 'showcase-detail'
-    view_update_name = 'showcase-update'
-    view_delete_name = 'showcase-delete-modal'
+    view_create_name = "showcase-create"
+    view_published_list_name = "showcase-list"
+    view_private_list_name = "showcase-list-owned"
+    view_detail_name = "showcase-detail"
+    view_update_name = "showcase-update"
+    view_delete_name = "showcase-delete-modal"
 
-    create_object_data = {'name': 'Test Showcase'}
-    update_object_data = {'name': 'Updated Test Showcase'}
+    create_object_data = {"name": "Test Showcase"}
+    update_object_data = {"name": "Updated Test Showcase"}
 
     @classmethod
     def create_related_objects(cls):
-        return {'region': Region.objects.create(name='Test Region')}
+        return {
+            "region": Region.objects.create(
+                name="Test Region", publication_status="published"
+            )
+        }

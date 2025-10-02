@@ -1,0 +1,86 @@
+networks:
+  full:
+
+
+services:
+  db:
+    image: "postgis/postgis:15-3.4"
+    ports:
+      - "5433:5432"
+    volumes:
+      - brit_db:/var/lib/postgresql/data/
+    env_file:
+      - brit/settings/.env
+    networks:
+      - full
+
+  web:
+    build:
+      context: .
+      args:
+        INSTALL_DEV: true
+    image: brit-web
+    restart: unless-stopped
+    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    volumes:
+      - ./:/app
+      - /app/.venv
+    depends_on:
+      - db
+      - redis
+      - celery
+    ports:
+      - "8000:8000"
+    env_file:
+      - brit/settings/.env
+    networks:
+      - full
+
+  celery:
+    image: brit-web
+    volumes:
+      - ./:/app
+      - /app/.venv
+    command: celery --app=brit worker --loglevel=info
+    env_file:
+      - brit/settings/.env
+    depends_on:
+      - db
+      - redis
+    networks:
+      - full
+
+  redis:
+    build:
+      context: ./docker/redis/
+    volumes:
+      - ./docker/redis/tests/:/tests
+    networks:
+      - full
+
+  db_admin:
+    build:
+      context: ./docker/db_admin/
+    env_file:
+      - brit/settings/.env
+    depends_on:
+      - db
+    networks:
+      - full
+    profiles: [ "db_admin" ]
+
+  flower:
+    image: brit-web
+    command: celery --app=brit --broker=redis://redis:6379/0 flower
+    ports:
+      - "5555:5555"
+    env_file:
+      - brit/settings/.env
+    depends_on:
+      - web
+      - redis
+    networks:
+      - full
+
+volumes:
+  brit_db:

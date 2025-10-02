@@ -1,24 +1,26 @@
 // This files must be included after the range_slider.js file.
-
-"use strict";
-$(function() {
-
-    const checkboxIncludeUnknown = $(".checkbox-include-unknown");
-
-    checkboxIncludeUnknown.each(function() {
-        const checkbox = $(this);
-        const formRow = checkbox.closest(".form-row");
-        const slider = formRow.find(".numeric-slider-range");
-        const isNullInput = $(`#${slider.attr("id")}_is_null`);
-        isNullInput.val(slider.data("cur_is_null"));
-        checkbox.prop('checked', isNullInput.val() === "true");
+document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.checkbox-include-unknown').forEach(checkbox => {
+        const formRow = checkbox.closest('.row.g-3');
+        if (!formRow) return;
+        const slider = formRow.querySelector('.numeric-slider-range');
+        if (!slider) return;
+        const isNullInput = document.getElementById(`${slider.id}_is_null`);
+        if (isNullInput) {
+            isNullInput.value = slider.dataset.cur_is_null;
+            checkbox.checked = isNullInput.value === 'true';
+        }
     });
-    checkboxIncludeUnknown.on('click', function() {
-        const checkbox = $(this);
-        const formRow = checkbox.closest(".form-row");
-        const sliderId = formRow.find(".numeric-slider-range").attr("id");
-        const isNullInput = $(`#${sliderId}_is_null`);
-
-        isNullInput.val(checkbox.is(':checked'));
+    document.querySelectorAll('.checkbox-include-unknown').forEach(checkbox => {
+        checkbox.addEventListener('click', () => {
+            const formRow = checkbox.closest('.row.g-3');
+            if (!formRow) return;
+            const slider = formRow.querySelector('.numeric-slider-range');
+            if (!slider) return;
+            const isNullInput = document.getElementById(`${slider.id}_is_null`);
+            if (isNullInput) {
+                isNullInput.value = checkbox.checked.toString();
+            }
+        });
     });
 });

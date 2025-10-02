@@ -1,16 +1,17 @@
-{% extends 'filtered_map.html' %}
+{% extends "filtered_map.html" %}
 {% load static %}
 
 {% block map_card_footer %}
     <a href="{% url 'showcase-list' %}" class="mr-3">
         <i class="fas fa-fw fa-list"></i> View as list
     </a>
-{% endblock %}
+{% endblock map_card_footer %}
 
-{% block filter_form_card %}{% endblock %}
+{% block filter_form_card %}
+{% endblock filter_form_card %}
 
 {% block javascript %}
     {{ block.super }}
     <script src="{% static 'lib/turf-inside/inside.min.js' %}"></script>
     <script src="{% static 'js/showcase_map.min.js' %}"></script>
-{% endblock %}
+{% endblock javascript %}

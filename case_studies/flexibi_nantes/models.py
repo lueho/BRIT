@@ -6,8 +6,12 @@ from django.dispatch import receiver
 from django.urls import reverse
 
 from distributions.models import TemporalDistribution, Timestep
-from materials.models import (Composition, Material, MaterialComponent, MaterialComponentGroup, SampleSeries)
-from utils.models import NamedUserCreatedObject, UserCreatedObject, UserCreatedObjectManager
+from materials.models import Composition, MaterialComponent, SampleSeries
+from utils.object_management.models import (
+    NamedUserCreatedObject,
+    UserCreatedObject,
+    UserCreatedObjectManager,
+)
 
 
 class NantesGreenhouses(models.Model):
@@ -41,10 +45,10 @@ class GreenhouseManager(UserCreatedObjectManager):
         types = []
         for greenhouse in self.all():
             greenhouse_type = {
-                'heated': greenhouse.heated,
-                'lighted': greenhouse.lighted,
-                'high_wire': greenhouse.high_wire,
-                'above_ground': greenhouse.above_ground,
+                "heated": greenhouse.heated,
+                "lighted": greenhouse.lighted,
+                "high_wire": greenhouse.high_wire,
+                "above_ground": greenhouse.above_ground,
             }
             greenhouse_type.update(greenhouse.cultures())
             types.append(greenhouse_type)
@@ -85,58 +89,58 @@ class Greenhouse(NamedUserCreatedObject):
         return self.greenhousegrowthcycle_set.count()
 
     def configuration(self):
-        return {gc: {'culture': gc.culture,
-                     'timesteps': [t for t in gc.timesteps],
-                     'table': gc.table_data} for gc in
-                self.greenhousegrowthcycle_set.all().order_by('cycle_number')}
+        return {
+            gc: {
+                "culture": gc.culture,
+                "timesteps": [t for t in gc.timesteps],
+                "table": gc.table_data,
+            }
+            for gc in self.greenhousegrowthcycle_set.all().order_by("cycle_number")
+        }
 
     def cultures(self):
-        cultures = {
-            'culture_1': None,
-            'culture_2': None,
-            'culture_3': None
-        }
+        cultures = {"culture_1": None, "culture_2": None, "culture_3": None}
         for growth_cycle in self.growth_cycles.all():
-            name = f'culture_{growth_cycle.cycle_number}'
+            name = f"culture_{growth_cycle.cycle_number}"
             cultures.update({name: growth_cycle.culture.name})
         return cultures
 
     def grouped_growth_cycles(self):
         grouped_growth_cycles = {}
         for cycle_number in range(1, self.number_of_growth_cycles() + 1):
-            for component_distribution in self.growth_cycles.filter(cycle_number=cycle_number):
+            for component_distribution in self.growth_cycles.filter(
+                cycle_number=cycle_number
+            ):
                 if cycle_number not in grouped_growth_cycles:
                     grouped_growth_cycles[cycle_number] = {
                         component_distribution.material: []
                     }
-                grouped_growth_cycles[cycle_number][component_distribution.material].append(component_distribution)
+                grouped_growth_cycles[cycle_number][
+                    component_distribution.material
+                ].append(component_distribution)
         return grouped_growth_cycles
 
     @property
     def filter_kwargs(self):
         kwargs = {
-            'heated': self.heated,
-            'lighted': self.lighted,
-            'high_wire': self.high_wire,
-            'above_ground': self.above_ground,
+            "heated": self.heated,
+            "lighted": self.lighted,
+            "high_wire": self.high_wire,
+            "above_ground": self.above_ground,
         }
-        cultures = {
-            'culture_1': None,
-            'culture_2': None,
-            'culture_3': None
-        }
+        cultures = {"culture_1": None, "culture_2": None, "culture_3": None}
         for growth_cycle in self.growth_cycles.all():
-            name = f'culture_{growth_cycle.cycle_number}'
+            name = f"culture_{growth_cycle.cycle_number}"
             cultures.update({name: growth_cycle.culture.name})
         kwargs.update(cultures)
         return kwargs
 
     def __str__(self):
-        h = 'heated' if self.heated else 'not heated'
-        l = 'lighting' if self.lighted else 'no lighting'
-        g = 'above ground' if self.above_ground else 'on ground'
-        s = 'high wire' if self.high_wire else 'classic'
-        return f'Greenhouse: {h}, {l}, {g}, {s}'
+        h = "heated" if self.heated else "not heated"
+        l = "lighting" if self.lighted else "no lighting"
+        g = "above ground" if self.above_ground else "on ground"
+        s = "high wire" if self.high_wire else "classic"
+        return f"Greenhouse: {h}, {l}, {g}, {s}"
 
 
 class Culture(NamedUserCreatedObject):
@@ -150,7 +154,9 @@ class GreenhouseGrowthCycle(UserCreatedObject):
     group_settings = models.ForeignKey(Composition, on_delete=models.CASCADE, null=True)
 
     def add_timestep(self, timestep):
-        ts_set = GrowthTimeStepSet.objects.create(owner=self.owner, timestep=timestep, growth_cycle=self)
+        ts_set = GrowthTimeStepSet.objects.create(
+            owner=self.owner, timestep=timestep, growth_cycle=self
+        )
         for component in self.group_settings.components:
             ts_set.add_component(component)
 
@@ -171,30 +177,34 @@ class GreenhouseGrowthCycle(UserCreatedObject):
 
     @property
     def timesteps(self):
-        return Timestep.objects.filter(id__in=[ts.timestep.id for ts in self.growthtimestepset_set.all()])
+        return Timestep.objects.filter(
+            id__in=[ts.timestep.id for ts in self.growthtimestepset_set.all()]
+        )
 
     @property
     def min_timestep(self):
-        return Timestep.objects.get(id=self.timesteps.aggregate(models.Min('id'))['id__min'])
+        return Timestep.objects.get(
+            id=self.timesteps.aggregate(models.Min("id"))["id__min"]
+        )
 
     @property
     def table_data(self):
         table_data = []
         components = self.group_settings.components
         for component in components:
-            table_row = {'Component': component.name}
+            table_row = {"Component": component.name}
             shares = GrowthShare.objects.filter(
                 component=component,
                 timestepset__growth_cycle=self,
-                timestepset__timestep__in=self.timesteps.all()
-            ).order_by('timestepset__timestep__id')
+                timestepset__timestep__in=self.timesteps.all(),
+            ).order_by("timestepset__timestep__id")
             for share in shares:
-                table_row[share.timestep.name] = f'{share.average}'
+                table_row[share.timestep.name] = f"{share.average}"
             table_data.append(table_row)
 
         # If no components, create a row with None values
         if not table_data:
-            table_row = {'component': None}
+            table_row = {"component": None}
             for timestep in self.timesteps.all():
                 table_row[timestep.name] = None
             table_data.append(table_row)
@@ -202,7 +212,7 @@ class GreenhouseGrowthCycle(UserCreatedObject):
         return table_data
 
     def get_absolute_url(self):
-        return reverse('greenhouse-detail', kwargs={'pk': self.greenhouse.id})
+        return reverse("greenhouse-detail", kwargs={"pk": self.greenhouse.id})
 
 
 @receiver(post_delete, sender=GreenhouseGrowthCycle)
@@ -213,15 +223,17 @@ def reorder_growth_cycles_post_delete(sender, instance, **kwargs):
 class GrowthTimeStepSet(models.Model):
     owner = models.ForeignKey(User, on_delete=models.CASCADE, null=True)
     timestep = models.ForeignKey(Timestep, on_delete=models.CASCADE)
-    growth_cycle = models.ForeignKey(GreenhouseGrowthCycle, on_delete=models.CASCADE, null=True)
+    growth_cycle = models.ForeignKey(
+        GreenhouseGrowthCycle, on_delete=models.CASCADE, null=True
+    )
 
     def add_component(self, component, **kwargs):
         share = GrowthShare.objects.create(
             owner=self.owner,
             component=component,
             timestepset=self,
-            average=kwargs.get('average', 0.0),
-            standard_deviation=kwargs.get('standard_deviation', 0.0)
+            average=kwargs.get("average", 0.0),
+            standard_deviation=kwargs.get("standard_deviation", 0.0),
         )
         return share
 
@@ -230,8 +242,12 @@ class GrowthTimeStepSet(models.Model):
 
 
 class GrowthShare(UserCreatedObject):
-    component = models.ForeignKey(MaterialComponent, on_delete=models.CASCADE, null=True)
-    timestepset = models.ForeignKey(GrowthTimeStepSet, on_delete=models.CASCADE, null=True)
+    component = models.ForeignKey(
+        MaterialComponent, on_delete=models.CASCADE, null=True
+    )
+    timestepset = models.ForeignKey(
+        GrowthTimeStepSet, on_delete=models.CASCADE, null=True
+    )
     average = models.FloatField(default=0.0)
     standard_deviation = models.FloatField(default=0.0)
 
@@ -241,12 +257,27 @@ class GrowthShare(UserCreatedObject):
 
 
 class BaseObjectManager(models.Manager):
-    DISTRIBUTION = 'Months of the year'
+    DISTRIBUTION = "Months of the year"
 
     def initialize(self):
-        distribution, created = TemporalDistribution.objects.get_or_create(name=self.DISTRIBUTION)
+        distribution, created = TemporalDistribution.objects.get_or_create(
+            name=self.DISTRIBUTION
+        )
         if created:
-            months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+            months = [
+                "Jan",
+                "Feb",
+                "Mar",
+                "Apr",
+                "May",
+                "Jun",
+                "Jul",
+                "Aug",
+                "Sep",
+                "Oct",
+                "Nov",
+                "Dec",
+            ]
             for month in months:
                 Timestep.objects.create(name=month, distribution=distribution)
 
@@ -268,6 +299,9 @@ class CaseStudyBaseObjects(models.Model):
     are missing (e.g. if a fresh database is used in a new instance of this tool), this model takes care that they are
     created.
     """
-    reference_distribution = models.ForeignKey(TemporalDistribution, on_delete=models.PROTECT, null=True)
+
+    reference_distribution = models.ForeignKey(
+        TemporalDistribution, on_delete=models.PROTECT, null=True
+    )
 
     objects = BaseObjectManager()

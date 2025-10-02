@@ -1,35 +1,50 @@
-import json
-
-from bootstrap_modal_forms.generic import BSModalCreateView, BSModalUpdateView
 from crispy_forms.helper import FormHelper
-from dal import autocomplete
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.core.exceptions import ObjectDoesNotExist
-from django.db.models import Q
 from django.http import HttpResponseRedirect
-from django.urls import reverse, reverse_lazy
+from django.urls import reverse
 from django.views.generic import UpdateView
 from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 
-import case_studies.flexibi_nantes.tasks
 from maps.models import Catchment, GeoDataset
 from maps.views import GeoDataSetPublishedFilteredMapView
 from materials.models import MaterialComponentGroup
-from utils.file_export.views import FilteredListFileExportView
-from utils.views import (NextOrSuccessUrlMixin, PrivateObjectFilterView, PrivateObjectListView,
-                         PublishedObjectFilterView, PublishedObjectListView, UserCreatedObjectDetailView,
-                         UserCreatedObjectModalDeleteView, UserCreatedObjectUpdateView, UserOwnsObjectMixin)
-from .filters import GreenhouseTypeFilter, NantesGreenhousesFilterSet
-from .forms import (CultureModalModelForm, CultureModelForm, GreenhouseGrowthCycle, GreenhouseGrowthCycleModelForm,
-                    GreenhouseModalModelForm,
-                    GreenhouseModelForm, GrowthCycleCreateForm,
-                    GrowthShareFormSetHelper, GrowthTimestepInline, InlineGrowthShare,
-                    UpdateGreenhouseGrowthCycleValuesForm)
-from .models import Culture, Greenhouse, GrowthTimeStepSet
+from utils.file_export.views import GenericUserCreatedObjectExportView
+from utils.object_management.views import (
+    PrivateObjectFilterView,
+    PrivateObjectListView,
+    PublishedObjectFilterView,
+    PublishedObjectListView,
+    UserCreatedObjectAutocompleteView,
+    UserCreatedObjectCreateView,
+    UserCreatedObjectDetailView,
+    UserCreatedObjectModalCreateView,
+    UserCreatedObjectModalDeleteView,
+    UserCreatedObjectModalUpdateView,
+    UserCreatedObjectUpdateView,
+    UserOwnsObjectMixin,
+)
+from utils.views import NextOrSuccessUrlMixin
 
+from .filters import GreenhouseTypeFilter, NantesGreenhousesFilterSet
+from .forms import (
+    CultureModalModelForm,
+    CultureModelForm,
+    GreenhouseGrowthCycle,
+    GreenhouseGrowthCycleModelForm,
+    GreenhouseModalModelForm,
+    GreenhouseModelForm,
+    GrowthCycleCreateForm,
+    GrowthShareFormSetHelper,
+    GrowthTimestepInline,
+    InlineGrowthShare,
+    UpdateGreenhouseGrowthCycleValuesForm,
+)
+from .models import Culture, Greenhouse, GrowthTimeStepSet
 
 # ----------- Culture CRUD ---------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
+
 
 class CulturePublishedListView(PublishedObjectListView):
     model = Culture
@@ -39,21 +54,15 @@ class CulturePrivateListView(PrivateObjectListView):
     model = Culture
 
 
-class CultureCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, BSModalCreateView):
+class CultureCreateView(UserCreatedObjectCreateView):
+    model = Culture
+    fields = ("name", "residue", "description")
+    permission_required = "flexibi_nantes.add_culture"
+
+
+class CultureModalCreateView(UserCreatedObjectModalCreateView):
     form_class = CultureModalModelForm
-    template_name = '../../brit/templates/modal_form.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({
-            'form_title': 'Create new culture',
-            'submit_button_text': 'Create'
-        })
-        return context
-
-    def form_valid(self, form):
-        form.instance.owner = self.request.user
-        return super().form_valid(form)
+    permission_required = "flexibi_nantes.add_culture"
 
 
 class CultureDetailView(UserCreatedObjectDetailView):
@@ -65,18 +74,9 @@ class CultureUpdateView(UserCreatedObjectUpdateView):
     form_class = CultureModelForm
 
 
-class CultureModalUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
+class CultureModalUpdateView(UserCreatedObjectModalUpdateView):
     model = Culture
     form_class = CultureModalModelForm
-    template_name = '../../brit/templates/modal_form.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({
-            'form_title': 'Edit culture',
-            'submit_button_text': 'Edit'
-        })
-        return context
 
 
 class CultureModalDeleteView(UserCreatedObjectModalDeleteView):
@@ -85,6 +85,7 @@ class CultureModalDeleteView(UserCreatedObjectModalDeleteView):
 
 # ----------- Greenhouse CRUD ------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
+
 
 class GreenhousePublishedFilterView(PublishedObjectFilterView):
     model = Greenhouse
@@ -96,31 +97,23 @@ class GreenhousePrivateFilterView(PrivateObjectFilterView):
     filterset_class = GreenhouseTypeFilter
 
 
-class GreenhouseCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, BSModalCreateView):
+class GreenhouseCreateView(UserCreatedObjectCreateView):
+    form_class = GreenhouseModelForm
+    permission_required = "flexibi_nantes.add_greenhouse"
+
+
+class GreenhouseModalCreateView(UserCreatedObjectModalCreateView):
     form_class = GreenhouseModalModelForm
-    template_name = '../../brit/templates/modal_form.html'
-    success_url = reverse_lazy('greenhouse-list')
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({
-            'form_title': 'Create new greenhouse type',
-            'submit_button_text': 'Create'
-        })
-        return context
-
-    def form_valid(self, form):
-        form.instance.owner = self.request.user
-        return super().form_valid(form)
+    permission_required = "flexibi_nantes.add_greenhouse"
 
 
 class GreenhouseDetailView(UserCreatedObjectDetailView):
     model = Greenhouse
-    template_name = 'greenhouse_detail.html'
+    template_name = "greenhouse_detail.html"
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update({'growth_cycles': self.object.configuration()})
+        context.update({"growth_cycles": self.object.configuration()})
         return context
 
 
@@ -129,18 +122,9 @@ class GreenhouseUpdateView(UserCreatedObjectUpdateView):
     form_class = GreenhouseModelForm
 
 
-class GreenhouseModalUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin, BSModalUpdateView):
+class GreenhouseModalUpdateView(UserCreatedObjectModalUpdateView):
     model = Greenhouse
     form_class = GreenhouseModalModelForm
-    template_name = '../../brit/templates/modal_form.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({
-            'form_title': 'Edit greenhouse',
-            'submit_button_text': 'Edit'
-        })
-        return context
 
 
 class GreenhouseModalDeleteView(UserCreatedObjectModalDeleteView):
@@ -150,45 +134,51 @@ class GreenhouseModalDeleteView(UserCreatedObjectModalDeleteView):
 # ----------- Growthcycle CRUD -----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
+
 class GreenhouseGrowthCycleCreateView(LoginRequiredMixin, CreateWithInlinesView):
     model = GreenhouseGrowthCycle
-    inlines = [GrowthTimestepInline, ]
-    fields = ('culture', 'greenhouse', 'group_settings',)
-    template_name = 'growth_cycle_inline_create.html'
+    inlines = [
+        GrowthTimestepInline,
+    ]
+    fields = (
+        "culture",
+        "greenhouse",
+        "group_settings",
+    )
+    template_name = "growth_cycle_inline_create.html"
 
     def get_success_url(self):
         return self.object.get_absolute_url()
 
 
-class GrowthCycleCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, BSModalCreateView):
-    model = GreenhouseGrowthCycle
+class GrowthCycleModalCreateView(UserCreatedObjectModalCreateView):
     form_class = GrowthCycleCreateForm
-    template_name = '../../brit/templates/modal_form.html'
-    object = None
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context.update({
-            'form_title': 'Add growth cycle',
-            'submit_button_text': 'Add'
-        })
-        return context
+    permission_required = "flexibi_nantes.add_greenhousegrowthcycle"
 
     def form_valid(self, form):
         if not self.request.is_ajax():
-            form.instance.owner = self.request.user
-            form.instance.greenhouse = Greenhouse.objects.get(id=self.kwargs.get('pk'))
+            form.instance.greenhouse = Greenhouse.objects.get(id=self.kwargs.get("pk"))
             material_settings = form.instance.culture.residue
-            macro_components = MaterialComponentGroup.objects.get(name='Macro Components')
+            macro_components = MaterialComponentGroup.objects.get(
+                name="Macro Components"
+            )
             # base_group = BaseObjects.objects.get.base_group
             base_group = MaterialComponentGroup.objects.default()
             try:
-                group_settings = material_settings.materialcomponentgroupsettings_set.get(group=macro_components)
+                group_settings = (
+                    material_settings.materialcomponentgroupsettings_set.get(
+                        group=macro_components
+                    )
+                )
             except ObjectDoesNotExist:
-                group_settings = material_settings.materialcomponentgroupsettings_set.get(group=base_group)
+                group_settings = (
+                    material_settings.materialcomponentgroupsettings_set.get(
+                        group=base_group
+                    )
+                )
             form.instance.group_settings = group_settings
             self.object = form.save()
-            for timestep in form.cleaned_data['timesteps']:
+            for timestep in form.cleaned_data["timesteps"]:
                 self.object.add_timestep(timestep)
             self.object.greenhouse.sort_growth_cycles()
         return HttpResponseRedirect(self.get_success_url())
@@ -196,11 +186,11 @@ class GrowthCycleCreateView(LoginRequiredMixin, NextOrSuccessUrlMixin, BSModalCr
 
 class GrowthCycleDetailView(UserCreatedObjectDetailView):
     model = GreenhouseGrowthCycle
-    template_name = 'growthcycle_detail.html'
+    template_name = "growthcycle_detail.html"
 
     def get_context_data(self, **kwargs):
-        kwargs['table_data'] = self.object.table_data
-        kwargs['growth_cycle'] = self.object
+        kwargs["table_data"] = self.object.table_data
+        kwargs["growth_cycle"] = self.object
         return super().get_context_data(**kwargs)
 
 
@@ -213,15 +203,21 @@ class GrowthCycleModalDeleteView(UserCreatedObjectModalDeleteView):
     model = GreenhouseGrowthCycle
 
     def get_success_url(self):
-        return reverse('greenhouse-detail', kwargs={'pk': self.object.greenhouse.pk})
+        return reverse("greenhouse-detail", kwargs={"pk": self.object.greenhouse.pk})
 
 
-class GrowthTimeStepSetModalUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, NextOrSuccessUrlMixin,
-                                       UpdateWithInlinesView):
+class GrowthTimeStepSetModalUpdateView(
+    LoginRequiredMixin,
+    UserOwnsObjectMixin,
+    NextOrSuccessUrlMixin,
+    UpdateWithInlinesView,
+):
     model = GrowthTimeStepSet
-    inlines = [InlineGrowthShare, ]
+    inlines = [
+        InlineGrowthShare,
+    ]
     fields = []
-    template_name = 'modal_form_with_formset.html'
+    template_name = "modal_form_with_formset.html"
 
     def get_context_data(self, **kwargs):
         inline_helper = GrowthShareFormSetHelper()
@@ -229,10 +225,10 @@ class GrowthTimeStepSetModalUpdateView(LoginRequiredMixin, UserOwnsObjectMixin, 
         form_helper = FormHelper()
         form_helper.form_tag = False
         context = {
-            'form_title': 'Change the composition',
-            'submit_button_text': 'Save',
-            'inline_helper': inline_helper,
-            'form_helper': form_helper
+            "form_title": "Change the composition",
+            "submit_button_text": "Save",
+            "inline_helper": inline_helper,
+            "form_helper": form_helper,
         }
         context.update(kwargs)
         return super().get_context_data(**context)
@@ -242,7 +238,7 @@ class UpdateGreenhouseGrowthCycleValuesView(LoginRequiredMixin, UpdateView):
     # TODO: Is this still required?
     model = GreenhouseGrowthCycle
     form_class = UpdateGreenhouseGrowthCycleValuesForm
-    template_name = 'greenhouse_growth_cycle_update_values.html'
+    template_name = "greenhouse_growth_cycle_update_values.html"
     object = None
 
     def form_valid(self, form):
@@ -250,42 +246,38 @@ class UpdateGreenhouseGrowthCycleValuesView(LoginRequiredMixin, UpdateView):
         return super().form_valid(form)
 
     def get_object(self, **kwargs):
-        return GreenhouseGrowthCycle.objects.get(id=self.kwargs.get('cycle_pk'))
+        return GreenhouseGrowthCycle.objects.get(id=self.kwargs.get("cycle_pk"))
 
     def get_success_url(self):
-        return reverse('greenhouse-detail', kwargs={'pk': self.kwargs.get('pk')})
+        return reverse("greenhouse-detail", kwargs={"pk": self.kwargs.get("pk")})
 
     def get_initial(self):
-        return {
-            'material': self.object.material,
-            'component': self.object.component
-        }
+        return {"material": self.object.material, "component": self.object.component}
 
 
 # ----------- Nantes Greenhouses GeoDataSet ----------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class NantesGreenhousesCatchmentAutocompleteView(autocomplete.Select2QuerySetView):
+class NantesGreenhousesCatchmentAutocompleteView(UserCreatedObjectAutocompleteView):
+    model = Catchment
+    geodataset_model_name = "NantesGreenhouses"
+
     def get_queryset(self):
-        if self.request.user.is_authenticated:
-            qs = Catchment.objects.filter(Q(owner=self.request.user) | Q(publication_status='published'))
-        else:
-            qs = Catchment.objects.filter(publication_status='published')
-        dataset_region = GeoDataset.objects.get(model_name='NantesGreenhouses').region
-        qs = qs.filter(region__borders__geom__within=dataset_region.geom).order_by('name')
-        if self.q:
-            qs = qs.filter(name__icontains=self.q)
-        return qs
+        queryset = super().get_queryset()
+        dataset_region = GeoDataset.objects.get(
+            model_name=self.geodataset_model_name
+        ).region
+        return queryset.filter(region__borders__geom__within=dataset_region.geom)
 
 
 class GreenhousesPublishedMapView(GeoDataSetPublishedFilteredMapView):
-    model_name = 'NantesGreenhouses'
-    template_name = 'nantes_greenhouses_map.html'
+    model_name = "NantesGreenhouses"
+    template_name = "nantes_greenhouses_map.html"
     filterset_class = NantesGreenhousesFilterSet
-    features_layer_api_basename = 'api-nantes-greenhouses'
-    map_title = 'Nantes Greenhouses'
+    features_layer_api_basename = "api-nantes-greenhouses"
+    map_title = "Nantes Greenhouses"
 
 
-class NantesGreenhousesListFileExportView(FilteredListFileExportView):
-    task_function = case_studies.flexibi_nantes.tasks.export_nantes_greenhouses_to_file
+class NantesGreenhousesListFileExportView(GenericUserCreatedObjectExportView):
+    model_label = "flexibi_nantes.NantesGreenhouses"

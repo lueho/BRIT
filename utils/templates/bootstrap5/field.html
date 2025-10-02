@@ -1,0 +1,18 @@
+{% extends "crispy_bootstrap5/field.html" %}
+
+{#
+Override to make sure errors are rendered when the widget is placed in a <td> cell.
+The upstream template only outputs error markup for div-based layouts.  When we
+render formsets as tables we include the field with tag="td"; without this block
+errors are silently dropped.
+#}
+
+{% block field %}
+    {{ block.super }}
+    {# when rendered in table layout show errors below widget #}
+    {% if tag == "td" and field.errors %}
+        <div class="invalid-feedback d-block">
+            {{ field.errors|first }}
+        </div>
+    {% endif %}
+{% endblock %}

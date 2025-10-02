@@ -1,0 +1,27 @@
+// Custom button styles for CTA
+.btn-cta {
+  @extend .btn-warning;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+}
+
+// Override default btn-link styling to match theme
+.btn-link {
+  color: $success;
+  text-decoration: none;
+
+  &:hover,
+  &:focus {
+    color: darken($success, 10%);
+    text-decoration: underline;
+  }
+
+  &:active {
+    color: darken($success, 15%);
+  }
+
+  // Remove shadow outline on focus
+  &:focus {
+    box-shadow: none;
+  }
+}

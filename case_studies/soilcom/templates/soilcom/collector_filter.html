@@ -1,5 +1,6 @@
 {% extends 'filtered_list.html' %}
 {% load crispy_forms_tags %}
+{% load moderation_tags %}
 
 {% block title %}BRIT | Waste collecting entities{% endblock %}
 
@@ -16,7 +17,7 @@
         <tbody>
         {% for object in object_list %}
             <tr>
-                <td data-label="Name"><a href="{{ object.get_absolute_url }}">{{ object.name }}</a></td>
+                <td data-label="Name"><a href="{% detail_or_review_url object %}">{{ object.name }}</a></td>
                 <td data-label="Catchment">{{ object.catchment }}</td>
             </tr>
         {% endfor %}

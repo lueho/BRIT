@@ -1,0 +1,163 @@
+{% extends "bootstrap5/formset_tomselect.html" %}
+
+{% comment %}
+    This is a legacy template maintained for backward compatibility.
+    It now extends the TomSelect formset template for consistency.
+    New code should use formset_tomselect.html directly with appropriate helpers.
+{% endcomment %}
+{% load crispy_forms_tags %}
+{% load crispy_forms_filters %}
+{% load crispy_forms_field %}
+
+{% comment %}
+    Dynamic formset with TomSelect support
+    
+    Parameters:
+    - formset: The Django formset to render
+    - form_id: Optional ID for the form container
+    - layout: "table" or "div" (default: "table")
+    - add_button_text: Text for the add button (default: "Add")
+    - add_button_class: CSS class for the add button
+{% endcomment %}
+
+{# Management form #}
+<div>
+    {{ formset.management_form|crispy }}
+</div>
+
+{% if layout|default:"table" == "table" %}
+    {% comment %}Table layout with labels only in the header{% endcomment %}
+    
+    <table class="table {% if table_class %}{{ table_class }}{% else %}table-sm{% endif %}" 
+           data-tomselect-formset="{{ formset.prefix }}"
+           {% if form_id %}data-tomselect-formset-id="{{ form_id }}"{% endif %}>
+        <thead>
+            <tr>
+                {% for field in formset.empty_form %}
+                    {% if field.label and not field.is_hidden and form_show_labels|default:True %}
+                        <th for="{{ field.auto_id }}" class="col-form-label {% if field.field.required %}requiredField{% endif %}">
+                            {{ field.label|safe }}{% if field.field.required %}<span class="asteriskField">*</span>{% endif %}
+                        </th>
+                    {% endif %}
+                {% endfor %}
+                <th class="formset-actions-col"></th>
+            </tr>
+        </thead>
+        
+        <tbody id="{% if form_id %}{{ form_id }}_{% endif %}formset-container">
+            {# Empty form template (hidden) #}
+            <tr id="{% if form_id %}{{ form_id }}_{% endif %}empty-form-row" class="d-none formset-form-row">
+                {% for field in formset.empty_form %}
+                    <td>
+                        {{ field|as_crispy_field }}
+                    </td>
+                {% endfor %}
+                <td class="formset-actions">
+                    <button type="button" class="btn btn-sm btn-outline-danger remove-form">
+                        <i class="fas fa-trash"></i>
+                    </button>
+                </td>
+            </tr>
+            
+            {# Existing form rows #}
+            {% for form in formset %}
+                <tr class="formset-form-row">
+                    {% for field in form %}
+                        <td>
+                            {{ field|as_crispy_field }}
+                        </td>
+                    {% endfor %}
+                    <td class="formset-actions">
+                        <button type="button" class="btn btn-sm btn-outline-danger remove-form">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </td>
+                </tr>
+            {% endfor %}
+        </tbody>
+        
+        <tfoot>
+            <tr>
+                <td colspan="{{ formset.empty_form|length|add:1 }}">
+                    <button type="button" 
+                            id="{% if form_id %}{{ form_id }}_{% endif %}add-form"
+                            class="{{ add_button_class|default:'btn btn-sm btn-outline-primary' }}">
+                        <i class="fas fa-plus"></i> {{ add_button_text|default:"Add" }}
+                    </button>
+                </td>
+            </tr>
+        </tfoot>
+    </table>
+{% else %}
+    <div class="formset-container"
+         data-tomselect-formset="{{ formset.prefix }}"
+         {% if form_id %}data-tomselect-formset-id="{{ form_id }}"{% endif %}>
+         
+        {% if form_show_labels|default:True %}
+        <!-- Field labels row (shown once) -->
+        <div class="row mb-2">
+            {% for field in formset.empty_form %}
+                {% if not field.is_hidden %}
+                    <div class="col{% if field_class %}-{{ field_class }}{% endif %}">
+                        <label for="{{ field.auto_id }}" class="form-label {% if field.field.required %}requiredField{% endif %}">
+                            {{ field.label|safe }}{% if field.field.required %}<span class="asteriskField">*</span>{% endif %}
+                        </label>
+                    </div>
+                {% endif %}
+            {% endfor %}
+            <div class="col-auto"><!-- Actions column --></div>
+        </div>
+        {% endif %}
+        
+        {% comment %}Div layout with labels in a separate row{% endcomment %}
+        
+        {# Empty form template (hidden) #}
+        <div id="{% if form_id %}{{ form_id }}_{% endif %}empty-form-row" class="d-none formset-form-row row mb-3">
+            {% for field in formset.empty_form %}
+                <div class="col{% if field_class %}-{{ field_class }}{% endif %}">
+                    {{ field|as_crispy_field }}
+                </div>
+            {% endfor %}
+            <div class="col-auto formset-actions">
+                <button type="button" class="btn btn-sm btn-outline-danger remove-form">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        </div>
+        
+        {# Container for form rows #}
+        <div id="{% if form_id %}{{ form_id }}_{% endif %}formset-container">
+            {# Existing form rows #}
+            {% for form in formset %}
+                <div class="formset-form-row row mb-3">
+                    {% for field in form %}
+                        {% if field.is_hidden %}
+                            {{ field }}
+                        {% else %}
+                            <div class="col{% if field_class %}-{{ field_class }}{% endif %}">
+                                {{ field|as_crispy_field }}
+                            </div>
+                        {% endif %}
+                    {% endfor %}
+                    <div class="col-auto formset-actions">
+                        <button type="button" class="btn btn-sm btn-outline-danger remove-form">
+                            <i class="fas fa-trash"></i>
+                        </button>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+        
+        <div class="row mb-3">
+            <div class="col">
+                <button type="button"
+                        id="{% if form_id %}{{ form_id }}_{% endif %}add-form"
+                        class="{{ add_button_class|default:'btn btn-sm btn-outline-primary' }}">
+                    <i class="fas fa-plus"></i> {{ add_button_text|default:"Add" }}
+                </button>
+            </div>
+        </div>
+    </div>
+{% endif %}
+
+{% include "bootstrap5/errors_formset.html" %}

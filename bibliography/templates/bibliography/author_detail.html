@@ -1,36 +1,50 @@
-{% extends 'simple_detail_card.html' %}
+{% extends "detail_with_options.html" %}
 
 {% block detail_body %}
     {% if object.last_names %}
-        <p class="card-text"><strong>Last names:</strong><br>
+        <p class="card-text">
+            <strong>Last names:</strong>
+            <br>
             {{ object.last_names }}
         </p>
     {% endif %}
     {% if object.first_names %}
-        <p class="card-text"><strong>First names:</strong><br>
+        <p class="card-text">
+            <strong>First names:</strong>
+            <br>
             {{ object.first_names }}
         </p>
     {% endif %}
     {% if object.middle_names %}
-        <p class="card-text"><strong>Middle names:</strong><br>
+        <p class="card-text">
+            <strong>Middle names:</strong>
+            <br>
             {{ object.middle_names }}
         </p>
     {% endif %}
     {% if object.suffixes %}
-        <p class="card-text"><strong>Suffixes:</strong><br>
+        <p class="card-text">
+            <strong>Suffixes:</strong>
+            <br>
             {{ object.suffixes }}
         </p>
     {% endif %}
     {% if object.preferred_citation %}
-        <p class="card-text"><strong>Preferred citation:</strong><br>
+        <p class="card-text">
+            <strong>Preferred citation:</strong>
+            <br>
             {{ object.preferred_citation }}
         </p>
     {% endif %}
     {% if object.sources %}
-        <p class="card-text"><strong>Publications:</strong></p>
+        <p class="card-text">
+            <strong>Publications:</strong>
+        </p>
         <ul>
             {% for publication in object.sources.all %}
-                <li><a href="{{ publication.get_absolute_url }}">{{ publication.title }}</a></li>
+                <li>
+                    <a href="{{ publication.get_absolute_url }}">{{ publication.title }}</a>
+                </li>
             {% endfor %}
         </ul>
     {% endif %}

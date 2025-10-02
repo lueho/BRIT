@@ -1,0 +1,14 @@
+{% extends "bootstrap5/formset_base.html" %}
+{% load crispy_forms_tags %}
+
+{% comment %}
+    This template extends the base formset template and adds TomSelect-specific
+    functionality. It should be used with the TomSelectFormsetHelper class.
+{% endcomment %}
+
+{% block formset_variables %}
+    {% comment %}
+        Force the formset_type to 'tomselect' for the data attribute
+        This ensures TomSelect JS initialization triggers correctly
+    {% endcomment %}
+{% endblock %}

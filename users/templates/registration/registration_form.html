@@ -12,7 +12,7 @@
         <form method="post" action="">
             {% csrf_token %}
             {{ form|crispy }}
-            <input type="submit" class="btn btn-primary btn-user btn-block" value="{% trans 'Submit' %}"/>
+            <input type="submit" class="btn btn-primary btn-user w-100" value="{% trans 'Submit' %}"/>
         </form>
     </div>
     <div class="p-3">

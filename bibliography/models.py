@@ -3,7 +3,7 @@ from django.db import models
 from django.db.models.signals import post_save
 from django.dispatch import receiver
 
-from utils.models import CRUDUrlsMixin, NamedUserCreatedObject, UserCreatedObject
+from utils.object_management.models import NamedUserCreatedObject, UserCreatedObject
 
 
 class Author(UserCreatedObject):
@@ -14,22 +14,31 @@ class Author(UserCreatedObject):
     preferred_citation = models.CharField(max_length=2046, null=True, blank=True)
 
     class Meta:
-        ordering = ['last_names', 'first_names']
+        ordering = ["last_names", "first_names"]
 
     def __str__(self):
-        parts = [' '.join(self.last_names.split()), ]
+        parts = [
+            " ".join(self.last_names.split()),
+        ]
         if self.first_names:
-            parts.append(' '.join(self.first_names.split()))
+            parts.append(" ".join(self.first_names.split()))
         if self.suffix:
             parts.append(self.suffix.strip())
-        return ', '.join(filter(None, parts))
+        return ", ".join(filter(None, parts))
 
     @property
     def bibtex_name(self):
         """Formats the author's name according to BibTeX conventions."""
-        initials = ' '.join([f"{name.strip()[0].upper()}." for name in
-                             (self.first_names or '').split() + (self.middle_names or '').split()])
-        bibtex = f"{' '.join(self.last_names.split())}{', ' + initials if initials else ''}"
+        initials = " ".join(
+            [
+                f"{name.strip()[0].upper()}."
+                for name in (self.first_names or "").split()
+                + (self.middle_names or "").split()
+            ]
+        )
+        bibtex = (
+            f"{' '.join(self.last_names.split())}{', ' + initials if initials else ''}"
+        )
         if self.suffix:
             bibtex += f", {self.suffix.strip()}"
         return bibtex
@@ -37,10 +46,17 @@ class Author(UserCreatedObject):
     @property
     def abbreviated_full_name(self):
         """Returns the abbreviated full name with initials."""
-        initials = ' '.join(
-            [f"{name[0].upper()}." for name in (self.first_names or '').split() + (self.middle_names or '').split() if
-             name])
-        abbreviated = f"{' '.join(self.last_names.split())}{', ' + initials if initials else ''}"
+        initials = " ".join(
+            [
+                f"{name[0].upper()}."
+                for name in (self.first_names or "").split()
+                + (self.middle_names or "").split()
+                if name
+            ]
+        )
+        abbreviated = (
+            f"{' '.join(self.last_names.split())}{', ' + initials if initials else ''}"
+        )
         if self.suffix:
             abbreviated += f", {self.suffix.strip()}"
         return abbreviated
@@ -62,20 +78,18 @@ class Licence(NamedUserCreatedObject):
 
 
 SOURCE_TYPES = (
-    ('article', 'article'),
-    ('dataset', 'dataset'),
-    ('book', 'book'),
-    ('website', 'website'),
-    ('custom', 'custom'),
+    ("article", "article"),
+    ("dataset", "dataset"),
+    ("book", "book"),
+    ("website", "website"),
+    ("custom", "custom"),
 )
 
 
 class Source(UserCreatedObject):
-    type = models.CharField(max_length=255, choices=SOURCE_TYPES, default='custom')
+    type = models.CharField(max_length=255, choices=SOURCE_TYPES, default="custom")
     authors = models.ManyToManyField(
-        Author,
-        through='SourceAuthor',
-        related_name='sources'
+        Author, through="SourceAuthor", related_name="sources"
     )
     publisher = models.CharField(max_length=127, blank=True, null=True)
     title = models.CharField(max_length=500)
@@ -84,7 +98,9 @@ class Source(UserCreatedObject):
     year = models.IntegerField(blank=True, null=True)
     abbreviation = models.CharField(max_length=50)
     abstract = models.TextField(blank=True, null=True)
-    licence = models.ForeignKey(Licence, on_delete=models.PROTECT, blank=True, null=True)
+    licence = models.ForeignKey(
+        Licence, on_delete=models.PROTECT, blank=True, null=True
+    )
     attributions = models.TextField(blank=True, null=True)
     url = models.URLField(max_length=511, blank=True, null=True)
     url_valid = models.BooleanField(default=False)
@@ -93,10 +109,10 @@ class Source(UserCreatedObject):
     last_accessed = models.DateField(blank=True, null=True)
 
     class Meta:
-        verbose_name = 'Source'
+        verbose_name = "Source"
 
     def ordered_authors(self):
-        return self.sourceauthors.order_by('position').select_related('author')
+        return self.sourceauthors.order_by("position").select_related("author")
 
     @property
     def authors_ordered(self):
@@ -109,16 +125,20 @@ class Source(UserCreatedObject):
 @receiver(post_save, sender=Source)
 def check_url_valid(sender, instance, created, **kwargs):
     if created:
-        celery.current_app.send_task('check_source_url', (instance.pk,))
+        celery.current_app.send_task("check_source_url", (instance.pk,))
 
 
 class SourceAuthor(models.Model):
-    source = models.ForeignKey('Source', on_delete=models.CASCADE, related_name='sourceauthors')
-    author = models.ForeignKey('Author', on_delete=models.CASCADE, related_name='sourceauthors')
+    source = models.ForeignKey(
+        "Source", on_delete=models.CASCADE, related_name="sourceauthors"
+    )
+    author = models.ForeignKey(
+        "Author", on_delete=models.CASCADE, related_name="sourceauthors"
+    )
     position = models.PositiveIntegerField()
 
     class Meta:
-        ordering = ['position']
+        ordering = ["position"]
 
     def __str__(self):
         return f"{self.author} - Position {self.position}"
