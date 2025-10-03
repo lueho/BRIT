@@ -1,4 +1,5 @@
 from datetime import date
+from decimal import Decimal
 
 from django.db import models
 from django.test import TestCase
@@ -6,6 +7,7 @@ from factory.django import mute_signals
 
 from maps.models import Attribute, LauRegion, NutsRegion, RegionAttributeValue
 from materials.models import MaterialCategory
+
 from ..models import (
     Collection,
     CollectionCatchment,
@@ -22,7 +24,6 @@ from ..serializers import CollectionFlatSerializer, CollectionModelSerializer
 
 
 class CollectionModelSerializerTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         MaterialCategory.objects.create(name="Biowaste component")
@@ -93,12 +94,12 @@ class CollectionModelSerializerTestCase(TestCase):
             self.assertIsInstance(url, str)
 
     def test_required_bin_capacity_field_serialization(self):
-        self.collection.required_bin_capacity = 120
+        self.collection.required_bin_capacity = Decimal("120.0")
         self.collection.save()
         serializer = CollectionModelSerializer(self.collection)
         data = serializer.data
         self.assertIn("required_bin_capacity", data)
-        self.assertEqual(int(data["required_bin_capacity"]), 120)
+        self.assertEqual(Decimal(data["required_bin_capacity"]), Decimal("120.0"))
         self.collection.required_bin_capacity = None
         self.collection.save()
         serializer = CollectionModelSerializer(self.collection)
@@ -137,7 +138,6 @@ class CollectionModelSerializerTestCase(TestCase):
 
 
 class CollectionFlatSerializerTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         MaterialCategory.objects.create(name="Biowaste component")
@@ -229,14 +229,6 @@ class CollectionFlatSerializerTestCase(TestCase):
             "collection_system",
             "country",
             "waste_category",
-            "connection_type",
-            "allowed_materials",
-            "forbidden_materials",
-            "fee_system",
-            "frequency",
-            "min_bin_size",
-            "required_bin_capacity",
-            "required_bin_capacity_reference",
             "connection_type",
             "allowed_materials",
             "forbidden_materials",
