@@ -1,0 +1,201 @@
+{% extends "base.html" %}
+{% load crispy_forms_tags %}
+
+{% block title %}{% if object %}Edit{% else %}Create{% endif %} Process{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row mb-4">
+        <div class="col-12">
+            <h1>{% if object %}Edit{% else %}Create{% endif %} Process</h1>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb">
+                    <li class="breadcrumb-item"><a href="{% url 'processes:dashboard' %}">Dashboard</a></li>
+                    <li class="breadcrumb-item"><a href="{% url 'processes:process-list' %}">Processes</a></li>
+                    <li class="breadcrumb-item active">{% if object %}Edit{% else %}Create{% endif %}</li>
+                </ol>
+            </nav>
+        </div>
+    </div>
+
+    <form method="post" enctype="multipart/form-data">
+        {% csrf_token %}
+        
+        <!-- Main Process Information -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Basic Information</h5>
+                    </div>
+                    <div class="card-body">
+                        {% crispy form %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Materials -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Materials (Inputs & Outputs)</h5>
+                    </div>
+                    <div class="card-body">
+                        {{ inlines.0.formset.management_form }}
+                        <div id="materials-formset">
+                            {% for form in inlines.0.formset %}
+                            <div class="formset-form border p-3 mb-3">
+                                {{ form.as_p }}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="addForm('materials')">
+                            <i class="bi bi-plus"></i> Add Material
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Operating Parameters -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Operating Parameters</h5>
+                    </div>
+                    <div class="card-body">
+                        {{ inlines.1.formset.management_form }}
+                        <div id="parameters-formset">
+                            {% for form in inlines.1.formset %}
+                            <div class="formset-form border p-3 mb-3">
+                                {{ form.as_p }}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="addForm('parameters')">
+                            <i class="bi bi-plus"></i> Add Parameter
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Links -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Links</h5>
+                    </div>
+                    <div class="card-body">
+                        {{ inlines.2.formset.management_form }}
+                        <div id="links-formset">
+                            {% for form in inlines.2.formset %}
+                            <div class="formset-form border p-3 mb-3">
+                                {{ form.as_p }}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="addForm('links')">
+                            <i class="bi bi-plus"></i> Add Link
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Info Resources -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>Information Resources</h5>
+                    </div>
+                    <div class="card-body">
+                        {{ inlines.3.formset.management_form }}
+                        <div id="resources-formset">
+                            {% for form in inlines.3.formset %}
+                            <div class="formset-form border p-3 mb-3">
+                                {{ form.as_p }}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="addForm('resources')">
+                            <i class="bi bi-plus"></i> Add Resource
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- References -->
+        <div class="row mb-4">
+            <div class="col-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5>References</h5>
+                    </div>
+                    <div class="card-body">
+                        {{ inlines.4.formset.management_form }}
+                        <div id="references-formset">
+                            {% for form in inlines.4.formset %}
+                            <div class="formset-form border p-3 mb-3">
+                                {{ form.as_p }}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        <button type="button" class="btn btn-sm btn-secondary" onclick="addForm('references')">
+                            <i class="bi bi-plus"></i> Add Reference
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Form Actions -->
+        <div class="row">
+            <div class="col-12">
+                <button type="submit" class="btn btn-primary btn-lg">
+                    <i class="bi bi-check-circle"></i> Save Process
+                </button>
+                <a href="{% if object %}{% url 'processes:process-detail' object.pk %}{% else %}{% url 'processes:process-list' %}{% endif %}" 
+                   class="btn btn-secondary btn-lg">
+                    Cancel
+                </a>
+            </div>
+        </div>
+    </form>
+</div>
+
+<script>
+// Simple inline formset add functionality
+function addForm(prefix) {
+    const formsetDiv = document.getElementById(prefix + '-formset');
+    const totalForms = document.querySelector(`#id_${prefix}-TOTAL_FORMS`);
+    const formCount = parseInt(totalForms.value);
+    
+    // Clone the first form
+    const firstForm = formsetDiv.querySelector('.formset-form');
+    const newForm = firstForm.cloneNode(true);
+    
+    // Update form index in field names and IDs
+    const formRegex = new RegExp(`${prefix}-(\\d+)-`, 'g');
+    newForm.innerHTML = newForm.innerHTML.replace(formRegex, `${prefix}-${formCount}-`);
+    
+    // Clear values
+    newForm.querySelectorAll('input, select, textarea').forEach(field => {
+        if (field.type !== 'checkbox' && field.type !== 'radio') {
+            field.value = '';
+        } else {
+            field.checked = false;
+        }
+    });
+    
+    formsetDiv.appendChild(newForm);
+    totalForms.value = formCount + 1;
+}
+</script>
+{% endblock %}

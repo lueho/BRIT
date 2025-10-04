@@ -1,0 +1,33 @@
+{% extends "detail_with_options.html" %}
+
+{% block title %}BRIT | Process Category: {{ object.name }}{% endblock %}
+
+{% block detail_body %}
+    <dl class="row">
+        <dt class="col-sm-3">Name</dt>
+        <dd class="col-sm-9">{{ object.name }}</dd>
+
+        <dt class="col-sm-3">Description</dt>
+        <dd class="col-sm-9">{{ object.description|default:"No description provided" }}</dd>
+    </dl>
+
+    <hr class="my-4">
+
+    <h6 class="mb-3">Processes in This Category ({{ processes.count }})</h6>
+    {% if processes %}
+    <div class="list-group">
+        {% for process in processes %}
+        <a href="{% url 'processes:process-detail' process.pk %}" class="list-group-item list-group-item-action">
+            <div class="d-flex w-100 justify-content-between">
+                <h6 class="mb-1">{{ process.name }}</h6>
+                <small>{{ process.mechanism }}</small>
+            </div>
+            <p class="mb-1">{{ process.short_description|truncatewords:15 }}</p>
+            <small class="text-muted">By {{ process.owner.username }}</small>
+        </a>
+        {% endfor %}
+    </div>
+    {% else %}
+    <p class="text-muted">No processes in this category yet.</p>
+    {% endif %}
+{% endblock %}

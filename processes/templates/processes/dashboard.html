@@ -1,0 +1,124 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Processes Dashboard{% endblock %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <div class="col-12">
+            <h1 class="mb-4">Processes Dashboard</h1>
+        </div>
+    </div>
+
+    <!-- Statistics Cards -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Total Processes</h5>
+                    <p class="card-text display-4">{{ total_processes }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Categories</h5>
+                    <p class="card-text display-4">{{ total_categories }}</p>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-body">
+                    <h5 class="card-title">Quick Actions</h5>
+                    <a href="{% url 'processes:process-create' %}" class="btn btn-primary">Add Process</a>
+                    <a href="{% url 'processes:processcategory-create' %}" class="btn btn-secondary">Add Category</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Categories with Counts -->
+    <div class="row mb-4">
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Top Categories</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group">
+                        {% for category in categories_with_counts %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <a href="{% url 'processes:processcategory-detail' category.pk %}">{{ category.name }}</a>
+                            <span class="badge bg-primary rounded-pill">{{ category.process_count }}</span>
+                        </li>
+                        {% empty %}
+                        <li class="list-group-item">No categories yet</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-6">
+            <div class="card">
+                <div class="card-header">
+                    <h5>Recent Processes</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group">
+                        {% for process in recent_processes %}
+                        <li class="list-group-item">
+                            <a href="{% url 'processes:process-detail' process.pk %}">{{ process.name }}</a>
+                            <small class="text-muted">{{ process.short_description|truncatewords:10 }}</small>
+                        </li>
+                        {% empty %}
+                        <li class="list-group-item">No processes yet</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {% if user.is_authenticated and my_processes %}
+    <!-- User's Processes -->
+    <div class="row">
+        <div class="col-12">
+            <div class="card">
+                <div class="card-header">
+                    <h5>My Processes</h5>
+                </div>
+                <div class="card-body">
+                    <ul class="list-group">
+                        {% for process in my_processes %}
+                        <li class="list-group-item d-flex justify-content-between align-items-center">
+                            <a href="{% url 'processes:process-detail' process.pk %}">{{ process.name }}</a>
+                            <span class="badge bg-{{ process.publication_status|default:'secondary' }}">
+                                {{ process.get_publication_status_display }}
+                            </span>
+                        </li>
+                        {% endfor %}
+                    </ul>
+                </div>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- Navigation Links -->
+    <div class="row mt-4">
+        <div class="col-12">
+            <div class="btn-group" role="group">
+                <a href="{% url 'processes:process-list' %}" class="btn btn-outline-primary">View All Processes</a>
+                <a href="{% url 'processes:processcategory-list' %}" class="btn btn-outline-primary">View All Categories</a>
+                {% if user.is_authenticated %}
+                <a href="{% url 'processes:process-list-owned' %}" class="btn btn-outline-secondary">My Processes</a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
