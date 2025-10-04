@@ -5,6 +5,7 @@ from utils.object_management.views import (
     OwnedObjectModelSelectOptionsView,
     PrivateObjectListView,
     PublishedObjectListView,
+    UserCreatedObjectAutocompleteView,
     UserCreatedObjectCreateView,
     UserCreatedObjectDetailView,
     UserCreatedObjectModalDeleteView,
@@ -48,6 +49,13 @@ class UnitUpdateView(UserCreatedObjectUpdateView):
 
 class UnitModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Unit
+
+
+class UnitAutocompleteView(UserCreatedObjectAutocompleteView):
+    """Autocomplete view for Unit selection."""
+
+    model = Unit
+    search_lookups = ["name__icontains", "abbreviation__icontains"]
 
 
 # ----------- Property CRUD --------------------------------------------------------------------------------------------
