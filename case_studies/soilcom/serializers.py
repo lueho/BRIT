@@ -1,5 +1,6 @@
 from collections import OrderedDict
 
+from django.urls import reverse
 from rest_framework import serializers
 from rest_framework_gis.fields import GeometrySerializerMethodField
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
@@ -194,6 +195,7 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
         source="description", required=False, allow_blank=True
     )
     sources = serializers.SerializerMethodField()
+    actions = serializers.SerializerMethodField()
     policy = serializers.SerializerMethodField()
 
     class Meta:
@@ -220,6 +222,7 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
             "valid_until",
             "comments",
             "sources",
+            "actions",
             "policy",
         )
 
@@ -271,6 +274,17 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
             }
         # Return policy as-is to keep a single source of truth for key names
         return policy
+
+    def get_actions(self, obj):
+        try:
+            return {
+                "detail_url": reverse("collection-detail", kwargs={"pk": obj.pk}),
+                "update_url": reverse("collection-update", kwargs={"pk": obj.pk}),
+                "copy_url": reverse("collection-copy", kwargs={"pk": obj.pk}),
+                "delete_url": reverse("collection-delete-modal", kwargs={"pk": obj.pk}),
+            }
+        except Exception:
+            return {}
 
 
 class CollectionFlatSerializer(serializers.ModelSerializer):
