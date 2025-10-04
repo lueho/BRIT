@@ -165,6 +165,10 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
         # Return policy as-is to keep a single source of truth for key names
         return policy
 
+    def get_required_bin_capacity_reference(self, obj):
+        """Returns the required bin capacity reference value."""
+        return obj.required_bin_capacity_reference
+
     def get_actions(self, obj):
         try:
             return {
