@@ -66,6 +66,8 @@ class AppPermission(models.Model):
 class ProcessCategory(NamedUserCreatedObject):
     """High level grouping for processes (e.g. *Thermochemical*)."""
 
+    url_format = "processes:{name_lower}-{action}{suffix}"
+
     class Meta:
         verbose_name = "Process category"
         verbose_name_plural = "Process categories"
@@ -73,6 +75,8 @@ class ProcessCategory(NamedUserCreatedObject):
 
 class Process(NamedUserCreatedObject):
     """Describes a process or process technology."""
+
+    url_format = "processes:{name_lower}-{action}{suffix}"
 
     parent = models.ForeignKey(
         "self",
