@@ -15,7 +15,7 @@ from bibliography.models import Source
 from materials.models import Material
 from utils.properties.models import Unit
 
-from .models import (
+from ..models import (
     Process,
     ProcessCategory,
     ProcessInfoResource,
