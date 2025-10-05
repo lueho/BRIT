@@ -19,7 +19,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Count, Prefetch
 from django.shortcuts import get_object_or_404
 from django.urls import reverse, reverse_lazy
-from django.views.generic import TemplateView
+from django.views.generic import ListView, TemplateView
 from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 
 from utils.object_management.views import (
@@ -28,6 +28,8 @@ from utils.object_management.views import (
     PrivateObjectListView,
     PublishedObjectFilterView,
     PublishedObjectListView,
+    ReviewObjectFilterView,
+    ReviewObjectListMixin,
     UserCreatedObjectAutocompleteView,
     UserCreatedObjectCreateView,
     UserCreatedObjectCreateWithInlinesView,
@@ -67,6 +69,33 @@ from .models import (
 
 
 # ==============================================================================
+# Helper Views
+# ==============================================================================
+
+
+class ReviewObjectListView(ReviewObjectListMixin, ListView):
+    """
+    List view for objects in review (for moderators).
+    Combines ReviewObjectListMixin with ListView functionality.
+    """
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(
+            {
+                "list_type": self.list_type,
+                "scope": "review",
+            }
+        )
+        return context
+
+    def get_template_names(self):
+        template_names = super().get_template_names()
+        template_names.append("simple_list_card.html")
+        return template_names
+
+
+# ==============================================================================
 # Dashboard
 # ==============================================================================
 
@@ -78,7 +107,7 @@ class ProcessDashboardView(TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        
+
         # Statistics
         context["total_processes"] = Process.objects.filter(
             publication_status="published"
@@ -86,25 +115,27 @@ class ProcessDashboardView(TemplateView):
         context["total_categories"] = ProcessCategory.objects.filter(
             publication_status="published"
         ).count()
-        
+
         # Recent processes
-        context["recent_processes"] = Process.objects.filter(
-            publication_status="published"
-        ).select_related("owner").prefetch_related("categories")[:5]
-        
+        context["recent_processes"] = (
+            Process.objects.filter(publication_status="published")
+            .select_related("owner")
+            .prefetch_related("categories")[:5]
+        )
+
         # Categories with process counts
         context["categories_with_counts"] = (
             ProcessCategory.objects.filter(publication_status="published")
             .annotate(process_count=Count("processes"))
             .order_by("-process_count")[:10]
         )
-        
+
         # User's private processes if authenticated
         if self.request.user.is_authenticated:
             context["my_processes"] = Process.objects.filter(
                 owner=self.request.user
             ).order_by("-lastmodified_at")[:5]
-        
+
         return context
 
 
@@ -122,7 +153,9 @@ class ProcessCategoryCreateView(UserCreatedObjectCreateView):
     permission_required = "processes.add_processcategory"
 
     def get_success_url(self):
-        return reverse("processes:processcategory-detail", kwargs={"pk": self.object.pk})
+        return reverse(
+            "processes:processcategory-detail", kwargs={"pk": self.object.pk}
+        )
 
 
 class ProcessCategoryModalCreateView(UserCreatedObjectModalCreateView):
@@ -147,6 +180,18 @@ class ProcessCategoryPublishedListView(PublishedObjectListView):
 
 class ProcessCategoryPrivateListView(PrivateObjectListView):
     """List user's private ProcessCategory objects."""
+
+    model = ProcessCategory
+    template_name = "processes/processcategory_list.html"
+    context_object_name = "categories"
+    paginate_by = 20
+
+    def get_queryset(self):
+        return super().get_queryset().annotate(process_count=Count("processes"))
+
+
+class ProcessCategoryReviewListView(ReviewObjectListView):
+    """List ProcessCategory objects in review (for moderators)."""
 
     model = ProcessCategory
     template_name = "processes/processcategory_list.html"
@@ -188,7 +233,9 @@ class ProcessCategoryUpdateView(UserCreatedObjectUpdateView):
     template_name = "processes/processcategory_form.html"
 
     def get_success_url(self):
-        return reverse("processes:processcategory-detail", kwargs={"pk": self.object.pk})
+        return reverse(
+            "processes:processcategory-detail", kwargs={"pk": self.object.pk}
+        )
 
 
 class ProcessCategoryModalUpdateView(UserCreatedObjectModalUpdateView):
@@ -288,6 +335,24 @@ class ProcessPrivateFilterView(PrivateObjectFilterView):
         )
 
 
+class ProcessReviewFilterView(ReviewObjectFilterView):
+    """List Process objects in review with filtering (for moderators)."""
+
+    model = Process
+    template_name = "processes/process_list.html"
+    context_object_name = "processes"
+    filterset_class = ProcessFilter
+    paginate_by = 20
+
+    def get_queryset(self):
+        return (
+            super()
+            .get_queryset()
+            .select_related("owner", "parent")
+            .prefetch_related("categories", "process_materials__material")
+        )
+
+
 class ProcessDetailView(UserCreatedObjectDetailView):
     """Display Process details with all related information."""
 
@@ -305,7 +370,9 @@ class ProcessDetailView(UserCreatedObjectDetailView):
                 "variants",
                 Prefetch(
                     "process_materials",
-                    queryset=ProcessMaterial.objects.select_related("material", "quantity_unit"),
+                    queryset=ProcessMaterial.objects.select_related(
+                        "material", "quantity_unit"
+                    ),
                 ),
                 Prefetch(
                     "operating_parameters",
@@ -322,11 +389,11 @@ class ProcessDetailView(UserCreatedObjectDetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        
+
         # Organize materials by role
         context["input_materials"] = self.object.input_materials
         context["output_materials"] = self.object.output_materials
-        
+
         # Group parameters by type
         params_by_type = {}
         for param in self.object.operating_parameters.all():
@@ -335,7 +402,7 @@ class ProcessDetailView(UserCreatedObjectDetailView):
                 params_by_type[param_type] = []
             params_by_type[param_type].append(param)
         context["parameters_by_type"] = params_by_type
-        
+
         return context
 
 
@@ -384,7 +451,9 @@ class ProcessAutocompleteView(UserCreatedObjectAutocompleteView):
 # ==============================================================================
 
 
-class ProcessAddMaterialView(LoginRequiredMixin, NextOrSuccessUrlMixin, CreateWithInlinesView):
+class ProcessAddMaterialView(
+    LoginRequiredMixin, NextOrSuccessUrlMixin, CreateWithInlinesView
+):
     """Add a material to an existing process."""
 
     model = ProcessMaterial
@@ -404,7 +473,9 @@ class ProcessAddMaterialView(LoginRequiredMixin, NextOrSuccessUrlMixin, CreateWi
         return reverse("processes:process-detail", kwargs={"pk": self.kwargs["pk"]})
 
 
-class ProcessAddParameterView(LoginRequiredMixin, NextOrSuccessUrlMixin, CreateWithInlinesView):
+class ProcessAddParameterView(
+    LoginRequiredMixin, NextOrSuccessUrlMixin, CreateWithInlinesView
+):
     """Add an operating parameter to an existing process."""
 
     model = ProcessOperatingParameter
