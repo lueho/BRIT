@@ -8,7 +8,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Count, Prefetch
 from django.shortcuts import get_object_or_404
 from django.urls import reverse
-from django.views.generic import TemplateView
+from django.views.generic import ListView, TemplateView
 from extra_views import CreateWithInlinesView
 
 from utils.object_management.views import (
@@ -17,6 +17,8 @@ from utils.object_management.views import (
     PrivateObjectListView,
     PublishedObjectFilterView,
     PublishedObjectListView,
+    ReviewObjectFilterView,
+    ReviewObjectListMixin,
     UserCreatedObjectAutocompleteView,
     UserCreatedObjectCreateView,
     UserCreatedObjectCreateWithInlinesView,
@@ -62,6 +64,33 @@ MOCK_PROCESS_TYPES = [
     {"id": 5, "name": "Hydrothermal Processing", "category": "Thermochemical"},
     {"id": 12, "name": "Pulping", "category": "Physicochemical"},
 ]
+
+# ==============================================================================
+# Helper Views
+# ==============================================================================
+
+
+class ReviewObjectListView(ReviewObjectListMixin, ListView):
+    """
+    List view for objects in review (for moderators).
+    Combines ReviewObjectListMixin with ListView functionality.
+    """
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(
+            {
+                "list_type": self.list_type,
+                "scope": "review",
+            }
+        )
+        return context
+
+    def get_template_names(self):
+        template_names = super().get_template_names()
+        template_names.append("simple_list_card.html")
+        return template_names
+
 
 # ==============================================================================
 # Dashboard
@@ -148,6 +177,18 @@ class ProcessCategoryPublishedListView(PublishedObjectListView):
 
 class ProcessCategoryPrivateListView(PrivateObjectListView):
     """List user's private ProcessCategory objects."""
+
+    model = ProcessCategory
+    template_name = "processes/processcategory_list.html"
+    context_object_name = "categories"
+    paginate_by = 20
+
+    def get_queryset(self):
+        return super().get_queryset().annotate(process_count=Count("processes"))
+
+
+class ProcessCategoryReviewListView(ReviewObjectListView):
+    """List ProcessCategory objects in review (for moderators)."""
 
     model = ProcessCategory
     template_name = "processes/processcategory_list.html"
@@ -275,6 +316,24 @@ class ProcessPublishedFilterView(PublishedObjectFilterView):
 
 class ProcessPrivateFilterView(PrivateObjectFilterView):
     """List user's private Process objects with filtering."""
+
+    model = Process
+    template_name = "processes/process_list.html"
+    context_object_name = "processes"
+    filterset_class = ProcessFilter
+    paginate_by = 20
+
+    def get_queryset(self):
+        return (
+            super()
+            .get_queryset()
+            .select_related("owner", "parent")
+            .prefetch_related("categories", "process_materials__material")
+        )
+
+
+class ProcessReviewFilterView(ReviewObjectFilterView):
+    """List Process objects in review with filtering (for moderators)."""
 
     model = Process
     template_name = "processes/process_list.html"

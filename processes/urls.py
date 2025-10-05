@@ -35,6 +35,11 @@ urlpatterns = [
         name="processcategory-list-owned",
     ),
     path(
+        "categories/review/",
+        views.ProcessCategoryReviewListView.as_view(),
+        name="processcategory-list-review",
+    ),
+    path(
         "categories/create/",
         views.ProcessCategoryCreateView.as_view(),
         name="processcategory-create",
@@ -99,6 +104,11 @@ urlpatterns = [
         "list/user/",
         views.ProcessPrivateFilterView.as_view(),
         name="process-list-owned",
+    ),
+    path(
+        "list/review/",
+        views.ProcessReviewFilterView.as_view(),
+        name="process-list-review",
     ),
     path(
         "create/",
