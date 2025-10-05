@@ -126,35 +126,42 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
         return {}
 
     def related_objects_post_data(self):
-        """Override to handle many-to-many fields and inline formsets."""
-        # Management forms for all inline formsets
+        """Override to handle many-to-many fields and inline formsets.
+        
+        Formset prefixes are based on the related_name attribute of ForeignKey fields:
+        - ProcessMaterial: process_materials
+        - ProcessOperatingParameter: operating_parameters
+        - ProcessLink: links
+        - ProcessInfoResource: info_resources
+        - ProcessReference: references
+        """
         return {
             "categories": [self.test_category.pk],
-            # ProcessMaterialInline management form
+            # ProcessMaterialInline (related_name='process_materials')
             "process_materials-TOTAL_FORMS": "0",
             "process_materials-INITIAL_FORMS": "0",
             "process_materials-MIN_NUM_FORMS": "0",
             "process_materials-MAX_NUM_FORMS": "1000",
-            # ProcessOperatingParameterInline management form
+            # ProcessOperatingParameterInline (related_name='operating_parameters')
             "operating_parameters-TOTAL_FORMS": "0",
             "operating_parameters-INITIAL_FORMS": "0",
             "operating_parameters-MIN_NUM_FORMS": "0",
             "operating_parameters-MAX_NUM_FORMS": "1000",
-            # ProcessLinkInline management form
-            "process_links-TOTAL_FORMS": "0",
-            "process_links-INITIAL_FORMS": "0",
-            "process_links-MIN_NUM_FORMS": "0",
-            "process_links-MAX_NUM_FORMS": "1000",
-            # ProcessInfoResourceInline management form
+            # ProcessLinkInline (related_name='links')
+            "links-TOTAL_FORMS": "0",
+            "links-INITIAL_FORMS": "0",
+            "links-MIN_NUM_FORMS": "0",
+            "links-MAX_NUM_FORMS": "1000",
+            # ProcessInfoResourceInline (related_name='info_resources')
             "info_resources-TOTAL_FORMS": "0",
             "info_resources-INITIAL_FORMS": "0",
             "info_resources-MIN_NUM_FORMS": "0",
             "info_resources-MAX_NUM_FORMS": "1000",
-            # ProcessReferenceInline management form
-            "process_references-TOTAL_FORMS": "0",
-            "process_references-INITIAL_FORMS": "0",
-            "process_references-MIN_NUM_FORMS": "0",
-            "process_references-MAX_NUM_FORMS": "1000",
+            # ProcessReferenceInline (related_name='references')
+            "references-TOTAL_FORMS": "0",
+            "references-INITIAL_FORMS": "0",
+            "references-MIN_NUM_FORMS": "0",
+            "references-MAX_NUM_FORMS": "1000",
         }
 
     @classmethod
