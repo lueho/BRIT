@@ -18,7 +18,7 @@ from ..serializers import (
     ProcessCategorySerializer,
     ProcessDetailSerializer,
     ProcessListSerializer,
-    ProcessMaterialSerializer,
+    ProcessMaterialAPISerializer,
     ProcessOperatingParameterSerializer,
 )
 
@@ -59,7 +59,9 @@ class ProcessMaterialSerializerTestCase(TestCase):
     def setUp(self):
         self.owner = get_user_model().objects.create(username="test_user")
         self.process = Process.objects.create(name="Test Process", owner=self.owner)
-        self.material = Material.objects.create(name="Test Material", owner=self.owner)
+        self.material = Material.objects.create(
+            name="Wood Chips", owner=self.owner, publication_status="published"
+        )
         self.unit = Unit.objects.create(name="kg", owner=self.owner)
         
         self.process_material = ProcessMaterial.objects.create(
@@ -72,7 +74,7 @@ class ProcessMaterialSerializerTestCase(TestCase):
 
     def test_serialize_process_material(self):
         """Serializer should serialize process material correctly."""
-        serializer = ProcessMaterialSerializer(self.process_material)
+        serializer = ProcessMaterialAPISerializer(self.process_material)
         data = serializer.data
         
         self.assertEqual(data["role"], ProcessMaterial.Role.INPUT)
