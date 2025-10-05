@@ -58,7 +58,7 @@ class ProcessFilter(django_filters.FilterSet):
         lookup_expr="isnull",
         exclude=True,
         label="Has Parent Process",
-        widget=forms.CheckboxInput(attrs={"class": "form-check-input"}),
+        widget=forms.NullBooleanSelect(attrs={"class": "form-select"}),
     )
     
     parent = django_filters.ModelChoiceFilter(

@@ -34,10 +34,10 @@ class ProcessCategorySerializer(serializers.ModelSerializer):
             "publication_status",
             "owner",
             "created_at",
-            "updated_at",
+            "lastmodified_at",
             "process_count",
         ]
-        read_only_fields = ["owner", "created_at", "updated_at"]
+        read_only_fields = ["owner", "created_at", "lastmodified_at"]
 
 
 class ProcessMaterialAPISerializer(serializers.ModelSerializer):
@@ -205,9 +205,9 @@ class ProcessListSerializer(serializers.ModelSerializer):
             "owner",
             "owner_name",
             "created_at",
-            "updated_at",
+            "lastmodified_at",
         ]
-        read_only_fields = ["owner", "created_at", "updated_at"]
+        read_only_fields = ["owner", "created_at", "lastmodified_at"]
 
 
 class ProcessDetailSerializer(serializers.ModelSerializer):
@@ -245,7 +245,7 @@ class ProcessDetailSerializer(serializers.ModelSerializer):
             "owner",
             "owner_name",
             "created_at",
-            "updated_at",
+            "lastmodified_at",
             # Related objects
             "process_materials",
             "operating_parameters",
@@ -257,7 +257,7 @@ class ProcessDetailSerializer(serializers.ModelSerializer):
             "output_materials",
             "sources",
         ]
-        read_only_fields = ["owner", "created_at", "updated_at"]
+        read_only_fields = ["owner", "created_at", "lastmodified_at"]
 
     def get_input_materials(self, obj):
         """Get list of input materials."""
