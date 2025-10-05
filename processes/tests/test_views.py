@@ -106,20 +106,56 @@ class ProcessCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
         "name": "Test Process",
         "short_description": "Test short description",
         "mechanism": "Test mechanism",
+        "description": "",
     }
     update_object_data = {
         "name": "Updated Test Process",
         "short_description": "Updated short description",
         "mechanism": "Updated mechanism",
+        "description": "Updated description",
     }
 
     @classmethod
     def create_related_objects(cls):
         """Create related ProcessCategory objects."""
         cls.test_category = ProcessCategory.objects.create(
-            name="Test Category", publication_status="published"
+            name="Test Category",
+            publication_status="published",
+            owner=cls.owner_user,
         )
         return {}
+
+    def related_objects_post_data(self):
+        """Override to handle many-to-many fields and inline formsets."""
+        # Management forms for all inline formsets
+        return {
+            "categories": [self.test_category.pk],
+            # ProcessMaterialInline management form
+            "process_materials-TOTAL_FORMS": "0",
+            "process_materials-INITIAL_FORMS": "0",
+            "process_materials-MIN_NUM_FORMS": "0",
+            "process_materials-MAX_NUM_FORMS": "1000",
+            # ProcessOperatingParameterInline management form
+            "operating_parameters-TOTAL_FORMS": "0",
+            "operating_parameters-INITIAL_FORMS": "0",
+            "operating_parameters-MIN_NUM_FORMS": "0",
+            "operating_parameters-MAX_NUM_FORMS": "1000",
+            # ProcessLinkInline management form
+            "process_links-TOTAL_FORMS": "0",
+            "process_links-INITIAL_FORMS": "0",
+            "process_links-MIN_NUM_FORMS": "0",
+            "process_links-MAX_NUM_FORMS": "1000",
+            # ProcessInfoResourceInline management form
+            "info_resources-TOTAL_FORMS": "0",
+            "info_resources-INITIAL_FORMS": "0",
+            "info_resources-MIN_NUM_FORMS": "0",
+            "info_resources-MAX_NUM_FORMS": "1000",
+            # ProcessReferenceInline management form
+            "process_references-TOTAL_FORMS": "0",
+            "process_references-INITIAL_FORMS": "0",
+            "process_references-MIN_NUM_FORMS": "0",
+            "process_references-MAX_NUM_FORMS": "1000",
+        }
 
     @classmethod
     def create_published_object(cls):
