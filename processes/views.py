@@ -432,9 +432,6 @@ class ProcessModalDeleteView(UserCreatedObjectModalDeleteView):
 
     model = Process
 
-    def get_success_url(self):
-        return reverse("processes:process-list")
-
 
 class ProcessAutocompleteView(UserCreatedObjectAutocompleteView):
     """Autocomplete view for Process selection."""
