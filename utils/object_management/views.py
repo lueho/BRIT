@@ -959,6 +959,17 @@ class PublishedObjectFilterView(
 class AddReviewCommentView(BaseReviewActionView):
     """Add a free-text review comment linked to an object."""
 
+    def test_func(self):
+        """Allow owners, staff, and moderators to comment."""
+        if not self.request.user.is_authenticated:
+            return False
+        try:
+            obj = self.get_object()
+        except Exception:
+            return False
+        policy = get_object_policy(self.request.user, obj, request=self.request)
+        return policy["is_owner"] or policy["is_staff"] or policy["is_moderator"]
+
     def post(self, request, *args, **kwargs):
         self.object = self.get_object(request, *args, **kwargs)
         obj = self.object
