@@ -1,4 +1,5 @@
 import os
+import sys
 
 from .settings import *
 
@@ -8,11 +9,15 @@ DEBUG = True
 
 ALLOWED_HOSTS = ["localhost", "127.0.0.1", "host.docker.internal", "testserver"]
 
-INSTALLED_APPS.append("debug_toolbar")
+# Only install debug toolbar if not running tests
+TESTING = "test" in sys.argv
 
-DEBUG_TOOLBAR_CONFIG = {
-    "SHOW_TOOLBAR_CALLBACK": lambda request: "/api/" not in request.path
-}
+if not TESTING:
+    INSTALLED_APPS.append("debug_toolbar")
+    DEBUG_TOOLBAR_CONFIG = {
+        "SHOW_TOOLBAR_CALLBACK": lambda request: "/api/" not in request.path,
+    }
+    MIDDLEWARE.insert(0, "debug_toolbar.middleware.DebugToolbarMiddleware")
 
 INTERNAL_IPS = ALLOWED_HOSTS
 
@@ -24,8 +29,6 @@ DATABASES["default"] = {
     "HOST": os.environ.get("POSTGRES_HOST"),
     "PORT": os.environ.get("POSTGRES_PORT"),
 }
-
-MIDDLEWARE.insert(0, "debug_toolbar.middleware.DebugToolbarMiddleware")
 
 CRISPY_FAIL_SILENTLY = False
 
