@@ -7,7 +7,7 @@ BRIT conventions and patterns from utils.object_management.views.
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Count, Prefetch
 from django.shortcuts import get_object_or_404
-from django.urls import reverse
+from django.urls import reverse, reverse_lazy
 from django.views.generic import ListView, TemplateView
 from extra_views import CreateWithInlinesView
 
@@ -168,6 +168,7 @@ class ProcessCategoryPublishedListView(PublishedObjectListView):
 
     model = ProcessCategory
     template_name = "processes/processcategory_list.html"
+    dashboard_url = reverse_lazy("processes:dashboard")
     context_object_name = "categories"
     paginate_by = 20
 
@@ -180,6 +181,7 @@ class ProcessCategoryPrivateListView(PrivateObjectListView):
 
     model = ProcessCategory
     template_name = "processes/processcategory_list.html"
+    dashboard_url = reverse_lazy("processes:dashboard")
     context_object_name = "categories"
     paginate_by = 20
 
@@ -188,10 +190,11 @@ class ProcessCategoryPrivateListView(PrivateObjectListView):
 
 
 class ProcessCategoryReviewListView(ReviewObjectListView):
-    """List ProcessCategory objects in review (for moderators)."""
+    """List ProcessCategory objects in review status for moderators."""
 
     model = ProcessCategory
     template_name = "processes/processcategory_list.html"
+    dashboard_url = reverse_lazy("processes:dashboard")
     context_object_name = "categories"
     paginate_by = 20
 
@@ -247,9 +250,6 @@ class ProcessCategoryModalDeleteView(UserCreatedObjectModalDeleteView):
 
     model = ProcessCategory
 
-    def get_success_url(self):
-        return reverse("processes:processcategory-list")
-
 
 class ProcessCategoryAutocompleteView(UserCreatedObjectAutocompleteView):
     """Autocomplete view for ProcessCategory selection."""
@@ -301,6 +301,7 @@ class ProcessPublishedFilterView(PublishedObjectFilterView):
 
     model = Process
     template_name = "processes/process_list.html"
+    dashboard_url = reverse_lazy("processes:dashboard")
     context_object_name = "processes"
     filterset_class = ProcessFilter
     paginate_by = 20
@@ -319,6 +320,7 @@ class ProcessPrivateFilterView(PrivateObjectFilterView):
 
     model = Process
     template_name = "processes/process_list.html"
+    dashboard_url = reverse_lazy("processes:dashboard")
     context_object_name = "processes"
     filterset_class = ProcessFilter
     paginate_by = 20
@@ -333,10 +335,11 @@ class ProcessPrivateFilterView(PrivateObjectFilterView):
 
 
 class ProcessReviewFilterView(ReviewObjectFilterView):
-    """List Process objects in review with filtering (for moderators)."""
+    """List Process objects in review status for moderators."""
 
     model = Process
     template_name = "processes/process_list.html"
+    dashboard_url = reverse_lazy("processes:dashboard")
     context_object_name = "processes"
     filterset_class = ProcessFilter
     paginate_by = 20
