@@ -71,6 +71,9 @@ class ProcessCategory(NamedUserCreatedObject):
     class Meta:
         verbose_name = "Process category"
         verbose_name_plural = "Process categories"
+        permissions = [
+            ("can_moderate_processcategory", "Can moderate process categories"),
+        ]
 
 
 class Process(NamedUserCreatedObject):
@@ -117,6 +120,9 @@ class Process(NamedUserCreatedObject):
 
     class Meta:
         ordering = ["name", "id"]
+        permissions = [
+            ("can_moderate_process", "Can moderate processes"),
+        ]
 
     @property
     def sources(self):
