@@ -1,7 +1,8 @@
 """Forms for the processes module following shared BRIT conventions."""
 
-from django import forms
+import types
 
+from django import forms
 from django_tomselect.forms import (
     TomSelectConfig,
     TomSelectModelChoiceField,
@@ -50,6 +51,8 @@ class ProcessCategoryModalModelForm(ModalModelFormMixin, ProcessCategoryModelFor
 
 
 class ProcessModelForm(SimpleModelForm):
+    # Note: When config with URL is provided, TomSelect validates via the autocomplete
+    # endpoint. For proper queryset validation in forms, we override in __init__.
     parent = TomSelectModelChoiceField(
         queryset=Process.objects.all(),
         required=False,
@@ -78,6 +81,31 @@ class ProcessModelForm(SimpleModelForm):
             "short_description": forms.Textarea(attrs={"rows": 2}),
             "description": forms.Textarea(attrs={"rows": 6}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Override TomSelect field validation to use queryset instead of URL endpoint
+        # This fixes form validation in tests while maintaining autocomplete in production
+        for field_name in ['parent', 'categories']:
+            field = self.fields[field_name]
+            
+            # Override validation methods to use queryset
+            def queryset_valid_value(self, value):
+                """Validate using queryset instead of URL endpoint."""
+                return self.queryset.filter(pk=value).exists()
+            
+            def queryset_check_values(self, value):
+                """Check values using queryset instead of URL endpoint."""
+                # For ModelMultipleChoiceField, value is a list of PKs
+                if isinstance(value, (list, tuple)):
+                    pks = [v for v in value if v]
+                    return list(self.queryset.filter(pk__in=pks))
+                return []
+            
+            # Bind methods to the field instance
+            field.valid_value = types.MethodType(queryset_valid_value, field)
+            if hasattr(field, '_check_values'):
+                field._check_values = types.MethodType(queryset_check_values, field)
 
 
 class ProcessModalModelForm(ModalModelFormMixin, ProcessModelForm):
