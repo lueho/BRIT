@@ -21,10 +21,10 @@ services:
         INSTALL_DEV: true
     image: brit-web
     restart: unless-stopped
-    command: sh -c "python manage.py migrate && python manage.py runserver 0.0.0.0:8000"
+    command: python manage.py runserver 0.0.0.0:8000
     volumes:
       - ./:/app
-      - /app/.venv
+      - brit_venv:/app/.venv
     depends_on:
       - db
       - redis
@@ -40,8 +40,9 @@ services:
     image: brit-web
     volumes:
       - ./:/app
-      - /app/.venv
-    command: celery --app=brit worker --loglevel=info
+      - brit_venv:/app/.venv
+    command: celery --app=brit worker --loglevel=info --pool=solo --concurrency=1 --without-gossip --without-mingle
+    stop_grace_period: 5s
     env_file:
       - brit/settings/.env
     depends_on:
@@ -84,3 +85,4 @@ services:
 
 volumes:
   brit_db:
+  brit_venv:
