@@ -9,6 +9,7 @@ from maps.models import Attribute, LauRegion, NutsRegion, RegionAttributeValue
 from materials.models import MaterialCategory
 
 from ..models import (
+    REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES,
     Collection,
     CollectionCatchment,
     CollectionFrequency,
@@ -107,6 +108,7 @@ class CollectionModelSerializerTestCase(TestCase):
         self.assertIsNone(data["required_bin_capacity"])
 
     def test_required_bin_capacity_reference_serialization(self):
+        choices = dict(REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES)
         for value in ["person", "household", "property", "not_specified", None, ""]:
             self.collection.required_bin_capacity_reference = value
             self.collection.save()
@@ -117,7 +119,25 @@ class CollectionModelSerializerTestCase(TestCase):
             elif value == "":
                 self.assertIn(data["required_bin_capacity_reference"], [None, ""])
             else:
-                self.assertEqual(data["required_bin_capacity_reference"], value)
+                expected = choices.get(value, value)
+                self.assertEqual(data["required_bin_capacity_reference"], expected)
+
+    def test_serializer_method_fields_have_matching_methods(self):
+        serializer = CollectionModelSerializer(self.collection)
+        serializer_method_fields = {
+            name: field
+            for name, field in serializer.fields.items()
+            if field.__class__.__name__ == "SerializerMethodField"
+        }
+        for field_name, field in serializer_method_fields.items():
+            method_name = getattr(field, "method_name", f"get_{field_name}")
+            self.assertTrue(
+                hasattr(serializer, method_name),
+                msg=(
+                    f"SerializerMethodField '{field_name}' is missing its method "
+                    f"'{method_name}' on {serializer.__class__.__name__}"
+                ),
+            )
 
     def test_connection_type_serialization_handles_none_and_empty_string(self):
         # None case
