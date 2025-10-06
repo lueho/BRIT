@@ -144,6 +144,14 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
     def get_sources(self, obj):
         return [flyer.url for flyer in obj.flyers.all() if flyer.url]
 
+    @staticmethod
+    def get_required_bin_capacity_reference(obj):
+        value = obj.required_bin_capacity_reference
+        if not value:
+            return None
+        choices = dict(models.REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES)
+        return choices.get(value, value)
+
     def to_representation(self, instance):
         data = super().to_representation(instance)
         if "sources" not in data:
