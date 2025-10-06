@@ -101,15 +101,9 @@ function getContextFlag(flag) {
         if (value === undefined) return null;
         if (value === 'true') return true;
         if (value === 'false') return false;
-        return value;
     } catch (_) {
         return null;
     }
-}
-
-function isStaffUser() {
-    const flag = getContextFlag('isStaff');
-    return flag === true; // default to false if not provided
 }
 
 function getCurrentUserId() {
@@ -560,46 +554,49 @@ const ButtonManager = (function () {
 
     function apply(data) {
         try {
-            // Update hrefs from server-provided actions if present
-            const actions = data && data.actions ? data.actions : null;
-            if (actions) {
-                try { console.debug('[WC] actions from server:', actions); } catch (_) { }
-                const nextParams = buildNextParams();
-                try {
-                    const detailBtn = document.getElementById('btn-collection-detail');
-                    if (detailBtn && actions.detail_url) {
-                        // Append next back to current filtered map
-                        let filter_params;
-                        try { filter_params = parseFilterParameters(); } catch (_) { filter_params = new URLSearchParams(window.location.search); }
-                        try { filter_params.set('scope', getScope()); } catch (_) { }
-                        filter_params.set('load_features', 'true');
-                        const nextTarget = window.location.pathname + '?' + filter_params.toString();
-                        const params = new URLSearchParams();
-                        params.set('next', nextTarget);
-                        const sep = actions.detail_url.indexOf('?') === -1 ? '?' : '&';
-                        detailBtn.setAttribute('href', actions.detail_url + sep + params.toString());
+            const nextParams = buildNextParams();
+
+            try {
+                const detailBtn = document.getElementById('btn-collection-detail');
+                if (detailBtn) {
+                    const tmpl = detailBtn.dataset.hrefTemplate;
+                    if (tmpl) {
+                        const detailUrl = tmpl.replace('__pk__', data.id);
+                        const sep = detailUrl.indexOf('?') === -1 ? '?' : '&';
+                        detailBtn.setAttribute('href', detailUrl + sep + nextParams.toString());
                         detailBtn.classList.remove('d-none');
+                    } else {
+                        detailBtn.classList.add('d-none');
                     }
-                } catch (_) { }
+                }
+            } catch (_) { }
 
-                try {
-                    const updateBtn = document.getElementById('btn-collection-update');
-                    if (updateBtn && actions.update_url) {
-                        updateBtn.setAttribute('href', actions.update_url + '?' + nextParams.toString());
+            try {
+                const updateBtn = document.getElementById('btn-collection-update');
+                if (updateBtn) {
+                    const tmpl = updateBtn.dataset.hrefTemplate;
+                    if (tmpl) {
+                        updateBtn.setAttribute('href', tmpl.replace('__pk__', data.id) + '?' + nextParams.toString());
                     }
-                } catch (_) { }
+                }
+            } catch (_) { }
 
-                try {
-                    const copyBtn = document.getElementById('btn-collection-copy');
-                    if (copyBtn && actions.copy_url) {
-                        copyBtn.setAttribute('href', actions.copy_url + '?' + nextParams.toString());
+            try {
+                const copyBtn = document.getElementById('btn-collection-copy');
+                if (copyBtn) {
+                    const tmpl = copyBtn.dataset.hrefTemplate;
+                    if (tmpl) {
+                        copyBtn.setAttribute('href', tmpl.replace('__pk__', data.id) + '?' + nextParams.toString());
                     }
-                } catch (_) { }
+                }
+            } catch (_) { }
 
-                try {
-                    const delBtn = document.getElementById('btn-collection-delete');
-                    if (delBtn && actions.delete_url) {
-                        const delUrl = actions.delete_url + '?' + nextParams.toString();
+            try {
+                const delBtn = document.getElementById('btn-collection-delete');
+                if (delBtn) {
+                    const tmpl = delBtn.dataset.hrefTemplate;
+                    if (tmpl) {
+                        const delUrl = tmpl.replace('__pk__', data.id) + '?' + nextParams.toString();
                         delBtn.setAttribute('href', delUrl);
                         try { delBtn.classList.remove('bmf-bound'); } catch (_) { }
                         try {
@@ -610,8 +607,8 @@ const ButtonManager = (function () {
                             }
                         } catch (_) { }
                     }
-                } catch (_) { }
-            }
+                }
+            } catch (_) { }
 
             const policy = data && data.policy ? data.policy : null;
             try { console.debug('[WC] policy from server:', policy); } catch (_) { }

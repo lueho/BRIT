@@ -113,8 +113,6 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
     )
     sources = serializers.SerializerMethodField()
     policy = serializers.SerializerMethodField()
-    actions = serializers.SerializerMethodField()
-
     class Meta:
         model = models.Collection
         fields = (
@@ -138,7 +136,6 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
             "comments",
             "sources",
             "policy",
-            "actions",
         )
 
     def get_sources(self, obj):
@@ -172,17 +169,6 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
             }
         # Return policy as-is to keep a single source of truth for key names
         return policy
-
-    def get_actions(self, obj):
-        try:
-            return {
-                "detail_url": reverse("collection-detail", kwargs={"pk": obj.pk}),
-                "update_url": reverse("collection-update", kwargs={"pk": obj.pk}),
-                "copy_url": reverse("collection-copy", kwargs={"pk": obj.pk}),
-                "delete_url": reverse("collection-delete-modal", kwargs={"pk": obj.pk}),
-            }
-        except Exception:
-            return {}
 
 
 class CollectionFlatSerializer(serializers.ModelSerializer):
