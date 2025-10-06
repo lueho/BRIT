@@ -1,5 +1,6 @@
 {% load static %}
 {% load leaflet_tags %}
+{% load moderation_tags %}
 {% leaflet_js %}
 {% leaflet_css %}
 
@@ -28,6 +29,7 @@
         </p>
     </div>
     <div class="card-footer d-flex">
+        {% object_policy object as policy %}
         <div class="dropdown">
             <button class="btn btn-secondary dropdown-toggle"
                     type="button"
@@ -43,7 +45,7 @@
                 </a>
             </div>
         </div>
-        {% if user == object.owner or user.is_staff %}
+        {% if policy.can_edit or policy.can_delete or policy.is_owner or policy.is_staff or policy.is_moderator %}
             <div class="dropdown">
                 <button class="btn btn-secondary dropdown-toggle ms-3"
                         type="button"
@@ -51,17 +53,19 @@
                         data-bs-toggle="dropdown"
                         aria-expanded="false">Options</button>
                 <div class="dropdown-menu" aria-labelledby="editDropdown">
-                    {% if user.is_staff or not object.is_published %}
+                    {% if policy.can_edit %}
                         <a class="dropdown-item"
                            href="{% url 'scenario-update' object.id %}?next={{ request.path }}">
-                            <i class="fas fa-fw fa-edit"></i> Edit
+                            <i class="fas fa-fw fa-pen-to-square"></i> Edit
                         </a>
                     {% endif %}
-                    <a class="dropdown-item"
-                       href="{% url 'download_scenario_summary' object.id %}">
-                        <i class="fas fa-fw fa-file-download"></i> Download definition file
-                    </a>
-                    {% if user.is_staff or not object.is_published %}
+                    {% if policy.is_owner or policy.is_staff %}
+                        <a class="dropdown-item"
+                           href="{% url 'download_scenario_summary' object.id %}">
+                            <i class="fas fa-fw fa-file-arrow-down"></i> Download definition file
+                        </a>
+                    {% endif %}
+                    {% if policy.can_delete %}
                         <a class="dropdown-item modal-link"
                            href="{% url 'scenario-delete-modal' object.pk %}">
                             <i class="fas fa-fw fa-trash"></i> Delete

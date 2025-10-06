@@ -3,6 +3,8 @@
 from django.contrib.auth.mixins import UserPassesTestMixin
 from django.core.exceptions import ImproperlyConfigured
 
+from .permissions import get_object_policy
+
 
 class AppendTemplateMixin:
     """Append extra_template_names onto whatever parent get_template_names() returns."""
@@ -33,25 +35,29 @@ class _BaseUserCreatedObjectAccessMixin(UserPassesTestMixin):
                 f"{obj.__class__.__name__} must have fields: {', '.join(missing)}"
             )
 
-    def _can_read(self):
-        obj, user = self.get_object(), self.request.user
+    def _get_policy(self, obj=None):
+        obj = obj or self.get_object()
         self._ensure_fields(obj)
-        status = getattr(obj, self.publication_status_field)
-        if status == self.published_status:
-            return True
-        return user.is_authenticated and (user.is_staff or obj.owner == user)
+        return get_object_policy(self.request.user, obj, request=self.request)
+
+    def _can_read(self):
+        policy = self._get_policy()
+        return (
+            policy["is_published"]
+            or policy["is_archived"]
+            or policy["is_owner"]
+            or policy["is_staff"]
+        )
 
     def _can_write(self):
-        obj, user = self.get_object(), self.request.user
-        self._ensure_fields(obj)
-        if not user.is_authenticated:
-            return False
-        if user.is_staff:
+        policy = self._get_policy()
+        if policy["can_edit"]:
             return True
-        status = getattr(obj, self.publication_status_field)
-        if status == self.published_status:
-            return False
-        return obj.owner == user
+        # Fallback for models without update URLs in the policy
+        return (
+            not policy["is_archived"]
+            and (policy["is_staff"] or (policy["is_owner"] and not policy["is_published"]))
+        )
 
 
 class UserCreatedObjectReadAccessMixin(_BaseUserCreatedObjectAccessMixin):
@@ -72,8 +78,8 @@ class UserOwnsObjectMixin(UserPassesTestMixin):
     """Only allow the owner (and no publication logic)."""
 
     def test_func(self):
-        user = self.request.user
-        return user.is_authenticated and self.get_object().owner == user
+        policy = get_object_policy(self.request.user, self.get_object(), request=self.request)
+        return policy["is_owner"]
 
 
 class CreateUserObjectMixin:

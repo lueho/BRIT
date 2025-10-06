@@ -1,18 +1,23 @@
-{% extends 'simple_detail_card.html' %}
+{% extends "detail_with_options.html" %}
 
 {% block detail_body %}
-    <p class="card-text"><strong>Name:</strong><br>
+    <p class="card-text">
+        <strong>Name:</strong>
+        <br>
         {{ object.name }}
     </p>
     {% if object.reference_url %}
-        <p class="card-text"><strong>Reference url:</strong><br>
+        <p class="card-text">
+            <strong>Reference url:</strong>
+            <br>
             <a href="{{ object.reference_url }}" target="_blank">{{ object.reference_url }}</a>
         </p>
     {% endif %}
     {% if object.description %}
-        <p class="card-text"><strong>Description:</strong><br>
+        <p class="card-text">
+            <strong>Description:</strong>
+            <br>
             {{ object.description }}
         </p>
     {% endif %}
 {% endblock detail_body %}
-        
