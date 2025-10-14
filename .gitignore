@@ -2,3 +2,10 @@
 /db_dump/
 /.idea/
 /brit/settings/.env
+/.venv/
+/venv/
+*.pyc
+.vscode
+.windsurf
+/__pycache__
+
