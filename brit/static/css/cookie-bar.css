@@ -1,0 +1,92 @@
+/* Cookie Bar Custom Styles */
+.cookie-bar {
+    z-index: 1050; /* Ensure it's above other elements but below modals */
+}
+
+.cookie-bar .btn {
+    border-radius: 0.375rem; /* Match Bootstrap's default border radius */
+    font-weight: 500;
+    min-width: 100px; /* Ensure buttons have consistent width */
+}
+
+.cookie-bar .btn-primary {
+    background-color: var(--bs-primary, #4B7156);
+    border-color: var(--bs-primary, #4B7156);
+}
+
+.cookie-bar .btn-primary:hover {
+    background-color: var(--bs-success, #376046);
+    border-color: var(--bs-success, #376046);
+}
+
+.cookie-bar .btn-outline-primary {
+    color: var(--bs-primary, #4B7156);
+    border-color: var(--bs-primary, #4B7156);
+}
+
+.cookie-bar .btn-outline-primary:hover {
+    background-color: var(--bs-primary, #4B7156);
+    border-color: var(--bs-primary, #4B7156);
+    color: #fff;
+}
+
+.cookie-bar .btn-outline-secondary {
+    color: var(--bs-secondary, #A0C7A6);
+    border-color: var(--bs-secondary, #A0C7A6);
+}
+
+.cookie-bar .btn-outline-secondary:hover {
+    background-color: var(--bs-secondary, #A0C7A6);
+    border-color: var(--bs-secondary, #A0C7A6);
+    color: #fff;
+}
+
+/* Responsive adjustments */
+@media (max-width: 767.98px) {
+    .cookie-bar .btn {
+        width: 100%;
+        margin-bottom: 0.5rem;
+        min-width: auto;
+    }
+    
+    .cookie-bar .d-flex.flex-wrap.gap-2 {
+        width: 100%;
+    }
+    
+    /* Reduce padding on mobile for better screen utilization */
+    .cookie-bar .p-3 {
+        padding: 1rem !important;
+    }
+}
+
+/* Animation for cookie bar appearance */
+@keyframes slideUp {
+    from {
+        transform: translateY(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.cookie-bar > div {
+    animation: slideUp 0.3s ease-out;
+}
+
+/* Ensure proper contrast for accessibility */
+.cookie-bar .text-muted {
+    color: #6c757d !important;
+}
+
+/* Improve focus styles for keyboard navigation */
+.cookie-bar .btn:focus,
+.cookie-bar .btn.focus {
+    box-shadow: 0 0 0 0.2rem rgba(75, 113, 86, 0.25);
+}
+
+/* Add subtle transition for hover effects */
+.cookie-bar .btn {
+    transition: all 0.15s ease-in-out;
+}

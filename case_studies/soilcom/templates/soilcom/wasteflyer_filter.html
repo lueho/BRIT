@@ -1,11 +1,13 @@
 {% extends 'filtered_list.html' %}
 {% load crispy_forms_tags %}
+{% load user_created_object_tags %}
+{% load moderation_tags %}
 
 {% block title %}BRIT | Waste Collection Flyers{% endblock %}
 
-{% block list_header %}<strong>Flyers</strong>{% endblock %}
+{% block list_card_header %}<strong>Flyers</strong>{% endblock %}
 
-{% block list_body %}
+{% block list_table %}
     <div class="table-responsive">
         <table class="table table-hover table-responsive-stack">
             <thead>
@@ -14,16 +16,25 @@
                 <th scope="col" class="col-9">URL</th>
                 <th scope="col">Valid</th>
                 <th scope="col">Checked</th>
+                {% if object_list.model|is_user_created %}
+                    <th class="actions-column">Status/Actions</th>
+                {% endif %}
             </tr>
             </thead>
             <tbody>
             {% for object in object_list %}
                 <tr>
-                    <td data-label="Id"><a href="{{ object.get_absolute_url }}">{{ object.id }}</a></td>
-                    <td data-label="URL" class="url-cell"><span><a href="{{ object.url }}" target="_blank">{{ object.url }}</a></span>
+                    <td data-label="Id"><a href="{% detail_or_review_url object %}">{{ object.id }}</a></td>
+                    <td data-label="URL" class="url-cell"><span><a href="{{ object.url }}"
+                                                                   target="_blank">{{ object.url }}</a></span>
                     </td>
                     <td data-label="Valid">{{ object.url_valid }}</td>
                     <td data-label="Checked">{{ object.url_checked|date:'d.m.Y' }}</td>
+                    {% if object_list.model|is_user_created %}
+                        <td class="actions-column mobile-no-label">
+                            {% include 'object_management/status_actions_cell.html' %}
+                        </td>
+                    {% endif %}
                 </tr>
             {% endfor %}
             </tbody>
@@ -31,18 +42,16 @@
             </tfoot>
         </table>
     </div>
-{% endblock list_body %}
+{% endblock list_table %}
 
-{% block list_footer %}
-    {% if perms.soilcom.change_wasteflyer %}
-        <span id="check_url" class="text-nowrap" style="display: inline-block; width: 7em">
-            <a href="javascript:void(0)" onclick="check_url()" class="mr-3">
-                <i class="fas fa-fw fa-check-circle"></i>
-                <span>check urls</span>
-            </a>
-        </span>
+{% block list_card_options_dropdown_additional_links %}
+    {% if private_list_owner == user or user.is_staff %}
+        <a id="check_url" class="btn btn-outline-secondary w-100 mb-2" href="javascript:void(0)" onclick="check_url()">
+            <i class="fas fa-fw fa-check-circle"></i>
+            <span>Check URLs</span>
+        </a>
     {% endif %}
-{% endblock list_footer %}
+{% endblock list_card_options_dropdown_additional_links %}
 
 {% block filter_body %}
     <form method="get">

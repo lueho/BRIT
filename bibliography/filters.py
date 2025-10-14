@@ -2,7 +2,16 @@ from django.db.models import Q
 from django_filters import CharFilter, FilterSet
 
 from utils.filters import BaseCrispyFilterSet
-from .models import Source
+from .models import Author, Source
+
+
+class AuthorFilterSet(BaseCrispyFilterSet):
+    last_names = CharFilter(lookup_expr='icontains')
+    first_names = CharFilter(lookup_expr='icontains')
+
+    class Meta:
+        model = Author
+        fields = ('last_names', 'first_names')
 
 
 def author_icontains(queryset, _, value):

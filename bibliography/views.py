@@ -1,212 +1,257 @@
 import json
 
 from celery.result import AsyncResult
-from dal.autocomplete import Select2QuerySetView
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.db.models import Q
+from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse
 from django.urls import reverse_lazy
 from django.views import View
 from django.views.generic import TemplateView
 
-from utils import views
-from utils.views import UserCreatedObjectDetailView
-from .filters import SourceFilter
-from .forms import (AuthorModalModelForm, AuthorModelForm, LicenceModalModelForm, LicenceModelForm,
-                    SourceModalModelForm, SourceModelForm)
-from .models import Author, Licence, SOURCE_TYPES, Source
+from utils.forms import TomSelectFormsetHelper
+from utils.object_management.permissions import get_object_policy
+from utils.object_management.views import (
+    PrivateObjectFilterView,
+    PrivateObjectListView,
+    PublishedObjectFilterView,
+    PublishedObjectListView,
+    UserCreatedObjectAutocompleteView,
+    UserCreatedObjectCreateView,
+    UserCreatedObjectCreateWithInlinesView,
+    UserCreatedObjectDetailView,
+    UserCreatedObjectModalCreateView,
+    UserCreatedObjectModalDeleteView,
+    UserCreatedObjectModalDetailView,
+    UserCreatedObjectModalUpdateView,
+    UserCreatedObjectUpdateView,
+    UserCreatedObjectUpdateWithInlinesView,
+)
+
+from .filters import AuthorFilterSet, SourceFilter
+from .forms import (
+    AuthorModalModelForm,
+    AuthorModelForm,
+    LicenceModalModelForm,
+    LicenceModelForm,
+    SourceModalModelForm,
+    SourceModelForm,
+)
+from .inlines import SourceAuthorInline
+from .models import SOURCE_TYPES, Author, Licence, Source
 from .serializers import HyperlinkedSourceSerializer
 from .tasks import check_source_url, check_source_urls
 
 
 class BibliographyDashboardView(TemplateView):
-    template_name = 'bibliography_dashboard.html'
+    template_name = "bibliography_dashboard.html"
 
 
 # ----------- Author CRUD ----------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class AuthorListView(views.OwnedObjectListView):
+class AuthorPublishedListView(PublishedObjectFilterView):
     model = Author
-    permission_required = set()
+    filterset_class = AuthorFilterSet
+    dashboard_url = reverse_lazy("bibliography-dashboard")
+    ordering = "last_names"
 
 
-class AuthorCreateView(views.OwnedObjectCreateView):
+class AuthorPrivateListView(PrivateObjectFilterView):
+    model = Author
+    filterset_class = AuthorFilterSet
+    dashboard_url = reverse_lazy("bibliography-dashboard")
+    ordering = "last_names"
+
+
+class AuthorCreateView(UserCreatedObjectCreateView):
     form_class = AuthorModelForm
-    permission_required = 'bibliography.add_author'
+    permission_required = "bibliography.add_author"
 
 
-class AuthorModalCreateView(views.OwnedObjectModalCreateView):
+class AuthorModalCreateView(UserCreatedObjectModalCreateView):
     form_class = AuthorModalModelForm
-    permission_required = 'bibliography.add_author'
+    permission_required = "bibliography.add_author"
 
 
 class AuthorDetailView(UserCreatedObjectDetailView):
     model = Author
 
 
-class AuthorModalDetailView(views.OwnedObjectModalDetailView):
-    template_name = 'author_detail_modal.html'
+class AuthorModalDetailView(UserCreatedObjectModalDetailView):
+    template_name = "author_detail_modal.html"
     model = Author
-    permission_required = set()
 
 
-class AuthorUpdateView(views.OwnedObjectUpdateView):
+class AuthorUpdateView(UserCreatedObjectUpdateView):
     model = Author
     form_class = AuthorModelForm
-    permission_required = 'bibliography.change_author'
 
 
-class AuthorModalUpdateView(views.OwnedObjectModalUpdateView):
+class AuthorModalUpdateView(UserCreatedObjectModalUpdateView):
     model = Author
     form_class = AuthorModalModelForm
-    permission_required = 'bibliography.change_author'
 
 
-class AuthorModalDeleteView(views.OwnedObjectModalDeleteView):
-    template_name = 'modal_delete.html'
+class AuthorModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Author
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('author-list')
-    permission_required = 'bibliography.delete_author'
 
 
-# ----------- Licence CRUD ----------------------------------------------------------------------------------------------
+# ----------- Author Utils ---------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class LicenceListView(views.OwnedObjectListView):
+
+class AuthorAutocompleteView(UserCreatedObjectAutocompleteView):
+    model = Author
+    search_lookups = [
+        "last_names__icontains",
+        "first_names__icontains",
+    ]
+    ordering = "last_names"
+    page_size = 10
+    value_fields = ["id", "last_names", "first_names"]
+    virtual_fields = ["label"]
+
+    def hook_prepare_results(self, results):
+        for result in results:
+            result["label"] = f"{result['last_names']}, {result['first_names']}"
+        return results
+
+
+# ----------- Licence CRUD ---------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class LicencePublishedListView(PublishedObjectListView):
     model = Licence
-    permission_required = set()
+    dashboard_url = reverse_lazy("bibliography-dashboard")
 
 
-class LicenceCreateView(views.OwnedObjectCreateView):
+class LicencePrivateListView(PrivateObjectListView):
+    model = Licence
+    dashboard_url = reverse_lazy("bibliography-dashboard")
+
+
+class LicenceCreateView(UserCreatedObjectCreateView):
     form_class = LicenceModelForm
-    permission_required = 'bibliography.add_licence'
+    permission_required = "bibliography.add_licence"
 
 
-class LicenceModalCreateView(views.OwnedObjectModalCreateView):
+class LicenceModalCreateView(UserCreatedObjectModalCreateView):
     form_class = LicenceModalModelForm
-    permission_required = 'bibliography.add_licence'
+    permission_required = "bibliography.add_licence"
 
 
 class LicenceDetailView(UserCreatedObjectDetailView):
     model = Licence
 
 
-class LicenceModalDetailView(views.OwnedObjectModalDetailView):
-    template_name = 'licence_detail_modal.html'
+class LicenceModalDetailView(UserCreatedObjectModalDetailView):
+    template_name = "licence_detail_modal.html"
     model = Licence
-    permission_required = set()
 
 
-class LicenceUpdateView(views.OwnedObjectUpdateView):
+class LicenceUpdateView(UserCreatedObjectUpdateView):
     model = Licence
     form_class = LicenceModelForm
-    permission_required = 'bibliography.change_licence'
 
 
-class LicenceModalUpdateView(views.OwnedObjectModalUpdateView):
+class LicenceModalUpdateView(UserCreatedObjectModalUpdateView):
     model = Licence
     form_class = LicenceModalModelForm
-    permission_required = 'bibliography.change_licence'
 
 
-class LicenceModalDeleteView(views.OwnedObjectModalDeleteView):
-    template_name = 'modal_delete.html'
+class LicenceModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Licence
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('licence-list')
-    permission_required = 'bibliography.delete_licence'
 
 
 # ----------- Source CRUD ----------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class SourceListView(views.OwnedObjectListView):
+
+class SourcePublishedFilterView(PublishedObjectFilterView):
     model = Source
-    queryset = Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by('abbreviation')
+    queryset = Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by(
+        "abbreviation"
+    )
     filterset_class = SourceFilter
-    filterset = None
-    permission_required = set()
-
-    def get_queryset(self):
-        queryset = super().get_queryset()
-        self.filterset = self.filterset_class(self.request.GET, queryset=queryset)
-        return self.filterset.qs
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['filter'] = self.filterset
-        return context
+    dashboard_url = reverse_lazy("bibliography-dashboard")
 
 
-class SourceCreateView(views.OwnedObjectCreateView):
+class SourcePrivateFilterView(PrivateObjectFilterView):
+    model = Source
+    queryset = Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by(
+        "abbreviation"
+    )
+    filterset_class = SourceFilter
+    dashboard_url = reverse_lazy("bibliography-dashboard")
+
+
+class SourceCreateView(UserCreatedObjectCreateWithInlinesView):
+    model = Source
     form_class = SourceModelForm
-    permission_required = 'bibliography.add_source'
+    inlines = [SourceAuthorInline]
+    permission_required = "bibliography.add_source"
+    formset_helper_class = TomSelectFormsetHelper
 
 
-class SourceModalCreateView(views.OwnedObjectModalCreateView):
+class SourceModalCreateView(UserCreatedObjectModalCreateView):
     form_class = SourceModalModelForm
-    permission_required = 'bibliography.add_source'
+    permission_required = "bibliography.add_source"
 
 
 class SourceDetailView(UserCreatedObjectDetailView):
     model = Source
 
 
-class SourceModalDetailView(views.OwnedObjectModalDetailView):
-    template_name = 'source_detail_modal.html'
+class SourceModalDetailView(UserCreatedObjectModalDetailView):
+    template_name = "source_detail_modal.html"
     model = Source
-    permission_required = set()
 
     def get_context_data(self, **kwargs):
         # TODO: Documentation
         context = super().get_context_data(**kwargs)
-        serializer = HyperlinkedSourceSerializer(self.object, context={'request': self.request})
-        context.update({
-            'modal_title': 'Source details',
-            'object_data': serializer.data
-        })
+        serializer = HyperlinkedSourceSerializer(
+            self.object, context={"request": self.request}
+        )
+        context.update(
+            {"modal_title": "Source details", "object_data": serializer.data}
+        )
         return context
 
 
-class SourceUpdateView(views.OwnedObjectUpdateView):
+class SourceUpdateView(UserCreatedObjectUpdateWithInlinesView):
     model = Source
     form_class = SourceModelForm
-    permission_required = 'bibliography.change_source'
+    inlines = [SourceAuthorInline]
+    formset_helper_class = TomSelectFormsetHelper
 
 
-class SourceModalUpdateView(views.OwnedObjectModalUpdateView):
+class SourceModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Source
-    form_class = SourceModalModelForm
-    permission_required = 'bibliography.change_source'
-
-
-class SourceModalDeleteView(views.OwnedObjectModalDeleteView):
-    template_name = 'modal_delete.html'
-    model = Source
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('source-list')
-    permission_required = 'bibliography.delete_source'
 
 
 # ----------- Source utils ---------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class SourceCheckUrlView(PermissionRequiredMixin, View):
+class SourceCheckUrlView(LoginRequiredMixin, View):
     object = None
     model = Source
-    permission_required = 'bibliography.change_source'
 
     def get(self, request, *args, **kwargs):
-        self.object = self.model.objects.get(pk=kwargs.get('pk'))
+        self.object = self.model.objects.get(pk=kwargs.get("pk"))
+        policy = get_object_policy(request.user, self.object, request=request)
+        if not (
+            policy.get("is_owner")
+            or policy.get("is_staff")
+            or policy.get("is_moderator")
+        ):
+            raise PermissionDenied
+
         task = check_source_url.delay(self.object.pk)
-        response_data = {
-            'task_id': task.task_id
-        }
-        return HttpResponse(json.dumps(response_data), content_type='application/json')
+        response_data = {"task_id": task.task_id}
+        return HttpResponse(json.dumps(response_data), content_type="application/json")
 
 
 class SourceCheckUrlProgressView(LoginRequiredMixin, View):
@@ -215,36 +260,41 @@ class SourceCheckUrlProgressView(LoginRequiredMixin, View):
     def get(request, task_id):
         result = AsyncResult(task_id)
         response_data = {
-            'state': result.state,
-            'details': result.info,
+            "state": result.state,
+            "details": result.info,
         }
-        return HttpResponse(json.dumps(response_data), content_type='application/json')
+        return HttpResponse(json.dumps(response_data), content_type="application/json")
 
 
 class SourceListCheckUrlsView(PermissionRequiredMixin, View):
     model = Source
     filterset_class = SourceFilter
     success_url = None
-    permission_required = 'bibliography.change_source'
+    permission_required = "bibliography.change_source"
     check_task = check_source_urls
 
     def get(self, request, *args, **kwargs):
         params = request.GET.copy()
-        params.pop('page', None)
+        params.pop("page", None)
         task = self.check_task.delay(params)
-        response_data = {
-            'task_id': task.task_id
-        }
-        return HttpResponse(json.dumps(response_data), content_type='application/json')
+        response_data = {"task_id": task.task_id}
+        return HttpResponse(json.dumps(response_data), content_type="application/json")
 
 
-class SourceAutocompleteView(Select2QuerySetView):
-    def get_queryset(self):
-        qs = Source.objects.filter(type__in=[t[0] for t in SOURCE_TYPES]).order_by('abbreviation')
-        if self.q:
-            qs = qs.filter(
-                Q(title__icontains=self.q) |
-                Q(authors__last_names__icontains=self.q) |
-                Q(authors__first_names__icontains=self.q)
-            ).distinct()
-        return qs
+class SourceAutocompleteView(UserCreatedObjectAutocompleteView):
+    model = Source
+    search_lookups = [
+        "title__icontains",
+        "authors__last_names__icontains",
+        "authors__first_names__icontains",
+    ]
+    ordering = "title"
+    page_size = 10
+    value_fields = ["id", "title", "authors__last_names", "authors__first_names"]
+
+    def hook_prepare_results(self, results):
+        for result in results:
+            formatted_name = f"{result['authors__last_names']}, {result['authors__first_names']}. {result['title']}"
+            result["text"] = formatted_name
+            result["selected_text"] = formatted_name
+        return results

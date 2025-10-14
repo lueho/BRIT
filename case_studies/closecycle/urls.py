@@ -1,13 +1,13 @@
-from django.urls import path, include
+from django.urls import include, path
 
 from .router import router
-from .views import (ShowcaseListView, ShowcaseCreateView, ShowcaseDetailView, ShowcaseUpdateView,
-                    ShowcaseModalDeleteView, ShowcaseMapView)
-
+from .views import (ShowcaseCreateView, ShowcaseDetailView, ShowcaseModalDeleteView, ShowcasePrivateFilterView,
+                    ShowcasePublishedListView, ShowcasePublishedMapView, ShowcaseUpdateView)
 
 urlpatterns = [
-    path('showcases/', ShowcaseListView.as_view(), name='showcase-list'),
-    path('showcases/map/', ShowcaseMapView.as_view(), name='Showcase'),
+    path('showcases/', ShowcasePublishedListView.as_view(), name='showcase-list'),
+    path('showcases/user/', ShowcasePrivateFilterView.as_view(), name='showcase-list-owned'),
+    path('showcases/map/', ShowcasePublishedMapView.as_view(), name='Showcase'),
     path('showcases/create/', ShowcaseCreateView.as_view(), name='showcase-create'),
     path('showcases/<int:pk>/', ShowcaseDetailView.as_view(), name='showcase-detail'),
     path('showcases/<int:pk>/update/', ShowcaseUpdateView.as_view(), name='showcase-update'),

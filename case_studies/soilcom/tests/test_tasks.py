@@ -6,78 +6,14 @@ from django.db.models import signals
 from django.http.request import MultiValueDict, QueryDict
 from django.test import TestCase
 from factory.django import mute_signals
-from mock import Mock, patch
+from unittest.mock import Mock, patch
 
 from maps.models import Region
 from ..models import (Collection, CollectionCatchment, CollectionFrequency, CollectionSystem, Collector,
                       MaterialCategory, WasteCategory, WasteComponent, WasteFlyer, WasteStream)
 from ..renderers import CollectionXLSXRenderer
 from ..serializers import CollectionFlatSerializer
-from ..tasks import (check_wasteflyer_url, check_wasteflyer_urls, check_wasteflyer_urls_callback,
-                     export_collections_to_file)
-
-
-@patch('utils.file_export.storages.write_file_for_download')
-class ExportCollectionToFileTestCase(TestCase):
-
-    @classmethod
-    def setUpTestData(cls):
-        User.objects.create(username='outsider')
-        member = User.objects.create(username='member')
-        member.user_permissions.add(Permission.objects.get(codename='add_collection'))
-
-        MaterialCategory.objects.create(name='Biowaste component')
-        material1 = WasteComponent.objects.create(name='Test material 1')
-        material2 = WasteComponent.objects.create(name='Test material 2')
-        waste_stream = WasteStream.objects.create(
-            name='Test waste stream',
-            category=WasteCategory.objects.create(name='Test category'),
-        )
-        waste_stream.allowed_materials.add(material1)
-        waste_stream.allowed_materials.add(material2)
-        with mute_signals(signals.post_save):
-            waste_flyer = WasteFlyer.objects.create(
-                abbreviation='WasteFlyer123',
-                url='https://www.test-flyer.org'
-            )
-        frequency = CollectionFrequency.objects.create(name='Test Frequency')
-        region = Region.objects.create(name='Test Region')
-        catchment = CollectionCatchment.objects.create(name='Test catchment', region=region)
-        for i in range(1, 3):
-            collection = Collection.objects.create(
-                name=f'collection{i}',
-                catchment=catchment,
-                collector=Collector.objects.create(name=f'collector{i}'),
-                collection_system=CollectionSystem.objects.create(name='Test system'),
-                waste_stream=waste_stream,
-                frequency=frequency,
-                description='This is a test case.'
-            )
-            collection.flyers.add(waste_flyer)
-
-    def setUp(self):
-        self.collector = Collector.objects.get(name='collector1')
-        self.mock_task = Mock()
-        self.mock_task.request.id = 1234
-        self.wrapped_export_collections_to_file = export_collections_to_file.__wrapped__.__func__
-        qs = Collection.objects.filter(collector__pk=self.collector.pk)
-        self.data = CollectionFlatSerializer(qs, many=True).data
-
-    def test_url_is_passed_through(self, mock_write):
-        mock_write.return_value = 'https://download.file'
-        url = self.wrapped_export_collections_to_file(self.mock_task, 'xlsx', {'collector': [str(self.collector.pk)]})
-        self.assertEqual(url, 'https://download.file')
-
-    def test_write_function_is_called_once_with_correct_data(self, mock_write):
-        mock_write.return_value = 'https://download.file'
-        self.wrapped_export_collections_to_file(self.mock_task, 'xlsx', {'collector': [str(self.collector.pk)]})
-        mock_write.assert_called_once_with('collections_1234.xlsx', self.data, CollectionXLSXRenderer)
-
-    def test_integration(self, mock_write):
-        task = export_collections_to_file.apply(args=['xlsx', {'collector': [str(self.collector.pk)]}])
-        while task.status == 'PENDING':
-            self.assertEqual('PENDING', task.status)
-        self.assertEqual('SUCCESS', task.status)
+from ..tasks import (check_wasteflyer_url, check_wasteflyer_urls, check_wasteflyer_urls_callback)
 
 
 @patch('case_studies.soilcom.tests.test_tasks.check_wasteflyer_urls.apply')

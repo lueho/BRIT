@@ -1,11 +1,19 @@
 /logs/
 /db_dump/
-/.idea/
+/.vscode/
 /brit/settings/.env
-/.venv/
-/venv/
 *.pyc
-.vscode
-.windsurf
-/__pycache__
+*/__pycache__/
+.env
 
+# windsurf rules
+.windsurfrules
+*code-workspace*
+
+/test-results/
+/.venv/
+/.devcontainer/
+/.windsurf/
+/site/
+.windsurf
+.vscode

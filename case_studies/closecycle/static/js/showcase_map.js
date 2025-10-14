@@ -38,12 +38,12 @@ function featureClickHandler(e, featureGroup) {
 
     // Check number of intersecting regions
     if (intersectingFeatures.size === 1) {
-        // If only one region, call getShowcaseDetails directly
+        // If only one region, fetch and render the summary for that feature only
         const [region] = intersectingFeatures.keys();
         const features = intersectingFeatures.get(region);
         const feature = features[0];
         selectFeature(feature);
-        getFeatureDetails(feature.feature.id);
+        fetchFeaturesLayerSummary({ id: feature.feature.id });
     } else {
         // Select all overlapping features
         intersectingFeatures.forEach(features => {
@@ -78,7 +78,7 @@ async function handleShowcaseClick(id, region, featureIndex) {
     resetFeatureStyles(window.featureGroup);
     const feature = window.intersectingFeatures.get(region)[featureIndex];
     selectFeature(feature);
-    await getFeatureDetails(feature.feature.id);
+    fetchFeaturesLayerSummary({ id: feature.feature.id });
     map.closePopup();
 }
 

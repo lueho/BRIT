@@ -16,15 +16,33 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 1000; /* Ensure it overlays the map */
+    z-index: 1000;
+    /* Ensure it overlays the map */
 }
 
 .overlay-content {
     text-align: center;
     color: #fff;
     font-family: Arial, sans-serif;
+    z-index: 1001;
+    /* Ensure content is above the overlay background */
+    position: relative;
+    padding: 20px;
+    background-color: rgba(0, 0, 0, 0.5);
+    /* Semi-transparent background */
+    border-radius: 8px;
+    max-width: 80%;
+    box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
 }
 
+#map-overlay .overlay-content p {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 500;
+    line-height: 1.5;
+    color: #fff !important;
+    /* Use !important to override _typography.scss styles */
+}
 
 #summary-container {
     margin-bottom: 2em;

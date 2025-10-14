@@ -4,7 +4,7 @@ from django.urls import reverse
 from factory.django import mute_signals
 
 from ..filters import SourceFilter
-from ..models import Author, Licence, Source
+from ..models import Author, Licence, Source, SourceAuthor
 
 
 class SourceFilterTestCase(TestCase):
@@ -23,8 +23,8 @@ class SourceFilterTestCase(TestCase):
                 abbreviation='TS1',
                 licence=licence,
             )
-        cls.source.authors.add(cls.author1)
-        cls.source.authors.add(author2)
+        SourceAuthor.objects.create(source=cls.source, author=cls.author1, position=1)
+        SourceAuthor.objects.create(source=cls.source, author=author2, position=2)
         with mute_signals(post_save):
             source = Source.objects.create(
                 type='book',
@@ -32,7 +32,7 @@ class SourceFilterTestCase(TestCase):
                 abbreviation='TS2',
                 licence=licence,
             )
-        source.authors.add(author2)
+        SourceAuthor.objects.create(source=source, author=author2, position=1)
 
     def test_title_icontains(self):
         factory = RequestFactory()

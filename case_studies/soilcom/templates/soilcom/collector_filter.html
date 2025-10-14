@@ -1,11 +1,12 @@
 {% extends 'filtered_list.html' %}
 {% load crispy_forms_tags %}
+{% load moderation_tags %}
 
 {% block title %}BRIT | Waste collecting entities{% endblock %}
 
-{% block list_header %}<strong>Collectors</strong>{% endblock %}
+{% block list_card_header %}<strong>Collectors</strong>{% endblock %}
 
-{% block list_body %}
+{% block list_table %}
     <table class="table table-responsive-stack">
         <thead>
         <tr>
@@ -16,7 +17,7 @@
         <tbody>
         {% for object in object_list %}
             <tr>
-                <td data-label="Name"><a href="{{ object.get_absolute_url }}">{{ object.name }}</a></td>
+                <td data-label="Name"><a href="{% detail_or_review_url object %}">{{ object.name }}</a></td>
                 <td data-label="Catchment">{{ object.catchment }}</td>
             </tr>
         {% endfor %}
@@ -24,7 +25,7 @@
         <tfoot>
         </tfoot>
     </table>
-{% endblock list_body %}
+{% endblock list_table %}
 
 {% block list_footer %}
     {% if 'soilcom.add_collector' in perms %}
@@ -34,9 +35,9 @@
         </a>
     {% endif %}
     {% if 'soilcom.change_collector' in perms %}
-        <a class="mr-2 text-nowrap" href="{% url 'waste-collection-home' %}">
-            <i class="fas fa-fw fa-cog"></i>
-            <span>Dashboard</span>
+        <a class="mr-2 text-nowrap" href="{% url 'wastecollection-dashboard' %}">
+            <i class="fas fa-fw fa-th-large"></i>
+            <span>Explorer</span>
         </a>
     {% endif %}
 {% endblock list_footer %}
@@ -47,7 +48,3 @@
         <button id="btn-filter" class="btn btn-primary" type="submit">Filter</button>
     </form>
 {% endblock filter_body %}
-
-{% block javascript %}
-    {{ block.super }}
-{% endblock javascript %}

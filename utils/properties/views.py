@@ -1,65 +1,86 @@
 from django.urls import reverse_lazy
+from django.views.generic import TemplateView
+
+from utils.object_management.views import (
+    OwnedObjectModelSelectOptionsView,
+    PrivateObjectListView,
+    PublishedObjectListView,
+    UserCreatedObjectCreateView,
+    UserCreatedObjectDetailView,
+    UserCreatedObjectModalDeleteView,
+    UserCreatedObjectUpdateView,
+)
 
 from .forms import PropertyModelForm, PropertyUnitModelForm
 from .models import Property, PropertyUnit
-from ..views import (OwnedObjectCreateView, OwnedObjectListView, OwnedObjectModalDeleteView,
-                     OwnedObjectModelSelectOptionsView, OwnedObjectUpdateView, UserCreatedObjectDetailView)
 
 
-class PropertyUnitListView(OwnedObjectListView):
+class PropertiesDashboardView(TemplateView):
+    template_name = "properties_dashboard.html"
+
+
+# ----------- PropertyUnit CRUD ----------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+class PropertyUnitPublishedListView(PublishedObjectListView):
     model = PropertyUnit
-    permission_required = set()
+    dashboard_url = reverse_lazy("properties-dashboard")
 
 
-class PropertyUnitCreateView(OwnedObjectCreateView):
+class PropertyUnitPrivateListView(PrivateObjectListView):
+    model = PropertyUnit
+    dashboard_url = reverse_lazy("properties-dashboard")
+
+
+class PropertyUnitCreateView(UserCreatedObjectCreateView):
     model = PropertyUnit
     form_class = PropertyUnitModelForm
-    permission_required = ('properties.add_propertyunit',)
+    permission_required = ("properties.add_propertyunit",)
 
 
 class PropertyUnitDetailView(UserCreatedObjectDetailView):
     model = PropertyUnit
 
 
-class PropertyUnitUpdateView(OwnedObjectUpdateView):
+class PropertyUnitUpdateView(UserCreatedObjectUpdateView):
     model = PropertyUnit
     form_class = PropertyUnitModelForm
-    permission_required = ('properties.change_propertyunit',)
 
 
-class PropertyUnitModalDeleteView(OwnedObjectModalDeleteView):
+class PropertyUnitModalDeleteView(UserCreatedObjectModalDeleteView):
     model = PropertyUnit
-    permission_required = ('properties.delete_propertyunit',)
-    success_message = 'Property unit deleted successfully.'
-    success_url = reverse_lazy('propertyunit-list')
 
 
-class PropertyListView(OwnedObjectListView):
+# ----------- Property CRUD --------------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class PropertyPublishedListView(PublishedObjectListView):
     model = Property
-    permission_required = set()
+    dashboard_url = reverse_lazy("properties-dashboard")
 
 
-class PropertyCreateView(OwnedObjectCreateView):
+class PropertyPrivateListView(PrivateObjectListView):
+    model = Property
+    dashboard_url = reverse_lazy("properties-dashboard")
+
+
+class PropertyCreateView(UserCreatedObjectCreateView):
     model = Property
     form_class = PropertyModelForm
-    permission_required = ('properties.add_property',)
+    permission_required = ("properties.add_property",)
 
 
 class PropertyDetailView(UserCreatedObjectDetailView):
     model = Property
 
 
-class PropertyUpdateView(OwnedObjectUpdateView):
+class PropertyUpdateView(UserCreatedObjectUpdateView):
     model = Property
     form_class = PropertyModelForm
-    permission_required = ('properties.change_property',)
 
 
-class PropertyModalDeleteView(OwnedObjectModalDeleteView):
+class PropertyModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Property
-    permission_required = ('properties.delete_property',)
-    success_message = 'Property deleted successfully.'
-    success_url = reverse_lazy('property-list')
 
 
 class PropertyUnitOptionsView(OwnedObjectModelSelectOptionsView):
@@ -71,5 +92,5 @@ class PropertyUnitOptionsView(OwnedObjectModelSelectOptionsView):
         return self.object_list.first()
 
     def get_queryset(self):
-        obj = self.model.objects.get(id=self.kwargs.get('pk'))
+        obj = self.model.objects.get(id=self.kwargs.get("pk"))
         return obj.allowed_units.all()

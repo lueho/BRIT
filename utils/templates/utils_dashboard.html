@@ -1,21 +1,22 @@
 {% extends 'base.html' %}
 
-{% block title %}BRIT | Utils Dashboard{% endblock %}
+{% block title %}BRIT | Utils Explorer{% endblock %}
 
 {% block content %}
 
     <div class="row">
         <div class="col col-12 col-md-6">
             <div class="card shadow h-100">
-                <div class="card-header"><strong>Utils</strong></div>
+                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+                    <h5 class="mb-0">Utils</h5>
+                </div>
                 <div class="card-body">
                     <p class="card-text">
-                        This is the utils dashboard. Here you can manage database entries that are basic and common to
+                        This is the utils explorer. Here you can manage database entries that are basic and common to
                         all other parts of the tool.
                     </p>
                 </div>
-                <div class="card-footer">
-                </div>
+                <div class="card-footer"></div>
             </div>
         </div>
     </div>
@@ -24,13 +25,14 @@
 
         <div class="col col-12 col-md-6 col-lg-3 mt-4">
             <div class="card shadow h-100">
-                <div class="card-header">
-                    <a href="{% url 'propertyunit-list' %}" class="stretched-link"><strong>Units</strong></a>
+                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+                    <h5 class="mb-0">
+                        <a href="{% url 'propertyunit-list' %}"
+                           class="stretched-link text-decoration-none text-body">Units</a>
+                    </h5>
                 </div>
                 <div class="card-body">
-                    <p class="card-text">
-                        Units for any physical, chemical or other properties.
-                    </p>
+                    <p class="card-text">Units for any physical, chemical or other properties.</p>
                 </div>
                 <div class="card-footer">
                     <a href="{% url 'propertyunit-list' %}" class="btn btn-primary">View Units</a>
@@ -38,11 +40,13 @@
             </div>
         </div>
 
-
         <div class="col col-12 col-md-6 col-lg-3 mt-4">
             <div class="card shadow h-100">
-                <div class="card-header">
-                    <a href="{% url 'property-list' %}" class="stretched-link"><strong>Properties</strong></a>
+                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+                    <h5 class="mb-0">
+                        <a href="{% url 'property-list' %}"
+                           class="stretched-link text-decoration-none text-body">Properties</a>
+                    </h5>
                 </div>
                 <div class="card-body">
                     <p class="card-text">

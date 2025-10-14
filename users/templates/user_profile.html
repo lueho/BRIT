@@ -13,33 +13,15 @@
     </div>
 
     <div class="pt-3">
-        <a href="{% url 'auth_password_change' %}" class="btn btn-primary btn-block">
+        <a href="{% url 'auth_password_change' %}" class="btn btn-primary w-100">
             Change password
         </a>
     </div>
 
     <div class="pt-3">
-        <a href="{% url 'user_delete' pk=user.pk %}" class="btn btn-danger btn-block modal-link">
+        <a href="{% url 'user_delete' pk=user.pk %}" class="btn btn-danger w-100 modal-link">
             Delete Account
         </a>
     </div>
 
 {% endblock card_body %}
-
-{% block javascript %}
-    {{ block.super }}
-
-    <script type="text/javascript">
-        $(document).ready(function () {
-
-            $(".modal-link").each(function () {
-                $(this).modalForm({
-                    formURL: $(this).data()["link"],
-                    errorClass: ".is-invalid"
-                })
-            });
-
-        });
-    </script>
-
-{% endblock javascript %}

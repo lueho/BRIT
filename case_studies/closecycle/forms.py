@@ -1,18 +1,19 @@
-from dal import autocomplete
-from django.forms import ModelChoiceField
+from django_tomselect.forms import TomSelectConfig, TomSelectModelChoiceField
 
-from maps.models import Region
-from utils.forms import AutoCompleteModelForm
+from utils.forms import SimpleModelForm
+
 from .models import Showcase
 
 
-class ShowcaseModelForm(AutoCompleteModelForm):
-    region = ModelChoiceField(
-        queryset=Region.objects.all(),
-        widget=autocomplete.ModelSelect2(url='region-autocomplete'),
-        required=True
+class ShowcaseModelForm(SimpleModelForm):
+    region = TomSelectModelChoiceField(
+        config=TomSelectConfig(
+            url="region-autocomplete",
+            label_field="name",
+        ),
+        label="Region",
     )
 
     class Meta:
         model = Showcase
-        fields = ('name', 'region', 'description')
+        fields = ("name", "region", "description")

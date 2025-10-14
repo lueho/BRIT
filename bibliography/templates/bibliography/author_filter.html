@@ -1,0 +1,28 @@
+{% extends 'filtered_list.html' %}
+{% load static %}
+{% load user_created_object_tags %}
+{% load moderation_tags %}
+
+{% block title %}BRIT | Bibliography | Authors{% endblock %}
+
+{% block list_table_head %}
+    <thead>
+    <tr>
+        <th>Name</th>
+        {% if object_list.model|is_user_created %}
+            <th class="actions-column">Status/Actions</th>
+        {% endif %}
+    </tr>
+    </thead>
+{% endblock list_table_head %}
+
+{% block list_table_row %}
+    <tr>
+        <td><a href="{% detail_or_review_url object %}">{{ object }}</a></td>
+        {% if object_list.model|is_user_created %}
+            <td class="actions-column mobile-no-label">
+                {% include 'object_management/status_actions_cell.html' %}
+            </td>
+        {% endif %}
+    </tr>
+{% endblock list_table_row %}

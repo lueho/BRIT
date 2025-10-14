@@ -1,4 +1,4 @@
-from django.contrib.gis.geos import Point
+from django.contrib.gis.geos import GEOSGeometry, Point
 from django.db.models import QuerySet
 from django.test import TestCase
 
@@ -43,11 +43,40 @@ class RegionTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.borders = GeoPolygon.objects.create(geom='MULTIPOLYGON (((30 20, 45 40, 10 40, 30 20)))')
-        cls.region = Region.objects.create(name='Test Region', country='DE', borders=cls.borders)
+        country_wkt = "MULTIPOLYGON(((0 0, 0 1, 1 1, 1 0, 0 0)))"
+        cls.country_borders = GeoPolygon.objects.create(
+            geom=GEOSGeometry(country_wkt, srid=4326)
+        )
+        cls.country_region = NutsRegion.objects.create(
+            name="Country",
+            levl_code=0,
+            cntr_code="DE",
+            borders=cls.country_borders
+        )
+
+        # Create a catchment polygon that is almost entirely within the country.
+        # Its coordinates are chosen so that without the buffer it might not be strictly contained,
+        # but with the buffer (0.001°) the geometry becomes fully contained.
+        catchment_wkt = (
+            "MULTIPOLYGON((("
+            "0 0, "  # bottom left
+            "0 1, "  # top left
+            "1 1, "  # top right (inside)
+            "1.004 0.5, "  # tiny bump to the right (outside)
+            "1 0, "  # bottom right (inside)
+            "0 0"  # close the ring
+            ")))"
+        )
+        cls.catchment_borders = GeoPolygon.objects.create(
+            geom=GEOSGeometry(catchment_wkt, srid=4326)
+        )
 
     def test_region_geom(self):
-        self.assertEqual(self.borders.geom, self.region.geom)
+        self.assertEqual(self.country_borders.geom, self.country_region.geom)
+
+    def test_country_field_automatically_set(self):
+        catchment_region = Region.objects.create(name='Catchment Region', borders=self.catchment_borders)
+        self.assertEqual('DE', catchment_region.country, )
 
 
 class CatchmentPostDeleteTestCase(TestCase):

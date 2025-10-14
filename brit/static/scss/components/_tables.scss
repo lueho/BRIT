@@ -1,0 +1,16 @@
+// Table styling
+.table {
+  thead {
+    th {
+      background-color: rgba($secondary, 0.15);
+      color: $primary;
+      border-bottom-color: rgba($primary, 0.2);
+    }
+  }
+
+  tbody {
+    tr:hover {
+      background-color: rgba($secondary, 0.05);
+    }
+  }
+}

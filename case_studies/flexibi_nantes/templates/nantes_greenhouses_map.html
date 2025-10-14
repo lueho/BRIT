@@ -1,21 +1,17 @@
-{% extends 'filtered_map.html' %}
+{% extends "filtered_map.html" %}
+{% load file_export_tags %}
 {% load static %}
 {% load crispy_forms_tags %}
-{% load file_export_tags %}
 
-{% block map_card_footer %}
-    {% if user.is_authenticated %}
-        {% export_link "csv" 'nantesgreenhouses-export' 'nantesgreenhouses-export-progress' %}
-        {% export_link "xlsx" 'nantesgreenhouses-export' 'nantesgreenhouses-export-progress' %}
-    {% endif %}
-{% endblock %}
+{% block map_export_actions %}
+    {% export_modal_button "nantesgreenhouses-export" list_type=list_type button_classes="btn btn-outline-secondary w-100 mb-2" %}
+{% endblock map_export_actions %}
 
 {% block extra_cards %}
-
     <div class="card shadow">
         <div class="card-header"
              role="button"
-             data-toggle="collapse"
+             data-bs-toggle="collapse"
              href="#learning-card-body"
              aria-expanded="true"
              aria-controls="learning-card-body">
@@ -33,7 +29,7 @@
         </div>
     </div>
 
-{% endblock %}
+{% endblock extra_cards %}
 
 {% block javascript %}
     {{ block.super }}

@@ -2,6 +2,7 @@ from django.contrib.sitemaps import Sitemap
 from django.urls import reverse
 from .sitemap_items import SITEMAP_ITEMS
 
+
 class DynamicViewSitemap(Sitemap):
     priority = 0.5
     changefreq = 'daily'

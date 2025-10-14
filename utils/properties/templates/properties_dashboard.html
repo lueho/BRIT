@@ -1,0 +1,58 @@
+{% extends 'base.html' %}
+
+{% block title %}BRIT | Properties Explorer{% endblock %}
+
+{% block content %}
+
+    <div class="row">
+        <div class="col col-12 col-md-6">
+            <div class="card shadow h-100">
+                <div class="card-header bg-body-tertiary border-bottom-0 py-3"><h5 class="mb-0">Properties</h5></div>
+                <div class="card-body">
+                    <p class="card-text">
+                        This is the properties explorer. All models related to properties can be managed from here.
+                    </p>
+                </div>
+                <div class="card-footer">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="row">
+
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+                    <h5 class="mb-0"><a href="{% url 'unit-list' %}" class="stretched-link text-decoration-none text-body">Units</a></h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Manage the available units here.
+                    </p>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'unit-list' %}" class="btn btn-primary">View Units</a>
+                </div>
+            </div>
+        </div>
+
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+                    <h5 class="mb-0"><a href="{% url 'property-list' %}" class="stretched-link text-decoration-none text-body">Properties</a></h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Manage all available properties here.
+                    </p>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'property-list' %}" class="btn btn-primary">View Properties</a>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+{% endblock content %}

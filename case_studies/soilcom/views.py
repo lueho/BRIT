@@ -1,338 +1,369 @@
+import hashlib
 import json
-from datetime import date
+from datetime import date, timedelta
+from urllib.parse import urlencode
 
 from celery.result import AsyncResult
-from dal.autocomplete import Select2QuerySetView
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
-from django.db.models import Max
+from django.core.exceptions import PermissionDenied
+from django.db.models import Count, Max, Min, Q
 from django.forms.models import model_to_dict
 from django.http import HttpResponse, HttpResponseRedirect
 from django.urls import reverse, reverse_lazy
+from django.utils.decorators import method_decorator
 from django.views import View
+from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.generic import TemplateView
 
-import case_studies.soilcom.tasks
-from bibliography.views import (SourceCheckUrlView, SourceCreateView, SourceModalCreateView, SourceModalDeleteView,
-                                SourceModalDetailView, SourceModalUpdateView, SourceUpdateView)
+from bibliography.views import (
+    SourceCheckUrlView,
+    SourceCreateView,
+    SourceModalCreateView,
+    SourceModalDeleteView,
+    SourceModalDetailView,
+)
+from maps.filters import CatchmentFilterSet
 from maps.forms import NutsAndLauCatchmentQueryForm
-from maps.views import CatchmentDetailView, GeoDataSetFilteredMapView, \
-    GeoDataSetFormMixin, \
-    MapMixin
+from maps.views import (
+    CatchmentCreateView,
+    CatchmentDetailView,
+    CatchmentUpdateView,
+    GeoDataSetFormMixin,
+    GeoDataSetPrivateFilteredMapView,
+    GeoDataSetPublishedFilteredMapView,
+    GeoDataSetReviewFilteredMapView,
+    MapMixin,
+)
+from utils.file_export.views import GenericUserCreatedObjectExportView
 from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineFormSetMixin
-from utils.views import (BRITFilterView, OwnedObjectCreateView, OwnedObjectListView, OwnedObjectModalCreateView,
-                         OwnedObjectModalDeleteView, OwnedObjectModalDetailView, OwnedObjectModalUpdateView,
-                         OwnedObjectModelSelectOptionsView, OwnedObjectUpdateView, UserCreatedObjectDetailView)
+from utils.object_management.views import (
+    OwnedObjectModelSelectOptionsView,
+    PrivateObjectFilterView,
+    PrivateObjectListView,
+    PublishedObjectFilterView,
+    PublishedObjectListView,
+    ReviewObjectFilterView,
+    UserCreatedObjectAutocompleteView,
+    UserCreatedObjectCreateView,
+    UserCreatedObjectDetailView,
+    UserCreatedObjectModalArchiveView,
+    UserCreatedObjectModalCreateView,
+    UserCreatedObjectModalDeleteView,
+    UserCreatedObjectModalDetailView,
+    UserCreatedObjectModalUpdateView,
+    UserCreatedObjectUpdateView,
+)
+
 from .filters import CollectionFilterSet, CollectorFilter, WasteFlyerFilter
-from .forms import (AggregatedCollectionPropertyValueModelForm, BaseWasteFlyerUrlFormSet, CollectionAddPredecessorForm,
-                    CollectionAddWasteSampleForm, CollectionFrequencyModalModelForm, CollectionFrequencyModelForm,
-                    CollectionModelForm, CollectionPropertyValueModelForm, CollectionRemovePredecessorForm,
-                    CollectionRemoveWasteSampleForm, CollectionSeasonForm, CollectionSeasonFormHelper,
-                    CollectionSeasonFormSet, CollectionSystemModalModelForm, CollectionSystemModelForm,
-                    CollectorModalModelForm, CollectorModelForm, WasteCategoryModalModelForm, WasteCategoryModelForm,
-                    WasteComponentModalModelForm, WasteComponentModelForm, WasteFlyerModalModelForm,
-                    WasteFlyerModelForm, WasteStreamModalModelForm, WasteStreamModelForm)
-from .models import (AggregatedCollectionPropertyValue, Collection, CollectionCatchment, CollectionCountOptions,
-                     CollectionFrequency,
-                     CollectionPropertyValue, CollectionSeason,
-                     CollectionSystem, Collector, WasteCategory, WasteComponent, WasteFlyer, WasteStream)
+from .forms import (
+    AggregatedCollectionPropertyValueModelForm,
+    BaseWasteFlyerUrlFormSet,
+    CollectionAddPredecessorForm,
+    CollectionAddWasteSampleForm,
+    CollectionFrequencyModalModelForm,
+    CollectionFrequencyModelForm,
+    CollectionModelForm,
+    CollectionPropertyValueModelForm,
+    CollectionRemovePredecessorForm,
+    CollectionRemoveWasteSampleForm,
+    CollectionSeasonForm,
+    CollectionSeasonFormHelper,
+    CollectionSeasonFormSet,
+    CollectionSystemModalModelForm,
+    CollectionSystemModelForm,
+    CollectorModalModelForm,
+    CollectorModelForm,
+    FeeSystemModelForm,
+    WasteCategoryModalModelForm,
+    WasteCategoryModelForm,
+    WasteComponentModalModelForm,
+    WasteComponentModelForm,
+    WasteFlyerModalModelForm,
+    WasteFlyerModelForm,
+)
+from .models import (
+    AggregatedCollectionPropertyValue,
+    Collection,
+    CollectionCatchment,
+    CollectionCountOptions,
+    CollectionFrequency,
+    CollectionPropertyValue,
+    CollectionSeason,
+    CollectionSystem,
+    Collector,
+    FeeSystem,
+    WasteCategory,
+    WasteComponent,
+    WasteFlyer,
+)
 from .tasks import check_wasteflyer_urls
 
 
-class CollectionHomeView(PermissionRequiredMixin, TemplateView):
-    template_name = 'waste_collection_home.html'
-    permission_required = 'soilcom.view_collection'
+class CollectionDashboardView(TemplateView):
+    template_name = "wastecollection_dashboard.html"
 
 
 # ----------- Collector CRUD -------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CollectorListView(BRITFilterView):
+class CollectorPublishedListView(PublishedObjectFilterView):
     model = Collector
     filterset_class = CollectorFilter
-    ordering = 'name'
+    dashboard_url = reverse_lazy("wastecollection-dashboard")
 
 
-class CollectorCreateView(OwnedObjectCreateView):
+class CollectorPrivateListView(PrivateObjectFilterView):
+    model = Collector
+    filterset_class = CollectorFilter
+    dashboard_url = reverse_lazy("wastecollection-dashboard")
+
+
+class CollectorCreateView(UserCreatedObjectCreateView):
     form_class = CollectorModelForm
-    success_url = reverse_lazy('collector-list')
-    permission_required = 'soilcom.add_collector'
+    permission_required = "soilcom.add_collector"
 
 
-class CollectorModalCreateView(OwnedObjectModalCreateView):
+class CollectorModalCreateView(UserCreatedObjectModalCreateView):
     form_class = CollectorModalModelForm
-    success_url = reverse_lazy('collector-list')
-    permission_required = 'soilcom.add_collector'
+    permission_required = "soilcom.add_collector"
 
 
 class CollectorDetailView(UserCreatedObjectDetailView):
     model = Collector
 
 
-class CollectorModalDetailView(OwnedObjectModalDetailView):
-    template_name = 'modal_detail.html'
+class CollectorModalDetailView(UserCreatedObjectModalDetailView):
     model = Collector
-    permission_required = 'soilcom.view_collector'
 
 
-class CollectorUpdateView(OwnedObjectUpdateView):
+class CollectorUpdateView(UserCreatedObjectUpdateView):
     model = Collector
     form_class = CollectorModelForm
-    permission_required = 'soilcom.change_collector'
 
 
-class CollectorModalUpdateView(OwnedObjectModalUpdateView):
+class CollectorModalUpdateView(UserCreatedObjectModalUpdateView):
     model = Collector
     form_class = CollectorModalModelForm
-    permission_required = 'soilcom.change_collector'
 
 
-class CollectorModalDeleteView(OwnedObjectModalDeleteView):
-    template_name = 'modal_delete.html'
+class CollectorModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Collector
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('collector-list')
-    permission_required = 'soilcom.delete_collector'
 
 
-# ----------- Collector utilities --------------------------------------------------------------------------------------
+# ----------- Collector Utils ------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class CollectorAutoCompleteView(Select2QuerySetView):
-    def get_queryset(self):
-        qs = Collector.objects.order_by('name')
-        if self.q:
-            qs = qs.filter(name__icontains=self.q)
-        return qs
+
+class CollectorAutocompleteView(UserCreatedObjectAutocompleteView):
+    model = Collector
 
 
 # ----------- Collection System CRUD -----------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class CollectionSystemListView(OwnedObjectListView):
+
+class CollectionSystemPublishedListView(PublishedObjectListView):
     model = CollectionSystem
-    permission_required = 'soilcom.view_collectionsystem'
+    dashboard_url = reverse_lazy("wastecollection-dashboard")
 
 
-class CollectionSystemCreateView(OwnedObjectCreateView):
+class CollectionSystemPrivateListView(PrivateObjectListView):
+    model = CollectionSystem
+    dashboard_url = reverse_lazy("wastecollection-dashboard")
+
+
+class CollectionSystemCreateView(UserCreatedObjectCreateView):
     form_class = CollectionSystemModelForm
-    success_url = reverse_lazy('collectionsystem-list')
-    permission_required = 'soilcom.add_collectionsystem'
+    permission_required = "soilcom.add_collectionsystem"
 
 
-class CollectionSystemModalCreateView(OwnedObjectModalCreateView):
+class CollectionSystemModalCreateView(UserCreatedObjectModalCreateView):
     form_class = CollectionSystemModalModelForm
-    success_url = reverse_lazy('collectionsystem-list')
-    permission_required = 'soilcom.add_collectionsystem'
+    permission_required = "soilcom.add_collectionsystem"
 
 
 class CollectionSystemDetailView(UserCreatedObjectDetailView):
-    template_name = 'simple_detail_card.html'
     model = CollectionSystem
 
 
-class CollectionSystemModalDetailView(OwnedObjectModalDetailView):
-    template_name = 'modal_detail.html'
+class CollectionSystemModalDetailView(UserCreatedObjectModalDetailView):
     model = CollectionSystem
-    permission_required = 'soilcom.view_collectionsystem'
 
 
-class CollectionSystemUpdateView(OwnedObjectUpdateView):
+class CollectionSystemUpdateView(UserCreatedObjectUpdateView):
     model = CollectionSystem
     form_class = CollectionSystemModelForm
-    permission_required = 'soilcom.change_collectionsystem'
 
 
-class CollectionSystemModalUpdateView(OwnedObjectModalUpdateView):
+class CollectionSystemModalUpdateView(UserCreatedObjectModalUpdateView):
     model = CollectionSystem
     form_class = CollectionSystemModalModelForm
-    permission_required = 'soilcom.change_collectionsystem'
 
 
-class CollectionSystemModalDeleteView(OwnedObjectModalDeleteView):
-    template_name = 'modal_delete.html'
+class CollectionSystemModalDeleteView(UserCreatedObjectModalDeleteView):
     model = CollectionSystem
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('collectionsystem-list')
-    permission_required = 'soilcom.delete_collectionsystem'
 
 
 # ----------- Waste Stream Category CRUD -------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class WasteCategoryListView(OwnedObjectListView):
+
+class WasteCategoryPublishedListView(PublishedObjectListView):
     model = WasteCategory
-    permission_required = 'soilcom.view_wastecategory'
+    dashboard_url = reverse_lazy("wastecollection-dashboard")
 
 
-class WasteCategoryCreateView(OwnedObjectCreateView):
+class WasteCategoryPrivateListView(PrivateObjectListView):
+    model = WasteCategory
+    dashboard_url = reverse_lazy("wastecollection-dashboard")
+
+
+class WasteCategoryCreateView(UserCreatedObjectCreateView):
     form_class = WasteCategoryModelForm
-    success_url = reverse_lazy('wastecategory-list')
-    permission_required = 'soilcom.add_wastecategory'
+    permission_required = "soilcom.add_wastecategory"
 
 
-class WasteCategoryModalCreateView(OwnedObjectModalCreateView):
+class WasteCategoryModalCreateView(UserCreatedObjectModalCreateView):
     form_class = WasteCategoryModalModelForm
-    success_url = reverse_lazy('wastecategory-list')
-    permission_required = 'soilcom.add_wastecategory'
+    permission_required = "soilcom.add_wastecategory"
 
 
 class WasteCategoryDetailView(UserCreatedObjectDetailView):
     model = WasteCategory
 
 
-class WasteCategoryModalDetailView(OwnedObjectModalDetailView):
-    template_name = 'modal_detail.html'
+class WasteCategoryModalDetailView(UserCreatedObjectModalDetailView):
     model = WasteCategory
-    permission_required = 'soilcom.view_wastecategory'
 
 
-class WasteCategoryUpdateView(OwnedObjectUpdateView):
+class WasteCategoryUpdateView(UserCreatedObjectUpdateView):
     model = WasteCategory
     form_class = WasteCategoryModelForm
-    permission_required = 'soilcom.change_wastecategory'
 
 
-class WasteCategoryModalUpdateView(OwnedObjectModalUpdateView):
+class WasteCategoryModalUpdateView(UserCreatedObjectModalUpdateView):
     model = WasteCategory
     form_class = WasteCategoryModalModelForm
-    permission_required = 'soilcom.change_wastecategory'
 
 
-class WasteCategoryModalDeleteView(OwnedObjectModalDeleteView):
-    template_name = 'modal_delete.html'
+class WasteCategoryModalDeleteView(UserCreatedObjectModalDeleteView):
     model = WasteCategory
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('wastecategory-list')
-    permission_required = 'soilcom.delete_wastecategory'
 
 
 # ----------- Waste Component CRUD -------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class WasteComponentListView(OwnedObjectListView):
+
+class WasteComponentPublishedListView(PublishedObjectListView):
     model = WasteComponent
-    permission_required = 'soilcom.view_wastecomponent'
+    dashboard_url = reverse_lazy("wastecollection-dashboard")
 
 
-class WasteComponentCreateView(OwnedObjectCreateView):
+class WasteComponentPrivateListView(PrivateObjectListView):
+    model = WasteComponent
+    dashboard_url = reverse_lazy("wastecollection-dashboard")
+
+
+class WasteComponentCreateView(UserCreatedObjectCreateView):
     form_class = WasteComponentModelForm
-    success_url = reverse_lazy('wastecomponent-list')
-    permission_required = 'soilcom.add_wastecomponent'
+    permission_required = "soilcom.add_wastecomponent"
 
 
-class WasteComponentModalCreateView(OwnedObjectModalCreateView):
+class WasteComponentModalCreateView(UserCreatedObjectModalCreateView):
     form_class = WasteComponentModalModelForm
-    success_url = reverse_lazy('wastecomponent-list')
-    permission_required = 'soilcom.add_wastecomponent'
+    permission_required = "soilcom.add_wastecomponent"
 
 
 class WasteComponentDetailView(UserCreatedObjectDetailView):
     model = WasteComponent
 
 
-class WasteComponentModalDetailView(OwnedObjectModalDetailView):
-    template_name = 'modal_detail.html'
+class WasteComponentModalDetailView(UserCreatedObjectModalDetailView):
     model = WasteComponent
-    permission_required = 'soilcom.view_wastecomponent'
 
 
-class WasteComponentUpdateView(OwnedObjectUpdateView):
+class WasteComponentUpdateView(UserCreatedObjectUpdateView):
     model = WasteComponent
     form_class = WasteComponentModelForm
-    permission_required = 'soilcom.change_wastecomponent'
 
 
-class WasteComponentModalUpdateView(OwnedObjectModalUpdateView):
+class WasteComponentModalUpdateView(UserCreatedObjectModalUpdateView):
     model = WasteComponent
     form_class = WasteComponentModalModelForm
-    permission_required = 'soilcom.change_wastecomponent'
 
 
-class WasteComponentModalDeleteView(OwnedObjectModalDeleteView):
-    template_name = 'modal_delete.html'
+class WasteComponentModalDeleteView(UserCreatedObjectModalDeleteView):
     model = WasteComponent
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('wastecomponent-list')
-    permission_required = 'soilcom.delete_wastecomponent'
 
 
-# ----------- Waste Stream CRUD ----------------------------------------------------------------------------------------
+# ----------- Fee System CRUD ------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class WasteStreamListView(OwnedObjectListView):
-    model = WasteStream
-    permission_required = 'soilcom.view_wastestream'
+
+class FeeSystemPublishedListView(PublishedObjectListView):
+    model = FeeSystem
+    dashboard_url = reverse_lazy("wastecollection-dashboard")
 
 
-class WasteStreamCreateView(OwnedObjectCreateView):
-    form_class = WasteStreamModelForm
-    success_url = reverse_lazy('wastestream-list')
-    permission_required = 'soilcom.add_wastestream'
+class FeeSystemPrivateListView(PrivateObjectListView):
+    model = FeeSystem
+    dashboard_url = reverse_lazy("wastecollection-dashboard")
 
 
-class WasteStreamModalCreateView(OwnedObjectModalCreateView):
-    form_class = WasteStreamModalModelForm
-    success_url = reverse_lazy('wastecategory-list')
-    permission_required = 'soilcom.add_wastestream'
+class FeeSystemCreateView(UserCreatedObjectCreateView):
+    form_class = FeeSystemModelForm
+    permission_required = "soilcom.add_feesystem"
 
 
-class WasteStreamDetailView(UserCreatedObjectDetailView):
-    model = WasteStream
+class FeeSystemDetailView(UserCreatedObjectDetailView):
+    model = FeeSystem
 
 
-class WasteStreamModalDetailView(OwnedObjectModalDetailView):
-    template_name = 'modal_detail.html'
-    model = WasteStream
-    permission_required = 'soilcom.view_wastestream'
+class FeeSystemUpdateView(UserCreatedObjectUpdateView):
+    model = FeeSystem
+    form_class = FeeSystemModelForm
 
 
-class WasteStreamUpdateView(OwnedObjectUpdateView):
-    model = WasteStream
-    form_class = WasteStreamModelForm
-    permission_required = 'soilcom.change_wastestream'
-
-
-class WasteStreamModalUpdateView(OwnedObjectModalUpdateView):
-    model = WasteStream
-    form_class = WasteStreamModalModelForm
-    permission_required = 'soilcom.change_wastestream'
-
-
-class WasteStreamModalDeleteView(OwnedObjectModalDeleteView):
-    template_name = 'modal_delete.html'
-    model = WasteStream
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('wastestream-list')
-    permission_required = 'soilcom.delete_wastestream'
+class FeeSystemModalDeleteView(UserCreatedObjectModalDeleteView):
+    model = FeeSystem
 
 
 # ----------- Waste Collection Flyer CRUD ------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class WasteFlyerListView(BRITFilterView):
+
+class WasteFlyerPublishedFilterView(PublishedObjectFilterView):
     model = WasteFlyer
     filterset_class = WasteFlyerFilter
-    ordering = 'id'
+    dashboard_url = reverse_lazy("wastecollection-dashboard")
+    ordering = "id"
+
+
+class WasteFlyerPrivateFilterView(PrivateObjectFilterView):
+    model = WasteFlyer
+    filterset_class = WasteFlyerFilter
+    dashboard_url = reverse_lazy("wastecollection-dashboard")
+    ordering = "id"
 
 
 class WasteFlyerCreateView(SourceCreateView):
     form_class = WasteFlyerModelForm
-    success_url = reverse_lazy('wasteflyer-list')
-    permission_required = 'soilcom.add_wasteflyer'
+    success_url = reverse_lazy("wasteflyer-list")
+    permission_required = "soilcom.add_wasteflyer"
 
     def form_valid(self, form):
-        form.instance.type = 'waste_flyer'
+        form.instance.type = "waste_flyer"
         return super().form_valid(form)
 
 
 class WasteFlyerModalCreateView(SourceModalCreateView):
     form_class = WasteFlyerModalModelForm
-    success_url = reverse_lazy('wasteflyer-list')
-    permission_required = 'soilcom.add_wasteflyer'
+    success_url = reverse_lazy("wasteflyer-list")
+    permission_required = "soilcom.add_wasteflyer"
 
     def form_valid(self, form):
-        form.instance.type = 'waste_flyer'
+        form.instance.type = "waste_flyer"
         return super().form_valid(form)
 
 
@@ -341,26 +372,16 @@ class WasteFlyerDetailView(UserCreatedObjectDetailView):
 
 
 class WasteFlyerModalDetailView(SourceModalDetailView):
-    template_name = 'modal_waste_flyer_detail.html'
+    template_name = "modal_waste_flyer_detail.html"
     model = WasteFlyer
-    permission_required = 'soilcom.view_wasteflyer'
 
 
-class WasteFlyerUpdateView(SourceUpdateView):
-    model = WasteFlyer
-    form_class = WasteFlyerModelForm
-    permission_required = 'soilcom.change_wasteflyer'
-
-
-class WasteFlyerModalUpdateView(SourceModalUpdateView):
-    model = WasteFlyer
-    form_class = WasteFlyerModalModelForm
-    permission_required = 'soilcom.change_wasteflyer'
+# There is no WasteFlyerUpdateView because wasteflyers are not managed separately only through the collections
+# they are connected to.
 
 
 class WasteFlyerModalDeleteView(SourceModalDeleteView):
-    success_url = reverse_lazy('wasteflyer-list')
-    permission_required = 'soilcom.delete_wasteflyer'
+    success_url = reverse_lazy("wasteflyer-list")
 
 
 # ----------- Waste Collection Flyer utils -----------------------------------------------------------------------------
@@ -369,75 +390,80 @@ class WasteFlyerModalDeleteView(SourceModalDeleteView):
 
 class WasteFlyerCheckUrlView(SourceCheckUrlView):
     model = WasteFlyer
-    permission_required = 'soilcom.change_wasteflyer'
+    permission_required = "soilcom.change_wasteflyer"
 
 
 class WasteFlyerCheckUrlProgressView(LoginRequiredMixin, View):
-
     @staticmethod
     def get(request, task_id):
         result = AsyncResult(task_id)
         response_data = {
-            'state': result.state,
-            'details': result.info,
+            "state": result.state,
+            "details": result.info,
         }
-        return HttpResponse(json.dumps(response_data), content_type='application/json')
+        return HttpResponse(json.dumps(response_data), content_type="application/json")
 
 
 class WasteFlyerListCheckUrlsView(PermissionRequiredMixin, View):
     model = WasteFlyer
     filterset_class = WasteFlyerFilter
-    permission_required = 'soilcom.change_wasteflyer'
+    permission_required = "soilcom.change_wasteflyer"
 
     @staticmethod
     def get(request, *args, **kwargs):
         params = request.GET.copy()
-        params.pop('csrfmiddlewaretoken', None)
-        params.pop('page', None)
+        params.pop("csrfmiddlewaretoken", None)
+        params.pop("page", None)
         task = check_wasteflyer_urls.delay(params)
         callback_id = task.get()[0][0]
-        response_data = {
-            'task_id': callback_id
-        }
-        return HttpResponse(json.dumps(response_data), content_type='application/json')
+        response_data = {"task_id": callback_id}
+        return HttpResponse(json.dumps(response_data), content_type="application/json")
 
 
 class WasteFlyerListCheckUrlsProgressView(LoginRequiredMixin, View):
-
     @staticmethod
     def get(request, task_id):
         result = AsyncResult(task_id)
         response_data = {
-            'state': result.state,
-            'details': result.info,
+            "state": result.state,
+            "details": result.info,
         }
-        return HttpResponse(json.dumps(response_data), content_type='application/json')
+        return HttpResponse(json.dumps(response_data), content_type="application/json")
 
 
 # ----------- Frequency CRUD -------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class FrequencyListView(OwnedObjectListView):
+
+class FrequencyPublishedListView(PublishedObjectListView):
     model = CollectionFrequency
-    permission_required = set()
+    dashboard_url = reverse_lazy("wastecollection-dashboard")
 
 
-class FrequencyCreateView(M2MInlineFormSetMixin, OwnedObjectCreateView):
+class FrequencyPrivateListView(PrivateObjectListView):
+    model = CollectionFrequency
+    dashboard_url = reverse_lazy("wastecollection-dashboard")
+
+
+class FrequencyCreateView(M2MInlineFormSetMixin, UserCreatedObjectCreateView):
     form_class = CollectionFrequencyModelForm
     formset_model = CollectionSeason
     formset_class = CollectionSeasonFormSet
     formset_form_class = CollectionSeasonForm
     formset_helper_class = CollectionSeasonFormHelper
-    formset_factory_kwargs = {'extra': 0}
-    relation_field_name = 'seasons'
-    permission_required = 'soilcom.add_collectionfrequency'
+    formset_factory_kwargs = {"extra": 0}
+    relation_field_name = "seasons"
+    permission_required = "soilcom.add_collectionfrequency"
+    template_name = "formsets_card.html"
 
     def get_formset_initial(self):
-        return list(CollectionSeason.objects.filter(
-            distribution__name='Months of the year',
-            first_timestep__name='January',
-            last_timestep__name='December'
-        ).values('distribution', 'first_timestep', 'last_timestep'))
+        return list(
+            CollectionSeason.objects.filter(
+                distribution__name="Months of the year",
+                first_timestep__name="January",
+                last_timestep__name="December",
+            ).values("distribution", "first_timestep", "last_timestep")
+        )
 
     def post(self, request, *args, **kwargs):
         form = self.get_form()
@@ -459,36 +485,38 @@ class FrequencyDetailView(UserCreatedObjectDetailView):
     model = CollectionFrequency
 
 
-class FrequencyModalDetailView(OwnedObjectModalDetailView):
-    template_name = 'modal_detail.html'
+class FrequencyModalDetailView(UserCreatedObjectModalDetailView):
     model = CollectionFrequency
-    permission_required = set()
 
 
-class FrequencyUpdateView(M2MInlineFormSetMixin, OwnedObjectUpdateView):
+class FrequencyUpdateView(M2MInlineFormSetMixin, UserCreatedObjectUpdateView):
     model = CollectionFrequency
     form_class = CollectionFrequencyModelForm
     formset_model = CollectionSeason
     formset_class = CollectionSeasonFormSet
     formset_form_class = CollectionSeasonForm
     formset_helper_class = CollectionSeasonFormHelper
-    formset_factory_kwargs = {'extra': 0}
-    relation_field_name = 'seasons'
-    permission_required = 'soilcom.change_collectionfrequency'
+    formset_factory_kwargs = {"extra": 0}
+    relation_field_name = "seasons"
+    template_name = "formsets_card.html"
 
     def get_formset_initial(self):
         initial = []
         for season in self.object.seasons.all():
-            options = CollectionCountOptions.objects.get(frequency=self.object, season=season)
-            initial.append({
-                'distribution': season.distribution,
-                'first_timestep': season.first_timestep,
-                'last_timestep': season.last_timestep,
-                'standard': options.standard,
-                'option_1': options.option_1,
-                'option_2': options.option_2,
-                'option_3': options.option_3,
-            })
+            options = CollectionCountOptions.objects.get(
+                frequency=self.object, season=season
+            )
+            initial.append(
+                {
+                    "distribution": season.distribution,
+                    "first_timestep": season.first_timestep,
+                    "last_timestep": season.last_timestep,
+                    "standard": options.standard,
+                    "option_1": options.option_1,
+                    "option_2": options.option_2,
+                    "option_3": options.option_3,
+                }
+            )
         return initial
 
     def post(self, request, *args, **kwargs):
@@ -505,142 +533,177 @@ class FrequencyUpdateView(M2MInlineFormSetMixin, OwnedObjectUpdateView):
             return self.render_to_response(context)
 
 
-class FrequencyModalUpdateView(OwnedObjectModalUpdateView):
+class FrequencyModalUpdateView(UserCreatedObjectModalUpdateView):
     model = CollectionFrequency
     form_class = CollectionFrequencyModalModelForm
-    permission_required = 'soilcom.change_collectionfrequency'
 
 
-class FrequencyModalDeleteView(OwnedObjectModalDeleteView):
-    template_name = 'modal_delete.html'
+class FrequencyModalDeleteView(UserCreatedObjectModalDeleteView):
     model = CollectionFrequency
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('collectionfrequency-list')
-    permission_required = 'soilcom.delete_collectionfrequency'
 
 
 # ----------- Frequency Utils ------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class FrequencyAutoCompleteView(Select2QuerySetView):
-    def get_queryset(self):
-        qs = CollectionFrequency.objects.order_by('name')
-        if self.q:
-            qs = qs.filter(name__icontains=self.q)
-        return qs
+class FrequencyAutocompleteView(UserCreatedObjectAutocompleteView):
+    model = CollectionFrequency
 
 
 # ----------- CollectionPropertyValue CRUD -----------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CollectionPropertyValueCreateView(OwnedObjectCreateView):
-    model = CollectionPropertyValue
+class CollectionPropertyValueCreateView(UserCreatedObjectCreateView):
     form_class = CollectionPropertyValueModelForm
-    permission_required = 'soilcom.add_collectionpropertyvalue'
+    permission_required = "soilcom.add_collectionpropertyvalue"
 
 
 class CollectionPropertyValueDetailView(UserCreatedObjectDetailView):
     model = CollectionPropertyValue
 
 
-class CollectionPropertyValueUpdateView(OwnedObjectUpdateView):
+class CollectionPropertyValueUpdateView(UserCreatedObjectUpdateView):
     model = CollectionPropertyValue
     form_class = CollectionPropertyValueModelForm
-    permission_required = 'soilcom.change_collectionpropertyvalue'
 
 
-class CollectionPropertyValueModalDeleteView(OwnedObjectModalDeleteView):
+class CollectionPropertyValueModalDeleteView(UserCreatedObjectModalDeleteView):
     model = CollectionPropertyValue
-    success_message = 'Successfully deleted.'
-    permission_required = 'soilcom.delete_collectionpropertyvalue'
 
     def get_success_url(self):
-        return reverse('collection-detail', kwargs={'pk': self.object.collection.pk})
+        return reverse("collection-detail", kwargs={"pk": self.object.collection.pk})
 
 
 # ----------- AggregatedCollectionPropertyValue CRUD -------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class AggregatedCollectionPropertyValueCreateView(OwnedObjectCreateView):
-    template_name = 'soilcom/collectionpropertyvalue_form.html'
+class AggregatedCollectionPropertyValueCreateView(UserCreatedObjectCreateView):
+    template_name = "soilcom/collectionpropertyvalue_form.html"
     form_class = AggregatedCollectionPropertyValueModelForm
-    permission_required = 'soilcom.add_aggregatedcollectionpropertyvalue'
+    permission_required = "soilcom.add_aggregatedcollectionpropertyvalue"
 
 
 class AggregatedCollectionPropertyValueDetailView(UserCreatedObjectDetailView):
     model = AggregatedCollectionPropertyValue
 
 
-class AggregatedCollectionPropertyValueUpdateView(OwnedObjectUpdateView):
-    template_name = 'soilcom/collectionpropertyvalue_form.html'
+class AggregatedCollectionPropertyValueUpdateView(UserCreatedObjectUpdateView):
+    template_name = "soilcom/collectionpropertyvalue_form.html"
     model = AggregatedCollectionPropertyValue
     form_class = AggregatedCollectionPropertyValueModelForm
-    permission_required = 'soilcom.change_aggregatedcollectionpropertyvalue'
 
 
-class AggregatedCollectionPropertyValueModalDeleteView(OwnedObjectModalDeleteView):
+class AggregatedCollectionPropertyValueModalDeleteView(
+    UserCreatedObjectModalDeleteView
+):
     model = AggregatedCollectionPropertyValue
-    success_message = 'Successfully deleted.'
-    permission_required = 'soilcom.delete_aggregatedcollectionpropertyvalue'
 
     def get_success_url(self):
-        return reverse('collection-list')
+        related_ids = list(self.object.collections.values_list("id", flat=True))
+        base_url = reverse("collection-list")
+        query_string = urlencode([("id", rid) for rid in related_ids])
+        return f"{base_url}?{query_string}"
 
 
 # ----------- CollectionCatchment CRUD ---------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+class CollectionCatchmentPublishedFilterView(PublishedObjectFilterView):
+    model = CollectionCatchment
+    filterset_class = CatchmentFilterSet
+    dashboard_url = reverse_lazy("wastecollection-dashboard")
+
+
+class CollectionCatchmentPrivateFilterView(PrivateObjectFilterView):
+    model = CollectionCatchment
+    filterset_class = CatchmentFilterSet
+    dashboard_url = reverse_lazy("wastecollection-dashboard")
+
+
+class CollectionCatchmentCreateView(CatchmentCreateView):
+    pass
+
+
 class CollectionCatchmentDetailView(CatchmentDetailView):
     model = CollectionCatchment
+
+
+class CollectionCatchmentUpdateView(CatchmentUpdateView):
+    def get_success_url(self):
+        return reverse("collectioncatchment-detail", kwargs={"pk": self.object.pk})
+
+
+class CollectionCatchmentModalDeleteView(UserCreatedObjectModalDeleteView):
+    model = CollectionCatchment
+
+    def get_success_url(self):
+        if self.object.publication_status == "published":
+            return f"{reverse('collectioncatchment-list')}?scope=published"
+        elif self.object.publication_status == "private":
+            return f"{reverse('collectioncatchment-list-owned')}?scope=private"
+
+
+# ----------- CollectionCatchment Utils -------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class CollectionCatchmentAutocompleteView(UserCreatedObjectAutocompleteView):
+    model = CollectionCatchment
+    geodataset_model_name = "WasteCollection"
 
 
 # ----------- Collection CRUD ------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
-class CollectionCurrentListView(BRITFilterView):
+
+class CollectionPublishedListView(PublishedObjectFilterView):
     model = Collection
     filterset_class = CollectionFilterSet
-    ordering = 'name'
-
-    def get_queryset(self):
-        queryset = super().get_queryset()
-
-        # Check if it's a GET request and no query parameters are present
-        # This implies that the user has just opened the page and no filtering has been applied yet.
-        if self.request.method == 'GET' and not self.request.GET:
-            queryset = queryset.currently_valid()
-
-        return queryset
+    dashboard_url = reverse_lazy("wastecollection-dashboard")
 
 
-class CollectionCreateView(M2MInlineFormSetMixin, OwnedObjectCreateView):
+class CollectionPrivateListView(PrivateObjectFilterView):
+    model = Collection
+    filterset_class = CollectionFilterSet
+    dashboard_url = reverse_lazy("wastecollection-dashboard")
+
+
+class CollectionReviewListView(ReviewObjectFilterView):
+    model = Collection
+    filterset_class = CollectionFilterSet
+    template_name = "collection_review_filter.html"
+    dashboard_url = reverse_lazy("wastecollection-dashboard")
+
+
+class CollectionCreateView(M2MInlineFormSetMixin, UserCreatedObjectCreateView):
     model = Collection
     form_class = CollectionModelForm
     formset_model = WasteFlyer
     formset_class = BaseWasteFlyerUrlFormSet
     formset_form_class = WasteFlyerModelForm
     formset_helper_class = DynamicTableInlineFormSetHelper
-    relation_field_name = 'flyers'
-    permission_required = 'soilcom.add_collection'
+    relation_field_name = "flyers"
+    permission_required = "soilcom.add_collection"
 
     def get_formset_kwargs(self, **kwargs):
         if self.request.method in ("POST", "PUT"):
-            kwargs.update({'owner': self.request.user})
+            kwargs.update({"owner": self.request.user})
         return super().get_formset_kwargs(**kwargs)
 
     def get_initial(self):
         initial = super().get_initial()
-        if 'region_id' in self.request.GET:
-            region_id = self.request.GET.get('region_id')
+        if "region_id" in self.request.GET:
+            region_id = self.request.GET.get("region_id")
             catchment = CollectionCatchment.objects.get(id=region_id)
-            initial['catchment'] = catchment
-        if 'collector' in self.request.GET:
-            initial['collector'] = Collector.objects.get(id=self.request.GET.get('collector'))
-        initial['valid_from'] = date.today()
+            initial["catchment"] = catchment
+        if "collector" in self.request.GET:
+            initial["collector"] = Collector.objects.get(
+                id=self.request.GET.get("collector")
+            )
+        initial["valid_from"] = date.today()
         return initial
 
     def post(self, request, *args, **kwargs):
@@ -660,17 +723,28 @@ class CollectionCreateView(M2MInlineFormSetMixin, OwnedObjectCreateView):
 
 
 class CollectionCopyView(CollectionCreateView):
+    """
+    View for duplicating an existing Collection. Copies all relevant fields and resets instance for new object creation.
+    """
+
     model = Collection
 
     def get_initial(self):
+        """
+        Returns initial data for the duplicate form, including all relevant fields from the original collection.
+        """
         initial = model_to_dict(self.object)
-        initial.update({
-            'waste_category': self.object.waste_stream.category.id,
-            'allowed_materials': [mat.id for mat in self.object.waste_stream.allowed_materials.all()],
-            'forbidden_materials': [mat.id for mat in self.object.waste_stream.forbidden_materials.all()],
-        })
-        # Prevent the ModelFormMixin from passing the original instance into the ModelForm by removing self.object.
-        # That way, a new instance is created, instead.
+        initial.update(
+            {
+                "waste_category": self.object.waste_stream.category.id,
+                "allowed_materials": [
+                    mat.id for mat in self.object.waste_stream.allowed_materials.all()
+                ],
+                "forbidden_materials": [
+                    mat.id for mat in self.object.waste_stream.forbidden_materials.all()
+                ],
+            }
+        )
         self.object = None
         return initial
 
@@ -684,17 +758,32 @@ class CollectionCopyView(CollectionCreateView):
 
 
 class CollectionCreateNewVersionView(CollectionCopyView):
+    """
+    View for creating a new version of a Collection. Inherits duplication logic and sets predecessor.
+    """
+
     predecessor = None
 
     def get_initial(self):
+        """
+        Returns initial data for the new version form, including all relevant fields from the original collection.
+        """
         initial = model_to_dict(self.object)
-        initial.update({
-            'waste_category': self.object.waste_stream.category.id,
-            'allowed_materials': [mat.id for mat in self.object.waste_stream.allowed_materials.all()],
-            'forbidden_materials': [mat.id for mat in self.object.waste_stream.forbidden_materials.all()],
-        })
-        # Prevent the ModelFormMixin from passing the original instance into the ModelForm by removing self.object.
-        # That way, a new instance is created, instead.
+        initial.update(
+            {
+                "waste_category": self.object.waste_stream.category.id,
+                "allowed_materials": [
+                    mat.id for mat in self.object.waste_stream.allowed_materials.all()
+                ],
+                "forbidden_materials": [
+                    mat.id for mat in self.object.waste_stream.forbidden_materials.all()
+                ],
+            }
+        )
+        if self.object.valid_until:
+            initial["valid_from"] = self.object.valid_until + timedelta(days=1)
+        else:
+            initial["valid_from"] = None
         self.predecessor = self.object
         self.object = None
         return initial
@@ -718,37 +807,48 @@ class CollectionCreateNewVersionView(CollectionCopyView):
             return self.render_to_response(context)
 
 
-class CollectionDetailView(UserCreatedObjectDetailView):
+class CollectionDetailView(MapMixin, UserCreatedObjectDetailView):
+    model = Collection
+    features_layer_api_basename = "api-waste-collection"
+    map_title = "Collection"
+
+    def get_override_params(self):
+        params = super().get_override_params()
+        # Always load the features layer for the current object on detail pages
+        params["load_features"] = True
+        return params
+
+
+class CollectionModalDetailView(UserCreatedObjectModalDetailView):
     model = Collection
 
 
-class CollectionModalDetailView(OwnedObjectModalDetailView):
-    template_name = 'modal_detail.html'
-    model = Collection
-    permission_required = 'soilcom.view_collection'
-
-
-class CollectionUpdateView(M2MInlineFormSetMixin, OwnedObjectUpdateView):
+class CollectionUpdateView(M2MInlineFormSetMixin, UserCreatedObjectUpdateView):
     model = Collection
     form_class = CollectionModelForm
     formset_model = WasteFlyer
     formset_class = BaseWasteFlyerUrlFormSet
     formset_form_class = WasteFlyerModelForm
     formset_helper_class = DynamicTableInlineFormSetHelper
-    relation_field_name = 'flyers'
-    permission_required = 'soilcom.change_collection'
+    relation_field_name = "flyers"
 
     def get_formset_kwargs(self, **kwargs):
-        kwargs.update({'owner': self.request.user})
+        kwargs.update({"owner": self.request.user})
         return super().get_formset_kwargs(**kwargs)
 
     def get_initial(self):
         initial = super().get_initial()
-        initial.update({
-            'waste_category': self.object.waste_stream.category.id,
-            'allowed_materials': [mat.id for mat in self.object.waste_stream.allowed_materials.all()],
-            'forbidden_materials': [mat.id for mat in self.object.waste_stream.forbidden_materials.all()],
-        })
+        initial.update(
+            {
+                "waste_category": self.object.waste_stream.category.id,
+                "allowed_materials": [
+                    mat.id for mat in self.object.waste_stream.allowed_materials.all()
+                ],
+                "forbidden_materials": [
+                    mat.id for mat in self.object.waste_stream.forbidden_materials.all()
+                ],
+            }
+        )
         return initial
 
     def post(self, request, *args, **kwargs):
@@ -765,206 +865,339 @@ class CollectionUpdateView(M2MInlineFormSetMixin, OwnedObjectUpdateView):
             return self.render_to_response(context)
 
 
-class CollectionModalDeleteView(OwnedObjectModalDeleteView):
-    template_name = 'modal_delete.html'
+class CollectionModalDeleteView(UserCreatedObjectModalDeleteView):
     model = Collection
-    success_message = 'Successfully deleted.'
-    success_url = reverse_lazy('collection-list')
-    permission_required = 'soilcom.delete_collection'
 
 
-# ----------- Collection utils -----------------------------------------------------------------------------------------
+class CollectionReviewFilterView(ReviewObjectFilterView):
+    model = Collection
+    filterset_class = CollectionFilterSet
+    dashboard_url = reverse_lazy("wastecollection-dashboard")
+
+    def get_filterset_kwargs(self, filterset_class=None):
+        kwargs = super().get_filterset_kwargs(filterset_class)
+        data = kwargs.get("data").copy() if kwargs.get("data") else {}
+        data["scope"] = "review"
+        kwargs["data"] = data
+        return kwargs
+
+
+# ----------- Collection Utils -----------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CollectionAutoCompleteView(Select2QuerySetView):
-    def get_queryset(self):
-        qs = Collection.objects.order_by('name')
-        if self.q:
-            qs = qs.filter(name__icontains=self.q)
-        return qs
+class CollectionAutocompleteView(UserCreatedObjectAutocompleteView):
+    model = Collection
+
+
+class CollectionListFileExportView(GenericUserCreatedObjectExportView):
+    model_label = "soilcom.Collection"
 
 
 class CollectionAddPropertyValueView(CollectionPropertyValueCreateView):
-
     def get_initial(self):
         initial = super().get_initial()
-        initial['collection'] = self.kwargs['pk']
+        initial["collection"] = self.kwargs["pk"]
         return initial
 
     def get_success_url(self):
-        return reverse('collection-detail', kwargs={'pk': self.kwargs['pk']})
+        return reverse("collection-detail", kwargs={"pk": self.kwargs["pk"]})
+
+    def form_valid(self, form):
+        """
+        Enforce that the new property value is attached to the parent Collection
+        referenced in the URL, regardless of any submitted form value.
+        """
+        try:
+            collection = Collection.objects.get(pk=self.kwargs.get("pk"))
+        except Collection.DoesNotExist as err:
+            raise PermissionDenied("Invalid parent collection.") from err
+        form.instance.collection = collection
+        return super().form_valid(form)
 
 
-class CollectionCatchmentAddAggregatedPropertyView(AggregatedCollectionPropertyValueCreateView):
-
+class CollectionCatchmentAddAggregatedPropertyView(
+    AggregatedCollectionPropertyValueCreateView
+):
     def get_initial(self):
         initial = super().get_initial()
-        catchment = CollectionCatchment.objects.get(pk=self.kwargs.get('pk'))
-        initial['collections'] = catchment.downstream_collections
+        catchment = CollectionCatchment.objects.get(pk=self.kwargs.get("pk"))
+        initial["collections"] = catchment.downstream_collections
         return initial
 
 
 class SelectNewlyCreatedObjectModelSelectOptionsView(OwnedObjectModelSelectOptionsView):
-
     def get_selected_object(self):
         # TODO: Improve this by adding owner to
-        created_at = self.model.objects.aggregate(max_created_at=Max('created_at'))['max_created_at']
+        created_at = self.model.objects.aggregate(max_created_at=Max("created_at"))[
+            "max_created_at"
+        ]
         return self.model.objects.get(created_at=created_at)
 
 
 class CollectorOptions(SelectNewlyCreatedObjectModelSelectOptionsView):
     model = Collector
-    permission_required = 'soilcom.view_collector'
+    permission_required = "soilcom.view_collector"
 
 
 class CollectionSystemOptions(SelectNewlyCreatedObjectModelSelectOptionsView):
     model = CollectionSystem
-    permission_required = 'soilcom.view_collectionsystem'
+    permission_required = "soilcom.view_collectionsystem"
 
 
 class CollectionFrequencyOptions(SelectNewlyCreatedObjectModelSelectOptionsView):
     model = CollectionFrequency
-    permission_required = 'soilcom.view_collectionfrequency'
+    permission_required = "soilcom.view_collectionfrequency"
 
 
 class WasteCategoryOptions(SelectNewlyCreatedObjectModelSelectOptionsView):
     model = WasteCategory
-    permission_required = 'soilcom.view_wastecategory'
+    permission_required = "soilcom.view_wastecategory"
+    template_name = "detail_with_options.html"
 
 
-class CollectionWasteSamplesView(OwnedObjectUpdateView):
-    template_name = 'collection_samples.html'
+class CollectionWasteSamplesView(UserCreatedObjectUpdateView):
+    template_name = "collection_samples.html"
     model = Collection
     form_class = CollectionAddWasteSampleForm
-    permission_required = 'soilcom.change_collection'
 
     def get_success_url(self):
-        return reverse('collection-wastesamples', kwargs={'pk': self.object.pk})
+        return reverse("collection-wastesamples", kwargs={"pk": self.object.pk})
 
     def get_form(self, form_class=None):
-        if self.request.method in ('POST', 'PUT'):
-            if self.request.POST['submit'] == 'Add':
+        if self.request.method in ("POST", "PUT"):
+            if self.request.POST["submit"] == "Add":
                 return CollectionAddWasteSampleForm(**self.get_form_kwargs())
-            if self.request.POST['submit'] == 'Remove':
+            if self.request.POST["submit"] == "Remove":
                 return CollectionRemoveWasteSampleForm(**self.get_form_kwargs())
         else:
             return super().get_form(self.get_form_class())
 
     def get_context_data(self, **kwargs):
-        kwargs['form_add'] = CollectionAddWasteSampleForm(**self.get_form_kwargs())
-        kwargs['form_remove'] = CollectionRemoveWasteSampleForm(**self.get_form_kwargs())
+        kwargs["form_add"] = CollectionAddWasteSampleForm(**self.get_form_kwargs())
+        kwargs["form_remove"] = CollectionRemoveWasteSampleForm(
+            **self.get_form_kwargs()
+        )
         return super().get_context_data(**kwargs)
 
     def form_valid(self, form):
-        if self.request.POST['submit'] == 'Add':
-            self.object.samples.add(form.cleaned_data['sample'])
-        if self.request.POST['submit'] == 'Remove':
-            self.object.samples.remove(form.cleaned_data['sample'])
+        if self.request.POST["submit"] == "Add":
+            self.object.samples.add(form.cleaned_data["sample"])
+        if self.request.POST["submit"] == "Remove":
+            self.object.samples.remove(form.cleaned_data["sample"])
         return HttpResponseRedirect(self.get_success_url())
 
 
-class CollectionPredecessorsView(OwnedObjectUpdateView):
-    template_name = 'collection_predecessors.html'
+class CollectionPredecessorsView(UserCreatedObjectUpdateView):
+    template_name = "collection_predecessors.html"
     model = Collection
     form_class = CollectionAddPredecessorForm
-    permission_required = 'soilcom.change_collection'
 
     def get_success_url(self):
-        return reverse('collection-predecessors', kwargs={'pk': self.object.pk})
+        return reverse("collection-predecessors", kwargs={"pk": self.object.pk})
 
     def get_form(self, form_class=None):
-        if self.request.method in ('POST', 'PUT'):
-            if self.request.POST['submit'] == 'Add':
+        if self.request.method in ("POST", "PUT"):
+            if self.request.POST["submit"] == "Add":
                 return CollectionAddPredecessorForm(**self.get_form_kwargs())
-            if self.request.POST['submit'] == 'Remove':
+            if self.request.POST["submit"] == "Remove":
                 return CollectionRemovePredecessorForm(**self.get_form_kwargs())
         else:
             return super().get_form(self.get_form_class())
 
     def get_context_data(self, **kwargs):
-        kwargs['form_add'] = CollectionAddPredecessorForm(**self.get_form_kwargs())
-        kwargs['form_remove'] = CollectionRemovePredecessorForm(**self.get_form_kwargs())
+        kwargs["form_add"] = CollectionAddPredecessorForm(**self.get_form_kwargs())
+        kwargs["form_remove"] = CollectionRemovePredecessorForm(
+            **self.get_form_kwargs()
+        )
         return super().get_context_data(**kwargs)
 
     def form_valid(self, form):
-        if self.request.POST['submit'] == 'Add':
-            self.object.predecessors.add(form.cleaned_data['predecessor'])
-        if self.request.POST['submit'] == 'Remove':
-            self.object.predecessors.remove(form.cleaned_data['predecessor'])
+        if self.request.POST["submit"] == "Add":
+            self.object.predecessors.add(form.cleaned_data["predecessor"])
+        if self.request.POST["submit"] == "Remove":
+            self.object.predecessors.remove(form.cleaned_data["predecessor"])
         return HttpResponseRedirect(self.get_success_url())
+
+
+class CollectionModalArchiveView(UserCreatedObjectModalArchiveView):
+    model = Collection
 
 
 # ----------- Maps -----------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 
+class SoilcomDatasetVersionMixin:
+    """
+    Provides a stable dataset version (dv) string for caching purposes.
+
+    The dv changes only when data visible for the current map scope changes.
+    It's computed from a scope-appropriate queryset using:
+    - COUNT(*)
+    - MAX(lastmodified_at)
+    - MIN(id)
+    - MAX(id)
+
+    The dv is then exposed to templates via context as "dataset_version".
+    """
+
+    dv_scope = None  # 'published' | 'private' | 'review' (optional override per view)
+
+    def get_dv_scope(self):
+        # Prefer explicit per-view scope, then URL param, finally default to 'published'
+        return (
+            getattr(self, "dv_scope", None)
+            or self.request.GET.get("scope")
+            or "published"
+        )
+
+    def _dv_queryset(self):
+        scope = self.get_dv_scope()
+        user = getattr(self.request, "user", None)
+        qs = Collection.objects.all()
+
+        if scope == "published":
+            qs = qs.filter(publication_status="published")
+        elif scope == "private":
+            if user and user.is_authenticated and not user.is_staff:
+                qs = qs.filter(owner=user)
+            else:
+                # Staff users on private scope: default to all (matches current staff behavior)
+                qs = qs
+        elif scope == "review":
+            if user and user.is_authenticated and not user.is_staff:
+                qs = qs.filter(Q(owner=user) | Q(publication_status="review"))
+            else:
+                # Staff: restrict dv to items in review to reflect the view's intent
+                qs = qs.filter(publication_status="review")
+        return qs
+
+    def get_dataset_version(self) -> str:
+        qs = self._dv_queryset()
+        agg = qs.aggregate(
+            cnt=Count("pk"),
+            max_mod=Max("lastmodified_at"),
+            min_id=Min("pk"),
+            max_id=Max("pk"),
+        )
+        scope = self.get_dv_scope()
+        cnt = agg.get("cnt") or 0
+        max_mod = agg.get("max_mod")
+        ts = int(max_mod.timestamp()) if max_mod else 0
+        min_id = agg.get("min_id") or 0
+        max_id = agg.get("max_id") or 0
+        base = f"{scope}:{cnt}:{ts}:{min_id}:{max_id}"
+        return hashlib.sha1(base.encode("utf-8")).hexdigest()[:12]
+
+    def get_context_data(self, **kwargs):
+        ctx = super().get_context_data(**kwargs)
+        ctx["dataset_version"] = self.get_dataset_version()
+        return ctx
+
+
+# TODO: This is out of use - Decide to fix or remove
 class CatchmentSelectView(GeoDataSetFormMixin, MapMixin, TemplateView):
-    template_name = 'waste_collection_catchment_list.html'
+    template_name = "waste_collection_catchment_list.html"
     form_class = NutsAndLauCatchmentQueryForm
-    region_url = reverse_lazy('data.catchment_region_geometries')
-    feature_url = reverse_lazy('data.catchment-options')
-    feature_summary_url = reverse_lazy('data.catchment_region_summaries')
+    region_url = reverse_lazy("data.catchment_region_geometries")
+    feature_url = reverse_lazy("data.catchment-options")
+    feature_summary_url = reverse_lazy("data.catchment_region_summaries")
     load_features = False
     load_catchment = True
     adjust_bounds_to_features = False
     load_region = False
-    map_title = 'Catchments'
-    feature_layer_style = {
-        'color': '#4061d2',
-        'fillOpacity': 1,
-        'stroke': False
-    }
+    map_title = "Catchments"
+    feature_layer_style = {"color": "#4061d2", "fillOpacity": 1, "stroke": False}
 
     def get_initial(self):
         initial = {}
         region_id = self.get_region_feature_id()
-        catchment_id = self.request.GET.get('catchment')
+        catchment_id = self.request.GET.get("catchment")
         if catchment_id:
             catchment = CollectionCatchment.objects.get(id=catchment_id)
-            initial['parent_region'] = catchment.parent_region.id
-            initial['catchment'] = catchment.id
+            initial["parent_region"] = catchment.parent_region.id
+            initial["catchment"] = catchment.id
         elif region_id:
-            initial['region'] = region_id
+            initial["region"] = region_id
         return initial
 
     def get_region_feature_id(self):
-        return self.request.GET.get('region')
+        return self.request.GET.get("region")
 
 
-class WasteCollectionMapView(GeoDataSetFilteredMapView):
-    model_name = 'WasteCollection'
-    template_name = 'waste_collection_map.html'
+class WasteCollectionPublishedMapView(
+    SoilcomDatasetVersionMixin, GeoDataSetPublishedFilteredMapView
+):
+    model_name = "WasteCollection"
+    template_name = "waste_collection_map.html"
     filterset_class = CollectionFilterSet
-    features_layer_api_basename = 'api-waste-collection'
-    map_title = 'Household Waste Collection Europe'
+    features_layer_api_basename = "api-waste-collection"
+    map_title = "Household Waste Collections"
+    dashboard_url = reverse_lazy("wastecollection-dashboard")
+    dv_scope = "published"
+
+    def get_filterset_kwargs(self, filterset_class=None):
+        kwargs = super().get_filterset_kwargs(filterset_class)
+        data = kwargs.get("data").copy() if kwargs.get("data") else {}
+        data["scope"] = "published"
+        kwargs["data"] = data
+        return kwargs
 
 
-# ----------- API ------------------------------------------------------------------------------------------------------
-# ----------------------------------------------------------------------------------------------------------------------
+class WasteCollectionPrivateMapView(
+    SoilcomDatasetVersionMixin, GeoDataSetPrivateFilteredMapView
+):
+    model_name = "WasteCollection"
+    template_name = "waste_collection_map.html"
+    filterset_class = CollectionFilterSet
+    features_layer_api_basename = "api-waste-collection"
+    map_title = "My Household Waste Collections"
+    dashboard_url = reverse_lazy("wastecollection-dashboard")
+    dv_scope = "private"
+
+    def get_filterset_kwargs(self, filterset_class=None):
+        kwargs = super().get_filterset_kwargs(filterset_class)
+        data = kwargs.get("data").copy() if kwargs.get("data") else {}
+        data["scope"] = "private"
+        kwargs["data"] = data
+        return kwargs
 
 
-class CollectionListFileExportView(LoginRequiredMixin, View):
+class WasteCollectionReviewMapView(
+    SoilcomDatasetVersionMixin, GeoDataSetReviewFilteredMapView
+):
+    model = Collection
+    model_name = "WasteCollection"
+    template_name = "waste_collection_map.html"
+    filterset_class = CollectionFilterSet
+    features_layer_api_basename = "api-waste-collection"
+    map_title = "Collections in Review"
+    dashboard_url = reverse_lazy("wastecollection-dashboard")
+    dv_scope = "review"
 
-    @staticmethod
-    def get(request, *args, **kwargs):
-        params = dict(request.GET)
-        file_format = params.pop('format', 'csv')[0]
-        params.pop('page', None)
-        task = case_studies.soilcom.tasks.export_collections_to_file.delay(file_format, params)
-        response_data = {
-            'task_id': task.task_id
-        }
-        return HttpResponse(json.dumps(response_data), content_type='application/json')
+    def get_filterset_kwargs(self, filterset_class=None):
+        kwargs = super().get_filterset_kwargs(filterset_class)
+        data = kwargs.get("data").copy() if kwargs.get("data") else {}
+        data["scope"] = "review"
+        kwargs["data"] = data
+        return kwargs
 
 
-class CollectionListFileExportProgressView(LoginRequiredMixin, View):
+@method_decorator(xframe_options_exempt, name="dispatch")
+class WasteCollectionPublishedMapIframeView(
+    SoilcomDatasetVersionMixin, GeoDataSetPublishedFilteredMapView
+):
+    model_name = "WasteCollection"
+    template_name = "waste_collection_map_iframe.html"
+    filterset_class = CollectionFilterSet
+    features_layer_api_basename = "api-waste-collection"
+    map_title = "Household Waste Collection Europe"
+    dv_scope = "published"
 
-    @staticmethod
-    def get(request, task_id):
-        result = AsyncResult(task_id)
-        response_data = {
-            'state': result.state,
-            'details': result.info,
-        }
-        return HttpResponse(json.dumps(response_data), content_type='application/json')
+    def get_filterset_kwargs(self, filterset_class=None):
+        kwargs = super().get_filterset_kwargs(filterset_class)
+        data = kwargs.get("data").copy() if kwargs.get("data") else {}
+        data["scope"] = "published"
+        kwargs["data"] = data
+        return kwargs

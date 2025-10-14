@@ -10,7 +10,7 @@
         <div class="col col-12 col-lg-3">
             {% include 'scenario_detail_card.html' %}
             <div class="card shadow">
-                <div class="card-header"><strong>Evaluation</strong></div>
+                <div class="card-header bg-body-tertiary border-bottom-0 py-3"><h5 class="mb-0">Evaluation</h5></div>
                 <div class="card-body" id="sources-body-{{ group_settings.id }}">
                     <p class="card-text">The results are ready! </p>
                     <div class="text-center">
@@ -29,7 +29,7 @@
                 {% for id, c in charts.items %}
                     <div class="col col-12 col-xl-6 mb-4">
                         <div class="card shadow h-100">
-                            <div class="card-header"><b>{{ c.title }}</b></div>
+                            <div class="card-header bg-body-tertiary border-bottom-0 py-3"><h5 class="mb-0">{{ c.title }}</h5></div>
                             <div class="card-body p-0">
                                 <div class="chart-bar">
                                     <canvas id="{{ id }}"></canvas>
@@ -44,16 +44,14 @@
             <div class="row">
                 <div class="col">
                     <div class="card shadow">
-                        <div class="card-header"><strong>Results by inventory</strong></div>
+                        <div class="card-header bg-body-tertiary border-bottom-0 py-3"><h5 class="mb-0">Results by inventory</h5></div>
                         <div class="card-body">
                             {% for layer in layers %}
                                 <div class="row mb-2">
                                     <div class="col col-12">
                                         <div class="card border-left-primary border">
-                                            <div class="card-header">
-                                                <strong>Feedstock:</strong> {{ layer.feedstock.name }} -
-                                                <strong>Dataset:</strong> {{ layer.inventory_algorithm.geodataset }} -
-                                                <strong>Algorithm:</strong> {{ layer.inventory_algorithm.name }}
+                                            <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+                                                <h5 class="mb-0">Feedstock: {{ layer.feedstock.name }} - Dataset: {{ layer.inventory_algorithm.geodataset }} - Algorithm: {{ layer.inventory_algorithm.name }}</h5>
                                             </div>
                                             <div class="card-body">
                                                 {% for aggregate in layer.aggregated_results %}
