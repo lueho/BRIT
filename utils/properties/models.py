@@ -1,6 +1,8 @@
 from django.db import models
 
-from ..models import NamedUserCreatedObject
+from users.models import get_default_owner
+from utils.object_management.models import NamedUserCreatedObject
+from utils.settings import settings
 
 
 class PropertyUnit(NamedUserCreatedObject):
@@ -18,7 +20,7 @@ class PropertyUnit(NamedUserCreatedObject):
 
 
 def get_default_unit_pk():
-    return Unit.objects.get_or_create(
+    return PropertyUnit.objects.get_or_create(
         owner=get_default_owner(),
         name=getattr(settings, "DEFAULT_UNIT_NAME", "No unit"),
     )[0].pk
@@ -42,7 +44,7 @@ class PropertyValue(NamedUserCreatedObject):
 
     property = models.ForeignKey(Property, on_delete=models.PROTECT)
     unit = models.ForeignKey(
-        Unit, on_delete=models.PROTECT, default=get_default_unit_pk
+        PropertyUnit, on_delete=models.PROTECT, default=get_default_unit_pk
     )
     average = models.FloatField()
     standard_deviation = models.FloatField(blank=True, null=True)
