@@ -1,11 +1,12 @@
-from .settings import *
 import os
+
+from .settings import *
 
 SITE_ID = 1
 
 DEBUG = True
 
-ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
+ALLOWED_HOSTS = ["localhost", "127.0.0.1", "host.docker.internal"]
 
 INSTALLED_APPS.append("debug_toolbar")
 
