@@ -62,6 +62,13 @@ class Collector(NamedUserCreatedObject):
     class Meta:
         verbose_name = "waste collector"
 
+    @property
+    def geom(self):
+        """Return the geometry from the associated catchment."""
+        if self.catchment:
+            return self.catchment.geom
+        return None
+
 
 class CollectionSystem(NamedUserCreatedObject):
     class Meta:

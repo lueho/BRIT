@@ -1,6 +1,5 @@
 from collections import OrderedDict
 
-from django.urls import reverse
 from rest_framework import serializers
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
@@ -17,6 +16,12 @@ class GeoreferencedWasteCollection(GeoPolygon, models.Collection):
     pass
 
 
+class GeoreferencedCollector(GeoPolygon, models.Collector):
+    """Proxy model combining Collector with GeoPolygon for GeoJSON serialization."""
+
+    pass
+
+
 class WasteCollectionGeometrySerializer(GeoFeatureModelSerializer):
     catchment = serializers.StringRelatedField(source="catchment.name")
     waste_category = serializers.StringRelatedField(source="waste_stream.category.name")
@@ -26,6 +31,58 @@ class WasteCollectionGeometrySerializer(GeoFeatureModelSerializer):
         model = GeoreferencedWasteCollection
         geo_field = "geom"
         fields = ["id", "catchment", "waste_category", "collection_system"]
+
+
+class CollectorGeometrySerializer(GeoFeatureModelSerializer):
+    """
+    GeoJSON serializer for Collectors with geometry and organizational level.
+    Used by QGIS for map rendering.
+    """
+
+    collector = serializers.CharField(source="name", read_only=True)
+    catchment = serializers.SerializerMethodField()
+    orga_level = serializers.SerializerMethodField()
+
+    class Meta:
+        model = GeoreferencedCollector
+        geo_field = "geom"
+        fields = ["id", "collector", "catchment", "orga_level"]
+
+    def get_catchment(self, obj):
+        """Get catchment name from the collector's catchment."""
+        if hasattr(obj, "catchment") and obj.catchment:
+            return obj.catchment.name
+        return None
+
+    def get_orga_level(self, obj):
+        """
+        Determine organizational level: 'nuts', 'lau', or 'individual'.
+        Based on whether the catchment's region has NUTS or LAU data.
+        """
+        if not hasattr(obj, "catchment") or not obj.catchment:
+            return "individual"
+
+        catchment = obj.catchment
+        if not hasattr(catchment, "region") or not catchment.region:
+            return "individual"
+
+        region = catchment.region
+
+        # Check if region has NUTS data
+        try:
+            if hasattr(region, "nutsregion") and region.nutsregion.nuts_id:
+                return "nuts"
+        except Exception:
+            pass
+
+        # Check if region has LAU data
+        try:
+            if hasattr(region, "lauregion") and region.lauregion.lau_id:
+                return "lau"
+        except Exception:
+            pass
+
+        return "individual"
 
 
 class OwnedObjectModelSerializer(serializers.ModelSerializer):
@@ -113,6 +170,7 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
     )
     sources = serializers.SerializerMethodField()
     policy = serializers.SerializerMethodField()
+
     class Meta:
         model = models.Collection
         fields = (
