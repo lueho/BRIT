@@ -1,5 +1,7 @@
 from django.db.models import Q
-from django_filters import CharFilter, FilterSet
+from django_filters import CharFilter, FilterSet, ModelChoiceFilter
+from django_tomselect.app_settings import TomSelectConfig
+from django_tomselect.widgets import TomSelectModelWidget
 
 from utils.filters import BaseCrispyFilterSet
 from .models import Author, Source
@@ -22,8 +24,28 @@ def author_icontains(queryset, _, value):
 
 class SourceModelFilterSet(FilterSet):
     abbreviation = CharFilter(lookup_expr='icontains')
-    authors = CharFilter(method=author_icontains, label='Author names contain')
-    title = CharFilter(lookup_expr='icontains')
+    authors = ModelChoiceFilter(
+        queryset=Author.objects.all(),
+        field_name='authors',
+        label='Author',
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(
+                url='author-autocomplete',
+                placeholder='Search authors...',
+            )
+        ),
+    )
+    title = ModelChoiceFilter(
+        queryset=Source.objects.all(),
+        field_name='title',
+        label='Title',
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(
+                url='source-autocomplete',
+                placeholder='Search by title...',
+            )
+        ),
+    )
 
     class Meta:
         model = Source
@@ -32,8 +54,28 @@ class SourceModelFilterSet(FilterSet):
 
 class SourceFilter(BaseCrispyFilterSet):
     abbreviation = CharFilter(lookup_expr='icontains')
-    authors = CharFilter(method=author_icontains, label='Author names contain')
-    title = CharFilter(lookup_expr='icontains')
+    authors = ModelChoiceFilter(
+        queryset=Author.objects.all(),
+        field_name='authors',
+        label='Author',
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(
+                url='author-autocomplete',
+                placeholder='Search authors...',
+            )
+        ),
+    )
+    title = ModelChoiceFilter(
+        queryset=Source.objects.all(),
+        field_name='title',
+        label='Title',
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(
+                url='source-autocomplete',
+                placeholder='Search by title...',
+            )
+        ),
+    )
 
     class Meta:
         model = Source
