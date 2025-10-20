@@ -288,9 +288,38 @@ class SourceAutocompleteView(UserCreatedObjectAutocompleteView):
         "abbreviation__icontains",
         "url__icontains",
     ]
-    ordering = "title"
-    page_size = 10
+    ordering = ["title"]  # Default ordering, overridden by search relevance
+    page_size = 20  # Increased from 10 to show more results
     value_fields = ["id", "title", "abbreviation", "type", "url"]
+
+    def get_queryset(self):
+        """Override to add relevance-based ordering when searching."""
+        from django.db.models import Case, IntegerField, Value, When
+
+        qs = super().get_queryset()
+
+        # If there's a search term, order by relevance
+        search_term = self.request.GET.get('term', '').strip()
+        if search_term:
+            # Order by: 1) starts with term, 2) contains term, 3) alphabetically
+            qs = qs.annotate(
+                relevance=Case(
+                    # Title starts with search term (highest priority)
+                    When(title__istartswith=search_term, then=Value(1)),
+                    # Abbreviation starts with search term
+                    When(abbreviation__istartswith=search_term, then=Value(2)),
+                    # Title contains search term
+                    When(title__icontains=search_term, then=Value(3)),
+                    # Abbreviation contains search term
+                    When(abbreviation__icontains=search_term, then=Value(4)),
+                    # URL contains search term
+                    When(url__icontains=search_term, then=Value(5)),
+                    default=Value(6),
+                    output_field=IntegerField(),
+                )
+            ).order_by('relevance', 'title')
+
+        return qs
 
     def hook_prepare_results(self, results):
         for result in results:
@@ -298,7 +327,7 @@ class SourceAutocompleteView(UserCreatedObjectAutocompleteView):
             abbreviation = result.get('abbreviation', '').strip()
             url = result.get('url', '').strip()
             source_type = result.get('type', '')
-            
+
             # Build display text with fallbacks for sources without meaningful titles
             if title and title.lower() not in ['', 'n/a', 'none', 'untitled']:
                 # Has a meaningful title
