@@ -31,17 +31,21 @@ class SourceModelFilterSet(FilterSet):
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
                 url='author-autocomplete',
+                value_field='id',
+                label_field='label',
                 placeholder='Search authors...',
             )
         ),
     )
     title = ModelChoiceFilter(
         queryset=Source.objects.all(),
-        field_name='title',
+        field_name='id',
         label='Title',
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
                 url='source-autocomplete',
+                value_field='id',
+                label_field='text',
                 placeholder='Search by title...',
             )
         ),
@@ -61,17 +65,21 @@ class SourceFilter(BaseCrispyFilterSet):
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
                 url='author-autocomplete',
+                value_field='id',
+                label_field='label',
                 placeholder='Search authors...',
             )
         ),
     )
     title = ModelChoiceFilter(
         queryset=Source.objects.all(),
-        field_name='title',
+        field_name='id',
         label='Title',
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
                 url='source-autocomplete',
+                value_field='id',
+                label_field='text',
                 placeholder='Search by title...',
             )
         ),
