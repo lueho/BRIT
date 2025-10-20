@@ -39,6 +39,7 @@ class SourceModelFilterSet(FilterSet):
     )
     title = ModelChoiceFilter(
         queryset=Source.objects.all(),
+        field_name='pk',
         to_field_name='id',
         label='Title',
         widget=TomSelectModelWidget(
@@ -73,6 +74,7 @@ class SourceFilter(BaseCrispyFilterSet):
     )
     title = ModelChoiceFilter(
         queryset=Source.objects.all(),
+        field_name='pk',
         to_field_name='id',
         label='Title',
         widget=TomSelectModelWidget(
