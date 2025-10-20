@@ -286,17 +286,38 @@ class SourceAutocompleteView(UserCreatedObjectAutocompleteView):
     search_lookups = [
         "title__icontains",
         "abbreviation__icontains",
+        "url__icontains",
     ]
     ordering = "title"
     page_size = 10
-    value_fields = ["id", "title", "abbreviation"]
+    value_fields = ["id", "title", "abbreviation", "type", "url"]
 
     def hook_prepare_results(self, results):
         for result in results:
-            # Display format: "Title (Abbreviation)" or just "Title" if no abbreviation
-            if result.get('abbreviation'):
-                result["text"] = f"{result['title']} ({result['abbreviation']})"
+            title = result.get('title', '').strip()
+            abbreviation = result.get('abbreviation', '').strip()
+            url = result.get('url', '').strip()
+            source_type = result.get('type', '')
+            
+            # Build display text with fallbacks for sources without meaningful titles
+            if title and title.lower() not in ['', 'n/a', 'none', 'untitled']:
+                # Has a meaningful title
+                if abbreviation:
+                    display = f"{title} ({abbreviation})"
+                else:
+                    display = title
+            elif url:
+                # No meaningful title, use URL (common for WasteFlyer)
+                display = f"{url}"
+                if abbreviation:
+                    display += f" ({abbreviation})"
+            elif abbreviation:
+                # Only abbreviation available
+                display = abbreviation
             else:
-                result["text"] = result['title']
-            result["selected_text"] = result["text"]
+                # Last resort: show type and ID
+                display = f"{source_type.replace('_', ' ').title()} (ID: {result['id']})"
+            
+            result["text"] = display
+            result["selected_text"] = display
         return results
