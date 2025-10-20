@@ -290,11 +290,24 @@ class SourceAutocompleteView(UserCreatedObjectAutocompleteView):
     ]
     ordering = "title"
     page_size = 10
-    value_fields = ["id", "title", "authors__last_names", "authors__first_names"]
+    value_fields = ["id", "title"]
 
     def hook_prepare_results(self, results):
+        # Get source IDs to fetch authors
+        source_ids = [result['id'] for result in results]
+        sources = Source.objects.filter(id__in=source_ids).prefetch_related('authors')
+        source_dict = {source.id: source for source in sources}
+        
         for result in results:
-            formatted_name = f"{result['authors__last_names']}, {result['authors__first_names']}. {result['title']}"
+            source = source_dict.get(result['id'])
+            if source and source.authors.exists():
+                # Get first author for display
+                first_author = source.authors.first()
+                author_str = f"{first_author.last_names}, {first_author.first_names}"
+            else:
+                author_str = "Unknown Author"
+            
+            formatted_name = f"{author_str}. {result['title']}"
             result["text"] = formatted_name
             result["selected_text"] = formatted_name
         return results
