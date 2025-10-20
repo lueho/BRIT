@@ -39,8 +39,6 @@ class SourceModelFilterSet(FilterSet):
     )
     title = ModelChoiceFilter(
         queryset=Source.objects.all(),
-        field_name='pk',
-        to_field_name='id',
         label='Title',
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
@@ -50,7 +48,14 @@ class SourceModelFilterSet(FilterSet):
                 placeholder='Search by title...',
             )
         ),
+        method='filter_title',
     )
+
+    @staticmethod
+    def filter_title(queryset, name, value):
+        if value:
+            return queryset.filter(pk=value.pk)
+        return queryset
 
     class Meta:
         model = Source
@@ -74,8 +79,6 @@ class SourceFilter(BaseCrispyFilterSet):
     )
     title = ModelChoiceFilter(
         queryset=Source.objects.all(),
-        field_name='pk',
-        to_field_name='id',
         label='Title',
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
@@ -85,8 +88,15 @@ class SourceFilter(BaseCrispyFilterSet):
                 placeholder='Search by title...',
             )
         ),
+        method='filter_title',
     )
 
     class Meta:
         model = Source
         fields = ('abbreviation', 'authors', 'title', 'type', 'year')
+
+    @staticmethod
+    def filter_title(queryset, name, value):
+        if value:
+            return queryset.filter(pk=value.pk)
+        return queryset
