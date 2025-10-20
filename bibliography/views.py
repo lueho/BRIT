@@ -292,17 +292,15 @@ class SourceAutocompleteView(UserCreatedObjectAutocompleteView):
     page_size = 20  # Increased from 10 to show more results
     value_fields = ["id", "title", "abbreviation", "type", "url"]
 
-    def get_queryset(self):
+    def order_queryset(self, queryset):
         """Override to add relevance-based ordering when searching."""
         from django.db.models import Case, IntegerField, Value, When
 
-        qs = super().get_queryset()
-
-        # If there's a search term, order by relevance
-        search_term = self.request.GET.get('term', '').strip()
+        # If there's a search term, order by relevance instead of alphabetically
+        search_term = getattr(self, 'query', '') or ''
         if search_term:
             # Order by: 1) starts with term, 2) contains term, 3) alphabetically
-            qs = qs.annotate(
+            queryset = queryset.annotate(
                 relevance=Case(
                     # Title starts with search term (highest priority)
                     When(title__istartswith=search_term, then=Value(1)),
@@ -318,15 +316,17 @@ class SourceAutocompleteView(UserCreatedObjectAutocompleteView):
                     output_field=IntegerField(),
                 )
             ).order_by('relevance', 'title')
+            return queryset
 
-        return qs
+        # No search term, use default ordering
+        return super().order_queryset(queryset)
 
     def hook_prepare_results(self, results):
         for result in results:
-            title = result.get('title', '').strip()
-            abbreviation = result.get('abbreviation', '').strip()
-            url = result.get('url', '').strip()
-            source_type = result.get('type', '')
+            title = (result.get('title') or '').strip()
+            abbreviation = (result.get('abbreviation') or '').strip()
+            url = (result.get('url') or '').strip()
+            source_type = result.get('type') or ''
 
             # Build display text with fallbacks for sources without meaningful titles
             if title and title.lower() not in ['', 'n/a', 'none', 'untitled']:
