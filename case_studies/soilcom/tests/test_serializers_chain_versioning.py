@@ -12,6 +12,7 @@ from case_studies.soilcom.models import (
     WasteStream,
 )
 from case_studies.soilcom.serializers import CollectionFlatSerializer
+from maps.models import NutsRegion
 
 
 class CollectionFlatSerializerChainAwareStatsTestCase(TestCase):
@@ -23,9 +24,10 @@ class CollectionFlatSerializerChainAwareStatsTestCase(TestCase):
             category=WasteCategory.objects.create(name="Cat"),
         )
         frequency = CollectionFrequency.objects.create(name="F")
+        nuts = NutsRegion.objects.create(name="Hamburg", country="DE", nuts_id="DE600")
         cls.collection_root = Collection.objects.create(
             name="C0",
-            catchment=CollectionCatchment.objects.create(name="Catch"),
+            catchment=CollectionCatchment.objects.create(name="Catch", region=nuts.region_ptr),
             collector=Collector.objects.create(name="Col"),
             collection_system=CollectionSystem.objects.create(name="Sys"),
             waste_stream=waste_stream,

@@ -891,6 +891,39 @@ class CollectionStatisticsAccessorsTestCase(TestCase):
         both = self.succ.aggregatedcollectionpropertyvalues_for_display(user=U())
         self.assertEqual(set(a.year for a in both), {2020, 2021})
 
+    def test_collectionpropertyvalues_for_display_published_tie_prefers_latest_version(self):
+        from utils.properties.models import Property, Unit
+        from case_studies.soilcom.models import CollectionPropertyValue
+
+        prop = Property.objects.create(name="TP", publication_status="published")
+        unit = Unit.objects.create(name="TU", publication_status="published")
+
+        v_root = CollectionPropertyValue.objects.create(
+            collection=self.root,
+            property=prop,
+            unit=unit,
+            year=2022,
+            average=1,
+            publication_status="published",
+        )
+        v_succ = CollectionPropertyValue.objects.create(
+            collection=self.succ,
+            property=prop,
+            unit=unit,
+            year=2022,
+            average=2,
+            publication_status="published",
+        )
+
+        lst = self.root.collectionpropertyvalues_for_display(user=None)
+        filtered = [
+            v
+            for v in lst
+            if v.property_id == prop.pk and v.unit_id == unit.pk and v.year == 2022
+        ]
+        self.assertEqual(len(filtered), 1)
+        self.assertEqual(filtered[0].pk, v_succ.pk)
+
 
 class CollectionSeasonTestCase(TestCase):
 
