@@ -822,13 +822,24 @@ class CollectionDetailView(MapMixin, UserCreatedObjectDetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = getattr(self.request, "user", None)
+
+        # Add visible successors (from main)
         try:
             successors_qs = self.object.successors.all()
         except Exception:
             successors_qs = Collection.objects.none()
-
         context["visible_successors"] = filter_queryset_for_user(successors_qs, user)
-        context["review_mode"] = False
+
+        # Add chain-aware property values (from refactoring branch)
+        context["collection_property_values"] = (
+            self.object.collectionpropertyvalues_for_display(user=self.request.user)
+        )
+        context["aggregated_collection_property_values"] = (
+            self.object.aggregatedcollectionpropertyvalues_for_display(
+                user=self.request.user
+            )
+        )
+
         return context
 
 

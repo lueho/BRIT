@@ -5,7 +5,7 @@ import celery
 from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models, transaction
-from django.db.models import Count, Q, Sum
+from django.db.models import Case, Count, IntegerField, Q, Sum, Value, When
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.urls import reverse
@@ -22,6 +22,7 @@ from utils.object_management.models import (
     UserCreatedObjectQuerySet,
     get_default_owner,
 )
+from utils.object_management.permissions import filter_queryset_for_user
 from utils.properties.models import PropertyValue
 
 
@@ -565,6 +566,87 @@ class Collection(NamedUserCreatedObject):
                 return candidate
 
         return candidate_qs.first()
+
+    @staticmethod
+    def _deduplicate_property_values(values):
+        """Return values without duplicates for the same property/unit/year key."""
+
+        seen = set()
+        ordered = []
+
+        for value in values:
+            key = (value.property_id, value.unit_id, value.year)
+            if key in seen:
+                continue
+
+            seen.add(key)
+            ordered.append(value)
+
+        return ordered
+
+    def collectionpropertyvalues_for_display(self, user=None):
+        """Return collection-specific property values visible to ``user`` across the chain."""
+
+        qs = CollectionPropertyValue.objects.filter(
+            collection__in=self.all_versions()
+        ).select_related("property", "unit", "collection")
+
+        qs = filter_queryset_for_user(qs, user)
+
+        published_status = getattr(CollectionPropertyValue, "STATUS_PUBLISHED", "published")
+
+        qs = qs.annotate(
+            publication_order=Case(
+                When(publication_status=published_status, then=Value(0)),
+                default=Value(1),
+                output_field=IntegerField(),
+            )
+        ).order_by(
+            "property__name",
+            "unit__name",
+            "year",
+            "publication_order",
+            "-collection__valid_from",
+            "-collection__pk",
+            "pk",
+        )
+
+        return self._deduplicate_property_values(qs)
+
+    def aggregatedcollectionpropertyvalues_for_display(self, user=None):
+        """Return aggregated property values visible to ``user`` across the chain."""
+
+        qs = (
+            AggregatedCollectionPropertyValue.objects.filter(
+                collections__in=self.all_versions()
+            )
+            .select_related("property", "unit")
+            .prefetch_related("collections")
+            .distinct()
+        )
+
+        qs = filter_queryset_for_user(qs, user)
+
+        published_status = getattr(
+            AggregatedCollectionPropertyValue, "STATUS_PUBLISHED", "published"
+        )
+
+        qs = qs.annotate(
+            publication_order=Case(
+                When(publication_status=published_status, then=Value(0)),
+                default=Value(1),
+                output_field=IntegerField(),
+            )
+        ).order_by(
+            "property__name",
+            "unit__name",
+            "year",
+            "publication_order",
+            "-created_at",
+            "-pk",
+        )
+
+        return list(qs)
 
     def construct_name(self):
         """

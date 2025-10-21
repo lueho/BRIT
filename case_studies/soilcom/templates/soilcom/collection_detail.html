@@ -242,8 +242,8 @@
     </p>
   {% endif %}
 
-  {% if object.collectionpropertyvalue_set.exists %}
-    {% regroup object.collectionpropertyvalue_set.all by property as property_list %}
+  {% if collection_property_values %}
+    {% regroup collection_property_values by property as property_list %}
     {% for prop in property_list %}
       <p class="card-text">
         <strong>{{ prop.grouper.name|title }}:</strong>
@@ -266,8 +266,8 @@
     {% endfor %}
   {% endif %}
 
-  {% if object.aggregatedcollectionpropertyvalue_set.exists %}
-    {% regroup object.aggregatedcollectionpropertyvalue_set.all by property as property_list %}
+  {% if aggregated_collection_property_values %}
+    {% regroup aggregated_collection_property_values by property as property_list %}
     {% for prop in property_list %}
       <p class="card-text">
         <strong>{{ prop.grouper.name|title }}:</strong>
