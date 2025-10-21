@@ -374,33 +374,35 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
             ordered_representation[field] = representation.get(field, None)
 
         additional_properties = ["specific waste collected", "Connection rate"]
+        user = getattr(self.context.get("request"), "user", None) if self.context else None
         for property_name in additional_properties:
-            # Add your custom fields at the desired position
             specific_property = Property.objects.filter(name=property_name).first()
-            if specific_property:
-                collection_values = models.CollectionPropertyValue.objects.filter(
-                    collection=instance, property=specific_property
-                )
-                for value in collection_values:
-                    column_name = (
-                        f"{property_name.lower().replace(' ', '_')}_{value.year}"
-                    )
-                    ordered_representation[column_name] = value.average
+            if not specific_property:
+                continue
 
-                # If no CollectionPropertyValue, then fetch the AggregatedCollectionPropertyValue
-                if not collection_values.exists():
-                    aggregated_values = (
-                        models.AggregatedCollectionPropertyValue.objects.filter(
-                            collections=instance, property=specific_property
-                        )
+            values = [
+                value
+                for value in instance.collectionpropertyvalues_for_display(user=user)
+                if value.property_id == specific_property.pk
+            ]
+
+            if not values:
+                values = [
+                    value
+                    for value in instance.aggregatedcollectionpropertyvalues_for_display(
+                        user=user
                     )
-                    for value in aggregated_values:
-                        column_name = (
-                            f"{property_name.lower().replace(' ', '_')}_{value.year}"
-                        )
-                        ordered_representation[column_name] = value.average
-                        # Mark this as an aggregated value
-                        ordered_representation["aggregated"] = True
+                    if value.property_id == specific_property.pk
+                ]
+                is_aggregated = bool(values)
+            else:
+                is_aggregated = False
+
+            for value in values:
+                column_name = f"{property_name.lower().replace(' ', '_')}_{value.year}"
+                ordered_representation[column_name] = value.average
+                if is_aggregated:
+                    ordered_representation["aggregated"] = True
 
         # Return the ordered representation
         return ordered_representation
