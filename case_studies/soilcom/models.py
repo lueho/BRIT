@@ -1,4 +1,5 @@
 from datetime import date
+from functools import cached_property
 
 import celery
 from django.core.exceptions import ValidationError
@@ -523,6 +524,47 @@ class Collection(NamedUserCreatedObject):
     @property
     def geom(self):
         return self.catchment.geom
+
+    @cached_property
+    def version_chain_ids(self):
+        """Return the set of primary keys connected through predecessors/successors."""
+
+        visited = set()
+        stack = [self]
+
+        while stack:
+            current = stack.pop()
+            if not current.pk or current.pk in visited:
+                continue
+
+            visited.add(current.pk)
+
+            stack.extend(current.predecessors.all())
+            stack.extend(current.successors.all())
+
+        return visited
+
+    def all_versions(self):
+        """Return a queryset with every version connected to this collection."""
+
+        model = self.__class__
+
+        if not self.version_chain_ids:
+            return model.objects.none()
+
+        return model.objects.filter(pk__in=self.version_chain_ids)
+
+    @cached_property
+    def version_anchor(self):
+        """Return the canonical version used as anchor for shared statistics."""
+
+        candidate_qs = self.all_versions().order_by("valid_from", "pk")
+
+        for candidate in candidate_qs:
+            if not candidate.predecessors.exists():
+                return candidate
+
+        return candidate_qs.first()
 
     def construct_name(self):
         """
