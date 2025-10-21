@@ -579,9 +579,12 @@ class CollectionPropertyValueUpdateView(UserCreatedObjectUpdateView):
 class CollectionPropertyValueModalDeleteView(UserCreatedObjectModalDeleteView):
     model = CollectionPropertyValue
 
-    def delete(self, request, *args, **kwargs):
+    def form_valid(self, form):
+        # Ensure we delete the anchor record for the same (property, unit, year)
+        # when the user deletes a CPV on a non-anchor collection.
         self.object = self.get_object()
         anchor = self.object.collection.version_anchor
+        anchor_value = None
         if anchor and self.object.collection_id != anchor.pk:
             try:
                 anchor_value = CollectionPropertyValue.objects.get(
@@ -592,13 +595,12 @@ class CollectionPropertyValueModalDeleteView(UserCreatedObjectModalDeleteView):
                 )
             except CollectionPropertyValue.DoesNotExist:
                 anchor_value = None
-        else:
-            anchor_value = self.object
 
+        # Delete anchor first if it is distinct from the current object
         if anchor_value and anchor_value.pk != self.object.pk:
             anchor_value.delete()
 
-        return super().delete(request, *args, **kwargs)
+        return super().form_valid(form)
 
     def get_success_url(self):
         anchor = self.object.collection.version_anchor
@@ -949,23 +951,30 @@ class CollectionListFileExportView(GenericUserCreatedObjectExportView):
 
 
 class CollectionAddPropertyValueView(CollectionPropertyValueCreateView):
+    # TODO: Handle permissions without overriding dispatch
     def dispatch(self, request, *args, **kwargs):
         # Let parent handle authentication first
         result = super().dispatch(request, *args, **kwargs)
-        
+
         # Only check policy for authenticated requests that passed parent checks
-        if request.user.is_authenticated and request.method in ('GET', 'POST'):
+        if request.user.is_authenticated and request.method in ("GET", "POST"):
             try:
                 self.parent_collection = Collection.objects.get(pk=kwargs.get("pk"))
             except Collection.DoesNotExist as err:
                 raise PermissionDenied("Invalid parent collection.") from err
 
-            policy = get_object_policy(request.user, self.parent_collection, request=request)
+            policy = get_object_policy(
+                request.user, self.parent_collection, request=request
+            )
             if not policy.get("can_add_property"):
-                raise PermissionDenied("You do not have permission to add statistics to this collection.")
+                raise PermissionDenied(
+                    "You do not have permission to add statistics to this collection."
+                )
 
-            self.anchor_collection = self.parent_collection.version_anchor or self.parent_collection
-        
+            self.anchor_collection = (
+                self.parent_collection.version_anchor or self.parent_collection
+            )
+
         return result
 
     def get_initial(self):
