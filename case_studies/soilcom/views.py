@@ -950,17 +950,23 @@ class CollectionListFileExportView(GenericUserCreatedObjectExportView):
 
 class CollectionAddPropertyValueView(CollectionPropertyValueCreateView):
     def dispatch(self, request, *args, **kwargs):
-        try:
-            self.parent_collection = Collection.objects.get(pk=kwargs.get("pk"))
-        except Collection.DoesNotExist as err:
-            raise PermissionDenied("Invalid parent collection.") from err
+        # Let parent handle authentication first
+        result = super().dispatch(request, *args, **kwargs)
+        
+        # Only check policy for authenticated requests that passed parent checks
+        if request.user.is_authenticated and request.method in ('GET', 'POST'):
+            try:
+                self.parent_collection = Collection.objects.get(pk=kwargs.get("pk"))
+            except Collection.DoesNotExist as err:
+                raise PermissionDenied("Invalid parent collection.") from err
 
-        policy = get_object_policy(request.user, self.parent_collection, request=request)
-        if not policy.get("can_add_property"):
-            raise PermissionDenied("You do not have permission to add statistics to this collection.")
+            policy = get_object_policy(request.user, self.parent_collection, request=request)
+            if not policy.get("can_add_property"):
+                raise PermissionDenied("You do not have permission to add statistics to this collection.")
 
-        self.anchor_collection = self.parent_collection.version_anchor or self.parent_collection
-        return super().dispatch(request, *args, **kwargs)
+            self.anchor_collection = self.parent_collection.version_anchor or self.parent_collection
+        
+        return result
 
     def get_initial(self):
         initial = super().get_initial()

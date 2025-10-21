@@ -1535,7 +1535,7 @@ class CollectionAddPropertyValueViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.collection = Collection.objects.create(
-            name="Test Collection", publication_status="published"
+            name="Test Collection", publication_status="published", owner=cls.member
         )
         cls.unit = Unit.objects.create(name="Test Unit", publication_status="published")
         cls.prop = Property.objects.create(
@@ -1574,12 +1574,15 @@ class CollectionAddPropertyValueViewTestCase(ViewWithPermissionsTestCase):
         request = RequestFactory().get(
             reverse(self.url_name, kwargs={"pk": self.collection.id})
         )
+        request.user = self.member
         view = views.CollectionAddPropertyValueView()
         view.setup(request)
         view.kwargs = {"pk": self.collection.id}
+        view.dispatch(request, pk=self.collection.id)
         initial = view.get_initial()
+        anchor = self.collection.version_anchor or self.collection
         expected = {
-            "collection": self.collection.pk,
+            "collection": anchor.pk,
         }
         self.assertDictEqual(expected, initial)
 
