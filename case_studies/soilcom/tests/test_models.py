@@ -757,6 +757,141 @@ class CollectionTestCase(TestCase):
             self.collection.save()
 
 
+class CollectionVersioningHelpersTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.catchment = CollectionCatchment.objects.create(name="C")
+        cls.system = CollectionSystem.objects.create(name="S")
+        cls.category = WasteCategory.objects.create(name="Cat")
+        cls.stream = WasteStream.objects.create(category=cls.category)
+
+    def _mk(self, year):
+        return Collection.objects.create(
+            catchment=self.catchment,
+            collection_system=self.system,
+            waste_stream=self.stream,
+            valid_from=date(year, 1, 1),
+        )
+
+    def test_all_versions_and_anchor_linear_chain(self):
+        a = self._mk(2020)
+        b = self._mk(2021)
+        c = self._mk(2022)
+        b.predecessors.add(a)
+        c.predecessors.add(b)
+
+        self.assertSetEqual(a.version_chain_ids, {a.pk, b.pk, c.pk})
+        self.assertSetEqual(set(b.all_versions().values_list("pk", flat=True)), {a.pk, b.pk, c.pk})
+        self.assertEqual(c.version_anchor, a)
+
+    def test_version_anchor_in_cycle_falls_back_to_earliest(self):
+        a = self._mk(2020)
+        b = self._mk(2019)
+        # Create a cycle: a<->b
+        a.predecessors.add(b)
+        b.predecessors.add(a)
+
+        # No node without predecessors; should pick earliest by valid_from then pk
+        anchor = a.version_anchor
+        self.assertIn(anchor.pk, {a.pk, b.pk})
+        self.assertEqual(anchor.valid_from, min(a.valid_from, b.valid_from))
+
+
+class CollectionStatisticsAccessorsTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.catchment = CollectionCatchment.objects.create(name="C")
+        cls.system = CollectionSystem.objects.create(name="S")
+        cls.category = WasteCategory.objects.create(name="Cat")
+        cls.stream = WasteStream.objects.create(category=cls.category)
+        cls.root = Collection.objects.create(
+            catchment=cls.catchment,
+            collection_system=cls.system,
+            waste_stream=cls.stream,
+            valid_from=date(2020, 1, 1),
+            publication_status="published",
+        )
+        cls.succ = Collection.objects.create(
+            catchment=cls.catchment,
+            collection_system=cls.system,
+            waste_stream=cls.stream,
+            valid_from=date(2021, 1, 1),
+            publication_status="published",
+        )
+        cls.succ.predecessors.add(cls.root)
+
+    def test_collectionpropertyvalues_for_display_dedup_and_scope(self):
+        from utils.properties.models import Property, Unit
+        from case_studies.soilcom.models import CollectionPropertyValue
+
+        prop = Property.objects.create(name="P", publication_status="published")
+        unit = Unit.objects.create(name="U", publication_status="published")
+        # Two values for same (prop, unit, year) across chain
+        v_root = CollectionPropertyValue.objects.create(
+            collection=self.root,
+            property=prop,
+            unit=unit,
+            year=2020,
+            average=10,
+            publication_status="private",
+        )
+        v_succ = CollectionPropertyValue.objects.create(
+            collection=self.succ,
+            property=prop,
+            unit=unit,
+            year=2020,
+            average=11,
+            publication_status="published",
+        )
+
+        # Anonymous: only published, dedup keeps published one
+        anon_list = self.succ.collectionpropertyvalues_for_display(user=None)
+        self.assertEqual(len(anon_list), 1)
+        self.assertEqual(anon_list[0].pk, v_succ.pk)
+
+        # Owner-like visibility: simulate staff/owner by passing a dummy user with is_staff=True
+        class U: is_staff=True; is_authenticated=True
+        full_list = self.succ.collectionpropertyvalues_for_display(user=U())
+        self.assertEqual(len(full_list), 1)  # dedup keeps published due to ordering
+        self.assertEqual(full_list[0].pk, v_succ.pk)
+
+    def test_aggregatedcollectionpropertyvalues_for_display_chain_and_scope(self):
+        from utils.properties.models import Property, Unit
+        from case_studies.soilcom.models import AggregatedCollectionPropertyValue
+
+        prop = Property.objects.create(name="PA", publication_status="published")
+        unit = Unit.objects.create(name="UA", publication_status="published")
+
+        agg1 = AggregatedCollectionPropertyValue.objects.create(
+            property=prop,
+            unit=unit,
+            year=2020,
+            average=42,
+            publication_status="private",
+        )
+        agg1.collections.add(self.root)
+
+        agg2 = AggregatedCollectionPropertyValue.objects.create(
+            property=prop,
+            unit=unit,
+            year=2021,
+            average=43,
+            publication_status="published",
+        )
+        agg2.collections.add(self.succ)
+
+        # Anonymous sees only published
+        anon = self.root.aggregatedcollectionpropertyvalues_for_display(user=None)
+        self.assertEqual([a.year for a in anon], [2021])
+
+        # Staff sees both, order by (property, unit, year, publication_order, -created_at, -pk)
+        class U: is_staff=True; is_authenticated=True
+        both = self.succ.aggregatedcollectionpropertyvalues_for_display(user=U())
+        self.assertEqual(set(a.year for a in both), {2020, 2021})
+
+
 class CollectionSeasonTestCase(TestCase):
 
     @classmethod
