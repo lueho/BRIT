@@ -428,7 +428,7 @@ def get_object_policy(user, obj, request=None, review_mode=False):
     # Object-specific management helpers
     # If published objects shouldn't mutate, gate with not is_published
     can_manage_samples = (is_owner or is_staff) and not is_archived and not is_published
-    can_add_property = (is_owner or is_staff) and not is_archived and not is_published
+    can_add_property = (is_owner or is_staff) and not is_archived
 
     # Duplicate/New version: require model add permission
     can_duplicate = False

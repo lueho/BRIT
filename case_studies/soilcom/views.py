@@ -36,7 +36,7 @@ from maps.views import (
 )
 from utils.file_export.views import GenericUserCreatedObjectExportView
 from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineFormSetMixin
-from utils.object_management.permissions import filter_queryset_for_user
+from utils.object_management.permissions import filter_queryset_for_user, get_object_policy
 from utils.object_management.views import (
     OwnedObjectModelSelectOptionsView,
     PrivateObjectFilterView,
@@ -568,12 +568,42 @@ class CollectionPropertyValueUpdateView(UserCreatedObjectUpdateView):
     model = CollectionPropertyValue
     form_class = CollectionPropertyValueModelForm
 
+    def form_valid(self, form):
+        instance = form.instance
+        anchor = instance.collection.version_anchor if instance.collection else None
+        if anchor and instance.collection_id != anchor.pk:
+            instance.collection = anchor
+        return super().form_valid(form)
+
 
 class CollectionPropertyValueModalDeleteView(UserCreatedObjectModalDeleteView):
     model = CollectionPropertyValue
 
+    def delete(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        anchor = self.object.collection.version_anchor
+        if anchor and self.object.collection_id != anchor.pk:
+            try:
+                anchor_value = CollectionPropertyValue.objects.get(
+                    collection=anchor,
+                    property=self.object.property,
+                    unit=self.object.unit,
+                    year=self.object.year,
+                )
+            except CollectionPropertyValue.DoesNotExist:
+                anchor_value = None
+        else:
+            anchor_value = self.object
+
+        if anchor_value and anchor_value.pk != self.object.pk:
+            anchor_value.delete()
+
+        return super().delete(request, *args, **kwargs)
+
     def get_success_url(self):
-        return reverse("collection-detail", kwargs={"pk": self.object.collection.pk})
+        anchor = self.object.collection.version_anchor
+        target = anchor.pk if anchor else self.object.collection.pk
+        return reverse("collection-detail", kwargs={"pk": target})
 
 
 # ----------- AggregatedCollectionPropertyValue CRUD -------------------------------------------------------------------
@@ -919,9 +949,23 @@ class CollectionListFileExportView(GenericUserCreatedObjectExportView):
 
 
 class CollectionAddPropertyValueView(CollectionPropertyValueCreateView):
+    def dispatch(self, request, *args, **kwargs):
+        try:
+            self.parent_collection = Collection.objects.get(pk=kwargs.get("pk"))
+        except Collection.DoesNotExist as err:
+            raise PermissionDenied("Invalid parent collection.") from err
+
+        policy = get_object_policy(request.user, self.parent_collection, request=request)
+        if not policy.get("can_add_property"):
+            raise PermissionDenied("You do not have permission to add statistics to this collection.")
+
+        self.anchor_collection = self.parent_collection.version_anchor or self.parent_collection
+        return super().dispatch(request, *args, **kwargs)
+
     def get_initial(self):
         initial = super().get_initial()
-        initial["collection"] = self.kwargs["pk"]
+        anchor = getattr(self, "anchor_collection", None)
+        initial["collection"] = anchor.pk if anchor else self.kwargs["pk"]
         return initial
 
     def get_success_url(self):
@@ -932,11 +976,13 @@ class CollectionAddPropertyValueView(CollectionPropertyValueCreateView):
         Enforce that the new property value is attached to the parent Collection
         referenced in the URL, regardless of any submitted form value.
         """
-        try:
-            collection = Collection.objects.get(pk=self.kwargs.get("pk"))
-        except Collection.DoesNotExist as err:
-            raise PermissionDenied("Invalid parent collection.") from err
-        form.instance.collection = collection
+        anchor = getattr(self, "anchor_collection", None)
+        if not anchor:
+            try:
+                anchor = Collection.objects.get(pk=self.kwargs.get("pk")).version_anchor
+            except Collection.DoesNotExist as err:
+                raise PermissionDenied("Invalid parent collection.") from err
+        form.instance.collection = anchor or form.instance.collection
         return super().form_valid(form)
 
 
