@@ -3,15 +3,15 @@ from datetime import date
 from django.test import TestCase
 from django.urls import reverse
 
-from utils.tests.testcases import ViewWithPermissionsTestCase
-
 from case_studies.soilcom.models import (
     Collection,
     CollectionCatchment,
+    CollectionPropertyValue,
     CollectionSystem,
     WasteCategory,
     WasteStream,
 )
+from utils.tests.testcases import ViewWithPermissionsTestCase
 
 
 class CollectionAddPropertyValueAnchoringTestCase(ViewWithPermissionsTestCase):
@@ -47,8 +47,12 @@ class CollectionAddPropertyValueAnchoringTestCase(ViewWithPermissionsTestCase):
 
         from utils.properties.models import Property, Unit
 
-        cls.prop = Property.objects.create(name="AnchorProp", publication_status="published")
-        cls.unit = Unit.objects.create(name="AnchorUnit", publication_status="published")
+        cls.prop = Property.objects.create(
+            name="AnchorProp", publication_status="published"
+        )
+        cls.unit = Unit.objects.create(
+            name="AnchorUnit", publication_status="published"
+        )
         cls.prop.allowed_units.add(cls.unit)
 
     def test_member_post_attaches_to_anchor(self):
@@ -67,7 +71,9 @@ class CollectionAddPropertyValueAnchoringTestCase(ViewWithPermissionsTestCase):
 
         from case_studies.soilcom.models import CollectionPropertyValue
 
-        cpv = CollectionPropertyValue.objects.get(property=self.prop, unit=self.unit, year=2022)
+        cpv = CollectionPropertyValue.objects.get(
+            property=self.prop, unit=self.unit, year=2022
+        )
         # Saved on anchor, not on the submitted collection
         self.assertEqual(cpv.collection_id, (self.succ.version_anchor or self.succ).pk)
 
@@ -100,11 +106,15 @@ class CollectionPropertyValueUpdateReanchorTestCase(ViewWithPermissionsTestCase)
         )
         cls.succ.predecessors.add(cls.root)
 
-        from utils.properties.models import Property, Unit
         from case_studies.soilcom.models import CollectionPropertyValue
+        from utils.properties.models import Property, Unit
 
-        cls.prop = Property.objects.create(name="ReanchorProp", publication_status="published")
-        cls.unit = Unit.objects.create(name="ReanchorUnit", publication_status="published")
+        cls.prop = Property.objects.create(
+            name="ReanchorProp", publication_status="published"
+        )
+        cls.unit = Unit.objects.create(
+            name="ReanchorUnit", publication_status="published"
+        )
         cls.prop.allowed_units.add(cls.unit)
 
         cls.cpv = CollectionPropertyValue.objects.create(
@@ -165,10 +175,12 @@ class CollectionPropertyValueDeleteAnchorSemanticsTestCase(ViewWithPermissionsTe
         )
         cls.succ.predecessors.add(cls.root)
 
-        from utils.properties.models import Property, Unit
         from case_studies.soilcom.models import CollectionPropertyValue
+        from utils.properties.models import Property, Unit
 
-        cls.prop = Property.objects.create(name="DelProp", publication_status="published")
+        cls.prop = Property.objects.create(
+            name="DelProp", publication_status="published"
+        )
         cls.unit = Unit.objects.create(name="DelUnit", publication_status="published")
         cls.prop.allowed_units.add(cls.unit)
 
@@ -194,13 +206,18 @@ class CollectionPropertyValueDeleteAnchorSemanticsTestCase(ViewWithPermissionsTe
     def test_delete_child_also_deletes_anchor_duplicate(self):
         self.client.force_login(self.member)
         response = self.client.post(
-            reverse("collectionpropertyvalue-delete-modal", kwargs={"pk": self.child_value.pk})
+            reverse(
+                "collectionpropertyvalue-delete-modal",
+                kwargs={"pk": self.child_value.pk},
+            )
         )
         self.assertEqual(response.status_code, 302)
         from case_studies.soilcom.models import CollectionPropertyValue
 
         self.assertFalse(
-            CollectionPropertyValue.objects.filter(pk__in=[self.child_value.pk, self.anchor_value.pk]).exists()
+            CollectionPropertyValue.objects.filter(
+                pk__in=[self.child_value.pk, self.anchor_value.pk]
+            ).exists()
         )
 
 
@@ -230,10 +247,12 @@ class CollectionDetailChainAwareValuesTestCase(ViewWithPermissionsTestCase):
         )
         cls.succ.predecessors.add(cls.root)
 
-        from utils.properties.models import Property, Unit
         from case_studies.soilcom.models import CollectionPropertyValue
+        from utils.properties.models import Property, Unit
 
-        cls.prop = Property.objects.create(name="ViewProp", publication_status="published")
+        cls.prop = Property.objects.create(
+            name="ViewProp", publication_status="published"
+        )
         cls.unit = Unit.objects.create(name="ViewUnit", publication_status="published")
         cls.prop.allowed_units.add(cls.unit)
         cls.anchor_value = CollectionPropertyValue.objects.create(
@@ -252,3 +271,132 @@ class CollectionDetailChainAwareValuesTestCase(ViewWithPermissionsTestCase):
         self.assertIn("collection_property_values", response.context)
         vals = response.context["collection_property_values"]
         self.assertTrue(any(v.pk == self.anchor_value.pk for v in vals))
+
+
+class CollectionReviewDetailPropertiesTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        from django.contrib.auth import get_user_model
+        from django.contrib.contenttypes.models import ContentType
+
+        from case_studies.soilcom.models import (
+            AggregatedCollectionPropertyValue,
+            Collection,
+            CollectionCatchment,
+            CollectionPropertyValue,
+            CollectionSystem,
+            WasteCategory,
+            WasteStream,
+        )
+        from utils.properties.models import Property, Unit
+
+        cls.User = get_user_model()
+        cls.staff = cls.User.objects.create(username="moderator", is_staff=True)
+
+        cls.catchment = CollectionCatchment.objects.create(name="RC")
+        cls.system = CollectionSystem.objects.create(name="RS")
+        cls.category = WasteCategory.objects.create(name="RCat")
+        cls.stream = WasteStream.objects.create(category=cls.category)
+        cls.collection = Collection.objects.create(
+            name="R",
+            catchment=cls.catchment,
+            collection_system=cls.system,
+            waste_stream=cls.stream,
+            publication_status="published",
+        )
+
+        cls.prop = Property.objects.create(
+            name="ReviewProp", publication_status="published"
+        )
+        cls.unit = Unit.objects.create(
+            name="ReviewUnit", publication_status="published"
+        )
+        cls.prop.allowed_units.add(cls.unit)
+
+        cls.cpv = CollectionPropertyValue.objects.create(
+            collection=cls.collection,
+            property=cls.prop,
+            unit=cls.unit,
+            year=2020,
+            average=77,
+            publication_status="published",
+        )
+
+        cls.agg = AggregatedCollectionPropertyValue.objects.create(
+            property=cls.prop,
+            unit=cls.unit,
+            year=2021,
+            average=88,
+            publication_status="published",
+        )
+        cls.agg.collections.add(cls.collection)
+
+        # Precompute URL bits used in tests
+        cls.ct_id = ContentType.objects.get_for_model(Collection).pk
+
+    def test_review_detail_shows_cpv_and_aggregated(self):
+        from django.urls import reverse
+
+        self.client.force_login(self.staff)
+        url = reverse(
+            "object_management:review_item_detail",
+            kwargs={"content_type_id": self.ct_id, "object_id": self.collection.pk},
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+        body = response.content.decode()
+        # CPV value rendered (average and unit)
+        self.assertIn("77", body)
+        self.assertIn("ReviewUnit", body)
+        # Aggregated section marked with '(aggregated)'
+        self.assertIn("aggregated", body)
+
+
+class CollectionDetailOnlyPublishedCpvsTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        from utils.properties.models import Property, Unit
+
+        cls.catchment = CollectionCatchment.objects.create(name="PC")
+        cls.system = CollectionSystem.objects.create(name="PS")
+        cls.category = WasteCategory.objects.create(name="PCat")
+        cls.stream = WasteStream.objects.create(category=cls.category)
+        cls.collection = Collection.objects.create(
+            name="PublishedCollection",
+            catchment=cls.catchment,
+            collection_system=cls.system,
+            waste_stream=cls.stream,
+            publication_status="published",
+        )
+
+        cls.prop = Property.objects.create(name="VisibilityProp", publication_status="published")
+        cls.published_unit = Unit.objects.create(name="PublishedUnit", publication_status="published")
+        cls.private_unit = Unit.objects.create(name="PrivateUnit", publication_status="published")
+        cls.prop.allowed_units.add(cls.published_unit, cls.private_unit)
+
+        cls.published_value = CollectionPropertyValue.objects.create(
+            collection=cls.collection,
+            property=cls.prop,
+            unit=cls.published_unit,
+            year=2020,
+            average=12,
+            publication_status="published",
+        )
+
+        cls.private_value = CollectionPropertyValue.objects.create(
+            collection=cls.collection,
+            property=cls.prop,
+            unit=cls.private_unit,
+            year=2021,
+            average=24,
+            publication_status="private",
+        )
+
+    def test_public_detail_only_shows_published_cpvs(self):
+        response = self.client.get(reverse("collection-detail", kwargs={"pk": self.collection.pk}))
+        self.assertEqual(response.status_code, 200)
+        body = response.content.decode()
+        self.assertIn("PublishedUnit", body)
+        self.assertNotIn("PrivateUnit", body)

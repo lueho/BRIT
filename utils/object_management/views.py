@@ -1139,6 +1139,19 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
         context["show_review_panel"] = True
         # The review panel expects 'review_logs'
         context["review_logs"] = list(actions)
+        obj = self.object
+        try:
+            getter = getattr(obj, "collectionpropertyvalues_for_display", None)
+            if callable(getter):
+                context["collection_property_values"] = getter(user=self.request.user)
+        except Exception:
+            pass
+        try:
+            getter = getattr(obj, "aggregatedcollectionpropertyvalues_for_display", None)
+            if callable(getter):
+                context["aggregated_collection_property_values"] = getter(user=self.request.user)
+        except Exception:
+            pass
         return context
 
 
