@@ -7,6 +7,32 @@
     {% include "object_management/review_status_badge.html" with object=object %}
 {% endblock detail_header_badge %}
 
+{% block detail_header_actions %}
+  <div class="btn-toolbar" role="toolbar" aria-label="Detail actions">
+    <div class="btn-group me-2" role="group">
+      {% with first_collection=object.collections.all|first %}
+        {% if first_collection %}
+          <a class="btn btn-sm btn-outline-secondary"
+             href="{{ first_collection.get_absolute_url }}"
+             title="Collection">
+            <i class="fas fa-arrow-left"></i>
+            <span class="d-none d-md-inline">Collection</span>
+          </a>
+        {% endif %}
+      {% endwith %}
+      {% if object.list_url %}
+        <a class="btn btn-sm btn-outline-secondary"
+           href="{{ object.list_url }}"
+           title="List">
+          <i class="fas fa-list-ul"></i>
+          <span class="d-none d-md-inline">List</span>
+        </a>
+      {% endif %}
+    </div>
+    {{ block.super }}
+  </div>
+{% endblock detail_header_actions %}
+
 {% block detail_body %}
     <p class="card-text">
         <strong>Collections:</strong>
