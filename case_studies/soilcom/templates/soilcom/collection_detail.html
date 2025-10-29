@@ -347,11 +347,11 @@
       {{ object.owner.username|default:object.owner }}
     </p>
   {% endif %}
-  {% if object.predecessors.exists %}
+  {% if visible_predecessors %}
     <strong>Predecessors:</strong>
     <br>
     <ul>
-      {% for predecessor_collection in object.predecessors.all %}
+      {% for predecessor_collection in visible_predecessors %}
         <li>
           <a href="{{ predecessor_collection.get_absolute_url }}">{{ predecessor_collection }}</a>
         </li>

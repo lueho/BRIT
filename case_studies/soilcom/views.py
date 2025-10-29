@@ -36,7 +36,10 @@ from maps.views import (
 )
 from utils.file_export.views import GenericUserCreatedObjectExportView
 from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineFormSetMixin
-from utils.object_management.permissions import filter_queryset_for_user, get_object_policy
+from utils.object_management.permissions import (
+    filter_queryset_for_user,
+    get_object_policy,
+)
 from utils.object_management.views import (
     OwnedObjectModelSelectOptionsView,
     PrivateObjectFilterView,
@@ -881,6 +884,19 @@ class CollectionDetailView(MapMixin, UserCreatedObjectDetailView):
 
         context["collection_property_values"] = cpvs
         context["aggregated_collection_property_values"] = agg_cpvs
+        # Restrict predecessors/successors to what the current user may view
+        try:
+            context["visible_successors"] = filter_queryset_for_user(
+                self.object.successors.all(), self.request.user
+            )
+        except Exception:
+            context["visible_successors"] = self.object.successors.none()
+        try:
+            context["visible_predecessors"] = filter_queryset_for_user(
+                self.object.predecessors.all(), self.request.user
+            )
+        except Exception:
+            context["visible_predecessors"] = self.object.predecessors.none()
         return context
 
 
