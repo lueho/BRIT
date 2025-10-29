@@ -60,7 +60,9 @@ def _safe_policy_fallback(user, obj, review_mode=False, error_message=None):
         pass
 
     export_list_type = (
-        "published" if (is_published or is_archived) else ("private" if (is_owner or is_staff) else None)
+        "published"
+        if (is_published or is_archived)
+        else ("private" if (is_owner or is_staff) else None)
     )
 
     policy = {
@@ -85,9 +87,12 @@ def _safe_policy_fallback(user, obj, review_mode=False, error_message=None):
         "can_withdraw_review": False,
         "can_approve": False,
         "can_reject": False,
-        "can_export": (is_published or is_archived) or (is_authenticated and (is_owner or is_staff)),
+        "can_export": (is_published or is_archived)
+        or (is_authenticated and (is_owner or is_staff)),
         "export_list_type": export_list_type,
-        "can_view_review_feedback": bool(is_owner and is_declined and not bool(review_mode)),
+        "can_view_review_feedback": bool(
+            is_owner and is_declined and not bool(review_mode)
+        ),
         # Fallback marker
         "fallback": True,
     }
@@ -146,12 +151,6 @@ def object_policy(context, obj, review_mode=False):
     """
     logger = logging.getLogger(__name__)
     try:
-        logger.debug(
-            "object_policy tag invoked: obj=%s review_mode=%s user=%s",
-            getattr(obj, "pk", None),
-            review_mode,
-            getattr(getattr(context.get("request"), "user", None), "id", None),
-        )
         request = context.get("request")
         user = getattr(request, "user", None) or context.get("user")
         # Local import to avoid circular imports at app load
@@ -160,11 +159,6 @@ def object_policy(context, obj, review_mode=False):
         )
 
         result = _get_object_policy(user, obj, request=request, review_mode=review_mode)
-        logger.debug(
-            "object_policy tag result: keys=%s fallback=%s",
-            sorted(result.keys()) if hasattr(result, "keys") else type(result).__name__,
-            getattr(result, "get", lambda *_: None)("fallback"),
-        )
         return result
     except Exception as e:
         logger.exception("object_policy tag failed", exc_info=True)
@@ -178,13 +172,17 @@ def object_policy(context, obj, review_mode=False):
                 and getattr(user, "is_authenticated", False)
                 and getattr(user, "is_staff", False)
             ):
-                return _safe_policy_fallback(user, obj, review_mode, f"{type(e).__name__}: {e}")
+                return _safe_policy_fallback(
+                    user, obj, review_mode, f"{type(e).__name__}: {e}"
+                )
             # Reveal to owner of the object as well (helps debugging private pages)
             try:
                 if user is not None and getattr(user, "is_authenticated", False):
                     owner_id = getattr(obj, "owner_id", None)
                     if owner_id == getattr(user, "id", None):
-                        return _safe_policy_fallback(user, obj, review_mode, f"{type(e).__name__}: {e}")
+                        return _safe_policy_fallback(
+                            user, obj, review_mode, f"{type(e).__name__}: {e}"
+                        )
             except Exception:
                 pass
         except Exception:
@@ -192,7 +190,9 @@ def object_policy(context, obj, review_mode=False):
         try:
             if getattr(settings, "DEBUG", False):
                 # In debug, reveal error and fallback too
-                return _safe_policy_fallback(user, obj, review_mode, f"{type(e).__name__}: {e}")
+                return _safe_policy_fallback(
+                    user, obj, review_mode, f"{type(e).__name__}: {e}"
+                )
         except Exception:
             pass
         # Last resort: minimal fallback without error message

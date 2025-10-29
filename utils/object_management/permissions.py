@@ -191,9 +191,8 @@ class UserCreatedObjectPermission(permissions.BasePermission):
             getattr(UserCreatedObject, "STATUS_DECLINED", "declined"),
         }
         return (
-            (obj.owner == request.user or getattr(request.user, "is_staff", False))
-            and status in allowed_statuses
-        )
+            obj.owner == request.user or getattr(request.user, "is_staff", False)
+        ) and status in allowed_statuses
 
     def has_withdraw_permission(self, request, obj):
         """
@@ -215,9 +214,8 @@ class UserCreatedObjectPermission(permissions.BasePermission):
             getattr(UserCreatedObject, "STATUS_DECLINED", "declined"),
         }
         return (
-            (obj.owner == request.user or getattr(request.user, "is_staff", False))
-            and status in allowed_statuses
-        )
+            obj.owner == request.user or getattr(request.user, "is_staff", False)
+        ) and status in allowed_statuses
 
     def has_approve_permission(self, request, obj):
         """
@@ -282,8 +280,10 @@ class UserCreatedObjectPermission(permissions.BasePermission):
 
         # Owner, staff, or moderator
         is_owner = getattr(obj, "owner_id", None) == getattr(request.user, "id", None)
-        return is_owner or getattr(request.user, "is_staff", False) or self._is_moderator(
-            request.user, obj
+        return (
+            is_owner
+            or getattr(request.user, "is_staff", False)
+            or self._is_moderator(request.user, obj)
         )
 
 
@@ -352,25 +352,25 @@ def get_object_policy(user, obj, request=None, review_mode=False):
     if request is None:
         request = SimpleNamespace(user=user)
 
-    logger.debug(
-        "Entering get_object_policy for obj=%s user=%s",
-        getattr(obj, "pk", None),
-        getattr(user, "id", None),
-    )
+    # logger.debug(
+    #     "Entering get_object_policy for obj=%s user=%s",
+    #     getattr(obj, "pk", None),
+    #     getattr(user, "id", None),
+    # )
 
     # Review workflow permissions (delegate to centralized helpers)
-    logger.debug(
-        "get_object_policy status: auth=%s archived=%s owner=%s staff=%s private=%s declined=%s in_review=%s obj=%s user=%s",
-        is_authenticated,
-        is_archived,
-        is_owner,
-        is_staff,
-        is_private,
-        is_declined,
-        is_in_review,
-        getattr(obj, "pk", None),
-        getattr(user, "id", None),
-    )
+    # logger.debug(
+    #     "get_object_policy status: auth=%s archived=%s owner=%s staff=%s private=%s declined=%s in_review=%s obj=%s user=%s",
+    #     is_authenticated,
+    #     is_archived,
+    #     is_owner,
+    #     is_staff,
+    #     is_private,
+    #     is_declined,
+    #     is_in_review,
+    #     getattr(obj, "pk", None),
+    #     getattr(user, "id", None),
+    # )
     can_submit_review = (
         bool(perm.has_submit_permission(request, obj)) if is_authenticated else False
     )
@@ -385,12 +385,12 @@ def get_object_policy(user, obj, request=None, review_mode=False):
         bool(perm.has_reject_permission(request, obj)) if is_authenticated else False
     )
 
-    logger.debug(
-        "get_object_policy actions: can_submit=%s can_withdraw=%s moderator=%s",
-        can_submit_review,
-        can_withdraw_review,
-        is_moderator,
-    )
+    # logger.debug(
+    #     "get_object_policy actions: can_submit=%s can_withdraw=%s moderator=%s",
+    #     can_submit_review,
+    #     can_withdraw_review,
+    #     is_moderator,
+    # )
     # CRUD-like actions
     has_update_url = bool(getattr(obj, "update_url", None))
     # Support both modal and direct delete URLs across templates
@@ -453,7 +453,9 @@ def get_object_policy(user, obj, request=None, review_mode=False):
         is_authenticated and (is_owner or is_staff)
     )
     export_list_type = (
-        "published" if (is_published or is_archived) else ("private" if (is_owner or is_staff) else None)
+        "published"
+        if (is_published or is_archived)
+        else ("private" if (is_owner or is_staff) else None)
     )
 
     # Review feedback visibility (declined and owner, outside explicit review mode UIs)
@@ -588,8 +590,7 @@ def filter_queryset_for_user(queryset, user):
         )
 
     return queryset.filter(
-        Q(owner=user)
-        | Q(publication_status=_resolve_status_value(model, "published"))
+        Q(owner=user) | Q(publication_status=_resolve_status_value(model, "published"))
     )
 
 
@@ -605,33 +606,25 @@ def build_scope_filter_params(scope: str | None, user):
         from .models import UserCreatedObject
 
         return {
-            "publication_status": [
-                _resolve_status_value(UserCreatedObject, "review")
-            ]
+            "publication_status": [_resolve_status_value(UserCreatedObject, "review")]
         }
 
     if scope == "declined":
         from .models import UserCreatedObject
 
         return {
-            "publication_status": [
-                _resolve_status_value(UserCreatedObject, "declined")
-            ]
+            "publication_status": [_resolve_status_value(UserCreatedObject, "declined")]
         }
 
     if scope == "archived":
         from .models import UserCreatedObject
 
         return {
-            "publication_status": [
-                _resolve_status_value(UserCreatedObject, "archived")
-            ]
+            "publication_status": [_resolve_status_value(UserCreatedObject, "archived")]
         }
 
     from .models import UserCreatedObject
 
     return {
-        "publication_status": [
-            _resolve_status_value(UserCreatedObject, "published")
-        ]
+        "publication_status": [_resolve_status_value(UserCreatedObject, "published")]
     }

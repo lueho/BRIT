@@ -1,5 +1,5 @@
 import logging
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse
 
 from bootstrap_modal_forms.generic import (
     BSModalCreateView,
@@ -256,7 +256,120 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
         return self.handle_review_action_post(request, *args, **kwargs)
 
 
-class SubmitForReviewView(BaseReviewActionView):
+class ReviewActionCascadeMixin:
+    """Extend review actions with logging + related property cascade."""
+
+    cascade_operation: str | None = None
+    cascade_log_label: str = "review_action"
+
+    def handle_review_action_post(self, request, *args, **kwargs):  # type: ignore[override]
+        response = super().handle_review_action_post(request, *args, **kwargs)
+        try:
+            self._cascade_related_property_values(request)
+        except Exception:
+            # Swallow cascade errors to avoid affecting main action flow
+            pass
+        return response
+
+    # --- Cascade helpers -------------------------------------------------
+    def _cascade_related_property_values(self, request):
+        if not self.cascade_operation:
+            return
+        if not hasattr(self, "object") or getattr(self, "object", None) is None:
+            return
+
+        try:
+            from case_studies.soilcom.models import (
+                AggregatedCollectionPropertyValue,
+                CollectionPropertyValue,
+            )
+        except Exception:
+            # If models can't be imported, skip cascade silently
+            return
+
+        versions = (
+            self.object.all_versions()
+            if hasattr(self.object, "all_versions")
+            else [self.object]
+        )
+        actor_id = getattr(request.user, "id", None)
+
+        cpv_statuses = self._allowed_statuses(CollectionPropertyValue)
+        agg_statuses = self._allowed_statuses(AggregatedCollectionPropertyValue)
+
+        cpv_qs = CollectionPropertyValue.objects.filter(collection__in=versions)
+        if cpv_statuses:
+            cpv_qs = cpv_qs.filter(publication_status__in=cpv_statuses)
+        cpv_owner_filter = self._cpv_owner_filter(actor_id)
+        if cpv_owner_filter is not None:
+            cpv_qs = cpv_qs.filter(cpv_owner_filter)
+        cpv_list = list(cpv_qs.select_related("collection", "property", "unit"))
+
+        agg_qs = AggregatedCollectionPropertyValue.objects.filter(
+            collections__in=versions
+        ).distinct()
+        if agg_statuses:
+            agg_qs = agg_qs.filter(publication_status__in=agg_statuses)
+        agg_owner_filter = self._agg_owner_filter(actor_id)
+        if agg_owner_filter is not None:
+            agg_qs = agg_qs.filter(agg_owner_filter)
+        agg_list = list(
+            agg_qs.select_related("property", "unit").prefetch_related("collections")
+        )
+
+        self._apply_transition(cpv_list)
+        self._apply_transition(agg_list)
+
+    def _allowed_statuses(self, model):
+        private_status = getattr(model, "STATUS_PRIVATE", "private")
+        review_status = getattr(model, "STATUS_REVIEW", "review")
+        declined_status = getattr(model, "STATUS_DECLINED", "declined")
+
+        if self.cascade_operation == "submit_for_review":
+            return [private_status, declined_status]
+        if self.cascade_operation == "withdraw_from_review":
+            return [review_status]
+        if self.cascade_operation == "reject":
+            return [review_status]
+        return []
+
+    def _cpv_owner_filter(self, actor_id):
+        if self.cascade_operation == "reject":
+            return None
+        if actor_id is None:
+            return None
+
+        from django.db.models import Q
+
+        return Q(owner_id=actor_id) | Q(collection__owner_id=actor_id)
+
+    def _agg_owner_filter(self, actor_id):
+        if self.cascade_operation == "reject":
+            return None
+        if actor_id is None:
+            return None
+
+        from django.db.models import Q
+
+        return Q(owner_id=actor_id)
+
+    def _apply_transition(self, values):
+        for val in values:
+            action = getattr(val, self.cascade_operation, None)
+            if not callable(action):
+                continue
+            try:
+                action()
+                try:
+                    val.refresh_from_db()
+                except Exception:
+                    pass
+            except Exception:
+                # Skip failures silently to avoid interrupting the main flow
+                pass
+
+
+class SubmitForReviewView(ReviewActionCascadeMixin, BaseReviewActionView):
     """View to submit an item for review."""
 
     permission_method = "has_submit_permission"
@@ -265,8 +378,31 @@ class SubmitForReviewView(BaseReviewActionView):
     )
     action_attr_name = "submit_for_review"
     review_action = ReviewAction.ACTION_SUBMITTED
+    cascade_operation = "submit_for_review"
+    cascade_log_label = "submit_for_review"
+
+    def post(self, request, *args, **kwargs):  # type: ignore[override]
+        """Handle preflight AJAX from modal-forms so real POST carries checkbox."""
+        try:
+            is_ajax = request.headers.get("x-requested-with") == "XMLHttpRequest"
+        except Exception:
+            is_ajax = False
+        if is_ajax:
+            # Optional early permission check to fail fast within the modal
+            try:
+                self.object = self.get_object(request, *args, **kwargs)
+                self.ensure_permission(request, self.object)
+            except PermissionDenied:
+                from django.http import HttpResponseForbidden
+
+                return HttpResponseForbidden(self.permission_denied_message)
+            from django.http import HttpResponse
+
+            return HttpResponse(status=204)
+        return super().post(request, *args, **kwargs)
 
 
+# ... rest of the code remains the same ...
 class WithdrawFromReviewView(BaseReviewActionView):
     """View to withdraw an item from review."""
 
@@ -278,9 +414,32 @@ class WithdrawFromReviewView(BaseReviewActionView):
     review_action = ReviewAction.ACTION_WITHDRAWN
 
     def get_success_url(self):
-        # Successful withdrawal always moves the object back to the private scope,
-        # so returning to the review interface would cause a permission error.
-        return self.object.get_absolute_url()
+        obj = getattr(self, "object", None)
+        next_url = self.request.POST.get("next") or self.request.GET.get("next")
+
+        if obj and next_url:
+            try:
+                review_path = reverse(
+                    "object_management:review_item_detail",
+                    kwargs={
+                        "content_type_id": ContentType.objects.get_for_model(
+                            obj.__class__
+                        ).pk,
+                        "object_id": obj.pk,
+                    },
+                )
+            except Exception:
+                review_path = None
+
+            if review_path:
+                parsed_next = urlparse(next_url)
+                if parsed_next.path == review_path:
+                    try:
+                        return obj.get_absolute_url()
+                    except Exception:
+                        pass
+
+        return super().get_success_url()
 
 
 class ApproveItemView(BaseReviewActionView):
@@ -292,13 +451,15 @@ class ApproveItemView(BaseReviewActionView):
     review_action = ReviewAction.ACTION_APPROVED
 
 
-class RejectItemView(BaseReviewActionView):
+class RejectItemView(ReviewActionCascadeMixin, BaseReviewActionView):
     """View to reject an item that is in review."""
 
     permission_method = "has_reject_permission"
     permission_denied_message = "You don't have permission to reject this item."
     action_attr_name = "reject"
     review_action = ReviewAction.ACTION_REJECTED
+    cascade_operation = "reject"
+    cascade_log_label = "reject"
 
 
 class BaseReviewActionModalView(BaseReviewActionView, BSModalReadView):
@@ -349,7 +510,7 @@ class BaseReviewActionModalView(BaseReviewActionView, BSModalReadView):
         return super().post(request, *args, **kwargs)
 
 
-class SubmitForReviewModalView(BaseReviewActionModalView):
+class SubmitForReviewModalView(ReviewActionCascadeMixin, BaseReviewActionModalView):
     template_name = "object_management/submit_for_review_modal.html"
 
     permission_method = "has_submit_permission"
@@ -358,9 +519,11 @@ class SubmitForReviewModalView(BaseReviewActionModalView):
     )
     action_attr_name = "submit_for_review"
     review_action = ReviewAction.ACTION_SUBMITTED
+    cascade_operation = "submit_for_review"
+    cascade_log_label = "submit_for_review"
 
 
-class WithdrawFromReviewModalView(BaseReviewActionModalView):
+class WithdrawFromReviewModalView(ReviewActionCascadeMixin, BaseReviewActionModalView):
     template_name = "object_management/withdraw_from_review_modal.html"
 
     permission_method = "has_withdraw_permission"
@@ -369,6 +532,8 @@ class WithdrawFromReviewModalView(BaseReviewActionModalView):
     )
     action_attr_name = "withdraw_from_review"
     review_action = ReviewAction.ACTION_WITHDRAWN
+    cascade_operation = "withdraw_from_review"
+    cascade_log_label = "withdraw_from_review"
 
     def get_success_url(self):
         return self.object.get_absolute_url()
@@ -383,13 +548,15 @@ class ApproveItemModalView(BaseReviewActionModalView):
     review_action = ReviewAction.ACTION_APPROVED
 
 
-class RejectItemModalView(BaseReviewActionModalView):
+class RejectItemModalView(ReviewActionCascadeMixin, BaseReviewActionModalView):
     template_name = "object_management/reject_item_modal.html"
 
     permission_method = "has_reject_permission"
     permission_denied_message = "You don't have permission to reject this item."
     action_attr_name = "reject"
     review_action = ReviewAction.ACTION_REJECTED
+    cascade_operation = "reject"
+    cascade_log_label = "reject"
 
 
 class UserOwnsObjectMixin(UserPassesTestMixin):
@@ -1140,16 +1307,89 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
         # The review panel expects 'review_logs'
         context["review_logs"] = list(actions)
         obj = self.object
+
+        # For review preview, we need CPVs with status in {published, review},
+        # preferring review over published for the same (property, unit, year) key.
+        # The model's helper method deduplicates preferring published, so we query directly.
         try:
-            getter = getattr(obj, "collectionpropertyvalues_for_display", None)
-            if callable(getter):
-                context["collection_property_values"] = getter(user=self.request.user)
+            if hasattr(obj, "all_versions") and hasattr(
+                obj, "_deduplicate_property_values"
+            ):
+                from django.db.models import Case, IntegerField, Value, When
+
+                from case_studies.soilcom.models import CollectionPropertyValue
+
+                cpv_qs = CollectionPropertyValue.objects.filter(
+                    collection__in=obj.all_versions(),
+                    publication_status__in=["published", "review"],
+                ).select_related("property", "unit", "collection")
+
+                # Order by property/unit/year, then prefer review (0) over published (1)
+                cpv_qs = cpv_qs.annotate(
+                    review_order=Case(
+                        When(publication_status="review", then=Value(0)),
+                        default=Value(1),
+                        output_field=IntegerField(),
+                    )
+                ).order_by(
+                    "property__name",
+                    "unit__name",
+                    "year",
+                    "review_order",
+                    "-collection__valid_from",
+                    "-collection__pk",
+                    "pk",
+                )
+
+                context["collection_property_values"] = (
+                    obj._deduplicate_property_values(cpv_qs)
+                )
         except Exception:
             pass
+
         try:
-            getter = getattr(obj, "aggregatedcollectionpropertyvalues_for_display", None)
-            if callable(getter):
-                context["aggregated_collection_property_values"] = getter(user=self.request.user)
+            if hasattr(obj, "all_versions"):
+                from django.db.models import Case, IntegerField, Value, When
+
+                from case_studies.soilcom.models import (
+                    AggregatedCollectionPropertyValue,
+                )
+
+                agg_qs = (
+                    AggregatedCollectionPropertyValue.objects.filter(
+                        collections__in=obj.all_versions(),
+                        publication_status__in=["published", "review"],
+                    )
+                    .select_related("property", "unit")
+                    .prefetch_related("collections")
+                    .distinct()
+                )
+
+                agg_qs = agg_qs.annotate(
+                    review_order=Case(
+                        When(publication_status="review", then=Value(0)),
+                        default=Value(1),
+                        output_field=IntegerField(),
+                    )
+                ).order_by(
+                    "property__name",
+                    "unit__name",
+                    "year",
+                    "review_order",
+                    "-created_at",
+                    "-pk",
+                )
+
+                # Deduplicate aggregated values by (property, unit, year)
+                seen = set()
+                agg_values = []
+                for val in agg_qs:
+                    key = (val.property_id, val.unit_id, val.year)
+                    if key not in seen:
+                        seen.add(key)
+                        agg_values.append(val)
+
+                context["aggregated_collection_property_values"] = agg_values
         except Exception:
             pass
         return context

@@ -1,9 +1,11 @@
 from datetime import date
 
+from django.contrib.auth import get_user_model
 from django.test import TestCase
 from django.urls import reverse
 
 from case_studies.soilcom.models import (
+    AggregatedCollectionPropertyValue,
     Collection,
     CollectionCatchment,
     CollectionPropertyValue,
@@ -400,3 +402,126 @@ class CollectionDetailOnlyPublishedCpvsTestCase(TestCase):
         body = response.content.decode()
         self.assertIn("PublishedUnit", body)
         self.assertNotIn("PrivateUnit", body)
+
+    def test_staff_detail_only_shows_published_cpvs(self):
+        staff = get_user_model().objects.create(username="staff-user", is_staff=True)
+        self.client.force_login(staff)
+        response = self.client.get(reverse("collection-detail", kwargs={"pk": self.collection.pk}))
+        self.assertEqual(response.status_code, 200)
+        context_vals = response.context["collection_property_values"]
+        self.assertTrue(all(v.publication_status == "published" for v in context_vals))
+        self.assertNotIn(
+            "PrivateUnit",
+            response.content.decode(),
+        )
+
+
+class CollectionReviewDetailPreviewTestCase(TestCase):
+
+    @classmethod
+    def setUpTestData(cls):
+        from django.contrib.contenttypes.models import ContentType
+        from utils.properties.models import Property, Unit
+
+        cls.User = get_user_model()
+        cls.staff = cls.User.objects.create(username="reviewer", is_staff=True)
+
+        cls.catchment = CollectionCatchment.objects.create(name="RC")
+        cls.system = CollectionSystem.objects.create(name="RS")
+        cls.category = WasteCategory.objects.create(name="RCat")
+        cls.stream = WasteStream.objects.create(category=cls.category)
+        cls.collection = Collection.objects.create(
+            name="ReviewCollection",
+            catchment=cls.catchment,
+            collection_system=cls.system,
+            waste_stream=cls.stream,
+            publication_status="review",
+        )
+
+        cls.prop = Property.objects.create(name="PreviewProp", publication_status="published")
+        cls.unit = Unit.objects.create(name="PreviewUnit", publication_status="published")
+        cls.other_unit = Unit.objects.create(name="OtherUnit", publication_status="published")
+        cls.prop.allowed_units.add(cls.unit, cls.other_unit)
+
+        cls.cpv_published = CollectionPropertyValue.objects.create(
+            collection=cls.collection,
+            property=cls.prop,
+            unit=cls.unit,
+            year=2020,
+            average=10,
+            publication_status="published",
+        )
+
+        cls.cpv_review = CollectionPropertyValue.objects.create(
+            collection=cls.collection,
+            property=cls.prop,
+            unit=cls.unit,
+            year=2020,
+            average=12,
+            publication_status="review",
+        )
+
+        cls.cpv_private = CollectionPropertyValue.objects.create(
+            collection=cls.collection,
+            property=cls.prop,
+            unit=cls.other_unit,
+            year=2021,
+            average=5,
+            publication_status="private",
+        )
+
+        # Aggregated values
+        cls.agg_prop = Property.objects.create(name="PreviewAggProp", publication_status="published")
+        cls.agg_unit = Unit.objects.create(name="AggUnit", publication_status="published")
+        cls.agg_prop.allowed_units.add(cls.agg_unit)
+
+        cls.agg_published = AggregatedCollectionPropertyValue.objects.create(
+            property=cls.agg_prop,
+            unit=cls.agg_unit,
+            year=2019,
+            average=40,
+            publication_status="published",
+        )
+        cls.agg_published.collections.add(cls.collection)
+
+        cls.agg_review = AggregatedCollectionPropertyValue.objects.create(
+            property=cls.agg_prop,
+            unit=cls.agg_unit,
+            year=2019,
+            average=45,
+            publication_status="review",
+        )
+        cls.agg_review.collections.add(cls.collection)
+
+        cls.agg_private = AggregatedCollectionPropertyValue.objects.create(
+            property=cls.agg_prop,
+            unit=cls.agg_unit,
+            year=2021,
+            average=55,
+            publication_status="private",
+        )
+        cls.agg_private.collections.add(cls.collection)
+
+        cls.ct_id = ContentType.objects.get_for_model(Collection).pk
+
+    def test_review_preview_shows_published_and_review_only(self):
+        self.client.force_login(self.staff)
+        url = reverse(
+            "object_management:review_item_detail",
+            kwargs={"content_type_id": self.ct_id, "object_id": self.collection.pk},
+        )
+        response = self.client.get(url)
+        self.assertEqual(response.status_code, 200)
+
+        cpvs = response.context["collection_property_values"]
+        self.assertEqual([v.pk for v in cpvs], [self.cpv_review.pk])
+        self.assertTrue(all(v.publication_status in {"published", "review"} for v in cpvs))
+
+        agg_vals = response.context["aggregated_collection_property_values"]
+        self.assertEqual([v.pk for v in agg_vals], [self.agg_review.pk])
+        self.assertTrue(all(v.publication_status in {"published", "review"} for v in agg_vals))
+
+        body = response.content.decode()
+        self.assertIn("12", body)
+        self.assertIn("45", body)
+        self.assertNotIn("Private", body)

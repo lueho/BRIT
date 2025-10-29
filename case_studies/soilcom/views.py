@@ -863,15 +863,24 @@ class CollectionDetailView(MapMixin, UserCreatedObjectDetailView):
         context["visible_successors"] = filter_queryset_for_user(successors_qs, user)
 
         # Add chain-aware property values (from refactoring branch)
-        context["collection_property_values"] = (
-            self.object.collectionpropertyvalues_for_display(user=self.request.user)
-        )
-        context["aggregated_collection_property_values"] = (
-            self.object.aggregatedcollectionpropertyvalues_for_display(
-                user=self.request.user
-            )
+        cpvs = self.object.collectionpropertyvalues_for_display(user=self.request.user)
+        agg_cpvs = self.object.aggregatedcollectionpropertyvalues_for_display(
+            user=self.request.user
         )
 
+        # For published collections, show only published property values to maintain public consistency
+        if self.object.publication_status == "published":
+            cpvs = [
+                v for v in cpvs if getattr(v, "publication_status", None) == "published"
+            ]
+            agg_cpvs = [
+                v
+                for v in agg_cpvs
+                if getattr(v, "publication_status", None) == "published"
+            ]
+
+        context["collection_property_values"] = cpvs
+        context["aggregated_collection_property_values"] = agg_cpvs
         return context
 
 
