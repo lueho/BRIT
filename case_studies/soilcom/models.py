@@ -696,7 +696,24 @@ class Collection(NamedUserCreatedObject):
         """
 
         with transaction.atomic():
-            for predecessor in self.predecessors.all():
+            # Acquire row-level locks on predecessors deterministically to avoid races
+            locked_predecessors_qs = (
+                self.predecessors.order_by("pk").select_for_update()
+            )
+            predecessors = list(locked_predecessors_qs)
+
+            # Also lock all potential successors linked to these predecessors (including self)
+            # to ensure visibility is consistent during the re-check and reduce deadlock risk
+            locked_successors_qs = (
+                self.__class__.objects.filter(predecessors__in=predecessors)
+                .order_by("pk")
+                .select_for_update()
+                .distinct()
+            )
+            _ = list(locked_successors_qs)
+
+            # Re-check after acquiring locks: ensure no other published successor exists
+            for predecessor in predecessors:
                 published_successors = predecessor.successors.filter(
                     publication_status="published"
                 ).exclude(pk=self.pk)
@@ -707,7 +724,8 @@ class Collection(NamedUserCreatedObject):
 
             super().approve(user=user)
 
-            for predecessor in self.predecessors.all():
+            # Archive all predecessors after publishing self
+            for predecessor in predecessors:
                 if predecessor.publication_status != "archived":
                     predecessor.publication_status = "archived"
                     predecessor.save(update_fields=["publication_status"])
