@@ -86,7 +86,6 @@ class WasteCategory(NamedUserCreatedObject):
 
 
 class WasteComponentManager(UserCreatedObjectManager):
-
     def get_queryset(self):
         categories = MaterialCategory.objects.filter(name__in=("Biowaste component",))
         return super().get_queryset().filter(categories__in=categories)
@@ -108,7 +107,6 @@ def add_material_category(sender, instance, created, **kwargs):
 
 
 class WasteStreamQuerySet(UserCreatedObjectQuerySet):
-
     def match_allowed_materials(self, allowed_materials):
         if allowed_materials is not None and allowed_materials.exists():
             return self.alias(
@@ -212,7 +210,6 @@ class WasteStreamQuerySet(UserCreatedObjectQuerySet):
         instance, created = self.get_or_create(defaults=defaults, **kwargs)
 
         if not created:
-
             new_allowed_materials = defaults.pop("allowed_materials", None)
             new_forbidden_materials = defaults.pop("forbidden_materials", None)
             category = kwargs.get("category", None)
@@ -252,7 +249,6 @@ class WasteStreamQuerySet(UserCreatedObjectQuerySet):
 
 
 class WasteStreamManager(UserCreatedObjectManager):
-
     def get_queryset(self):
         return WasteStreamQuerySet(self.model, using=self._db)
 
@@ -284,7 +280,6 @@ class WasteStream(NamedUserCreatedObject):
 
 
 class WasteFlyerManager(UserCreatedObjectManager):
-
     def get_queryset(self):
         return super().get_queryset().filter(type="waste_flyer")
 
@@ -315,7 +310,6 @@ def check_url_valid(sender, instance, created, **kwargs):
 
 
 class CollectionSeasonManager(UserCreatedObjectManager):
-
     def get_queryset(self):
         distribution = TemporalDistribution.objects.get(
             owner=get_default_owner(), name="Months of the year"
@@ -403,7 +397,6 @@ class FeeSystem(NamedUserCreatedObject):
 
 
 class CollectionQuerySet(UserCreatedObjectQuerySet):
-
     def valid_on(self, date):
         return self.filter(
             Q(valid_from__lte=date), Q(valid_until__gte=date) | Q(valid_until=None)
@@ -593,18 +586,29 @@ class Collection(NamedUserCreatedObject):
 
         qs = filter_queryset_for_user(qs, user)
 
-        published_status = getattr(CollectionPropertyValue, "STATUS_PUBLISHED", "published")
+        published_status = getattr(
+            CollectionPropertyValue, "STATUS_PUBLISHED", "published"
+        )
+        user_id = getattr(user, "id", None)
 
         qs = qs.annotate(
+            owner_order=Case(
+                When(owner_id=user_id, then=Value(0)),
+                default=Value(1),
+                output_field=IntegerField(),
+            )
+            if user_id
+            else Value(1),
             publication_order=Case(
                 When(publication_status=published_status, then=Value(0)),
                 default=Value(1),
                 output_field=IntegerField(),
-            )
+            ),
         ).order_by(
             "property__name",
             "unit__name",
             "year",
+            "owner_order",
             "publication_order",
             "-collection__valid_from",
             "-collection__pk",
@@ -630,17 +634,26 @@ class Collection(NamedUserCreatedObject):
         published_status = getattr(
             AggregatedCollectionPropertyValue, "STATUS_PUBLISHED", "published"
         )
+        user_id = getattr(user, "id", None)
 
         qs = qs.annotate(
+            owner_order=Case(
+                When(owner_id=user_id, then=Value(0)),
+                default=Value(1),
+                output_field=IntegerField(),
+            )
+            if user_id
+            else Value(1),
             publication_order=Case(
                 When(publication_status=published_status, then=Value(0)),
                 default=Value(1),
                 output_field=IntegerField(),
-            )
+            ),
         ).order_by(
             "property__name",
             "unit__name",
             "year",
+            "owner_order",
             "publication_order",
             "-created_at",
             "-pk",
@@ -697,9 +710,9 @@ class Collection(NamedUserCreatedObject):
 
         with transaction.atomic():
             # Acquire row-level locks on predecessors deterministically to avoid races
-            locked_predecessors_qs = (
-                self.predecessors.order_by("pk").select_for_update()
-            )
+            locked_predecessors_qs = self.predecessors.order_by(
+                "pk"
+            ).select_for_update()
             predecessors = list(locked_predecessors_qs)
 
             # Re-check after acquiring locks: ensure no other published successor exists

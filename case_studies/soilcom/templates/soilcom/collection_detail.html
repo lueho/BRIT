@@ -260,6 +260,9 @@
                 {{ val.average }} {{ val.unit.name }} ({{ val.year }})
               {% endif %}
             </a>
+            {% if val.publication_status and val.publication_status != 'published' %}
+              <span class="badge bg-secondary">{{ val.publication_status }}</span>
+            {% endif %}
           </li>
         {% endfor %}
       </ul>
@@ -284,6 +287,9 @@
                 {{ val.average }} {{ val.unit.name }} ({{ val.year }}) (aggregated)
               {% endif %}
             </a>
+            {% if val.publication_status and val.publication_status != 'published' %}
+              <span class="badge bg-secondary">{{ val.publication_status }}</span>
+            {% endif %}
           </li>
         {% endfor %}
       </ul>

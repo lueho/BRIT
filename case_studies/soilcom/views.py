@@ -871,16 +871,8 @@ class CollectionDetailView(MapMixin, UserCreatedObjectDetailView):
             user=self.request.user
         )
 
-        # For published collections, show only published property values to maintain public consistency
-        if self.object.publication_status == "published":
-            cpvs = [
-                v for v in cpvs if getattr(v, "publication_status", None) == "published"
-            ]
-            agg_cpvs = [
-                v
-                for v in agg_cpvs
-                if getattr(v, "publication_status", None) == "published"
-            ]
+        # Visibility of CPVs/ACPVs is already enforced in the model helpers via filter_queryset_for_user.
+        # Do not force published-only here so owners can see their own private/review values.
 
         context["collection_property_values"] = cpvs
         context["aggregated_collection_property_values"] = agg_cpvs
