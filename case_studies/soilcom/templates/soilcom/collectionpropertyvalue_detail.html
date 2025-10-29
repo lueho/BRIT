@@ -71,6 +71,12 @@
             {% endfor %}
         </ul>
     {% endif %}
+
+    <p class="card-text">
+        <strong>Owner:</strong>
+        <br>
+        {{ object.owner }}
+    </p>
 {% endblock detail_body %}
 
 {% block detail_footer %}
