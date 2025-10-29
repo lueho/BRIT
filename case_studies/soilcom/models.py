@@ -702,16 +702,6 @@ class Collection(NamedUserCreatedObject):
             )
             predecessors = list(locked_predecessors_qs)
 
-            # Also lock all potential successors linked to these predecessors (including self)
-            # to ensure visibility is consistent during the re-check and reduce deadlock risk
-            locked_successors_qs = (
-                self.__class__.objects.filter(predecessors__in=predecessors)
-                .order_by("pk")
-                .select_for_update()
-                .distinct()
-            )
-            _ = list(locked_successors_qs)
-
             # Re-check after acquiring locks: ensure no other published successor exists
             for predecessor in predecessors:
                 published_successors = predecessor.successors.filter(
