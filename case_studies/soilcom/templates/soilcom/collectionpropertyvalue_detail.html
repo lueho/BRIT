@@ -35,6 +35,15 @@
         <br>
         <a href="{{ object.collection.get_absolute_url }}">{{ object.collection }}</a>
     </p>
+    {% with anchor=object.collection.version_anchor %}
+        {% if anchor and anchor.pk != object.collection.pk %}
+            <p class="card-text">
+                <strong>Anchor collection:</strong>
+                <br>
+                <a href="{{ anchor.get_absolute_url }}">{{ anchor }}</a>
+            </p>
+        {% endif %}
+    {% endwith %}
     <p class="card-text">
         <strong>Property:</strong>
         <br>
@@ -77,6 +86,43 @@
         <br>
         {{ object.owner }}
     </p>
+    {% if object.publication_status != 'published' %}
+        <p class="card-text text-muted small">
+            {% if object.publication_status == 'private' %}
+                Visible only to you (owner) and moderators until submitted.
+            {% elif object.publication_status == 'review' %}
+                Awaiting moderator review.
+            {% elif object.publication_status == 'declined' %}
+                Changes were declined; update and resubmit after addressing feedback.
+            {% endif %}
+        </p>
+    {% endif %}
+    {% object_policy object as policy %}
+    {% if policy.can_submit_review or policy.can_withdraw_review or policy.can_approve or policy.can_reject %}
+        <div class="mt-3 d-flex flex-wrap gap-2">
+            {% if policy.can_submit_review %}
+                <a class="btn btn-outline-primary modal-link"
+                   href="{% url 'object_management:submit_for_review_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
+                    <i class="fas fa-paper-plane"></i>
+                    Submit for review
+                </a>
+            {% endif %}
+            {% if policy.can_withdraw_review %}
+                <a class="btn btn-outline-warning modal-link"
+                   href="{% url 'object_management:withdraw_from_review_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
+                    <i class="fas fa-rotate-left"></i>
+                    Withdraw
+                </a>
+            {% endif %}
+            {% if policy.can_approve or policy.can_reject %}
+                <a class="btn btn-outline-secondary"
+                   href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
+                    <i class="fas fa-clipboard-check"></i>
+                    Open review view
+                </a>
+            {% endif %}
+        </div>
+    {% endif %}
 {% endblock detail_body %}
 
 {% block detail_footer %}
@@ -92,7 +138,7 @@
         {% if object.list_url %}
             <a href="{{ object.list_url }}" class="ms-3">
                 <i class="fas fa-fw fa-list">
-                </i> see all
+                </i> See all
             </a>
         {% endif %}
     {% endblock list_link %}
@@ -101,7 +147,7 @@
             {% if policy.can_edit and object.update_url %}
                 <a href="{{ object.update_url }}" class="ms-3">
                     <i class="fas fa-fw fa-edit">
-                    </i> edit
+                    </i> Edit
                 </a>
             {% endif %}
         {% endblock update_link %}
@@ -109,7 +155,7 @@
             {% if policy.can_delete and object.modal_delete_url %}
                 <a href="{{ object.modal_delete_url }}" class="modal-link ms-3">
                     <i class="fas fa-fw fa-trash">
-                    </i> delete
+                    </i> Delete
                 </a>
             {% endif %}
         {% endblock delete_link %}

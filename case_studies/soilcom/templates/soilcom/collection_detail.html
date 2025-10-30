@@ -263,6 +263,32 @@
             {% if val.publication_status and val.publication_status != 'published' %}
               <span class="badge bg-secondary">{{ val.publication_status }}</span>
             {% endif %}
+            {% object_policy val as val_policy %}
+            {% if val_policy.can_submit_review or val_policy.can_withdraw_review or val_policy.can_approve or val_policy.can_reject %}
+              <div class="mt-1 d-flex flex-wrap gap-2">
+                {% if val_policy.can_submit_review %}
+                  <a class="btn btn-xs btn-outline-primary modal-link"
+                     href="{% url 'object_management:submit_for_review_modal' content_type_id=val|get_content_type_id object_id=val.id %}?next={{ request.get_full_path|urlencode }}">
+                    <i class="fas fa-paper-plane"></i>
+                    Submit for review
+                  </a>
+                {% endif %}
+                {% if val_policy.can_withdraw_review %}
+                  <a class="btn btn-xs btn-outline-warning modal-link"
+                     href="{% url 'object_management:withdraw_from_review_modal' content_type_id=val|get_content_type_id object_id=val.id %}?next={{ request.get_full_path|urlencode }}">
+                    <i class="fas fa-rotate-left"></i>
+                    Withdraw
+                  </a>
+                {% endif %}
+                {% if val_policy.can_approve or val_policy.can_reject %}
+                  <a class="btn btn-xs btn-outline-secondary"
+                     href="{% url 'object_management:review_item_detail' content_type_id=val|get_content_type_id object_id=val.id %}?next={{ request.get_full_path|urlencode }}">
+                    <i class="fas fa-clipboard-check"></i>
+                    Review view
+                  </a>
+                {% endif %}
+              </div>
+            {% endif %}
           </li>
         {% endfor %}
       </ul>
@@ -289,6 +315,32 @@
             </a>
             {% if val.publication_status and val.publication_status != 'published' %}
               <span class="badge bg-secondary">{{ val.publication_status }}</span>
+            {% endif %}
+            {% object_policy val as agg_policy %}
+            {% if agg_policy.can_submit_review or agg_policy.can_withdraw_review or agg_policy.can_approve or agg_policy.can_reject %}
+              <div class="mt-1 d-flex flex-wrap gap-2">
+                {% if agg_policy.can_submit_review %}
+                  <a class="btn btn-xs btn-outline-primary modal-link"
+                     href="{% url 'object_management:submit_for_review_modal' content_type_id=val|get_content_type_id object_id=val.id %}?next={{ request.get_full_path|urlencode }}">
+                    <i class="fas fa-paper-plane"></i>
+                    Submit for review
+                  </a>
+                {% endif %}
+                {% if agg_policy.can_withdraw_review %}
+                  <a class="btn btn-xs btn-outline-warning modal-link"
+                     href="{% url 'object_management:withdraw_from_review_modal' content_type_id=val|get_content_type_id object_id=val.id %}?next={{ request.get_full_path|urlencode }}">
+                    <i class="fas fa-rotate-left"></i>
+                    Withdraw
+                  </a>
+                {% endif %}
+                {% if agg_policy.can_approve or agg_policy.can_reject %}
+                  <a class="btn btn-xs btn-outline-secondary"
+                     href="{% url 'object_management:review_item_detail' content_type_id=val|get_content_type_id object_id=val.id %}?next={{ request.get_full_path|urlencode }}">
+                    <i class="fas fa-clipboard-check"></i>
+                    Review view
+                  </a>
+                {% endif %}
+              </div>
             {% endif %}
           </li>
         {% endfor %}

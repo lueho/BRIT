@@ -883,12 +883,12 @@ class CollectionDetailView(MapMixin, UserCreatedObjectDetailView):
             )
         except Exception:
             context["visible_successors"] = self.object.successors.none()
-        try:
-            context["visible_predecessors"] = filter_queryset_for_user(
-                self.object.predecessors.all(), self.request.user
-            )
-        except Exception:
-            context["visible_predecessors"] = self.object.predecessors.none()
+        predecessors_qs = (
+            self.object.predecessors.all()
+            .select_related("owner")
+            .order_by("-lastmodified_at", "-pk")
+        )
+        context["visible_predecessors"] = list(predecessors_qs)
         return context
 
 
