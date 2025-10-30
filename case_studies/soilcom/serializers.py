@@ -93,10 +93,20 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
     )
     frequency = serializers.StringRelatedField()
     fee_system = serializers.StringRelatedField()
-    min_bin_size = serializers.IntegerField(required=False, allow_null=True)
-    required_bin_capacity = serializers.IntegerField(required=False, allow_null=True)
-    required_bin_capacity_reference = serializers.CharField(
-        required=False, allow_null=True
+    min_bin_size = serializers.DecimalField(
+        max_digits=8,
+        decimal_places=1,
+        required=False,
+        allow_null=True,
+    )
+    required_bin_capacity = serializers.DecimalField(
+        max_digits=8,
+        decimal_places=1,
+        required=False,
+        allow_null=True,
+    )
+    required_bin_capacity_reference = serializers.SerializerMethodField(
+        label="Required bin capacity reference"
     )
     comments = serializers.CharField(
         source="description", required=False, allow_blank=True
@@ -155,6 +165,14 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
         # Return policy as-is to keep a single source of truth for key names
         return policy
 
+    def get_required_bin_capacity_reference(self, obj):
+        """Returns the human-readable required bin capacity reference value."""
+        value = obj.required_bin_capacity_reference
+        if not value:
+            return None
+        choices = dict(models.REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES)
+        return choices.get(value, value)
+
     def get_actions(self, obj):
         try:
             return {
@@ -190,8 +208,18 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
         source="fee_system.name", label="Fee system"
     )
     frequency = serializers.StringRelatedField(label="Frequency")
-    min_bin_size = serializers.IntegerField(required=False, allow_null=True)
-    required_bin_capacity = serializers.IntegerField(required=False, allow_null=True)
+    min_bin_size = serializers.DecimalField(
+        max_digits=8,
+        decimal_places=1,
+        required=False,
+        allow_null=True,
+    )
+    required_bin_capacity = serializers.DecimalField(
+        max_digits=8,
+        decimal_places=1,
+        required=False,
+        allow_null=True,
+    )
     required_bin_capacity_reference = serializers.CharField(
         required=False, allow_null=True
     )
@@ -279,6 +307,14 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
             return comments
         else:
             return ""
+
+    @staticmethod
+    def get_required_bin_capacity_reference(obj):
+        value = obj.required_bin_capacity_reference
+        if not value:
+            return ""
+        choices = dict(models.REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES)
+        return choices.get(value, value)
 
     def to_representation(self, instance):
         # Call the superclass's to_representation method to get the default ordering

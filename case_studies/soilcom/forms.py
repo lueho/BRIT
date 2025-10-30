@@ -7,10 +7,12 @@ from django.forms import (
     CheckboxSelectMultiple,
     ChoiceField,
     DateInput,
+    DecimalField,
     HiddenInput,
     IntegerField,
     ModelChoiceField,
     ModelMultipleChoiceField,
+    NumberInput,
     RadioSelect,
 )
 from django.utils.translation import gettext as _
@@ -390,8 +392,20 @@ class CollectionModelForm(CreateInlineMixin, SimpleModelForm):
         label="Connection type",
         help_text="Indicates whether connection to the collection system is mandatory, voluntary, or not specified. Leave blank for never set; select 'not specified' for explicit user choice.",
     )
-    min_bin_size = IntegerField(required=False, min_value=0)
-    required_bin_capacity = IntegerField(required=False, min_value=0)
+    min_bin_size = DecimalField(
+        required=False,
+        min_value=0,
+        max_digits=8,
+        decimal_places=1,
+        widget=NumberInput(attrs={"step": "0.1", "min": "0"}),
+    )
+    required_bin_capacity = DecimalField(
+        required=False,
+        min_value=0,
+        max_digits=8,
+        decimal_places=1,
+        widget=NumberInput(attrs={"step": "0.1", "min": "0"}),
+    )
     required_bin_capacity_reference = ChoiceField(
         choices=[("", "---------")] + REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES,
         required=False,
