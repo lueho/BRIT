@@ -11,7 +11,6 @@
         <small class="text-muted">{% trans "Detail-based review panel" %}</small>
       </div>
     {% endif %}
-
     {# Thread (collapsible when long) #}
     <div class="mb-3">
       {% if review_logs %}
@@ -82,7 +81,6 @@
         <div class="text-muted">{% trans "No review activity yet." %}</div>
       {% endif %}
     </div>
-
     {# Shared message box for all actions #}
     <div class="mb-2">
       <label for="review-message-{{ object.id }}" class="form-label mb-1 small">{% trans "Message (optional)" %}</label>
@@ -91,7 +89,6 @@
                 rows="2"
                 placeholder="{% trans 'Write a short note or comment…' %}"></textarea>
     </div>
-
     {# Actions #}
     <div class="btn-toolbar gap-2 flex-wrap align-items-center"
          role="toolbar"
@@ -111,7 +108,6 @@
           </button>
         </form>
       {% endif %}
-
       {# Owner actions (owners only) via policy #}
       {% if policy.is_owner %}
         {% if policy.is_declined %}
@@ -167,36 +163,19 @@
           {% endif %}
         {% endif %}
       {% endif %}
-
       {# Moderator actions via policy #}
       {% if policy.is_in_review %}
         {% if policy.can_approve %}
-          <form method="post"
-                action="{% url 'object_management:approve_item' content_type_id=object|get_content_type_id object_id=object.id %}"
-                class="m-0 btn-group align-items-center"
-                role="group"
-                onsubmit="return copySharedMessage(this, 'review-message-{{ object.id }}')">
-            {% csrf_token %}
-            <input type="hidden" name="next" value="{{ request.get_full_path }}">
-            <input type="hidden" name="message" value="">
-            <button type="submit" class="btn btn-sm btn-success">
-              <i class="fas fa-check"></i> {% trans "Approve" %}
-            </button>
-          </form>
+          <a class="btn btn-sm btn-success modal-link"
+             href="{% url 'object_management:approve_item_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
+            <i class="fas fa-check"></i> {% trans "Approve" %}
+          </a>
         {% endif %}
         {% if policy.can_reject %}
-          <form method="post"
-                action="{% url 'object_management:reject_item' content_type_id=object|get_content_type_id object_id=object.id %}"
-                class="m-0 btn-group align-items-center"
-                role="group"
-                onsubmit="return copySharedMessage(this, 'review-message-{{ object.id }}')">
-            {% csrf_token %}
-            <input type="hidden" name="next" value="{{ request.get_full_path }}">
-            <input type="hidden" name="message" value="">
-            <button type="submit" class="btn btn-sm btn-danger">
-              <i class="fas fa-xmark"></i> {% trans "Reject" %}
-            </button>
-          </form>
+          <a class="btn btn-sm btn-danger modal-link"
+             href="{% url 'object_management:reject_item_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
+            <i class="fas fa-xmark"></i> {% trans "Reject" %}
+          </a>
         {% endif %}
       {% endif %}
     </div>

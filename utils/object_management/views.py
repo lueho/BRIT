@@ -55,6 +55,7 @@ from ..views import (
     NextOrSuccessUrlMixin,
     NoFormTagMixin,
 )
+from .redirects import ReviewActionRedirectResolver
 
 logger = logging.getLogger(__name__)
 
@@ -475,6 +476,7 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
 
     permission_method: str | None = None
     permission_denied_message: str = "You don't have permission to perform this action."
+    redirect_handlers: dict = {}
 
     def get_object(self, request=None, *args, **kwargs):
         """Get the object being reviewed based on content type and ID.
@@ -483,19 +485,39 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
         Resolves IDs from self.kwargs so subclasses (including modal views)
         don't need to override this method.
         """
+        cached_object = getattr(self, "object", None)
+        if cached_object is not None:
+            return cached_object
+
         content_type_id = self.kwargs.get("content_type_id")
         object_id = self.kwargs.get("object_id")
 
         content_type = get_object_or_404(ContentType, pk=content_type_id)
         model_class = content_type.model_class()
-        return get_object_or_404(model_class, pk=object_id)
+        obj = get_object_or_404(model_class, pk=object_id)
+        self.object = obj
+        return obj
 
     def get_success_url(self):
-        """Override to support both 'next' parameter and fallback to object URL."""
+        """Resolve redirect target using the shared redirect resolver."""
+        obj = self.get_object()
         next_url = self.request.POST.get("next") or self.request.GET.get("next")
-        if next_url:
-            return next_url
-        return self.object.get_absolute_url()
+
+        resolver = self.get_redirect_resolver(obj)
+        default_url = obj.get_absolute_url()
+        return resolver.resolve_action_redirect(
+            self.review_action, next_url, default_url
+        )
+
+    def get_action_redirect_handlers(self):
+        return dict(self.redirect_handlers)
+
+    def get_redirect_resolver(self, obj):
+        return ReviewActionRedirectResolver(
+            self.request,
+            obj,
+            action_handlers=self.get_action_redirect_handlers(),
+        )
 
     def has_action_permission(self, request, obj) -> bool:
         try:
