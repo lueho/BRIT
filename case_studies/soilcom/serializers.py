@@ -138,18 +138,11 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
             "comments",
             "sources",
             "policy",
+            "actions",
         )
 
     def get_sources(self, obj):
         return [flyer.url for flyer in obj.flyers.all() if flyer.url]
-
-    @staticmethod
-    def get_required_bin_capacity_reference(obj):
-        value = obj.required_bin_capacity_reference
-        if not value:
-            return None
-        choices = dict(models.REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES)
-        return choices.get(value, value)
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -173,8 +166,12 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
         return policy
 
     def get_required_bin_capacity_reference(self, obj):
-        """Returns the required bin capacity reference value."""
-        return obj.required_bin_capacity_reference
+        """Returns the human-readable required bin capacity reference value."""
+        value = obj.required_bin_capacity_reference
+        if not value:
+            return None
+        choices = dict(models.REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES)
+        return choices.get(value, value)
 
     def get_actions(self, obj):
         try:
