@@ -335,11 +335,11 @@
       {% endfor %}
     </ul>
   {% endif %}
-  {% if object.successors.exists %}
+  {% if visible_successors %}
     <strong>Successors:</strong>
     <br>
     <ul>
-      {% for successor_collection in object.successors.all %}
+      {% for successor_collection in visible_successors %}
         <li>
           <a href="{{ successor_collection.get_absolute_url }}">{{ successor_collection }}</a>
         </li>
