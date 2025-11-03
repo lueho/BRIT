@@ -11,6 +11,9 @@
     {% leaflet_js %}
     {% leaflet_css %}
     <link rel="stylesheet" href="{% static 'css/maps.min.css' %}">
+    <style>
+      .map-container { height: 240px; }
+    </style>
   {% endif %}
 {% endblock style_sheets %}
 
@@ -20,33 +23,38 @@
 {% trans "Are you sure you want to approve this?" as approve_confirm %}
 {% trans "Are you sure you want to reject this?" as reject_confirm %}
 
-{% object_policy object review_mode=review_mode as policy %}
-
 {% block detail_header_badge %}
   {% include "object_management/review_status_badge.html" with object=object %}
 {% endblock detail_header_badge %}
 
 {% block detail_header_actions %}
+  {% object_policy object review_mode=review_mode as policy %}
   <div class="btn-toolbar" role="toolbar" aria-label="Detail actions">
     <div class="btn-group me-2" role="group">
-      {% if request.GET.back %}
-        <a class="btn btn-sm btn-outline-secondary"
-           href="{{ request.GET.back }}"
-           title="Back to results">
-          <i class="fas fa-arrow-left"></i> <span class="d-none d-md-inline">Back to results</span>
-        </a>
-      {% else %}
+      {% with back_url=request.GET.back %}
+        {% if back_url %}
+          <a class="btn btn-sm btn-outline-secondary"
+             href="{{ back_url }}"
+             title="Back to results">
+            <i class="fas fa-arrow-left"></i>
+            <span class="d-none d-md-inline">Back to results</span>
+          </a>
+        {% endif %}
+      {% endwith %}
+      {% if not request.GET.review %}
         {% if object.list_url %}
           <a class="btn btn-sm btn-outline-secondary"
              href="{{ object.list_url }}"
              title="List">
-            <i class="fas fa-list-ul"></i> <span class="d-none d-md-inline">List</span>
+            <i class="fas fa-list-ul"></i>
+            <span class="d-none d-md-inline">List</span>
           </a>
         {% else %}
           <a class="btn btn-sm btn-outline-secondary"
              href="{% url 'collection-list' %}"
              title="List">
-            <i class="fas fa-list-ul"></i> <span class="d-none d-md-inline">List</span>
+            <i class="fas fa-list-ul"></i>
+            <span class="d-none d-md-inline">List</span>
           </a>
         {% endif %}
       {% endif %}
@@ -95,7 +103,7 @@
 {% endblock detail_header_actions %}
 {% block detail_top_image %}
   {% if not review_mode %}
-    <div class="card-img-top" style="height: 240px;">{% leaflet_map "main" %}</div>
+    <div class="card-img-top map-container">{% leaflet_map "main" %}</div>
   {% endif %}
 {% endblock detail_top_image %}
 
@@ -287,7 +295,7 @@
     <ul>
       {% for flyer in object.flyers.all %}
         <li>
-          <a href="{{ flyer.url }}" target="blank">{{ flyer.url }}</a>
+          <a href="{{ flyer.url }}" target="_blank">{{ flyer.url }}</a>
         </li>
       {% endfor %}
     </ul>
@@ -405,15 +413,7 @@
     </a>
   {% endif %}
 
-  {# Navigate to Review view if currently in review #}
-  {% if policy.is_in_review and not review_mode %}
-    {% if policy.is_owner or policy.is_staff or policy.is_moderator %}
-      <a class="btn btn-outline-secondary w-100 mb-2"
-         href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
-        <i class="fas fa-clipboard-check"></i> Review view
-      </a>
-    {% endif %}
-  {% endif %}
+  {# Review navigation is exposed in the header action group to avoid duplication #}
 
   {# Review workflow #}
   {% if policy.can_submit_review %}

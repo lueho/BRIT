@@ -828,6 +828,7 @@ class CollectionDetailView(MapMixin, UserCreatedObjectDetailView):
             successors_qs = Collection.objects.none()
 
         context["visible_successors"] = filter_queryset_for_user(successors_qs, user)
+        context["review_mode"] = False
         return context
 
 
