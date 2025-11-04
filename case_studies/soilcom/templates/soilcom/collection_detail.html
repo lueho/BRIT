@@ -251,6 +251,7 @@
       <ul>
         {% for val in prop.list|dictsortreversed:"year" %}
           <li>
+            {% include "object_management/review_status_icon.html" with object=val %}
             <a href="{{ val.get_absolute_url }}">
               {% if val.standard_deviation %}
                 {{ val.average }} ± {{ val.standard_deviation }} {{ val.unit.name }} (
@@ -274,6 +275,7 @@
       <ul>
         {% for val in prop.list|dictsortreversed:"year" %}
           <li>
+            {% include "object_management/review_status_icon.html" with object=val %}
             <a href="{{ val.get_absolute_url }}">
               {% if val.standard_deviation %}
                 {{ val.average }} ± {{ val.standard_deviation }} {{ val.unit.name }} (
