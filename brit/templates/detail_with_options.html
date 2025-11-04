@@ -21,48 +21,38 @@
             {% block detail_header_badge %}
             {% endblock detail_header_badge %}
             {% block detail_header_actions %}
-              {% object_policy object as policy %}
-              {% if policy.can_view_review_feedback %}
-                <a class="btn btn-sm btn-outline-danger"
-                   href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
-                   title="Review feedback">
-                  <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review feedback</span>
-                </a>
-              {% else %}
-                {% if policy.is_in_review %}
-                  {% if policy.is_owner %}
-                    <a class="btn btn-sm btn-outline-secondary"
+              {% block detail_header_primary_actions %}
+                {% object_policy object as policy %}
+                {% block detail_header_review_actions %}
+                  {% if policy.can_view_review_feedback %}
+                    <a class="btn btn-sm btn-outline-danger"
                        href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
-                       title="Review view">
-                      <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review view</span>
+                       title="Review feedback">
+                      <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review feedback</span>
                     </a>
-                  {% else %}
-                    {% if policy.is_staff %}
+                  {% elif policy.is_in_review %}
+                    {% if policy.is_owner or policy.is_staff or policy.is_moderator %}
                       <a class="btn btn-sm btn-outline-secondary"
                          href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
                          title="Review view">
                         <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review view</span>
                       </a>
-                    {% else %}
-                      {% if policy.is_moderator %}
-                        <a class="btn btn-sm btn-outline-secondary"
-                           href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
-                           title="Review view">
-                          <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review view</span>
-                        </a>
-                      {% endif %}
                     {% endif %}
-                  {% endif %}
-                {% elif policy.is_declined %}
-                  {% if policy.is_staff or policy.is_moderator %}
+                  {% elif policy.is_declined and policy.is_staff %}
+                    <a class="btn btn-sm btn-outline-secondary"
+                       href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
+                       title="Review view">
+                      <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review view</span>
+                    </a>
+                  {% elif policy.is_declined and policy.is_moderator %}
                     <a class="btn btn-sm btn-outline-secondary"
                        href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
                        title="Review view">
                       <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review view</span>
                     </a>
                   {% endif %}
-                {% endif %}
-              {% endif %}
+                {% endblock detail_header_review_actions %}
+              {% endblock detail_header_primary_actions %}
             {% endblock detail_header_actions %}
           </div>
         </div>

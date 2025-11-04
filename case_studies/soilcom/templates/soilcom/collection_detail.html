@@ -11,9 +11,7 @@
     {% leaflet_js %}
     {% leaflet_css %}
     <link rel="stylesheet" href="{% static 'css/maps.min.css' %}">
-    <style>
-      .map-container { height: 240px; }
-    </style>
+    <link rel="stylesheet" href="{% static 'soilcom/css/collection_detail.css' %}">
   {% endif %}
 {% endblock style_sheets %}
 
@@ -28,79 +26,94 @@
 {% endblock detail_header_badge %}
 
 {% block detail_header_actions %}
-  {% object_policy object review_mode=review_mode as policy %}
   <div class="btn-toolbar" role="toolbar" aria-label="Detail actions">
-    <div class="btn-group me-2" role="group">
-      {% with back_url=request.GET.back %}
-        {% if back_url %}
-          <a class="btn btn-sm btn-outline-secondary"
-             href="{{ back_url }}"
-             title="Back to results">
-            <i class="fas fa-arrow-left"></i>
-            <span class="d-none d-md-inline">Back to results</span>
-          </a>
+    {% block detail_header_primary_actions %}
+      <div class="btn-group me-2" role="group">
+        {% with back_url=request.GET.back %}
+          {% if back_url %}
+            <a class="btn btn-sm btn-outline-secondary"
+               href="{{ back_url }}"
+               title="Back to results">
+              <i class="fas fa-arrow-left"></i>
+              <span class="d-none d-md-inline">Back to results</span>
+            </a>
+          {% endif %}
+        {% endwith %}
+        {% if not request.GET.review %}
+          {% if object.list_url %}
+            <a class="btn btn-sm btn-outline-secondary"
+               href="{{ object.list_url }}"
+               title="List">
+              <i class="fas fa-list-ul"></i>
+              <span class="d-none d-md-inline">List</span>
+            </a>
+          {% else %}
+            <a class="btn btn-sm btn-outline-secondary"
+               href="{% url 'collection-list' %}"
+               title="List">
+              <i class="fas fa-list-ul"></i>
+              <span class="d-none d-md-inline">List</span>
+            </a>
+          {% endif %}
         {% endif %}
-      {% endwith %}
-      {% if not request.GET.review %}
-        {% if object.list_url %}
+        {% if request.GET.next %}
           <a class="btn btn-sm btn-outline-secondary"
-             href="{{ object.list_url }}"
-             title="List">
-            <i class="fas fa-list-ul"></i>
-            <span class="d-none d-md-inline">List</span>
-          </a>
-        {% else %}
-          <a class="btn btn-sm btn-outline-secondary"
-             href="{% url 'collection-list' %}"
-             title="List">
-            <i class="fas fa-list-ul"></i>
-            <span class="d-none d-md-inline">List</span>
-          </a>
-        {% endif %}
-      {% endif %}
-      {# Map link: prefer returning to filtered map via ?next=, otherwise go to public map filtered by feature id #}
-      {% if request.GET.next %}
-        <a class="btn btn-sm btn-outline-secondary"
-           href="{{ request.GET.next }}"
-           title="Map">
-          <i class="fas fa-map"></i> <span class="d-none d-md-inline">Map</span>
-        </a>
-      {% else %}
-        {# Derive scope from publication_status when possible #}
-        {% with scope=object.publication_status %}
-          <a class="btn btn-sm btn-outline-secondary"
-             href="{% url 'WasteCollection' %}?id={{ object.id }}&load_features=true{% if scope %}&scope={{ scope }}{% endif %}"
+             href="{{ request.GET.next }}"
              title="Map">
             <i class="fas fa-map"></i> <span class="d-none d-md-inline">Map</span>
           </a>
-        {% endwith %}
-      {% endif %}
-      <a class="btn btn-sm btn-outline-secondary"
-         href="{% url 'wastecollection-dashboard' %}"
-         title="Open Explorer (dashboard)">
-        <i class="fas fa-table-cells-large"></i> <span class="d-none d-md-inline">Explorer</span>
-      </a>
-    </div>
-    <div class="btn-group me-2" role="group">
-      {% if policy.can_view_review_feedback %}
-        <a class="btn btn-sm btn-outline-danger"
-           href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}"
-           title="Review feedback">
-          <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review feedback</span>
+        {% else %}
+          {% with scope=object.publication_status %}
+            <a class="btn btn-sm btn-outline-secondary"
+               href="{% url 'WasteCollection' %}?id={{ object.id }}&load_features=true{% if scope %}&scope={{ scope }}{% endif %}"
+               title="Map">
+              <i class="fas fa-map"></i> <span class="d-none d-md-inline">Map</span>
+            </a>
+          {% endwith %}
+        {% endif %}
+        <a class="btn btn-sm btn-outline-secondary"
+           href="{% url 'wastecollection-dashboard' %}"
+           title="Open Explorer (dashboard)">
+          <i class="fas fa-table-cells-large"></i> <span class="d-none d-md-inline">Explorer</span>
         </a>
-      {% elif policy.is_in_review %}
-        {% if policy.is_owner or policy.is_staff or policy.is_moderator %}
+      </div>
+    {% endblock detail_header_primary_actions %}
+    {% block detail_header_review_actions %}
+      {% object_policy object review_mode=review_mode as policy %}
+      <div class="btn-group me-2" role="group">
+        {% if policy.can_view_review_feedback %}
+          <a class="btn btn-sm btn-outline-danger"
+             href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}"
+             title="Review feedback">
+            <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review feedback</span>
+          </a>
+        {% elif policy.is_in_review %}
+          {% if policy.is_owner or policy.is_staff or policy.is_moderator %}
+            <a class="btn btn-sm btn-outline-secondary"
+               href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
+               title="Review view">
+              <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review view</span>
+            </a>
+          {% endif %}
+        {% elif policy.is_declined and policy.is_staff %}
+          <a class="btn btn-sm btn-outline-secondary"
+             href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
+             title="Review view">
+            <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review view</span>
+          </a>
+        {% elif policy.is_declined and policy.is_moderator %}
           <a class="btn btn-sm btn-outline-secondary"
              href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
              title="Review view">
             <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review view</span>
           </a>
         {% endif %}
-      {% endif %}
-    </div>
+      </div>
+    {% endblock detail_header_review_actions %}
   </div>
   {# Reject handled via global modal scaffold (modal-link in options pane) #}
 {% endblock detail_header_actions %}
+
 {% block detail_top_image %}
   {% if not review_mode %}
     <div class="card-img-top map-container">{% leaflet_map "main" %}</div>
