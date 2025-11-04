@@ -529,26 +529,39 @@ def apply_scope_filter(queryset, scope: str | None, user=None):
 
     status_field = "publication_status"
 
-    if scope == "published":
-        return queryset.filter(**{status_field: _resolve_status_value(model, "published")})
+    def _status_kwargs(name: str):
+        return {status_field: _resolve_status_value(model, name)}
 
-    if scope == "private":
-        if not user or not getattr(user, "is_authenticated", False):
-            return queryset.none()
+    def _ensure_owner_field(scope_name: str):
         if not hasattr(model, "owner"):
             raise ImproperlyConfigured(
-                f"{model.__name__} must define an 'owner' field to use the private scope."
+                f"{model.__name__} must define an 'owner' field to use the '{scope_name}' scope."
             )
+
+    staff_or_moderator = getattr(user, "is_staff", False) or user_is_moderator_for_model(
+        user, model
+    )
+    is_authenticated = bool(user) and getattr(user, "is_authenticated", False)
+
+    if scope == "published":
+        return queryset.filter(**_status_kwargs("published"))
+
+    if scope == "private":
+        if staff_or_moderator:
+            return queryset
+        if not is_authenticated:
+            return queryset.none()
+        _ensure_owner_field("private")
         return queryset.filter(owner=user)
 
-    if scope == "review":
-        return queryset.filter(**{status_field: _resolve_status_value(model, "review")})
-
-    if scope == "declined":
-        return queryset.filter(**{status_field: _resolve_status_value(model, "declined")})
-
-    if scope == "archived":
-        return queryset.filter(**{status_field: _resolve_status_value(model, "archived")})
+    if scope in {"review", "declined", "archived"}:
+        filtered = queryset.filter(**_status_kwargs(scope))
+        if staff_or_moderator:
+            return filtered
+        if not is_authenticated:
+            return queryset.none()
+        _ensure_owner_field(scope)
+        return filtered.filter(owner=user)
 
     return queryset
 
@@ -565,7 +578,6 @@ def filter_queryset_for_user(queryset, user):
         return queryset
 
     if not getattr(user, "is_authenticated", False):
-        # Anonymous users: only published (exclude archived)
         return queryset.filter(
             publication_status=_resolve_status_value(model, "published")
         )

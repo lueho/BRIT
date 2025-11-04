@@ -36,6 +36,7 @@ from maps.views import (
 )
 from utils.file_export.views import GenericUserCreatedObjectExportView
 from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineFormSetMixin
+from utils.object_management.permissions import filter_queryset_for_user
 from utils.object_management.views import (
     OwnedObjectModelSelectOptionsView,
     PrivateObjectFilterView,
@@ -817,6 +818,18 @@ class CollectionDetailView(MapMixin, UserCreatedObjectDetailView):
         # Always load the features layer for the current object on detail pages
         params["load_features"] = True
         return params
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = getattr(self.request, "user", None)
+        try:
+            successors_qs = self.object.successors.all()
+        except Exception:
+            successors_qs = Collection.objects.none()
+
+        context["visible_successors"] = filter_queryset_for_user(successors_qs, user)
+        context["review_mode"] = False
+        return context
 
 
 class CollectionModalDetailView(UserCreatedObjectModalDetailView):

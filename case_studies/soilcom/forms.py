@@ -288,6 +288,14 @@ class CollectionPropertyValueModelForm(SimpleModelForm):
         ),
         label="Collection",
     )
+    sources = TomSelectModelMultipleChoiceField(
+        config=TomSelectConfig(
+            url="source-autocomplete",
+            label_field="abbreviation",
+        ),
+        label="Sources",
+        required=False,
+    )
 
     class Meta:
         model = CollectionPropertyValue
@@ -298,6 +306,7 @@ class CollectionPropertyValueModelForm(SimpleModelForm):
             "year",
             "average",
             "standard_deviation",
+            "sources",
         )
 
 
@@ -309,6 +318,14 @@ class AggregatedCollectionPropertyValueModelForm(SimpleModelForm):
         ),
         label="Collections",
     )
+    sources = TomSelectModelMultipleChoiceField(
+        config=TomSelectConfig(
+            url="source-autocomplete",
+            label_field="abbreviation",
+        ),
+        label="Sources",
+        required=False,
+    )
 
     class Meta:
         model = AggregatedCollectionPropertyValue
@@ -319,6 +336,7 @@ class AggregatedCollectionPropertyValueModelForm(SimpleModelForm):
             "year",
             "average",
             "standard_deviation",
+            "sources",
         )
 
 

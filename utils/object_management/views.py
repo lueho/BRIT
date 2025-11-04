@@ -277,6 +277,11 @@ class WithdrawFromReviewView(BaseReviewActionView):
     action_attr_name = "withdraw_from_review"
     review_action = ReviewAction.ACTION_WITHDRAWN
 
+    def get_success_url(self):
+        # Successful withdrawal always moves the object back to the private scope,
+        # so returning to the review interface would cause a permission error.
+        return self.object.get_absolute_url()
+
 
 class ApproveItemView(BaseReviewActionView):
     """View to approve an item that is in review."""
@@ -364,6 +369,9 @@ class WithdrawFromReviewModalView(BaseReviewActionModalView):
     )
     action_attr_name = "withdraw_from_review"
     review_action = ReviewAction.ACTION_WITHDRAWN
+
+    def get_success_url(self):
+        return self.object.get_absolute_url()
 
 
 class ApproveItemModalView(BaseReviewActionModalView):

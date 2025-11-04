@@ -1,6 +1,7 @@
 from django.conf import settings
 from django.db import models
 
+from bibliography.models import Source
 from utils.object_management.models import NamedUserCreatedObject, get_default_owner
 
 
@@ -51,6 +52,11 @@ class PropertyValue(NamedUserCreatedObject):
     )
     average = models.FloatField()
     standard_deviation = models.FloatField(blank=True, null=True)
+    sources = models.ManyToManyField(
+        Source,
+        blank=True,
+        help_text="Sources or references for this property value.",
+    )
 
     class Meta:
         abstract = True
