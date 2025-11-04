@@ -110,7 +110,29 @@ All API endpoints are expected to mirror the rules above; if you add new endpoin
 
 ## Per‑model moderator permission
 
-Moderation rights are granted via `can_moderate_<model>` permissions created and distributed automatically (post‑migrate) to the configured moderators group. See `utils/object_management/signals.py` and `settings.REVIEW_MODERATORS_GROUP_NAME` (defaults to `moderators`). Staff users always qualify as moderators.
+Moderation rights are granted via `can_moderate_<model>` permissions created and distributed automatically via a `post_migrate` signal to the configured moderators group.
+
+**How it works:**
+- Signal handler in `utils/object_management/signals.py` automatically creates permissions for all `UserCreatedObject` subclasses
+- Runs in **all environments** (development, production, and tests) for consistent behavior
+- Permissions are assigned to the group specified by `settings.REVIEW_MODERATORS_GROUP_NAME` (defaults to `"moderators"`)
+- Uses `get_or_create()` for idempotent execution
+- Staff users always qualify as moderators regardless of group membership
+
+**Testing:**
+When writing tests, **fetch** permissions rather than creating them:
+```python
+# ✅ Correct
+permission = Permission.objects.get(
+    codename="can_moderate_mymodel",
+    content_type=content_type,
+)
+
+# ❌ Wrong - will cause IntegrityError
+# permission = Permission.objects.create(...)
+```
+
+See `utils/object_management/README.md` for detailed documentation on the permission system.
 
 ## Using the policy in templates
 

@@ -4,9 +4,6 @@ from django.conf import settings
 from django.contrib.auth.models import User
 from django.utils import timezone
 
-from distributions.utils import INITIALIZATION_DEPENDENCIES
-
-
 INITIALIZATION_DEPENDENCIES = ["users"]
 
 
@@ -14,7 +11,15 @@ def ensure_initial_data(stdout=None):
     """
     Ensures all required initial data for the utils app exists.
     Idempotent: safe to run multiple times.
-    Creates the default owner (from DEFAULT_OBJECT_OWNER_USERNAME if set, else ADMIN_USERNAME).
+
+    Creates the default owner user (from DEFAULT_OBJECT_OWNER_USERNAME if set,
+    else ADMIN_USERNAME environment variable).
+
+    Note: Moderation permissions (can_moderate_<model>) are created automatically
+    by the post_migrate signal in utils/object_management/signals.py, not here.
+
+    Returns:
+        dict: Contains 'default_owner' User instance
     """
     admin_username = os.environ.get("ADMIN_USERNAME")
     owner_username = getattr(settings, "DEFAULT_OBJECT_OWNER_USERNAME", admin_username)
