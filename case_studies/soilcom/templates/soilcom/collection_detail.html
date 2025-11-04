@@ -260,9 +260,6 @@
                 {{ val.average }} {{ val.unit.name }} ({{ val.year }})
               {% endif %}
             </a>
-            {% if val.publication_status and val.publication_status != 'published' %}
-              <span class="badge bg-secondary">{{ val.publication_status }}</span>
-            {% endif %}
             {% object_policy val as val_policy %}
             {% if val_policy.can_submit_review or val_policy.can_withdraw_review or val_policy.can_approve or val_policy.can_reject %}
               <div class="mt-1 d-flex flex-wrap gap-2">
@@ -313,9 +310,6 @@
                 {{ val.average }} {{ val.unit.name }} ({{ val.year }}) (aggregated)
               {% endif %}
             </a>
-            {% if val.publication_status and val.publication_status != 'published' %}
-              <span class="badge bg-secondary">{{ val.publication_status }}</span>
-            {% endif %}
             {% object_policy val as agg_policy %}
             {% if agg_policy.can_submit_review or agg_policy.can_withdraw_review or agg_policy.can_approve or agg_policy.can_reject %}
               <div class="mt-1 d-flex flex-wrap gap-2">
