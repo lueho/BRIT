@@ -1286,11 +1286,28 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
             return get_object_or_404(model_class, pk=object_id)
         return super().get_object(queryset)
 
+    def get_review_specific_context(self, context):
+        """
+        Hook for subclasses to add model-specific context to the review view.
+
+        Override this method in subclasses to provide additional context data
+        specific to the model being reviewed (e.g., related objects, preview data).
+
+        Args:
+            context: The context dict built so far
+
+        Returns:
+            dict: Additional context items to merge into the main context
+        """
+        return {}
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # Resolve and pass the base template the wrapper should extend.
+
+        # Resolve and pass the base template the wrapper should extend
         context["base_template"] = self._resolve_base_template()
         context["review_mode"] = True
+
         # Provide action history so reviewers can see prior comments and explanations
         try:
             obj = self.object
@@ -1300,98 +1317,19 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
             ).order_by("-created_at", "-id")
         except Exception:
             actions = []
+
         # Old variable used by wrapper; keep for compatibility
         context["review_actions"] = actions
         # Ensure the embedded review panel in the base detail template is shown
         context["show_review_panel"] = True
         # The review panel expects 'review_logs'
         context["review_logs"] = list(actions)
-        obj = self.object
 
-        # For review preview, we need CPVs with status in {published, review},
-        # preferring review over published for the same (property, unit, year) key.
-        # The model's helper method deduplicates preferring published, so we query directly.
-        try:
-            if hasattr(obj, "all_versions") and hasattr(
-                obj, "_deduplicate_property_values"
-            ):
-                from django.db.models import Case, IntegerField, Value, When
+        # Allow subclasses to add model-specific context
+        model_specific_context = self.get_review_specific_context(context)
+        if model_specific_context:
+            context.update(model_specific_context)
 
-                from case_studies.soilcom.models import CollectionPropertyValue
-
-                cpv_qs = CollectionPropertyValue.objects.filter(
-                    collection__in=obj.all_versions(),
-                    publication_status__in=["published", "review"],
-                ).select_related("property", "unit", "collection")
-
-                # Order by property/unit/year, then prefer review (0) over published (1)
-                cpv_qs = cpv_qs.annotate(
-                    review_order=Case(
-                        When(publication_status="review", then=Value(0)),
-                        default=Value(1),
-                        output_field=IntegerField(),
-                    )
-                ).order_by(
-                    "property__name",
-                    "unit__name",
-                    "year",
-                    "review_order",
-                    "-collection__valid_from",
-                    "-collection__pk",
-                    "pk",
-                )
-
-                context["collection_property_values"] = (
-                    obj._deduplicate_property_values(cpv_qs)
-                )
-        except Exception:
-            pass
-
-        try:
-            if hasattr(obj, "all_versions"):
-                from django.db.models import Case, IntegerField, Value, When
-
-                from case_studies.soilcom.models import (
-                    AggregatedCollectionPropertyValue,
-                )
-
-                agg_qs = (
-                    AggregatedCollectionPropertyValue.objects.filter(
-                        collections__in=obj.all_versions(),
-                        publication_status__in=["published", "review"],
-                    )
-                    .select_related("property", "unit")
-                    .prefetch_related("collections")
-                    .distinct()
-                )
-
-                agg_qs = agg_qs.annotate(
-                    review_order=Case(
-                        When(publication_status="review", then=Value(0)),
-                        default=Value(1),
-                        output_field=IntegerField(),
-                    )
-                ).order_by(
-                    "property__name",
-                    "unit__name",
-                    "year",
-                    "review_order",
-                    "-created_at",
-                    "-pk",
-                )
-
-                # Deduplicate aggregated values by (property, unit, year)
-                seen = set()
-                agg_values = []
-                for val in agg_qs:
-                    key = (val.property_id, val.unit_id, val.year)
-                    if key not in seen:
-                        seen.add(key)
-                        agg_values.append(val)
-
-                context["aggregated_collection_property_values"] = agg_values
-        except Exception:
-            pass
         return context
 
 

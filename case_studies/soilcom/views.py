@@ -46,6 +46,7 @@ from utils.object_management.views import (
     PrivateObjectListView,
     PublishedObjectFilterView,
     PublishedObjectListView,
+    ReviewItemDetailView,
     ReviewObjectFilterView,
     UserCreatedObjectAutocompleteView,
     UserCreatedObjectCreateView,
@@ -902,6 +903,103 @@ class CollectionDetailView(MapMixin, UserCreatedObjectDetailView):
 
 class CollectionModalDetailView(UserCreatedObjectModalDetailView):
     model = Collection
+
+
+class CollectionReviewItemDetailView(ReviewItemDetailView):
+    """
+    Collection-specific review detail view with property value preview.
+
+    Extends the base review view to show collection property values and
+    aggregated property values with review-aware deduplication logic.
+    """
+
+    model = Collection
+
+    def get_review_specific_context(self, context):
+        """Add collection property values for review preview."""
+        obj = self.object
+        review_context = {}
+
+        # For review preview, show CPVs with status in {published, review},
+        # preferring review over published for the same (property, unit, year) key
+        try:
+            if hasattr(obj, "all_versions") and hasattr(
+                obj, "_deduplicate_property_values"
+            ):
+                from django.db.models import Case, IntegerField, Value, When
+
+                cpv_qs = CollectionPropertyValue.objects.filter(
+                    collection__in=obj.all_versions(),
+                    publication_status__in=["published", "review"],
+                ).select_related("property", "unit", "collection")
+
+                # Order by property/unit/year, then prefer review (0) over published (1)
+                cpv_qs = cpv_qs.annotate(
+                    review_order=Case(
+                        When(publication_status="review", then=Value(0)),
+                        default=Value(1),
+                        output_field=IntegerField(),
+                    )
+                ).order_by(
+                    "property__name",
+                    "unit__name",
+                    "year",
+                    "review_order",
+                    "-collection__valid_from",
+                    "-collection__pk",
+                    "pk",
+                )
+
+                review_context["collection_property_values"] = (
+                    obj._deduplicate_property_values(cpv_qs)
+                )
+        except Exception:
+            pass
+
+        # Same logic for aggregated property values
+        try:
+            if hasattr(obj, "all_versions"):
+                from django.db.models import Case, IntegerField, Value, When
+
+                agg_qs = (
+                    AggregatedCollectionPropertyValue.objects.filter(
+                        collections__in=obj.all_versions(),
+                        publication_status__in=["published", "review"],
+                    )
+                    .select_related("property", "unit")
+                    .prefetch_related("collections")
+                    .distinct()
+                )
+
+                agg_qs = agg_qs.annotate(
+                    review_order=Case(
+                        When(publication_status="review", then=Value(0)),
+                        default=Value(1),
+                        output_field=IntegerField(),
+                    )
+                ).order_by(
+                    "property__name",
+                    "unit__name",
+                    "year",
+                    "review_order",
+                    "-created_at",
+                    "-pk",
+                )
+
+                # Deduplicate aggregated values by (property, unit, year)
+                seen = set()
+                agg_values = []
+                for val in agg_qs:
+                    key = (val.property_id, val.unit_id, val.year)
+                    if key not in seen:
+                        seen.add(key)
+                        agg_values.append(val)
+
+                review_context["aggregated_collection_property_values"] = agg_values
+        except Exception:
+            pass
+
+        return review_context
 
 
 class CollectionUpdateView(M2MInlineFormSetMixin, UserCreatedObjectUpdateView):

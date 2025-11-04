@@ -452,6 +452,11 @@ urlpatterns = [
         name="collection-detail-modal",
     ),
     path(
+        "collections/<int:pk>/review/",
+        views.CollectionReviewItemDetailView.as_view(),
+        name="collection-review-detail",
+    ),
+    path(
         "collections/<int:pk>/update/",
         views.CollectionUpdateView.as_view(),
         name="collection-update",
