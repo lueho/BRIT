@@ -7,33 +7,18 @@ page, then defers to the model's regular detail template content.
 #}
 
 {% block detail_header_actions %}
-  {% with True as review_mode %}
-    {{ block.super }}
-  {% endwith %}
+  {{ block.super }}
 {% endblock detail_header_actions %}
 
 {% block detail_header_review_actions %}
-  {% with next_url=request.GET.next %}
-    {% if next_url and next_url != request.get_full_path %}
+  {# Back link to detail view - use next parameter or object's detail URL #}
+  {% with back_url=request.GET.next|default:object.get_absolute_url %}
+    {% if back_url %}
       <a class="btn btn-sm btn-outline-secondary"
-         href="{{ next_url }}"
+         href="{{ back_url }}"
          title="Detail view">
         <i class="fas fa-file-lines"></i> <span class="d-none d-sm-inline">Detail view</span>
       </a>
-    {% else %}
-      {% with detail_url=object.get_absolute_url %}
-        {% if detail_url and detail_url != request.get_full_path %}
-          <a class="btn btn-sm btn-outline-secondary"
-             href="{{ detail_url }}"
-             title="Detail view">
-            <i class="fas fa-file-lines"></i> <span class="d-none d-sm-inline">Detail view</span>
-          </a>
-        {% endif %}
-      {% endwith %}
     {% endif %}
   {% endwith %}
 {% endblock detail_header_review_actions %}
-
-{% block content %}
-  {% with True as review_mode %}{{ block.super }}{% endwith %}
-{% endblock content %}
