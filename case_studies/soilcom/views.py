@@ -856,39 +856,47 @@ class CollectionDetailView(MapMixin, UserCreatedObjectDetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        user = getattr(self.request, "user", None)
+        user = self.request.user
 
-        # Add visible successors (from main)
-        try:
-            successors_qs = self.object.successors.all()
-        except Exception:
-            successors_qs = Collection.objects.none()
-        context["visible_successors"] = filter_queryset_for_user(successors_qs, user)
+        # Add chain-aware property values visible to the current user
+        cpvs = self.object.collectionpropertyvalues_for_display(user=user)
+        agg_cpvs = self.object.aggregatedcollectionpropertyvalues_for_display(user=user)
 
-        # Add chain-aware property values (from refactoring branch)
-        cpvs = self.object.collectionpropertyvalues_for_display(user=self.request.user)
-        agg_cpvs = self.object.aggregatedcollectionpropertyvalues_for_display(
-            user=self.request.user
+        # On published collections, show only published property values to maintain
+        # public consistency, UNLESS the viewer is the collection owner
+        is_owner = (
+            hasattr(self.object, "owner")
+            and hasattr(user, "id")
+            and self.object.owner_id == user.id
         )
-
-        # Visibility of CPVs/ACPVs is already enforced in the model helpers via filter_queryset_for_user.
-        # Do not force published-only here so owners can see their own private/review values.
+        if self.object.publication_status == "published" and not is_owner:
+            cpvs = [
+                v for v in cpvs if getattr(v, "publication_status", None) == "published"
+            ]
+            agg_cpvs = [
+                v
+                for v in agg_cpvs
+                if getattr(v, "publication_status", None) == "published"
+            ]
 
         context["collection_property_values"] = cpvs
         context["aggregated_collection_property_values"] = agg_cpvs
-        # Restrict predecessors/successors to what the current user may view
+
+        # Filter version chain links (predecessors/successors) by user visibility
         try:
             context["visible_successors"] = filter_queryset_for_user(
-                self.object.successors.all(), self.request.user
+                self.object.successors.all(), user
             )
         except Exception:
             context["visible_successors"] = self.object.successors.none()
+
         predecessors_qs = (
             self.object.predecessors.all()
             .select_related("owner")
             .order_by("-lastmodified_at", "-pk")
         )
         context["visible_predecessors"] = list(predecessors_qs)
+
         return context
 
 

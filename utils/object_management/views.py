@@ -1011,9 +1011,6 @@ class UserCreatedObjectReadAccessMixin(UserPassesTestMixin):
                 published_value = _resolve_status_value(obj.__class__, "published")
                 if status == published_value:
                     return True
-                archived_value = _resolve_status_value(obj.__class__, "archived")
-                if status == archived_value:
-                    return True
         except Exception:
             pass
 
@@ -1021,9 +1018,7 @@ class UserCreatedObjectReadAccessMixin(UserPassesTestMixin):
         policy = get_object_policy(self.request.user, obj, request=self.request)
         if policy["is_published"]:
             return True
-        if policy.get("is_archived"):
-            return True
-        # Otherwise restrict to owner, staff, or moderator (archived not public)
+        # Archived, private, review, and declined objects require authentication
         return policy["is_owner"] or policy["is_staff"] or policy["is_moderator"]
 
 
