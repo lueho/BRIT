@@ -4,7 +4,7 @@
 {% object_policy object as policy %}
 
 {% block detail_header_badge %}
-  {% include "object_management/review_status_badge.html" with object=object %}
+    {% include "object_management/review_status_badge.html" with object=object %}
 {% endblock detail_header_badge %}
 
 {% block detail_body %}
@@ -36,6 +36,18 @@
             <br>
             {{ object.average }} {{ object.unit }}
         </p>
+    {% endif %}
+    {% if object.sources.exists %}
+        <p class="card-text">
+            <strong>Sources:</strong>
+        </p>
+        <ul>
+            {% for source in object.sources.all %}
+                <li>
+                    <a href="{{ source.get_absolute_url }}">{{ source.abbreviation }}</a>
+                </li>
+            {% endfor %}
+        </ul>
     {% endif %}
 {% endblock detail_body %}
 
