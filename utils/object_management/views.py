@@ -246,130 +246,34 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
                 )
             except Exception:
                 pass
+
+            # Hook for model-specific post-action behavior (e.g., cascading)
+            self.post_action_hook(request, previous_status)
+
         except Exception as e:
             messages.error(request, f"Error performing action: {str(e)}")
 
         return HttpResponseRedirect(self.get_success_url())
+
+    def post_action_hook(self, request, previous_status=None):
+        """
+        Hook for subclasses to implement model-specific post-action behavior.
+
+        Called after the main action succeeds and before redirecting.
+        Subclasses can override this to add cascading, notifications, etc.
+
+        Args:
+            request: The HTTP request
+            previous_status: The object's publication_status before the action
+        """
+        pass
 
     # Default POST handler for all review action views (modal and non‑modal)
     def post(self, request, *args, **kwargs):  # type: ignore[override]
         return self.handle_review_action_post(request, *args, **kwargs)
 
 
-class ReviewActionCascadeMixin:
-    """Extend review actions with logging + related property cascade."""
-
-    cascade_operation: str | None = None
-    cascade_log_label: str = "review_action"
-
-    def handle_review_action_post(self, request, *args, **kwargs):  # type: ignore[override]
-        response = super().handle_review_action_post(request, *args, **kwargs)
-        try:
-            self._cascade_related_property_values(request)
-        except Exception:
-            # Swallow cascade errors to avoid affecting main action flow
-            pass
-        return response
-
-    # --- Cascade helpers -------------------------------------------------
-    def _cascade_related_property_values(self, request):
-        if not self.cascade_operation:
-            return
-        if not hasattr(self, "object") or getattr(self, "object", None) is None:
-            return
-
-        try:
-            from case_studies.soilcom.models import (
-                AggregatedCollectionPropertyValue,
-                CollectionPropertyValue,
-            )
-        except Exception:
-            # If models can't be imported, skip cascade silently
-            return
-
-        versions = (
-            self.object.all_versions()
-            if hasattr(self.object, "all_versions")
-            else [self.object]
-        )
-        actor_id = getattr(request.user, "id", None)
-
-        cpv_statuses = self._allowed_statuses(CollectionPropertyValue)
-        agg_statuses = self._allowed_statuses(AggregatedCollectionPropertyValue)
-
-        cpv_qs = CollectionPropertyValue.objects.filter(collection__in=versions)
-        if cpv_statuses:
-            cpv_qs = cpv_qs.filter(publication_status__in=cpv_statuses)
-        cpv_owner_filter = self._cpv_owner_filter(actor_id)
-        if cpv_owner_filter is not None:
-            cpv_qs = cpv_qs.filter(cpv_owner_filter)
-        cpv_list = list(cpv_qs.select_related("collection", "property", "unit"))
-
-        agg_qs = AggregatedCollectionPropertyValue.objects.filter(
-            collections__in=versions
-        ).distinct()
-        if agg_statuses:
-            agg_qs = agg_qs.filter(publication_status__in=agg_statuses)
-        agg_owner_filter = self._agg_owner_filter(actor_id)
-        if agg_owner_filter is not None:
-            agg_qs = agg_qs.filter(agg_owner_filter)
-        agg_list = list(
-            agg_qs.select_related("property", "unit").prefetch_related("collections")
-        )
-
-        self._apply_transition(cpv_list)
-        self._apply_transition(agg_list)
-
-    def _allowed_statuses(self, model):
-        private_status = getattr(model, "STATUS_PRIVATE", "private")
-        review_status = getattr(model, "STATUS_REVIEW", "review")
-        declined_status = getattr(model, "STATUS_DECLINED", "declined")
-
-        if self.cascade_operation == "submit_for_review":
-            return [private_status, declined_status]
-        if self.cascade_operation == "withdraw_from_review":
-            return [review_status]
-        if self.cascade_operation == "reject":
-            return [review_status]
-        return []
-
-    def _cpv_owner_filter(self, actor_id):
-        if self.cascade_operation == "reject":
-            return None
-        if actor_id is None:
-            return None
-
-        from django.db.models import Q
-
-        return Q(owner_id=actor_id) | Q(collection__owner_id=actor_id)
-
-    def _agg_owner_filter(self, actor_id):
-        if self.cascade_operation == "reject":
-            return None
-        if actor_id is None:
-            return None
-
-        from django.db.models import Q
-
-        return Q(owner_id=actor_id)
-
-    def _apply_transition(self, values):
-        for val in values:
-            action = getattr(val, self.cascade_operation, None)
-            if not callable(action):
-                continue
-            try:
-                action()
-                try:
-                    val.refresh_from_db()
-                except Exception:
-                    pass
-            except Exception:
-                # Skip failures silently to avoid interrupting the main flow
-                pass
-
-
-class SubmitForReviewView(ReviewActionCascadeMixin, BaseReviewActionView):
+class SubmitForReviewView(BaseReviewActionView):
     """View to submit an item for review."""
 
     permission_method = "has_submit_permission"
@@ -378,8 +282,6 @@ class SubmitForReviewView(ReviewActionCascadeMixin, BaseReviewActionView):
     )
     action_attr_name = "submit_for_review"
     review_action = ReviewAction.ACTION_SUBMITTED
-    cascade_operation = "submit_for_review"
-    cascade_log_label = "submit_for_review"
 
     def post(self, request, *args, **kwargs):  # type: ignore[override]
         """Handle preflight AJAX from modal-forms so real POST carries checkbox."""
@@ -451,15 +353,13 @@ class ApproveItemView(BaseReviewActionView):
     review_action = ReviewAction.ACTION_APPROVED
 
 
-class RejectItemView(ReviewActionCascadeMixin, BaseReviewActionView):
+class RejectItemView(BaseReviewActionView):
     """View to reject an item that is in review."""
 
     permission_method = "has_reject_permission"
     permission_denied_message = "You don't have permission to reject this item."
     action_attr_name = "reject"
     review_action = ReviewAction.ACTION_REJECTED
-    cascade_operation = "reject"
-    cascade_log_label = "reject"
 
 
 class BaseReviewActionModalView(BaseReviewActionView, BSModalReadView):
@@ -510,7 +410,7 @@ class BaseReviewActionModalView(BaseReviewActionView, BSModalReadView):
         return super().post(request, *args, **kwargs)
 
 
-class SubmitForReviewModalView(ReviewActionCascadeMixin, BaseReviewActionModalView):
+class SubmitForReviewModalView(BaseReviewActionModalView):
     template_name = "object_management/submit_for_review_modal.html"
 
     permission_method = "has_submit_permission"
@@ -519,11 +419,9 @@ class SubmitForReviewModalView(ReviewActionCascadeMixin, BaseReviewActionModalVi
     )
     action_attr_name = "submit_for_review"
     review_action = ReviewAction.ACTION_SUBMITTED
-    cascade_operation = "submit_for_review"
-    cascade_log_label = "submit_for_review"
 
 
-class WithdrawFromReviewModalView(ReviewActionCascadeMixin, BaseReviewActionModalView):
+class WithdrawFromReviewModalView(BaseReviewActionModalView):
     template_name = "object_management/withdraw_from_review_modal.html"
 
     permission_method = "has_withdraw_permission"
@@ -532,8 +430,6 @@ class WithdrawFromReviewModalView(ReviewActionCascadeMixin, BaseReviewActionModa
     )
     action_attr_name = "withdraw_from_review"
     review_action = ReviewAction.ACTION_WITHDRAWN
-    cascade_operation = "withdraw_from_review"
-    cascade_log_label = "withdraw_from_review"
 
     def get_success_url(self):
         return self.object.get_absolute_url()
@@ -548,15 +444,13 @@ class ApproveItemModalView(BaseReviewActionModalView):
     review_action = ReviewAction.ACTION_APPROVED
 
 
-class RejectItemModalView(ReviewActionCascadeMixin, BaseReviewActionModalView):
+class RejectItemModalView(BaseReviewActionModalView):
     template_name = "object_management/reject_item_modal.html"
 
     permission_method = "has_reject_permission"
     permission_denied_message = "You don't have permission to reject this item."
     action_attr_name = "reject"
     review_action = ReviewAction.ACTION_REJECTED
-    cascade_operation = "reject"
-    cascade_log_label = "reject"
 
 
 class UserOwnsObjectMixin(UserPassesTestMixin):

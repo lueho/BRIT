@@ -41,13 +41,19 @@ from utils.object_management.permissions import (
     get_object_policy,
 )
 from utils.object_management.views import (
+    ApproveItemModalView,
+    ApproveItemView,
     OwnedObjectModelSelectOptionsView,
     PrivateObjectFilterView,
     PrivateObjectListView,
     PublishedObjectFilterView,
     PublishedObjectListView,
+    RejectItemModalView,
+    RejectItemView,
     ReviewItemDetailView,
     ReviewObjectFilterView,
+    SubmitForReviewModalView,
+    SubmitForReviewView,
     UserCreatedObjectAutocompleteView,
     UserCreatedObjectCreateView,
     UserCreatedObjectDetailView,
@@ -57,6 +63,8 @@ from utils.object_management.views import (
     UserCreatedObjectModalDetailView,
     UserCreatedObjectModalUpdateView,
     UserCreatedObjectUpdateView,
+    WithdrawFromReviewModalView,
+    WithdrawFromReviewView,
 )
 
 from .filters import CollectionFilterSet, CollectorFilter, WasteFlyerFilter
@@ -905,6 +913,98 @@ class CollectionModalDetailView(UserCreatedObjectModalDetailView):
     model = Collection
 
 
+class CollectionReviewActionCascadeMixin:
+    """
+    Cascade review actions from Collections to related property values.
+
+    When a Collection's review state changes (submit, withdraw, reject, approve),
+    this mixin cascades the action to CollectionPropertyValues and
+    AggregatedCollectionPropertyValues across the entire version chain.
+    """
+
+    def post_action_hook(self, request, previous_status=None):
+        """Cascade the review action to related property values."""
+        super().post_action_hook(request, previous_status)
+
+        # Determine action from view's action_attr_name
+        action_name = getattr(self, "action_attr_name", None)
+        if not action_name or not hasattr(self, "object"):
+            return
+
+        # Get all versions in the chain
+        versions = (
+            self.object.all_versions()
+            if hasattr(self.object, "all_versions")
+            else [self.object]
+        )
+
+        actor_id = getattr(request.user, "id", None)
+
+        # Determine which property values to cascade to
+        cpv_statuses = self._allowed_statuses_for_action(action_name)
+        if not cpv_statuses:
+            return
+
+        # Query property values
+        cpv_qs = CollectionPropertyValue.objects.filter(collection__in=versions)
+        cpv_qs = cpv_qs.filter(publication_status__in=cpv_statuses)
+
+        # Apply owner filtering for submit/withdraw (not for reject/approve)
+        if action_name in ("submit_for_review", "withdraw_from_review") and actor_id:
+            from django.db.models import Q
+
+            cpv_qs = cpv_qs.filter(
+                Q(owner_id=actor_id) | Q(collection__owner_id=actor_id)
+            )
+
+        cpv_list = list(cpv_qs.select_related("collection", "property", "unit"))
+
+        # Query aggregated property values
+        agg_qs = AggregatedCollectionPropertyValue.objects.filter(
+            collections__in=versions
+        ).distinct()
+        agg_qs = agg_qs.filter(publication_status__in=cpv_statuses)
+
+        # Apply owner filtering for submit/withdraw (not for reject/approve)
+        if action_name in ("submit_for_review", "withdraw_from_review") and actor_id:
+            agg_qs = agg_qs.filter(owner_id=actor_id)
+
+        agg_list = list(
+            agg_qs.select_related("property", "unit").prefetch_related("collections")
+        )
+
+        # Apply the transition to all property values
+        self._apply_transition(cpv_list + agg_list, action_name)
+
+    def _allowed_statuses_for_action(self, action_name):
+        """Return which publication statuses should be affected by this action."""
+        if action_name == "submit_for_review":
+            return ["private", "declined"]
+        elif action_name == "withdraw_from_review":
+            return ["review"]
+        elif action_name == "reject":
+            return ["review"]
+        elif action_name == "approve":
+            return ["review"]
+        return []
+
+    def _apply_transition(self, values, action_name):
+        """Apply the review action to each value."""
+        for val in values:
+            action_method = getattr(val, action_name, None)
+            if not callable(action_method):
+                continue
+            try:
+                # For approve, pass the user
+                if action_name == "approve":
+                    action_method(user=self.request.user)
+                else:
+                    action_method()
+            except Exception:
+                # Log but don't fail - cascade errors shouldn't block the main action
+                pass
+
+
 class CollectionReviewItemDetailView(ReviewItemDetailView):
     """
     Collection-specific review detail view with property value preview.
@@ -1415,3 +1515,64 @@ class WasteCollectionPublishedMapIframeView(
         data["scope"] = "published"
         kwargs["data"] = data
         return kwargs
+# Collection-specific review action views with cascade support
+# These views extend the base review action views to add property value cascading
+
+
+class CollectionSubmitForReviewView(CollectionReviewActionCascadeMixin, SubmitForReviewView):
+    """Submit a Collection for review and cascade to related property values."""
+
+    pass
+
+
+class CollectionWithdrawFromReviewView(
+    CollectionReviewActionCascadeMixin, WithdrawFromReviewView
+):
+    """Withdraw a Collection from review and cascade to related property values."""
+
+    pass
+
+
+class CollectionApproveItemView(CollectionReviewActionCascadeMixin, ApproveItemView):
+    """Approve a Collection and cascade to related property values."""
+
+    pass
+
+
+class CollectionRejectItemView(CollectionReviewActionCascadeMixin, RejectItemView):
+    """Reject a Collection and cascade to related property values."""
+
+    pass
+
+
+# Modal versions
+class CollectionSubmitForReviewModalView(
+    CollectionReviewActionCascadeMixin, SubmitForReviewModalView
+):
+    """Modal: Submit a Collection for review with cascade."""
+
+    pass
+
+
+class CollectionWithdrawFromReviewModalView(
+    CollectionReviewActionCascadeMixin, WithdrawFromReviewModalView
+):
+    """Modal: Withdraw a Collection from review with cascade."""
+
+    pass
+
+
+class CollectionApproveItemModalView(
+    CollectionReviewActionCascadeMixin, ApproveItemModalView
+):
+    """Modal: Approve a Collection with cascade."""
+
+    pass
+
+
+class CollectionRejectItemModalView(
+    CollectionReviewActionCascadeMixin, RejectItemModalView
+):
+    """Modal: Reject a Collection with cascade."""
+
+    pass
