@@ -1,16 +1,63 @@
+"""
+Automatic Permission Creation for UserCreatedObject Models
+
+This module provides signal handlers that automatically create and manage
+moderation permissions for all UserCreatedObject subclasses in the project.
+
+## Overview
+
+When Django runs migrations, this signal handler:
+1. Discovers all concrete (non-abstract) UserCreatedObject subclasses
+2. Creates a `can_moderate_<model>` permission for each model
+3. Assigns these permissions to the moderators group
+
+## Permission Naming
+
+Permissions follow a consistent naming pattern:
+- Codename: `can_moderate_<model_name>` (e.g., "can_moderate_collection")
+- Name: "Can moderate <verbose_name_plural>" (e.g., "Can moderate collections")
+
+## Configuration
+
+- Group name: Set via `settings.REVIEW_MODERATORS_GROUP_NAME` (default: "moderators")
+- The signal runs in all environments (dev, production, and tests)
+- Uses get_or_create() for idempotency - safe to run multiple times
+
+## Usage in Tests
+
+Tests should FETCH permissions, not create them:
+
+    # ✅ Correct
+    permission = Permission.objects.get(
+        codename="can_moderate_mymodel",
+        content_type=content_type,
+    )
+
+    # ❌ Wrong - will cause IntegrityError
+    # permission = Permission.objects.create(...)
+
+## Architecture
+
+The permission creation is centralized here (single source of truth) and used by:
+- UserCreatedObjectPermission class (DRF permissions)
+- UserCreatedObject querysets (filtering reviewable items)
+- Views and mixins (access control)
+- Templates (button visibility via templatetags)
+
+Staff users always have moderation rights and don't need explicit permissions.
+
+See Also:
+- docs/02_developer_guide/user_created_objects.md
+- utils/object_management/README.md
+- utils/object_management/permissions.py
+"""
+
 from django.apps import apps
 from django.conf import settings
 from django.contrib.auth.models import Group, Permission
 from django.contrib.contenttypes.models import ContentType
 from django.db.models.signals import post_migrate
 from django.dispatch import receiver
-
-# We create per-model moderation permissions for all concrete subclasses of
-# utils.object_management.models.UserCreatedObject and assign them to a
-# configurable moderators group.
-# - Permission codename format: can_moderate_<model_name>
-# - Checked throughout the codebase in UserCreatedObjectPermission/_querysets/views/templates
-# - Staff users implicitly have moderation rights and do not need the permission
 
 
 def _iter_user_created_models():
@@ -40,13 +87,9 @@ def ensure_moderation_permissions(sender, **kwargs):
     After migrations, ensure custom per-model moderation permissions exist and
     are assigned to the moderators group.
 
-    Skips execution when running tests (settings.TESTING=True) to avoid
-    colliding with tests that explicitly create these permissions.
+    Runs in all environments (including tests) to ensure permissions exist
+    consistently. Uses get_or_create for idempotency.
     """
-    # Avoid interfering with the project test suite which manages permissions explicitly
-    if getattr(settings, "TESTING", False):
-        return
-
     group_name = getattr(settings, "REVIEW_MODERATORS_GROUP_NAME", "moderators")
 
     try:
