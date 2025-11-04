@@ -27,11 +27,10 @@ class ReviewWorkflowViewTests(TestCase):
         cls.moderator = User.objects.create_user(username="moderator")
         cls.regular_user = User.objects.create_user(username="regular")
 
-        # Add moderator permissions
+        # Add moderator permissions (created automatically by signal)
         content_type = ContentType.objects.get_for_model(Collection)
-        permission = Permission.objects.create(
+        permission = Permission.objects.get(
             codename="can_moderate_collection",
-            name="Can moderate collections",
             content_type=content_type,
         )
         cls.moderator.user_permissions.add(permission)
