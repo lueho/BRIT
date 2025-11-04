@@ -1002,6 +1002,12 @@ class CollectionReviewItemDetailView(ReviewItemDetailView):
         return review_context
 
 
+# Register the specialized review view for Collection model
+# This allows the generic object_management:review_item_detail URL to automatically
+# delegate to this view when reviewing Collection objects
+CollectionReviewItemDetailView.register_for_model(Collection)
+
+
 class CollectionUpdateView(M2MInlineFormSetMixin, UserCreatedObjectUpdateView):
     model = Collection
     form_class = CollectionModelForm

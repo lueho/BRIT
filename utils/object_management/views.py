@@ -1209,10 +1209,28 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
     - Use a wrapper template that extends the object's normal detail template.
     - Determine the base detail template via Django's default naming convention
       (<app_label>/<model_name>_detail.html) and fall back to detail_with_options.html.
-     - Provide the resolved base template to the wrapper via context as 'base_template'.
+    - Provide the resolved base template to the wrapper via context as 'base_template'.
+    - Support model-specific subclasses via registry pattern for specialized context.
+
+    Subclasses can register themselves for specific models to provide custom
+    review-specific context via get_review_specific_context() hook method.
     """
 
     template_name = "object_management/review_detail_wrapper.html"
+    _model_view_registry = {}
+
+    @classmethod
+    def register_for_model(cls, model_class):
+        """
+        Register this view class as the handler for a specific model.
+
+        Usage in subclass:
+            class CollectionReviewItemDetailView(ReviewItemDetailView):
+                model = Collection
+
+            CollectionReviewItemDetailView.register_for_model(Collection)
+        """
+        ReviewItemDetailView._model_view_registry[model_class] = cls
 
     def test_func(self):
         """Allow access for staff and moderators; owners when in review or declined.
@@ -1235,11 +1253,24 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
         return user_is_moderator_for_model(user, obj.__class__)
 
     def dispatch(self, request, *args, **kwargs):
-        """Authorize review details for moderators/staff and for owners in review/declined.
+        """
+        Authorize review details for moderators/staff and for owners in review/declined.
 
-        Owners can access while the item is in review (for commenting) and when declined (to read feedback).
+        If a specialized view is registered for this model, delegate to it.
+        Owners can access while the item is in review (for commenting) and when declined
+        (to read feedback).
         """
         obj = self.get_object()
+        model_class = obj.__class__
+
+        # Check if there's a specialized review view registered for this model
+        specialized_view_class = self._model_view_registry.get(model_class)
+        if specialized_view_class and specialized_view_class != self.__class__:
+            # Create instance of specialized view and delegate
+            specialized_view = specialized_view_class.as_view()
+            return specialized_view(request, *args, **kwargs)
+
+        # Standard authorization checks
         policy = get_object_policy(request.user, obj, request=request)
 
         if policy["is_owner"]:
