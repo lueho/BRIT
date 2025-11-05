@@ -31,11 +31,7 @@ from django_filters.views import FilterView
 from django_tomselect.autocompletes import AutocompleteModelView
 from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 
-from case_studies.soilcom.models import (
-    AggregatedCollectionPropertyValue,
-    Collection,
-    CollectionPropertyValue,
-)
+from django.conf import settings
 from utils.object_management.filters import ReviewDashboardFilterSet
 from utils.object_management.models import ReviewAction, UserCreatedObject
 from utils.object_management.permissions import (
@@ -69,7 +65,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
     template_name = "object_management/review_dashboard.html"
     filterset_class = ReviewDashboardFilterSet
     context_object_name = "review_items"
-    paginate_by = 20
+    paginate_by = getattr(settings, 'REVIEW_DASHBOARD_PAGE_SIZE', 20)
 
     def get_available_models(self):
         """Discover all concrete UserCreatedObject subclasses that have items in review.
@@ -83,12 +79,21 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
         from django.apps import apps
         from django.contrib.auth.models import Permission
 
-        # Priority models to always show in filters if user has permissions
-        priority_models = [
-            Collection,
-            CollectionPropertyValue,
-            AggregatedCollectionPropertyValue,
-        ]
+        # Get priority models from settings (models always shown in filters if user has permissions)
+        # Format: ['app_label.ModelName', ...]
+        priority_model_paths = getattr(
+            settings, 'REVIEW_DASHBOARD_PRIORITY_MODELS', []
+        )
+        priority_models = []
+        for model_path in priority_model_paths:
+            try:
+                app_label, model_name = model_path.split('.')
+                model = apps.get_model(app_label, model_name)
+                priority_models.append(model)
+            except (ValueError, LookupError) as e:
+                logger.warning(
+                    f"Could not load priority model '{model_path}': {e}"
+                )
 
         available_models = []
 

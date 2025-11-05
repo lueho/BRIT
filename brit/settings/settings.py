@@ -278,3 +278,16 @@ TOMSELECT = {
     },
     "ENABLE_LOGGING": False,
 }
+
+# Review Dashboard Configuration
+# Priority models always shown in review dashboard filters if user has permissions
+# (even if no items currently in review). This helps moderators quickly access
+# the most commonly reviewed content types.
+REVIEW_DASHBOARD_PRIORITY_MODELS = [
+    "soilcom.Collection",
+    "soilcom.CollectionPropertyValue",
+    "soilcom.AggregatedCollectionPropertyValue",
+]
+
+# Number of items to display per page in review dashboard
+REVIEW_DASHBOARD_PAGE_SIZE = 20
