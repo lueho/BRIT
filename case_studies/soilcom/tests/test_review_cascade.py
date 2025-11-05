@@ -1,15 +1,23 @@
 """
-Test cases for cascading review actions from Collections to related property values.
+Test cases for Collection review action cascade functionality.
 
-Tests verify that when a Collection's review state changes (submit, withdraw,
-approve, reject), the action cascades correctly to CollectionPropertyValues and
-AggregatedCollectionPropertyValues across version chains.
+ARCHITECTURE NOTE:
+Cascade is a VIEW-LEVEL feature, not a model-level feature.
+Direct model method calls (e.g., collection.submit_for_review()) do NOT cascade.
+Only views using CollectionReviewActionCascadeMixin trigger cascade.
+
+These tests verify that the mixin correctly cascades review actions to
+CollectionPropertyValues and AggregatedCollectionPropertyValues when used in
+Collection-specific review action views.
+
+Tests use RequestFactory to simulate view-level calls and test the mixin logic
+in isolation, bypassing URL routing.
 """
 
 from datetime import date
 
 from django.contrib.auth import get_user_model
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 
 from case_studies.soilcom.models import (
     AggregatedCollectionPropertyValue,
@@ -20,13 +28,19 @@ from case_studies.soilcom.models import (
     WasteCategory,
     WasteStream,
 )
+from case_studies.soilcom.views import (
+    CollectionApproveItemView,
+    CollectionRejectItemView,
+    CollectionSubmitForReviewView,
+    CollectionWithdrawFromReviewView,
+)
 from utils.properties.models import Property, Unit
 
 User = get_user_model()
 
 
-class CollectionReviewCascadeTestCase(TestCase):
-    """Base test case with common setup for cascade tests."""
+class CollectionCascadeMixinTestCase(TestCase):
+    """Test the CollectionReviewActionCascadeMixin functionality."""
 
     @classmethod
     def setUpTestData(cls):
@@ -69,6 +83,8 @@ class CollectionReviewCascadeTestCase(TestCase):
         cls.prop1.allowed_units.add(cls.unit1)
         cls.prop2.allowed_units.add(cls.unit2)
 
+        cls.factory = RequestFactory()
+
     def _create_collection(self, name, owner, status="private", valid_from=None):
         """Helper to create a collection."""
         return Collection.objects.create(
@@ -107,102 +123,105 @@ class CollectionReviewCascadeTestCase(TestCase):
         return acpv
 
 
-class SubmitForReviewCascadeTest(CollectionReviewCascadeTestCase):
-    """Test cascading submit_for_review action to property values.
+class SubmitCascadeMixinTest(CollectionCascadeMixinTestCase):
+    """Test submit_for_review cascade via CollectionSubmitForReviewView."""
 
-    NOTE: Cascade is a view-level feature, not model-level.
-    Direct model method calls do NOT cascade.
-    Only Collection-specific views (CollectionSubmitForReviewView) trigger cascade.
-    """
-
-    def test_model_submit_does_not_cascade(self):
-        """Direct model method calls do NOT cascade (by design)."""
+    def test_submit_cascades_to_owner_cpvs(self):
+        """Submit cascades to owner's private and declined CPVs."""
         collection = self._create_collection("C1", self.owner, status="private")
-        cpv = self._create_cpv(
-            collection, self.prop1, self.unit1, self.owner, status="private"
+        cpv_private = self._create_cpv(
+            collection, self.prop1, self.unit1, self.owner, "private", year=2020
+        )
+        cpv_declined = self._create_cpv(
+            collection, self.prop1, self.unit1, self.owner, "declined", year=2021
+        )
+        cpv_published = self._create_cpv(
+            collection, self.prop1, self.unit1, self.owner, "published", year=2022
         )
 
-        # Direct model call
-        collection.submit_for_review()
-        cpv.refresh_from_db()
+        request = self.factory.post("/")
+        request.user = self.owner
 
-        self.assertEqual(collection.publication_status, "review")
-        self.assertEqual(cpv.publication_status, "private")  # NOT cascaded
+        view = CollectionSubmitForReviewView()
+        view.request = request
+        view.object = collection
+        view.action_attr_name = "submit_for_review"
+        view.post_action_hook(request, "private")
 
-    def test_submit_cascades_to_owner_cpvs_declined(self):
-        """Submit cascades to owner's declined CPVs."""
+        cpv_private.refresh_from_db()
+        cpv_declined.refresh_from_db()
+        cpv_published.refresh_from_db()
+
+        self.assertEqual(cpv_private.publication_status, "review")
+        self.assertEqual(cpv_declined.publication_status, "review")
+        self.assertEqual(cpv_published.publication_status, "published")  # Unchanged
+
+    def test_submit_includes_collaborator_cpvs(self):
+        """Submit cascades to all CPVs on owner's collection, including collaborators' CPVs."""
         collection = self._create_collection("C1", self.owner, status="private")
-        cpv = self._create_cpv(
-            collection, self.prop1, self.unit1, self.owner, status="declined"
+        cpv_owner = self._create_cpv(
+            collection, self.prop1, self.unit1, self.owner, "private"
+        )
+        # Other user contributed a CPV to owner's collection
+        cpv_other = self._create_cpv(
+            collection, self.prop2, self.unit2, self.other_owner, "private"
         )
 
-        collection.submit_for_review()
-        cpv.refresh_from_db()
+        request = self.factory.post("/")
+        request.user = self.owner
 
-        self.assertEqual(collection.publication_status, "review")
-        self.assertEqual(cpv.publication_status, "review")
+        view = CollectionSubmitForReviewView()
+        view.request = request
+        view.object = collection
+        view.action_attr_name = "submit_for_review"
+        view.post_action_hook(request, "private")
 
-    def test_submit_skips_published_cpvs(self):
-        """Submit does not cascade to published CPVs."""
-        collection = self._create_collection("C1", self.owner, status="private")
-        cpv = self._create_cpv(
-            collection, self.prop1, self.unit1, self.owner, status="published"
-        )
+        cpv_owner.refresh_from_db()
+        cpv_other.refresh_from_db()
 
-        collection.submit_for_review()
-        cpv.refresh_from_db()
+        # Both cascade because they're on the owner's collection
+        self.assertEqual(cpv_owner.publication_status, "review")
+        self.assertEqual(cpv_other.publication_status, "review")  # Also cascaded
 
-        self.assertEqual(collection.publication_status, "review")
-        self.assertEqual(cpv.publication_status, "published")  # Unchanged
-
-    def test_submit_skips_other_users_cpvs(self):
-        """Submit does not cascade to CPVs owned by other users."""
-        collection = self._create_collection("C1", self.owner, status="private")
-        cpv = self._create_cpv(
-            collection, self.prop1, self.unit1, self.other_owner, status="private"
-        )
-
-        collection.submit_for_review()
-        cpv.refresh_from_db()
-
-        self.assertEqual(collection.publication_status, "review")
-        self.assertEqual(cpv.publication_status, "private")  # Unchanged
-
-    def test_submit_cascades_to_owner_acpvs(self):
+    def test_submit_cascades_to_acpvs(self):
         """Submit cascades to owner's aggregated property values."""
         collection = self._create_collection("C1", self.owner, status="private")
         acpv = self._create_acpv(
-            [collection], self.prop1, self.unit1, self.owner, status="private"
+            [collection], self.prop1, self.unit1, self.owner, "private"
         )
 
-        collection.submit_for_review()
-        acpv.refresh_from_db()
+        request = self.factory.post("/")
+        request.user = self.owner
 
-        self.assertEqual(collection.publication_status, "review")
+        view = CollectionSubmitForReviewView()
+        view.request = request
+        view.object = collection
+        view.action_attr_name = "submit_for_review"
+        view.post_action_hook(request, "private")
+
+        acpv.refresh_from_db()
         self.assertEqual(acpv.publication_status, "review")
 
     def test_submit_cascades_across_version_chain(self):
-        """Submit cascades to CPVs across entire version chain."""
-        # Create version chain: v1 -> v2 -> v3
-        v1 = self._create_collection(
-            "V1", self.owner, status="published", valid_from=date(2020, 1, 1)
-        )
-        v2 = self._create_collection(
-            "V2", self.owner, status="published", valid_from=date(2021, 1, 1)
-        )
-        v3 = self._create_collection(
-            "V3", self.owner, status="private", valid_from=date(2022, 1, 1)
-        )
+        """Submit cascades to CPVs on all versions in the chain."""
+        v1 = self._create_collection("V1", self.owner, "published", date(2020, 1, 1))
+        v2 = self._create_collection("V2", self.owner, "published", date(2021, 1, 1))
+        v3 = self._create_collection("V3", self.owner, "private", date(2022, 1, 1))
         v2.predecessors.add(v1)
         v3.predecessors.add(v2)
 
-        # Create CPVs on different versions
         cpv1 = self._create_cpv(v1, self.prop1, self.unit1, self.owner, "private")
         cpv2 = self._create_cpv(v2, self.prop1, self.unit1, self.owner, "declined")
         cpv3 = self._create_cpv(v3, self.prop1, self.unit1, self.owner, "private")
 
-        # Submit v3 - should cascade to all versions
-        v3.submit_for_review()
+        request = self.factory.post("/")
+        request.user = self.owner
+
+        view = CollectionSubmitForReviewView()
+        view.request = request
+        view.object = v3
+        view.action_attr_name = "submit_for_review"
+        view.post_action_hook(request, "private")
 
         cpv1.refresh_from_db()
         cpv2.refresh_from_db()
@@ -212,167 +231,122 @@ class SubmitForReviewCascadeTest(CollectionReviewCascadeTestCase):
         self.assertEqual(cpv2.publication_status, "review")
         self.assertEqual(cpv3.publication_status, "review")
 
-    def test_cascade_with_mixin_submit(self):
-        """Cascade works when using CollectionReviewActionCascadeMixin."""
-        from django.test import RequestFactory
 
-        from case_studies.soilcom.views import CollectionSubmitForReviewView
+class WithdrawCascadeMixinTest(CollectionCascadeMixinTestCase):
+    """Test withdraw_from_review cascade via CollectionWithdrawFromReviewView."""
 
-        collection = self._create_collection("C1", self.owner, status="private")
-        cpv_owner = self._create_cpv(
-            collection, self.prop1, self.unit1, self.owner, status="private"
-        )
-        cpv_other = self._create_cpv(
-            collection, self.prop2, self.unit2, self.other_owner, status="private"
-        )
-
-        # Simulate view call
-        factory = RequestFactory()
-        request = factory.post("/fake/")
-        request.user = self.owner
-
-        view = CollectionSubmitForReviewView()
-        view.request = request
-        view.object = collection
-        view.post_action_hook(request, previous_status="private")
-
-        cpv_owner.refresh_from_db()
-        cpv_other.refresh_from_db()
-
-        # Owner's CPV should cascade
-        self.assertEqual(cpv_owner.publication_status, "review")
-        # Other user's CPV should NOT cascade (owner filtering)
-        self.assertEqual(cpv_other.publication_status, "private")
-
-
-class WithdrawFromReviewCascadeTest(CollectionReviewCascadeTestCase):
-    """Test cascading withdraw_from_review action to property values."""
-
-    def test_withdraw_cascades_to_owner_cpvs_in_review(self):
+    def test_withdraw_cascades_to_owner_cpvs(self):
         """Withdraw cascades to owner's CPVs in review."""
         collection = self._create_collection("C1", self.owner, status="review")
-        cpv = self._create_cpv(
-            collection, self.prop1, self.unit1, self.owner, status="review"
-        )
+        cpv = self._create_cpv(collection, self.prop1, self.unit1, self.owner, "review")
 
-        collection.withdraw_from_review()
+        request = self.factory.post("/")
+        request.user = self.owner
+
+        view = CollectionWithdrawFromReviewView()
+        view.request = request
+        view.object = collection
+        view.action_attr_name = "withdraw_from_review"
+        view.post_action_hook(request, "review")
+
         cpv.refresh_from_db()
-
-        self.assertEqual(collection.publication_status, "private")
         self.assertEqual(cpv.publication_status, "private")
 
-    def test_withdraw_skips_published_cpvs(self):
-        """Withdraw does not cascade to published CPVs."""
-        collection = self._create_collection("C1", self.owner, status="review")
-        cpv = self._create_cpv(
-            collection, self.prop1, self.unit1, self.owner, status="published"
-        )
-
-        collection.withdraw_from_review()
-        cpv.refresh_from_db()
-
-        self.assertEqual(collection.publication_status, "private")
-        self.assertEqual(cpv.publication_status, "published")  # Unchanged
-
-    def test_withdraw_skips_other_users_cpvs(self):
-        """Withdraw does not cascade to CPVs owned by other users."""
-        collection = self._create_collection("C1", self.owner, status="review")
-        cpv = self._create_cpv(
-            collection, self.prop1, self.unit1, self.other_owner, status="review"
-        )
-
-        collection.withdraw_from_review()
-        cpv.refresh_from_db()
-
-        self.assertEqual(collection.publication_status, "private")
-        self.assertEqual(cpv.publication_status, "review")  # Unchanged
-
-    def test_withdraw_cascades_across_version_chain(self):
-        """Withdraw cascades across entire version chain."""
-        # Create version chain
-        v1 = self._create_collection(
-            "V1", self.owner, status="published", valid_from=date(2020, 1, 1)
-        )
-        v2 = self._create_collection(
-            "V2", self.owner, status="review", valid_from=date(2021, 1, 1)
-        )
-        v2.predecessors.add(v1)
-
-        # Create CPVs in review
-        cpv1 = self._create_cpv(v1, self.prop1, self.unit1, self.owner, "review")
-        cpv2 = self._create_cpv(v2, self.prop1, self.unit1, self.owner, "review")
-
-        v2.withdraw_from_review()
-
-        cpv1.refresh_from_db()
-        cpv2.refresh_from_db()
-
-        self.assertEqual(cpv1.publication_status, "private")
-        self.assertEqual(cpv2.publication_status, "private")
-
-
-class ApproveCascadeTest(CollectionReviewCascadeTestCase):
-    """Test cascading approve action to property values."""
-
-    def test_approve_cascades_to_cpvs_in_review(self):
-        """Approve cascades to all CPVs in review, regardless of owner."""
+    def test_withdraw_includes_collaborator_cpvs(self):
+        """Withdraw cascades to all CPVs on owner's collection, including collaborators'."""
         collection = self._create_collection("C1", self.owner, status="review")
         cpv_owner = self._create_cpv(
-            collection, self.prop1, self.unit1, self.owner, status="review"
+            collection, self.prop1, self.unit1, self.owner, "review"
         )
         cpv_other = self._create_cpv(
-            collection, self.prop2, self.unit2, self.other_owner, status="review"
+            collection, self.prop2, self.unit2, self.other_owner, "review"
         )
 
-        collection.approve(user=self.staff)
+        request = self.factory.post("/")
+        request.user = self.owner
+
+        view = CollectionWithdrawFromReviewView()
+        view.request = request
+        view.object = collection
+        view.action_attr_name = "withdraw_from_review"
+        view.post_action_hook(request, "review")
+
         cpv_owner.refresh_from_db()
         cpv_other.refresh_from_db()
 
-        self.assertEqual(collection.publication_status, "published")
-        self.assertEqual(cpv_owner.publication_status, "published")
-        self.assertEqual(cpv_other.publication_status, "published")  # Also cascaded
+        # Both cascade because they're on the owner's collection
+        self.assertEqual(cpv_owner.publication_status, "private")
+        self.assertEqual(cpv_other.publication_status, "private")  # Also cascaded
 
-    def test_approve_skips_private_cpvs(self):
-        """Approve does not cascade to private CPVs."""
+
+class ApproveCascadeMixinTest(CollectionCascadeMixinTestCase):
+    """Test approve cascade via CollectionApproveItemView."""
+
+    def test_approve_cascades_to_all_cpvs_in_review(self):
+        """Approve cascades to ALL CPVs in review, regardless of owner."""
         collection = self._create_collection("C1", self.owner, status="review")
-        cpv = self._create_cpv(
-            collection, self.prop1, self.unit1, self.owner, status="private"
+        cpv_owner = self._create_cpv(
+            collection, self.prop1, self.unit1, self.owner, "review"
+        )
+        cpv_other = self._create_cpv(
+            collection, self.prop2, self.unit2, self.other_owner, "review"
         )
 
-        collection.approve(user=self.staff)
-        cpv.refresh_from_db()
+        request = self.factory.post("/")
+        request.user = self.staff
 
-        self.assertEqual(collection.publication_status, "published")
-        self.assertEqual(cpv.publication_status, "private")  # Unchanged
+        view = CollectionApproveItemView()
+        view.request = request
+        view.object = collection
+        view.action_attr_name = "approve"
+        view.post_action_hook(request, "review")
+
+        cpv_owner.refresh_from_db()
+        cpv_other.refresh_from_db()
+
+        # Both should be approved
+        self.assertEqual(cpv_owner.publication_status, "published")
+        self.assertEqual(cpv_other.publication_status, "published")
+        self.assertEqual(cpv_owner.approved_by, self.staff)
+        self.assertEqual(cpv_other.approved_by, self.staff)
 
     def test_approve_cascades_to_acpvs(self):
-        """Approve cascades to aggregated property values in review."""
+        """Approve cascades to aggregated property values."""
         collection = self._create_collection("C1", self.owner, status="review")
         acpv = self._create_acpv(
-            [collection], self.prop1, self.unit1, self.owner, status="review"
+            [collection], self.prop1, self.unit1, self.owner, "review"
         )
 
-        collection.approve(user=self.staff)
-        acpv.refresh_from_db()
+        request = self.factory.post("/")
+        request.user = self.staff
 
-        self.assertEqual(collection.publication_status, "published")
+        view = CollectionApproveItemView()
+        view.request = request
+        view.object = collection
+        view.action_attr_name = "approve"
+        view.post_action_hook(request, "review")
+
+        acpv.refresh_from_db()
         self.assertEqual(acpv.publication_status, "published")
+        self.assertEqual(acpv.approved_by, self.staff)
 
     def test_approve_cascades_across_version_chain(self):
-        """Approve cascades across entire version chain."""
-        v1 = self._create_collection(
-            "V1", self.owner, status="published", valid_from=date(2020, 1, 1)
-        )
-        v2 = self._create_collection(
-            "V2", self.owner, status="review", valid_from=date(2021, 1, 1)
-        )
+        """Approve cascades to CPVs on all versions."""
+        v1 = self._create_collection("V1", self.owner, "published", date(2020, 1, 1))
+        v2 = self._create_collection("V2", self.owner, "review", date(2021, 1, 1))
         v2.predecessors.add(v1)
 
-        # CPVs in review on both versions
         cpv1 = self._create_cpv(v1, self.prop1, self.unit1, self.owner, "review")
         cpv2 = self._create_cpv(v2, self.prop1, self.unit1, self.owner, "review")
 
-        v2.approve(user=self.staff)
+        request = self.factory.post("/")
+        request.user = self.staff
+
+        view = CollectionApproveItemView()
+        view.request = request
+        view.object = v2
+        view.action_attr_name = "approve"
+        view.post_action_hook(request, "review")
 
         cpv1.refresh_from_db()
         cpv2.refresh_from_db()
@@ -380,192 +354,75 @@ class ApproveCascadeTest(CollectionReviewCascadeTestCase):
         self.assertEqual(cpv1.publication_status, "published")
         self.assertEqual(cpv2.publication_status, "published")
 
-    def test_approve_sets_approved_by_on_cpvs(self):
-        """Approve passes the approving user to CPVs."""
-        collection = self._create_collection("C1", self.owner, status="review")
-        cpv = self._create_cpv(
-            collection, self.prop1, self.unit1, self.owner, status="review"
-        )
 
-        collection.approve(user=self.staff)
-        cpv.refresh_from_db()
-
-        self.assertEqual(cpv.publication_status, "published")
-        self.assertEqual(cpv.approved_by, self.staff)
-
-
-class RejectCascadeTest(CollectionReviewCascadeTestCase):
-    """Test cascading reject action to property values."""
+class RejectCascadeMixinTest(CollectionCascadeMixinTestCase):
+    """Test reject cascade via CollectionRejectItemView."""
 
     def test_reject_cascades_to_all_cpvs_in_review(self):
-        """Reject cascades to all CPVs in review, regardless of owner."""
+        """Reject cascades to ALL CPVs in review, regardless of owner."""
         collection = self._create_collection("C1", self.owner, status="review")
         cpv_owner = self._create_cpv(
-            collection, self.prop1, self.unit1, self.owner, status="review"
+            collection, self.prop1, self.unit1, self.owner, "review"
         )
         cpv_other = self._create_cpv(
-            collection, self.prop2, self.unit2, self.other_owner, status="review"
+            collection, self.prop2, self.unit2, self.other_owner, "review"
         )
 
-        collection.reject()
+        request = self.factory.post("/")
+        request.user = self.staff
+
+        view = CollectionRejectItemView()
+        view.request = request
+        view.object = collection
+        view.action_attr_name = "reject"
+        view.post_action_hook(request, "review")
+
         cpv_owner.refresh_from_db()
         cpv_other.refresh_from_db()
 
-        self.assertEqual(collection.publication_status, "declined")
+        # Both should be rejected
         self.assertEqual(cpv_owner.publication_status, "declined")
-        self.assertEqual(cpv_other.publication_status, "declined")  # Also cascaded
-
-    def test_reject_skips_published_cpvs(self):
-        """Reject does not cascade to published CPVs."""
-        collection = self._create_collection("C1", self.owner, status="review")
-        cpv = self._create_cpv(
-            collection, self.prop1, self.unit1, self.owner, status="published"
-        )
-
-        collection.reject()
-        cpv.refresh_from_db()
-
-        self.assertEqual(collection.publication_status, "declined")
-        self.assertEqual(cpv.publication_status, "published")  # Unchanged
+        self.assertEqual(cpv_other.publication_status, "declined")
 
     def test_reject_cascades_to_acpvs(self):
-        """Reject cascades to aggregated property values in review."""
+        """Reject cascades to aggregated property values."""
         collection = self._create_collection("C1", self.owner, status="review")
         acpv = self._create_acpv(
-            [collection], self.prop1, self.unit1, self.owner, status="review"
+            [collection], self.prop1, self.unit1, self.owner, "review"
         )
 
-        collection.reject()
-        acpv.refresh_from_db()
+        request = self.factory.post("/")
+        request.user = self.staff
 
-        self.assertEqual(collection.publication_status, "declined")
+        view = CollectionRejectItemView()
+        view.request = request
+        view.object = collection
+        view.action_attr_name = "reject"
+        view.post_action_hook(request, "review")
+
+        acpv.refresh_from_db()
         self.assertEqual(acpv.publication_status, "declined")
 
     def test_reject_cascades_across_version_chain(self):
-        """Reject cascades across entire version chain."""
-        v1 = self._create_collection(
-            "V1", self.owner, status="published", valid_from=date(2020, 1, 1)
-        )
-        v2 = self._create_collection(
-            "V2", self.owner, status="review", valid_from=date(2021, 1, 1)
-        )
+        """Reject cascades to CPVs on all versions."""
+        v1 = self._create_collection("V1", self.owner, "published", date(2020, 1, 1))
+        v2 = self._create_collection("V2", self.owner, "review", date(2021, 1, 1))
         v2.predecessors.add(v1)
 
         cpv1 = self._create_cpv(v1, self.prop1, self.unit1, self.owner, "review")
         cpv2 = self._create_cpv(v2, self.prop1, self.unit1, self.owner, "review")
 
-        v2.reject()
+        request = self.factory.post("/")
+        request.user = self.staff
+
+        view = CollectionRejectItemView()
+        view.request = request
+        view.object = v2
+        view.action_attr_name = "reject"
+        view.post_action_hook(request, "review")
 
         cpv1.refresh_from_db()
         cpv2.refresh_from_db()
 
         self.assertEqual(cpv1.publication_status, "declined")
         self.assertEqual(cpv2.publication_status, "declined")
-
-
-class CascadeEdgeCasesTest(CollectionReviewCascadeTestCase):
-    """Test edge cases and error handling in cascade logic."""
-
-    def test_cascade_handles_complex_version_chain(self):
-        """Cascade works with branching version chains."""
-        # Create a diamond pattern: v1 -> v2a, v1 -> v2b, v2a -> v3, v2b -> v3
-        v1 = self._create_collection(
-            "V1", self.owner, status="published", valid_from=date(2020, 1, 1)
-        )
-        v2a = self._create_collection(
-            "V2a", self.owner, status="published", valid_from=date(2021, 1, 1)
-        )
-        v2b = self._create_collection(
-            "V2b", self.owner, status="published", valid_from=date(2021, 6, 1)
-        )
-        v3 = self._create_collection(
-            "V3", self.owner, status="private", valid_from=date(2022, 1, 1)
-        )
-        v2a.predecessors.add(v1)
-        v2b.predecessors.add(v1)
-        v3.predecessors.add(v2a, v2b)
-
-        # CPVs on each version
-        cpv1 = self._create_cpv(v1, self.prop1, self.unit1, self.owner, "private")
-        cpv2a = self._create_cpv(v2a, self.prop1, self.unit1, self.owner, "declined")
-        cpv2b = self._create_cpv(v2b, self.prop1, self.unit1, self.owner, "private")
-        cpv3 = self._create_cpv(v3, self.prop1, self.unit1, self.owner, "private")
-
-        v3.submit_for_review()
-
-        cpv1.refresh_from_db()
-        cpv2a.refresh_from_db()
-        cpv2b.refresh_from_db()
-        cpv3.refresh_from_db()
-
-        # All should be in review
-        self.assertEqual(cpv1.publication_status, "review")
-        self.assertEqual(cpv2a.publication_status, "review")
-        self.assertEqual(cpv2b.publication_status, "review")
-        self.assertEqual(cpv3.publication_status, "review")
-
-    def test_cascade_with_no_property_values(self):
-        """Cascade succeeds even when no property values exist."""
-        collection = self._create_collection("C1", self.owner, status="private")
-
-        # Should not raise exception
-        collection.submit_for_review()
-
-        self.assertEqual(collection.publication_status, "review")
-
-    def test_cascade_with_mixed_statuses(self):
-        """Cascade only affects CPVs in appropriate statuses."""
-        collection = self._create_collection("C1", self.owner, status="private")
-
-        cpv_private = self._create_cpv(
-            collection, self.prop1, self.unit1, self.owner, "private", year=2020
-        )
-        cpv_review = self._create_cpv(
-            collection, self.prop1, self.unit1, self.owner, "review", year=2021
-        )
-        cpv_published = self._create_cpv(
-            collection, self.prop1, self.unit1, self.owner, "published", year=2022
-        )
-        cpv_declined = self._create_cpv(
-            collection, self.prop1, self.unit1, self.owner, "declined", year=2023
-        )
-
-        collection.submit_for_review()
-
-        cpv_private.refresh_from_db()
-        cpv_review.refresh_from_db()
-        cpv_published.refresh_from_db()
-        cpv_declined.refresh_from_db()
-
-        # Only private and declined should be submitted
-        self.assertEqual(cpv_private.publication_status, "review")
-        self.assertEqual(
-            cpv_review.publication_status, "review"
-        )  # Was already in review
-        self.assertEqual(cpv_published.publication_status, "published")  # Unchanged
-        self.assertEqual(
-            cpv_declined.publication_status, "review"
-        )  # Declined -> review
-
-    def test_cascade_doesnt_fail_on_cpv_error(self):
-        """Cascade continues even if individual CPV transitions fail."""
-        collection = self._create_collection("C1", self.owner, status="review")
-
-        # Create CPVs - one might fail but cascade should continue
-        cpv1 = self._create_cpv(
-            collection, self.prop1, self.unit1, self.owner, "review", year=2020
-        )
-        cpv2 = self._create_cpv(
-            collection, self.prop2, self.unit2, self.owner, "review", year=2021
-        )
-
-        # Approve collection - even if one CPV has an issue, others should succeed
-        collection.approve(user=self.staff)
-
-        cpv1.refresh_from_db()
-        cpv2.refresh_from_db()
-
-        self.assertEqual(collection.publication_status, "published")
-        # Both should be published (assuming no actual errors)
-        self.assertEqual(cpv1.publication_status, "published")
-        self.assertEqual(cpv2.publication_status, "published")
