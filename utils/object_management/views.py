@@ -7,6 +7,7 @@ from bootstrap_modal_forms.generic import (
     BSModalReadView,
     BSModalUpdateView,
 )
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import (
     LoginRequiredMixin,
@@ -25,16 +26,13 @@ from django.http import Http404, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.template.loader import select_template
 from django.urls import reverse
-from django.utils import timezone
 from django.views.generic import CreateView, DetailView, ListView, UpdateView, View
 from django_filters.views import FilterView
 from django_tomselect.autocompletes import AutocompleteModelView
 from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 
-from django.conf import settings
 from utils.object_management.filters import ReviewDashboardFilterSet
 from utils.object_management.models import ReviewAction, UserCreatedObject
-from utils.object_management.review_filtering import ReviewItemFilter
 from utils.object_management.permissions import (
     UserCreatedObjectPermission,
     _resolve_status_value,
@@ -43,6 +41,7 @@ from utils.object_management.permissions import (
     get_object_policy,
     user_is_moderator_for_model,
 )
+from utils.object_management.review_filtering import ReviewItemFilter
 
 from ..forms import DynamicTableInlineFormSetHelper
 from ..views import (
@@ -66,7 +65,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
     template_name = "object_management/review_dashboard.html"
     filterset_class = ReviewDashboardFilterSet
     context_object_name = "review_items"
-    paginate_by = getattr(settings, 'REVIEW_DASHBOARD_PAGE_SIZE', 20)
+    paginate_by = getattr(settings, "REVIEW_DASHBOARD_PAGE_SIZE", 20)
 
     def get_available_models(self):
         """Discover all concrete UserCreatedObject subclasses that have items in review.
@@ -74,7 +73,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
         Returns models that either:
         1. Have items currently in review, OR
         2. Are in the priority list and user has moderation permissions
-        
+
         Optimized to avoid N+1 queries by pre-fetching all user permissions.
         """
         from django.apps import apps
@@ -82,19 +81,15 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
 
         # Get priority models from settings (models always shown in filters if user has permissions)
         # Format: ['app_label.ModelName', ...]
-        priority_model_paths = getattr(
-            settings, 'REVIEW_DASHBOARD_PRIORITY_MODELS', []
-        )
+        priority_model_paths = getattr(settings, "REVIEW_DASHBOARD_PRIORITY_MODELS", [])
         priority_models = []
         for model_path in priority_model_paths:
             try:
-                app_label, model_name = model_path.split('.')
+                app_label, model_name = model_path.split(".")
                 model = apps.get_model(app_label, model_name)
                 priority_models.append(model)
             except (ValueError, LookupError) as e:
-                logger.warning(
-                    f"Could not load priority model '{model_path}': {e}"
-                )
+                logger.warning(f"Could not load priority model '{model_path}': {e}")
 
         available_models = []
 
@@ -108,14 +103,14 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
             user_can_moderate_all = False
             # Get user permissions (both direct and via groups) in a single query
             user_permission_codenames = set(
-                Permission.objects.filter(
-                    user=self.request.user
-                ).values_list('codename', flat=True)
+                Permission.objects.filter(user=self.request.user).values_list(
+                    "codename", flat=True
+                )
             )
             group_permission_codenames = set(
-                Permission.objects.filter(
-                    group__user=self.request.user
-                ).values_list('codename', flat=True)
+                Permission.objects.filter(group__user=self.request.user).values_list(
+                    "codename", flat=True
+                )
             )
             user_permission_codenames |= group_permission_codenames
 
@@ -194,17 +189,17 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
 
         Returns a list (not QuerySet) of heterogeneous objects since we're
         combining multiple model types.
-        
+
         Performance optimization: Instead of loading ALL items into memory,
         we use database-level ordering and limit fetching to a reasonable
         number of items per model to reduce memory usage.
-        
+
         Note: For very large datasets, consider implementing per-model
         pagination with client-side merging or database UNION queries.
         """
         review_items = []
         available_models = self.get_available_models()
-        
+
         # Calculate a reasonable fetch limit per model to prevent loading
         # thousands of items into memory. Multiply by number of models
         # to ensure we get enough items even if some models have few items.
@@ -244,8 +239,9 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
                     try:
                         # Even in fallback, use database ordering and limit
                         items = list(
-                            model_class.objects.in_review()
-                            .order_by("-submitted_at")[:max_items_per_model]
+                            model_class.objects.in_review().order_by("-submitted_at")[
+                                :max_items_per_model
+                            ]
                         )
                         # Filter out in Python as a last resort
                         filtered_items = [
@@ -279,6 +275,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
         # Fallback
         try:
             from case_studies.soilcom.models import Collection
+
             return Collection.objects.none()
         except ImportError:
             return UserCreatedObject.objects.none()
@@ -293,7 +290,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
         from django.core.paginator import Paginator
 
         paginator = Paginator(review_items, self.paginate_by)
-        page_number = self.request.GET.get('page')
+        page_number = self.request.GET.get("page")
         page_obj = paginator.get_page(page_number)
 
         context.update(
