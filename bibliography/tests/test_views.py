@@ -155,10 +155,16 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
     def setUpTestData(cls):
         super().setUpTestData()
 
+        from django.contrib.contenttypes.models import ContentType
+        
         moderator = User.objects.create(username="moderator")
-        moderator.user_permissions.add(
-            Permission.objects.get(codename="can_moderate_source")
+        content_type = ContentType.objects.get_for_model(Source)
+        permission, _ = Permission.objects.get_or_create(
+            codename="can_moderate_source",
+            content_type=content_type,
+            defaults={"name": "Can moderate sources"},
         )
+        moderator.user_permissions.add(permission)
         cls.util_objects["moderator"] = moderator
 
         author_1 = Author.objects.create(

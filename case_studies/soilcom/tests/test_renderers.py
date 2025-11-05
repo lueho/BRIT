@@ -4,6 +4,7 @@ from datetime import date
 from io import BytesIO
 
 from django.contrib.auth.models import Permission, User
+from django.contrib.contenttypes.models import ContentType
 from django.db.models import signals
 from django.test import TestCase
 from factory.django import mute_signals
@@ -149,7 +150,13 @@ class CollectionXLSXRendererTestCase(TestCase):
     def setUpTestData(cls):
         User.objects.create(username="outsider")
         member = User.objects.create(username="member")
-        member.user_permissions.add(Permission.objects.get(codename="add_collection"))
+        content_type = ContentType.objects.get_for_model(Collection)
+        permission, _ = Permission.objects.get_or_create(
+            codename="add_collection",
+            content_type=content_type,
+            defaults={"name": "Can add collection"},
+        )
+        member.user_permissions.add(permission)
 
         MaterialCategory.objects.create(name="Biowaste component")
         cls.allowed_material_1 = WasteComponent.objects.create(

@@ -19,11 +19,12 @@ class ReviewWorkflowModalViewTests(TestCase):
         cls.moderator = User.objects.create_user(username="moderator")
         cls.regular_user = User.objects.create_user(username="regular")
 
-        # Moderator permission for Collection (created automatically by signal)
+        # Moderator permission for Collection
         content_type = ContentType.objects.get_for_model(Collection)
-        permission = Permission.objects.get(
+        permission, _ = Permission.objects.get_or_create(
             codename="can_moderate_collection",
             content_type=content_type,
+            defaults={"name": "Can moderate collections"},
         )
         cls.moderator.user_permissions.add(permission)
 

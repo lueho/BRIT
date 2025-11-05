@@ -2,6 +2,7 @@ import logging
 from urllib.parse import quote
 
 from django import template
+from django.apps import apps
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.urls import reverse
@@ -362,3 +363,78 @@ def detail_or_review_url(context, obj, use_back=False):
             return absolute_url
     except Exception:  # pragma: no cover - defensive
         return absolute_url
+
+
+@register.simple_tag
+def is_moderator_for_any_model(user):
+    """Check if user has moderation permissions for any UserCreatedObject model.
+
+    Returns True if the user is staff or has can_moderate_* permission for any model.
+    This is useful for showing/hiding moderator-specific UI elements.
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+
+    # Staff users are always moderators
+    if getattr(user, "is_staff", False):
+        return True
+
+    # Check if user has any can_moderate_* permission
+    try:
+        from utils.object_management.models import UserCreatedObject
+
+        for model in apps.get_models():
+            if (
+                issubclass(model, UserCreatedObject)
+                and not model._meta.abstract
+            ):
+                perm_codename = f"can_moderate_{model._meta.model_name}"
+                full_perm = f"{model._meta.app_label}.{perm_codename}"
+                if user.has_perm(full_perm):
+                    return True
+    except Exception:
+        # If something goes wrong, fail closed
+        return False
+
+    return False
+
+
+@register.simple_tag
+def pending_review_count_for_user(user):
+    """Count items pending review that the user can moderate.
+
+    Returns the total count of items in review status across all models
+    where the user has moderation permissions (excluding their own items).
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return 0
+
+    try:
+        from utils.object_management.models import UserCreatedObject
+        from utils.object_management.permissions import user_is_moderator_for_model
+
+        total_count = 0
+
+        for model in apps.get_models():
+            if (
+                issubclass(model, UserCreatedObject)
+                and not model._meta.abstract
+                and hasattr(model, "objects")
+            ):
+                if user_is_moderator_for_model(user, model):
+                    try:
+                        # Count items in review, excluding user's own items
+                        count = (
+                            model.objects.in_review()
+                            .exclude(owner=user)
+                            .count()
+                        )
+                        total_count += count
+                    except Exception:
+                        # Skip models that don't support the query
+                        continue
+
+        return total_count
+    except Exception:
+        # If something goes wrong, return 0
+        return 0

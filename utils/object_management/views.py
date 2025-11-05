@@ -8,7 +8,6 @@ from bootstrap_modal_forms.generic import (
     BSModalUpdateView,
 )
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import (
     LoginRequiredMixin,
     PermissionRequiredMixin,
@@ -26,14 +25,18 @@ from django.shortcuts import get_object_or_404
 from django.template.loader import select_template
 from django.urls import reverse
 from django.utils import timezone
-from django.utils.decorators import method_decorator
 from django.views.generic import CreateView, DetailView, ListView, UpdateView, View
 from django_filters.views import FilterView
 from django_tomselect.autocompletes import AutocompleteModelView
 from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 
-from case_studies.soilcom.models import Collection
-from utils.object_management.models import ReviewAction
+from case_studies.soilcom.models import (
+    AggregatedCollectionPropertyValue,
+    Collection,
+    CollectionPropertyValue,
+)
+from utils.object_management.filters import ReviewDashboardFilterSet
+from utils.object_management.models import ReviewAction, UserCreatedObject
 from utils.object_management.permissions import (
     UserCreatedObjectPermission,
     _resolve_status_value,
@@ -54,37 +57,117 @@ from ..views import (
 logger = logging.getLogger(__name__)
 
 
-class ReviewDashboardView(ListView):
-    """Dashboard showing all objects in review status that the user can moderate."""
+class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
+    """Dashboard showing all objects in review status that the user can moderate.
+
+    Supports filtering by model type, owner, submission date, and search.
+    Dynamically discovers all UserCreatedObject subclasses and shows items
+    the current user has permission to moderate.
+    """
 
     template_name = "object_management/review_dashboard.html"
+    filterset_class = ReviewDashboardFilterSet
     context_object_name = "review_items"
     paginate_by = 20
 
-    @method_decorator(login_required)
-    def dispatch(self, *args, **kwargs):
-        return super().dispatch(*args, **kwargs)
+    def get_available_models(self):
+        """Discover all concrete UserCreatedObject subclasses that have items in review.
 
-    def get_queryset(self):
-        # Start with an empty queryset
+        Returns models that either:
+        1. Have items currently in review, OR
+        2. Are in the priority list and user has moderation permissions
+        """
+        from django.apps import apps
+
+        # Priority models to always show in filters if user has permissions
+        priority_models = [
+            Collection,
+            CollectionPropertyValue,
+            AggregatedCollectionPropertyValue,
+        ]
+
+        available_models = []
+
+        # First, add priority models if user has permissions (even if no items in review)
+        for model in priority_models:
+            if user_is_moderator_for_model(self.request.user, model):
+                if model not in available_models:
+                    available_models.append(model)
+
+        # Then discover other models with items in review
+        for model in apps.get_models():
+            # Check if model inherits from UserCreatedObject and is not abstract
+            if (
+                issubclass(model, UserCreatedObject)
+                and not model._meta.abstract
+                and hasattr(model, "objects")
+                and model not in available_models  # Don't duplicate priority models
+            ):
+                # Check if user can moderate this model type
+                if user_is_moderator_for_model(self.request.user, model):
+                    # Check if there are any items in review for this model
+                    try:
+                        if model.objects.in_review().exists():
+                            available_models.append(model)
+                    except Exception:
+                        pass
+
+        return available_models
+
+    def get_filterset_kwargs(self, filterset_class):
+        """Override to pass available_models and provide a dummy queryset.
+
+        Since we're working with a heterogeneous list of objects rather than
+        a single QuerySet, we need to provide a dummy queryset to satisfy
+        django_filters' initialization, but we won't actually use it for filtering.
+        """
+        kwargs = super().get_filterset_kwargs(filterset_class)
+
+        # Remove the queryset from kwargs since we're using a list
+        # Replace it with a dummy queryset (we just need something with a .model attribute)
+
+        # Get first available model or use a default
+        available_models = self.get_available_models()
+        if available_models:
+            # Use the first available model's queryset as a dummy
+            kwargs["queryset"] = available_models[0].objects.none()
+        else:
+            # No models available, create an empty queryset from UserCreatedObject subclass
+            # This shouldn't happen in practice, but provides a fallback
+            try:
+                # Try to get Collection as fallback
+                from case_studies.soilcom.models import Collection
+
+                kwargs["queryset"] = Collection.objects.none()
+            except ImportError:
+                # If Collection doesn't exist, we have bigger problems
+                # Return empty list-like object
+                kwargs["queryset"] = []
+
+        kwargs["available_models"] = available_models
+        return kwargs
+
+    def collect_review_items(self):
+        """Collect all review items from models the user can moderate.
+
+        Returns a list (not QuerySet) of heterogeneous objects since we're
+        combining multiple model types.
+        """
         review_items = []
+        available_models = self.get_available_models()
 
-        # Get all model classes that inherit from UserCreatedObject
-        # For now, we'll just use Collection as an example
-        model_classes = [Collection]
-
-        for model_class in model_classes:
-            # Check if user can moderate this model type
-            if user_is_moderator_for_model(self.request.user, model_class):
-                # Get items in review for this model, excluding current user's own items
+        for model_class in available_models:
+            # Get items in review for this model, excluding current user's own items
+            try:
+                items = (
+                    model_class.objects.in_review()
+                    .exclude(owner=self.request.user)
+                    .select_related("owner", "approved_by")
+                )
+                review_items.extend(list(items))
+            except Exception:
+                # Fallback if owner field is absent or exclude fails
                 try:
-                    items = (
-                        model_class.objects.in_review()
-                        .exclude(owner=self.request.user)
-                        .select_related("owner", "approved_by")
-                    )
-                except Exception:
-                    # Fallback if owner field is absent or exclude fails
                     items = model_class.objects.in_review().select_related(
                         "owner", "approved_by"
                     )
@@ -94,15 +177,151 @@ class ReviewDashboardView(ListView):
                         for i in items
                         if getattr(i, "owner_id", None) != self.request.user.id
                     ]
-                review_items.extend(items)
+                    review_items.extend(items)
+                except Exception:
+                    pass
 
-        # Sort by submitted_at date (newest first)
-        review_items.sort(key=lambda x: x.submitted_at or timezone.now(), reverse=True)
+        # Apply filters from the filterset
+        review_items = self.apply_filters(review_items)
+
         return review_items
+
+    def get_queryset(self):
+        """Override to return dummy queryset for FilterView compatibility.
+
+        The actual items are collected in get_context_data().
+        """
+        # Return empty queryset from first available model or a default
+        available_models = self.get_available_models()
+        if available_models:
+            return available_models[0].objects.none()
+        # Fallback
+        try:
+            from case_studies.soilcom.models import Collection
+            return Collection.objects.none()
+        except ImportError:
+            return UserCreatedObject.objects.none()
+
+    def apply_filters(self, items):
+        """Apply filters to the collected items list.
+
+        Since we have a heterogeneous list of objects, we apply filters
+        in Python rather than at the database level.
+        """
+        if not self.request.GET:
+            # No filters applied, sort and return
+            items.sort(
+                key=lambda x: getattr(x, "submitted_at", None) or timezone.now(),
+                reverse=True,
+            )
+            return items
+
+        # Get filter values
+        search = self.request.GET.get("search", "").strip()
+        model_types = self.request.GET.getlist("model_type")
+        owner_id = self.request.GET.get("owner")
+        submitted_after = self.request.GET.get("submitted_after")
+        submitted_before = self.request.GET.get("submitted_before")
+        ordering = self.request.GET.get("ordering", "-submitted_at")
+
+        # Apply search filter
+        if search:
+            items = [
+                item
+                for item in items
+                if search.lower() in str(getattr(item, "name", "")).lower()
+            ]
+
+        # Apply model type filter
+        if model_types:
+            from django.contrib.contenttypes.models import ContentType
+
+            model_type_ids = [int(mt) for mt in model_types if mt.isdigit()]
+            items = [
+                item
+                for item in items
+                if ContentType.objects.get_for_model(item.__class__).id
+                in model_type_ids
+            ]
+
+        # Apply owner filter
+        if owner_id and owner_id.isdigit():
+            items = [
+                item
+                for item in items
+                if getattr(item, "owner_id", None) == int(owner_id)
+            ]
+
+        # Apply date filters
+        if submitted_after:
+            from datetime import datetime
+
+            try:
+                after_date = datetime.strptime(submitted_after, "%Y-%m-%d").date()
+                items = [
+                    item
+                    for item in items
+                    if getattr(item, "submitted_at", None)
+                    and item.submitted_at.date() >= after_date
+                ]
+            except ValueError:
+                pass
+
+        if submitted_before:
+            from datetime import datetime
+
+            try:
+                before_date = datetime.strptime(submitted_before, "%Y-%m-%d").date()
+                items = [
+                    item
+                    for item in items
+                    if getattr(item, "submitted_at", None)
+                    and item.submitted_at.date() <= before_date
+                ]
+            except ValueError:
+                pass
+
+        # Apply ordering
+        reverse = ordering.startswith("-")
+        field = ordering.lstrip("-")
+
+        if field == "submitted_at":
+            items.sort(
+                key=lambda x: getattr(x, "submitted_at", None) or timezone.now(),
+                reverse=reverse,
+            )
+        elif field == "name":
+            items.sort(
+                key=lambda x: str(getattr(x, "name", "")).lower(), reverse=reverse
+            )
+
+        return items
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["title"] = "Content Review Dashboard"
+
+        # Replace the queryset-based object_list with our collected items
+        review_items = self.collect_review_items()
+
+        # Manually paginate the list
+        from django.core.paginator import Paginator
+
+        paginator = Paginator(review_items, self.paginate_by)
+        page_number = self.request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+
+        context.update(
+            {
+                "title": "Content Review Dashboard",
+                "list_type": "review",
+                "header": "Content Review Dashboard",
+                "review_items": page_obj.object_list,
+                "object_list": page_obj.object_list,  # For template compatibility
+                "page_obj": page_obj,
+                "paginator": paginator,
+                "is_paginated": page_obj.has_other_pages(),
+            }
+        )
         return context
 
 

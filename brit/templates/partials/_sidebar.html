@@ -1,3 +1,4 @@
+{% load moderation_tags %}
 <nav class="sb-sidenav accordion sb-sidenav-light" id="sidenavAccordion">
   <div class="sb-sidenav-menu">
     <div class="nav">
@@ -7,6 +8,21 @@
         </div>
         Home
       </a>
+      {% is_moderator_for_any_model user as is_moderator %}
+      {% if is_moderator %}
+        <div class="sb-sidenav-menu-heading">Moderation</div>
+        <a class="nav-link {% if '/object_management/review/' in request.path %}active{% endif %}"
+           href="{% url 'object_management:review_dashboard' %}">
+          <div class="sb-nav-link-icon">
+            <i class="fas fa-clipboard-check"></i>
+          </div>
+          Review Dashboard
+          {% pending_review_count_for_user user as pending_count %}
+          {% if pending_count > 0 %}
+            <span class="badge bg-warning text-dark rounded-pill ms-auto">{{ pending_count }}</span>
+          {% endif %}
+        </a>
+      {% endif %}
       <div class="sb-sidenav-menu-heading">Tools</div>
       <a class="nav-link {% if '/maps/' in request.path %}active{% endif %}"
          href="{% url 'maps_list' %}">

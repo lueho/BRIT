@@ -1,72 +1,93 @@
-{% extends "base.html" %}
+{% extends "filtered_list.html" %}
 {% load static %}
 {% load moderation_tags %}
+{% load custom_tags %}
+{% load crispy_forms_tags %}
 
 {% block title %}
-    {{ title }}
+    BRIT | {{ title }}
 {% endblock title %}
 
-{% block content %}
-    <div class="container mt-4">
-        <h1>{{ title }}</h1>
+{% block list_card_header %}
+    <strong><i class="fas fa-clipboard-check"></i> {{ title }}</strong>
+{% endblock list_card_header %}
 
-        {% if review_items %}
-            <div class="table-responsive">
-                <table class="table table-striped">
-                    <thead>
+{% block list_table %}
+    {% if review_items %}
+        <p class="text-muted small mb-2">
+            Showing {{ page_obj.start_index }}-{{ page_obj.end_index }} of {{ page_obj.paginator.count }} results
+        </p>
+        
+        <div class="table-responsive">
+            <table class="table modern-table">
+                <thead>
+                    <tr>
+                        <th>Type</th>
+                        <th>Name</th>
+                        <th>Owner</th>
+                        <th>Submitted</th>
+                        <th class="actions-column">Status/Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for object in review_items %}
                         <tr>
-                            <th>Type</th>
-                            <th>Name</th>
-                            <th>Owner</th>
-                            <th>Submitted</th>
-                            <th>Actions</th>
+                            <td data-label="Type">
+                                <span class="badge bg-secondary">{{ object.verbose_name|default:"Item" }}</span>
+                            </td>
+                            <td data-label="Name">
+                                <a href="{% detail_or_review_url object %}">{{ object.name|default:object }}</a>
+                            </td>
+                            <td data-label="Owner">
+                                {{ object.owner.username }}
+                            </td>
+                            <td data-label="Submitted">
+                                {{ object.submitted_at|date:"Y-m-d H:i"|default:"—" }}
+                            </td>
+                            <td class="actions-column mobile-no-label">
+                                {% include "object_management/status_actions_cell.html" %}
+                            </td>
                         </tr>
-                    </thead>
-                    <tbody>
-                        {% for item in review_items %}
-                            <tr>
-                                <td>{{ item.verbose_name }}</td>
-                                <td>
-                                    <a href="{{ item.detail_url }}?review=1">{{ item }}</a>
-                                </td>
-                                <td>{{ item.owner.username }}</td>
-                                <td>{{ item.submitted_at|date:"Y-m-d H:i" }}</td>
-                                <td>
-                                    <div class="btn-group" role="group">
-                                        <form method="post"
-                                              action="{% url 'object_management:approve_item' content_type_id=item|get_content_type_id object_id=item.id %}"
-                                              class="d-inline">
-                                            {% csrf_token %}
-                                            <button type="submit"
-                                                    class="btn btn-success btn-sm"
-                                                    onclick="return confirm('Are you sure you want to approve this {{ item.verbose_name }}?')">
-                                                <i class="fas fa-check"></i> Approve
-                                            </button>
-                                        </form>
-                                        <form method="post"
-                                              action="{% url 'object_management:reject_item' content_type_id=item|get_content_type_id object_id=item.id %}"
-                                              class="d-inline ms-2">
-                                            {% csrf_token %}
-                                            <button type="submit"
-                                                    class="btn btn-danger btn-sm"
-                                                    onclick="return confirm('Are you sure you want to reject this {{ item.verbose_name }}?')">
-                                                <i class="fas fa-times"></i> Reject
-                                            </button>
-                                        </form>
-                                    </div>
-                                </td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="alert alert-info">
+            <i class="fas fa-info-circle"></i> There are no items currently in review.
+        </div>
+    {% endif %}
+{% endblock list_table %}
 
-            {% include "partials/_pagination.html" with page_obj=page_obj %}
+{% block filters_pane_body %}
+    <form method="get">
+        {% crispy filter.form %}
+        <div class="d-flex justify-content-end gap-2 mt-2">
+            <button id="btn-filter"
+                    class="btn btn-primary submit-filter"
+                    type="submit">
+                <i class="fas fa-filter"></i> Filter
+            </button>
+            <a class="btn btn-outline-secondary"
+               href="{% url 'object_management:review_dashboard' %}"
+               aria-label="Reset filters">
+                <i class="fas fa-rotate-left"></i> Reset
+            </a>
+        </div>
+    </form>
+{% endblock filters_pane_body %}
 
-        {% else %}
-            <div class="alert alert-info">
-                <p>There are no items currently in review.</p>
+{% block options_pane_body %}
+    <p class="text-muted small">
+        Review items from all models you have permission to moderate.
+    </p>
+    
+    {% if page_obj %}
+        <div class="card mb-2">
+            <div class="card-body">
+                <h6 class="card-title mb-2"><i class="fas fa-chart-simple"></i> Statistics</h6>
+                <p class="mb-1"><strong>Total items:</strong> {{ page_obj.paginator.count }}</p>
             </div>
-        {% endif %}
-    </div>
-{% endblock content %}
+        </div>
+    {% endif %}
+{% endblock options_pane_body %}
