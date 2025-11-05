@@ -34,6 +34,7 @@ from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 from django.conf import settings
 from utils.object_management.filters import ReviewDashboardFilterSet
 from utils.object_management.models import ReviewAction, UserCreatedObject
+from utils.object_management.review_filtering import ReviewItemFilter
 from utils.object_management.permissions import (
     UserCreatedObjectPermission,
     _resolve_status_value,
@@ -258,8 +259,11 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
                             f"Could not collect review items for {model_class.__name__}: {e3}"
                         )
 
-        # Apply filters from the filterset
-        review_items = self.apply_filters(review_items)
+        # Apply filters using ReviewItemFilter helper
+        # Note: ReviewDashboardFilterSet generates the form UI,
+        # but filtering happens here in Python since we have heterogeneous objects
+        filter_obj = ReviewItemFilter(review_items, self.request.GET)
+        review_items = filter_obj.filter()
 
         return review_items
 
@@ -278,101 +282,6 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
             return Collection.objects.none()
         except ImportError:
             return UserCreatedObject.objects.none()
-
-    def apply_filters(self, items):
-        """Apply filters to the collected items list.
-
-        Since we have a heterogeneous list of objects, we apply filters
-        in Python rather than at the database level.
-        """
-        if not self.request.GET:
-            # No filters applied, sort and return
-            items.sort(
-                key=lambda x: getattr(x, "submitted_at", None) or timezone.now(),
-                reverse=True,
-            )
-            return items
-
-        # Get filter values
-        search = self.request.GET.get("search", "").strip()
-        model_types = self.request.GET.getlist("model_type")
-        owner_id = self.request.GET.get("owner")
-        submitted_after = self.request.GET.get("submitted_after")
-        submitted_before = self.request.GET.get("submitted_before")
-        ordering = self.request.GET.get("ordering", "-submitted_at")
-
-        # Apply search filter
-        if search:
-            items = [
-                item
-                for item in items
-                if search.lower() in str(getattr(item, "name", "")).lower()
-            ]
-
-        # Apply model type filter
-        if model_types:
-            from django.contrib.contenttypes.models import ContentType
-
-            model_type_ids = [int(mt) for mt in model_types if mt.isdigit()]
-            items = [
-                item
-                for item in items
-                if ContentType.objects.get_for_model(item.__class__).id
-                in model_type_ids
-            ]
-
-        # Apply owner filter
-        if owner_id and owner_id.isdigit():
-            items = [
-                item
-                for item in items
-                if getattr(item, "owner_id", None) == int(owner_id)
-            ]
-
-        # Apply date filters
-        if submitted_after:
-            from datetime import datetime
-
-            try:
-                after_date = datetime.strptime(submitted_after, "%Y-%m-%d").date()
-                items = [
-                    item
-                    for item in items
-                    if getattr(item, "submitted_at", None)
-                    and item.submitted_at.date() >= after_date
-                ]
-            except ValueError:
-                pass
-
-        if submitted_before:
-            from datetime import datetime
-
-            try:
-                before_date = datetime.strptime(submitted_before, "%Y-%m-%d").date()
-                items = [
-                    item
-                    for item in items
-                    if getattr(item, "submitted_at", None)
-                    and item.submitted_at.date() <= before_date
-                ]
-            except ValueError:
-                pass
-
-        # Apply ordering
-        reverse = ordering.startswith("-")
-        field = ordering.lstrip("-")
-
-        if field == "submitted_at":
-            items.sort(
-                key=lambda x: getattr(x, "submitted_at", None) or timezone.now(),
-                reverse=reverse,
-            )
-        elif field == "name":
-            items.sort(
-                key=lambda x: str(getattr(x, "name", "")).lower(), reverse=reverse
-            )
-
-        return items
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

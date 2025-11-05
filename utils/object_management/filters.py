@@ -39,12 +39,20 @@ class ReviewDashboardFilterFormHelper(FormHelper):
 class ReviewDashboardFilterSet(BaseCrispyFilterSet):
     """FilterSet for the review dashboard supporting multi-model filtering.
 
-    Provides filters for:
+    IMPORTANT: This FilterSet is used ONLY for generating the filter form UI.
+    Actual filtering is performed in Python by ReviewItemFilter (review_filtering.py)
+    because we're working with heterogeneous object lists from multiple models,
+    which cannot be filtered at the database level.
+
+    Provides filter form fields for:
     - Text search across object names
     - Model type (ContentType) filtering
     - Owner/submitter filtering
     - Submission date range
     - Sorting options
+    
+    See: utils.object_management.review_filtering.ReviewItemFilter for the
+    actual filtering implementation.
     """
 
     search = CharFilter(
