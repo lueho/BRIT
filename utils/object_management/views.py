@@ -16,6 +16,7 @@ from django.contrib.auth.mixins import (
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.messages.views import SuccessMessageMixin
 from django.core.exceptions import (
+    FieldDoesNotExist,
     ImproperlyConfigured,
     ObjectDoesNotExist,
     PermissionDenied,
@@ -109,7 +110,11 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
                     try:
                         if model.objects.in_review().exists():
                             available_models.append(model)
-                    except Exception:
+                    except (AttributeError, Exception) as e:
+                        # Model may not have in_review() manager method or other issues
+                        logger.debug(
+                            f"Could not check review items for {model.__name__}: {e}"
+                        )
                         pass
 
         return available_models
@@ -165,21 +170,36 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
                     .select_related("owner", "approved_by")
                 )
                 review_items.extend(list(items))
-            except Exception:
-                # Fallback if owner field is absent or exclude fails
+            except (FieldDoesNotExist, AttributeError) as e:
+                # Fallback if owner/approved_by fields are absent
+                logger.debug(
+                    f"Could not use select_related for {model_class.__name__}: {e}. "
+                    "Trying without select_related."
+                )
                 try:
-                    items = model_class.objects.in_review().select_related(
-                        "owner", "approved_by"
+                    items = model_class.objects.in_review().exclude(
+                        owner=self.request.user
                     )
-                    # Filter out in Python as a last resort
-                    items = [
-                        i
-                        for i in items
-                        if getattr(i, "owner_id", None) != self.request.user.id
-                    ]
-                    review_items.extend(items)
-                except Exception:
-                    pass
+                    review_items.extend(list(items))
+                except (FieldDoesNotExist, AttributeError) as e2:
+                    # owner field might not exist, filter in Python
+                    logger.debug(
+                        f"Could not exclude owner for {model_class.__name__}: {e2}. "
+                        "Filtering in Python."
+                    )
+                    try:
+                        items = model_class.objects.in_review()
+                        # Filter out in Python as a last resort
+                        filtered_items = [
+                            i
+                            for i in items
+                            if getattr(i, "owner_id", None) != self.request.user.id
+                        ]
+                        review_items.extend(filtered_items)
+                    except Exception as e3:
+                        logger.warning(
+                            f"Could not collect review items for {model_class.__name__}: {e3}"
+                        )
 
         # Apply filters from the filterset
         review_items = self.apply_filters(review_items)
@@ -1607,7 +1627,8 @@ class UserCreatedObjectModalArchiveView(
         """Centralized permission check via UserCreatedObjectPermission.has_archive_permission."""
         try:
             obj = self.get_object()
-        except Exception:
+        except (Http404, AttributeError) as e:
+            logger.debug(f"Could not get object for archive permission check: {e}")
             return False
         perm = UserCreatedObjectPermission()
         return bool(perm.has_archive_permission(self.request, obj))
@@ -1653,7 +1674,8 @@ class UserCreatedObjectModalDeleteView(
             next_url = self.request.POST.get("next") or self.request.GET.get("next")
             if next_url:
                 return next_url
-        except Exception:
+        except (AttributeError, KeyError) as e:
+            logger.debug(f"Could not get 'next' URL from request: {e}")
             pass
 
         if self.success_url:
