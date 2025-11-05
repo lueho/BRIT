@@ -77,8 +77,11 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
         Returns models that either:
         1. Have items currently in review, OR
         2. Are in the priority list and user has moderation permissions
+        
+        Optimized to avoid N+1 queries by pre-fetching all user permissions.
         """
         from django.apps import apps
+        from django.contrib.auth.models import Permission
 
         # Priority models to always show in filters if user has permissions
         priority_models = [
@@ -89,9 +92,37 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
 
         available_models = []
 
+        # Optimize: Pre-fetch all user permissions in a single query
+        # This avoids N+1 queries when checking permissions for each model
+        if self.request.user.is_staff:
+            # Staff users can moderate all models
+            user_can_moderate_all = True
+            user_permission_codenames = set()
+        else:
+            user_can_moderate_all = False
+            # Get user permissions (both direct and via groups) in a single query
+            user_permission_codenames = set(
+                Permission.objects.filter(
+                    user=self.request.user
+                ).values_list('codename', flat=True)
+            )
+            group_permission_codenames = set(
+                Permission.objects.filter(
+                    group__user=self.request.user
+                ).values_list('codename', flat=True)
+            )
+            user_permission_codenames |= group_permission_codenames
+
+        # Helper to check if user can moderate a specific model (using cached permissions)
+        def can_moderate(model):
+            if user_can_moderate_all:
+                return True
+            codename = f"can_moderate_{model._meta.model_name}"
+            return codename in user_permission_codenames
+
         # First, add priority models if user has permissions (even if no items in review)
         for model in priority_models:
-            if user_is_moderator_for_model(self.request.user, model):
+            if can_moderate(model):
                 if model not in available_models:
                     available_models.append(model)
 
@@ -105,7 +136,7 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
                 and model not in available_models  # Don't duplicate priority models
             ):
                 # Check if user can moderate this model type
-                if user_is_moderator_for_model(self.request.user, model):
+                if can_moderate(model):
                     # Check if there are any items in review for this model
                     try:
                         if model.objects.in_review().exists():
