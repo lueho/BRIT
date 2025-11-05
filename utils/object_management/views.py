@@ -184,21 +184,36 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
         return kwargs
 
     def collect_review_items(self):
-        """Collect all review items from models the user can moderate.
+        """Collect review items from models the user can moderate.
 
         Returns a list (not QuerySet) of heterogeneous objects since we're
         combining multiple model types.
+        
+        Performance optimization: Instead of loading ALL items into memory,
+        we use database-level ordering and limit fetching to a reasonable
+        number of items per model to reduce memory usage.
+        
+        Note: For very large datasets, consider implementing per-model
+        pagination with client-side merging or database UNION queries.
         """
         review_items = []
         available_models = self.get_available_models()
+        
+        # Calculate a reasonable fetch limit per model to prevent loading
+        # thousands of items into memory. Multiply by number of models
+        # to ensure we get enough items even if some models have few items.
+        # This is a heuristic - can be tuned based on actual usage.
+        max_items_per_model = self.paginate_by * max(10, len(available_models))
 
         for model_class in available_models:
             # Get items in review for this model, excluding current user's own items
             try:
+                # Apply database-level ordering and limit to reduce memory usage
                 items = (
                     model_class.objects.in_review()
                     .exclude(owner=self.request.user)
                     .select_related("owner", "approved_by")
+                    .order_by("-submitted_at")[:max_items_per_model]
                 )
                 review_items.extend(list(items))
             except (FieldDoesNotExist, AttributeError) as e:
@@ -208,8 +223,10 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
                     "Trying without select_related."
                 )
                 try:
-                    items = model_class.objects.in_review().exclude(
-                        owner=self.request.user
+                    items = (
+                        model_class.objects.in_review()
+                        .exclude(owner=self.request.user)
+                        .order_by("-submitted_at")[:max_items_per_model]
                     )
                     review_items.extend(list(items))
                 except (FieldDoesNotExist, AttributeError) as e2:
@@ -219,7 +236,11 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
                         "Filtering in Python."
                     )
                     try:
-                        items = model_class.objects.in_review()
+                        # Even in fallback, use database ordering and limit
+                        items = list(
+                            model_class.objects.in_review()
+                            .order_by("-submitted_at")[:max_items_per_model]
+                        )
                         # Filter out in Python as a last resort
                         filtered_items = [
                             i
