@@ -285,16 +285,68 @@ class SourceAutocompleteView(UserCreatedObjectAutocompleteView):
     model = Source
     search_lookups = [
         "title__icontains",
-        "authors__last_names__icontains",
-        "authors__first_names__icontains",
+        "abbreviation__icontains",
+        "url__icontains",
     ]
-    ordering = "title"
-    page_size = 10
-    value_fields = ["id", "title", "authors__last_names", "authors__first_names"]
+    ordering = ["title"]  # Default ordering, overridden by search relevance
+    page_size = 20  # Increased from 10 to show more results
+    value_fields = ["id", "title", "abbreviation", "type", "url"]
+
+    def order_queryset(self, queryset):
+        """Override to add relevance-based ordering when searching."""
+        from django.db.models import Case, IntegerField, Value, When
+
+        # If there's a search term, order by relevance instead of alphabetically
+        search_term = getattr(self, 'query', '') or ''
+        if search_term:
+            # Order by: 1) starts with term, 2) contains term, 3) alphabetically
+            queryset = queryset.annotate(
+                relevance=Case(
+                    # Title starts with search term (highest priority)
+                    When(title__istartswith=search_term, then=Value(1)),
+                    # Abbreviation starts with search term
+                    When(abbreviation__istartswith=search_term, then=Value(2)),
+                    # Title contains search term
+                    When(title__icontains=search_term, then=Value(3)),
+                    # Abbreviation contains search term
+                    When(abbreviation__icontains=search_term, then=Value(4)),
+                    # URL contains search term
+                    When(url__icontains=search_term, then=Value(5)),
+                    default=Value(6),
+                    output_field=IntegerField(),
+                )
+            ).order_by('relevance', 'title')
+            return queryset
+
+        # No search term, use default ordering
+        return super().order_queryset(queryset)
 
     def hook_prepare_results(self, results):
         for result in results:
-            formatted_name = f"{result['authors__last_names']}, {result['authors__first_names']}. {result['title']}"
-            result["text"] = formatted_name
-            result["selected_text"] = formatted_name
+            title = (result.get('title') or '').strip()
+            abbreviation = (result.get('abbreviation') or '').strip()
+            url = (result.get('url') or '').strip()
+            source_type = result.get('type') or ''
+
+            # Build display text with fallbacks for sources without meaningful titles
+            if title and title.lower() not in ['', 'n/a', 'none', 'untitled']:
+                # Has a meaningful title
+                if abbreviation:
+                    display = f"{title} ({abbreviation})"
+                else:
+                    display = title
+            elif url:
+                # No meaningful title, use URL (common for WasteFlyer)
+                display = f"{url}"
+                if abbreviation:
+                    display += f" ({abbreviation})"
+            elif abbreviation:
+                # Only abbreviation available
+                display = abbreviation
+            else:
+                # Last resort: show type and ID
+                display = f"{source_type.replace('_', ' ').title()} (ID: {result['id']})"
+            
+            result["text"] = display
+            result["selected_text"] = display
         return results
