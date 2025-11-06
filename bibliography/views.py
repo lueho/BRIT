@@ -255,7 +255,6 @@ class SourceCheckUrlView(LoginRequiredMixin, View):
 
 
 class SourceCheckUrlProgressView(LoginRequiredMixin, View):
-
     @staticmethod
     def get(request, task_id):
         result = AsyncResult(task_id)
@@ -287,14 +286,47 @@ class SourceAutocompleteView(UserCreatedObjectAutocompleteView):
         "title__icontains",
         "authors__last_names__icontains",
         "authors__first_names__icontains",
+        "url__icontains",
     ]
     ordering = "title"
     page_size = 10
-    value_fields = ["id", "title", "authors__last_names", "authors__first_names"]
+    value_fields = [
+        "id",
+        "type",
+        "title",
+        "abbreviation",
+        "url",
+        "authors__last_names",
+        "authors__first_names",
+    ]
 
     def hook_prepare_results(self, results):
         for result in results:
-            formatted_name = f"{result['authors__last_names']}, {result['authors__first_names']}. {result['title']}"
+            source_type = result.get("type", "custom")
+
+            if source_type == "waste_flyer":
+                # WasteFlyers are identified by URL
+                url = result.get("url", "")
+                formatted_name = url if url else f"WasteFlyer #{result['id']}"
+            else:
+                # Traditional sources use author/title format
+                last_names = result.get("authors__last_names", "").strip()
+                first_names = result.get("authors__first_names", "").strip()
+                title = result.get("title", "").strip()
+
+                if last_names or first_names:
+                    author_part = f"{last_names}, {first_names}".strip(", ")
+                    formatted_name = f"{author_part}. {title}" if title else author_part
+                else:
+                    formatted_name = (
+                        title
+                        if title
+                        else result.get("abbreviation", f"Source #{result['id']}")
+                    )
+
+            # Set all possible label fields that forms might use
             result["text"] = formatted_name
             result["selected_text"] = formatted_name
+            result["abbreviation"] = formatted_name  # For forms using label_field="abbreviation"
+            result["label"] = formatted_name  # For forms using label_field="label"
         return results

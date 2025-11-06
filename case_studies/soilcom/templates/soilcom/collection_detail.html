@@ -11,7 +11,8 @@
     {% leaflet_js %}
     {% leaflet_css %}
     <link rel="stylesheet" href="{% static 'css/maps.min.css' %}">
-    <link rel="stylesheet" href="{% static 'soilcom/css/collection_detail.css' %}">
+    <link rel="stylesheet"
+          href="{% static 'soilcom/css/collection_detail.css' %}">
   {% endif %}
 {% endblock style_sheets %}
 
@@ -130,6 +131,11 @@
     <strong>Collector:</strong>
     <br>
     <a href="{{ object.collector.get_absolute_url }}">{{ object.collector.name }}</a>
+  </p>
+  <p class="card-text">
+    <strong>Catchment:</strong>
+    <br>
+    <a href="{{ object.catchment.get_absolute_url }}">{{ object.catchment.name }}</a>
   </p>
   <p class="card-text">
     <strong>Collection System:</strong>
