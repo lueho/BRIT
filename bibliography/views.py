@@ -288,7 +288,6 @@ class SourceAutocompleteView(UserCreatedObjectAutocompleteView):
         "authors__first_names__icontains",
         "url__icontains",
     ]
-    ordering = "title"
     page_size = 10
     value_fields = [
         "id",
@@ -299,6 +298,30 @@ class SourceAutocompleteView(UserCreatedObjectAutocompleteView):
         "authors__last_names",
         "authors__first_names",
     ]
+
+    def get_queryset(self):
+        """Order sources to prioritize actual bibliographic sources over URLs."""
+        qs = super().get_queryset()
+        # Annotate with has_authors to prioritize sources with authors
+        # Then order by type (waste_flyer comes last alphabetically)
+        # Then by title
+        from django.db.models import Count, Case, When, IntegerField, OuterRef, Exists
+        from bibliography.models import SourceAuthor
+        
+        # Check if source has any authors using Exists instead of Count to avoid GROUP BY issues
+        has_authors_subquery = SourceAuthor.objects.filter(source=OuterRef('pk'))
+        
+        qs = qs.annotate(
+            has_authors=Exists(has_authors_subquery),
+            # Prioritize non-waste_flyer types
+            type_priority=Case(
+                When(type='waste_flyer', then=1),
+                default=0,
+                output_field=IntegerField(),
+            )
+        ).order_by('type_priority', '-has_authors', 'title')
+        
+        return qs
 
     def hook_prepare_results(self, results):
         for result in results:
