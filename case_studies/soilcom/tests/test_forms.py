@@ -3,6 +3,7 @@ from datetime import date
 from django.db.models import signals
 from django.db.models.signals import post_save
 from django.forms import formset_factory
+from django.http import QueryDict
 from django.test import TestCase
 from factory.django import mute_signals
 
@@ -33,6 +34,20 @@ from ..models import (
     WasteFlyer,
     WasteStream,
 )
+
+
+def dict_to_querydict(data):
+    """
+    Convert a dict to QueryDict for form testing.
+    Handles list values properly (multiple values for same key).
+    """
+    qd = QueryDict(mutable=True)
+    for key, value in data.items():
+        if isinstance(value, list):
+            qd.setlist(key, value)
+        else:
+            qd[key] = value
+    return qd
 
 
 class CollectionSeasonModelFormTestCase(TestCase):
@@ -306,7 +321,7 @@ class CollectionModelFormTestCase(TestCase):
 
     def test_form_errors(self):
         data = {"connection_rate_year": 123}
-        form = CollectionModelForm(instance=self.collection, data=data)
+        form = CollectionModelForm(instance=self.collection, data=dict_to_querydict(data))
         self.assertFalse(form.is_valid())
         self.assertEqual(form.errors["catchment"][0], "This field is required.")
         self.assertEqual(form.errors["collection_system"][0], "This field is required.")
@@ -315,7 +330,7 @@ class CollectionModelFormTestCase(TestCase):
 
     def test_waste_stream_get_or_create_on_save(self):
         form = CollectionModelForm(
-            data={
+            data=dict_to_querydict({
                 "catchment": self.catchment.id,
                 "collector": self.collector.id,
                 "collection_system": self.collection_system.id,
@@ -332,7 +347,7 @@ class CollectionModelFormTestCase(TestCase):
                 "valid_from": date(2023, 1, 1),
                 "description": "This is a test case",
                 "connection_type": "VOLUNTARY",
-            }
+            })
         )
         self.assertTrue(form.is_valid())
         form.instance.owner = self.collection.owner
@@ -346,7 +361,7 @@ class CollectionModelFormTestCase(TestCase):
         self.assertEqual(instance.waste_stream.category.id, self.waste_category.id)
 
         equal_form = CollectionModelForm(
-            data={
+            data=dict_to_querydict({
                 "catchment": self.catchment.id,
                 "collector": self.collector.id,
                 "collection_system": self.collection_system.id,
@@ -364,7 +379,7 @@ class CollectionModelFormTestCase(TestCase):
                 "flyer_url": "https://www.great-test-flyers.com",
                 "description": "This is a test case",
                 "connection_type": "VOLUNTARY",
-            }
+            })
         )
         self.assertTrue(equal_form.is_valid())
         equal_form.instance.owner = self.collection.owner
@@ -379,7 +394,7 @@ class CollectionModelFormTestCase(TestCase):
     ):
         form = CollectionModelForm(
             instance=self.collection,
-            data={
+            data=dict_to_querydict({
                 "catchment": self.catchment.id,
                 "collector": self.collector.id,
                 "collection_system": self.collection_system.id,
@@ -397,7 +412,7 @@ class CollectionModelFormTestCase(TestCase):
                 "valid_until": date(2023, 12, 31),
                 "description": "This is a test case",
                 "connection_type": "VOLUNTARY",
-            },
+            }),
         )
         self.assertTrue(form.is_valid())
         form.save()
@@ -429,13 +444,13 @@ class CollectionModelFormTestCase(TestCase):
             "required_bin_capacity_reference": "person",
             "valid_from": date(2023, 1, 1),
         }
-        form = CollectionModelForm(data=data)
+        form = CollectionModelForm(data=dict_to_querydict(data))
         self.assertTrue(form.is_valid(), form.errors)
         instance = form.save(commit=False)
         self.assertEqual(instance.required_bin_capacity, 5)
         # Null/blank value
         data["required_bin_capacity"] = ""
-        form = CollectionModelForm(data=data)
+        form = CollectionModelForm(data=dict_to_querydict(data))
         self.assertTrue(form.is_valid(), form.errors)
         instance = form.save(commit=False)
         self.assertIsNone(instance.required_bin_capacity)
@@ -463,13 +478,13 @@ class CollectionModelFormTestCase(TestCase):
             "required_bin_capacity_reference": "person",
             "valid_from": date(2023, 1, 1),
         }
-        form = CollectionModelForm(data=data)
+        form = CollectionModelForm(data=dict_to_querydict(data))
         self.assertTrue(form.is_valid(), form.errors)
         instance = form.save(commit=False)
         self.assertEqual(instance.required_bin_capacity_reference, "person")
         # Null/blank value
         data["required_bin_capacity_reference"] = ""
-        form = CollectionModelForm(data=data)
+        form = CollectionModelForm(data=dict_to_querydict(data))
         self.assertTrue(form.is_valid(), form.errors)
         instance = form.save(commit=False)
         self.assertIn(instance.required_bin_capacity_reference, [None, ""])
@@ -494,7 +509,7 @@ class CollectionModelFormTestCase(TestCase):
                 "valid_from": date(2023, 1, 1),
                 "connection_type": value if value is not None else "",
             }
-            form = CollectionModelForm(data=data)
+            form = CollectionModelForm(data=dict_to_querydict(data))
             self.assertTrue(
                 form.is_valid(),
                 f"Form should be valid for connection_type={value}: {form.errors}",
@@ -531,13 +546,13 @@ class CollectionModelFormTestCase(TestCase):
             "required_bin_capacity_reference": "person",
             "valid_from": date(2023, 1, 1),
         }
-        form = CollectionModelForm(data=data)
+        form = CollectionModelForm(data=dict_to_querydict(data))
         self.assertTrue(form.is_valid(), form.errors)
         instance = form.save(commit=False)
         self.assertEqual(instance.required_bin_capacity_reference, "person")
         # Null/blank value
         data["required_bin_capacity_reference"] = ""
-        form = CollectionModelForm(data=data)
+        form = CollectionModelForm(data=dict_to_querydict(data))
         self.assertTrue(form.is_valid(), form.errors)
         instance = form.save(commit=False)
         self.assertIn(instance.required_bin_capacity_reference, [None, ""])
