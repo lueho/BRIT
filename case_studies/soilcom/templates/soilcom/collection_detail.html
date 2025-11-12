@@ -361,14 +361,31 @@
     </ul>
   {% endif %}
 
+  {% if object.sources.exists %}
+    <p class="card-text">
+      <strong>Bibliographic References:</strong>
+    </p>
+    <ul>
+      {% for source in object.sources.all %}
+        <li>
+          <a href="{{ source.get_absolute_url }}">{{ source.abbreviation }}</a>
+          {% if source.title %} - {{ source.title }}{% endif %}
+          {% if source.year %} ({{ source.year }}){% endif %}
+        </li>
+      {% endfor %}
+    </ul>
+  {% endif %}
+
   {% if object.flyers.exists %}
     <p class="card-text">
-      <strong>Sources:</strong>
+      <strong>Waste Management Documents (URLs):</strong>
     </p>
     <ul>
       {% for flyer in object.flyers.all %}
         <li>
-          <a href="{{ flyer.url }}" target="_blank">{{ flyer.url }}</a>
+          <a href="{{ flyer.url }}" target="_blank" rel="noopener noreferrer">
+            {{ flyer.url }}
+          </a>
         </li>
       {% endfor %}
     </ul>
