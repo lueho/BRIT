@@ -45,7 +45,12 @@
                     {% for opt in option.1 %}
                         <li class="list-group-item d-flex justify-content-between align-items-center" 
                             data-value="{{ opt.value }}">
-                            <div class="source-title">{{ opt.label }}</div>
+                            <div class="source-title">
+                                <a href="{% url 'source-detail-modal' opt.value %}" 
+                                   class="modal-link text-decoration-none">
+                                    {{ opt.label }}
+                                </a>
+                            </div>
                             <button type="button" 
                                     class="btn btn-sm btn-outline-danger source-remove-btn"
                                     data-value="{{ opt.value }}"
