@@ -279,7 +279,7 @@ class WasteFlyerFormSetHelper(DynamicTableInlineFormSetHelper):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Add a descriptive legend/title for the formset
-        self.legend = "🔗 Waste Management Documents (URLs)"
+        self.legend = '<i class="fas fa-link me-1"></i> Waste Management Documents (URLs)'
         self.help_text = "Quick links to waste management flyers, collection schedules, or municipal documents. URLs are automatically saved as references."
         self.form_show_labels = True  # Show URL label for each field
 
@@ -410,8 +410,7 @@ class CollectionModelForm(CreateInlineMixin, SimpleModelForm):
             autocomplete_url="source-autocomplete", label_field="label"
         ),
         required=False,
-        label="📚 Bibliographic References",
-        help_text="Research papers, books, reports, and other documented sources with full metadata (authors, year, DOI, etc.). Use the autocomplete to search by title or abbreviation.",
+        label="Bibliographic References",  # Label won't be shown - widget has its own header
     )
     collection_system = ModelChoiceField(
         queryset=CollectionSystem.objects.all(), required=True

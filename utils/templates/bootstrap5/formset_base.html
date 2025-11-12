@@ -23,20 +23,6 @@
     </div>
 {% endif %}
 
-{% comment %}Display formset legend and help text if provided{% endcomment %}
-{% if helper.legend %}
-    <div class="card mb-3">
-        <div class="card-header">
-            <h6 class="mb-0">{{ helper.legend }}</h6>
-        </div>
-        {% if helper.help_text %}
-            <div class="card-body pb-2">
-                <p class="text-muted small mb-0">{{ helper.help_text }}</p>
-            </div>
-        {% endif %}
-    </div>
-{% endif %}
-
 {% comment %}
     The formset can be rendered in two different layouts:
     1. Table Layout (default) - Each form is rendered as a table row
@@ -45,10 +31,24 @@
 
 {% block formset_variables %}{% endblock %}
 
+{% comment %}Wrap entire formset in card if legend is provided{% endcomment %}
+{% if helper.legend %}
+<div class="card mb-3">
+    <div class="card-header bg-light">
+        <h6 class="mb-0">{{ helper.legend|safe }}</h6>
+    </div>
+    {% if helper.help_text %}
+        <div class="card-body py-2 border-bottom bg-light">
+            <p class="text-muted small mb-0">{{ helper.help_text }}</p>
+        </div>
+    {% endif %}
+    <div class="card-body p-0">
+{% endif %}
+
 {% if layout|default:"table" == "table" %}
     {% comment %}Table layout with labels only in the header{% endcomment %}
     
-    <table{% if form_id %} id="{{ form_id }}_table"{% endif %} class="table {% if table_class %}{{ table_class }}{% else %}table-sm table-borderless{% endif %}"
+    <table{% if form_id %} id="{{ form_id }}_table"{% endif %} class="table {% if table_class %}{{ table_class }}{% else %}table-sm mb-0{% endif %}"
            {% if formset_helper.formset_type == 'tomselect' or formset_type == 'tomselect' %}
                data-formset-type="tomselect"
            {% else %}
@@ -123,14 +123,21 @@
         
         <tfoot>
             <tr>
-                <td colspan="{{ formset.empty_form|length|add:"1" }}">
-                    <button type="button" id="{% if form_id %}{{ form_id }}_{% endif %}add-form" class="btn btn-sm btn-outline-success">
+                <td colspan="{{ formset.empty_form|length|add:"1" }}" class="border-0 bg-light">
+                    <button type="button" id="{% if form_id %}{{ form_id }}_{% endif %}add-form" class="btn btn-sm btn-outline-success mt-2">
                         <i class="fas fa-plus"></i> Add
                     </button>
                 </td>
             </tr>
         </tfoot>
     </table>
+
+{% comment %}Close card wrapper if legend was provided{% endcomment %}
+{% if helper.legend %}
+    </div>
+</div>
+{% endif %}
+
 {% else %}
     <div class="formset-container"
          data-formset-type="{{ formset_type|default:'standard' }}"
@@ -212,6 +219,13 @@
             </div>
         </div>
     </div>
+
+{% comment %}Close card wrapper for div layout if legend was provided{% endcomment %}
+{% if helper.legend %}
+    </div>
+</div>
+{% endif %}
+
 {% endif %}
 
 {% if formset_tag %}
