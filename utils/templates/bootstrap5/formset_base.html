@@ -56,20 +56,20 @@
            {% endif %}
            data-formset="{{ formset.prefix }}"
            {% if form_id %}data-formset-id="{{ form_id }}"{% endif %}>
-        <thead>
+        <thead class="table-light">
         {% if formset.readonly and not formset.queryset.exists %}
         {% else %}
             <tr>
                 {% for field in formset.empty_form %}
                     {% if not field.is_hidden %}
                         <th for="{{ field.auto_id }}"
-                            class="col-form-label {% if field.field.required %}requiredField{% endif %}">
+                            class="col-form-label border-0 {% if field.field.required %}requiredField{% endif %}">
                             {{ field.label|safe }}{% if field.field.required and not field|is_checkbox %}
                                 <span class="asteriskField">*</span>{% endif %}
                         </th>
                     {% endif %}
                 {% endfor %}
-                <th class="formset-actions-col"></th>
+                <th class="formset-actions-col border-0"></th>
             </tr>
         {% endif %}
         </thead>
@@ -113,7 +113,7 @@
                         {% endif %}
                     {% endfor %}
                     <td class="formset-actions">
-                        <button type="button" class="btn btn-sm btn-outline-danger remove-form">
+                        <button type="button" class="btn btn-sm btn-outline-danger remove-form" aria-label="Remove">
                             <i class="fas fa-trash"></i>
                         </button>
                     </td>
@@ -123,7 +123,7 @@
         
         <tfoot>
             <tr>
-                <td colspan="{{ formset.empty_form|length|add:"1" }}" class="border-0 bg-light">
+                <td colspan="100" class="border-0 bg-light">
                     <button type="button" id="{% if form_id %}{{ form_id }}_{% endif %}add-form" class="btn btn-sm btn-outline-success mt-2">
                         <i class="fas fa-plus"></i> Add
                     </button>

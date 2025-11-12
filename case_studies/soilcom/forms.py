@@ -1,7 +1,7 @@
 from datetime import timedelta
 
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import HTML, Column, Div, Field, Layout, Row
+from crispy_forms.layout import Column, Div, Field, HTML, Layout, Row
 from django.core.exceptions import ValidationError
 from django.forms import (
     CheckboxSelectMultiple,
@@ -378,8 +378,11 @@ class CollectionModelFormHelper(FormHelper):
         Field("valid_until"),
         # Additional information
         Field("description"),
-        # References section
-        Field("sources", css_class="mt-4"),
+        # References section (widget renders its own card header with label)
+        Div(
+            Field("sources", template="bootstrap5/field_no_label.html"),
+            css_class="mt-4"
+        ),
     )
 
 

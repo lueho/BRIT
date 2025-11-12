@@ -150,7 +150,7 @@ function addSourceToList(listEl, value, label, targetSelect) {
     removeBtn.className = 'btn btn-sm btn-outline-danger source-remove-btn';
     removeBtn.dataset.value = value;
     removeBtn.setAttribute('aria-label', 'Remove');
-    removeBtn.innerHTML = '<i class="bi bi-x-lg"></i> Remove';
+    removeBtn.innerHTML = '<i class="fas fa-trash"></i>';
 
     li.appendChild(titleDiv);
     li.appendChild(removeBtn);
