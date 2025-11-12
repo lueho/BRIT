@@ -8,19 +8,25 @@ from django.forms import (
     DateField,
     DateInput,
     ModelChoiceField,
+    ModelMultipleChoiceField,
     MultipleChoiceField,
     ValidationError,
 )
 from django.forms.widgets import CheckboxSelectMultiple, RadioSelect
 from django.urls import reverse
-from django_tomselect.forms import TomSelectConfig, TomSelectModelChoiceField
+from django_tomselect.forms import (
+    TomSelectConfig,
+    TomSelectModelChoiceField,
+)
 from leaflet.forms.widgets import LeafletWidget
 
+from bibliography.models import Source
 from utils.forms import (
     ModalModelFormMixin,
     SimpleForm,
     SimpleModelForm,
 )
+from utils.widgets import SourceListWidget
 
 from .models import (
     Attribute,
@@ -36,9 +42,38 @@ from .models import (
 
 
 class GeoDataSetModelForm(SimpleModelForm):
+    sources = ModelMultipleChoiceField(
+        queryset=Source.objects.none(),  # Will be populated in __init__
+        widget=SourceListWidget(
+            autocomplete_url="source-autocomplete", label_field="label"
+        ),
+        required=False,
+        label="Sources",
+        help_text="Add sources using the autocomplete search above",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Only load selected sources to avoid performance issues
+        if self.instance and self.instance.pk:
+            self.fields["sources"].queryset = self.instance.sources.all()
+        else:
+            # For new instances, check if sources were submitted in POST data
+            data = kwargs.get('data')
+            if data and 'sources' in data:
+                # Get the submitted source IDs
+                source_ids = data.getlist('sources')
+                if source_ids:
+                    # Load only the submitted sources for validation
+                    self.fields["sources"].queryset = Source.objects.filter(id__in=source_ids)
+                else:
+                    self.fields["sources"].queryset = Source.objects.none()
+            else:
+                self.fields["sources"].queryset = Source.objects.none()
+
     class Meta:
         model = GeoDataset
-        fields = ("name", "publish", "model_name", "description")
+        fields = ("name", "publish", "model_name", "sources", "description")
 
 
 class LocationModelForm(SimpleModelForm):
@@ -198,7 +233,6 @@ class RegionMergeForm(SimpleForm):
 
 
 class RegionMergeFormSet(BaseFormSet):
-
     def clean(self):
         if any(self.errors):
             return
@@ -258,22 +292,22 @@ class NutsRegionQueryForm(SimpleForm):
         helper.layout = Layout(
             Field(
                 "level_0",
-                data_optionsapi=f'{reverse("data.nuts_region_options")}',
+                data_optionsapi=f"{reverse('data.nuts_region_options')}",
                 data_lvl=0,
             ),
             Field(
                 "level_1",
-                data_optionsapi=f'{reverse("data.nuts_region_options")}',
+                data_optionsapi=f"{reverse('data.nuts_region_options')}",
                 data_lvl=1,
             ),
             Field(
                 "level_2",
-                data_optionsapi=f'{reverse("data.nuts_region_options")}',
+                data_optionsapi=f"{reverse('data.nuts_region_options')}",
                 data_lvl=2,
             ),
             Field(
                 "level_3",
-                data_optionsapi=f'{reverse("data.nuts_region_options")}',
+                data_optionsapi=f"{reverse('data.nuts_region_options')}",
                 data_lvl=3,
             ),
         )
@@ -313,22 +347,22 @@ class NutsAndLauCatchmentQueryForm(SimpleForm):
         helper.layout = Layout(
             Field(
                 "level_0",
-                data_optionsapi=f'{reverse("data.nuts_lau_catchment_options")}',
+                data_optionsapi=f"{reverse('data.nuts_lau_catchment_options')}",
                 data_lvl=0,
             ),
             Field(
                 "level_1",
-                data_optionsapi=f'{reverse("data.nuts_lau_catchment_options")}',
+                data_optionsapi=f"{reverse('data.nuts_lau_catchment_options')}",
                 data_lvl=1,
             ),
             Field(
                 "level_2",
-                data_optionsapi=f'{reverse("data.nuts_lau_catchment_options")}',
+                data_optionsapi=f"{reverse('data.nuts_lau_catchment_options')}",
                 data_lvl=2,
             ),
             Field(
                 "level_3",
-                data_optionsapi=f'{reverse("data.nuts_lau_catchment_options")}',
+                data_optionsapi=f"{reverse('data.nuts_lau_catchment_options')}",
                 data_lvl=3,
             ),
             Field("level_4", data_lvl=4),

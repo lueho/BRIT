@@ -1,13 +1,13 @@
 from decimal import ROUND_HALF_UP, Decimal
 
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import HTML, Field, Layout, Row
+from crispy_forms.layout import Field, Layout, Row
 from django.core.exceptions import ValidationError
 from django.forms import (
     DateTimeInput,
     DecimalField,
-    HiddenInput,
     ModelChoiceField,
+    ModelMultipleChoiceField,
     NumberInput,
     Widget,
 )
@@ -28,6 +28,7 @@ from utils.forms import (
     ModalModelFormMixin,
     SimpleModelForm,
 )
+from utils.widgets import SourceListWidget
 
 from .models import (
     AnalyticalMethod,
@@ -170,16 +171,34 @@ class SampleModelForm(SimpleModelForm):
         required=False,
         label="Series",
     )
-    sources = TomSelectModelMultipleChoiceField(
-        config=TomSelectConfig(
-            url="source-autocomplete",
-            label_field="label",
+    sources = ModelMultipleChoiceField(
+        queryset=Source.objects.none(),  # Will be populated in __init__
+        widget=SourceListWidget(
+            autocomplete_url="source-autocomplete", label_field="label"
         ),
-        attrs={"class": "form-control mb-3"},
-        label="Single Select",
         required=False,
-        help_text="Example of single select with autocomplete and clear button.",
+        label="Sources",
+        help_text="Add sources using the autocomplete search above",
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Only load selected sources to avoid performance issues
+        if self.instance and self.instance.pk:
+            self.fields["sources"].queryset = self.instance.sources.all()
+        else:
+            # For new instances, check if sources were submitted in POST data
+            data = kwargs.get('data')
+            if data and 'sources' in data:
+                # Get the submitted source IDs
+                source_ids = data.getlist('sources')
+                if source_ids:
+                    # Load only the submitted sources for validation
+                    self.fields["sources"].queryset = Source.objects.filter(id__in=source_ids)
+                else:
+                    self.fields["sources"].queryset = Source.objects.none()
+            else:
+                self.fields["sources"].queryset = Source.objects.none()
 
     class Meta:
         model = Sample
@@ -208,7 +227,6 @@ class SampleModalModelForm(ModalModelFormMixin, SampleModelForm):
 
 
 class CompositionModelForm(SimpleModelForm):
-
     class Meta:
         model = Composition
         fields = ("group", "sample", "fractions_of")
@@ -394,7 +412,6 @@ class WeightShareInlineForm(WeightShareModelForm):
 
 
 class WeightShareInlineFormset(BaseInlineFormSet):
-
     def clean(self):
         super().clean()
 

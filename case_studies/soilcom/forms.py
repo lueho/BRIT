@@ -22,6 +22,7 @@ from django_tomselect.forms import (
     TomSelectModelMultipleChoiceField,
 )
 
+from bibliography.models import Source
 from distributions.models import TemporalDistribution, Timestep
 from materials.models import Material, Sample
 from utils.crispy_fields import ForeignkeyField
@@ -33,6 +34,7 @@ from utils.forms import (
     SimpleModelForm,
 )
 from utils.object_management.models import get_default_owner
+from utils.widgets import SourceListWidget
 
 from .models import (
     CONNECTION_TYPE_CHOICES,
@@ -207,7 +209,6 @@ class CollectionSeasonForm(SimpleForm):
 
 
 class CollectionSeasonFormSet(M2MInlineFormSet):
-
     def clean(self):
         for i, form in enumerate(self.forms):
             if (
@@ -269,7 +270,6 @@ class WasteFlyerModalModelForm(ModalModelFormMixin, WasteFlyerModelForm):
 
 
 class BaseWasteFlyerUrlFormSet(M2MInlineFormSet):
-
     def __init__(self, *args, **kwargs):
         self.owner = kwargs.pop("owner", get_default_owner())
         super().__init__(*args, **kwargs)
@@ -358,6 +358,7 @@ class CollectionModelFormHelper(FormHelper):
         Field("valid_from"),
         Field("valid_until"),
         Field("description"),
+        Field("sources"),
     )
 
 
@@ -381,6 +382,15 @@ class CollectionModelForm(CreateInlineMixin, SimpleModelForm):
         ),
         label="Collector",
         required=True,
+    )
+    sources = ModelMultipleChoiceField(
+        queryset=Source.objects.none(),  # Will be populated in __init__
+        widget=SourceListWidget(
+            autocomplete_url="source-autocomplete", label_field="label"
+        ),
+        required=False,
+        label="Sources",
+        help_text="Add sources using the autocomplete search above",
     )
     collection_system = ModelChoiceField(
         queryset=CollectionSystem.objects.all(), required=True
@@ -431,6 +441,27 @@ class CollectionModelForm(CreateInlineMixin, SimpleModelForm):
         help_text="Defines the unit (person, household, property) for which the required bin capacity applies. Leave blank if not specified.",
     )
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Only load selected sources to avoid performance issues
+        if self.instance and self.instance.pk:
+            self.fields["sources"].queryset = self.instance.sources.all()
+        else:
+            # For new instances, check if sources were submitted in POST data
+            data = kwargs.get("data")
+            if data and "sources" in data:
+                # Get the submitted source IDs
+                source_ids = data.getlist("sources")
+                if source_ids:
+                    # Load only the submitted sources for validation
+                    self.fields["sources"].queryset = Source.objects.filter(
+                        id__in=source_ids
+                    )
+                else:
+                    self.fields["sources"].queryset = Source.objects.none()
+            else:
+                self.fields["sources"].queryset = Source.objects.none()
+
     class Meta:
         model = Collection
         fields = (
@@ -449,6 +480,7 @@ class CollectionModelForm(CreateInlineMixin, SimpleModelForm):
             "min_bin_size",
             "required_bin_capacity",
             "required_bin_capacity_reference",
+            "sources",
         )
         labels = {
             "description": "Comments",
@@ -468,7 +500,7 @@ class CollectionModelForm(CreateInlineMixin, SimpleModelForm):
         instance = super().save(commit=False)
         data = self.cleaned_data
         instance.name = (
-            f'{data["catchment"]} {data["waste_category"]} {data["collection_system"]}'
+            f"{data['catchment']} {data['waste_category']} {data['collection_system']}"
         )
         allowed_materials = Material.objects.filter(id__in=data["allowed_materials"])
         if not allowed_materials.exists():

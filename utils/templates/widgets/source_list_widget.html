@@ -1,0 +1,53 @@
+{% load static %}
+<div class="source-list-widget-container" data-field-name="{{ widget.name }}">
+    {# Hidden select for form submission - only contains selected values #}
+    <select name="{{ widget.name }}" 
+            id="{{ widget.attrs.id }}" 
+            multiple 
+            style="display: none;"
+            {% include "django/forms/widgets/attrs.html" %}>
+        {% for option in widget.optgroups %}
+            {% for opt in option.1 %}
+                <option value="{{ opt.value }}" selected>{{ opt.label }}</option>
+            {% endfor %}
+        {% endfor %}
+    </select>
+    
+    {# TomSelect input for adding new sources #}
+    <div class="source-add-section mb-3">
+        <label for="{{ widget.attrs.id }}_add" class="form-label">Add sources:</label>
+        <input type="text" 
+               id="{{ widget.attrs.id }}_add" 
+               class="form-control source-tomselect-add"
+               placeholder="Search and select sources..."
+               value=""
+               data-autocomplete-url="{% url widget.autocomplete_url %}"
+               data-label-field="{{ widget.label_field }}"
+               data-target-select="{{ widget.attrs.id }}">
+    </div>
+    
+    {# List of selected sources #}
+    <div class="source-selected-list">
+        <label class="form-label">Selected sources:</label>
+        <ul class="list-group" id="{{ widget.attrs.id }}_list">
+            {% for option in widget.optgroups %}
+                {% for opt in option.1 %}
+                    <li class="list-group-item d-flex justify-content-between align-items-start" 
+                        data-value="{{ opt.value }}">
+                        <div class="source-title">{{ opt.label }}</div>
+                        <button type="button" 
+                                class="btn btn-sm btn-outline-danger source-remove-btn"
+                                data-value="{{ opt.value }}"
+                                aria-label="Remove">
+                            <i class="bi bi-x-lg"></i> Remove
+                        </button>
+                    </li>
+                {% endfor %}
+            {% endfor %}
+        </ul>
+        <p class="text-muted mt-2" id="{{ widget.attrs.id }}_empty" 
+           style="{% if widget.value %}display: none;{% endif %}">
+            No sources selected. Use the search above to add sources.
+        </p>
+    </div>
+</div>

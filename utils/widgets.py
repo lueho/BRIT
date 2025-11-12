@@ -1,4 +1,4 @@
-from django.forms.widgets import HiddenInput
+from django.forms.widgets import HiddenInput, SelectMultiple
 from django_filters.widgets import SuffixedMultiWidget
 
 
@@ -234,3 +234,47 @@ class NullablePercentageRangeSliderWidget(NullableRangeSliderWidget):
     """
 
     unit = "%"
+
+
+class SourceListWidget(SelectMultiple):
+    """
+    Widget that displays selected sources as a list (one per line) and uses
+    TomSelect autocomplete for adding new sources.
+
+    This avoids loading thousands of sources into the page while still showing
+    selected sources with full titles for easy distinction.
+
+    Usage:
+        sources = ModelMultipleChoiceField(
+            queryset=Source.objects.none(),  # Don't pre-load all sources
+            widget=SourceListWidget(
+                autocomplete_url='source-autocomplete',
+                label_field='label'
+            ),
+            required=False
+        )
+    """
+
+    template_name = "widgets/source_list_widget.html"
+
+    def __init__(self, attrs=None, autocomplete_url=None, label_field="label"):
+        self.autocomplete_url = autocomplete_url or "source-autocomplete"
+        self.label_field = label_field
+        super().__init__(attrs)
+
+    def get_context(self, name, value, attrs):
+        context = super().get_context(name, value, attrs)
+        context["widget"]["autocomplete_url"] = self.autocomplete_url
+        context["widget"]["label_field"] = self.label_field
+        return context
+
+    def value_from_datadict(self, data, files, name):
+        """
+        Extract the list of selected source IDs from the submitted form data.
+        """
+        # Get all values for this field name (multiple selection)
+        return data.getlist(name)
+
+    class Media:
+        css = {"all": ("utils/css/source_list_widget.css",)}
+        js = ("utils/js/source_list_widget.js",)
