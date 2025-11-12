@@ -28,6 +28,7 @@ from materials.models import Material, Sample
 from utils.crispy_fields import ForeignkeyField
 from utils.forms import (
     CreateInlineMixin,
+    DynamicTableInlineFormSetHelper,
     M2MInlineFormSet,
     ModalModelFormMixin,
     SimpleForm,
@@ -246,7 +247,10 @@ class WasteFlyerModelForm(SimpleModelForm):
     class Meta:
         model = WasteFlyer
         fields = ("url",)
-        labels = {"url": "Sources (Urls)"}
+        labels = {"url": "Document URL"}
+        help_texts = {
+            "url": "Quick links to waste management flyers, collection schedules, or municipal documents. URLs are automatically saved as references."
+        }
 
     def save(self, commit=True):
         if commit:
@@ -267,6 +271,19 @@ class WasteFlyerModelForm(SimpleModelForm):
 
 class WasteFlyerModalModelForm(ModalModelFormMixin, WasteFlyerModelForm):
     pass
+
+
+class WasteFlyerFormSetHelper(DynamicTableInlineFormSetHelper):
+    """
+    Custom formset helper for waste flyer URLs with clear labeling.
+    Distinguishes waste management document URLs from bibliographic references.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Add a descriptive legend/title for the formset
+        self.legend = "Waste Management Documents (URLs)"
+        self.form_show_labels = False  # Hide individual labels since we have legend
 
 
 class BaseWasteFlyerUrlFormSet(M2MInlineFormSet):
@@ -343,21 +360,27 @@ class AggregatedCollectionPropertyValueModelForm(SimpleModelForm):
 class CollectionModelFormHelper(FormHelper):
     form_tag = False
     layout = Layout(
+        # Collection identification and location
         Field("catchment"),
         ForeignkeyField("collector"),
         ForeignkeyField("collection_system"),
+        # Waste stream configuration
         ForeignkeyField("waste_category"),
         Field("connection_type"),
         Field("allowed_materials"),
         Field("forbidden_materials"),
+        # Collection parameters
         ForeignkeyField("fee_system"),
         Field("frequency"),
         Field("min_bin_size"),
         Field("required_bin_capacity"),
         Field("required_bin_capacity_reference"),
+        # Validity period
         Field("valid_from"),
         Field("valid_until"),
+        # Additional information
         Field("description"),
+        # Bibliographic references (research papers, books, etc.)
         Field("sources"),
     )
 
@@ -389,8 +412,8 @@ class CollectionModelForm(CreateInlineMixin, SimpleModelForm):
             autocomplete_url="source-autocomplete", label_field="label"
         ),
         required=False,
-        label="Sources",
-        help_text="Add sources using the autocomplete search above",
+        label="Bibliographic References",
+        help_text="Research papers, books, reports, and other documented sources with full metadata (authors, year, DOI, etc.). Use the autocomplete to search by title or abbreviation.",
     )
     collection_system = ModelChoiceField(
         queryset=CollectionSystem.objects.all(), required=True

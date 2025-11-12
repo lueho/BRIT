@@ -35,7 +35,7 @@ from maps.views import (
     MapMixin,
 )
 from utils.file_export.views import GenericUserCreatedObjectExportView
-from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineFormSetMixin
+from utils.forms import M2MInlineFormSetMixin
 from utils.object_management.permissions import (
     filter_queryset_for_user,
     get_object_policy,
@@ -77,6 +77,7 @@ from .forms import (
     CollectionFrequencyModelForm,
     CollectionModelForm,
     CollectionPropertyValueModelForm,
+    WasteFlyerFormSetHelper,
     CollectionRemovePredecessorForm,
     CollectionRemoveWasteSampleForm,
     CollectionSeasonForm,
@@ -729,7 +730,7 @@ class CollectionCreateView(M2MInlineFormSetMixin, UserCreatedObjectCreateView):
     formset_model = WasteFlyer
     formset_class = BaseWasteFlyerUrlFormSet
     formset_form_class = WasteFlyerModelForm
-    formset_helper_class = DynamicTableInlineFormSetHelper
+    formset_helper_class = WasteFlyerFormSetHelper
     relation_field_name = "flyers"
     permission_required = "soilcom.add_collection"
 
@@ -1114,7 +1115,7 @@ class CollectionUpdateView(M2MInlineFormSetMixin, UserCreatedObjectUpdateView):
     formset_model = WasteFlyer
     formset_class = BaseWasteFlyerUrlFormSet
     formset_form_class = WasteFlyerModelForm
-    formset_helper_class = DynamicTableInlineFormSetHelper
+    formset_helper_class = WasteFlyerFormSetHelper
     relation_field_name = "flyers"
 
     def get_formset_kwargs(self, **kwargs):
