@@ -280,6 +280,17 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
         except ImportError:
             return UserCreatedObject.objects.none()
 
+    def paginate_queryset(self, queryset, page_size):
+        """Override to prevent parent FilterView from paginating the dummy queryset.
+
+        The parent MultipleObjectMixin tries to paginate get_queryset() which returns
+        an empty queryset. This causes Http404 on page 2+. We handle pagination
+        manually in get_context_data() for the actual heterogeneous review items.
+
+        Returns None to indicate "no pagination at this level".
+        """
+        return (None, None, None, None)
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
