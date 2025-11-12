@@ -38,13 +38,14 @@ document.addEventListener('DOMContentLoaded', function () {
             placeholder: input.getAttribute('placeholder') || 'Search sources...',
             maxOptions: 50,
             loadThrottle: 300,
-            preload: false,
+            preload: 'focus',  // Load initial suggestions on focus
             create: false,
             persist: false,
             load: function (query, callback) {
-                if (!query.length) return callback();
-
-                fetch(autocompleteUrl + '?q=' + encodeURIComponent(query))
+                // Build URL with query parameter (empty for initial suggestions)
+                const url = autocompleteUrl + (query ? '?q=' + encodeURIComponent(query) : '');
+                
+                fetch(url)
                     .then(response => response.json())
                     .then(json => {
                         callback(json.results || json);
