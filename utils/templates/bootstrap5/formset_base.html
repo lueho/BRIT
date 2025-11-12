@@ -23,6 +23,20 @@
     </div>
 {% endif %}
 
+{% comment %}Display formset legend and help text if provided{% endcomment %}
+{% if helper.legend %}
+    <div class="card mb-3">
+        <div class="card-header">
+            <h6 class="mb-0">{{ helper.legend }}</h6>
+        </div>
+        {% if helper.help_text %}
+            <div class="card-body pb-2">
+                <p class="text-muted small mb-0">{{ helper.help_text }}</p>
+            </div>
+        {% endif %}
+    </div>
+{% endif %}
+
 {% comment %}
     The formset can be rendered in two different layouts:
     1. Table Layout (default) - Each form is rendered as a table row

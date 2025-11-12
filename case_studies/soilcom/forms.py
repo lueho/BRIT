@@ -247,10 +247,7 @@ class WasteFlyerModelForm(SimpleModelForm):
     class Meta:
         model = WasteFlyer
         fields = ("url",)
-        labels = {"url": "Document URL"}
-        help_texts = {
-            "url": "Quick links to waste management flyers, collection schedules, or municipal documents. URLs are automatically saved as references."
-        }
+        labels = {"url": "URL"}
 
     def save(self, commit=True):
         if commit:
@@ -282,8 +279,9 @@ class WasteFlyerFormSetHelper(DynamicTableInlineFormSetHelper):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Add a descriptive legend/title for the formset
-        self.legend = "Waste Management Documents (URLs)"
-        self.form_show_labels = False  # Hide individual labels since we have legend
+        self.legend = "🔗 Waste Management Documents (URLs)"
+        self.help_text = "Quick links to waste management flyers, collection schedules, or municipal documents. URLs are automatically saved as references."
+        self.form_show_labels = True  # Show URL label for each field
 
 
 class BaseWasteFlyerUrlFormSet(M2MInlineFormSet):
@@ -380,8 +378,8 @@ class CollectionModelFormHelper(FormHelper):
         Field("valid_until"),
         # Additional information
         Field("description"),
-        # Bibliographic references (research papers, books, etc.)
-        Field("sources"),
+        # References section
+        Field("sources", css_class="mt-4"),
     )
 
 
@@ -412,7 +410,7 @@ class CollectionModelForm(CreateInlineMixin, SimpleModelForm):
             autocomplete_url="source-autocomplete", label_field="label"
         ),
         required=False,
-        label="Bibliographic References",
+        label="📚 Bibliographic References",
         help_text="Research papers, books, reports, and other documented sources with full metadata (authors, year, DOI, etc.). Use the autocomplete to search by title or abbreviation.",
     )
     collection_system = ModelChoiceField(
