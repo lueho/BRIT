@@ -343,6 +343,11 @@ class GeoDataSetCreateView(UserCreatedObjectCreateView):
     form_class = GeoDataSetModelForm
     permission_required = "maps.add_geodataset"
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['request'] = self.request
+        return kwargs
+
 
 class FilteredMapMixin(MapMixin):
     model_name = None  # TODO: Remove this for pk
@@ -411,6 +416,11 @@ class GeoDataSetPrivateFilteredMapView(FilteredMapMixin, PrivateObjectFilterView
 class GeoDataSetUpdateView(UserCreatedObjectUpdateView):
     model = GeoDataset
     form_class = GeoDataSetModelForm
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['request'] = self.request
+        return kwargs
 
 
 class GeoDataSetModalDeleteView(UserCreatedObjectModalDeleteView):

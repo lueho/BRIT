@@ -498,6 +498,11 @@ class SampleCreateView(UserCreatedObjectCreateView):
     form_class = SampleModelForm
     permission_required = "materials.add_sample"
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['request'] = self.request
+        return kwargs
+
 
 class SampleModalCreateView(UserCreatedObjectModalCreateView):
     form_class = SampleModalModelForm
@@ -524,6 +529,11 @@ class SampleDetailView(UserCreatedObjectDetailView):
 class SampleUpdateView(UserCreatedObjectUpdateView):
     model = Sample
     form_class = SampleModelForm
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['request'] = self.request
+        return kwargs
 
 
 class SampleModalDeleteView(UserCreatedObjectModalDeleteView):
@@ -621,6 +631,11 @@ class SampleCreateDuplicateView(UserCreatedObjectUpdateView):
     model = Sample
     form_class = SampleModelForm
     object = None
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['request'] = self.request
+        return kwargs
 
     def get_initial(self):
         initial = super().get_initial()
