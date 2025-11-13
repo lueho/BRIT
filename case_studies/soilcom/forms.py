@@ -1,7 +1,7 @@
 from datetime import timedelta
 
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import Column, Div, Field, HTML, Layout, Row
+from crispy_forms.layout import HTML, Column, Div, Field, Layout, Row
 from django.core.exceptions import ValidationError
 from django.forms import (
     CheckboxSelectMultiple,
@@ -35,6 +35,7 @@ from utils.forms import (
     SimpleModelForm,
 )
 from utils.object_management.models import get_default_owner
+from utils.object_management.permissions import filter_queryset_for_user
 from utils.widgets import SourceListWidget
 
 from .models import (
@@ -279,7 +280,9 @@ class WasteFlyerFormSetHelper(DynamicTableInlineFormSetHelper):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # Add a descriptive legend/title for the formset
-        self.legend = '<i class="fas fa-link me-1"></i> Waste Management Documents (URLs)'
+        self.legend = (
+            '<i class="fas fa-link me-1"></i> Waste Management Documents (URLs)'
+        )
         self.help_text = "Quick links to waste management flyers, collection schedules, or municipal documents. URLs are automatically saved as references."
         self.form_show_labels = True  # Show URL label for each field
 
@@ -381,7 +384,7 @@ class CollectionModelFormHelper(FormHelper):
         # References section (widget renders its own card header with label)
         Div(
             Field("sources", template="bootstrap5/field_no_label.html"),
-            css_class="mt-4"
+            css_class="mt-4",
         ),
     )
 
@@ -465,25 +468,37 @@ class CollectionModelForm(CreateInlineMixin, SimpleModelForm):
     )
 
     def __init__(self, *args, **kwargs):
+        # Get the user from the request if available (passed through the view)
+        request = kwargs.pop('request', None)
         super().__init__(*args, **kwargs)
-        # Only load selected sources to avoid performance issues
+
+        # For validation, we need to include sources that:
+        # 1. Are already assigned to this collection (if editing)
+        # 2. Are being submitted in the POST data
+        # 3. Are accessible to the current user (for permission check)
+
+        data = kwargs.get("data")
+        source_ids = set()
+
+        # Add currently assigned sources
         if self.instance and self.instance.pk:
-            self.fields["sources"].queryset = self.instance.sources.all()
+            source_ids.update(self.instance.sources.values_list("id", flat=True))
+
+        # Add submitted sources
+        if data and "sources" in data:
+            submitted_ids = data.getlist("sources")
+            if submitted_ids:
+                source_ids.update(int(sid) for sid in submitted_ids if sid)
+
+        # Build queryset with all relevant sources
+        if source_ids:
+            queryset = Source.objects.filter(id__in=source_ids)
+            # Filter by user permissions if we have a user
+            if request and hasattr(request, "user"):
+                queryset = filter_queryset_for_user(queryset, request.user)
+            self.fields["sources"].queryset = queryset
         else:
-            # For new instances, check if sources were submitted in POST data
-            data = kwargs.get("data")
-            if data and "sources" in data:
-                # Get the submitted source IDs
-                source_ids = data.getlist("sources")
-                if source_ids:
-                    # Load only the submitted sources for validation
-                    self.fields["sources"].queryset = Source.objects.filter(
-                        id__in=source_ids
-                    )
-                else:
-                    self.fields["sources"].queryset = Source.objects.none()
-            else:
-                self.fields["sources"].queryset = Source.objects.none()
+            self.fields["sources"].queryset = Source.objects.none()
 
     class Meta:
         model = Collection

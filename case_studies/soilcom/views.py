@@ -734,6 +734,11 @@ class CollectionCreateView(M2MInlineFormSetMixin, UserCreatedObjectCreateView):
     relation_field_name = "flyers"
     permission_required = "soilcom.add_collection"
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['request'] = self.request
+        return kwargs
+
     def get_formset_kwargs(self, **kwargs):
         if self.request.method in ("POST", "PUT"):
             kwargs.update({"owner": self.request.user})
@@ -1117,6 +1122,11 @@ class CollectionUpdateView(M2MInlineFormSetMixin, UserCreatedObjectUpdateView):
     formset_form_class = WasteFlyerModelForm
     formset_helper_class = WasteFlyerFormSetHelper
     relation_field_name = "flyers"
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['request'] = self.request
+        return kwargs
 
     def get_formset_kwargs(self, **kwargs):
         kwargs.update({"owner": self.request.user})
