@@ -1,11 +1,13 @@
-from django.db import migrations, models
 import django.core.validators
+from django.db import migrations, models
 
 
 class Migration(migrations.Migration):
-
     dependencies = [
-        ("soilcom", "0003_alter_aggregatedcollectionpropertyvalue_publication_status_and_more"),
+        (
+            "soilcom",
+            "0003_alter_aggregatedcollectionpropertyvalue_publication_status_and_more",
+        ),
     ]
 
     operations = [

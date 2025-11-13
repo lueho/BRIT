@@ -1,14 +1,12 @@
-from unittest.mock import Mock, patch
-
 from django.contrib.auth.models import Permission
 from django.db.models.signals import post_save
 from django.urls import reverse
 from factory.django import mute_signals
 
+from utils.object_management.models import User
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 
 from ..models import Author, Licence, Source, SourceAuthor, check_url_valid
-from utils.object_management.models import User
 
 
 def setUpModule():
@@ -50,7 +48,6 @@ class AuthorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
 
 
 class AuthorAutoCompleteViewTestCase(ViewWithPermissionsTestCase):
-
     def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse("author-autocomplete"))
         self.assertEqual(response.status_code, 200)
@@ -156,7 +153,7 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         super().setUpTestData()
 
         from django.contrib.contenttypes.models import ContentType
-        
+
         moderator = User.objects.create(username="moderator")
         content_type = ContentType.objects.get_for_model(Source)
         permission, _ = Permission.objects.get_or_create(
@@ -235,7 +232,9 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         response = self.client.get(self.get_detail_url(self.published_object.pk))
         self.assertContains(response, "check url")
 
-    def test_detail_view_published_doesnt_contain_check_url_button_for_unprivileged_non_owner(self):
+    def test_detail_view_published_doesnt_contain_check_url_button_for_unprivileged_non_owner(
+        self,
+    ):
         self.client.force_login(self.non_owner_user)
         response = self.client.get(self.get_detail_url(self.published_object.pk))
         self.assertNotContains(response, "check url")
@@ -277,7 +276,7 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
             "sourceauthors-0-author": "",  # No author selected
         }
         post_data.update(related_post_data)
-        response = self.client.post(self.get_create_url(), post_data, follow=True)
+        self.client.post(self.get_create_url(), post_data, follow=True)
         from ..models import Source
 
         source = Source.objects.latest("pk")
@@ -297,7 +296,7 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
             "sourceauthors-1-author": self.source_author_2.author.pk,
         }
         update_data.update(update_related_post_data)
-        response = self.client.post(update_url, update_data, follow=True)
+        self.client.post(update_url, update_data, follow=True)
         source.refresh_from_db()
         self.assertEqual(source.sourceauthors.count(), 2)
         author_ids = set(source.sourceauthors.values_list("author_id", flat=True))

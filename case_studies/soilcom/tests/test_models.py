@@ -7,9 +7,7 @@ from django.urls import reverse
 from factory.django import mute_signals
 
 from distributions.models import Period, TemporalDistribution, Timestep
-from maps.models import GeoDataset, Region
 from materials.models import Material
-from django.test import TestCase
 from utils.tests.testcases import comparable_model_dict
 
 from ..models import (
@@ -26,7 +24,6 @@ from ..models import (
 
 
 class InitialDataTestCase(TestCase):
-
     @staticmethod
     def test_simple_initial_collection_frequency_exists():
         season = CollectionSeason.objects.get(
@@ -93,7 +90,6 @@ class CollectionCatchmentTestCase(TestCase):
 
 
 class WasteStreamQuerysetTestCase(TestCase):
-
     def setUp(self):
         self.allowed_material_1 = Material.objects.create(name="Allowed Material 1")
         self.allowed_material_2 = Material.objects.create(name="Allowed Material 2")
@@ -147,7 +143,7 @@ class WasteStreamQuerysetTestCase(TestCase):
             category=self.waste_stream.category, name=self.waste_stream.name
         )
         self.assertFalse(created)
-        self.assertIsInstance(instance, WasteStream),
+        (self.assertIsInstance(instance, WasteStream),)
         self.assertDictEqual(
             comparable_model_dict(instance), comparable_model_dict(self.waste_stream)
         )
@@ -554,7 +550,6 @@ class WasteStreamQuerysetTestCase(TestCase):
 
 
 class WasteStreamTestCase(TestCase):
-
     def test_models_uses_manager_from_custom_waste_stream_queryset(self):
         self.assertEqual(
             type(WasteStream.objects).__name__, "ManagerFromWasteStreamQuerySet"
@@ -562,7 +557,6 @@ class WasteStreamTestCase(TestCase):
 
 
 class WasteFlyerTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         with mute_signals(signals.post_save):
@@ -585,7 +579,6 @@ class WasteFlyerTestCase(TestCase):
 
 
 class CollectionTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         collection_system = CollectionSystem.objects.create(name="System")
@@ -749,7 +742,6 @@ class CollectionTestCase(TestCase):
             self.collection, self.predecessor_collection.successors.first()
         )
 
-
     def test_valid_until_cannot_be_before_valid_from(self):
         self.collection.valid_until = date(2023, 12, 31)
         with self.assertRaises(ValidationError):
@@ -758,7 +750,6 @@ class CollectionTestCase(TestCase):
 
 
 class CollectionVersioningHelpersTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         cls.catchment = CollectionCatchment.objects.create(name="C")
@@ -782,7 +773,9 @@ class CollectionVersioningHelpersTestCase(TestCase):
         c.predecessors.add(b)
 
         self.assertSetEqual(a.version_chain_ids, {a.pk, b.pk, c.pk})
-        self.assertSetEqual(set(b.all_versions().values_list("pk", flat=True)), {a.pk, b.pk, c.pk})
+        self.assertSetEqual(
+            set(b.all_versions().values_list("pk", flat=True)), {a.pk, b.pk, c.pk}
+        )
         self.assertEqual(c.version_anchor, a)
 
     def test_version_anchor_in_cycle_falls_back_to_earliest(self):
@@ -799,7 +792,6 @@ class CollectionVersioningHelpersTestCase(TestCase):
 
 
 class CollectionStatisticsAccessorsTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         cls.catchment = CollectionCatchment.objects.create(name="C")
@@ -823,13 +815,13 @@ class CollectionStatisticsAccessorsTestCase(TestCase):
         cls.succ.predecessors.add(cls.root)
 
     def test_collectionpropertyvalues_for_display_dedup_and_scope(self):
-        from utils.properties.models import Property, Unit
         from case_studies.soilcom.models import CollectionPropertyValue
+        from utils.properties.models import Property, Unit
 
         prop = Property.objects.create(name="P", publication_status="published")
         unit = Unit.objects.create(name="U", publication_status="published")
         # Two values for same (prop, unit, year) across chain
-        v_root = CollectionPropertyValue.objects.create(
+        CollectionPropertyValue.objects.create(
             collection=self.root,
             property=prop,
             unit=unit,
@@ -852,14 +844,17 @@ class CollectionStatisticsAccessorsTestCase(TestCase):
         self.assertEqual(anon_list[0].pk, v_succ.pk)
 
         # Owner-like visibility: simulate staff/owner by passing a dummy user with is_staff=True
-        class U: is_staff=True; is_authenticated=True
+        class U:
+            is_staff = True
+            is_authenticated = True
+
         full_list = self.succ.collectionpropertyvalues_for_display(user=U())
         self.assertEqual(len(full_list), 1)  # dedup keeps published due to ordering
         self.assertEqual(full_list[0].pk, v_succ.pk)
 
     def test_aggregatedcollectionpropertyvalues_for_display_chain_and_scope(self):
-        from utils.properties.models import Property, Unit
         from case_studies.soilcom.models import AggregatedCollectionPropertyValue
+        from utils.properties.models import Property, Unit
 
         prop = Property.objects.create(name="PA", publication_status="published")
         unit = Unit.objects.create(name="UA", publication_status="published")
@@ -887,18 +882,23 @@ class CollectionStatisticsAccessorsTestCase(TestCase):
         self.assertEqual([a.year for a in anon], [2021])
 
         # Staff sees both, order by (property, unit, year, publication_order, -created_at, -pk)
-        class U: is_staff=True; is_authenticated=True
-        both = self.succ.aggregatedcollectionpropertyvalues_for_display(user=U())
-        self.assertEqual(set(a.year for a in both), {2020, 2021})
+        class U:
+            is_staff = True
+            is_authenticated = True
 
-    def test_collectionpropertyvalues_for_display_published_tie_prefers_latest_version(self):
-        from utils.properties.models import Property, Unit
+        both = self.succ.aggregatedcollectionpropertyvalues_for_display(user=U())
+        self.assertEqual({a.year for a in both}, {2020, 2021})
+
+    def test_collectionpropertyvalues_for_display_published_tie_prefers_latest_version(
+        self,
+    ):
         from case_studies.soilcom.models import CollectionPropertyValue
+        from utils.properties.models import Property, Unit
 
         prop = Property.objects.create(name="TP", publication_status="published")
         unit = Unit.objects.create(name="TU", publication_status="published")
 
-        v_root = CollectionPropertyValue.objects.create(
+        CollectionPropertyValue.objects.create(
             collection=self.root,
             property=prop,
             unit=unit,
@@ -926,7 +926,6 @@ class CollectionStatisticsAccessorsTestCase(TestCase):
 
 
 class CollectionSeasonTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         cls.distribution = TemporalDistribution.objects.get(name="Months of the year")
@@ -944,7 +943,6 @@ class CollectionSeasonTestCase(TestCase):
 
 
 class CollectionFrequencyTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         distribution = TemporalDistribution.objects.get(name="Months of the year")

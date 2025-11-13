@@ -1,6 +1,6 @@
-from django.forms import MultiValueField, FloatField, BooleanField
+from django.forms import BooleanField, FloatField, MultiValueField
 
-from utils.widgets import NullableRangeSliderWidget, NullablePercentageRangeSliderWidget
+from utils.widgets import NullablePercentageRangeSliderWidget, NullableRangeSliderWidget
 
 
 class NullableRangeField(MultiValueField):
@@ -14,6 +14,7 @@ class NullableRangeField(MultiValueField):
     Attributes:
         widget: The widget class to use for rendering the field.
     """
+
     widget = NullableRangeSliderWidget
 
     def __init__(self, fields=None, *args, **kwargs):
@@ -27,10 +28,7 @@ class NullableRangeField(MultiValueField):
             **kwargs: Additional keyword arguments passed to the parent class.
         """
         if fields is None:
-            fields = (
-                FloatField(),
-                FloatField(),
-                BooleanField())
+            fields = (FloatField(), FloatField(), BooleanField())
         super().__init__(fields, *args, **kwargs)
 
     def compress(self, data_list):
@@ -62,4 +60,5 @@ class NullablePercentageRangeField(NullableRangeField):
     Attributes:
         widget: The widget class to use for rendering the field.
     """
+
     widget = NullablePercentageRangeSliderWidget

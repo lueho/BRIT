@@ -322,9 +322,6 @@ class Region(NamedUserCreatedObject):
             self.borders.geom = value
             self.borders.save()  # Save the changes to the GeoPolygon instance
 
-    def __str__(self):
-        return f"{self.name or 'Unnamed Region'} ({self.country})"
-
     @property
     def country_code(self):
         try:
@@ -415,7 +412,7 @@ class NutsRegion(Region):
                 levl_code=lvl, nuts_id__startswith=self.nuts_id
             )
         if self.levl_code == 3:
-            pedigree[f"qs_4"] = self.lau_children.all()
+            pedigree["qs_4"] = self.lau_children.all()
 
         return pedigree
 

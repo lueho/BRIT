@@ -1,18 +1,18 @@
 from unittest import TestCase as NativeTestCase
 
 from utils.exceptions import UnitMismatchError
-from ..plots import BaseChart, BarChart, BaseDataSet
+
+from ..plots import BarChart, BaseChart, BaseDataSet
 
 
 class BaseDataSetTestCase(NativeTestCase):
-
     def setUp(self):
         self.ds = BaseDataSet()
-        self.labels = ['First dataset', 'Second dataset']
+        self.labels = ["First dataset", "Second dataset"]
         self.dataset_kwargs = {
-            'label': 'Test dataset',
-            'data': {'Column 1': 1.0, 'Column 2': 2.0, 'Column 3': 3.0},
-            'unit': 'kg/a'
+            "label": "Test dataset",
+            "data": {"Column 1": 1.0, "Column 2": 2.0, "Column 3": 3.0},
+            "unit": "kg/a",
         }
 
     def test_create_dataset(self):
@@ -26,25 +26,25 @@ class BaseDataSetTestCase(NativeTestCase):
 
     def test_get_xlabels(self):
         ds = BaseDataSet(**self.dataset_kwargs)
-        xlabels = ['Column 1', 'Column 2', 'Column 3']
+        xlabels = ["Column 1", "Column 2", "Column 3"]
         self.assertListEqual(ds.xlabels, xlabels)
 
     def test_set_and_get_unit(self):
         self.assertIsNone(self.ds.unit)
-        self.ds.unit = 'kg/a'
-        self.assertEqual(self.ds.unit, 'kg/a')
+        self.ds.unit = "kg/a"
+        self.assertEqual(self.ds.unit, "kg/a")
 
     def test_dataset_str(self):
-        self.ds.label = 'First dataset'
-        self.assertEqual(str(self.ds), 'First dataset')
+        self.ds.label = "First dataset"
+        self.assertEqual(str(self.ds), "First dataset")
 
     def test_set_and_get_data(self):
-        data = {'column 1': -1, 'column 2': 1}
+        data = {"column 1": -1, "column 2": 1}
         self.ds.data = data
         self.assertDictEqual(self.ds.data, data)
 
     def test_dataset_length(self):
-        self.ds.data = {f'Column {i}': 1 for i in range(5)}
+        self.ds.data = {f"Column {i}": 1 for i in range(5)}
         self.assertEqual(len(self.ds), 5)
 
     def test_set_and_get_background_color(self):
@@ -53,37 +53,36 @@ class BaseDataSetTestCase(NativeTestCase):
 
     def test_create_dataset_with_kwargs(self):
         dataset = BaseDataSet(**self.dataset_kwargs)
-        self.assertEqual(dataset.label, self.dataset_kwargs['label'])
-        self.assertDictEqual(dataset.data, self.dataset_kwargs['data'])
+        self.assertEqual(dataset.label, self.dataset_kwargs["label"])
+        self.assertDictEqual(dataset.data, self.dataset_kwargs["data"])
 
 
 class BasePlotTestCase(NativeTestCase):
-
     def setUp(self):
         self.chart = BaseChart()
-        self.labels = ['First column', 'Second column', 'Third column']
-        self.unit = 'Mg/a'
+        self.labels = ["First column", "Second column", "Third column"]
+        self.unit = "Mg/a"
         self.dataset1_kwargs = {
-            'label': 'Dataset 1',
-            'data': {'Column 1': 1.0, 'Column 2': 2.0, 'Column 3': 3.0},
-            'unit': self.unit
+            "label": "Dataset 1",
+            "data": {"Column 1": 1.0, "Column 2": 2.0, "Column 3": 3.0},
+            "unit": self.unit,
         }
         self.dataset1 = BaseDataSet(**self.dataset1_kwargs)
         self.dataset2_kwargs = {
-            'label': 'Dataset 2',
-            'data': {'Column 1': 1.5, 'Column 2': 2.5, 'Column 3': 3.5},
-            'unit': self.unit
+            "label": "Dataset 2",
+            "data": {"Column 1": 1.5, "Column 2": 2.5, "Column 3": 3.5},
+            "unit": self.unit,
         }
         self.chart_dict = {
-            'id': 'testChart',
-            'title': 'Test chart',
-            'labels': ['First column', 'Second column', 'Third column'],
-            'unit': self.unit,
-            'type': 'stacked-barchart',
-            'show_legend': False,
-            'data': [
-                {'label': 'Dataset 1', 'data': [1.0, 2.0, 3.0], 'unit': self.unit},
-                {'label': 'Dataset 2', 'data': [1.5, 2.5, 3.5], 'unit': self.unit}
+            "id": "testChart",
+            "title": "Test chart",
+            "labels": ["First column", "Second column", "Third column"],
+            "unit": self.unit,
+            "type": "stacked-barchart",
+            "show_legend": False,
+            "data": [
+                {"label": "Dataset 1", "data": [1.0, 2.0, 3.0], "unit": self.unit},
+                {"label": "Dataset 2", "data": [1.5, 2.5, 3.5], "unit": self.unit},
             ],
         }
 
@@ -92,7 +91,7 @@ class BasePlotTestCase(NativeTestCase):
 
     def test_set_and_get_plot_type(self):
         self.assertIsNone(self.chart.type)
-        chart_types = ['stacked-barchart', 'piechart']
+        chart_types = ["stacked-barchart", "piechart"]
         for chart_type in chart_types:
             self.chart.type = chart_type
             self.assertEqual(self.chart.type, chart_type)
@@ -119,20 +118,20 @@ class BasePlotTestCase(NativeTestCase):
         self.assertEqual(self.chart.unit, self.unit)
 
     def test_create_with_kwargs(self):
-        chart = BaseChart(**self.chart_dict)
+        BaseChart(**self.chart_dict)
         self.maxDiff = None
         generated_dict = self.chart.as_dict()
-        self.assertIn('type', generated_dict.keys())
-        self.assertIn('data', generated_dict.keys())
-        self.assertIn('options', generated_dict.keys())
-        self.assertIn('labels', generated_dict['data'])
-        self.assertIn('datasets', generated_dict['data'])
-        self.assertIn('unit', generated_dict['data'])
-        for dataset in generated_dict['data']['datasets']:
-            self.assertIn('label', dataset.keys())
-            self.assertIn('data', dataset.keys())
-            self.assertIn('backgroundColor', dataset.keys())
-            self.assertIn('borderColor', dataset.keys())
+        self.assertIn("type", generated_dict.keys())
+        self.assertIn("data", generated_dict.keys())
+        self.assertIn("options", generated_dict.keys())
+        self.assertIn("labels", generated_dict["data"])
+        self.assertIn("datasets", generated_dict["data"])
+        self.assertIn("unit", generated_dict["data"])
+        for dataset in generated_dict["data"]["datasets"]:
+            self.assertIn("label", dataset.keys())
+            self.assertIn("data", dataset.keys())
+            self.assertIn("backgroundColor", dataset.keys())
+            self.assertIn("borderColor", dataset.keys())
 
     def test_has_no_data_at_instantiation(self):
         self.assertFalse(self.chart.has_data)
@@ -149,7 +148,9 @@ class BasePlotTestCase(NativeTestCase):
         self.chart.add_dataset(**self.dataset1_kwargs)
         self.assertTrue(self.chart.has_data)
         self.assertIsInstance(self.chart.data[0], BaseDataSet)
-        self.assertEqual(vars(self.chart.data[0]), vars(BaseDataSet(**self.dataset1_kwargs)))
+        self.assertEqual(
+            vars(self.chart.data[0]), vars(BaseDataSet(**self.dataset1_kwargs))
+        )
 
     def test_add_and_get_two_datasets(self):
         self.chart.unit = self.unit
@@ -157,45 +158,46 @@ class BasePlotTestCase(NativeTestCase):
         self.chart.add_dataset(**self.dataset2_kwargs)
         self.assertEqual(len(self.chart.data), 2)
         self.assertEqual(self.chart.data[0], self.dataset1)
-        self.assertEqual(vars(self.chart.data[1]), vars(BaseDataSet(**self.dataset2_kwargs)))
+        self.assertEqual(
+            vars(self.chart.data[1]), vars(BaseDataSet(**self.dataset2_kwargs))
+        )
 
     def test_add_dataset_raises_unit_mismatch_error(self):
         ds_kwargs = self.dataset2_kwargs.copy()
-        ds_kwargs['unit'] = 'Imposter'
+        ds_kwargs["unit"] = "Imposter"
         with self.assertRaises(UnitMismatchError):
             self.chart.add_dataset(**ds_kwargs)
 
     def test_add_dataset_stores_labels(self):
         self.chart.unit = self.unit
         self.chart.add_dataset(**self.dataset2_kwargs)
-        self.assertListEqual(self.chart.labels, ['Column 1', 'Column 2', 'Column 3'])
+        self.assertListEqual(self.chart.labels, ["Column 1", "Column 2", "Column 3"])
 
     def test_as_dict(self):
         self.chart.unit = self.unit
         self.chart.add_dataset(self.dataset1)
         self.chart.add_dataset(**self.dataset2_kwargs)
         self.chart.labels = self.labels
-        self.chart.title = 'Test chart'
-        self.chart.type = 'stacked-barchart'
+        self.chart.title = "Test chart"
+        self.chart.type = "stacked-barchart"
         self.chart.show_legend = False
-        self.chart.id = 'testChart'
+        self.chart.id = "testChart"
         self.maxDiff = None
         generated_dict = self.chart.as_dict()
-        self.assertIn('type', generated_dict.keys())
-        self.assertIn('data', generated_dict.keys())
-        self.assertIn('options', generated_dict.keys())
-        self.assertIn('labels', generated_dict['data'])
-        self.assertIn('datasets', generated_dict['data'])
-        self.assertIn('unit', generated_dict['data'])
-        for dataset in generated_dict['data']['datasets']:
-            self.assertIn('label', dataset.keys())
-            self.assertIn('data', dataset.keys())
-            self.assertIn('backgroundColor', dataset.keys())
-            self.assertIn('borderColor', dataset.keys())
+        self.assertIn("type", generated_dict.keys())
+        self.assertIn("data", generated_dict.keys())
+        self.assertIn("options", generated_dict.keys())
+        self.assertIn("labels", generated_dict["data"])
+        self.assertIn("datasets", generated_dict["data"])
+        self.assertIn("unit", generated_dict["data"])
+        for dataset in generated_dict["data"]["datasets"]:
+            self.assertIn("label", dataset.keys())
+            self.assertIn("data", dataset.keys())
+            self.assertIn("backgroundColor", dataset.keys())
+            self.assertIn("borderColor", dataset.keys())
 
 
 class BarchartTestCase(NativeTestCase):
-
     def test_create_barchart(self):
         barchart = BarChart()
-        self.assertEqual(barchart.type, 'barchart')
+        self.assertEqual(barchart.type, "barchart")

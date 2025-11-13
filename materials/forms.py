@@ -7,7 +7,6 @@ from django.forms import (
     DateTimeInput,
     DecimalField,
     ModelChoiceField,
-    ModelMultipleChoiceField,
     NumberInput,
     Widget,
 )

@@ -356,7 +356,6 @@ class CollectionReviewDetailPropertiesTestCase(TestCase):
 
 
 class CollectionDetailOnlyPublishedCpvsTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         from utils.properties.models import Property, Unit
@@ -373,9 +372,15 @@ class CollectionDetailOnlyPublishedCpvsTestCase(TestCase):
             publication_status="published",
         )
 
-        cls.prop = Property.objects.create(name="VisibilityProp", publication_status="published")
-        cls.published_unit = Unit.objects.create(name="PublishedUnit", publication_status="published")
-        cls.private_unit = Unit.objects.create(name="PrivateUnit", publication_status="published")
+        cls.prop = Property.objects.create(
+            name="VisibilityProp", publication_status="published"
+        )
+        cls.published_unit = Unit.objects.create(
+            name="PublishedUnit", publication_status="published"
+        )
+        cls.private_unit = Unit.objects.create(
+            name="PrivateUnit", publication_status="published"
+        )
         cls.prop.allowed_units.add(cls.published_unit, cls.private_unit)
 
         cls.published_value = CollectionPropertyValue.objects.create(
@@ -397,7 +402,9 @@ class CollectionDetailOnlyPublishedCpvsTestCase(TestCase):
         )
 
     def test_public_detail_only_shows_published_cpvs(self):
-        response = self.client.get(reverse("collection-detail", kwargs={"pk": self.collection.pk}))
+        response = self.client.get(
+            reverse("collection-detail", kwargs={"pk": self.collection.pk})
+        )
         self.assertEqual(response.status_code, 200)
         body = response.content.decode()
         self.assertIn("PublishedUnit", body)
@@ -406,7 +413,9 @@ class CollectionDetailOnlyPublishedCpvsTestCase(TestCase):
     def test_staff_detail_only_shows_published_cpvs(self):
         staff = get_user_model().objects.create(username="staff-user", is_staff=True)
         self.client.force_login(staff)
-        response = self.client.get(reverse("collection-detail", kwargs={"pk": self.collection.pk}))
+        response = self.client.get(
+            reverse("collection-detail", kwargs={"pk": self.collection.pk})
+        )
         self.assertEqual(response.status_code, 200)
         context_vals = response.context["collection_property_values"]
         self.assertTrue(all(v.publication_status == "published" for v in context_vals))
@@ -417,10 +426,10 @@ class CollectionDetailOnlyPublishedCpvsTestCase(TestCase):
 
 
 class CollectionReviewDetailPreviewTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         from django.contrib.contenttypes.models import ContentType
+
         from utils.properties.models import Property, Unit
 
         cls.User = get_user_model()
@@ -438,9 +447,15 @@ class CollectionReviewDetailPreviewTestCase(TestCase):
             publication_status="review",
         )
 
-        cls.prop = Property.objects.create(name="PreviewProp", publication_status="published")
-        cls.unit = Unit.objects.create(name="PreviewUnit", publication_status="published")
-        cls.other_unit = Unit.objects.create(name="OtherUnit", publication_status="published")
+        cls.prop = Property.objects.create(
+            name="PreviewProp", publication_status="published"
+        )
+        cls.unit = Unit.objects.create(
+            name="PreviewUnit", publication_status="published"
+        )
+        cls.other_unit = Unit.objects.create(
+            name="OtherUnit", publication_status="published"
+        )
         cls.prop.allowed_units.add(cls.unit, cls.other_unit)
 
         cls.cpv_published = CollectionPropertyValue.objects.create(
@@ -471,8 +486,12 @@ class CollectionReviewDetailPreviewTestCase(TestCase):
         )
 
         # Aggregated values
-        cls.agg_prop = Property.objects.create(name="PreviewAggProp", publication_status="published")
-        cls.agg_unit = Unit.objects.create(name="AggUnit", publication_status="published")
+        cls.agg_prop = Property.objects.create(
+            name="PreviewAggProp", publication_status="published"
+        )
+        cls.agg_unit = Unit.objects.create(
+            name="AggUnit", publication_status="published"
+        )
         cls.agg_prop.allowed_units.add(cls.agg_unit)
 
         cls.agg_published = AggregatedCollectionPropertyValue.objects.create(
@@ -515,11 +534,15 @@ class CollectionReviewDetailPreviewTestCase(TestCase):
 
         cpvs = response.context["collection_property_values"]
         self.assertEqual([v.pk for v in cpvs], [self.cpv_review.pk])
-        self.assertTrue(all(v.publication_status in {"published", "review"} for v in cpvs))
+        self.assertTrue(
+            all(v.publication_status in {"published", "review"} for v in cpvs)
+        )
 
         agg_vals = response.context["aggregated_collection_property_values"]
         self.assertEqual([v.pk for v in agg_vals], [self.agg_review.pk])
-        self.assertTrue(all(v.publication_status in {"published", "review"} for v in agg_vals))
+        self.assertTrue(
+            all(v.publication_status in {"published", "review"} for v in agg_vals)
+        )
 
         body = response.content.decode()
         self.assertIn("12", body)

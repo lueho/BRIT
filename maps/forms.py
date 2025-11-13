@@ -8,7 +8,6 @@ from django.forms import (
     DateField,
     DateInput,
     ModelChoiceField,
-    ModelMultipleChoiceField,
     MultipleChoiceField,
     ValidationError,
 )
@@ -41,7 +40,9 @@ from .models import (
 )
 
 
-class GeoDataSetModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModelForm):
+class GeoDataSetModelForm(
+    UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModelForm
+):
     # sources field and __init__ logic provided by SourcesFieldMixin
 
     class Meta:

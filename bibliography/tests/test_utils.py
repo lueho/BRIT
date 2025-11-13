@@ -1,20 +1,20 @@
-from django.test import SimpleTestCase
 from unittest.mock import patch
 
-from ..utils import check_url, check_source_urls
+from django.test import SimpleTestCase
+
+from ..utils import check_url
 
 
-@patch('requests.get')
-@patch('requests.head')
+@patch("requests.get")
+@patch("requests.head")
 class SourceCheckUrlTestCase(SimpleTestCase):
-
     def setUp(self):
-        self.url = 'https://www.flyer-test-url.org'
+        self.url = "https://www.flyer-test-url.org"
         self.headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:84.0) Gecko/20200101 Firefox/84.0',
-            'Accept-Language': 'en-GB,en;q=0.5',
-            'Referer': 'https://www.wikipedia.org',
-            'DNT': '1'
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:84.0) Gecko/20200101 Firefox/84.0",
+            "Accept-Language": "en-GB,en;q=0.5",
+            "Referer": "https://www.wikipedia.org",
+            "DNT": "1",
         }
 
     def test_request_with_http_status_200_returns_true(self, mock_head, mock_get):
@@ -35,4 +35,6 @@ class SourceCheckUrlTestCase(SimpleTestCase):
         mock_head.return_value.status_code = 405
         mock_get.return_value.status_code = 200
         self.assertTrue(check_url(self.url))
-        mock_get.assert_called_once_with(self.url, headers=self.headers, allow_redirects=True)
+        mock_get.assert_called_once_with(
+            self.url, headers=self.headers, allow_redirects=True
+        )

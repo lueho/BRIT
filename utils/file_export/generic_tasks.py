@@ -1,7 +1,8 @@
-from django.http.request import QueryDict, MultiValueDict
-from django.apps import apps
 from celery import shared_task
+from django.http.request import MultiValueDict, QueryDict
+
 import utils.file_export.storages
+
 from .export_registry import get_export_spec
 
 

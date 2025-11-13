@@ -12,6 +12,7 @@ from openpyxl import load_workbook
 
 from maps.models import NutsRegion
 from materials.models import MaterialCategory
+
 from ..models import (
     Collection,
     CollectionCatchment,
@@ -29,7 +30,6 @@ from ..serializers import CollectionFlatSerializer
 
 
 class CollectionCSVRendererTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         MaterialCategory.objects.create(name="Biowaste component")
@@ -105,7 +105,12 @@ class CollectionCSVRendererTestCase(TestCase):
         self.file.seek(0)
         reader = csv.DictReader(codecs.getreader("utf-8")(self.file), delimiter="\t")
         valid_labels = [
-            "Compulsory", "Voluntary", "Mandatory", "Mandatory with exception for home composters", "Not specified", ""
+            "Compulsory",
+            "Voluntary",
+            "Mandatory",
+            "Mandatory with exception for home composters",
+            "Not specified",
+            "",
         ]
         for row in reader:
             self.assertIn(row["Connection type"], valid_labels)
@@ -145,7 +150,6 @@ class CollectionCSVRendererTestCase(TestCase):
 
 
 class CollectionXLSXRendererTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         User.objects.create(username="outsider")
@@ -213,8 +217,7 @@ class CollectionXLSXRendererTestCase(TestCase):
         wb = load_workbook(self.file)
         ws = wb.active
         ordered_content = [
-            dict((k, row.get(k)) for k in list(renderer.labels.keys()))
-            for row in content
+            {k: row.get(k) for k in list(renderer.labels.keys())} for row in content
         ]
-        for column, (key, value) in enumerate(ordered_content[0].items(), start=1):
+        for column, (key, _value) in enumerate(ordered_content[0].items(), start=1):
             self.assertEqual(renderer.labels[key], ws.cell(row=1, column=column).value)

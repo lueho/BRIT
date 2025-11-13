@@ -1,11 +1,12 @@
 import django.contrib.gis.db.models as gis_models
 from django.apps import apps
-from django.db import models, connection
+from django.db import connection, models
 from django.urls import reverse
 
 from distributions.models import TemporalDistribution, Timestep
-from inventories.models import Scenario, InventoryAlgorithm
-from materials.models import SampleSeries, MaterialComponent
+from inventories.models import InventoryAlgorithm, Scenario
+from materials.models import MaterialComponent, SampleSeries
+
 from .exceptions import InvalidGeometryType, NoFeaturesProvided, TableAlreadyExists
 
 
@@ -19,32 +20,38 @@ class LayerField(models.Model):
     data_type = models.CharField(max_length=10)
 
     def data_type_object(self):
-        if self.data_type == 'float':
+        if self.data_type == "float":
             return models.FloatField()
-        elif self.data_type == 'int':
+        elif self.data_type == "int":
             return models.IntegerField()
 
     @staticmethod
     def model_field_type(data_type: str):
-        if data_type == 'float':
+        if data_type == "float":
             return models.FloatField(blank=True, null=True)
-        elif data_type == 'int':
+        elif data_type == "int":
             return models.IntegerField(blank=True, null=True)
-        elif data_type == 'str':
+        elif data_type == "str":
             return models.CharField(blank=True, null=True, max_length=200)
 
 
 class LayerManager(models.Manager):
-    supported_geometry_types = ['Point', 'MultiPoint', 'LineString', 'MultiLineString', 'Polygon', 'MultiPolygon', ]
+    supported_geometry_types = [
+        "Point",
+        "MultiPoint",
+        "LineString",
+        "MultiLineString",
+        "Polygon",
+        "MultiPolygon",
+    ]
 
     def create_or_replace(self, **kwargs):
+        results = kwargs.pop("results")
 
-        results = kwargs.pop('results')
-
-        if 'features' not in results or len(results['features']) == 0:
+        if "features" not in results or len(results["features"]) == 0:
             raise NoFeaturesProvided(results)
         else:
-            features = results['features']
+            features = results["features"]
             fields = {}
             # The data types of the fields are detected from their content. Any column that has only null values
             # will be omitted completely
@@ -62,16 +69,22 @@ class LayerManager(models.Manager):
             # data type could be detected. They should be omitted but this information should be logged
             # TODO: add omitted columns info to log
 
-            kwargs['geom_type'] = fields.pop('geom')
-            if kwargs['geom_type'] not in self.supported_geometry_types:
-                raise InvalidGeometryType(kwargs['geom_type'])
+            kwargs["geom_type"] = fields.pop("geom")
+            if kwargs["geom_type"] not in self.supported_geometry_types:
+                raise InvalidGeometryType(kwargs["geom_type"])
 
-            kwargs['table_name'] = 'result_of_scenario_' + \
-                                   str(kwargs['scenario'].id) + '_algorithm_' + \
-                                   str(kwargs['algorithm'].id) + '_feedstock_' + \
-                                   str(kwargs['feedstock'].id)
+            kwargs["table_name"] = (
+                "result_of_scenario_"
+                + str(kwargs["scenario"].id)
+                + "_algorithm_"
+                + str(kwargs["algorithm"].id)
+                + "_feedstock_"
+                + str(kwargs["feedstock"].id)
+            )
 
-            layer, created = super().get_or_create(table_name=kwargs['table_name'], defaults=kwargs)
+            layer, created = super().get_or_create(
+                table_name=kwargs["table_name"], defaults=kwargs
+            )
 
             if created:
                 layer.add_layer_fields(fields)
@@ -93,10 +106,10 @@ class LayerManager(models.Manager):
             for feature in features:
                 feature_collection.objects.create(**feature)
 
-        if 'aggregated_values' in results:
-            layer.add_aggregated_values(results['aggregated_values'])
-        if 'aggregated_distributions' in results:
-            layer.add_aggregated_distributions(results['aggregated_distributions'])
+        if "aggregated_values" in results:
+            layer.add_aggregated_values(results["aggregated_values"])
+        if "aggregated_distributions" in results:
+            layer.add_aggregated_distributions(results["aggregated_distributions"])
 
         return layer, feature_collection
 
@@ -122,56 +135,61 @@ class Layer(models.Model):
 
     class Meta:
         constraints = [
-            models.UniqueConstraint(fields=['table_name'], name='unique table_name')
+            models.UniqueConstraint(fields=["table_name"], name="unique table_name")
         ]
 
     def add_aggregated_values(self, aggregates: []):
         for aggregate in aggregates:
-            LayerAggregatedValue.objects.create(name=aggregate['name'],
-                                                value=aggregate['value'],
-                                                unit=aggregate['unit'],
-                                                layer=self)
+            LayerAggregatedValue.objects.create(
+                name=aggregate["name"],
+                value=aggregate["value"],
+                unit=aggregate["unit"],
+                layer=self,
+            )
 
     def add_aggregated_distributions(self, distributions):
         for distribution in distributions:
-            dist = TemporalDistribution.objects.get(id=distribution['distribution'])
-            aggdist = LayerAggregatedDistribution.objects.create(name=distribution['name'],
-                                                                 distribution=dist,
-                                                                 layer=self)
+            dist = TemporalDistribution.objects.get(id=distribution["distribution"])
+            aggdist = LayerAggregatedDistribution.objects.create(
+                name=distribution["name"], distribution=dist, layer=self
+            )
 
-            for dset in distribution['sets']:
+            for dset in distribution["sets"]:
                 distset = DistributionSet.objects.create(
-                    aggregated_distribution=aggdist,
-                    timestep_id=dset['timestep']
+                    aggregated_distribution=aggdist, timestep_id=dset["timestep"]
                 )
-                for share in dset['shares']:
+                for share in dset["shares"]:
                     DistributionShare.objects.create(
-                        component_id=share['component'],
-                        average=share['average'],
+                        component_id=share["component"],
+                        average=share["average"],
                         standard_deviation=0.0,  # TODO
-                        distribution_set=distset
+                        distribution_set=distset,
                     )
 
     def add_layer_fields(self, fields: dict):
         for field_name, data_type in fields.items():
-            field, created = LayerField.objects.get_or_create(field_name=field_name, data_type=data_type)
+            field, created = LayerField.objects.get_or_create(
+                field_name=field_name, data_type=data_type
+            )
             self.layer_fields.add(field)
 
     def as_dict(self):
         return {
-            'name': self.name,
-            'geom_type': self.geom_type,
-            'table_name': self.table_name,
-            'scenario': self.scenario,
-            'feedstock': self.feedstock,
-            'inventory_algorithm': self.algorithm,
-            'layer_fields': [field for field in self.layer_fields.all()],
-            'aggregated_results': [
-                {'name': aggregate.name,
-                 'value': int(aggregate.value),
-                 'unit': aggregate.unit}
+            "name": self.name,
+            "geom_type": self.geom_type,
+            "table_name": self.table_name,
+            "scenario": self.scenario,
+            "feedstock": self.feedstock,
+            "inventory_algorithm": self.algorithm,
+            "layer_fields": list(self.layer_fields.all()),
+            "aggregated_results": [
+                {
+                    "name": aggregate.name,
+                    "value": int(aggregate.value),
+                    "unit": aggregate.unit,
+                }
                 for aggregate in self.layeraggregatedvalue_set.all()
-            ]
+            ],
         }
 
     def update_or_create_feature_collection(self):
@@ -182,12 +200,12 @@ class Layer(models.Model):
 
         # Empty app registry from any previous version of this model
         model_name = self.table_name
-        if model_name in apps.all_models['layer_manager']:
-            del apps.all_models['layer_manager'][model_name]
+        if model_name in apps.all_models["layer_manager"]:
+            del apps.all_models["layer_manager"][model_name]
 
         attrs = {
-            '__module__': 'layer_manager.models',
-            'geom': getattr(gis_models, self.geom_type + 'Field')(srid=4326)
+            "__module__": "layer_manager.models",
+            "geom": getattr(gis_models, self.geom_type + "Field")(srid=4326),
         }
 
         # Add all custom columns to model
@@ -220,11 +238,14 @@ class Layer(models.Model):
             schema_editor.create_model(feature_collection)
 
     def feature_table_url(self):
-        return reverse('scenario_result_map', kwargs={'pk': self.scenario.id, 'algo_pk': self.algorithm.id})
+        return reverse(
+            "scenario_result_map",
+            kwargs={"pk": self.scenario.id, "algo_pk": self.algorithm.id},
+        )
 
     def delete(self, **kwargs):
         self.delete_feature_table()
-        del apps.all_models['layer_manager'][self.table_name]
+        del apps.all_models["layer_manager"][self.table_name]
         super().delete()
 
     def delete_feature_table(self):
@@ -251,21 +272,22 @@ class Layer(models.Model):
         """
 
         # If the model is already registered, return original model
-        if self.table_name in apps.all_models['layer_manager']:
-            return apps.all_models['layer_manager'][self.table_name]
+        if self.table_name in apps.all_models["layer_manager"]:
+            return apps.all_models["layer_manager"][self.table_name]
         else:
             return self.update_or_create_feature_collection()
 
     def is_defined_by(self, **kwargs):
-
-        fields = {field.field_name: field.data_type for field in self.layer_fields.all()}
+        fields = {
+            field.field_name: field.data_type for field in self.layer_fields.all()
+        }
 
         comparisons = [
-            self.table_name == kwargs['table_name'],
-            self.geom_type == kwargs['geom_type'],
-            self.scenario == kwargs['scenario'],
-            self.algorithm == kwargs['algorithm'],
-            fields == kwargs['fields']
+            self.table_name == kwargs["table_name"],
+            self.geom_type == kwargs["geom_type"],
+            self.scenario == kwargs["scenario"],
+            self.algorithm == kwargs["algorithm"],
+            fields == kwargs["fields"],
         ]
         return all(comparisons)
 
@@ -277,12 +299,12 @@ class LayerAggregatedValue(models.Model):
 
     name = models.CharField(max_length=63)
     value = models.FloatField()
-    unit = models.CharField(max_length=15, blank=True, null=True, default='')
+    unit = models.CharField(max_length=15, blank=True, null=True, default="")
     layer = models.ForeignKey(Layer, on_delete=models.CASCADE)
 
 
 DISTRIBUTION_TYPES = (
-    ('seasonal', 'seasonal'),  # Assumes array with length 12 for each month of the year
+    ("seasonal", "seasonal"),  # Assumes array with length 12 for each month of the year
 )
 
 
@@ -294,34 +316,39 @@ class LayerAggregatedDistribution(models.Model):
 
     name = models.CharField(max_length=255, null=True)
     type = models.CharField(max_length=255, choices=DISTRIBUTION_TYPES, null=True)
-    distribution = models.ForeignKey(TemporalDistribution, on_delete=models.CASCADE, null=True)
+    distribution = models.ForeignKey(
+        TemporalDistribution, on_delete=models.CASCADE, null=True
+    )
     layer = models.ForeignKey(Layer, on_delete=models.CASCADE, null=True)
 
     @property
     def shares(self):
-        return DistributionShare.objects.filter(distribution_set__aggregated_distribution=self)
+        return DistributionShare.objects.filter(
+            distribution_set__aggregated_distribution=self
+        )
 
     @property
     def components(self):
         return MaterialComponent.objects.filter(
-            id__in=[share['component'] for share in self.shares.values('component').distinct()]
+            id__in=[
+                share["component"]
+                for share in self.shares.values("component").distinct()
+            ]
         )
 
     @property
     def serialized(self):
         dist = []
         for component in self.components:
-            component_dist = {
-                'label': component.name,
-                'data': {},
-                'unit': 'Mg/a'
-            }
+            component_dist = {"label": component.name, "data": {}, "unit": "Mg/a"}
             # data = {}
             for timestep in self.distribution.timestep_set.all():
                 try:  # TODO: find better way to deal with the fact that there is not a value for every component/timestep combination
-                    share = self.shares.get(component=component, distribution_set__timestep=timestep)
-                    component_dist['data'][timestep.name] = share.average
-                except:
+                    share = self.shares.get(
+                        component=component, distribution_set__timestep=timestep
+                    )
+                    component_dist["data"][timestep.name] = share.average
+                except Exception:  # noqa: S110
                     pass
             # component_dist['data'].append(data)
             dist.append(component_dist)
@@ -330,11 +357,15 @@ class LayerAggregatedDistribution(models.Model):
 
 class DistributionSet(models.Model):
     timestep = models.ForeignKey(Timestep, on_delete=models.CASCADE, null=True)
-    aggregated_distribution = models.ForeignKey(LayerAggregatedDistribution, on_delete=models.CASCADE, null=True)
+    aggregated_distribution = models.ForeignKey(
+        LayerAggregatedDistribution, on_delete=models.CASCADE, null=True
+    )
 
 
 class DistributionShare(models.Model):
     distribution_set = models.ForeignKey(DistributionSet, on_delete=models.CASCADE)
-    component = models.ForeignKey(MaterialComponent, on_delete=models.CASCADE, null=True)
+    component = models.ForeignKey(
+        MaterialComponent, on_delete=models.CASCADE, null=True
+    )
     average = models.FloatField()
     standard_deviation = models.DecimalField(decimal_places=2, max_digits=5)

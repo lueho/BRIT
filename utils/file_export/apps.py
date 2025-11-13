@@ -2,8 +2,8 @@ from django.apps import AppConfig
 
 
 class FileExportConfig(AppConfig):
-    default_auto_field = 'django.db.models.BigAutoField'
-    name = 'utils.file_export'
+    default_auto_field = "django.db.models.BigAutoField"
+    name = "utils.file_export"
 
     def ready(self):
         # Ensure export registry is initialized in every process (web, celery, management commands)

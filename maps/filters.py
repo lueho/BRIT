@@ -1,5 +1,3 @@
-import json
-
 from django.forms import HiddenInput
 from django_filters import CharFilter, ModelChoiceFilter, NumberFilter
 from django_tomselect.app_settings import TomSelectConfig

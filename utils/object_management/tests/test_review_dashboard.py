@@ -348,9 +348,7 @@ class ReviewDashboardFilterTests(TestCase):
         cls.moderator = User.objects.create_user(
             username="moderator", password="test123", is_staff=True
         )
-        cls.owner = User.objects.create_user(
-            username="owner", password="test123"
-        )
+        cls.owner = User.objects.create_user(username="owner", password="test123")
 
         # Create multiple collections with different attributes
         # Owned by different user so moderator can see them
@@ -394,7 +392,7 @@ class ReviewDashboardFilterTests(TestCase):
 
         # The filter should be in the context
         self.assertIn("filter", response.context)
-        
+
         # The search value should be preserved in the filter form
         # Check if the form has the search value
         filter_obj = response.context["filter"]

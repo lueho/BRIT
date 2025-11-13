@@ -2,13 +2,13 @@
 
 import django.db.models.deletion
 import django.utils.timezone
-import utils.object_management.models
 from django.conf import settings
 from django.db import migrations, models
 
+import utils.object_management.models
+
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [

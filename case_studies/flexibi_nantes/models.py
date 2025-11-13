@@ -40,7 +40,6 @@ class NantesGreenhouses(models.Model):
 
 
 class GreenhouseManager(UserCreatedObjectManager):
-
     def types(self):
         types = []
         for greenhouse in self.all():
@@ -64,7 +63,7 @@ class Greenhouse(NamedUserCreatedObject):
     objects = GreenhouseManager()
 
     def components(self):
-        return list(set([share.component for share in self.shares]))
+        return list({share.component for share in self.shares})
 
     @property
     def shares(self):
@@ -92,7 +91,7 @@ class Greenhouse(NamedUserCreatedObject):
         return {
             gc: {
                 "culture": gc.culture,
-                "timesteps": [t for t in gc.timesteps],
+                "timesteps": list(gc.timesteps),
                 "table": gc.table_data,
             }
             for gc in self.greenhousegrowthcycle_set.all().order_by("cycle_number")
@@ -137,10 +136,10 @@ class Greenhouse(NamedUserCreatedObject):
 
     def __str__(self):
         h = "heated" if self.heated else "not heated"
-        l = "lighting" if self.lighted else "no lighting"
+        lighting = "lighting" if self.lighted else "no lighting"
         g = "above ground" if self.above_ground else "on ground"
         s = "high wire" if self.high_wire else "classic"
-        return f"Greenhouse: {h}, {l}, {g}, {s}"
+        return f"Greenhouse: {h}, {lighting}, {g}, {s}"
 
 
 class Culture(NamedUserCreatedObject):
@@ -166,7 +165,7 @@ class GreenhouseGrowthCycle(UserCreatedObject):
 
         # For now, the reference temporal distribution is hard coded
         reference_distribution = CaseStudyBaseObjects.objects.get.reference_distribution
-        value_dict = {timestep: 0 for timestep in reference_distribution.timesteps}
+        value_dict = dict.fromkeys(reference_distribution.timesteps, 0)
         for share in self.shares:
             value_dict[share.timestep] += share.average
         return list(value_dict.values())

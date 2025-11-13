@@ -1,12 +1,16 @@
 from rest_framework.serializers import ModelSerializer
 
-from utils.properties.models import (Property, PropertyValue, Unit, )
+from utils.properties.models import (
+    Property,
+    PropertyValue,
+    Unit,
+)
 
 
 class UnitModelSerializer(ModelSerializer):
     class Meta:
         model = Unit
-        fields = ('id', 'name', 'dimensionless', 'reference_quantity', 'description')
+        fields = ("id", "name", "dimensionless", "reference_quantity", "description")
 
 
 class PropertyModelSerializer(ModelSerializer):
@@ -14,10 +18,17 @@ class PropertyModelSerializer(ModelSerializer):
 
     class Meta:
         model = Property
-        fields = ('id', 'name', 'allowed_units', 'description')
+        fields = ("id", "name", "allowed_units", "description")
 
 
 class PropertyValueModelSerializer(ModelSerializer):
     class Meta:
         model = PropertyValue
-        fields = ('id', 'property', 'unit', 'average', 'standard_deviation', 'description')
+        fields = (
+            "id",
+            "property",
+            "unit",
+            "average",
+            "standard_deviation",
+            "description",
+        )

@@ -2,7 +2,6 @@ from django.urls import path
 
 from .views import (
     InventoryAlgorithmAutocompleteView,
-    ScenarioGeoDataSetAutocompleteView,
     PrivateScenarioFilterView,
     PublishedScenarioFilterView,
     ResultMapAPI,
@@ -12,6 +11,7 @@ from .views import (
     ScenarioCreateView,
     ScenarioDetailView,
     ScenarioEvaluationProgressView,
+    ScenarioGeoDataSetAutocompleteView,
     ScenarioModalDeleteView,
     ScenarioRemoveInventoryAlgorithmView,
     ScenarioResultDetailMapView,

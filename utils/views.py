@@ -1,7 +1,6 @@
 from urllib.parse import urlencode
 
 from crispy_forms.helper import FormHelper
-from django.contrib.auth.mixins import PermissionRequiredMixin, UserPassesTestMixin
 from django.http import HttpResponseRedirect, JsonResponse
 from django.shortcuts import render
 from django.template.loader import render_to_string
@@ -43,7 +42,6 @@ class NoFormTagMixin:
             helper.form_tag = False
             form.helper = helper
         return form
-
 
 
 class ModalMessageView(TemplateView):
@@ -154,9 +152,6 @@ class ModelSelectOptionsView(ListView):
                 )
             }
         )
-
-
-
 
 
 class UtilsDashboardView(TemplateView):

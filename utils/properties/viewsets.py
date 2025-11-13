@@ -1,6 +1,7 @@
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
 from utils.properties.serializers import PropertyModelSerializer, UnitModelSerializer
+
 from .models import Property, Unit
 
 

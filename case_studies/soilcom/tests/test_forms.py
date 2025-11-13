@@ -1,7 +1,6 @@
 from datetime import date
 
 from django.db.models import signals
-from django.db.models.signals import post_save
 from django.forms import formset_factory
 from django.http import QueryDict
 from django.test import TestCase
@@ -51,7 +50,6 @@ def dict_to_querydict(data):
 
 
 class CollectionSeasonModelFormTestCase(TestCase):
-
     def test_passing_values_other_than_from_distribution_months_of_the_year_raises_validation_errors(
         self,
     ):
@@ -77,7 +75,6 @@ class CollectionSeasonModelFormTestCase(TestCase):
 
 
 class CollectionSeasonFormSetTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         cls.distribution = TemporalDistribution.objects.get(name="Months of the year")
@@ -241,7 +238,6 @@ class CollectionSeasonFormSetTestCase(TestCase):
 
 
 class CollectionModelFormTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         cls.catchment = CollectionCatchment.objects.create(
@@ -321,7 +317,9 @@ class CollectionModelFormTestCase(TestCase):
 
     def test_form_errors(self):
         data = {"connection_rate_year": 123}
-        form = CollectionModelForm(instance=self.collection, data=dict_to_querydict(data))
+        form = CollectionModelForm(
+            instance=self.collection, data=dict_to_querydict(data)
+        )
         self.assertFalse(form.is_valid())
         self.assertEqual(form.errors["catchment"][0], "This field is required.")
         self.assertEqual(form.errors["collection_system"][0], "This field is required.")
@@ -330,24 +328,26 @@ class CollectionModelFormTestCase(TestCase):
 
     def test_waste_stream_get_or_create_on_save(self):
         form = CollectionModelForm(
-            data=dict_to_querydict({
-                "catchment": self.catchment.id,
-                "collector": self.collector.id,
-                "collection_system": self.collection_system.id,
-                "waste_category": self.waste_category.id,
-                "allowed_materials": [
-                    self.allowed_material_1.id,
-                    self.allowed_material_2.id,
-                ],
-                "forbidden_materials": [
-                    self.forbidden_material_1.id,
-                    self.forbidden_material_2.id,
-                ],
-                "frequency": self.frequency.id,
-                "valid_from": date(2023, 1, 1),
-                "description": "This is a test case",
-                "connection_type": "VOLUNTARY",
-            })
+            data=dict_to_querydict(
+                {
+                    "catchment": self.catchment.id,
+                    "collector": self.collector.id,
+                    "collection_system": self.collection_system.id,
+                    "waste_category": self.waste_category.id,
+                    "allowed_materials": [
+                        self.allowed_material_1.id,
+                        self.allowed_material_2.id,
+                    ],
+                    "forbidden_materials": [
+                        self.forbidden_material_1.id,
+                        self.forbidden_material_2.id,
+                    ],
+                    "frequency": self.frequency.id,
+                    "valid_from": date(2023, 1, 1),
+                    "description": "This is a test case",
+                    "connection_type": "VOLUNTARY",
+                }
+            )
         )
         self.assertTrue(form.is_valid())
         form.instance.owner = self.collection.owner
@@ -361,25 +361,27 @@ class CollectionModelFormTestCase(TestCase):
         self.assertEqual(instance.waste_stream.category.id, self.waste_category.id)
 
         equal_form = CollectionModelForm(
-            data=dict_to_querydict({
-                "catchment": self.catchment.id,
-                "collector": self.collector.id,
-                "collection_system": self.collection_system.id,
-                "waste_category": self.waste_category.id,
-                "allowed_materials": [
-                    self.allowed_material_1.id,
-                    self.allowed_material_2.id,
-                ],
-                "forbidden_materials": [
-                    self.forbidden_material_1.id,
-                    self.forbidden_material_2.id,
-                ],
-                "frequency": self.frequency.id,
-                "valid_from": date(2023, 1, 1),
-                "flyer_url": "https://www.great-test-flyers.com",
-                "description": "This is a test case",
-                "connection_type": "VOLUNTARY",
-            })
+            data=dict_to_querydict(
+                {
+                    "catchment": self.catchment.id,
+                    "collector": self.collector.id,
+                    "collection_system": self.collection_system.id,
+                    "waste_category": self.waste_category.id,
+                    "allowed_materials": [
+                        self.allowed_material_1.id,
+                        self.allowed_material_2.id,
+                    ],
+                    "forbidden_materials": [
+                        self.forbidden_material_1.id,
+                        self.forbidden_material_2.id,
+                    ],
+                    "frequency": self.frequency.id,
+                    "valid_from": date(2023, 1, 1),
+                    "flyer_url": "https://www.great-test-flyers.com",
+                    "description": "This is a test case",
+                    "connection_type": "VOLUNTARY",
+                }
+            )
         )
         self.assertTrue(equal_form.is_valid())
         equal_form.instance.owner = self.collection.owner
@@ -394,25 +396,27 @@ class CollectionModelFormTestCase(TestCase):
     ):
         form = CollectionModelForm(
             instance=self.collection,
-            data=dict_to_querydict({
-                "catchment": self.catchment.id,
-                "collector": self.collector.id,
-                "collection_system": self.collection_system.id,
-                "waste_category": self.waste_category.id,
-                "allowed_materials": [
-                    self.allowed_material_1.id,
-                    self.allowed_material_2.id,
-                ],
-                "forbidden_materials": [
-                    self.forbidden_material_1.id,
-                    self.forbidden_material_2.id,
-                ],
-                "frequency": self.frequency.id,
-                "valid_from": date(2023, 1, 1),
-                "valid_until": date(2023, 12, 31),
-                "description": "This is a test case",
-                "connection_type": "VOLUNTARY",
-            }),
+            data=dict_to_querydict(
+                {
+                    "catchment": self.catchment.id,
+                    "collector": self.collector.id,
+                    "collection_system": self.collection_system.id,
+                    "waste_category": self.waste_category.id,
+                    "allowed_materials": [
+                        self.allowed_material_1.id,
+                        self.allowed_material_2.id,
+                    ],
+                    "forbidden_materials": [
+                        self.forbidden_material_1.id,
+                        self.forbidden_material_2.id,
+                    ],
+                    "frequency": self.frequency.id,
+                    "valid_from": date(2023, 1, 1),
+                    "valid_until": date(2023, 12, 31),
+                    "description": "This is a test case",
+                    "connection_type": "VOLUNTARY",
+                }
+            ),
         )
         self.assertTrue(form.is_valid())
         form.save()
@@ -491,7 +495,6 @@ class CollectionModelFormTestCase(TestCase):
 
     def test_connection_type_field_accepts_all_choices(self):
         from case_studies.soilcom.forms import CONNECTION_TYPE_CHOICES
-        from case_studies.soilcom.models import Collection
 
         valid_choices = [c[0] for c in CONNECTION_TYPE_CHOICES] + [None, ""]
         for value in valid_choices:
@@ -559,7 +562,6 @@ class CollectionModelFormTestCase(TestCase):
 
 
 class WasteFlyerUrlFormSetTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         with mute_signals(signals.post_save):
@@ -764,7 +766,6 @@ class CollectionAddWasteSampleFormTestCase(TestCase):
 
 
 class CollectionRemoveWasteSampleFormTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         CollectionCatchment.objects.create(name="Catchment")
@@ -829,7 +830,6 @@ class CollectionRemoveWasteSampleFormTestCase(TestCase):
 
 
 class CollectionAddPredecessorFormTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         catchment1 = CollectionCatchment.objects.create(
@@ -913,7 +913,6 @@ class CollectionAddPredecessorFormTestCase(TestCase):
 
 
 class CollectionRemovePredecessorFormTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         CollectionCatchment.objects.create(name="Catchment")

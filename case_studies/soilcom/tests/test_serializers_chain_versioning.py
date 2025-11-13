@@ -27,7 +27,9 @@ class CollectionFlatSerializerChainAwareStatsTestCase(TestCase):
         nuts = NutsRegion.objects.create(name="Hamburg", country="DE", nuts_id="DE600")
         cls.collection_root = Collection.objects.create(
             name="C0",
-            catchment=CollectionCatchment.objects.create(name="Catch", region=nuts.region_ptr),
+            catchment=CollectionCatchment.objects.create(
+                name="Catch", region=nuts.region_ptr
+            ),
             collector=Collector.objects.create(name="Col"),
             collection_system=CollectionSystem.objects.create(name="Sys"),
             waste_stream=waste_stream,
@@ -62,8 +64,8 @@ class CollectionFlatSerializerChainAwareStatsTestCase(TestCase):
 
         # Create a CPV on successor for 'specific waste collected'
         from case_studies.soilcom.models import (
-            CollectionPropertyValue,
             AggregatedCollectionPropertyValue,
+            CollectionPropertyValue,
         )
 
         CollectionPropertyValue.objects.create(

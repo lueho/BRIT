@@ -77,7 +77,6 @@ from .forms import (
     CollectionFrequencyModelForm,
     CollectionModelForm,
     CollectionPropertyValueModelForm,
-    WasteFlyerFormSetHelper,
     CollectionRemovePredecessorForm,
     CollectionRemoveWasteSampleForm,
     CollectionSeasonForm,
@@ -92,6 +91,7 @@ from .forms import (
     WasteCategoryModelForm,
     WasteComponentModalModelForm,
     WasteComponentModelForm,
+    WasteFlyerFormSetHelper,
     WasteFlyerModalModelForm,
     WasteFlyerModelForm,
 )
@@ -736,7 +736,7 @@ class CollectionCreateView(M2MInlineFormSetMixin, UserCreatedObjectCreateView):
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs['request'] = self.request
+        kwargs["request"] = self.request
         return kwargs
 
     def get_formset_kwargs(self, **kwargs):
@@ -1125,7 +1125,7 @@ class CollectionUpdateView(M2MInlineFormSetMixin, UserCreatedObjectUpdateView):
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs['request'] = self.request
+        kwargs["request"] = self.request
         return kwargs
 
     def get_formset_kwargs(self, **kwargs):
@@ -1526,11 +1526,15 @@ class WasteCollectionPublishedMapIframeView(
         data["scope"] = "published"
         kwargs["data"] = data
         return kwargs
+
+
 # Collection-specific review action views with cascade support
 # These views extend the base review action views to add property value cascading
 
 
-class CollectionSubmitForReviewView(CollectionReviewActionCascadeMixin, SubmitForReviewView):
+class CollectionSubmitForReviewView(
+    CollectionReviewActionCascadeMixin, SubmitForReviewView
+):
     """Submit a Collection for review and cascade to related property values."""
 
     pass

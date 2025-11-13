@@ -21,11 +21,8 @@ from ..models import (
     CollectionFrequency,
     CollectionPropertyValue,
     CollectionSeason,
-    CollectionSystem,
     Collector,
-    WasteCategory,
     WasteFlyer,
-    WasteStream,
 )
 
 
@@ -81,7 +78,6 @@ class WasteFlyerFilterTestCase(TestCase):
 
 
 class CollectionsPerYearFilterTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         distribution = TemporalDistribution.objects.get(name="Months of the year")
@@ -152,7 +148,6 @@ class CollectionsPerYearFilterTestCase(TestCase):
 
 
 class ConnectionRateFilterTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         cls.collection1 = Collection.objects.create(name="Collection 1")
@@ -196,7 +191,6 @@ class ConnectionRateFilterTestCase(TestCase):
 
 
 class SpecWasteCollectedFilterTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         cls.collection1 = Collection.objects.create(name="Collection 1")
@@ -240,7 +234,6 @@ class SpecWasteCollectedFilterTestCase(TestCase):
 
 
 class CollectionFilterTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         distribution = TemporalDistribution.objects.get(name="Months of the year")
@@ -429,12 +422,12 @@ class CollectionFilterTestCase(TestCase):
     def test_connection_type_filter_variants(self):
         from case_studies.soilcom.models import Collection
 
-        base_kwargs = dict(
-            catchment=self.collection1.catchment,
-            collector=self.collection1.collector,
-            collection_system=self.collection1.collection_system,
-            waste_stream=self.collection1.waste_stream,
-        )
+        base_kwargs = {
+            "catchment": self.collection1.catchment,
+            "collector": self.collection1.collector,
+            "collection_system": self.collection1.collection_system,
+            "waste_stream": self.collection1.waste_stream,
+        }
         values = [
             ("MANDATORY", "MANDATORY"),
             ("VOLUNTARY", "VOLUNTARY"),
@@ -661,7 +654,6 @@ class CollectionFilterTestCase(TestCase):
 
 
 class CollectorFilterTestCase(TestCase):
-
     def test_filter_form_has_no_formtags(self):
         filtr = CollectorFilter(queryset=Collector.objects.all())
         self.assertFalse(filtr.form.helper.form_tag)

@@ -1,5 +1,6 @@
 """Test CollectionPropertyValue in review dashboard."""
-from django.contrib.auth.models import Permission, User
+
+from django.contrib.auth.models import User
 from django.contrib.contenttypes.models import ContentType
 from django.db.models.signals import post_save, pre_save
 from django.test import TestCase
@@ -21,9 +22,7 @@ class CollectionPropertyValueReviewDashboardTest(TestCase):
         cls.staff_user = User.objects.create_user(
             username="staff", password="test123", is_staff=True
         )
-        cls.owner_user = User.objects.create_user(
-            username="owner", password="test123"
-        )
+        cls.owner_user = User.objects.create_user(username="owner", password="test123")
 
         # Create a unit and property for the CPV
         cls.unit = Unit.objects.create(
@@ -69,7 +68,9 @@ class CollectionPropertyValueReviewDashboardTest(TestCase):
         self.assertIn("CollectionPropertyValue", item_types)
 
         # Verify the CPV is the one we created
-        cpvs = [item for item in review_items if isinstance(item, CollectionPropertyValue)]
+        cpvs = [
+            item for item in review_items if isinstance(item, CollectionPropertyValue)
+        ]
         self.assertEqual(len(cpvs), 1)
         self.assertEqual(cpvs[0].id, self.cpv.id)
 

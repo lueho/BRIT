@@ -305,22 +305,23 @@ class SourceAutocompleteView(UserCreatedObjectAutocompleteView):
         # Annotate with has_authors to prioritize sources with authors
         # Then order by type (waste_flyer comes last alphabetically)
         # Then by title
-        from django.db.models import Count, Case, When, IntegerField, OuterRef, Exists
+        from django.db.models import Case, Exists, IntegerField, OuterRef, When
+
         from bibliography.models import SourceAuthor
-        
+
         # Check if source has any authors using Exists instead of Count to avoid GROUP BY issues
-        has_authors_subquery = SourceAuthor.objects.filter(source=OuterRef('pk'))
-        
+        has_authors_subquery = SourceAuthor.objects.filter(source=OuterRef("pk"))
+
         qs = qs.annotate(
             has_authors=Exists(has_authors_subquery),
             # Prioritize non-waste_flyer types
             type_priority=Case(
-                When(type='waste_flyer', then=1),
+                When(type="waste_flyer", then=1),
                 default=0,
                 output_field=IntegerField(),
-            )
-        ).order_by('type_priority', '-has_authors', 'title')
-        
+            ),
+        ).order_by("type_priority", "-has_authors", "title")
+
         return qs
 
     def hook_prepare_results(self, results):
@@ -350,6 +351,8 @@ class SourceAutocompleteView(UserCreatedObjectAutocompleteView):
             # Set all possible label fields that forms might use
             result["text"] = formatted_name
             result["selected_text"] = formatted_name
-            result["abbreviation"] = formatted_name  # For forms using label_field="abbreviation"
+            result["abbreviation"] = (
+                formatted_name  # For forms using label_field="abbreviation"
+            )
             result["label"] = formatted_name  # For forms using label_field="label"
         return results

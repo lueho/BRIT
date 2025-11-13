@@ -7,9 +7,10 @@ filtering for these heterogeneous collections.
 The ReviewDashboardFilterSet in filters.py generates the filter form UI,
 but actual filtering is delegated to this module.
 """
+
 import logging
 from datetime import datetime
-from typing import Any, List
+from typing import Any
 
 from django.contrib.contenttypes.models import ContentType
 from django.utils import timezone
@@ -19,18 +20,18 @@ logger = logging.getLogger(__name__)
 
 class ReviewItemFilter:
     """Pure Python filtering for heterogeneous review item lists.
-    
+
     Applies search, model type, owner, date, and ordering filters
     to a list of mixed model instances.
-    
+
     Usage:
         filter_obj = ReviewItemFilter(items, request.GET)
         filtered_items = filter_obj.filter()
     """
 
-    def __init__(self, items: List[Any], params: dict):
+    def __init__(self, items: list[Any], params: dict):
         """Initialize filter with items and filter parameters.
-        
+
         Args:
             items: List of model instances to filter
             params: Dictionary of filter parameters (typically request.GET)
@@ -38,7 +39,7 @@ class ReviewItemFilter:
         self.items = items
         self.params = params
 
-    def filter(self) -> List[Any]:
+    def filter(self) -> list[Any]:
         """Apply all filters and return filtered, sorted list."""
         items = self.items
 
@@ -73,7 +74,7 @@ class ReviewItemFilter:
 
         return items
 
-    def _apply_search(self, items: List[Any], search: str) -> List[Any]:
+    def _apply_search(self, items: list[Any], search: str) -> list[Any]:
         """Filter items by case-insensitive name search."""
         search_lower = search.lower()
         return [
@@ -83,8 +84,8 @@ class ReviewItemFilter:
         ]
 
     def _apply_model_type_filter(
-        self, items: List[Any], model_type_ids: List[str]
-    ) -> List[Any]:
+        self, items: list[Any], model_type_ids: list[str]
+    ) -> list[Any]:
         """Filter items by ContentType IDs."""
         try:
             # Convert to integers, skipping non-numeric values
@@ -101,7 +102,7 @@ class ReviewItemFilter:
             logger.warning(f"Invalid model_type filter values: {e}")
             return items
 
-    def _apply_owner_filter(self, items: List[Any], owner_id: str) -> List[Any]:
+    def _apply_owner_filter(self, items: list[Any], owner_id: str) -> list[Any]:
         """Filter items by owner ID."""
         if not owner_id.isdigit():
             logger.warning(f"Invalid owner_id filter value: {owner_id}")
@@ -109,18 +110,16 @@ class ReviewItemFilter:
 
         owner_id_int = int(owner_id)
         return [
-            item
-            for item in items
-            if getattr(item, "owner_id", None) == owner_id_int
+            item for item in items if getattr(item, "owner_id", None) == owner_id_int
         ]
 
     def _apply_date_filter(
-        self, items: List[Any], date_str: str, is_after: bool
-    ) -> List[Any]:
+        self, items: list[Any], date_str: str, is_after: bool
+    ) -> list[Any]:
         """Filter items by submission date (before or after)."""
         try:
             filter_date = datetime.strptime(date_str, "%Y-%m-%d").date()
-            
+
             if is_after:
                 return [
                     item
@@ -139,7 +138,7 @@ class ReviewItemFilter:
             logger.warning(f"Invalid date filter value '{date_str}': {e}")
             return items
 
-    def _apply_ordering(self, items: List[Any], ordering: str) -> List[Any]:
+    def _apply_ordering(self, items: list[Any], ordering: str) -> list[Any]:
         """Sort items by the specified field and direction."""
         reverse = ordering.startswith("-")
         field = ordering.lstrip("-")
@@ -161,7 +160,7 @@ class ReviewItemFilter:
 
         return items
 
-    def _apply_default_sort(self, items: List[Any]) -> List[Any]:
+    def _apply_default_sort(self, items: list[Any]) -> list[Any]:
         """Apply default sorting (newest first by submitted_at)."""
         items_copy = list(items)  # Don't modify original
         items_copy.sort(
