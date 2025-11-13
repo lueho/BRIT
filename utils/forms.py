@@ -340,23 +340,38 @@ class SourcesFieldMixin:
         from utils.object_management.permissions import filter_queryset_for_user
         from utils.widgets import SourceListWidget
 
-        # Capture data and request BEFORE calling super().__init__
-        # (parent consumes kwargs, so we need to extract values first)
-        # Note: PopRequestMixin may have already popped 'request' in modal forms,
-        # so check self.request first (set by PopRequestMixin)
-        request = kwargs.pop('request', None)
-        data = kwargs.get("data")  # Get data before parent consumes it
+        # Capture data BEFORE calling super().__init__ (parent consumes it)
+        data = kwargs.get("data")
+
+        # DON'T pop 'request' here! PopRequestMixin (later in MRO) needs it.
+        # For regular forms without PopRequestMixin, we need to pop it to avoid
+        # "unexpected keyword argument" error.
+        # Solution: Check if PopRequestMixin is in the MRO
+        has_pop_request = any(
+            cls.__name__ == 'PopRequestMixin' 
+            for cls in self.__class__.__mro__
+        )
+        
+        if not has_pop_request:
+            # Regular form - pop request ourselves before super().__init__()
+            request = kwargs.pop('request', None)
+        else:
+            # Modal form - don't pop, let PopRequestMixin handle it
+            request = None
 
         super().__init__(*args, **kwargs)
 
-        # If PopRequestMixin already set self.request, use that
-        if not request and hasattr(self, 'request'):
-            request = self.request
+        # If PopRequestMixin was in MRO, it set self.request
+        if has_pop_request:
+            request = getattr(self, 'request', None)
 
         # Ensure sources field exists and has proper widget
         if "sources" not in self.fields:
             return  # Field not included in this form, skip mixin logic
 
+        # Configure the sources field
+        self.fields["sources"].required = False  # Sources are optional
+        
         # Set widget if not already customized
         if not isinstance(self.fields["sources"].widget, SourceListWidget):
             self.fields["sources"].widget = SourceListWidget(
