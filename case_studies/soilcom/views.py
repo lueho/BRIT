@@ -572,6 +572,11 @@ class CollectionPropertyValueCreateView(UserCreatedObjectCreateView):
     form_class = CollectionPropertyValueModelForm
     permission_required = "soilcom.add_collectionpropertyvalue"
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["request"] = self.request
+        return kwargs
+
 
 class CollectionPropertyValueDetailView(UserCreatedObjectDetailView):
     model = CollectionPropertyValue
@@ -580,6 +585,11 @@ class CollectionPropertyValueDetailView(UserCreatedObjectDetailView):
 class CollectionPropertyValueUpdateView(UserCreatedObjectUpdateView):
     model = CollectionPropertyValue
     form_class = CollectionPropertyValueModelForm
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["request"] = self.request
+        return kwargs
 
     def form_valid(self, form):
         instance = form.instance
@@ -630,6 +640,11 @@ class AggregatedCollectionPropertyValueCreateView(UserCreatedObjectCreateView):
     form_class = AggregatedCollectionPropertyValueModelForm
     permission_required = "soilcom.add_aggregatedcollectionpropertyvalue"
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["request"] = self.request
+        return kwargs
+
 
 class AggregatedCollectionPropertyValueDetailView(UserCreatedObjectDetailView):
     model = AggregatedCollectionPropertyValue
@@ -639,6 +654,11 @@ class AggregatedCollectionPropertyValueUpdateView(UserCreatedObjectUpdateView):
     template_name = "soilcom/collectionpropertyvalue_form.html"
     model = AggregatedCollectionPropertyValue
     form_class = AggregatedCollectionPropertyValueModelForm
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["request"] = self.request
+        return kwargs
 
 
 class AggregatedCollectionPropertyValueModalDeleteView(

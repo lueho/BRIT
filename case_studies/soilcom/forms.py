@@ -177,7 +177,7 @@ class CollectionSeasonForm(SimpleForm):
         )
 
     def __init__(self, *args, **kwargs):
-        super(CollectionSeasonForm, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.fields["distribution"].queryset = TemporalDistribution.objects.filter(
             name="Months of the year"
         )
@@ -211,7 +211,7 @@ class CollectionSeasonForm(SimpleForm):
 
 class CollectionSeasonFormSet(M2MInlineFormSet):
     def clean(self):
-        for i, form in enumerate(self.forms):
+        for i, _form in enumerate(self.forms):
             if (
                 i > 0
                 and self.forms[i - 1].cleaned_data.get("last_timestep").order
@@ -297,7 +297,26 @@ class BaseWasteFlyerUrlFormSet(M2MInlineFormSet):
         return child_objects
 
 
-class CollectionPropertyValueModelForm(SimpleModelForm):
+class CollectionPropertyValueModelFormHelper(FormHelper):
+    form_tag = False
+    layout = Layout(
+        Field("collection"),
+        Field("property"),
+        Field("unit"),
+        Field("year"),
+        Field("average"),
+        Field("standard_deviation"),
+        # References section (widget renders its own card header with label)
+        Div(
+            Field("sources", template="bootstrap5/field_no_label.html"),
+            css_class="mt-4",
+        ),
+    )
+
+
+class CollectionPropertyValueModelForm(
+    UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModelForm
+):
     collection = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="collection-autocomplete",
@@ -305,14 +324,7 @@ class CollectionPropertyValueModelForm(SimpleModelForm):
         ),
         label="Collection",
     )
-    sources = TomSelectModelMultipleChoiceField(
-        config=TomSelectConfig(
-            url="source-autocomplete",
-            label_field="abbreviation",
-        ),
-        label="Sources",
-        required=False,
-    )
+    # sources field and widget provided by SourcesFieldMixin
 
     class Meta:
         model = CollectionPropertyValue
@@ -325,9 +337,29 @@ class CollectionPropertyValueModelForm(SimpleModelForm):
             "standard_deviation",
             "sources",
         )
+        form_helper_class = CollectionPropertyValueModelFormHelper
 
 
-class AggregatedCollectionPropertyValueModelForm(SimpleModelForm):
+class AggregatedCollectionPropertyValueModelFormHelper(FormHelper):
+    form_tag = False
+    layout = Layout(
+        Field("collections"),
+        Field("property"),
+        Field("unit"),
+        Field("year"),
+        Field("average"),
+        Field("standard_deviation"),
+        # References section (widget renders its own card header with label)
+        Div(
+            Field("sources", template="bootstrap5/field_no_label.html"),
+            css_class="mt-4",
+        ),
+    )
+
+
+class AggregatedCollectionPropertyValueModelForm(
+    UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModelForm
+):
     collections = TomSelectModelMultipleChoiceField(
         config=TomSelectConfig(
             url="collection-autocomplete",
@@ -335,14 +367,7 @@ class AggregatedCollectionPropertyValueModelForm(SimpleModelForm):
         ),
         label="Collections",
     )
-    sources = TomSelectModelMultipleChoiceField(
-        config=TomSelectConfig(
-            url="source-autocomplete",
-            label_field="abbreviation",
-        ),
-        label="Sources",
-        required=False,
-    )
+    # sources field and widget provided by SourcesFieldMixin
 
     class Meta:
         model = AggregatedCollectionPropertyValue
@@ -355,6 +380,7 @@ class AggregatedCollectionPropertyValueModelForm(SimpleModelForm):
             "standard_deviation",
             "sources",
         )
+        form_helper_class = AggregatedCollectionPropertyValueModelFormHelper
 
 
 class CollectionModelFormHelper(FormHelper):
@@ -388,7 +414,9 @@ class CollectionModelFormHelper(FormHelper):
     )
 
 
-class CollectionModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, CreateInlineMixin, SimpleModelForm):
+class CollectionModelForm(
+    UserCreatedObjectFormMixin, SourcesFieldMixin, CreateInlineMixin, SimpleModelForm
+):
     """
     Model form for Collection, including all collection parameters and waste stream fields.
     """
