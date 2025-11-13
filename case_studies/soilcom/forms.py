@@ -22,7 +22,6 @@ from django_tomselect.forms import (
     TomSelectModelMultipleChoiceField,
 )
 
-from bibliography.models import Source
 from distributions.models import TemporalDistribution, Timestep
 from materials.models import Material, Sample
 from utils.crispy_fields import ForeignkeyField
@@ -33,10 +32,9 @@ from utils.forms import (
     ModalModelFormMixin,
     SimpleForm,
     SimpleModelForm,
+    SourcesFieldMixin,
 )
 from utils.object_management.models import get_default_owner
-from utils.object_management.permissions import filter_queryset_for_user
-from utils.widgets import SourceListWidget
 
 from .models import (
     CONNECTION_TYPE_CHOICES,
@@ -389,7 +387,7 @@ class CollectionModelFormHelper(FormHelper):
     )
 
 
-class CollectionModelForm(CreateInlineMixin, SimpleModelForm):
+class CollectionModelForm(SourcesFieldMixin, CreateInlineMixin, SimpleModelForm):
     """
     Model form for Collection, including all collection parameters and waste stream fields.
     """
@@ -410,14 +408,8 @@ class CollectionModelForm(CreateInlineMixin, SimpleModelForm):
         label="Collector",
         required=True,
     )
-    sources = ModelMultipleChoiceField(
-        queryset=Source.objects.none(),  # Will be populated in __init__
-        widget=SourceListWidget(
-            autocomplete_url="source-autocomplete", label_field="label"
-        ),
-        required=False,
-        label="Bibliographic References",  # Label won't be shown - widget has its own header
-    )
+    # sources field provided by SourcesFieldMixin
+    # Widget has its own header, so label won't be shown
     collection_system = ModelChoiceField(
         queryset=CollectionSystem.objects.all(), required=True
     )
@@ -467,38 +459,7 @@ class CollectionModelForm(CreateInlineMixin, SimpleModelForm):
         help_text="Defines the unit (person, household, property) for which the required bin capacity applies. Leave blank if not specified.",
     )
 
-    def __init__(self, *args, **kwargs):
-        # Get the user from the request if available (passed through the view)
-        request = kwargs.pop('request', None)
-        super().__init__(*args, **kwargs)
-
-        # For validation, we need to include sources that:
-        # 1. Are already assigned to this collection (if editing)
-        # 2. Are being submitted in the POST data
-        # 3. Are accessible to the current user (for permission check)
-
-        data = kwargs.get("data")
-        source_ids = set()
-
-        # Add currently assigned sources
-        if self.instance and self.instance.pk:
-            source_ids.update(self.instance.sources.values_list("id", flat=True))
-
-        # Add submitted sources
-        if data and "sources" in data:
-            submitted_ids = data.getlist("sources")
-            if submitted_ids:
-                source_ids.update(int(sid) for sid in submitted_ids if sid)
-
-        # Build queryset with all relevant sources
-        if source_ids:
-            queryset = Source.objects.filter(id__in=source_ids)
-            # Filter by user permissions if we have a user
-            if request and hasattr(request, "user"):
-                queryset = filter_queryset_for_user(queryset, request.user)
-            self.fields["sources"].queryset = queryset
-        else:
-            self.fields["sources"].queryset = Source.objects.none()
+    # __init__ logic for sources field is provided by SourcesFieldMixin
 
     class Meta:
         model = Collection

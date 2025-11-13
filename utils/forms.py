@@ -6,6 +6,7 @@ from django.forms import (
     BaseModelFormSet,
     Form,
     ModelForm,
+    ModelMultipleChoiceField,
     formset_factory,
     modelformset_factory,
 )
@@ -297,3 +298,97 @@ class M2MInlineModelFormSetMixin:
             kwargs["formset"] = self.get_formset()
             kwargs["formset_helper"] = self.get_formset_helper_class()()
         return super().get_context_data(**kwargs)
+
+
+class SourcesFieldMixin:
+    """
+    Mixin for ModelForms that adds a sources M2M field with autocomplete widget
+    and handles permission filtering.
+
+    This mixin provides:
+    1. A 'sources' field with SourceListWidget for autocomplete
+    2. Automatic queryset population in __init__ based on:
+       - Currently assigned sources (if editing)
+       - Submitted sources (from POST data)
+       - User permissions (via filter_queryset_for_user)
+
+    Usage:
+        class MyModelForm(SourcesFieldMixin, SimpleModelForm):
+            class Meta:
+                model = MyModel
+                fields = ('name', 'sources', ...)
+
+        # In the view, pass request to the form:
+        def get_form_kwargs(self):
+            kwargs = super().get_form_kwargs()
+            kwargs['request'] = self.request
+            return kwargs
+
+    The mixin expects:
+    - Form to be used with a model that has a 'sources' M2M relationship
+    - 'sources' to be listed in Meta.fields
+    - View to pass 'request' in get_form_kwargs()
+
+    Security:
+    - Filters sources by user permissions using filter_queryset_for_user()
+    - Ensures users can only select published sources or sources they own
+    """
+
+    def __init__(self, *args, **kwargs):
+        # Import here to avoid circular imports
+        from bibliography.models import Source
+        from utils.object_management.permissions import filter_queryset_for_user
+        from utils.widgets import SourceListWidget
+
+        # Capture data and request BEFORE calling super().__init__
+        # (parent consumes kwargs, so we need to extract values first)
+        # Note: PopRequestMixin may have already popped 'request' in modal forms,
+        # so check self.request first (set by PopRequestMixin)
+        request = kwargs.pop('request', None)
+        data = kwargs.get("data")  # Get data before parent consumes it
+
+        super().__init__(*args, **kwargs)
+
+        # If PopRequestMixin already set self.request, use that
+        if not request and hasattr(self, 'request'):
+            request = self.request
+
+        # Ensure sources field exists and has proper widget
+        if "sources" not in self.fields:
+            return  # Field not included in this form, skip mixin logic
+
+        # Set widget if not already customized
+        if not isinstance(self.fields["sources"].widget, SourceListWidget):
+            self.fields["sources"].widget = SourceListWidget(
+                autocomplete_url="source-autocomplete",
+                label_field="label"
+            )
+
+        # Always start with empty queryset (will be populated below)
+        self.fields["sources"].queryset = Source.objects.none()
+
+        # For validation, we need to include sources that:
+        # 1. Are already assigned to this object (if editing)
+        # 2. Are being submitted in the POST data
+        # 3. Are accessible to the current user (for permission check)
+
+        source_ids = set()
+
+        # Add currently assigned sources
+        if self.instance and self.instance.pk and hasattr(self.instance, 'sources'):
+            source_ids.update(self.instance.sources.values_list("id", flat=True))
+
+        # Add submitted sources
+        if data and "sources" in data:
+            submitted_ids = data.getlist("sources")
+            if submitted_ids:
+                source_ids.update(int(sid) for sid in submitted_ids if sid)
+
+        # Build queryset with all relevant sources
+        if source_ids:
+            queryset = Source.objects.filter(id__in=source_ids)
+            # Filter by user permissions if we have a user
+            if request and hasattr(request, "user"):
+                queryset = filter_queryset_for_user(queryset, request.user)
+            self.fields["sources"].queryset = queryset
+        # else: queryset is already set to Source.objects.none() above
