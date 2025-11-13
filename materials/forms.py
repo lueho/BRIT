@@ -28,6 +28,7 @@ from utils.forms import (
     ModalModelFormMixin,
     SimpleModelForm,
     SourcesFieldMixin,
+    UserCreatedObjectFormMixin,
 )
 
 from .models import (
@@ -156,7 +157,7 @@ class SampleSeriesAddTemporalDistributionModalModelForm(ModalModelForm):
         )
 
 
-class SampleModelForm(SourcesFieldMixin, SimpleModelForm):
+class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModelForm):
     material = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="material-autocomplete",

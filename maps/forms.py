@@ -25,6 +25,7 @@ from utils.forms import (
     SimpleForm,
     SimpleModelForm,
     SourcesFieldMixin,
+    UserCreatedObjectFormMixin,
 )
 
 from .models import (
@@ -40,7 +41,7 @@ from .models import (
 )
 
 
-class GeoDataSetModelForm(SourcesFieldMixin, SimpleModelForm):
+class GeoDataSetModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModelForm):
     # sources field and __init__ logic provided by SourcesFieldMixin
 
     class Meta:

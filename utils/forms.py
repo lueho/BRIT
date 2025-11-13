@@ -1,6 +1,6 @@
 from bootstrap_modal_forms.mixins import CreateUpdateAjaxMixin, PopRequestMixin
 from crispy_forms.helper import FormHelper
-from django.core.exceptions import ImproperlyConfigured
+from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.forms import (
     BaseFormSet,
     BaseModelFormSet,
@@ -300,20 +300,109 @@ class M2MInlineModelFormSetMixin:
         return super().get_context_data(**kwargs)
 
 
+class UserCreatedObjectFormMixin:
+    """
+    Mixin that validates all UserCreatedObject references in the form have
+    proper permissions for the current user.
+    
+    This provides centralized, consistent permission checking for all fields
+    that reference UserCreatedObject models (single or M2M), preventing users
+    from POSTing IDs of objects they don't have access to.
+    
+    Usage:
+        class MyModelForm(UserCreatedObjectFormMixin, SimpleModelForm):
+            # Your fields...
+            class Meta:
+                model = MyModel
+                fields = (...)
+        
+        # In the view:
+        def get_form_kwargs(self):
+            kwargs = super().get_form_kwargs()
+            kwargs['request'] = self.request
+            return kwargs
+    
+    Security:
+    - Validates at form.clean() time (backend validation)
+    - Complements autocomplete filtering (frontend UX)
+    - Prevents bypass via browser devtools or direct POST
+    - Works with both single (ForeignKey) and multiple (M2M) relationships
+    
+    The mixin expects:
+    - Form to be used with a view that passes 'request' in get_form_kwargs()
+    - Will validate any field containing UserCreatedObject instances
+    """
+    
+    def clean(self):
+        """
+        Validate that all UserCreatedObject references are accessible to the user.
+        Raises ValidationError if user tries to reference objects they can't access.
+        """
+        from utils.object_management.models import UserCreatedObject
+        from utils.object_management.permissions import filter_queryset_for_user
+        
+        cleaned_data = super().clean()
+        request = getattr(self, 'request', None)
+        
+        # Skip validation if no request (shouldn't happen in normal usage)
+        if not request or not hasattr(request, 'user'):
+            return cleaned_data
+        
+        # Check all fields for UserCreatedObject references
+        for field_name, value in cleaned_data.items():
+            if value is None:
+                continue
+            
+            # Handle both single objects and iterables (M2M, multiple choice)
+            objects_to_check = []
+            if hasattr(value, '__iter__') and not isinstance(value, (str, bytes)):
+                # M2M or multiple choice field
+                objects_to_check = list(value)
+            else:
+                # Single object (ForeignKey, OneToOne)
+                objects_to_check = [value]
+            
+            # Validate each object
+            for obj in objects_to_check:
+                if not isinstance(obj, UserCreatedObject):
+                    continue
+                
+                # Use existing permission system to check access
+                filtered_qs = filter_queryset_for_user(
+                    obj.__class__.objects.filter(pk=obj.pk),
+                    request.user
+                )
+                
+                if not filtered_qs.exists():
+                    # User doesn't have permission to access this object
+                    raise ValidationError(
+                        {
+                            field_name: (
+                                f"You don't have permission to access the selected "
+                                f"{obj.__class__._meta.verbose_name}: {obj}"
+                            )
+                        },
+                        code='permission_denied'
+                    )
+        
+        return cleaned_data
+
+
 class SourcesFieldMixin:
     """
-    Mixin for ModelForms that adds a sources M2M field with autocomplete widget
-    and handles permission filtering.
-
-    This mixin provides:
-    1. A 'sources' field with SourceListWidget for autocomplete
-    2. Automatic queryset population in __init__ based on:
-       - Currently assigned sources (if editing)
-       - Submitted sources (from POST data)
-       - User permissions (via filter_queryset_for_user)
+    Mixin for ModelForms that adds a sources M2M field with SourceListWidget.
+    
+    This mixin handles:
+    1. Automatic widget setup (SourceListWidget with autocomplete)
+    2. Queryset population for validation (assigned + submitted sources)
+    3. Makes sources field optional by default
+    
+    Note: Permission validation is handled by UserCreatedObjectFormMixin.clean()
+    This mixin only needs to ensure submitted/assigned sources are in the queryset
+    so Django's validation doesn't reject them before our permission check runs.
 
     Usage:
-        class MyModelForm(SourcesFieldMixin, SimpleModelForm):
+        class MyModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModelForm):
             class Meta:
                 model = MyModel
                 fields = ('name', 'sources', ...)
@@ -327,17 +416,12 @@ class SourcesFieldMixin:
     The mixin expects:
     - Form to be used with a model that has a 'sources' M2M relationship
     - 'sources' to be listed in Meta.fields
-    - View to pass 'request' in get_form_kwargs()
-
-    Security:
-    - Filters sources by user permissions using filter_queryset_for_user()
-    - Ensures users can only select published sources or sources they own
+    - View to pass 'request' in get_form_kwargs() (for UserCreatedObjectFormMixin)
     """
 
     def __init__(self, *args, **kwargs):
         # Import here to avoid circular imports
         from bibliography.models import Source
-        from utils.object_management.permissions import filter_queryset_for_user
         from utils.widgets import SourceListWidget
 
         # Capture data BEFORE calling super().__init__ (parent consumes it)
@@ -354,16 +438,9 @@ class SourcesFieldMixin:
         
         if not has_pop_request:
             # Regular form - pop request ourselves before super().__init__()
-            request = kwargs.pop('request', None)
-        else:
-            # Modal form - don't pop, let PopRequestMixin handle it
-            request = None
+            kwargs.pop('request', None)
 
         super().__init__(*args, **kwargs)
-
-        # If PopRequestMixin was in MRO, it set self.request
-        if has_pop_request:
-            request = getattr(self, 'request', None)
 
         # Ensure sources field exists and has proper widget
         if "sources" not in self.fields:
@@ -379,31 +456,22 @@ class SourcesFieldMixin:
                 label_field="label"
             )
 
-        # Always start with empty queryset (will be populated below)
-        self.fields["sources"].queryset = Source.objects.none()
-
-        # For validation, we need to include sources that:
-        # 1. Are already assigned to this object (if editing)
-        # 2. Are being submitted in the POST data
-        # 3. Are accessible to the current user (for permission check)
-
+        # Populate queryset with assigned + submitted sources for validation
+        # Permission check happens in UserCreatedObjectFormMixin.clean()
         source_ids = set()
 
         # Add currently assigned sources
         if self.instance and self.instance.pk and hasattr(self.instance, 'sources'):
             source_ids.update(self.instance.sources.values_list("id", flat=True))
 
-        # Add submitted sources
+        # Add submitted sources (from POST data)
         if data and "sources" in data:
             submitted_ids = data.getlist("sources")
             if submitted_ids:
                 source_ids.update(int(sid) for sid in submitted_ids if sid)
 
-        # Build queryset with all relevant sources
+        # Set queryset to include all relevant sources (permission check in clean())
         if source_ids:
-            queryset = Source.objects.filter(id__in=source_ids)
-            # Filter by user permissions if we have a user
-            if request and hasattr(request, "user"):
-                queryset = filter_queryset_for_user(queryset, request.user)
-            self.fields["sources"].queryset = queryset
-        # else: queryset is already set to Source.objects.none() above
+            self.fields["sources"].queryset = Source.objects.filter(id__in=source_ids)
+        else:
+            self.fields["sources"].queryset = Source.objects.none()

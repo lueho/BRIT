@@ -33,6 +33,7 @@ from utils.forms import (
     SimpleForm,
     SimpleModelForm,
     SourcesFieldMixin,
+    UserCreatedObjectFormMixin,
 )
 from utils.object_management.models import get_default_owner
 
@@ -387,7 +388,7 @@ class CollectionModelFormHelper(FormHelper):
     )
 
 
-class CollectionModelForm(SourcesFieldMixin, CreateInlineMixin, SimpleModelForm):
+class CollectionModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, CreateInlineMixin, SimpleModelForm):
     """
     Model form for Collection, including all collection parameters and waste stream fields.
     """
