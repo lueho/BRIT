@@ -70,7 +70,6 @@ from utils.object_management.views import (
 from .filters import CollectionFilterSet, CollectorFilter, WasteFlyerFilter
 from .forms import (
     AggregatedCollectionPropertyValueModelForm,
-    BaseWasteFlyerUrlFormSet,
     CollectionAddPredecessorForm,
     CollectionAddWasteSampleForm,
     CollectionFrequencyModalModelForm,
@@ -91,6 +90,7 @@ from .forms import (
     WasteCategoryModelForm,
     WasteComponentModalModelForm,
     WasteComponentModelForm,
+    WasteFlyerFormSet,
     WasteFlyerFormSetHelper,
     WasteFlyerModalModelForm,
     WasteFlyerModelForm,
@@ -568,8 +568,15 @@ class FrequencyAutocompleteView(UserCreatedObjectAutocompleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CollectionPropertyValueCreateView(UserCreatedObjectCreateView):
+class CollectionPropertyValueCreateView(
+    M2MInlineFormSetMixin, UserCreatedObjectCreateView
+):
     form_class = CollectionPropertyValueModelForm
+    formset_model = WasteFlyer
+    formset_class = WasteFlyerFormSet
+    formset_form_class = WasteFlyerModelForm
+    formset_helper_class = WasteFlyerFormSetHelper
+    relation_field_name = "sources"
     permission_required = "soilcom.add_collectionpropertyvalue"
 
     def get_form_kwargs(self):
@@ -577,19 +584,36 @@ class CollectionPropertyValueCreateView(UserCreatedObjectCreateView):
         kwargs["request"] = self.request
         return kwargs
 
+    def get_formset_kwargs(self, **kwargs):
+        if self.request.method in ("POST", "PUT"):
+            kwargs.update({"owner": self.request.user})
+        return super().get_formset_kwargs(**kwargs)
+
 
 class CollectionPropertyValueDetailView(UserCreatedObjectDetailView):
     model = CollectionPropertyValue
 
 
-class CollectionPropertyValueUpdateView(UserCreatedObjectUpdateView):
+class CollectionPropertyValueUpdateView(
+    M2MInlineFormSetMixin, UserCreatedObjectUpdateView
+):
     model = CollectionPropertyValue
     form_class = CollectionPropertyValueModelForm
+    formset_model = WasteFlyer
+    formset_class = WasteFlyerFormSet
+    formset_form_class = WasteFlyerModelForm
+    formset_helper_class = WasteFlyerFormSetHelper
+    relation_field_name = "sources"
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs["request"] = self.request
         return kwargs
+
+    def get_formset_kwargs(self, **kwargs):
+        if self.request.method in ("POST", "PUT"):
+            kwargs.update({"owner": self.request.user})
+        return super().get_formset_kwargs(**kwargs)
 
     def form_valid(self, form):
         instance = form.instance
@@ -635,9 +659,16 @@ class CollectionPropertyValueModalDeleteView(UserCreatedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class AggregatedCollectionPropertyValueCreateView(UserCreatedObjectCreateView):
+class AggregatedCollectionPropertyValueCreateView(
+    M2MInlineFormSetMixin, UserCreatedObjectCreateView
+):
     template_name = "soilcom/collectionpropertyvalue_form.html"
     form_class = AggregatedCollectionPropertyValueModelForm
+    formset_model = WasteFlyer
+    formset_class = WasteFlyerFormSet
+    formset_form_class = WasteFlyerModelForm
+    formset_helper_class = WasteFlyerFormSetHelper
+    relation_field_name = "sources"
     permission_required = "soilcom.add_aggregatedcollectionpropertyvalue"
 
     def get_form_kwargs(self):
@@ -645,20 +676,37 @@ class AggregatedCollectionPropertyValueCreateView(UserCreatedObjectCreateView):
         kwargs["request"] = self.request
         return kwargs
 
+    def get_formset_kwargs(self, **kwargs):
+        if self.request.method in ("POST", "PUT"):
+            kwargs.update({"owner": self.request.user})
+        return super().get_formset_kwargs(**kwargs)
+
 
 class AggregatedCollectionPropertyValueDetailView(UserCreatedObjectDetailView):
     model = AggregatedCollectionPropertyValue
 
 
-class AggregatedCollectionPropertyValueUpdateView(UserCreatedObjectUpdateView):
+class AggregatedCollectionPropertyValueUpdateView(
+    M2MInlineFormSetMixin, UserCreatedObjectUpdateView
+):
     template_name = "soilcom/collectionpropertyvalue_form.html"
     model = AggregatedCollectionPropertyValue
     form_class = AggregatedCollectionPropertyValueModelForm
+    formset_model = WasteFlyer
+    formset_class = WasteFlyerFormSet
+    formset_form_class = WasteFlyerModelForm
+    formset_helper_class = WasteFlyerFormSetHelper
+    relation_field_name = "sources"
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
         kwargs["request"] = self.request
         return kwargs
+
+    def get_formset_kwargs(self, **kwargs):
+        if self.request.method in ("POST", "PUT"):
+            kwargs.update({"owner": self.request.user})
+        return super().get_formset_kwargs(**kwargs)
 
 
 class AggregatedCollectionPropertyValueModalDeleteView(
@@ -748,7 +796,7 @@ class CollectionCreateView(M2MInlineFormSetMixin, UserCreatedObjectCreateView):
     model = Collection
     form_class = CollectionModelForm
     formset_model = WasteFlyer
-    formset_class = BaseWasteFlyerUrlFormSet
+    formset_class = WasteFlyerFormSet
     formset_form_class = WasteFlyerModelForm
     formset_helper_class = WasteFlyerFormSetHelper
     relation_field_name = "flyers"
@@ -1138,7 +1186,7 @@ class CollectionUpdateView(M2MInlineFormSetMixin, UserCreatedObjectUpdateView):
     model = Collection
     form_class = CollectionModelForm
     formset_model = WasteFlyer
-    formset_class = BaseWasteFlyerUrlFormSet
+    formset_class = WasteFlyerFormSet
     formset_form_class = WasteFlyerModelForm
     formset_helper_class = WasteFlyerFormSetHelper
     relation_field_name = "flyers"

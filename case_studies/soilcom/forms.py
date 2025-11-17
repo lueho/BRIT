@@ -286,15 +286,40 @@ class WasteFlyerFormSetHelper(DynamicTableInlineFormSetHelper):
         self.form_show_labels = True  # Show URL label for each field
 
 
-class BaseWasteFlyerUrlFormSet(M2MInlineFormSet):
+class WasteFlyerFormSet(M2MInlineFormSet):
+    """
+    Formset for managing WasteFlyer URLs.
+
+    Handles proper cleanup by only deleting orphaned WasteFlyers that are not
+    connected to any Collection (via flyers or sources) or PropertyValue (via sources).
+    """
+
     def __init__(self, *args, **kwargs):
         self.owner = kwargs.pop("owner", get_default_owner())
         super().__init__(*args, **kwargs)
 
     def save(self, commit=True):
         child_objects = super().save(commit=commit)
-        WasteFlyer.objects.filter(collections=None).delete()
+
+        # Delete WasteFlyers that are completely orphaned - not connected to:
+        # 1. Collection.flyers (via 'collections' reverse relation)
+        # 2. Collection.sources (via 'collection' reverse relation)
+        # 3. CollectionPropertyValue.sources (via 'collectionpropertyvalue' reverse relation)
+        # 4. AggregatedCollectionPropertyValue.sources
+        #    (via 'aggregatedcollectionpropertyvalue' reverse relation)
+        WasteFlyer.objects.filter(
+            collections__isnull=True,
+            collection__isnull=True,
+            collectionpropertyvalue__isnull=True,
+            aggregatedcollectionpropertyvalue__isnull=True,
+        ).delete()
+
         return child_objects
+
+
+# Backward-compatible aliases for old FormSet names
+BaseWasteFlyerUrlFormSet = WasteFlyerFormSet
+PropertyValueWasteFlyerFormSet = WasteFlyerFormSet
 
 
 class CollectionPropertyValueModelFormHelper(FormHelper):
