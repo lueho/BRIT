@@ -854,7 +854,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
         self.assertTrue(error_msg in response.context["form"].errors["waste_category"])
 
     def test_post_with_valid_form_data(self):
-        self.assertEqual(Collection.objects.count(), 1)
+        initial_count = Collection.objects.count()
         self.client.force_login(self.staff_user)
         response = self.client.post(
             self.get_create_url(),
@@ -872,7 +872,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
                     self.forbidden_material_1.id,
                     self.forbidden_material_2.id,
                 ],
-                "frequency": self.frequency.id,
+                "frequency": self.related_objects["frequency"].id,
                 "valid_from": date(2020, 1, 1),
                 "description": "This is a test case that should pass!",
                 "form-INITIAL_FORMS": "0",
@@ -884,7 +884,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
             },
         )
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(Collection.objects.count(), 2)
+        self.assertEqual(Collection.objects.count(), initial_count + 1)
 
     def test_post_with_unspecified_allowed_materials_creates_generic_waste_stream(self):
         self.client.force_login(self.staff_user)
