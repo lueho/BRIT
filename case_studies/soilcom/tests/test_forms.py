@@ -1,13 +1,16 @@
 from datetime import date
 
+from django.contrib.auth.models import User
 from django.db.models import signals
 from django.forms import formset_factory
 from django.http import QueryDict
-from django.test import TestCase
+from django.test import RequestFactory, TestCase
 from factory.django import mute_signals
 
+from bibliography.models import Source
 from distributions.models import TemporalDistribution, Timestep
 from materials.models import Material, MaterialCategory, Sample, SampleSeries
+from utils.object_management.models import get_default_owner
 
 from ..forms import (
     CollectionAddPredecessorForm,
@@ -1088,3 +1091,194 @@ class CollectionRemovePredecessorFormTestCase(TestCase):
         self.assertEqual(
             form.fields["predecessor"].queryset.first(), self.predecessor_collection
         )
+
+
+class CollectionModelFormPermissionTestCase(TestCase):
+    """
+    Test that UserCreatedObjectFormMixin properly validates permissions on referenced objects.
+
+    These tests ensure that forms properly reject references to UserCreatedObjects
+    that the current user does not have access to, providing backend validation
+    as part of the defense-in-depth security model.
+    """
+
+    def setUp(self):
+        """Set up test users and objects."""
+        self.default_owner = get_default_owner()
+        self.user1 = User.objects.create_user(username="user1", password="testpass")
+        self.user2 = User.objects.create_user(username="user2", password="testpass")
+
+        # Create published objects that user2 can access
+        self.catchment = CollectionCatchment.objects.create(
+            name="Test Catchment",
+            owner=self.user1,
+            publication_status="published",
+        )
+        self.collector = Collector.objects.create(
+            name="Test Collector",
+            owner=self.user1,
+            publication_status="published",
+        )
+        self.collection_system = CollectionSystem.objects.create(
+            name="Test System",
+            owner=self.user1,
+            publication_status="published",
+        )
+        self.waste_category = WasteCategory.objects.create(
+            name="Test Category",
+            owner=self.user1,
+            publication_status="published",
+        )
+        self.waste_stream = WasteStream.objects.create(
+            name="Test Stream",
+            category=self.waste_category,
+            owner=self.user1,
+            publication_status="published",
+        )
+
+        # Create a private source owned by user1 (not accessible to user2)
+        self.private_source = Source.objects.create(
+            owner=self.user1,
+            title="Private Source",
+            abbreviation="PRIV1",
+            publication_status="private",
+        )
+
+        # Create a published source (accessible to everyone)
+        self.public_source = Source.objects.create(
+            owner=self.user1,
+            title="Public Source",
+            abbreviation="PUB1",
+            publication_status="published",
+        )
+
+        # Create a private waste flyer owned by user1
+        self.private_flyer = WasteFlyer.objects.create(
+            owner=self.user1,
+            title="Private Flyer",
+            abbreviation="PFLYER1",
+            url="https://example.com/private",
+            publication_status="private",
+        )
+
+        # Create a published waste flyer
+        self.public_flyer = WasteFlyer.objects.create(
+            owner=self.user1,
+            title="Public Flyer",
+            abbreviation="PFLYER2",
+            url="https://example.com/public",
+            publication_status="published",
+        )
+
+        self.factory = RequestFactory()
+
+    def test_form_rejects_private_source_from_other_user(self):
+        """Test that form rejects a private source owned by another user."""
+        request = self.factory.post("/")
+        request.user = self.user2
+
+        form_data = {
+            "name": "Test Collection",
+            "catchment": self.catchment.pk,
+            "collector": self.collector.pk,
+            "collection_system": self.collection_system.pk,
+            "waste_category": self.waste_category.pk,
+            "waste_stream": self.waste_stream.pk,
+            "valid_from": "2024-01-01",
+            "sources": [self.private_source.pk],  # User2 shouldn't have access
+        }
+
+        form = CollectionModelForm(data=dict_to_querydict(form_data), request=request)
+        self.assertFalse(form.is_valid())
+        self.assertIn("sources", form.errors)
+        # Check that the error message mentions permission
+        error_msg = str(form.errors["sources"])
+        self.assertIn("permission", error_msg.lower())
+
+    def test_form_accepts_public_source(self):
+        """Test that form accepts a published source accessible to all users."""
+        request = self.factory.post("/")
+        request.user = self.user2
+
+        form_data = {
+            "name": "Test Collection",
+            "catchment": self.catchment.pk,
+            "collector": self.collector.pk,
+            "collection_system": self.collection_system.pk,
+            "waste_category": self.waste_category.pk,
+            "waste_stream": self.waste_stream.pk,
+            "valid_from": "2024-01-01",
+            "sources": [self.public_source.pk],  # Public source should be accessible
+        }
+
+        form = CollectionModelForm(data=dict_to_querydict(form_data), request=request)
+        # The form might still be invalid due to other fields, but sources should not be in errors
+        if not form.is_valid():
+            self.assertNotIn("sources", form.errors)
+
+    def test_form_accepts_own_private_source(self):
+        """Test that form accepts a private source owned by the current user."""
+        request = self.factory.post("/")
+        request.user = self.user1
+
+        form_data = {
+            "name": "Test Collection",
+            "catchment": self.catchment.pk,
+            "collector": self.collector.pk,
+            "collection_system": self.collection_system.pk,
+            "waste_category": self.waste_category.pk,
+            "waste_stream": self.waste_stream.pk,
+            "valid_from": "2024-01-01",
+            "sources": [self.private_source.pk],  # User1's own private source
+        }
+
+        form = CollectionModelForm(data=dict_to_querydict(form_data), request=request)
+        # The form might still be invalid due to other fields, but sources should not be in errors
+        if not form.is_valid():
+            self.assertNotIn("sources", form.errors)
+
+    def test_form_rejects_mix_of_accessible_and_inaccessible_sources(self):
+        """Test that form rejects when some sources are inaccessible."""
+        request = self.factory.post("/")
+        request.user = self.user2
+
+        form_data = {
+            "name": "Test Collection",
+            "catchment": self.catchment.pk,
+            "collector": self.collector.pk,
+            "collection_system": self.collection_system.pk,
+            "waste_category": self.waste_category.pk,
+            "waste_stream": self.waste_stream.pk,
+            "valid_from": "2024-01-01",
+            "sources": [
+                self.public_source.pk,
+                self.private_source.pk,  # Mix of public and private
+            ],
+        }
+
+        form = CollectionModelForm(data=dict_to_querydict(form_data), request=request)
+        self.assertFalse(form.is_valid())
+        self.assertIn("sources", form.errors)
+
+    def test_form_without_request_fails_gracefully(self):
+        """Test that form without request parameter handles gracefully."""
+        # This should not crash, but the permission check won't work without request
+        form_data = {
+            "name": "Test Collection",
+            "catchment": self.catchment.pk,
+            "collector": self.collector.pk,
+            "collection_system": self.collection_system.pk,
+            "waste_category": self.waste_category.pk,
+            "waste_stream": self.waste_stream.pk,
+            "valid_from": "2024-01-01",
+            "sources": [self.private_source.pk],
+        }
+
+        # Without request, the mixin should skip permission checks
+        form = CollectionModelForm(data=dict_to_querydict(form_data))
+        # Form may be invalid for other reasons, but shouldn't crash
+        # We don't assert anything specific here, just that it doesn't raise an exception
+        try:
+            form.is_valid()
+        except Exception as e:
+            self.fail(f"Form raised unexpected exception without request: {e}")
