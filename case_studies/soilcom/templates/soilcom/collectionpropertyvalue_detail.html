@@ -75,7 +75,31 @@
         <ul>
             {% for source in object.sources.all %}
                 <li>
-                    <a href="{{ source.get_absolute_url }}">{{ source.abbreviation }}</a>
+                    {% if source.type == "waste_flyer" %}
+                        {# Waste flyer: Display as clickable URL with document icon #}
+                        <i class="fas fa-file-alt text-muted"></i>
+                        <span class="badge bg-secondary text-white me-2">Waste Flyer</span>
+                        <a href="{{ source.url }}"
+                           target="_blank"
+                           rel="noopener noreferrer"
+                           class="text-break">
+                            {{ source.url }}
+                            <i class="fas fa-external-link-alt ms-1 small"></i>
+                        </a>
+                    {% else %}
+                        {# Regular bibliographic source #}
+                        <a href="{{ source.get_absolute_url }}">{{ source.abbreviation }}</a>
+                        {% if source.title %}- {{ source.title }}{% endif %}
+                        {% if source.year %}({{ source.year }}){% endif %}
+                        {% if source.url %}
+                            <br>
+                            <span class="text-muted small">
+                                <a href="{{ source.url }}" target="_blank" rel="noopener noreferrer">
+                                    <i class="fas fa-external-link-alt"></i> {{ source.url }}
+                                </a>
+                            </span>
+                        {% endif %}
+                    {% endif %}
                 </li>
             {% endfor %}
         </ul>

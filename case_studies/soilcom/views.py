@@ -965,6 +965,30 @@ class CollectionDetailView(MapMixin, UserCreatedObjectDetailView):
         context["collection_property_values"] = cpvs
         context["aggregated_collection_property_values"] = agg_cpvs
 
+        # Collect all sources from collection, flyers, CPVs, and ACPVs
+        all_sources = set()
+
+        # Sources directly on the collection
+        for source in self.object.sources.all():
+            all_sources.add(source)
+
+        # Flyers are also sources (WasteFlyer is a proxy of Source)
+        for flyer in self.object.flyers.all():
+            all_sources.add(flyer)
+
+        # Sources from collection property values
+        for cpv in cpvs:
+            for source in cpv.sources.all():
+                all_sources.add(source)
+
+        # Sources from aggregated collection property values
+        for acpv in agg_cpvs:
+            for source in acpv.sources.all():
+                all_sources.add(source)
+
+        # Sort sources by abbreviation for consistent display
+        context["all_sources"] = sorted(all_sources, key=lambda s: s.abbreviation)
+
         # Filter version chain links (predecessors/successors) by user visibility
         try:
             context["visible_successors"] = filter_queryset_for_user(
@@ -1102,10 +1126,14 @@ class CollectionReviewItemDetailView(ReviewItemDetailView):
             ):
                 from django.db.models import Case, IntegerField, Value, When
 
-                cpv_qs = CollectionPropertyValue.objects.filter(
-                    collection__in=obj.all_versions(),
-                    publication_status__in=["published", "review"],
-                ).select_related("property", "unit", "collection")
+                cpv_qs = (
+                    CollectionPropertyValue.objects.filter(
+                        collection__in=obj.all_versions(),
+                        publication_status__in=["published", "review"],
+                    )
+                    .select_related("property", "unit", "collection")
+                    .prefetch_related("sources")
+                )
 
                 # Order by property/unit/year, then prefer review (0) over published (1)
                 cpv_qs = cpv_qs.annotate(
@@ -1141,7 +1169,7 @@ class CollectionReviewItemDetailView(ReviewItemDetailView):
                         publication_status__in=["published", "review"],
                     )
                     .select_related("property", "unit")
-                    .prefetch_related("collections")
+                    .prefetch_related("collections", "sources")
                     .distinct()
                 )
 
@@ -1170,6 +1198,37 @@ class CollectionReviewItemDetailView(ReviewItemDetailView):
                         agg_values.append(val)
 
                 review_context["aggregated_collection_property_values"] = agg_values
+        except Exception:
+            pass
+
+        # Collect all sources from collection, flyers, CPVs, and ACPVs
+        try:
+            all_sources = set()
+
+            # Sources directly on the collection
+            for source in obj.sources.all():
+                all_sources.add(source)
+
+            # Flyers are also sources (WasteFlyer is a proxy of Source)
+            for flyer in obj.flyers.all():
+                all_sources.add(flyer)
+
+            # Sources from collection property values (if available in context)
+            cpvs = review_context.get("collection_property_values", [])
+            for cpv in cpvs:
+                for source in cpv.sources.all():
+                    all_sources.add(source)
+
+            # Sources from aggregated collection property values (if available in context)
+            agg_cpvs = review_context.get("aggregated_collection_property_values", [])
+            for acpv in agg_cpvs:
+                for source in acpv.sources.all():
+                    all_sources.add(source)
+
+            # Sort sources by abbreviation for consistent display
+            review_context["all_sources"] = sorted(
+                all_sources, key=lambda s: s.abbreviation
+            )
         except Exception:
             pass
 

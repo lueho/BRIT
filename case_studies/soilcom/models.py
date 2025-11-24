@@ -228,7 +228,7 @@ class WasteStreamQuerySet(UserCreatedObjectQuerySet):
                 if qs.exists():
                     raise ValidationError(
                         """
-                        Waste stream cannot be updated. Equivalent waste stream of equal category and same combination 
+                        Waste stream cannot be updated. Equivalent waste stream of equal category and same combination
                         of allowed and forbidden materials already exists.
                         """
                     )
@@ -580,9 +580,11 @@ class Collection(NamedUserCreatedObject):
     def collectionpropertyvalues_for_display(self, user=None):
         """Return collection-specific property values visible to ``user`` across the chain."""
 
-        qs = CollectionPropertyValue.objects.filter(
-            collection__in=self.all_versions()
-        ).select_related("property", "unit", "collection")
+        qs = (
+            CollectionPropertyValue.objects.filter(collection__in=self.all_versions())
+            .select_related("property", "unit", "collection")
+            .prefetch_related("sources")
+        )
 
         qs = filter_queryset_for_user(qs, user)
 
@@ -625,7 +627,7 @@ class Collection(NamedUserCreatedObject):
                 collections__in=self.all_versions()
             )
             .select_related("property", "unit")
-            .prefetch_related("collections")
+            .prefetch_related("collections", "sources")
             .distinct()
         )
 
