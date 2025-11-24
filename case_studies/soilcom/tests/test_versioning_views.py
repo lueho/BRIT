@@ -65,6 +65,11 @@ class CollectionAddPropertyValueAnchoringTestCase(ViewWithPermissionsTestCase):
             "unit": self.unit.pk,
             "year": 2022,
             "average": 12.3,
+            # Add formset management data for WasteFlyerFormSet
+            "form-TOTAL_FORMS": "0",
+            "form-INITIAL_FORMS": "0",
+            "form-MIN_NUM_FORMS": "0",
+            "form-MAX_NUM_FORMS": "1000",
         }
         response = self.client.post(
             reverse(self.url_name, kwargs={"pk": self.succ.pk}), data=data
@@ -139,6 +144,11 @@ class CollectionPropertyValueUpdateReanchorTestCase(ViewWithPermissionsTestCase)
                 "unit": self.unit.pk,
                 "year": 2020,
                 "average": 6,
+                # Add formset management data for WasteFlyerFormSet
+                "form-TOTAL_FORMS": "0",
+                "form-INITIAL_FORMS": "0",
+                "form-MIN_NUM_FORMS": "0",
+                "form-MAX_NUM_FORMS": "1000",
             },
         )
         self.assertEqual(response.status_code, 302)

@@ -329,6 +329,91 @@ class UserCreatedObjectFormMixin:
     - Will validate any field containing UserCreatedObject instances
     """
 
+    def __init__(self, *args, **kwargs):
+        """Capture request and adjust UserCreatedObject field querysets."""
+        from django.forms import ModelChoiceField, ModelMultipleChoiceField
+
+        from utils.object_management.models import UserCreatedObject
+
+        # Capture request for permission validation in clean()
+        # Only pop request if PopRequestMixin is NOT in the MRO (it will pop it itself)
+        has_pop_request_mixin = any(
+            cls.__name__ == "PopRequestMixin" for cls in self.__class__.__mro__
+        )
+
+        if not has_pop_request_mixin:
+            # Pop it ourselves if PopRequestMixin isn't present
+            request = kwargs.pop("request", None)
+            if request:
+                self.request = request
+            elif not hasattr(self, "request"):
+                self.request = None
+
+        # Get data before super().__init__ consumes it
+        data = kwargs.get("data")
+
+        super().__init__(*args, **kwargs)
+
+        # If PopRequestMixin is in the MRO, it has already set self.request during super().__init__()
+
+        # After fields are initialized, adjust querysets for all UserCreatedObject fields
+        # to include submitted values (prevents Django field validation from rejecting
+        # them before our clean() method can run permission checks)
+        if data:
+            for field_name, field in self.fields.items():
+                # Only process ModelChoiceField and ModelMultipleChoiceField
+                if not isinstance(field, ModelChoiceField | ModelMultipleChoiceField):
+                    continue
+
+                # Get the model from the queryset
+                # Even TomSelect fields should have queryset initialized by now
+                try:
+                    if field.queryset is None:
+                        # Some fields may have None queryset - skip them
+                        continue
+                    model = field.queryset.model
+                except (AttributeError, TypeError):
+                    continue
+
+                # Check if this field references UserCreatedObject
+                try:
+                    if not issubclass(model, UserCreatedObject):
+                        continue
+                except TypeError:
+                    continue
+
+                # Collect submitted IDs for this field
+                submitted_ids = set()
+
+                # Handle both single and multiple choice fields
+                if field_name in data:
+                    values = (
+                        data.getlist(field_name)
+                        if hasattr(data, "getlist")
+                        else [data.get(field_name)]
+                    )
+                    for val in values:
+                        if val:
+                            try:
+                                submitted_ids.add(int(val))
+                            except (ValueError, TypeError):
+                                pass
+
+                # Collect existing IDs (for update forms)
+                existing_ids = set()
+                if self.instance and self.instance.pk:
+                    if hasattr(self.instance, field_name):
+                        attr = getattr(self.instance, field_name)
+                        if hasattr(attr, "all"):  # M2M field
+                            existing_ids.update(attr.values_list("pk", flat=True))
+                        elif hasattr(attr, "pk"):  # FK field
+                            existing_ids.add(attr.pk)
+
+                # Expand queryset to include all relevant IDs
+                all_ids = submitted_ids | existing_ids
+                if all_ids:
+                    field.queryset = model.objects.filter(pk__in=all_ids)
+
     def clean(self):
         """
         Validate that all UserCreatedObject references are accessible to the user.
@@ -422,15 +507,14 @@ class SourcesFieldMixin:
         # Capture data BEFORE calling super().__init__ (parent consumes it)
         data = kwargs.get("data")
 
-        # DON'T pop 'request' here! PopRequestMixin (later in MRO) needs it.
-        # For regular forms without PopRequestMixin, we need to pop it to avoid
-        # "unexpected keyword argument" error.
-        # Solution: Check if PopRequestMixin is in the MRO
-        has_pop_request = any(
-            cls.__name__ == "PopRequestMixin" for cls in self.__class__.__mro__
+        # DON'T pop 'request' if another mixin already handles it
+        # Check if PopRequestMixin or UserCreatedObjectFormMixin is in the MRO
+        has_request_handler = any(
+            cls.__name__ in ("PopRequestMixin", "UserCreatedObjectFormMixin")
+            for cls in self.__class__.__mro__
         )
 
-        if not has_pop_request:
+        if not has_request_handler:
             # Regular form - pop request ourselves before super().__init__()
             kwargs.pop("request", None)
 

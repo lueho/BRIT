@@ -43,7 +43,11 @@ from utils.object_management.permissions import (
 )
 from utils.object_management.review_filtering import ReviewItemFilter
 
-from ..forms import DynamicTableInlineFormSetHelper
+from ..forms import (
+    DynamicTableInlineFormSetHelper,
+    SourcesFieldMixin,
+    UserCreatedObjectFormMixin,
+)
 from ..views import (
     FilterDefaultsMixin,
     ModelSelectOptionsView,
@@ -1191,6 +1195,17 @@ class CreateUserObjectMixin(PermissionRequiredMixin, NextOrSuccessUrlMixin):
 class UserCreatedObjectCreateView(
     CreateUserObjectMixin, NoFormTagMixin, SuccessMessageMixin, CreateView
 ):
+    def get_form_kwargs(self):
+        """Pass request to form if it supports UserCreatedObjectFormMixin or SourcesFieldMixin."""
+        kwargs = super().get_form_kwargs()
+        form_class = self.get_form_class()
+
+        # Only pass request if form knows how to handle it
+        if issubclass(form_class, UserCreatedObjectFormMixin | SourcesFieldMixin):
+            kwargs["request"] = self.request
+
+        return kwargs
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         model_name = "Object"
@@ -1236,6 +1251,13 @@ class UserCreatedObjectModalCreateView(PermissionRequiredMixin, BSModalCreateVie
             return True
         # For non-staff users, use the default permission check
         return super().has_permission()
+
+    def get_form_kwargs(self):
+        """Pass request to form - required by bootstrap_modal_forms and our custom mixins."""
+        kwargs = super().get_form_kwargs()
+        # Always pass request for modal forms since PopRequestMixin expects it
+        kwargs["request"] = self.request
+        return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -1499,6 +1521,17 @@ class UserCreatedObjectUpdateView(
 ):
     # TODO: Implement permission flow for publication process and moderators.
 
+    def get_form_kwargs(self):
+        """Pass request to form if it supports UserCreatedObjectFormMixin or SourcesFieldMixin."""
+        kwargs = super().get_form_kwargs()
+        form_class = self.get_form_class()
+
+        # Only pass request if form knows how to handle it
+        if issubclass(form_class, UserCreatedObjectFormMixin | SourcesFieldMixin):
+            kwargs["request"] = self.request
+
+        return kwargs
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update(
@@ -1522,6 +1555,17 @@ class UserCreatedObjectCreateWithInlinesView(
     CreateUserObjectMixin, CreateWithInlinesView
 ):
     formset_helper_class = DynamicTableInlineFormSetHelper
+
+    def get_form_kwargs(self):
+        """Pass request to form if it supports UserCreatedObjectFormMixin or SourcesFieldMixin."""
+        kwargs = super().get_form_kwargs()
+        form_class = self.get_form_class()
+
+        # Only pass request if form knows how to handle it
+        if issubclass(form_class, UserCreatedObjectFormMixin | SourcesFieldMixin):
+            kwargs["request"] = self.request
+
+        return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -1548,6 +1592,17 @@ class UserCreatedObjectUpdateWithInlinesView(
 ):
     formset_helper_class = DynamicTableInlineFormSetHelper
 
+    def get_form_kwargs(self):
+        """Pass request to form if it supports UserCreatedObjectFormMixin or SourcesFieldMixin."""
+        kwargs = super().get_form_kwargs()
+        form_class = self.get_form_class()
+
+        # Only pass request if form knows how to handle it
+        if issubclass(form_class, UserCreatedObjectFormMixin | SourcesFieldMixin):
+            kwargs["request"] = self.request
+
+        return kwargs
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update(
@@ -1573,6 +1628,17 @@ class UserCreatedObjectModalUpdateView(
 ):
     template_name = "modal_form.html"
     success_message = "Successfully updated."
+
+    def get_form_kwargs(self):
+        """Pass request to form if it supports UserCreatedObjectFormMixin or SourcesFieldMixin."""
+        kwargs = super().get_form_kwargs()
+        form_class = self.get_form_class()
+
+        # Only pass request if form knows how to handle it
+        if issubclass(form_class, UserCreatedObjectFormMixin | SourcesFieldMixin):
+            kwargs["request"] = self.request
+
+        return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

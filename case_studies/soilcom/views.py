@@ -486,8 +486,8 @@ class FrequencyCreateView(M2MInlineFormSetMixin, UserCreatedObjectCreateView):
         if form.is_valid() and formset.is_valid():
             form.instance.owner = self.request.user
             self.object = form.save()
-            formset = self.get_formset()
-            formset.is_valid()
+            # Update formset's parent_object so it can set the M2M relationship
+            formset.parent_object = self.object
             formset.save()
             return HttpResponseRedirect(self.get_success_url())
         else:
@@ -589,6 +589,27 @@ class CollectionPropertyValueCreateView(
             kwargs.update({"owner": self.request.user})
         return super().get_formset_kwargs(**kwargs)
 
+    def post(self, request, *args, **kwargs):
+        form = self.get_form()
+        formset = self.get_formset()
+
+        if form.is_valid() and formset.is_valid():
+            return self.forms_valid(form, formset)
+        else:
+            return self.forms_invalid(form, formset)
+
+    def forms_valid(self, form, formset):
+        form.instance.owner = self.request.user
+        self.object = form.save()
+        # Update formset's parent_object so it can set the M2M relationship
+        formset.parent_object = self.object
+        formset.save()
+        return HttpResponseRedirect(self.get_success_url())
+
+    def forms_invalid(self, form, formset):
+        context = self.get_context_data(form=form, formset=formset)
+        return self.render_to_response(context)
+
 
 class CollectionPropertyValueDetailView(UserCreatedObjectDetailView):
     model = CollectionPropertyValue
@@ -615,12 +636,32 @@ class CollectionPropertyValueUpdateView(
             kwargs.update({"owner": self.request.user})
         return super().get_formset_kwargs(**kwargs)
 
-    def form_valid(self, form):
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        form = self.get_form()
+        formset = self.get_formset()
+
+        if form.is_valid() and formset.is_valid():
+            return self.forms_valid(form, formset)
+        else:
+            return self.forms_invalid(form, formset)
+
+    def forms_valid(self, form, formset):
         instance = form.instance
         anchor = instance.collection.version_anchor if instance.collection else None
         if anchor and instance.collection_id != anchor.pk:
             instance.collection = anchor
-        return super().form_valid(form)
+
+        self.object = form.save()
+        # Update formset's parent_object so it can set the M2M relationship
+        formset.parent_object = self.object
+        formset.save()
+        return HttpResponseRedirect(self.get_success_url())
+
+    def forms_invalid(self, form, formset):
+        return self.render_to_response(
+            self.get_context_data(form=form, formset=formset)
+        )
 
 
 class CollectionPropertyValueModalDeleteView(UserCreatedObjectModalDeleteView):
@@ -832,8 +873,8 @@ class CollectionCreateView(M2MInlineFormSetMixin, UserCreatedObjectCreateView):
         if form.is_valid() and formset.is_valid():
             form.instance.owner = self.request.user
             self.object = form.save()
-            formset = self.get_formset()
-            formset.is_valid()
+            # Update formset's parent_object so it can set the M2M relationship
+            formset.parent_object = self.object
             formset.save()
             return HttpResponseRedirect(self.get_success_url())
         else:
@@ -1353,19 +1394,20 @@ class CollectionAddPropertyValueView(CollectionPropertyValueCreateView):
     def get_success_url(self):
         return reverse("collection-detail", kwargs={"pk": self.kwargs["pk"]})
 
-    def form_valid(self, form):
+    def forms_valid(self, form, formset):
         """
-        Enforce that the new property value is attached to the parent Collection
+        Enforce that the new property value is attached to the anchor Collection
         referenced in the URL, regardless of any submitted form value.
         """
         anchor = getattr(self, "anchor_collection", None)
         if not anchor:
             try:
-                anchor = Collection.objects.get(pk=self.kwargs.get("pk")).version_anchor
+                parent = Collection.objects.get(pk=self.kwargs.get("pk"))
+                anchor = parent.version_anchor or parent
             except Collection.DoesNotExist as err:
                 raise PermissionDenied("Invalid parent collection.") from err
-        form.instance.collection = anchor or form.instance.collection
-        return super().form_valid(form)
+        form.instance.collection = anchor
+        return super().forms_valid(form, formset)
 
 
 class CollectionCatchmentAddAggregatedPropertyView(

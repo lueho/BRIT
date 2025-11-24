@@ -10,7 +10,6 @@ from distributions.models import TemporalDistribution, Timestep
 from materials.models import Material, MaterialCategory, Sample, SampleSeries
 
 from ..forms import (
-    BaseWasteFlyerUrlFormSet,
     CollectionAddPredecessorForm,
     CollectionAddWasteSampleForm,
     CollectionModelForm,
@@ -18,6 +17,7 @@ from ..forms import (
     CollectionRemoveWasteSampleForm,
     CollectionSeasonForm,
     CollectionSeasonFormSet,
+    WasteFlyerFormSet,
     WasteFlyerModelForm,
 )
 from ..models import (
@@ -565,39 +565,39 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         with mute_signals(signals.post_save):
-            flyer_1 = WasteFlyer.objects.create(url="https://www.test-flyers.org")
-            flyer_2 = WasteFlyer.objects.create(url="https://www.best-flyers.org")
-            flyer_3 = WasteFlyer.objects.create(url="https://www.rest-flyers.org")
+            cls.flyer_1 = WasteFlyer.objects.create(url="https://www.test-flyers.org")
+            cls.flyer_2 = WasteFlyer.objects.create(url="https://www.best-flyers.org")
+            cls.flyer_3 = WasteFlyer.objects.create(url="https://www.rest-flyers.org")
         CollectionCatchment.objects.create(name="Catchment")
         collector = Collector.objects.create(name="Collector")
-        collection_system = CollectionSystem.objects.create(name="System")
+        cls.collection_system = CollectionSystem.objects.create(name="System")
         waste_category = WasteCategory.objects.create(name="Category")
         material_group = MaterialCategory.objects.create(name="Biowaste component")
         material1 = WasteComponent.objects.create(name="Material 1")
         material1.categories.add(material_group)
         material2 = WasteComponent.objects.create(name="Material 2")
         material2.categories.add(material_group)
-        waste_stream = WasteStream.objects.create(category=waste_category)
-        waste_stream.allowed_materials.set([material1, material2])
+        cls.waste_stream = WasteStream.objects.create(category=waste_category)
+        cls.waste_stream.allowed_materials.set([material1, material2])
         cls.collection = Collection.objects.create(
             name="collection1",
             collector=collector,
-            collection_system=collection_system,
-            waste_stream=waste_stream,
+            collection_system=cls.collection_system,
+            waste_stream=cls.waste_stream,
         )
-        cls.collection.flyers.set([flyer_1, flyer_2, flyer_3])
-        collection2 = Collection.objects.create(
+        cls.collection.flyers.set([cls.flyer_1, cls.flyer_2, cls.flyer_3])
+        cls.collection2 = Collection.objects.create(
             name="collection2",
             collector=collector,
-            collection_system=collection_system,
-            waste_stream=waste_stream,
+            collection_system=cls.collection_system,
+            waste_stream=cls.waste_stream,
         )
-        collection2.flyers.set([flyer_1, flyer_2])
+        cls.collection2.flyers.set([cls.flyer_1, cls.flyer_2])
 
     def test_associated_flyer_urls_are_shown_as_initial_values(self):
         initial_urls = [{"url": flyer.url} for flyer in self.collection.flyers.all()]
         WasteFlyerModelFormSet = formset_factory(
-            WasteFlyerModelForm, formset=BaseWasteFlyerUrlFormSet, extra=0
+            WasteFlyerModelForm, formset=WasteFlyerFormSet, extra=0
         )
         formset = WasteFlyerModelFormSet(
             parent_object=self.collection,
@@ -617,7 +617,7 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             "form-2-url": initial_urls[2]["url"],
         }
         WasteFlyerModelFormSet = formset_factory(
-            WasteFlyerModelForm, formset=BaseWasteFlyerUrlFormSet
+            WasteFlyerModelForm, formset=WasteFlyerFormSet
         )
         formset = WasteFlyerModelFormSet(
             parent_object=self.collection, data=data, relation_field_name="flyers"
@@ -631,7 +631,7 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
     def test_empty_url_field_is_ignored(self):
         data = {"form-INITIAL_FORMS": 1, "form-TOTAL_FORMS": 1, "form-0-url": ""}
         WasteFlyerModelFormSet = formset_factory(
-            WasteFlyerModelForm, formset=BaseWasteFlyerUrlFormSet, extra=0
+            WasteFlyerModelForm, formset=WasteFlyerFormSet, extra=0
         )
         formset = WasteFlyerModelFormSet(
             data, parent_object=self.collection, relation_field_name="flyers"
@@ -654,7 +654,7 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             "form-3-url": "https://www.fest-flyers.org",
         }
         WasteFlyerModelFormSet = formset_factory(
-            WasteFlyerModelForm, formset=BaseWasteFlyerUrlFormSet
+            WasteFlyerModelForm, formset=WasteFlyerFormSet
         )
         formset = WasteFlyerModelFormSet(
             data, parent_object=self.collection, relation_field_name="flyers"
@@ -677,7 +677,7 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             "form-2-url": initial_urls[2]["url"],
         }
         WasteFlyerModelFormSet = formset_factory(
-            WasteFlyerModelForm, formset=BaseWasteFlyerUrlFormSet
+            WasteFlyerModelForm, formset=WasteFlyerFormSet
         )
         formset = WasteFlyerModelFormSet(
             data, parent_object=self.collection, relation_field_name="flyers"
@@ -699,7 +699,7 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             "form-2-url": "",
         }
         WasteFlyerModelFormSet = formset_factory(
-            WasteFlyerModelForm, formset=BaseWasteFlyerUrlFormSet
+            WasteFlyerModelForm, formset=WasteFlyerFormSet
         )
         formset = WasteFlyerModelFormSet(
             data, parent_object=self.collection, relation_field_name="flyers"
@@ -714,7 +714,7 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
 
     def test_save_two_new_and_equal_urls_only_once(self):
         WasteFlyerModelFormSet = formset_factory(
-            WasteFlyerModelForm, formset=BaseWasteFlyerUrlFormSet
+            WasteFlyerModelForm, formset=WasteFlyerFormSet
         )
         url = "https://www.fest-flyers.org"
         data = {
@@ -734,6 +734,122 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
         WasteFlyer.objects.get(url=url)
         # one should be deleted and one created ==> +-0
         self.assertEqual(original_flyer_count, WasteFlyer.objects.count())
+
+    def test_flyer_referenced_by_property_value_is_not_deleted(self):
+        """Test that a flyer referenced by a CollectionPropertyValue is not deleted."""
+        from utils.properties.models import Property, Unit
+
+        from ..models import CollectionPropertyValue
+
+        # Create a property value that references a flyer via sources
+        unit = Unit.objects.create(name="Test Unit")
+        prop = Property.objects.create(name="Test Property", unit="kg")
+        prop_value = CollectionPropertyValue.objects.create(
+            name="Test Property Value",
+            collection=self.collection,
+            property=prop,
+            unit=unit,
+            average=10.0,
+        )
+        prop_value.sources.add(self.flyer_1)
+
+        # Remove flyer_1 from collection's flyers
+        initial_urls = [{"url": flyer.url} for flyer in self.collection.flyers.all()]
+        data = {
+            "form-INITIAL_FORMS": 3,
+            "form-TOTAL_FORMS": 3,
+            "form-0-url": initial_urls[1]["url"],  # Keep flyer_2
+            "form-1-url": initial_urls[2]["url"],  # Keep flyer_3
+            "form-2-url": "",  # Remove flyer_1 from collection
+        }
+        WasteFlyerModelFormSet = formset_factory(
+            WasteFlyerModelForm, formset=WasteFlyerFormSet
+        )
+        formset = WasteFlyerModelFormSet(
+            data, parent_object=self.collection, relation_field_name="flyers"
+        )
+        self.assertTrue(formset.is_valid())
+        formset.save()
+
+        # flyer_1 should still exist because it's referenced by prop_value
+        WasteFlyer.objects.get(pk=self.flyer_1.pk)
+        # It should be removed from collection.flyers
+        self.assertEqual(2, self.collection.flyers.count())
+        self.assertNotIn(self.flyer_1, self.collection.flyers.all())
+
+    def test_flyer_referenced_by_aggregated_property_value_is_not_deleted(self):
+        """Test that a flyer referenced by AggregatedCollectionPropertyValue is not deleted."""
+        from utils.properties.models import Property, Unit
+
+        from ..models import AggregatedCollectionPropertyValue
+
+        # Create aggregated property value that references a flyer via sources
+        unit = Unit.objects.create(name="Test Unit 2", publication_status="published")
+        prop = Property.objects.create(
+            name="Test Property 2", unit="kg", publication_status="published"
+        )
+        prop.allowed_units.add(unit)
+        agg_prop_value = AggregatedCollectionPropertyValue.objects.create(
+            name="Test Aggregated Property Value",
+            property=prop,
+            unit=unit,
+            average=20.0,
+            year=2024,
+        )
+        agg_prop_value.sources.add(self.flyer_2)
+
+        # Remove flyer_2 from collection's flyers
+        initial_urls = [{"url": flyer.url} for flyer in self.collection.flyers.all()]
+        data = {
+            "form-INITIAL_FORMS": 3,
+            "form-TOTAL_FORMS": 3,
+            "form-0-url": initial_urls[0]["url"],  # Keep flyer_1
+            "form-1-url": "",  # Remove flyer_2 from collection
+            "form-2-url": initial_urls[2]["url"],  # Keep flyer_3
+        }
+        WasteFlyerModelFormSet = formset_factory(
+            WasteFlyerModelForm, formset=WasteFlyerFormSet
+        )
+        formset = WasteFlyerModelFormSet(
+            data, parent_object=self.collection, relation_field_name="flyers"
+        )
+        self.assertTrue(formset.is_valid())
+        formset.save()
+
+        # flyer_2 should still exist because it's referenced by agg_prop_value
+        WasteFlyer.objects.get(pk=self.flyer_2.pk)
+        # It should be removed from collection.flyers
+        self.assertEqual(2, self.collection.flyers.count())
+        self.assertNotIn(self.flyer_2, self.collection.flyers.all())
+
+    def test_flyer_referenced_as_generic_source_is_not_deleted(self):
+        """Test that a flyer used as a generic Source elsewhere is not deleted."""
+        # Add flyer_3 to collection2's sources (as generic Source, not as flyer)
+        self.collection2.sources.add(self.flyer_3)
+
+        # Remove flyer_3 from collection's flyers
+        initial_urls = [{"url": flyer.url} for flyer in self.collection.flyers.all()]
+        data = {
+            "form-INITIAL_FORMS": 3,
+            "form-TOTAL_FORMS": 3,
+            "form-0-url": initial_urls[0]["url"],  # Keep flyer_1
+            "form-1-url": initial_urls[1]["url"],  # Keep flyer_2
+            "form-2-url": "",  # Remove flyer_3 from collection
+        }
+        WasteFlyerModelFormSet = formset_factory(
+            WasteFlyerModelForm, formset=WasteFlyerFormSet
+        )
+        formset = WasteFlyerModelFormSet(
+            data, parent_object=self.collection, relation_field_name="flyers"
+        )
+        self.assertTrue(formset.is_valid())
+        formset.save()
+
+        # flyer_3 should still exist because it's referenced by collection2.sources
+        WasteFlyer.objects.get(pk=self.flyer_3.pk)
+        # It should be removed from collection.flyers
+        self.assertEqual(2, self.collection.flyers.count())
+        self.assertNotIn(self.flyer_3, self.collection.flyers.all())
 
 
 class CollectionAddWasteSampleFormTestCase(TestCase):

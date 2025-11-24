@@ -299,6 +299,10 @@ class WasteFlyerFormSet(M2MInlineFormSet):
         super().__init__(*args, **kwargs)
 
     def save(self, commit=True):
+        for form in self.forms:
+            if not getattr(form.instance, "owner", None):
+                form.instance.owner = self.owner
+
         child_objects = super().save(commit=commit)
 
         # Delete WasteFlyers that are completely orphaned - not connected to:
@@ -315,11 +319,6 @@ class WasteFlyerFormSet(M2MInlineFormSet):
         ).delete()
 
         return child_objects
-
-
-# Backward-compatible aliases for old FormSet names
-BaseWasteFlyerUrlFormSet = WasteFlyerFormSet
-PropertyValueWasteFlyerFormSet = WasteFlyerFormSet
 
 
 class CollectionPropertyValueModelFormHelper(FormHelper):

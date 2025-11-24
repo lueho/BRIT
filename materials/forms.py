@@ -15,7 +15,6 @@ from django.utils.safestring import mark_safe
 from django_tomselect.forms import (
     TomSelectConfig,
     TomSelectModelChoiceField,
-    TomSelectModelMultipleChoiceField,
 )
 from extra_views import InlineFormSetFactory
 
@@ -107,18 +106,9 @@ class MaterialPropertyValueModalModelForm(
     pass
 
 
-class AnalyticalMethodModelForm(SimpleModelForm):
-    sources = TomSelectModelMultipleChoiceField(
-        config=TomSelectConfig(
-            url="source-autocomplete",
-            label_field="label",
-        ),
-        attrs={"class": "form-control mb-3"},
-        label="Sources",
-        required=False,
-        help_text="Optional: Select multiple sources if applicable.",
-    )
-
+class AnalyticalMethodModelForm(
+    UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModelForm
+):
     class Meta:
         model = AnalyticalMethod
         fields = (
