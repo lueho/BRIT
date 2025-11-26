@@ -624,7 +624,7 @@ class CollectionCatchmentCRUDViewsTestCase(
     AbstractTestCases.UserCreatedObjectCRUDViewTestCase
 ):
     model = CollectionCatchment
-    model_add_permission = "add_catchment"
+    model_add_permission = "add_collectioncatchment"
 
     view_dashboard_name = "wastecollection-dashboard"
     view_published_list_name = "collectioncatchment-list"

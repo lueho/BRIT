@@ -779,7 +779,7 @@ class CollectionCatchmentPrivateFilterView(PrivateObjectFilterView):
 
 
 class CollectionCatchmentCreateView(CatchmentCreateView):
-    pass
+    permission_required = "soilcom.add_collectioncatchment"
 
 
 class CollectionCatchmentDetailView(CatchmentDetailView):
