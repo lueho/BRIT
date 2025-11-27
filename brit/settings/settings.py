@@ -94,6 +94,7 @@ TEMPLATES = [
                 "django.contrib.messages.context_processors.messages",
                 "brit.context_processors.google_analytics",
                 "django_tomselect.context_processors.tomselect",
+                "utils.breadcrumbs.context_processors.breadcrumbs",
             ],
         },
     },

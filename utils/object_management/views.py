@@ -43,6 +43,7 @@ from utils.object_management.permissions import (
 )
 from utils.object_management.review_filtering import ReviewItemFilter
 
+from ..breadcrumbs import BreadcrumbMixin
 from ..forms import (
     DynamicTableInlineFormSetHelper,
     SourcesFieldMixin,
@@ -944,7 +945,7 @@ class PrivateObjectListMixin(LoginRequiredMixin, UserCreatedObjectListMixin):
 
 
 class PublishedObjectFilterView(
-    PublishedObjectListMixin, FilterDefaultsMixin, FilterView
+    BreadcrumbMixin, PublishedObjectListMixin, FilterDefaultsMixin, FilterView
 ):
     """
     A view to display a list of published objects with default filters applied.
@@ -1030,7 +1031,9 @@ class ReviewObjectFilterView(ReviewObjectListMixin, FilterDefaultsMixin, FilterV
         return template_names
 
 
-class PrivateObjectFilterView(PrivateObjectListMixin, FilterDefaultsMixin, FilterView):
+class PrivateObjectFilterView(
+    BreadcrumbMixin, PrivateObjectListMixin, FilterDefaultsMixin, FilterView
+):
     """
     A view to display a list of objects owned by the currently logged-in user with default filters applied.
     """
@@ -1049,7 +1052,7 @@ class PrivateObjectFilterView(PrivateObjectListMixin, FilterDefaultsMixin, Filte
         return template_names
 
 
-class PublishedObjectListView(PublishedObjectListMixin, ListView):
+class PublishedObjectListView(BreadcrumbMixin, PublishedObjectListMixin, ListView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update(
@@ -1071,7 +1074,7 @@ class PublishedObjectListView(PublishedObjectListMixin, ListView):
         return template_names
 
 
-class PrivateObjectListView(PrivateObjectListMixin, ListView):
+class PrivateObjectListView(BreadcrumbMixin, PrivateObjectListMixin, ListView):
     """
     A view to display a list of objects owned by the currently logged-in user.
     """
@@ -1193,7 +1196,11 @@ class CreateUserObjectMixin(PermissionRequiredMixin, NextOrSuccessUrlMixin):
 
 
 class UserCreatedObjectCreateView(
-    CreateUserObjectMixin, NoFormTagMixin, SuccessMessageMixin, CreateView
+    BreadcrumbMixin,
+    CreateUserObjectMixin,
+    NoFormTagMixin,
+    SuccessMessageMixin,
+    CreateView,
 ):
     def get_form_kwargs(self):
         """Pass request to form if it supports UserCreatedObjectFormMixin or SourcesFieldMixin."""
@@ -1292,7 +1299,9 @@ class UserCreatedObjectModalCreateView(PermissionRequiredMixin, BSModalCreateVie
         return super().form_valid(form)
 
 
-class UserCreatedObjectDetailView(UserCreatedObjectReadAccessMixin, DetailView):
+class UserCreatedObjectDetailView(
+    BreadcrumbMixin, UserCreatedObjectReadAccessMixin, DetailView
+):
     """
     A view to display the details of a user created object only if it is either published or owned by the currently
     logged-in user. Views that inherit from this view must use models that inherit from UserCreatedObject.
@@ -1517,7 +1526,10 @@ class UserCreatedObjectModalDetailView(
 
 
 class UserCreatedObjectUpdateView(
-    UserCreatedObjectWriteAccessMixin, NextOrSuccessUrlMixin, UpdateView
+    BreadcrumbMixin,
+    UserCreatedObjectWriteAccessMixin,
+    NextOrSuccessUrlMixin,
+    UpdateView,
 ):
     # TODO: Implement permission flow for publication process and moderators.
 
