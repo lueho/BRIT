@@ -14,6 +14,14 @@ from .config import (
 )
 
 
+def _urls_match(url1: str | None, url2: str | None) -> bool:
+    """Check if two URLs point to the same page (ignoring query strings)."""
+    if not url1 or not url2:
+        return False
+    # Strip query strings and trailing slashes for comparison
+    return url1.rstrip("/").split("?")[0] == url2.rstrip("/").split("?")[0]
+
+
 class Breadcrumb:
     """A single breadcrumb item."""
 
@@ -62,31 +70,60 @@ class BreadcrumbMixin:
         """
         crumbs = []
 
-        # Always start with Home
-        crumbs.append(Breadcrumb("Home", reverse("home"), "fa-home"))
+        # Get current request path for comparison
+        current_path = None
+        try:
+            current_path = self.request.path
+        except AttributeError:
+            pass
+
+        home_url = reverse("home")
+
+        # Always start with Home (unless we ARE home)
+        if not _urls_match(current_path, home_url):
+            crumbs.append(Breadcrumb("Home", home_url, "fa-home"))
 
         # Determine section from model or explicit setting
         section = self._get_section()
+        section_url = None
+        is_on_section_page = False
         if section:
             try:
                 section_url = reverse(section["url_name"])
+            except Exception:
+                section_url = None
+
+            is_on_section_page = _urls_match(current_path, section_url)
+            # Add section as link if we're not ON it, otherwise we'll add it as active later
+            if not is_on_section_page:
                 crumbs.append(
                     Breadcrumb(section["label"], section_url, section["icon"])
                 )
-            except Exception:
-                crumbs.append(Breadcrumb(section["label"], None, section["icon"]))
 
         # Add subsection if applicable (e.g., "Samples" within "Materials")
         subsection = self._get_subsection()
+        is_on_subsection_page = False
         if subsection and subsection != section:
             try:
                 subsection_url = reverse(subsection["url_name"])
-                crumbs.append(Breadcrumb(subsection["label"], subsection_url))
+                is_on_subsection_page = _urls_match(current_path, subsection_url)
+                # Add subsection as link if we're not ON it
+                if not is_on_subsection_page:
+                    crumbs.append(Breadcrumb(subsection["label"], subsection_url))
             except Exception:
                 pass
 
         # Add view-specific breadcrumbs
-        crumbs.extend(self._get_view_breadcrumbs())
+        view_crumbs = self._get_view_breadcrumbs()
+
+        # If we're on a section/subsection page with no other breadcrumbs, add it as active
+        if not view_crumbs:
+            if is_on_subsection_page and subsection:
+                crumbs.append(Breadcrumb(subsection["label"]))
+            elif is_on_section_page and section:
+                crumbs.append(Breadcrumb(section["label"]))
+
+        crumbs.extend(view_crumbs)
 
         # Mark last item as active (no URL)
         if crumbs:
@@ -182,6 +219,10 @@ class BreadcrumbMixin:
 
                 # Add "Edit" as final
                 crumbs.append(Breadcrumb(self.breadcrumb_label or "Edit"))
+
+        # Other views (TemplateView, etc.): add custom label if provided
+        elif self.breadcrumb_label:
+            crumbs.append(Breadcrumb(self.breadcrumb_label))
 
         return crumbs
 

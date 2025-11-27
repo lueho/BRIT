@@ -277,6 +277,8 @@ class GreenhousesPublishedMapView(GeoDataSetPublishedFilteredMapView):
     filterset_class = NantesGreenhousesFilterSet
     features_layer_api_basename = "api-nantes-greenhouses"
     map_title = "Nantes Greenhouses"
+    breadcrumb_section = "maps"
+    breadcrumb_label = "Nantes Greenhouses"
 
 
 class NantesGreenhousesListFileExportView(GenericUserCreatedObjectExportView):

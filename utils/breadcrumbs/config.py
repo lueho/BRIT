@@ -100,6 +100,13 @@ MODEL_SECTIONS = {
     "collectioncatchment": "waste_collection",
     "wasteflyer": "waste_collection",
     "wastecategory": "waste_collection",
+    # Case studies - Nantes
+    "greenhouse": "maps",
+    "culture": "sources",
+    "growthcycle": "maps",
+    "growthtimestepset": "maps",
+    # Case studies - Hamburg
+    "roadsidetree": "maps",
 }
 
 # Subsection definitions for models that need intermediate breadcrumbs
@@ -180,6 +187,15 @@ MODEL_SUBSECTIONS = {
     "collector": {
         "label": "Collectors",
         "url_name": "collector-list",
+    },
+    # Case studies - Nantes
+    "greenhouse": {
+        "label": "Greenhouses",
+        "url_name": "greenhouse-list",
+    },
+    "culture": {
+        "label": "Cultures",
+        "url_name": "culture-list",
     },
 }
 

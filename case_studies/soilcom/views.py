@@ -1630,6 +1630,8 @@ class WasteCollectionPublishedMapView(
     map_title = "Household Waste Collections"
     dashboard_url = reverse_lazy("wastecollection-dashboard")
     dv_scope = "published"
+    breadcrumb_section = "maps"
+    breadcrumb_label = "Household Waste Collections"
 
     def get_filterset_kwargs(self, filterset_class=None):
         kwargs = super().get_filterset_kwargs(filterset_class)

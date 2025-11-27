@@ -13,6 +13,8 @@ class RoadsideTreesPublishedMapView(GeoDataSetPublishedFilteredMapView):
     filterset_class = HamburgRoadsideTreesFilterSet
     features_layer_api_basename = "api-hamburg-roadside-trees"
     map_title = "Roadside Trees"
+    breadcrumb_section = "maps"
+    breadcrumb_label = "Roadside Trees"
 
 
 @method_decorator(xframe_options_exempt, name="dispatch")

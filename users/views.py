@@ -6,6 +6,8 @@ from django.urls import reverse, reverse_lazy
 from django.views.generic import DeleteView, TemplateView
 from django_tomselect.autocompletes import AutocompleteModelView
 
+from utils.breadcrumbs import BreadcrumbMixin
+
 from .forms import CustomAuthenticationForm
 
 
@@ -16,16 +18,17 @@ class UserDeleteView(LoginRequiredMixin, DeleteView):
     success_url = reverse_lazy("home")
 
 
-class UserProfileView(LoginRequiredMixin, TemplateView):
+class UserProfileView(BreadcrumbMixin, LoginRequiredMixin, TemplateView):
     model = User
     template_name = "user_profile.html"
+    breadcrumb_label = "Profile"
 
 
 class ModalLoginView(BSModalLoginView):
     authentication_form = CustomAuthenticationForm
     template_name = "modal_form.html"
     success_message = "Success: You were successfully logged in."
-    extra_context = dict(success_url=reverse_lazy("login"))
+    extra_context = {"success_url": reverse_lazy("login")}
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
