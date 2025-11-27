@@ -13,7 +13,6 @@ app_name = "processes"
 urlpatterns = [
     # Dashboard
     path("dashboard/", views.ProcessDashboardView.as_view(), name="dashboard"),
-
     # ProcessCategory URLs
     path(
         "categories/",
@@ -75,7 +74,6 @@ urlpatterns = [
         views.ProcessCategoryOptions.as_view(),
         name="processcategory-options",
     ),
-
     # Process URLs
     path(
         "list/",
@@ -137,7 +135,6 @@ urlpatterns = [
         views.ProcessAutocompleteView.as_view(),
         name="process-autocomplete",
     ),
-
     # API endpoints
     path("api/", include(router.urls)),
 ]
