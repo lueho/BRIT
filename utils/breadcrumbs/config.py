@@ -200,6 +200,53 @@ MODEL_SUBSECTIONS = {
 }
 
 
+# Define which subsections/lists belong to each section (for dropdown menus)
+# Each entry maps a section key to a list of subsection definitions
+SECTION_CHILDREN = {
+    "materials": [
+        {"label": "Samples", "url_name": "sample-list-featured"},
+        {"label": "Sample Series", "url_name": "sampleseries-list"},
+        {"label": "Materials", "url_name": "material-list"},
+        {"label": "Components", "url_name": "materialcomponent-list"},
+        {"label": "Properties", "url_name": "materialproperty-list"},
+        {"label": "Analytical Methods", "url_name": "analyticalmethod-list"},
+    ],
+    "maps": [
+        {"label": "Map Explorer", "url_name": "maps-dashboard"},
+        {"label": "Geo Datasets", "url_name": "geodataset-list"},
+        {"label": "Catchments", "url_name": "catchment-list"},
+        {"label": "Regions", "url_name": "region-list"},
+        {"label": "Attributes", "url_name": "attribute-list"},
+        {"label": "Locations", "url_name": "location-list"},
+    ],
+    "bibliography": [
+        {"label": "Sources", "url_name": "source-list"},
+        {"label": "Authors", "url_name": "author-list"},
+        {"label": "Licences", "url_name": "licence-list"},
+    ],
+    "waste_collection": [
+        {"label": "Collections", "url_name": "collection-list"},
+        {"label": "Collectors", "url_name": "collector-list"},
+    ],
+    "inventories": [
+        {"label": "Scenarios", "url_name": "scenario-list"},
+    ],
+}
+
+
+def get_section_children(section_key: str) -> list[dict]:
+    """Get the child items for a section (for dropdown menus)."""
+    children = SECTION_CHILDREN.get(section_key, [])
+    resolved = []
+    for child in children:
+        try:
+            url = reverse(child["url_name"])
+            resolved.append({"label": child["label"], "url": url})
+        except Exception:
+            pass  # Skip items with invalid URLs
+    return resolved
+
+
 def get_section_for_model(model_name: str) -> dict | None:
     """Get the section configuration for a given model name."""
     section_key = MODEL_SECTIONS.get(model_name.lower())

@@ -8,8 +8,9 @@ from django.urls import reverse
 from django.views.generic import CreateView, DetailView, ListView, UpdateView
 
 from .config import (
+    MODEL_SECTIONS,
     SECTIONS,
-    get_section_for_model,
+    get_section_children,
     get_subsection_for_model,
 )
 
@@ -25,13 +26,25 @@ def _urls_match(url1: str | None, url2: str | None) -> bool:
 class Breadcrumb:
     """A single breadcrumb item."""
 
-    __slots__ = ("label", "url", "icon", "is_active")
+    __slots__ = ("label", "url", "icon", "is_active", "dropdown_items")
 
-    def __init__(self, label: str, url: str | None = None, icon: str | None = None):
+    def __init__(
+        self,
+        label: str,
+        url: str | None = None,
+        icon: str | None = None,
+        dropdown_items: list[dict] | None = None,
+    ):
         self.label = label
         self.url = url
         self.icon = icon
         self.is_active = url is None
+        self.dropdown_items = dropdown_items or []
+
+    @property
+    def has_dropdown(self) -> bool:
+        """Check if this breadcrumb has dropdown items."""
+        return bool(self.dropdown_items)
 
     def __repr__(self):
         return f"Breadcrumb({self.label!r}, {self.url!r})"
@@ -84,7 +97,7 @@ class BreadcrumbMixin:
             crumbs.append(Breadcrumb("Home", home_url, "fa-home"))
 
         # Determine section from model or explicit setting
-        section = self._get_section()
+        section_key, section = self._get_section()
         section_url = None
         is_on_section_page = False
         if section:
@@ -96,8 +109,17 @@ class BreadcrumbMixin:
             is_on_section_page = _urls_match(current_path, section_url)
             # Add section as link if we're not ON it, otherwise we'll add it as active later
             if not is_on_section_page:
+                # Get dropdown items for this section
+                dropdown_items = (
+                    get_section_children(section_key) if section_key else []
+                )
                 crumbs.append(
-                    Breadcrumb(section["label"], section_url, section["icon"])
+                    Breadcrumb(
+                        section["label"],
+                        section_url,
+                        section["icon"],
+                        dropdown_items,
+                    )
                 )
 
         # Add subsection if applicable (e.g., "Samples" within "Materials")
@@ -133,11 +155,15 @@ class BreadcrumbMixin:
 
         return crumbs
 
-    def _get_section(self) -> dict | None:
-        """Determine the section for this view."""
+    def _get_section(self) -> tuple[str | None, dict | None]:
+        """Determine the section for this view.
+
+        Returns:
+            Tuple of (section_key, section_dict) or (None, None) if not found.
+        """
         # Explicit section setting takes precedence
         if self.breadcrumb_section:
-            return SECTIONS.get(self.breadcrumb_section)
+            return self.breadcrumb_section, SECTIONS.get(self.breadcrumb_section)
 
         # Try to determine from model
         model = getattr(self, "model", None)
@@ -148,9 +174,12 @@ class BreadcrumbMixin:
                 model = queryset.model
 
         if model:
-            return get_section_for_model(model._meta.model_name)
+            model_name = model._meta.model_name.lower()
+            section_key = MODEL_SECTIONS.get(model_name)
+            if section_key:
+                return section_key, SECTIONS.get(section_key)
 
-        return None
+        return None, None
 
     def _get_subsection(self) -> dict | None:
         """Determine the subsection for this view (model-level list page)."""

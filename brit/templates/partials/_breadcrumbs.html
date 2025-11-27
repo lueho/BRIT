@@ -7,6 +7,23 @@
                         {% if crumb.icon %}<i class="fas {{ crumb.icon }} me-1"></i>{% endif %}
                         {{ crumb.label }}
                     </li>
+                {% elif crumb.has_dropdown %}
+                    <li class="breadcrumb-item dropdown">
+                        <a href="{{ crumb.url }}"
+                           class="dropdown-toggle text-decoration-none"
+                           data-bs-toggle="dropdown"
+                           aria-expanded="false">
+                            {% if crumb.icon %}<i class="fas {{ crumb.icon }} me-1"></i>{% endif %}
+                            {{ crumb.label }}
+                        </a>
+                        <ul class="dropdown-menu">
+                            {% for item in crumb.dropdown_items %}
+                                <li>
+                                    <a class="dropdown-item" href="{{ item.url }}">{{ item.label }}</a>
+                                </li>
+                            {% endfor %}
+                        </ul>
+                    </li>
                 {% else %}
                     <li class="breadcrumb-item">
                         <a href="{{ crumb.url }}">
