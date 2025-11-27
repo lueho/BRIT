@@ -3,15 +3,14 @@ from rest_framework.serializers import DecimalField, Serializer, SerializerMetho
 
 class DecimalWithCommaField(DecimalField):
     def to_representation(self, value):
-        return super().to_representation(value).replace('.', ',')
+        return super().to_representation(value).replace(".", ",")
 
 
-class SimuCF(object):
-
+class SimuCF:
     def __init__(self, *args, **kwargs):
-        self.amount = kwargs.get('amount')
+        self.amount = kwargs.get("amount")
         self.degr_mat_dry_solid_content = 66.6
-        self.material = kwargs.get('material')
+        self.material = kwargs.get("material")
         self.carbohydrates = self.material.carbohydrates * self.amount
         self.starch = self.material.starch * self.amount
         self.amino_acids = self.material.amino_acids * self.amount
@@ -30,7 +29,7 @@ class SimuCF(object):
         self.inorganics = 0
         self.inorganics_ts = 50
         self.bulk_density = 0.8
-        self.length_of_treatment = kwargs.get('length_of_treatment')
+        self.length_of_treatment = kwargs.get("length_of_treatment")
         self.evap = [0] * self.length_of_treatment
         self.water_input = [0] * self.length_of_treatment
         self.ferric_chloride = [0] * self.length_of_treatment
@@ -69,10 +68,10 @@ class SimuCFSerializer(Serializer):
 
     @staticmethod
     def format_list(value_list):
-        text = ''
+        text = ""
         for index, value in enumerate(value_list):
-            value = f'{value:.3f}'.replace('.', ',')
-            text += f'{index},000\t{value}\n'
+            value = f"{value:.3f}".replace(".", ",")
+            text += f"{index},000\t{value}\n"
         return text
 
     def get_evap(self, obj):
@@ -101,4 +100,3 @@ class SimuCFSerializer(Serializer):
 
     def get_aeration_rate(self, obj):
         return self.format_list(obj.aeration_rate)
-

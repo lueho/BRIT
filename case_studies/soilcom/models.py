@@ -1,10 +1,11 @@
 from datetime import date
+from functools import cached_property
 
 import celery
 from django.core.exceptions import ValidationError
-from django.core.validators import RegexValidator
+from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models, transaction
-from django.db.models import Count, Q, Sum
+from django.db.models import Case, Count, IntegerField, Q, Sum, Value, When
 from django.db.models.signals import post_save, pre_save
 from django.dispatch import receiver
 from django.urls import reverse
@@ -21,6 +22,7 @@ from utils.object_management.models import (
     UserCreatedObjectQuerySet,
     get_default_owner,
 )
+from utils.object_management.permissions import filter_queryset_for_user
 from utils.properties.models import PropertyValue
 
 
@@ -62,6 +64,13 @@ class Collector(NamedUserCreatedObject):
     class Meta:
         verbose_name = "waste collector"
 
+    @property
+    def geom(self):
+        """Return the geometry from the associated catchment."""
+        if self.catchment:
+            return self.catchment.geom
+        return None
+
 
 class CollectionSystem(NamedUserCreatedObject):
     class Meta:
@@ -77,7 +86,6 @@ class WasteCategory(NamedUserCreatedObject):
 
 
 class WasteComponentManager(UserCreatedObjectManager):
-
     def get_queryset(self):
         categories = MaterialCategory.objects.filter(name__in=("Biowaste component",))
         return super().get_queryset().filter(categories__in=categories)
@@ -99,7 +107,6 @@ def add_material_category(sender, instance, created, **kwargs):
 
 
 class WasteStreamQuerySet(UserCreatedObjectQuerySet):
-
     def match_allowed_materials(self, allowed_materials):
         if allowed_materials is not None and allowed_materials.exists():
             return self.alias(
@@ -203,7 +210,6 @@ class WasteStreamQuerySet(UserCreatedObjectQuerySet):
         instance, created = self.get_or_create(defaults=defaults, **kwargs)
 
         if not created:
-
             new_allowed_materials = defaults.pop("allowed_materials", None)
             new_forbidden_materials = defaults.pop("forbidden_materials", None)
             category = kwargs.get("category", None)
@@ -222,7 +228,7 @@ class WasteStreamQuerySet(UserCreatedObjectQuerySet):
                 if qs.exists():
                     raise ValidationError(
                         """
-                        Waste stream cannot be updated. Equivalent waste stream of equal category and same combination 
+                        Waste stream cannot be updated. Equivalent waste stream of equal category and same combination
                         of allowed and forbidden materials already exists.
                         """
                     )
@@ -243,7 +249,6 @@ class WasteStreamQuerySet(UserCreatedObjectQuerySet):
 
 
 class WasteStreamManager(UserCreatedObjectManager):
-
     def get_queryset(self):
         return WasteStreamQuerySet(self.model, using=self._db)
 
@@ -275,7 +280,6 @@ class WasteStream(NamedUserCreatedObject):
 
 
 class WasteFlyerManager(UserCreatedObjectManager):
-
     def get_queryset(self):
         return super().get_queryset().filter(type="waste_flyer")
 
@@ -306,7 +310,6 @@ def check_url_valid(sender, instance, created, **kwargs):
 
 
 class CollectionSeasonManager(UserCreatedObjectManager):
-
     def get_queryset(self):
         distribution = TemporalDistribution.objects.get(
             owner=get_default_owner(), name="Months of the year"
@@ -394,7 +397,6 @@ class FeeSystem(NamedUserCreatedObject):
 
 
 class CollectionQuerySet(UserCreatedObjectQuerySet):
-
     def valid_on(self, date):
         return self.filter(
             Q(valid_from__lte=date), Q(valid_until__gte=date) | Q(valid_until=None)
@@ -483,17 +485,23 @@ class Collection(NamedUserCreatedObject):
         help_text="Indicates whether connection to the collection system is mandatory, voluntary, or not specified. Leave blank for never set; select 'not specified' for explicit user choice.",
     )
 
-    min_bin_size = models.PositiveIntegerField(
+    min_bin_size = models.DecimalField(
         blank=True,
         null=True,
         verbose_name="Smallest available bin size (L)",
         help_text="Smallest physical bin size that the collector provides for this collection. Exceprions may apply (e.g. for home composters)",
+        max_digits=8,
+        decimal_places=1,
+        validators=[MinValueValidator(0)],
     )
-    required_bin_capacity = models.PositiveIntegerField(
+    required_bin_capacity = models.DecimalField(
         blank=True,
         null=True,
         verbose_name="Required bin capacity per unit (L)",
         help_text="Minimum total bin capacity that must be supplied per reference unit (see field below).",
+        max_digits=8,
+        decimal_places=1,
+        validators=[MinValueValidator(0)],
     )
     required_bin_capacity_reference = models.CharField(
         max_length=16,
@@ -510,6 +518,150 @@ class Collection(NamedUserCreatedObject):
     @property
     def geom(self):
         return self.catchment.geom
+
+    @cached_property
+    def version_chain_ids(self):
+        """Return the set of primary keys connected through predecessors/successors."""
+
+        visited = set()
+        stack = [self]
+
+        while stack:
+            current = stack.pop()
+            if not current.pk or current.pk in visited:
+                continue
+
+            visited.add(current.pk)
+
+            stack.extend(current.predecessors.all())
+            stack.extend(current.successors.all())
+
+        return visited
+
+    def all_versions(self):
+        """Return a queryset with every version connected to this collection."""
+
+        model = self.__class__
+
+        if not self.version_chain_ids:
+            return model.objects.none()
+
+        return model.objects.filter(pk__in=self.version_chain_ids)
+
+    @cached_property
+    def version_anchor(self):
+        """Return the canonical version used as anchor for shared statistics."""
+
+        candidate_qs = self.all_versions().order_by("valid_from", "pk")
+
+        for candidate in candidate_qs:
+            if not candidate.predecessors.exists():
+                return candidate
+
+        return candidate_qs.first()
+
+    @staticmethod
+    def _deduplicate_property_values(values):
+        """Return values without duplicates for the same property/unit/year key."""
+
+        seen = set()
+        ordered = []
+
+        for value in values:
+            key = (value.property_id, value.unit_id, value.year)
+            if key in seen:
+                continue
+
+            seen.add(key)
+            ordered.append(value)
+
+        return ordered
+
+    def collectionpropertyvalues_for_display(self, user=None):
+        """Return collection-specific property values visible to ``user`` across the chain."""
+
+        qs = (
+            CollectionPropertyValue.objects.filter(collection__in=self.all_versions())
+            .select_related("property", "unit", "collection")
+            .prefetch_related("sources")
+        )
+
+        qs = filter_queryset_for_user(qs, user)
+
+        published_status = getattr(
+            CollectionPropertyValue, "STATUS_PUBLISHED", "published"
+        )
+        user_id = getattr(user, "id", None)
+
+        qs = qs.annotate(
+            owner_order=Case(
+                When(owner_id=user_id, then=Value(0)),
+                default=Value(1),
+                output_field=IntegerField(),
+            )
+            if user_id
+            else Value(1),
+            publication_order=Case(
+                When(publication_status=published_status, then=Value(0)),
+                default=Value(1),
+                output_field=IntegerField(),
+            ),
+        ).order_by(
+            "property__name",
+            "unit__name",
+            "year",
+            "owner_order",
+            "publication_order",
+            "-collection__valid_from",
+            "-collection__pk",
+            "pk",
+        )
+
+        return self._deduplicate_property_values(qs)
+
+    def aggregatedcollectionpropertyvalues_for_display(self, user=None):
+        """Return aggregated property values visible to ``user`` across the chain."""
+
+        qs = (
+            AggregatedCollectionPropertyValue.objects.filter(
+                collections__in=self.all_versions()
+            )
+            .select_related("property", "unit")
+            .prefetch_related("collections", "sources")
+            .distinct()
+        )
+
+        qs = filter_queryset_for_user(qs, user)
+
+        published_status = getattr(
+            AggregatedCollectionPropertyValue, "STATUS_PUBLISHED", "published"
+        )
+        user_id = getattr(user, "id", None)
+
+        qs = qs.annotate(
+            owner_order=Case(
+                When(owner_id=user_id, then=Value(0)),
+                default=Value(1),
+                output_field=IntegerField(),
+            )
+            if user_id
+            else Value(1),
+            publication_order=Case(
+                When(publication_status=published_status, then=Value(0)),
+                default=Value(1),
+                output_field=IntegerField(),
+            ),
+        ).order_by(
+            "property__name",
+            "unit__name",
+            "year",
+            "owner_order",
+            "publication_order",
+            "-created_at",
+            "-pk",
+        )
+
+        return list(qs)
 
     def construct_name(self):
         """
@@ -559,7 +711,14 @@ class Collection(NamedUserCreatedObject):
         """
 
         with transaction.atomic():
-            for predecessor in self.predecessors.all():
+            # Acquire row-level locks on predecessors deterministically to avoid races
+            locked_predecessors_qs = self.predecessors.order_by(
+                "pk"
+            ).select_for_update()
+            predecessors = list(locked_predecessors_qs)
+
+            # Re-check after acquiring locks: ensure no other published successor exists
+            for predecessor in predecessors:
                 published_successors = predecessor.successors.filter(
                     publication_status="published"
                 ).exclude(pk=self.pk)
@@ -570,10 +729,38 @@ class Collection(NamedUserCreatedObject):
 
             super().approve(user=user)
 
-            for predecessor in self.predecessors.all():
+            # Archive all predecessors after publishing self
+            for predecessor in predecessors:
                 if predecessor.publication_status != "archived":
                     predecessor.publication_status = "archived"
                     predecessor.save(update_fields=["publication_status"])
+
+    def reject(self):
+        """Reject the collection and cascade to related property values in review."""
+
+        from utils.object_management.models import UserCreatedObject
+
+        review_status = UserCreatedObject.STATUS_REVIEW
+
+        with transaction.atomic():
+            pending_property_values = list(
+                self.collectionpropertyvalue_set.filter(
+                    publication_status=review_status
+                )
+            )
+            pending_aggregated_values = list(
+                self.aggregatedcollectionpropertyvalue_set.filter(
+                    publication_status=review_status
+                ).distinct()
+            )
+
+            super().reject()
+
+            for value in pending_property_values:
+                value.reject()
+
+            for aggregated_value in pending_aggregated_values:
+                aggregated_value.reject()
 
     @classmethod
     def public_map_url(cls):

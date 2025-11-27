@@ -2,6 +2,7 @@ import logging
 from urllib.parse import quote
 
 from django import template
+from django.apps import apps
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
 from django.urls import reverse
@@ -59,7 +60,11 @@ def _safe_policy_fallback(user, obj, review_mode=False, error_message=None):
     except Exception:
         pass
 
-    export_list_type = "public" if is_published else ("private" if (is_owner or is_staff) else None)
+    export_list_type = (
+        "published"
+        if (is_published or is_archived)
+        else ("private" if (is_owner or is_staff) else None)
+    )
 
     policy = {
         "is_authenticated": is_authenticated,
@@ -83,9 +88,12 @@ def _safe_policy_fallback(user, obj, review_mode=False, error_message=None):
         "can_withdraw_review": False,
         "can_approve": False,
         "can_reject": False,
-        "can_export": is_published or (is_authenticated and (is_owner or is_staff)),
+        "can_export": (is_published or is_archived)
+        or (is_authenticated and (is_owner or is_staff)),
         "export_list_type": export_list_type,
-        "can_view_review_feedback": bool(is_owner and is_declined and not bool(review_mode)),
+        "can_view_review_feedback": bool(
+            is_owner and is_declined and not bool(review_mode)
+        ),
         # Fallback marker
         "fallback": True,
     }
@@ -144,12 +152,6 @@ def object_policy(context, obj, review_mode=False):
     """
     logger = logging.getLogger(__name__)
     try:
-        logger.debug(
-            "object_policy tag invoked: obj=%s review_mode=%s user=%s",
-            getattr(obj, "pk", None),
-            review_mode,
-            getattr(getattr(context.get("request"), "user", None), "id", None),
-        )
         request = context.get("request")
         user = getattr(request, "user", None) or context.get("user")
         # Local import to avoid circular imports at app load
@@ -158,11 +160,6 @@ def object_policy(context, obj, review_mode=False):
         )
 
         result = _get_object_policy(user, obj, request=request, review_mode=review_mode)
-        logger.debug(
-            "object_policy tag result: keys=%s fallback=%s",
-            sorted(result.keys()) if hasattr(result, "keys") else type(result).__name__,
-            getattr(result, "get", lambda *_: None)("fallback"),
-        )
         return result
     except Exception as e:
         logger.exception("object_policy tag failed", exc_info=True)
@@ -176,13 +173,17 @@ def object_policy(context, obj, review_mode=False):
                 and getattr(user, "is_authenticated", False)
                 and getattr(user, "is_staff", False)
             ):
-                return _safe_policy_fallback(user, obj, review_mode, f"{type(e).__name__}: {e}")
+                return _safe_policy_fallback(
+                    user, obj, review_mode, f"{type(e).__name__}: {e}"
+                )
             # Reveal to owner of the object as well (helps debugging private pages)
             try:
                 if user is not None and getattr(user, "is_authenticated", False):
                     owner_id = getattr(obj, "owner_id", None)
                     if owner_id == getattr(user, "id", None):
-                        return _safe_policy_fallback(user, obj, review_mode, f"{type(e).__name__}: {e}")
+                        return _safe_policy_fallback(
+                            user, obj, review_mode, f"{type(e).__name__}: {e}"
+                        )
             except Exception:
                 pass
         except Exception:
@@ -190,7 +191,9 @@ def object_policy(context, obj, review_mode=False):
         try:
             if getattr(settings, "DEBUG", False):
                 # In debug, reveal error and fallback too
-                return _safe_policy_fallback(user, obj, review_mode, f"{type(e).__name__}: {e}")
+                return _safe_policy_fallback(
+                    user, obj, review_mode, f"{type(e).__name__}: {e}"
+                )
         except Exception:
             pass
         # Last resort: minimal fallback without error message
@@ -360,3 +363,78 @@ def detail_or_review_url(context, obj, use_back=False):
             return absolute_url
     except Exception:  # pragma: no cover - defensive
         return absolute_url
+
+
+@register.simple_tag
+def is_moderator_for_any_model(user):
+    """Check if user has moderation permissions for any UserCreatedObject model.
+
+    Returns True if the user is staff or has can_moderate_* permission for any model.
+    This is useful for showing/hiding moderator-specific UI elements.
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return False
+
+    # Staff users are always moderators
+    if getattr(user, "is_staff", False):
+        return True
+
+    # Check if user has any can_moderate_* permission
+    try:
+        from utils.object_management.models import UserCreatedObject
+
+        for model in apps.get_models():
+            if (
+                issubclass(model, UserCreatedObject)
+                and not model._meta.abstract
+            ):
+                perm_codename = f"can_moderate_{model._meta.model_name}"
+                full_perm = f"{model._meta.app_label}.{perm_codename}"
+                if user.has_perm(full_perm):
+                    return True
+    except Exception:
+        # If something goes wrong, fail closed
+        return False
+
+    return False
+
+
+@register.simple_tag
+def pending_review_count_for_user(user):
+    """Count items pending review that the user can moderate.
+
+    Returns the total count of items in review status across all models
+    where the user has moderation permissions (excluding their own items).
+    """
+    if not user or not getattr(user, "is_authenticated", False):
+        return 0
+
+    try:
+        from utils.object_management.models import UserCreatedObject
+        from utils.object_management.permissions import user_is_moderator_for_model
+
+        total_count = 0
+
+        for model in apps.get_models():
+            if (
+                issubclass(model, UserCreatedObject)
+                and not model._meta.abstract
+                and hasattr(model, "objects")
+            ):
+                if user_is_moderator_for_model(user, model):
+                    try:
+                        # Count items in review, excluding user's own items
+                        count = (
+                            model.objects.in_review()
+                            .exclude(owner=user)
+                            .count()
+                        )
+                        total_count += count
+                    except Exception:
+                        # Skip models that don't support the query
+                        continue
+
+        return total_count
+    except Exception:
+        # If something goes wrong, return 0
+        return 0

@@ -13,7 +13,6 @@ class HasModelPermission(permissions.BasePermission):
     # TODO: EOL this class
 
     def has_permission(self, request, view):
-
         # The OPTIONS method is not associated with any action and should always be allowed
         if request.method in ("OPTIONS", "HEAD"):
             return True
@@ -23,7 +22,7 @@ class HasModelPermission(permissions.BasePermission):
                 "View does not have a 'permission_required' attribute."
             )
 
-        if not type(view.permission_required) is dict:
+        if type(view.permission_required) is not dict:
             raise ImproperlyConfigured(
                 "View's 'permission_required' attribute must be a dictionary."
             )

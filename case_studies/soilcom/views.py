@@ -1,6 +1,6 @@
 import hashlib
 import json
-from datetime import date
+from datetime import date, timedelta
 from urllib.parse import urlencode
 
 from celery.result import AsyncResult
@@ -35,14 +35,25 @@ from maps.views import (
     MapMixin,
 )
 from utils.file_export.views import GenericUserCreatedObjectExportView
-from utils.forms import DynamicTableInlineFormSetHelper, M2MInlineFormSetMixin
+from utils.forms import M2MInlineFormSetMixin
+from utils.object_management.permissions import (
+    filter_queryset_for_user,
+    get_object_policy,
+)
 from utils.object_management.views import (
+    ApproveItemModalView,
+    ApproveItemView,
     OwnedObjectModelSelectOptionsView,
     PrivateObjectFilterView,
     PrivateObjectListView,
     PublishedObjectFilterView,
     PublishedObjectListView,
+    RejectItemModalView,
+    RejectItemView,
+    ReviewItemDetailView,
     ReviewObjectFilterView,
+    SubmitForReviewModalView,
+    SubmitForReviewView,
     UserCreatedObjectAutocompleteView,
     UserCreatedObjectCreateView,
     UserCreatedObjectDetailView,
@@ -52,12 +63,13 @@ from utils.object_management.views import (
     UserCreatedObjectModalDetailView,
     UserCreatedObjectModalUpdateView,
     UserCreatedObjectUpdateView,
+    WithdrawFromReviewModalView,
+    WithdrawFromReviewView,
 )
 
 from .filters import CollectionFilterSet, CollectorFilter, WasteFlyerFilter
 from .forms import (
     AggregatedCollectionPropertyValueModelForm,
-    BaseWasteFlyerUrlFormSet,
     CollectionAddPredecessorForm,
     CollectionAddWasteSampleForm,
     CollectionFrequencyModalModelForm,
@@ -78,6 +90,8 @@ from .forms import (
     WasteCategoryModelForm,
     WasteComponentModalModelForm,
     WasteComponentModelForm,
+    WasteFlyerFormSet,
+    WasteFlyerFormSetHelper,
     WasteFlyerModalModelForm,
     WasteFlyerModelForm,
 )
@@ -184,7 +198,6 @@ class CollectionSystemModalCreateView(UserCreatedObjectModalCreateView):
 
 
 class CollectionSystemDetailView(UserCreatedObjectDetailView):
-    template_name = "simple_detail_card.html"
     model = CollectionSystem
 
 
@@ -473,8 +486,8 @@ class FrequencyCreateView(M2MInlineFormSetMixin, UserCreatedObjectCreateView):
         if form.is_valid() and formset.is_valid():
             form.instance.owner = self.request.user
             self.object = form.save()
-            formset = self.get_formset()
-            formset.is_valid()
+            # Update formset's parent_object so it can set the M2M relationship
+            formset.parent_object = self.object
             formset.save()
             return HttpResponseRedirect(self.get_success_url())
         else:
@@ -555,45 +568,186 @@ class FrequencyAutocompleteView(UserCreatedObjectAutocompleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CollectionPropertyValueCreateView(UserCreatedObjectCreateView):
+class CollectionPropertyValueCreateView(
+    M2MInlineFormSetMixin, UserCreatedObjectCreateView
+):
     form_class = CollectionPropertyValueModelForm
+    formset_model = WasteFlyer
+    formset_class = WasteFlyerFormSet
+    formset_form_class = WasteFlyerModelForm
+    formset_helper_class = WasteFlyerFormSetHelper
+    relation_field_name = "sources"
     permission_required = "soilcom.add_collectionpropertyvalue"
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["request"] = self.request
+        return kwargs
+
+    def get_formset_kwargs(self, **kwargs):
+        if self.request.method in ("POST", "PUT"):
+            kwargs.update({"owner": self.request.user})
+        return super().get_formset_kwargs(**kwargs)
+
+    def post(self, request, *args, **kwargs):
+        form = self.get_form()
+        formset = self.get_formset()
+
+        if form.is_valid() and formset.is_valid():
+            return self.forms_valid(form, formset)
+        else:
+            return self.forms_invalid(form, formset)
+
+    def forms_valid(self, form, formset):
+        form.instance.owner = self.request.user
+        self.object = form.save()
+        # Update formset's parent_object so it can set the M2M relationship
+        formset.parent_object = self.object
+        formset.save()
+        return HttpResponseRedirect(self.get_success_url())
+
+    def forms_invalid(self, form, formset):
+        context = self.get_context_data(form=form, formset=formset)
+        return self.render_to_response(context)
 
 
 class CollectionPropertyValueDetailView(UserCreatedObjectDetailView):
     model = CollectionPropertyValue
 
 
-class CollectionPropertyValueUpdateView(UserCreatedObjectUpdateView):
+class CollectionPropertyValueUpdateView(
+    M2MInlineFormSetMixin, UserCreatedObjectUpdateView
+):
     model = CollectionPropertyValue
     form_class = CollectionPropertyValueModelForm
+    formset_model = WasteFlyer
+    formset_class = WasteFlyerFormSet
+    formset_form_class = WasteFlyerModelForm
+    formset_helper_class = WasteFlyerFormSetHelper
+    relation_field_name = "sources"
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["request"] = self.request
+        return kwargs
+
+    def get_formset_kwargs(self, **kwargs):
+        if self.request.method in ("POST", "PUT"):
+            kwargs.update({"owner": self.request.user})
+        return super().get_formset_kwargs(**kwargs)
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        form = self.get_form()
+        formset = self.get_formset()
+
+        if form.is_valid() and formset.is_valid():
+            return self.forms_valid(form, formset)
+        else:
+            return self.forms_invalid(form, formset)
+
+    def forms_valid(self, form, formset):
+        instance = form.instance
+        anchor = instance.collection.version_anchor if instance.collection else None
+        if anchor and instance.collection_id != anchor.pk:
+            instance.collection = anchor
+
+        self.object = form.save()
+        # Update formset's parent_object so it can set the M2M relationship
+        formset.parent_object = self.object
+        formset.save()
+        return HttpResponseRedirect(self.get_success_url())
+
+    def forms_invalid(self, form, formset):
+        return self.render_to_response(
+            self.get_context_data(form=form, formset=formset)
+        )
 
 
 class CollectionPropertyValueModalDeleteView(UserCreatedObjectModalDeleteView):
     model = CollectionPropertyValue
 
+    def form_valid(self, form):
+        # Ensure we delete the anchor record for the same (property, unit, year)
+        # when the user deletes a CPV on a non-anchor collection.
+        self.object = self.get_object()
+        anchor = self.object.collection.version_anchor
+        anchor_value = None
+        if anchor and self.object.collection_id != anchor.pk:
+            try:
+                anchor_value = CollectionPropertyValue.objects.get(
+                    collection=anchor,
+                    property=self.object.property,
+                    unit=self.object.unit,
+                    year=self.object.year,
+                )
+            except CollectionPropertyValue.DoesNotExist:
+                anchor_value = None
+
+        # Delete anchor first if it is distinct from the current object
+        if anchor_value and anchor_value.pk != self.object.pk:
+            anchor_value.delete()
+
+        return super().form_valid(form)
+
     def get_success_url(self):
-        return reverse("collection-detail", kwargs={"pk": self.object.collection.pk})
+        anchor = self.object.collection.version_anchor
+        target = anchor.pk if anchor else self.object.collection.pk
+        return reverse("collection-detail", kwargs={"pk": target})
 
 
 # ----------- AggregatedCollectionPropertyValue CRUD -------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class AggregatedCollectionPropertyValueCreateView(UserCreatedObjectCreateView):
+class AggregatedCollectionPropertyValueCreateView(
+    M2MInlineFormSetMixin, UserCreatedObjectCreateView
+):
     template_name = "soilcom/collectionpropertyvalue_form.html"
     form_class = AggregatedCollectionPropertyValueModelForm
+    formset_model = WasteFlyer
+    formset_class = WasteFlyerFormSet
+    formset_form_class = WasteFlyerModelForm
+    formset_helper_class = WasteFlyerFormSetHelper
+    relation_field_name = "sources"
     permission_required = "soilcom.add_aggregatedcollectionpropertyvalue"
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["request"] = self.request
+        return kwargs
+
+    def get_formset_kwargs(self, **kwargs):
+        if self.request.method in ("POST", "PUT"):
+            kwargs.update({"owner": self.request.user})
+        return super().get_formset_kwargs(**kwargs)
 
 
 class AggregatedCollectionPropertyValueDetailView(UserCreatedObjectDetailView):
     model = AggregatedCollectionPropertyValue
 
 
-class AggregatedCollectionPropertyValueUpdateView(UserCreatedObjectUpdateView):
+class AggregatedCollectionPropertyValueUpdateView(
+    M2MInlineFormSetMixin, UserCreatedObjectUpdateView
+):
     template_name = "soilcom/collectionpropertyvalue_form.html"
     model = AggregatedCollectionPropertyValue
     form_class = AggregatedCollectionPropertyValueModelForm
+    formset_model = WasteFlyer
+    formset_class = WasteFlyerFormSet
+    formset_form_class = WasteFlyerModelForm
+    formset_helper_class = WasteFlyerFormSetHelper
+    relation_field_name = "sources"
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["request"] = self.request
+        return kwargs
+
+    def get_formset_kwargs(self, **kwargs):
+        if self.request.method in ("POST", "PUT"):
+            kwargs.update({"owner": self.request.user})
+        return super().get_formset_kwargs(**kwargs)
 
 
 class AggregatedCollectionPropertyValueModalDeleteView(
@@ -625,7 +779,7 @@ class CollectionCatchmentPrivateFilterView(PrivateObjectFilterView):
 
 
 class CollectionCatchmentCreateView(CatchmentCreateView):
-    pass
+    permission_required = "soilcom.add_collectioncatchment"
 
 
 class CollectionCatchmentDetailView(CatchmentDetailView):
@@ -683,11 +837,16 @@ class CollectionCreateView(M2MInlineFormSetMixin, UserCreatedObjectCreateView):
     model = Collection
     form_class = CollectionModelForm
     formset_model = WasteFlyer
-    formset_class = BaseWasteFlyerUrlFormSet
+    formset_class = WasteFlyerFormSet
     formset_form_class = WasteFlyerModelForm
-    formset_helper_class = DynamicTableInlineFormSetHelper
+    formset_helper_class = WasteFlyerFormSetHelper
     relation_field_name = "flyers"
     permission_required = "soilcom.add_collection"
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["request"] = self.request
+        return kwargs
 
     def get_formset_kwargs(self, **kwargs):
         if self.request.method in ("POST", "PUT"):
@@ -714,8 +873,8 @@ class CollectionCreateView(M2MInlineFormSetMixin, UserCreatedObjectCreateView):
         if form.is_valid() and formset.is_valid():
             form.instance.owner = self.request.user
             self.object = form.save()
-            formset = self.get_formset()
-            formset.is_valid()
+            # Update formset's parent_object so it can set the M2M relationship
+            formset.parent_object = self.object
             formset.save()
             return HttpResponseRedirect(self.get_success_url())
         else:
@@ -781,6 +940,10 @@ class CollectionCreateNewVersionView(CollectionCopyView):
                 ],
             }
         )
+        if self.object.valid_until:
+            initial["valid_from"] = self.object.valid_until + timedelta(days=1)
+        else:
+            initial["valid_from"] = None
         self.predecessor = self.object
         self.object = None
         return initial
@@ -815,19 +978,323 @@ class CollectionDetailView(MapMixin, UserCreatedObjectDetailView):
         params["load_features"] = True
         return params
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+
+        # Add chain-aware property values visible to the current user
+        cpvs = self.object.collectionpropertyvalues_for_display(user=user)
+        agg_cpvs = self.object.aggregatedcollectionpropertyvalues_for_display(user=user)
+
+        # On published collections, show only published property values to maintain
+        # public consistency, UNLESS the viewer is the collection owner
+        is_owner = (
+            hasattr(self.object, "owner")
+            and hasattr(user, "id")
+            and self.object.owner_id == user.id
+        )
+        if self.object.publication_status == "published" and not is_owner:
+            cpvs = [
+                v for v in cpvs if getattr(v, "publication_status", None) == "published"
+            ]
+            agg_cpvs = [
+                v
+                for v in agg_cpvs
+                if getattr(v, "publication_status", None) == "published"
+            ]
+
+        context["collection_property_values"] = cpvs
+        context["aggregated_collection_property_values"] = agg_cpvs
+
+        # Collect all sources from collection, flyers, CPVs, and ACPVs
+        all_sources = set()
+
+        # Sources directly on the collection
+        for source in self.object.sources.all():
+            all_sources.add(source)
+
+        # Flyers are also sources (WasteFlyer is a proxy of Source)
+        for flyer in self.object.flyers.all():
+            all_sources.add(flyer)
+
+        # Sources from collection property values
+        for cpv in cpvs:
+            for source in cpv.sources.all():
+                all_sources.add(source)
+
+        # Sources from aggregated collection property values
+        for acpv in agg_cpvs:
+            for source in acpv.sources.all():
+                all_sources.add(source)
+
+        # Sort sources by abbreviation for consistent display
+        context["all_sources"] = sorted(all_sources, key=lambda s: s.abbreviation)
+
+        # Filter version chain links (predecessors/successors) by user visibility
+        try:
+            context["visible_successors"] = filter_queryset_for_user(
+                self.object.successors.all(), user
+            )
+        except Exception:
+            context["visible_successors"] = self.object.successors.none()
+
+        predecessors_qs = (
+            self.object.predecessors.all()
+            .select_related("owner")
+            .order_by("-lastmodified_at", "-pk")
+        )
+        context["visible_predecessors"] = list(predecessors_qs)
+
+        return context
+
 
 class CollectionModalDetailView(UserCreatedObjectModalDetailView):
     model = Collection
+
+
+class CollectionReviewActionCascadeMixin:
+    """
+    Cascade review actions from Collections to related property values.
+
+    When a Collection's review state changes (submit, withdraw, reject, approve),
+    this mixin cascades the action to CollectionPropertyValues and
+    AggregatedCollectionPropertyValues across the entire version chain.
+    """
+
+    def post_action_hook(self, request, previous_status=None):
+        """Cascade the review action to related property values."""
+        super().post_action_hook(request, previous_status)
+
+        # Determine action from view's action_attr_name
+        action_name = getattr(self, "action_attr_name", None)
+        if not action_name or not hasattr(self, "object"):
+            return
+
+        # Get all versions in the chain
+        versions = (
+            self.object.all_versions()
+            if hasattr(self.object, "all_versions")
+            else [self.object]
+        )
+
+        actor_id = getattr(request.user, "id", None)
+
+        # Determine which property values to cascade to
+        cpv_statuses = self._allowed_statuses_for_action(action_name)
+        if not cpv_statuses:
+            return
+
+        # Query property values
+        cpv_qs = CollectionPropertyValue.objects.filter(collection__in=versions)
+        cpv_qs = cpv_qs.filter(publication_status__in=cpv_statuses)
+
+        # Apply owner filtering for submit/withdraw (not for reject/approve)
+        if action_name in ("submit_for_review", "withdraw_from_review") and actor_id:
+            from django.db.models import Q
+
+            cpv_qs = cpv_qs.filter(
+                Q(owner_id=actor_id) | Q(collection__owner_id=actor_id)
+            )
+
+        cpv_list = list(cpv_qs.select_related("collection", "property", "unit"))
+
+        # Query aggregated property values
+        agg_qs = AggregatedCollectionPropertyValue.objects.filter(
+            collections__in=versions
+        ).distinct()
+        agg_qs = agg_qs.filter(publication_status__in=cpv_statuses)
+
+        # Apply owner filtering for submit/withdraw (not for reject/approve)
+        if action_name in ("submit_for_review", "withdraw_from_review") and actor_id:
+            agg_qs = agg_qs.filter(owner_id=actor_id)
+
+        agg_list = list(
+            agg_qs.select_related("property", "unit").prefetch_related("collections")
+        )
+
+        # Apply the transition to all property values
+        self._apply_transition(cpv_list + agg_list, action_name)
+
+    def _allowed_statuses_for_action(self, action_name):
+        """Return which publication statuses should be affected by this action."""
+        if action_name == "submit_for_review":
+            return ["private", "declined"]
+        elif action_name == "withdraw_from_review":
+            return ["review"]
+        elif action_name == "reject":
+            return ["review"]
+        elif action_name == "approve":
+            return ["review"]
+        return []
+
+    def _apply_transition(self, values, action_name):
+        """Apply the review action to each value."""
+        for val in values:
+            action_method = getattr(val, action_name, None)
+            if not callable(action_method):
+                continue
+            try:
+                # For approve, pass the user
+                if action_name == "approve":
+                    action_method(user=self.request.user)
+                else:
+                    action_method()
+            except Exception:
+                # Log but don't fail - cascade errors shouldn't block the main action
+                pass
+
+
+class CollectionReviewItemDetailView(ReviewItemDetailView):
+    """
+    Collection-specific review detail view with property value preview.
+
+    Extends the base review view to show collection property values and
+    aggregated property values with review-aware deduplication logic.
+    """
+
+    model = Collection
+
+    def get_review_specific_context(self, context):
+        """Add collection property values for review preview."""
+        obj = self.object
+        review_context = {}
+
+        # For review preview, show CPVs with status in {published, review},
+        # preferring review over published for the same (property, unit, year) key
+        try:
+            if hasattr(obj, "all_versions") and hasattr(
+                obj, "_deduplicate_property_values"
+            ):
+                from django.db.models import Case, IntegerField, Value, When
+
+                cpv_qs = (
+                    CollectionPropertyValue.objects.filter(
+                        collection__in=obj.all_versions(),
+                        publication_status__in=["published", "review"],
+                    )
+                    .select_related("property", "unit", "collection")
+                    .prefetch_related("sources")
+                )
+
+                # Order by property/unit/year, then prefer review (0) over published (1)
+                cpv_qs = cpv_qs.annotate(
+                    review_order=Case(
+                        When(publication_status="review", then=Value(0)),
+                        default=Value(1),
+                        output_field=IntegerField(),
+                    )
+                ).order_by(
+                    "property__name",
+                    "unit__name",
+                    "year",
+                    "review_order",
+                    "-collection__valid_from",
+                    "-collection__pk",
+                    "pk",
+                )
+
+                review_context["collection_property_values"] = (
+                    obj._deduplicate_property_values(cpv_qs)
+                )
+        except Exception:
+            pass
+
+        # Same logic for aggregated property values
+        try:
+            if hasattr(obj, "all_versions"):
+                from django.db.models import Case, IntegerField, Value, When
+
+                agg_qs = (
+                    AggregatedCollectionPropertyValue.objects.filter(
+                        collections__in=obj.all_versions(),
+                        publication_status__in=["published", "review"],
+                    )
+                    .select_related("property", "unit")
+                    .prefetch_related("collections", "sources")
+                    .distinct()
+                )
+
+                agg_qs = agg_qs.annotate(
+                    review_order=Case(
+                        When(publication_status="review", then=Value(0)),
+                        default=Value(1),
+                        output_field=IntegerField(),
+                    )
+                ).order_by(
+                    "property__name",
+                    "unit__name",
+                    "year",
+                    "review_order",
+                    "-created_at",
+                    "-pk",
+                )
+
+                # Deduplicate aggregated values by (property, unit, year)
+                seen = set()
+                agg_values = []
+                for val in agg_qs:
+                    key = (val.property_id, val.unit_id, val.year)
+                    if key not in seen:
+                        seen.add(key)
+                        agg_values.append(val)
+
+                review_context["aggregated_collection_property_values"] = agg_values
+        except Exception:
+            pass
+
+        # Collect all sources from collection, flyers, CPVs, and ACPVs
+        try:
+            all_sources = set()
+
+            # Sources directly on the collection
+            for source in obj.sources.all():
+                all_sources.add(source)
+
+            # Flyers are also sources (WasteFlyer is a proxy of Source)
+            for flyer in obj.flyers.all():
+                all_sources.add(flyer)
+
+            # Sources from collection property values (if available in context)
+            cpvs = review_context.get("collection_property_values", [])
+            for cpv in cpvs:
+                for source in cpv.sources.all():
+                    all_sources.add(source)
+
+            # Sources from aggregated collection property values (if available in context)
+            agg_cpvs = review_context.get("aggregated_collection_property_values", [])
+            for acpv in agg_cpvs:
+                for source in acpv.sources.all():
+                    all_sources.add(source)
+
+            # Sort sources by abbreviation for consistent display
+            review_context["all_sources"] = sorted(
+                all_sources, key=lambda s: s.abbreviation
+            )
+        except Exception:
+            pass
+
+        return review_context
+
+
+# Register the specialized review view for Collection model
+# This allows the generic object_management:review_item_detail URL to automatically
+# delegate to this view when reviewing Collection objects
+CollectionReviewItemDetailView.register_for_model(Collection)
 
 
 class CollectionUpdateView(M2MInlineFormSetMixin, UserCreatedObjectUpdateView):
     model = Collection
     form_class = CollectionModelForm
     formset_model = WasteFlyer
-    formset_class = BaseWasteFlyerUrlFormSet
+    formset_class = WasteFlyerFormSet
     formset_form_class = WasteFlyerModelForm
-    formset_helper_class = DynamicTableInlineFormSetHelper
+    formset_helper_class = WasteFlyerFormSetHelper
     relation_field_name = "flyers"
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs["request"] = self.request
+        return kwargs
 
     def get_formset_kwargs(self, **kwargs):
         kwargs.update({"owner": self.request.user})
@@ -892,26 +1359,55 @@ class CollectionListFileExportView(GenericUserCreatedObjectExportView):
 
 
 class CollectionAddPropertyValueView(CollectionPropertyValueCreateView):
+    # TODO: Handle permissions without overriding dispatch
+    def dispatch(self, request, *args, **kwargs):
+        # Let parent handle authentication first
+        result = super().dispatch(request, *args, **kwargs)
+
+        # Only check policy for authenticated requests that passed parent checks
+        if request.user.is_authenticated and request.method in ("GET", "POST"):
+            try:
+                self.parent_collection = Collection.objects.get(pk=kwargs.get("pk"))
+            except Collection.DoesNotExist as err:
+                raise PermissionDenied("Invalid parent collection.") from err
+
+            policy = get_object_policy(
+                request.user, self.parent_collection, request=request
+            )
+            if not policy.get("can_add_property"):
+                raise PermissionDenied(
+                    "You do not have permission to add statistics to this collection."
+                )
+
+            self.anchor_collection = (
+                self.parent_collection.version_anchor or self.parent_collection
+            )
+
+        return result
+
     def get_initial(self):
         initial = super().get_initial()
-        initial["collection"] = self.kwargs["pk"]
+        anchor = getattr(self, "anchor_collection", None)
+        initial["collection"] = anchor.pk if anchor else self.kwargs["pk"]
         return initial
 
     def get_success_url(self):
         return reverse("collection-detail", kwargs={"pk": self.kwargs["pk"]})
 
-    def form_valid(self, form):
+    def forms_valid(self, form, formset):
         """
-        Enforce that the new property value is attached to the parent Collection
+        Enforce that the new property value is attached to the anchor Collection
         referenced in the URL, regardless of any submitted form value.
         """
-        try:
-            collection = Collection.objects.get(pk=self.kwargs.get("pk"))
-        except Collection.DoesNotExist:
-            # Treat missing parent as forbidden action in this specialized route
-            raise PermissionDenied("Invalid parent collection.")
-        form.instance.collection = collection
-        return super().form_valid(form)
+        anchor = getattr(self, "anchor_collection", None)
+        if not anchor:
+            try:
+                parent = Collection.objects.get(pk=self.kwargs.get("pk"))
+                anchor = parent.version_anchor or parent
+            except Collection.DoesNotExist as err:
+                raise PermissionDenied("Invalid parent collection.") from err
+        form.instance.collection = anchor
+        return super().forms_valid(form, formset)
 
 
 class CollectionCatchmentAddAggregatedPropertyView(
@@ -951,6 +1447,7 @@ class CollectionFrequencyOptions(SelectNewlyCreatedObjectModelSelectOptionsView)
 class WasteCategoryOptions(SelectNewlyCreatedObjectModelSelectOptionsView):
     model = WasteCategory
     permission_required = "soilcom.view_wastecategory"
+    template_name = "detail_with_options.html"
 
 
 class CollectionWasteSamplesView(UserCreatedObjectUpdateView):
@@ -1198,3 +1695,68 @@ class WasteCollectionPublishedMapIframeView(
         data["scope"] = "published"
         kwargs["data"] = data
         return kwargs
+
+
+# Collection-specific review action views with cascade support
+# These views extend the base review action views to add property value cascading
+
+
+class CollectionSubmitForReviewView(
+    CollectionReviewActionCascadeMixin, SubmitForReviewView
+):
+    """Submit a Collection for review and cascade to related property values."""
+
+    pass
+
+
+class CollectionWithdrawFromReviewView(
+    CollectionReviewActionCascadeMixin, WithdrawFromReviewView
+):
+    """Withdraw a Collection from review and cascade to related property values."""
+
+    pass
+
+
+class CollectionApproveItemView(CollectionReviewActionCascadeMixin, ApproveItemView):
+    """Approve a Collection and cascade to related property values."""
+
+    pass
+
+
+class CollectionRejectItemView(CollectionReviewActionCascadeMixin, RejectItemView):
+    """Reject a Collection and cascade to related property values."""
+
+    pass
+
+
+# Modal versions
+class CollectionSubmitForReviewModalView(
+    CollectionReviewActionCascadeMixin, SubmitForReviewModalView
+):
+    """Modal: Submit a Collection for review with cascade."""
+
+    pass
+
+
+class CollectionWithdrawFromReviewModalView(
+    CollectionReviewActionCascadeMixin, WithdrawFromReviewModalView
+):
+    """Modal: Withdraw a Collection from review with cascade."""
+
+    pass
+
+
+class CollectionApproveItemModalView(
+    CollectionReviewActionCascadeMixin, ApproveItemModalView
+):
+    """Modal: Approve a Collection with cascade."""
+
+    pass
+
+
+class CollectionRejectItemModalView(
+    CollectionReviewActionCascadeMixin, RejectItemModalView
+):
+    """Modal: Reject a Collection with cascade."""
+
+    pass

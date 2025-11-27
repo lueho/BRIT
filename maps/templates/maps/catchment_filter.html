@@ -1,54 +1,37 @@
-{% extends 'filtered_list.html' %}
+{% extends "filtered_list.html" %}
 {% load crispy_forms_tags %}
 {% load user_created_object_tags %}
 {% load moderation_tags %}
 
-{% block title %}BRIT | Maps | Catchments{% endblock %}
+{% block title %}
+    BRIT | Maps | Catchments
+{% endblock title %}
 
-{% block list_card_header %}<strong>Catchments</strong>{% endblock %}
+{% block list_card_header %}
+    <strong>Catchments</strong>
+{% endblock list_card_header %}
 
 {% block list_table %}
     <table class="table table-responsive-stack">
         <thead>
-        <tr>
-            <th>Name</th>
-            <th>Type</th>
-            {% if object_list.model|is_user_created %}
-                <th class="actions-column">Status/Actions</th>
-            {% endif %}
-        </tr>
+            <tr>
+                <th>Name</th>
+                <th>Type</th>
+                {% if object_list.model|is_user_created %}<th class="actions-column">Status/Actions</th>{% endif %}
+            </tr>
         </thead>
         <tbody>
-        {% for object in object_list %}
-            <tr>
-                <td data-label="Name"><a href="{% detail_or_review_url object %}">{{ object.name }}</a></td>
-                <td data-label="Type">{{ object.type }}</td>
-                {% if object_list.model|is_user_created %}
-                    <td class="actions-column mobile-no-label">
-                        {% include 'object_management/status_actions_cell.html' %}
+            {% for object in object_list %}
+                <tr>
+                    <td data-label="Name">
+                        <a href="{% detail_or_review_url object %}">{{ object.name }}</a>
                     </td>
-                {% endif %}
-            </tr>
-        {% endfor %}
+                    <td data-label="Type">{{ object.type }}</td>
+                    {% if object_list.model|is_user_created %}
+                        <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
+                    {% endif %}
+                </tr>
+            {% endfor %}
         </tbody>
-        <tfoot>
-        </tfoot>
     </table>
 {% endblock list_table %}
-
-{% block list_card_footer_create_link %}
-    {% if user.is_authenticated %}
-        <a class="dropdown-item"
-           href="{{ object_list.model.create_url }}"
-           aria-label="Create new {{ object_list.model.get_verbose_name }}">
-            <i class="fas fa-fw fa-plus"></i> Create new {{ object_list.model.get_verbose_name }}
-        </a>
-    {% endif %}
-{% endblock list_card_footer_create_link %}
-
-{% block filter_body %}
-    <form method="get">
-        {% crispy filter.form %}
-        <button id="btn-filter" class="btn btn-primary" type="submit">Filter</button>
-    </form>
-{% endblock filter_body %}

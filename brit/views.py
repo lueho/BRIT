@@ -1,33 +1,33 @@
+import time
+
+from django.core.cache import cache
+from django.http import HttpResponse
 from django.utils.decorators import method_decorator
+from django.views import View
 from django.views.decorators.clickjacking import xframe_options_exempt
 from django.views.generic import TemplateView
 
 
-@method_decorator(xframe_options_exempt, name='dispatch')
+@method_decorator(xframe_options_exempt, name="dispatch")
 class HomeView(TemplateView):
-    template_name = 'home.html'
+    template_name = "home.html"
 
 
 class AboutView(TemplateView):
-    template_name = 'about.html'
+    template_name = "about.html"
 
 
 class LearningView(TemplateView):
-    template_name = 'learning.html'
+    template_name = "learning.html"
 
 
 class PrivacyPolicyView(TemplateView):
-    template_name = 'privacy_policy.html'
-
-
-from django.core.cache import cache
-from django.views import View
-import time
+    template_name = "privacy_policy.html"
 
 
 class CacheTestView(View):
     def get(self, request):
-        cache_key = 'cache_test'
+        cache_key = "cache_test"
         cache_time = 30  # Cache for 30 seconds
 
         # Try to get the value from the cache
@@ -46,16 +46,13 @@ class CacheTestView(View):
             return HttpResponse(f"Cached value: {cached_value}")
 
 
-from django.http import HttpResponse
-
-
 def set_session(request):
-    request.session['test_key'] = 'test_value'
+    request.session["test_key"] = "test_value"
     return HttpResponse("Session value set")
 
 
 def get_session(request):
-    value = request.session.get('test_key', 'Not found')
+    value = request.session.get("test_key", "Not found")
     return HttpResponse(f"Session value: {value}")
 
 

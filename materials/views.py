@@ -14,6 +14,7 @@ from extra_views import UpdateWithInlinesView
 
 from distributions.models import TemporalDistribution
 from distributions.plots import DoughnutChart
+from utils.object_management.permissions import get_object_policy
 from utils.object_management.views import (
     PrivateObjectFilterView,
     PrivateObjectListView,
@@ -497,10 +498,20 @@ class SampleCreateView(UserCreatedObjectCreateView):
     form_class = SampleModelForm
     permission_required = "materials.add_sample"
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['request'] = self.request
+        return kwargs
+
 
 class SampleModalCreateView(UserCreatedObjectModalCreateView):
     form_class = SampleModalModelForm
     permission_required = "materials.add_sample"
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['request'] = self.request
+        return kwargs
 
 
 class SampleDetailView(UserCreatedObjectDetailView):
@@ -523,6 +534,11 @@ class SampleDetailView(UserCreatedObjectDetailView):
 class SampleUpdateView(UserCreatedObjectUpdateView):
     model = Sample
     form_class = SampleModelForm
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['request'] = self.request
+        return kwargs
 
 
 class SampleModalDeleteView(UserCreatedObjectModalDeleteView):
@@ -605,10 +621,12 @@ class SampleModalAddPropertyView(UserPassesTestMixin, UserCreatedObjectModalCrea
         return HttpResponseRedirect(self.get_success_url())
 
     def test_func(self):
-        if not self.request.user.is_authenticated:
+        try:
+            sample = Sample.objects.get(pk=self.kwargs.get("pk"))
+        except Sample.DoesNotExist:
             return False
-        sample = Sample.objects.get(pk=self.kwargs.get("pk"))
-        return self.request.user == sample.owner
+        policy = get_object_policy(self.request.user, sample, request=self.request)
+        return policy["can_add_property"]
 
     def get_success_url(self):
         return reverse("sample-detail", kwargs={"pk": self.kwargs.get("pk")})
@@ -618,6 +636,11 @@ class SampleCreateDuplicateView(UserCreatedObjectUpdateView):
     model = Sample
     form_class = SampleModelForm
     object = None
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['request'] = self.request
+        return kwargs
 
     def get_initial(self):
         initial = super().get_initial()

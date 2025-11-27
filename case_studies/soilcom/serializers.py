@@ -1,6 +1,5 @@
 from collections import OrderedDict
 
-from django.urls import reverse
 from rest_framework import serializers
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
@@ -17,6 +16,12 @@ class GeoreferencedWasteCollection(GeoPolygon, models.Collection):
     pass
 
 
+class GeoreferencedCollector(GeoPolygon, models.Collector):
+    """Proxy model combining Collector with GeoPolygon for GeoJSON serialization."""
+
+    pass
+
+
 class WasteCollectionGeometrySerializer(GeoFeatureModelSerializer):
     catchment = serializers.StringRelatedField(source="catchment.name")
     waste_category = serializers.StringRelatedField(source="waste_stream.category.name")
@@ -26,6 +31,58 @@ class WasteCollectionGeometrySerializer(GeoFeatureModelSerializer):
         model = GeoreferencedWasteCollection
         geo_field = "geom"
         fields = ["id", "catchment", "waste_category", "collection_system"]
+
+
+class CollectorGeometrySerializer(GeoFeatureModelSerializer):
+    """
+    GeoJSON serializer for Collectors with geometry and organizational level.
+    Used by QGIS for map rendering.
+    """
+
+    collector = serializers.CharField(source="name", read_only=True)
+    catchment = serializers.SerializerMethodField()
+    orga_level = serializers.SerializerMethodField()
+
+    class Meta:
+        model = GeoreferencedCollector
+        geo_field = "geom"
+        fields = ["id", "collector", "catchment", "orga_level"]
+
+    def get_catchment(self, obj):
+        """Get catchment name from the collector's catchment."""
+        if hasattr(obj, "catchment") and obj.catchment:
+            return obj.catchment.name
+        return None
+
+    def get_orga_level(self, obj):
+        """
+        Determine organizational level: 'nuts', 'lau', or 'individual'.
+        Based on whether the catchment's region has NUTS or LAU data.
+        """
+        if not hasattr(obj, "catchment") or not obj.catchment:
+            return "individual"
+
+        catchment = obj.catchment
+        if not hasattr(catchment, "region") or not catchment.region:
+            return "individual"
+
+        region = catchment.region
+
+        # Check if region has NUTS data
+        try:
+            if hasattr(region, "nutsregion") and region.nutsregion.nuts_id:
+                return "nuts"
+        except Exception:
+            pass
+
+        # Check if region has LAU data
+        try:
+            if hasattr(region, "lauregion") and region.lauregion.lau_id:
+                return "lau"
+        except Exception:
+            pass
+
+        return "individual"
 
 
 class OwnedObjectModelSerializer(serializers.ModelSerializer):
@@ -93,17 +150,26 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
     )
     frequency = serializers.StringRelatedField()
     fee_system = serializers.StringRelatedField()
-    min_bin_size = serializers.IntegerField(required=False, allow_null=True)
-    required_bin_capacity = serializers.IntegerField(required=False, allow_null=True)
-    required_bin_capacity_reference = serializers.CharField(
-        required=False, allow_null=True
+    min_bin_size = serializers.DecimalField(
+        max_digits=8,
+        decimal_places=1,
+        required=False,
+        allow_null=True,
+    )
+    required_bin_capacity = serializers.DecimalField(
+        max_digits=8,
+        decimal_places=1,
+        required=False,
+        allow_null=True,
+    )
+    required_bin_capacity_reference = serializers.SerializerMethodField(
+        label="Required bin capacity reference"
     )
     comments = serializers.CharField(
         source="description", required=False, allow_blank=True
     )
     sources = serializers.SerializerMethodField()
     policy = serializers.SerializerMethodField()
-    actions = serializers.SerializerMethodField()
 
     class Meta:
         model = models.Collection
@@ -128,11 +194,18 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
             "comments",
             "sources",
             "policy",
-            "actions",
         )
 
     def get_sources(self, obj):
         return [flyer.url for flyer in obj.flyers.all() if flyer.url]
+
+    @staticmethod
+    def get_required_bin_capacity_reference(obj):
+        value = obj.required_bin_capacity_reference
+        if not value:
+            return None
+        choices = dict(models.REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES)
+        return choices.get(value, value)
 
     def to_representation(self, instance):
         data = super().to_representation(instance)
@@ -154,17 +227,6 @@ class CollectionModelSerializer(FieldLabelModelSerializer):
             }
         # Return policy as-is to keep a single source of truth for key names
         return policy
-
-    def get_actions(self, obj):
-        try:
-            return {
-                "detail_url": reverse("collection-detail", kwargs={"pk": obj.pk}),
-                "update_url": reverse("collection-update", kwargs={"pk": obj.pk}),
-                "copy_url": reverse("collection-copy", kwargs={"pk": obj.pk}),
-                "delete_url": reverse("collection-delete-modal", kwargs={"pk": obj.pk}),
-            }
-        except Exception:
-            return {}
 
 
 class CollectionFlatSerializer(serializers.ModelSerializer):
@@ -190,8 +252,18 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
         source="fee_system.name", label="Fee system"
     )
     frequency = serializers.StringRelatedField(label="Frequency")
-    min_bin_size = serializers.IntegerField(required=False, allow_null=True)
-    required_bin_capacity = serializers.IntegerField(required=False, allow_null=True)
+    min_bin_size = serializers.DecimalField(
+        max_digits=8,
+        decimal_places=1,
+        required=False,
+        allow_null=True,
+    )
+    required_bin_capacity = serializers.DecimalField(
+        max_digits=8,
+        decimal_places=1,
+        required=False,
+        allow_null=True,
+    )
     required_bin_capacity_reference = serializers.CharField(
         required=False, allow_null=True
     )
@@ -280,6 +352,14 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
         else:
             return ""
 
+    @staticmethod
+    def get_required_bin_capacity_reference(obj):
+        value = obj.required_bin_capacity_reference
+        if not value:
+            return ""
+        choices = dict(models.REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES)
+        return choices.get(value, value)
+
     def to_representation(self, instance):
         # Call the superclass's to_representation method to get the default ordering
         representation = super().to_representation(instance)
@@ -294,33 +374,35 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
             ordered_representation[field] = representation.get(field, None)
 
         additional_properties = ["specific waste collected", "Connection rate"]
+        user = getattr(self.context.get("request"), "user", None) if self.context else None
         for property_name in additional_properties:
-            # Add your custom fields at the desired position
             specific_property = Property.objects.filter(name=property_name).first()
-            if specific_property:
-                collection_values = models.CollectionPropertyValue.objects.filter(
-                    collection=instance, property=specific_property
-                )
-                for value in collection_values:
-                    column_name = (
-                        f"{property_name.lower().replace(' ', '_')}_{value.year}"
-                    )
-                    ordered_representation[column_name] = value.average
+            if not specific_property:
+                continue
 
-                # If no CollectionPropertyValue, then fetch the AggregatedCollectionPropertyValue
-                if not collection_values.exists():
-                    aggregated_values = (
-                        models.AggregatedCollectionPropertyValue.objects.filter(
-                            collections=instance, property=specific_property
-                        )
+            values = [
+                value
+                for value in instance.collectionpropertyvalues_for_display(user=user)
+                if value.property_id == specific_property.pk
+            ]
+
+            if not values:
+                values = [
+                    value
+                    for value in instance.aggregatedcollectionpropertyvalues_for_display(
+                        user=user
                     )
-                    for value in aggregated_values:
-                        column_name = (
-                            f"{property_name.lower().replace(' ', '_')}_{value.year}"
-                        )
-                        ordered_representation[column_name] = value.average
-                        # Mark this as an aggregated value
-                        ordered_representation["aggregated"] = True
+                    if value.property_id == specific_property.pk
+                ]
+                is_aggregated = bool(values)
+            else:
+                is_aggregated = False
+
+            for value in values:
+                column_name = f"{property_name.lower().replace(' ', '_')}_{value.year}"
+                ordered_representation[column_name] = value.average
+                if is_aggregated:
+                    ordered_representation["aggregated"] = True
 
         # Return the ordered representation
         return ordered_representation

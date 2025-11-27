@@ -20,10 +20,10 @@ class ReviewWorkflowModelTests(TestCase):
 
         # Add moderator permissions
         content_type = ContentType.objects.get_for_model(Collection)
-        permission = Permission.objects.create(
+        permission, _ = Permission.objects.get_or_create(
             codename="can_moderate_collection",
-            name="Can moderate collections",
             content_type=content_type,
+            defaults={"name": "Can moderate collections"},
         )
         self.moderator.user_permissions.add(permission)
 

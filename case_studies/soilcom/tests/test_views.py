@@ -37,7 +37,6 @@ from maps.models import (
 )
 from materials.models import (
     Material,
-    MaterialCategory,
     Sample,
     SampleSeries,
 )
@@ -45,14 +44,13 @@ from utils.properties.models import Property, Unit
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 
 from .. import views
-from ..forms import BaseWasteFlyerUrlFormSet, CollectionModelForm
+from ..forms import CollectionModelForm, WasteFlyerFormSet
 from ..models import (
     AggregatedCollectionPropertyValue,
     CollectionCountOptions,
     CollectionFrequency,
     CollectionSeason,
     FeeSystem,
-    WasteFlyer,
 )
 
 
@@ -481,9 +479,66 @@ class CollectionPropertyValueCRUDViewsTestCase(
             ),
         }
 
+    def related_objects_post_data(self):
+        data = super().related_objects_post_data()
+        # Add formset management data for WasteFlyerFormSet
+        data.update(
+            {
+                "form-TOTAL_FORMS": "0",
+                "form-INITIAL_FORMS": "0",
+                "form-MIN_NUM_FORMS": "0",
+                "form-MAX_NUM_FORMS": "1000",
+            }
+        )
+        return data
+
     def get_delete_success_url(self, publication_status=None):
         return reverse(
             "collection-detail", kwargs={"pk": self.related_objects["collection"].pk}
+        )
+
+    def test_add_waste_flyer_via_update_view(self):
+        """Test that WasteFlyer can be added through CPV update view formset."""
+        self.client.force_login(self.owner_user)
+
+        url = reverse(
+            "collectionpropertyvalue-update", kwargs={"pk": self.unpublished_object.pk}
+        )
+
+        # Prepare POST data with WasteFlyer formset
+        data = {
+            "collection": self.related_objects["collection"].pk,
+            "property": self.related_objects["property"].pk,
+            "unit": self.related_objects["unit"].pk,
+            "year": 2022,
+            "average": 15,  # Update value to verify main form works
+            "standard_deviation": "",
+            # Formset data for WasteFlyer
+            "form-TOTAL_FORMS": "1",
+            "form-INITIAL_FORMS": "0",
+            "form-MIN_NUM_FORMS": "0",
+            "form-MAX_NUM_FORMS": "1000",
+            "form-0-url": "http://example.com/flyer.pdf",
+        }
+
+        response = self.client.post(url, data)
+
+        self.assertEqual(response.status_code, 302)
+
+        self.unpublished_object.refresh_from_db()
+        self.assertEqual(self.unpublished_object.average, 15)
+
+        # Check if WasteFlyer was created
+        flyers = WasteFlyer.objects.filter(url="http://example.com/flyer.pdf")
+        self.assertTrue(flyers.exists(), "WasteFlyer should be created")
+
+        flyer = flyers.first()
+
+        # Check if WasteFlyer is linked to CPV via sources
+        self.assertIn(
+            flyer,
+            self.unpublished_object.sources.all(),
+            "WasteFlyer should be linked to CPV",
         )
 
 
@@ -544,7 +599,12 @@ class AggregatedCollectionPropertyValueCRUDViewsTestCase(
                     Collection.objects.create(
                         name="Test Collection 4", publication_status="published"
                     ).pk,
-                ]
+                ],
+                # Add formset management data for WasteFlyerFormSet
+                "form-TOTAL_FORMS": "0",
+                "form-INITIAL_FORMS": "0",
+                "form-MIN_NUM_FORMS": "0",
+                "form-MAX_NUM_FORMS": "1000",
             }
         )
         return data
@@ -564,7 +624,7 @@ class CollectionCatchmentCRUDViewsTestCase(
     AbstractTestCases.UserCreatedObjectCRUDViewTestCase
 ):
     model = CollectionCatchment
-    model_add_permission = "add_catchment"
+    model_add_permission = "add_collectioncatchment"
 
     view_dashboard_name = "wastecollection-dashboard"
     view_published_list_name = "collectioncatchment-list"
@@ -794,7 +854,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
         self.assertTrue(error_msg in response.context["form"].errors["waste_category"])
 
     def test_post_with_valid_form_data(self):
-        self.assertEqual(Collection.objects.count(), 1)
+        initial_count = Collection.objects.count()
         self.client.force_login(self.staff_user)
         response = self.client.post(
             self.get_create_url(),
@@ -812,7 +872,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
                     self.forbidden_material_1.id,
                     self.forbidden_material_2.id,
                 ],
-                "frequency": self.frequency.id,
+                "frequency": self.related_objects["frequency"].id,
                 "valid_from": date(2020, 1, 1),
                 "description": "This is a test case that should pass!",
                 "form-INITIAL_FORMS": "0",
@@ -824,7 +884,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
             },
         )
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(Collection.objects.count(), 2)
+        self.assertEqual(Collection.objects.count(), initial_count + 1)
 
     def test_post_with_unspecified_allowed_materials_creates_generic_waste_stream(self):
         self.client.force_login(self.staff_user)
@@ -930,7 +990,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
         view.kwargs = {"pk": self.unpublished_object.pk}
         view.object = self.unpublished_object
         formset = view.get_formset()
-        self.assertIsInstance(formset, BaseWasteFlyerUrlFormSet)
+        self.assertIsInstance(formset, WasteFlyerFormSet)
         self.assertEqual(2, formset.initial_form_count())
 
     def test_post_get_formset(self):
@@ -949,7 +1009,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
         view.kwargs = {"pk": self.unpublished_object.pk}
         view.object = self.unpublished_object
         formset = view.get_formset()
-        self.assertIsInstance(formset, BaseWasteFlyerUrlFormSet)
+        self.assertIsInstance(formset, WasteFlyerFormSet)
 
     def test_context_contains_form_and_formset(self):
         self.client.force_login(self.owner_user)
@@ -957,7 +1017,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
         self.assertIsInstance(response.context["form"], CollectionModelForm)
         self.assertIsInstance(response.context["formset"], BaseFormSet)
 
-    def test_post_with_missing_data_errors(self):
+    def test_update_post_with_missing_data_errors(self):
         self.client.force_login(self.owner_user)
         response = self.client.post(
             self.get_update_url(self.unpublished_object.pk),
@@ -973,7 +1033,7 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
         )
         self.assertTrue(error_msg in response.context["form"].errors["waste_category"])
 
-    def test_post_with_valid_form_data(self):
+    def test_update_post_with_valid_form_data(self):
         self.client.force_login(self.owner_user)
         response = self.client.post(
             self.get_update_url(self.unpublished_object.pk),
@@ -1535,7 +1595,7 @@ class CollectionAddPropertyValueViewTestCase(ViewWithPermissionsTestCase):
     def setUpTestData(cls):
         super().setUpTestData()
         cls.collection = Collection.objects.create(
-            name="Test Collection", publication_status="published"
+            name="Test Collection", publication_status="published", owner=cls.member
         )
         cls.unit = Unit.objects.create(name="Test Unit", publication_status="published")
         cls.prop = Property.objects.create(
@@ -1574,12 +1634,15 @@ class CollectionAddPropertyValueViewTestCase(ViewWithPermissionsTestCase):
         request = RequestFactory().get(
             reverse(self.url_name, kwargs={"pk": self.collection.id})
         )
+        request.user = self.member
         view = views.CollectionAddPropertyValueView()
         view.setup(request)
         view.kwargs = {"pk": self.collection.id}
+        view.dispatch(request, pk=self.collection.id)
         initial = view.get_initial()
+        anchor = self.collection.version_anchor or self.collection
         expected = {
-            "collection": self.collection.pk,
+            "collection": anchor.pk,
         }
         self.assertDictEqual(expected, initial)
 
@@ -1605,6 +1668,11 @@ class CollectionAddPropertyValueViewTestCase(ViewWithPermissionsTestCase):
             "year": 2022,
             "average": 123.5,
             "standard_deviation": 12.6,
+            # Add formset management data for WasteFlyerFormSet
+            "form-TOTAL_FORMS": "0",
+            "form-INITIAL_FORMS": "0",
+            "form-MIN_NUM_FORMS": "0",
+            "form-MAX_NUM_FORMS": "1000",
         }
         response = self.client.post(
             reverse(self.url_name, kwargs={"pk": self.collection.pk}), data=data

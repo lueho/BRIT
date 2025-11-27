@@ -13,13 +13,18 @@ from django.forms import (
 )
 from django.forms.widgets import CheckboxSelectMultiple, RadioSelect
 from django.urls import reverse
-from django_tomselect.forms import TomSelectConfig, TomSelectModelChoiceField
+from django_tomselect.forms import (
+    TomSelectConfig,
+    TomSelectModelChoiceField,
+)
 from leaflet.forms.widgets import LeafletWidget
 
 from utils.forms import (
     ModalModelFormMixin,
     SimpleForm,
     SimpleModelForm,
+    SourcesFieldMixin,
+    UserCreatedObjectFormMixin,
 )
 
 from .models import (
@@ -35,10 +40,14 @@ from .models import (
 )
 
 
-class GeoDataSetModelForm(SimpleModelForm):
+class GeoDataSetModelForm(
+    UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModelForm
+):
+    # sources field and __init__ logic provided by SourcesFieldMixin
+
     class Meta:
         model = GeoDataset
-        fields = ("name", "publish", "model_name", "description")
+        fields = ("name", "publish", "model_name", "sources", "description")
 
 
 class LocationModelForm(SimpleModelForm):
@@ -198,7 +207,6 @@ class RegionMergeForm(SimpleForm):
 
 
 class RegionMergeFormSet(BaseFormSet):
-
     def clean(self):
         if any(self.errors):
             return
@@ -258,22 +266,22 @@ class NutsRegionQueryForm(SimpleForm):
         helper.layout = Layout(
             Field(
                 "level_0",
-                data_optionsapi=f'{reverse("data.nuts_region_options")}',
+                data_optionsapi=f"{reverse('data.nuts_region_options')}",
                 data_lvl=0,
             ),
             Field(
                 "level_1",
-                data_optionsapi=f'{reverse("data.nuts_region_options")}',
+                data_optionsapi=f"{reverse('data.nuts_region_options')}",
                 data_lvl=1,
             ),
             Field(
                 "level_2",
-                data_optionsapi=f'{reverse("data.nuts_region_options")}',
+                data_optionsapi=f"{reverse('data.nuts_region_options')}",
                 data_lvl=2,
             ),
             Field(
                 "level_3",
-                data_optionsapi=f'{reverse("data.nuts_region_options")}',
+                data_optionsapi=f"{reverse('data.nuts_region_options')}",
                 data_lvl=3,
             ),
         )
@@ -313,22 +321,22 @@ class NutsAndLauCatchmentQueryForm(SimpleForm):
         helper.layout = Layout(
             Field(
                 "level_0",
-                data_optionsapi=f'{reverse("data.nuts_lau_catchment_options")}',
+                data_optionsapi=f"{reverse('data.nuts_lau_catchment_options')}",
                 data_lvl=0,
             ),
             Field(
                 "level_1",
-                data_optionsapi=f'{reverse("data.nuts_lau_catchment_options")}',
+                data_optionsapi=f"{reverse('data.nuts_lau_catchment_options')}",
                 data_lvl=1,
             ),
             Field(
                 "level_2",
-                data_optionsapi=f'{reverse("data.nuts_lau_catchment_options")}',
+                data_optionsapi=f"{reverse('data.nuts_lau_catchment_options')}",
                 data_lvl=2,
             ),
             Field(
                 "level_3",
-                data_optionsapi=f'{reverse("data.nuts_lau_catchment_options")}',
+                data_optionsapi=f"{reverse('data.nuts_lau_catchment_options')}",
                 data_lvl=3,
             ),
             Field("level_4", data_lvl=4),

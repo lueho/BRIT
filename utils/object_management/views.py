@@ -1,5 +1,5 @@
 import logging
-from urllib.parse import unquote
+from urllib.parse import unquote, urlparse
 
 from bootstrap_modal_forms.generic import (
     BSModalCreateView,
@@ -7,8 +7,8 @@ from bootstrap_modal_forms.generic import (
     BSModalReadView,
     BSModalUpdateView,
 )
+from django.conf import settings
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.contrib.auth.mixins import (
     LoginRequiredMixin,
     PermissionRequiredMixin,
@@ -16,24 +16,38 @@ from django.contrib.auth.mixins import (
 )
 from django.contrib.contenttypes.models import ContentType
 from django.contrib.messages.views import SuccessMessageMixin
-from django.core.exceptions import ImproperlyConfigured, PermissionDenied
-from django.db.models import Q
-from django.http import HttpResponseRedirect
+from django.core.exceptions import (
+    FieldDoesNotExist,
+    ImproperlyConfigured,
+    ObjectDoesNotExist,
+    PermissionDenied,
+)
+from django.http import Http404, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
 from django.template.loader import select_template
 from django.urls import reverse
-from django.utils import timezone
-from django.utils.decorators import method_decorator
 from django.views.generic import CreateView, DetailView, ListView, UpdateView, View
 from django_filters.views import FilterView
 from django_tomselect.autocompletes import AutocompleteModelView
 from extra_views import CreateWithInlinesView, UpdateWithInlinesView
 
-from case_studies.soilcom.models import Collection
-from utils.object_management.models import ReviewAction
-from utils.object_management.permissions import UserCreatedObjectPermission
+from utils.object_management.filters import ReviewDashboardFilterSet
+from utils.object_management.models import ReviewAction, UserCreatedObject
+from utils.object_management.permissions import (
+    UserCreatedObjectPermission,
+    _resolve_status_value,
+    apply_scope_filter,
+    filter_queryset_for_user,
+    get_object_policy,
+    user_is_moderator_for_model,
+)
+from utils.object_management.review_filtering import ReviewItemFilter
 
-from ..forms import DynamicTableInlineFormSetHelper
+from ..forms import (
+    DynamicTableInlineFormSetHelper,
+    SourcesFieldMixin,
+    UserCreatedObjectFormMixin,
+)
 from ..views import (
     FilterDefaultsMixin,
     ModelSelectOptionsView,
@@ -44,60 +58,268 @@ from ..views import (
 logger = logging.getLogger(__name__)
 
 
-class ReviewDashboardView(ListView):
-    """Dashboard showing all objects in review status that the user can moderate."""
+class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
+    """Dashboard showing all objects in review status that the user can moderate.
+
+    Supports filtering by model type, owner, submission date, and search.
+    Dynamically discovers all UserCreatedObject subclasses and shows items
+    the current user has permission to moderate.
+    """
 
     template_name = "object_management/review_dashboard.html"
+    filterset_class = ReviewDashboardFilterSet
     context_object_name = "review_items"
-    paginate_by = 20
+    paginate_by = getattr(settings, "REVIEW_DASHBOARD_PAGE_SIZE", 20)
 
-    @method_decorator(login_required)
-    def dispatch(self, *args, **kwargs):
-        return super().dispatch(*args, **kwargs)
+    def get_available_models(self):
+        """Discover all concrete UserCreatedObject subclasses that have items in review.
 
-    def get_queryset(self):
-        # Start with an empty queryset
+        Returns models that either:
+        1. Have items currently in review, OR
+        2. Are in the priority list and user has moderation permissions
+
+        Optimized to avoid N+1 queries by pre-fetching all user permissions.
+        """
+        from django.apps import apps
+        from django.contrib.auth.models import Permission
+
+        # Get priority models from settings (models always shown in filters if user has permissions)
+        # Format: ['app_label.ModelName', ...]
+        priority_model_paths = getattr(settings, "REVIEW_DASHBOARD_PRIORITY_MODELS", [])
+        priority_models = []
+        for model_path in priority_model_paths:
+            try:
+                app_label, model_name = model_path.split(".")
+                model = apps.get_model(app_label, model_name)
+                priority_models.append(model)
+            except (ValueError, LookupError) as e:
+                logger.warning(f"Could not load priority model '{model_path}': {e}")
+
+        available_models = []
+
+        # Optimize: Pre-fetch all user permissions in a single query
+        # This avoids N+1 queries when checking permissions for each model
+        if self.request.user.is_staff:
+            # Staff users can moderate all models
+            user_can_moderate_all = True
+            user_permission_codenames = set()
+        else:
+            user_can_moderate_all = False
+            # Get user permissions (both direct and via groups) in a single query
+            user_permission_codenames = set(
+                Permission.objects.filter(user=self.request.user).values_list(
+                    "codename", flat=True
+                )
+            )
+            group_permission_codenames = set(
+                Permission.objects.filter(group__user=self.request.user).values_list(
+                    "codename", flat=True
+                )
+            )
+            user_permission_codenames |= group_permission_codenames
+
+        # Helper to check if user can moderate a specific model (using cached permissions)
+        def can_moderate(model):
+            if user_can_moderate_all:
+                return True
+            codename = f"can_moderate_{model._meta.model_name}"
+            return codename in user_permission_codenames
+
+        # First, add priority models if user has permissions (even if no items in review)
+        for model in priority_models:
+            if can_moderate(model):
+                if model not in available_models:
+                    available_models.append(model)
+
+        # Then discover other models with items in review
+        for model in apps.get_models():
+            # Check if model inherits from UserCreatedObject and is not abstract
+            if (
+                issubclass(model, UserCreatedObject)
+                and not model._meta.abstract
+                and hasattr(model, "objects")
+                and model not in available_models  # Don't duplicate priority models
+            ):
+                # Check if user can moderate this model type
+                if can_moderate(model):
+                    # Check if there are any items in review for this model
+                    try:
+                        if model.objects.in_review().exists():
+                            available_models.append(model)
+                    except (AttributeError, Exception) as e:
+                        # Model may not have in_review() manager method or other issues
+                        logger.debug(
+                            f"Could not check review items for {model.__name__}: {e}"
+                        )
+                        pass
+
+        return available_models
+
+    def get_filterset_kwargs(self, filterset_class):
+        """Override to pass available_models and provide a dummy queryset.
+
+        Since we're working with a heterogeneous list of objects rather than
+        a single QuerySet, we need to provide a dummy queryset to satisfy
+        django_filters' initialization, but we won't actually use it for filtering.
+        """
+        kwargs = super().get_filterset_kwargs(filterset_class)
+
+        # Remove the queryset from kwargs since we're using a list
+        # Replace it with a dummy queryset (we just need something with a .model attribute)
+
+        # Get first available model or use a default
+        available_models = self.get_available_models()
+        if available_models:
+            # Use the first available model's queryset as a dummy
+            kwargs["queryset"] = available_models[0].objects.none()
+        else:
+            # No models available, create an empty queryset from UserCreatedObject subclass
+            # This shouldn't happen in practice, but provides a fallback
+            try:
+                # Try to get Collection as fallback
+                from case_studies.soilcom.models import Collection
+
+                kwargs["queryset"] = Collection.objects.none()
+            except ImportError:
+                # If Collection doesn't exist, we have bigger problems
+                # Return empty list-like object
+                kwargs["queryset"] = []
+
+        kwargs["available_models"] = available_models
+        return kwargs
+
+    def collect_review_items(self):
+        """Collect review items from models the user can moderate.
+
+        Returns a list (not QuerySet) of heterogeneous objects since we're
+        combining multiple model types.
+
+        Performance optimization: Instead of loading ALL items into memory,
+        we use database-level ordering and limit fetching to a reasonable
+        number of items per model to reduce memory usage.
+
+        Note: For very large datasets, consider implementing per-model
+        pagination with client-side merging or database UNION queries.
+        """
         review_items = []
+        available_models = self.get_available_models()
 
-        # Get all model classes that inherit from UserCreatedObject
-        # For now, we'll just use Collection as an example
-        model_classes = [Collection]
+        # Calculate a reasonable fetch limit per model to prevent loading
+        # thousands of items into memory. Multiply by number of models
+        # to ensure we get enough items even if some models have few items.
+        # This is a heuristic - can be tuned based on actual usage.
+        max_items_per_model = self.paginate_by * max(10, len(available_models))
 
-        for model_class in model_classes:
-            # Check if user can moderate this model type
-            ContentType.objects.get_for_model(model_class)
-            perm_codename = f"can_moderate_{model_class._meta.model_name}"
-            app_label = model_class._meta.app_label
-            full_perm = f"{app_label}.{perm_codename}"
-
-            if self.request.user.is_staff or self.request.user.has_perm(full_perm):
-                # Get items in review for this model, excluding current user's own items
+        for model_class in available_models:
+            # Get items in review for this model, excluding current user's own items
+            try:
+                # Apply database-level ordering and limit to reduce memory usage
+                items = (
+                    model_class.objects.in_review()
+                    .exclude(owner=self.request.user)
+                    .select_related("owner", "approved_by")
+                    .order_by("-submitted_at")[:max_items_per_model]
+                )
+                review_items.extend(list(items))
+            except (FieldDoesNotExist, AttributeError) as e:
+                # Fallback if owner/approved_by fields are absent
+                logger.debug(
+                    f"Could not use select_related for {model_class.__name__}: {e}. "
+                    "Trying without select_related."
+                )
                 try:
                     items = (
                         model_class.objects.in_review()
                         .exclude(owner=self.request.user)
-                        .select_related("owner", "approved_by")
+                        .order_by("-submitted_at")[:max_items_per_model]
                     )
-                except Exception:
-                    # Fallback if owner field is absent or exclude fails
-                    items = model_class.objects.in_review().select_related(
-                        "owner", "approved_by"
+                    review_items.extend(list(items))
+                except (FieldDoesNotExist, AttributeError) as e2:
+                    # owner field might not exist, filter in Python
+                    logger.debug(
+                        f"Could not exclude owner for {model_class.__name__}: {e2}. "
+                        "Filtering in Python."
                     )
-                    # Filter out in Python as a last resort
-                    items = [
-                        i
-                        for i in items
-                        if getattr(i, "owner_id", None) != self.request.user.id
-                    ]
-                review_items.extend(items)
+                    try:
+                        # Even in fallback, use database ordering and limit
+                        items = list(
+                            model_class.objects.in_review().order_by("-submitted_at")[
+                                :max_items_per_model
+                            ]
+                        )
+                        # Filter out in Python as a last resort
+                        filtered_items = [
+                            i
+                            for i in items
+                            if getattr(i, "owner_id", None) != self.request.user.id
+                        ]
+                        review_items.extend(filtered_items)
+                    except Exception as e3:
+                        logger.warning(
+                            f"Could not collect review items for {model_class.__name__}: {e3}"
+                        )
 
-        # Sort by submitted_at date (newest first)
-        review_items.sort(key=lambda x: x.submitted_at or timezone.now(), reverse=True)
+        # Apply filters using ReviewItemFilter helper
+        # Note: ReviewDashboardFilterSet generates the form UI,
+        # but filtering happens here in Python since we have heterogeneous objects
+        filter_obj = ReviewItemFilter(review_items, self.request.GET)
+        review_items = filter_obj.filter()
+
         return review_items
+
+    def get_queryset(self):
+        """Override to return dummy queryset for FilterView compatibility.
+
+        The actual items are collected in get_context_data().
+        """
+        # Return empty queryset from first available model or a default
+        available_models = self.get_available_models()
+        if available_models:
+            return available_models[0].objects.none()
+        # Fallback
+        try:
+            from case_studies.soilcom.models import Collection
+
+            return Collection.objects.none()
+        except ImportError:
+            return UserCreatedObject.objects.none()
+
+    def paginate_queryset(self, queryset, page_size):
+        """Override to prevent parent FilterView from paginating the dummy queryset.
+
+        The parent MultipleObjectMixin tries to paginate get_queryset() which returns
+        an empty queryset. This causes Http404 on page 2+. We handle pagination
+        manually in get_context_data() for the actual heterogeneous review items.
+
+        Returns None to indicate "no pagination at this level".
+        """
+        return (None, None, None, None)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context["title"] = "Content Review Dashboard"
+
+        # Replace the queryset-based object_list with our collected items
+        review_items = self.collect_review_items()
+
+        # Manually paginate the list
+        from django.core.paginator import Paginator
+
+        paginator = Paginator(review_items, self.paginate_by)
+        page_number = self.request.GET.get("page")
+        page_obj = paginator.get_page(page_number)
+
+        context.update(
+            {
+                "title": "Content Review Dashboard",
+                "list_type": "review",
+                "header": "Content Review Dashboard",
+                "review_items": page_obj.object_list,
+                "object_list": page_obj.object_list,  # For template compatibility
+                "page_obj": page_obj,
+                "paginator": paginator,
+                "is_paginated": page_obj.has_other_pages(),
+            }
+        )
         return context
 
 
@@ -241,10 +463,27 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
                 )
             except Exception:
                 pass
+
+            # Hook for model-specific post-action behavior (e.g., cascading)
+            self.post_action_hook(request, previous_status)
+
         except Exception as e:
             messages.error(request, f"Error performing action: {str(e)}")
 
         return HttpResponseRedirect(self.get_success_url())
+
+    def post_action_hook(self, request, previous_status=None):
+        """
+        Hook for subclasses to implement model-specific post-action behavior.
+
+        Called after the main action succeeds and before redirecting.
+        Subclasses can override this to add cascading, notifications, etc.
+
+        Args:
+            request: The HTTP request
+            previous_status: The object's publication_status before the action
+        """
+        pass
 
     # Default POST handler for all review action views (modal and non‑modal)
     def post(self, request, *args, **kwargs):  # type: ignore[override]
@@ -261,7 +500,28 @@ class SubmitForReviewView(BaseReviewActionView):
     action_attr_name = "submit_for_review"
     review_action = ReviewAction.ACTION_SUBMITTED
 
+    def post(self, request, *args, **kwargs):  # type: ignore[override]
+        """Handle preflight AJAX from modal-forms so real POST carries checkbox."""
+        try:
+            is_ajax = request.headers.get("x-requested-with") == "XMLHttpRequest"
+        except Exception:
+            is_ajax = False
+        if is_ajax:
+            # Optional early permission check to fail fast within the modal
+            try:
+                self.object = self.get_object(request, *args, **kwargs)
+                self.ensure_permission(request, self.object)
+            except PermissionDenied:
+                from django.http import HttpResponseForbidden
 
+                return HttpResponseForbidden(self.permission_denied_message)
+            from django.http import HttpResponse
+
+            return HttpResponse(status=204)
+        return super().post(request, *args, **kwargs)
+
+
+# ... rest of the code remains the same ...
 class WithdrawFromReviewView(BaseReviewActionView):
     """View to withdraw an item from review."""
 
@@ -271,6 +531,34 @@ class WithdrawFromReviewView(BaseReviewActionView):
     )
     action_attr_name = "withdraw_from_review"
     review_action = ReviewAction.ACTION_WITHDRAWN
+
+    def get_success_url(self):
+        obj = getattr(self, "object", None)
+        next_url = self.request.POST.get("next") or self.request.GET.get("next")
+
+        if obj and next_url:
+            try:
+                review_path = reverse(
+                    "object_management:review_item_detail",
+                    kwargs={
+                        "content_type_id": ContentType.objects.get_for_model(
+                            obj.__class__
+                        ).pk,
+                        "object_id": obj.pk,
+                    },
+                )
+            except Exception:
+                review_path = None
+
+            if review_path:
+                parsed_next = urlparse(next_url)
+                if parsed_next.path == review_path:
+                    try:
+                        return obj.get_absolute_url()
+                    except Exception:
+                        pass
+
+        return super().get_success_url()
 
 
 class ApproveItemView(BaseReviewActionView):
@@ -360,6 +648,9 @@ class WithdrawFromReviewModalView(BaseReviewActionModalView):
     action_attr_name = "withdraw_from_review"
     review_action = ReviewAction.ACTION_WITHDRAWN
 
+    def get_success_url(self):
+        return self.object.get_absolute_url()
+
 
 class ApproveItemModalView(BaseReviewActionModalView):
     template_name = "object_management/approve_item_modal.html"
@@ -386,12 +677,18 @@ class UserOwnsObjectMixin(UserPassesTestMixin):
     """
 
     def test_func(self):
-        # If the user is not authenticated, fail the test
-        if not self.request.user.is_authenticated:
+        try:
+            obj = self.get_object()
+        except Http404:
+            # Propagate 404 so DetailView handles nonexistent objects correctly
+            raise
+        except ObjectDoesNotExist as err:
+            # Normalize model DoesNotExist to Http404
+            raise Http404 from err
+        except Exception:
             return False
-
-        # Allow access only if the user owns the object
-        return self.get_object().owner == self.request.user
+        policy = get_object_policy(self.request.user, obj, request=self.request)
+        return policy["is_owner"]
 
 
 class UserCreatedObjectListMixin:
@@ -403,19 +700,22 @@ class UserCreatedObjectListMixin:
 
     def get_queryset(self):
         queryset = super().get_queryset()
+        # Some unit tests call view.get(request) directly without authentication middleware;
+        # ensure we handle requests without a 'user' attribute gracefully.
+        try:
+            user = getattr(self.request, "user", None)
+        except Exception:
+            user = None
 
         if not hasattr(queryset.model, "publication_status"):
             raise ImproperlyConfigured(
                 f"The model {queryset.model.__name__} must have a 'publication_status' field."
             )
 
-        query_params = {}
-        if self.list_type == "public":
-            query_params["publication_status"] = "published"
-        elif self.list_type == "private":
-            query_params["owner"] = self.request.user
-
-        queryset = queryset.filter(**query_params)
+        if self.list_type in {"published", "private", "review", "declined", "archived"}:
+            queryset = apply_scope_filter(queryset, self.list_type, user=user)
+        else:
+            queryset = filter_queryset_for_user(queryset, user)
 
         # If an OrderingFilter already set an explicit order, do not override it
         try:
@@ -568,11 +868,10 @@ class UserCreatedObjectListMixin:
         review_count = 0
         try:
             if model is not None and hasattr(model, "objects"):
-                # Public count
+                # Published count
                 try:
-                    public_count = model.objects.filter(
-                        publication_status="published"
-                    ).count()
+                    public_qs = apply_scope_filter(model.objects.all(), "published")
+                    public_count = public_qs.count()
                 except Exception:
                     public_count = 0
 
@@ -580,7 +879,10 @@ class UserCreatedObjectListMixin:
                 user = self.request.user
                 try:
                     if user and user.is_authenticated and hasattr(model, "owner"):
-                        private_count = model.objects.filter(owner=user).count()
+                        private_qs = apply_scope_filter(
+                            model.objects.all(), "private", user=user
+                        )
+                        private_count = private_qs.count()
                 except Exception:
                     private_count = 0
 
@@ -590,7 +892,7 @@ class UserCreatedObjectListMixin:
                     if hasattr(model.objects, "in_review"):
                         review_qs = model.objects.in_review()
                     else:
-                        review_qs = model.objects.filter(publication_status="review")
+                        review_qs = apply_scope_filter(model.objects.all(), "review")
 
                     # Exclude the current user's own objects from review count
                     user = self.request.user
@@ -603,13 +905,8 @@ class UserCreatedObjectListMixin:
                     # Only count if the user is a moderator for this model
                     can_moderate = False
                     if self.request.user and self.request.user.is_authenticated:
-                        perm_codename = f"can_moderate_{model._meta.model_name}"
-                        app_label = model._meta.app_label
-                        can_moderate = (
-                            self.request.user.is_staff
-                            or self.request.user.has_perm(
-                                f"{app_label}.{perm_codename}"
-                            )
+                        can_moderate = user_is_moderator_for_model(
+                            self.request.user, model
                         )
                     review_count = review_qs.count() if can_moderate else 0
                 except Exception:
@@ -639,7 +936,7 @@ class UserCreatedObjectListMixin:
 
 
 class PublishedObjectListMixin(UserCreatedObjectListMixin):
-    list_type = "public"
+    list_type = "published"
 
 
 class PrivateObjectListMixin(LoginRequiredMixin, UserCreatedObjectListMixin):
@@ -662,6 +959,17 @@ class PublishedObjectFilterView(
 class AddReviewCommentView(BaseReviewActionView):
     """Add a free-text review comment linked to an object."""
 
+    def test_func(self):
+        """Allow owners, staff, and moderators to comment."""
+        if not self.request.user.is_authenticated:
+            return False
+        try:
+            obj = self.get_object()
+        except Exception:
+            return False
+        policy = get_object_policy(self.request.user, obj, request=self.request)
+        return policy["is_owner"] or policy["is_staff"] or policy["is_moderator"]
+
     def post(self, request, *args, **kwargs):
         self.object = self.get_object(request, *args, **kwargs)
         obj = self.object
@@ -670,10 +978,8 @@ class AddReviewCommentView(BaseReviewActionView):
         if not request.user.is_authenticated:
             raise PermissionDenied("Authentication required.")
 
-        # Authorization: owners can always comment on their own objects; moderators too
-        is_owner = obj.owner_id == request.user.id
-        can_moderate = UserCreatedObjectPermission().is_moderator(request.user, obj)
-        if not (is_owner or can_moderate or request.user.is_staff):
+        policy = get_object_policy(request.user, obj, request=request)
+        if not (policy["is_owner"] or policy["is_staff"] or policy["is_moderator"]):
             raise PermissionDenied("You don't have permission to comment on this item.")
 
         message = (request.POST.get("message") or "").strip()
@@ -713,10 +1019,7 @@ class ReviewObjectListMixin(
         user = self.request.user
         if not user.is_authenticated:
             return False
-        app_label = model._meta.app_label
-        model_name = model._meta.model_name
-        perm_codename = f"can_moderate_{model_name}"
-        return user.is_staff or user.has_perm(f"{app_label}.{perm_codename}")
+        return user_is_moderator_for_model(user, model)
 
     def get_queryset(self):
         queryset = super().get_queryset()
@@ -805,9 +1108,17 @@ class UserCreatedObjectReadAccessMixin(UserPassesTestMixin):
     permission_denied_message = "You do not have permission to access this object."
 
     def test_func(self):
-        obj = self.get_object()
+        try:
+            obj = self.get_object()
+        except Http404:
+            # Ensure missing objects yield 404 rather than permission redirect
+            raise
+        except ObjectDoesNotExist as err:
+            # Normalize model-specific DoesNotExist to Http404
+            raise Http404 from err
+        except Exception:
+            return False
 
-        # Ensure the object has the required fields
         if not hasattr(obj, self.publication_status_field) or not hasattr(
             obj, self.owner_field
         ):
@@ -815,29 +1126,22 @@ class UserCreatedObjectReadAccessMixin(UserPassesTestMixin):
                 f"The model {obj.__class__.__name__} must have '{self.publication_status_field}' and '{self.owner_field}' fields."
             )
 
-        publication_status = getattr(obj, self.publication_status_field)
-        owner = getattr(obj, self.owner_field)
-        user = self.request.user
+        # Directly honor model publication_status for public read access
+        try:
+            status = getattr(obj, self.publication_status_field, None)
+            if status is not None:
+                published_value = _resolve_status_value(obj.__class__, "published")
+                if status == published_value:
+                    return True
+        except Exception:
+            pass
 
-        # Published or Archived: accessible to all
-        if (
-            publication_status == self.published_status
-            or getattr(obj, "is_archived", False)
-            or publication_status == "archived"
-        ):
+        # Policy-based evaluation (covers private/review/declined/archived and role checks)
+        policy = get_object_policy(self.request.user, obj, request=self.request)
+        if policy["is_published"]:
             return True
-        else:
-            if user.is_authenticated:
-                # Private/Review/Declined: accessible to owner, staff, or moderators
-                try:
-                    perm = UserCreatedObjectPermission()
-                    is_moderator = perm.is_moderator(user, obj)
-                except Exception:
-                    is_moderator = False
-                return owner == user or user.is_staff or is_moderator
-            else:
-                # Private: not accessible for unauthenticated users
-                return False
+        # Archived, private, review, and declined objects require authentication
+        return policy["is_owner"] or policy["is_staff"] or policy["is_moderator"]
 
 
 class UserCreatedObjectWriteAccessMixin(UserPassesTestMixin):
@@ -860,9 +1164,16 @@ class UserCreatedObjectWriteAccessMixin(UserPassesTestMixin):
         if not user.is_authenticated:
             return False
 
-        obj = self.get_object()
+        try:
+            obj = self.get_object()
+        except Http404:
+            # For write operations on nonexistent objects, propagate 404
+            raise
+        except ObjectDoesNotExist as err:
+            raise Http404 from err
+        except Exception:
+            return False
 
-        # Ensure the object has the required fields
         if not hasattr(obj, self.publication_status_field) or not hasattr(
             obj, self.owner_field
         ):
@@ -870,20 +1181,13 @@ class UserCreatedObjectWriteAccessMixin(UserPassesTestMixin):
                 f"The model {obj.__class__.__name__} must have '{self.publication_status_field}' and '{self.owner_field}' fields."
             )
 
-        publication_status = getattr(obj, self.publication_status_field)
-        owner = getattr(obj, self.owner_field)
-
-        # staff can change any object
-        if user.is_staff:
+        policy = get_object_policy(user, obj, request=self.request)
+        if policy["can_edit"]:
             return True
 
-        # published objects can only be changed by staff
-        if publication_status == self.published_status:
-            return False
-
-        # owners can change their own objects if they are not published
-        if publication_status in ("private", "review", "declined"):
-            return owner == user
+        return not policy["is_archived"] and (
+            policy["is_staff"] or (policy["is_owner"] and not policy["is_published"])
+        )
 
 
 class CreateUserObjectMixin(PermissionRequiredMixin, NextOrSuccessUrlMixin):
@@ -902,6 +1206,17 @@ class CreateUserObjectMixin(PermissionRequiredMixin, NextOrSuccessUrlMixin):
 class UserCreatedObjectCreateView(
     CreateUserObjectMixin, NoFormTagMixin, SuccessMessageMixin, CreateView
 ):
+    def get_form_kwargs(self):
+        """Pass request to form if it supports UserCreatedObjectFormMixin or SourcesFieldMixin."""
+        kwargs = super().get_form_kwargs()
+        form_class = self.get_form_class()
+
+        # Only pass request if form knows how to handle it
+        if issubclass(form_class, UserCreatedObjectFormMixin | SourcesFieldMixin):
+            kwargs["request"] = self.request
+
+        return kwargs
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         model_name = "Object"
@@ -948,6 +1263,13 @@ class UserCreatedObjectModalCreateView(PermissionRequiredMixin, BSModalCreateVie
         # For non-staff users, use the default permission check
         return super().has_permission()
 
+    def get_form_kwargs(self):
+        """Pass request to form - required by bootstrap_modal_forms and our custom mixins."""
+        kwargs = super().get_form_kwargs()
+        # Always pass request for modal forms since PopRequestMixin expects it
+        kwargs["request"] = self.request
+        return kwargs
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
@@ -992,7 +1314,7 @@ class UserCreatedObjectDetailView(UserCreatedObjectReadAccessMixin, DetailView):
             template_names = super().get_template_names()
         except ImproperlyConfigured:
             template_names = []
-        template_names.append("simple_detail_card.html")
+        template_names.append("detail_with_options.html")
         return template_names
 
     def get_context_data(self, **kwargs):
@@ -1026,11 +1348,29 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
     Implementation strategy:
     - Use a wrapper template that extends the object's normal detail template.
     - Determine the base detail template via Django's default naming convention
-      (<app_label>/<model_name>_detail.html) and fall back to simple_detail_card.html.
-     - Provide the resolved base template to the wrapper via context as 'base_template'.
+      (<app_label>/<model_name>_detail.html) and fall back to detail_with_options.html.
+    - Provide the resolved base template to the wrapper via context as 'base_template'.
+    - Support model-specific subclasses via registry pattern for specialized context.
+
+    Subclasses can register themselves for specific models to provide custom
+    review-specific context via get_review_specific_context() hook method.
     """
 
     template_name = "object_management/review_detail_wrapper.html"
+    _model_view_registry = {}
+
+    @classmethod
+    def register_for_model(cls, model_class):
+        """
+        Register this view class as the handler for a specific model.
+
+        Usage in subclass:
+            class CollectionReviewItemDetailView(ReviewItemDetailView):
+                model = Collection
+
+            CollectionReviewItemDetailView.register_for_model(Collection)
+        """
+        ReviewItemDetailView._model_view_registry[model_class] = cls
 
     def test_func(self):
         """Allow access for staff and moderators; owners when in review or declined.
@@ -1045,56 +1385,42 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
             return False
 
         obj = self.get_object()
-        # Owners: allowed when object is in review (to comment) or declined (to read feedback)
-        if getattr(obj, "owner_id", None) == getattr(user, "id", None):
-            return bool(
-                getattr(obj, "is_in_review", False)
-                or getattr(obj, "is_declined", False)
-            )
+        policy = get_object_policy(user, obj, request=self.request)
 
-        # Moderators/staff: allowed
-        app_label = obj._meta.app_label
-        perm_codename = f"can_moderate_{obj._meta.model_name}"
-        return bool(
-            getattr(user, "is_staff", False)
-            or user.has_perm(f"{app_label}.{perm_codename}")
-        )
+        if policy["is_owner"]:
+            return policy["is_in_review"] or policy["is_declined"]
+
+        return user_is_moderator_for_model(user, obj.__class__)
 
     def dispatch(self, request, *args, **kwargs):
-        """Authorize review details for moderators/staff and for owners in review/declined.
+        """
+        Authorize review details for moderators/staff and for owners in review/declined.
 
-        Owners can access while the item is in review (for commenting) and when declined (to read feedback).
+        If a specialized view is registered for this model, delegate to it.
+        Owners can access while the item is in review (for commenting) and when declined
+        (to read feedback).
         """
         obj = self.get_object()
-        model = obj.__class__
-        app_label = model._meta.app_label
-        perm_codename = f"can_moderate_{model._meta.model_name}"
+        model_class = obj.__class__
 
-        # If the current user is the owner
-        if (
-            request.user.is_authenticated
-            and hasattr(obj, "owner")
-            and obj.owner_id == request.user.id
-        ):
-            # Allow owners for objects in review (to comment) and declined (to read feedback)
-            if bool(
-                getattr(obj, "is_in_review", False)
-                or getattr(obj, "is_declined", False)
-            ):
+        # Check if there's a specialized review view registered for this model
+        specialized_view_class = self._model_view_registry.get(model_class)
+        if specialized_view_class and specialized_view_class != self.__class__:
+            # Create instance of specialized view and delegate
+            specialized_view = specialized_view_class.as_view()
+            return specialized_view(request, *args, **kwargs)
+
+        # Standard authorization checks
+        policy = get_object_policy(request.user, obj, request=request)
+
+        if policy["is_owner"]:
+            if policy["is_in_review"] or policy["is_declined"]:
                 return super().dispatch(request, *args, **kwargs)
-            # Otherwise, owners are blocked from the review details endpoint
             raise PermissionDenied(
                 "Owners can only access review details while the item is in review or declined."
             )
 
-        # For non-owners, require moderator permissions
-        if not (
-            request.user.is_authenticated
-            and (
-                request.user.is_staff
-                or request.user.has_perm(f"{app_label}.{perm_codename}")
-            )
-        ):
+        if not user_is_moderator_for_model(request.user, obj.__class__):
             raise PermissionDenied(
                 "You do not have permission to access the review details page."
             )
@@ -1111,7 +1437,7 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
         candidates = [
             f"{app_label}/{model_name}_detail.html",
             # Ultimate fallback to our generic detail card
-            "simple_detail_card.html",
+            "detail_with_options.html",
         ]
 
         # Select the first template that exists.
@@ -1131,11 +1457,28 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
             return get_object_or_404(model_class, pk=object_id)
         return super().get_object(queryset)
 
+    def get_review_specific_context(self, context):
+        """
+        Hook for subclasses to add model-specific context to the review view.
+
+        Override this method in subclasses to provide additional context data
+        specific to the model being reviewed (e.g., related objects, preview data).
+
+        Args:
+            context: The context dict built so far
+
+        Returns:
+            dict: Additional context items to merge into the main context
+        """
+        return {}
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # Resolve and pass the base template the wrapper should extend.
+
+        # Resolve and pass the base template the wrapper should extend
         context["base_template"] = self._resolve_base_template()
         context["review_mode"] = True
+
         # Provide action history so reviewers can see prior comments and explanations
         try:
             obj = self.object
@@ -1145,12 +1488,19 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
             ).order_by("-created_at", "-id")
         except Exception:
             actions = []
+
         # Old variable used by wrapper; keep for compatibility
         context["review_actions"] = actions
         # Ensure the embedded review panel in the base detail template is shown
         context["show_review_panel"] = True
         # The review panel expects 'review_logs'
         context["review_logs"] = list(actions)
+
+        # Allow subclasses to add model-specific context
+        model_specific_context = self.get_review_specific_context(context)
+        if model_specific_context:
+            context.update(model_specific_context)
+
         return context
 
 
@@ -1182,6 +1532,17 @@ class UserCreatedObjectUpdateView(
 ):
     # TODO: Implement permission flow for publication process and moderators.
 
+    def get_form_kwargs(self):
+        """Pass request to form if it supports UserCreatedObjectFormMixin or SourcesFieldMixin."""
+        kwargs = super().get_form_kwargs()
+        form_class = self.get_form_class()
+
+        # Only pass request if form knows how to handle it
+        if issubclass(form_class, UserCreatedObjectFormMixin | SourcesFieldMixin):
+            kwargs["request"] = self.request
+
+        return kwargs
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update(
@@ -1205,6 +1566,17 @@ class UserCreatedObjectCreateWithInlinesView(
     CreateUserObjectMixin, CreateWithInlinesView
 ):
     formset_helper_class = DynamicTableInlineFormSetHelper
+
+    def get_form_kwargs(self):
+        """Pass request to form if it supports UserCreatedObjectFormMixin or SourcesFieldMixin."""
+        kwargs = super().get_form_kwargs()
+        form_class = self.get_form_class()
+
+        # Only pass request if form knows how to handle it
+        if issubclass(form_class, UserCreatedObjectFormMixin | SourcesFieldMixin):
+            kwargs["request"] = self.request
+
+        return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -1231,6 +1603,17 @@ class UserCreatedObjectUpdateWithInlinesView(
 ):
     formset_helper_class = DynamicTableInlineFormSetHelper
 
+    def get_form_kwargs(self):
+        """Pass request to form if it supports UserCreatedObjectFormMixin or SourcesFieldMixin."""
+        kwargs = super().get_form_kwargs()
+        form_class = self.get_form_class()
+
+        # Only pass request if form knows how to handle it
+        if issubclass(form_class, UserCreatedObjectFormMixin | SourcesFieldMixin):
+            kwargs["request"] = self.request
+
+        return kwargs
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update(
@@ -1256,6 +1639,17 @@ class UserCreatedObjectModalUpdateView(
 ):
     template_name = "modal_form.html"
     success_message = "Successfully updated."
+
+    def get_form_kwargs(self):
+        """Pass request to form if it supports UserCreatedObjectFormMixin or SourcesFieldMixin."""
+        kwargs = super().get_form_kwargs()
+        form_class = self.get_form_class()
+
+        # Only pass request if form knows how to handle it
+        if issubclass(form_class, UserCreatedObjectFormMixin | SourcesFieldMixin):
+            kwargs["request"] = self.request
+
+        return kwargs
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -1284,7 +1678,8 @@ class UserCreatedObjectModalArchiveView(
         """Centralized permission check via UserCreatedObjectPermission.has_archive_permission."""
         try:
             obj = self.get_object()
-        except Exception:
+        except (Http404, AttributeError) as e:
+            logger.debug(f"Could not get object for archive permission check: {e}")
             return False
         perm = UserCreatedObjectPermission()
         return bool(perm.has_archive_permission(self.request, obj))
@@ -1330,7 +1725,8 @@ class UserCreatedObjectModalDeleteView(
             next_url = self.request.POST.get("next") or self.request.GET.get("next")
             if next_url:
                 return next_url
-        except Exception:
+        except (AttributeError, KeyError) as e:
+            logger.debug(f"Could not get 'next' URL from request: {e}")
             pass
 
         if self.success_url:
@@ -1395,13 +1791,13 @@ class UserCreatedObjectAutocompleteView(AutocompleteModelView):
     page_size = 15
 
     def hook_queryset(self, queryset):
-        if self.request.user and self.request.user.is_authenticated:
-            if self.request.user.is_staff:
-                return queryset
-            return queryset.filter(
-                Q(owner=self.request.user) | Q(publication_status="published")
-            )
-        return queryset.filter(publication_status="published")
+        qs = filter_queryset_for_user(queryset, self.request.user)
+        try:
+            archived_val = _resolve_status_value(queryset.model, "archived")
+            return qs.exclude(publication_status=archived_val)
+        except Exception:
+            # If model has no publication_status or resolution fails, return filtered qs as-is
+            return qs
 
     def apply_filters(self, queryset):
         if not self.filter_by:
@@ -1429,18 +1825,13 @@ class UserCreatedObjectAutocompleteView(AutocompleteModelView):
             value = "published"
 
         if lookup == "scope__name":
-            if value == "private":
-                if not self.request.user.is_authenticated:
-                    queryset = queryset.none()
-                else:
-                    queryset = queryset.filter(owner=self.request.user)
-            elif value == "published":
-                queryset = queryset.filter(publication_status="published")
-            else:
-                logger.warning(
-                    f"Unexpected scope value: {repr(value)}, expected 'private' or 'published'. Defaulting to 'published' behavior."
+            scope_value = value or "published"
+            try:
+                queryset = apply_scope_filter(
+                    queryset, scope_value, user=self.request.user
                 )
-                queryset = queryset.filter(publication_status="published")
+            except ImproperlyConfigured:
+                queryset = queryset.none()
         # Generic guard: skip obviously invalid values (e.g. the language code accidentally
         # injected in the request) that would break lookups expecting an integer PK.
         # Django would raise FieldError / ValueError when trying to cast the string to int.

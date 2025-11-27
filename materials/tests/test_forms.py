@@ -1,6 +1,7 @@
 from decimal import ROUND_HALF_UP, Decimal
 
 from django.contrib.auth.models import Group, Permission, User
+from django.contrib.contenttypes.models import ContentType
 from django.forms import inlineformset_factory
 from django.test import TestCase
 
@@ -113,11 +114,17 @@ class CompositionUpdateFormTestCase(TestCase):
         member = User.objects.create_user(username="member")
 
         members_group = Group.objects.create(name="members")
-        change_composition_permission = Permission.objects.get(
-            codename="change_composition"
+        composition_ct = ContentType.objects.get_for_model(Composition)
+        change_composition_permission, _ = Permission.objects.get_or_create(
+            codename="change_composition",
+            content_type=composition_ct,
+            defaults={"name": "Can change composition"},
         )
-        change_weightshare_permission = Permission.objects.get(
-            codename="change_weightshare"
+        weightshare_ct = ContentType.objects.get_for_model(WeightShare)
+        change_weightshare_permission, _ = Permission.objects.get_or_create(
+            codename="change_weightshare",
+            content_type=weightshare_ct,
+            defaults={"name": "Can change weight share"},
         )
         members_group.permissions.add(
             change_composition_permission, change_weightshare_permission

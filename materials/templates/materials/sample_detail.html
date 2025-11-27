@@ -7,6 +7,7 @@
 {% endblock title %}
 
 {% block content %}
+    {% object_policy object as policy %}
     <div class="row">
         <div class="col col-12 col-md-6 col-lg-3 mt-4">
             <div class="card shadow h-100">
@@ -92,11 +93,11 @@
                                 <i class="fas fa-fw fa-list"></i> My Samples
                             </a>
                             <a class="dropdown-item" href="{% url 'materials-dashboard' %}">
-                                <i class="fas fa-fw fa-th-large"></i> Explorer
+                                <i class="fas fa-fw fa-table-cells-large"></i> Explorer
                             </a>
                         </div>
                     </div>
-                    {% if user == object.owner or user.is_staff %}
+                    {% if policy.can_edit or policy.can_delete or policy.can_duplicate or policy.is_owner or policy.is_staff or policy.is_moderator %}
                         <div class="dropdown">
                             <button class="btn btn-secondary dropdown-toggle ms-3"
                                     type="button"
@@ -104,29 +105,22 @@
                                     data-bs-toggle="dropdown"
                                     aria-expanded="false">Options</button>
                             <div class="dropdown-menu" aria-labelledby="editDropdown">
-                                {% if object.update_url %}
-                                    {% if user.is_staff %}
-                                        <a class="dropdown-item" href="{% url 'sample-update' object.id %}">
-                                            <i class="fas fa-pen-to-square"></i> Edit
-                                        </a>
-                                    {% elif user == object.owner %}
-                                        {% if object.publication_status != object.STATUS_PUBLISHED %}
-                                            <a class="dropdown-item" href="{% url 'sample-update' object.id %}">
-                                                <i class="fas fa-pen-to-square"></i> Edit
-                                            </a>
-                                        {% endif %}
-                                    {% endif %}
+                                {% if policy.can_edit %}
+                                    <a class="dropdown-item" href="{% url 'sample-update' object.id %}">
+                                        <i class="fas fa-pen-to-square"></i> Edit
+                                    </a>
                                 {% endif %}
-                                {% object_policy object as policy %}
                                 {% if policy.is_owner and policy.is_in_review %}
                                     <a class="dropdown-item"
                                        href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
                                         <i class="fas fa-fw fa-clipboard-check"></i> Review view
                                     </a>
                                 {% endif %}
-                                <a class="dropdown-item" href="{% url 'sample-duplicate' object.id %}">
-                                    <i class="fas fa-fw fa-copy"></i> Duplicate
-                                </a>
+                                {% if policy.can_duplicate %}
+                                    <a class="dropdown-item" href="{% url 'sample-duplicate' object.id %}">
+                                        <i class="fas fa-fw fa-copy"></i> Duplicate
+                                    </a>
+                                {% endif %}
                                 {% if policy.can_delete %}
                                     <a class="dropdown-item modal-link"
                                        href="{% url 'sample-delete-modal' object.pk %}">
@@ -135,13 +129,12 @@
                                 {% endif %}
                             </div>
                         </div>
-                        {% object_policy object as policy %}
-                        {% if policy.is_owner and policy.is_in_review %}
-                            <a class="btn btn-outline-secondary ms-3"
-                               href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
-                                <i class="fas fa-clipboard-check"></i> Review view
-                            </a>
-                        {% endif %}
+                    {% endif %}
+                    {% if policy.is_owner and policy.is_in_review %}
+                        <a class="btn btn-outline-secondary ms-3"
+                           href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
+                            <i class="fas fa-clipboard-check"></i> Review view
+                        </a>
                     {% endif %}
                 </div>
             </div>
@@ -158,7 +151,7 @@
                             <tr>
                                 <th>Property</th>
                                 <th>Value</th>
-                                {% if request.user == object.owner %}<th class="remove-property collapse multi-collapse">Remove</th>{% endif %}
+                                {% if policy.can_add_property %}<th class="remove-property collapse multi-collapse">Remove</th>{% endif %}
                             </tr>
                         </thead>
                         <tbody>
@@ -172,7 +165,7 @@
                                         {{ property.average }}
                                         ± {{ property.standard_deviation }} {{ property.property.unit }}
                                     </td>
-                                    {% if request.user == object.owner %}
+                                    {% if policy.can_add_property %}
                                         <td class="remove-property collapse multi-collapse">
                                             <a href="{% url 'materialpropertyvalue-delete-modal' property.id %}?next={{ request.path }}"
                                                class="modal-link">
@@ -186,7 +179,7 @@
                     </table>
                 </div>
                 <div class="card-footer">
-                    {% if request.user == object.owner %}
+                    {% if policy.can_add_property %}
                         <a href="{% url 'sample-add-property' object.id %}">
                             <i class="fas fa-fw fa-plus"></i> Add property
                         </a>
@@ -274,7 +267,7 @@
                         <b>Shares of:</b> {{ composition.fractions_of_name }}
                     </div>
                     <div class="card-footer d-flex">
-                        {% if user == object.owner or user.is_staff %}
+                        {% if policy.can_manage_samples %}
                             <a id="move-group-{{ composition.id }}-left"
                                href="{% url 'composition-order-down' composition.id %}?next={{ request.path }}"
                                class="me-3 nowrap">
@@ -283,7 +276,7 @@
                             <a id="edit-group-{{ composition.id }}"
                                href="{% url 'composition-update' composition.id %}?next={{ request.path }}"
                                class="me-3 nowrap">
-                                <i class="fas fa-fw fa-edit"></i> Edit
+                                <i class="fas fa-fw fa-pen-to-square"></i> Edit
                             </a>
                             <a id="remove-group-{{ composition.id }}"
                                href="{% url 'composition-delete-modal' composition.id %}?next={{ request.path }}"
@@ -301,7 +294,7 @@
             </div>
         {% endfor %}
     </div>
-    {% if request.user == object.owner %}
+    {% if policy.can_manage_samples %}
         <div id="add-component-group">
             <div class="row">
                 <div class="col mt-4">

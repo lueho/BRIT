@@ -1,6 +1,6 @@
 from bootstrap_modal_forms.mixins import CreateUpdateAjaxMixin, PopRequestMixin
 from crispy_forms.helper import FormHelper
-from django.core.exceptions import ImproperlyConfigured
+from django.core.exceptions import ImproperlyConfigured, ValidationError
 from django.forms import (
     BaseFormSet,
     BaseModelFormSet,
@@ -148,7 +148,6 @@ class TomSelectFormsetHelper(BaseFormsetHelper):
 
 
 class M2MInlineFormSet(BaseFormSet):
-
     def __init__(self, *args, **kwargs):
         self.parent_object = kwargs.pop("parent_object", None)
         self.relation_field_name = kwargs.pop("relation_field_name")
@@ -226,8 +225,7 @@ class M2MInlineFormSetMixin:
     def get_relation_field_name(self):
         if not hasattr(self.model, self.relation_field_name):
             raise ImproperlyConfigured(
-                "%(rfn)s is not a valid relational field name of model %(cls)s"
-                % {"rfn": self.relation_field_name, "cls": self.model.__name__}
+                f"{self.relation_field_name} is not a valid relational field name of model {self.model.__name__}"
             )
         return self.relation_field_name
 
@@ -239,7 +237,6 @@ class M2MInlineFormSetMixin:
 
 
 class M2MInlineModelFormSet(BaseModelFormSet):
-
     def __init__(self, *args, **kwargs):
         self.parent_object = kwargs.pop("parent_object", None)
         self.relation_field_name = kwargs.pop("relation_field_name", None)
@@ -297,3 +294,261 @@ class M2MInlineModelFormSetMixin:
             kwargs["formset"] = self.get_formset()
             kwargs["formset_helper"] = self.get_formset_helper_class()()
         return super().get_context_data(**kwargs)
+
+
+class UserCreatedObjectFormMixin:
+    """
+    Mixin that validates all UserCreatedObject references in the form have
+    proper permissions for the current user.
+
+    This provides centralized, consistent permission checking for all fields
+    that reference UserCreatedObject models (single or M2M), preventing users
+    from POSTing IDs of objects they don't have access to.
+
+    Usage:
+        class MyModelForm(UserCreatedObjectFormMixin, SimpleModelForm):
+            # Your fields...
+            class Meta:
+                model = MyModel
+                fields = (...)
+
+        # In the view:
+        def get_form_kwargs(self):
+            kwargs = super().get_form_kwargs()
+            kwargs['request'] = self.request
+            return kwargs
+
+    Security:
+    - Validates at form.clean() time (backend validation)
+    - Complements autocomplete filtering (frontend UX)
+    - Prevents bypass via browser devtools or direct POST
+    - Works with both single (ForeignKey) and multiple (M2M) relationships
+
+    The mixin expects:
+    - Form to be used with a view that passes 'request' in get_form_kwargs()
+    - Will validate any field containing UserCreatedObject instances
+    """
+
+    def __init__(self, *args, **kwargs):
+        """Capture request and adjust UserCreatedObject field querysets."""
+        from django.forms import ModelChoiceField, ModelMultipleChoiceField
+
+        from utils.object_management.models import UserCreatedObject
+
+        # Capture request for permission validation in clean()
+        # Only pop request if PopRequestMixin is NOT in the MRO (it will pop it itself)
+        has_pop_request_mixin = any(
+            cls.__name__ == "PopRequestMixin" for cls in self.__class__.__mro__
+        )
+
+        if not has_pop_request_mixin:
+            # Pop it ourselves if PopRequestMixin isn't present
+            request = kwargs.pop("request", None)
+            if request:
+                self.request = request
+            elif not hasattr(self, "request"):
+                self.request = None
+
+        # Get data before super().__init__ consumes it
+        data = kwargs.get("data")
+
+        super().__init__(*args, **kwargs)
+
+        # If PopRequestMixin is in the MRO, it has already set self.request during super().__init__()
+
+        # After fields are initialized, adjust querysets for all UserCreatedObject fields
+        # to include submitted values (prevents Django field validation from rejecting
+        # them before our clean() method can run permission checks)
+        if data:
+            for field_name, field in self.fields.items():
+                # Only process ModelChoiceField and ModelMultipleChoiceField
+                if not isinstance(field, ModelChoiceField | ModelMultipleChoiceField):
+                    continue
+
+                # Get the model from the queryset
+                # Even TomSelect fields should have queryset initialized by now
+                try:
+                    if field.queryset is None:
+                        # Some fields may have None queryset - skip them
+                        continue
+                    model = field.queryset.model
+                except (AttributeError, TypeError):
+                    continue
+
+                # Check if this field references UserCreatedObject
+                try:
+                    if not issubclass(model, UserCreatedObject):
+                        continue
+                except TypeError:
+                    continue
+
+                # Collect submitted IDs for this field
+                submitted_ids = set()
+
+                # Handle both single and multiple choice fields
+                if field_name in data:
+                    values = (
+                        data.getlist(field_name)
+                        if hasattr(data, "getlist")
+                        else [data.get(field_name)]
+                    )
+                    for val in values:
+                        if val:
+                            try:
+                                submitted_ids.add(int(val))
+                            except (ValueError, TypeError):
+                                pass
+
+                # Collect existing IDs (for update forms)
+                existing_ids = set()
+                if self.instance and self.instance.pk:
+                    if hasattr(self.instance, field_name):
+                        attr = getattr(self.instance, field_name)
+                        if hasattr(attr, "all"):  # M2M field
+                            existing_ids.update(attr.values_list("pk", flat=True))
+                        elif hasattr(attr, "pk"):  # FK field
+                            existing_ids.add(attr.pk)
+
+                # Expand queryset to include all relevant IDs
+                all_ids = submitted_ids | existing_ids
+                if all_ids:
+                    field.queryset = model.objects.filter(pk__in=all_ids)
+
+    def clean(self):
+        """
+        Validate that all UserCreatedObject references are accessible to the user.
+        Raises ValidationError if user tries to reference objects they can't access.
+        """
+        from utils.object_management.models import UserCreatedObject
+        from utils.object_management.permissions import filter_queryset_for_user
+
+        cleaned_data = super().clean()
+        request = getattr(self, "request", None)
+
+        # Skip validation if no request (shouldn't happen in normal usage)
+        if not request or not hasattr(request, "user"):
+            return cleaned_data
+
+        # Check all fields for UserCreatedObject references
+        for field_name, value in cleaned_data.items():
+            if value is None:
+                continue
+
+            # Handle both single objects and iterables (M2M, multiple choice)
+            objects_to_check = []
+            if hasattr(value, "__iter__") and not isinstance(value, str | bytes):
+                # M2M or multiple choice field
+                objects_to_check = list(value)
+            else:
+                # Single object (ForeignKey, OneToOne)
+                objects_to_check = [value]
+
+            # Validate each object
+            for obj in objects_to_check:
+                if not isinstance(obj, UserCreatedObject):
+                    continue
+
+                # Use existing permission system to check access
+                filtered_qs = filter_queryset_for_user(
+                    obj.__class__.objects.filter(pk=obj.pk), request.user
+                )
+
+                if not filtered_qs.exists():
+                    # User doesn't have permission to access this object
+                    raise ValidationError(
+                        {
+                            field_name: (
+                                f"You don't have permission to access the selected "
+                                f"{obj.__class__._meta.verbose_name}: {obj}"
+                            )
+                        },
+                        code="permission_denied",
+                    )
+
+        return cleaned_data
+
+
+class SourcesFieldMixin:
+    """
+    Mixin for ModelForms that adds a sources M2M field with SourceListWidget.
+
+    This mixin handles:
+    1. Automatic widget setup (SourceListWidget with autocomplete)
+    2. Queryset population for validation (assigned + submitted sources)
+    3. Makes sources field optional by default
+
+    Note: Permission validation is handled by UserCreatedObjectFormMixin.clean()
+    This mixin only needs to ensure submitted/assigned sources are in the queryset
+    so Django's validation doesn't reject them before our permission check runs.
+
+    Usage:
+        class MyModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModelForm):
+            class Meta:
+                model = MyModel
+                fields = ('name', 'sources', ...)
+
+        # In the view, pass request to the form:
+        def get_form_kwargs(self):
+            kwargs = super().get_form_kwargs()
+            kwargs['request'] = self.request
+            return kwargs
+
+    The mixin expects:
+    - Form to be used with a model that has a 'sources' M2M relationship
+    - 'sources' to be listed in Meta.fields
+    - View to pass 'request' in get_form_kwargs() (for UserCreatedObjectFormMixin)
+    """
+
+    def __init__(self, *args, **kwargs):
+        # Import here to avoid circular imports
+        from bibliography.models import Source
+        from utils.widgets import SourceListWidget
+
+        # Capture data BEFORE calling super().__init__ (parent consumes it)
+        data = kwargs.get("data")
+
+        # DON'T pop 'request' if another mixin already handles it
+        # Check if PopRequestMixin or UserCreatedObjectFormMixin is in the MRO
+        has_request_handler = any(
+            cls.__name__ in ("PopRequestMixin", "UserCreatedObjectFormMixin")
+            for cls in self.__class__.__mro__
+        )
+
+        if not has_request_handler:
+            # Regular form - pop request ourselves before super().__init__()
+            kwargs.pop("request", None)
+
+        super().__init__(*args, **kwargs)
+
+        # Ensure sources field exists and has proper widget
+        if "sources" not in self.fields:
+            return  # Field not included in this form, skip mixin logic
+
+        # Configure the sources field
+        self.fields["sources"].required = False  # Sources are optional
+
+        # Set widget if not already customized
+        if not isinstance(self.fields["sources"].widget, SourceListWidget):
+            self.fields["sources"].widget = SourceListWidget(
+                autocomplete_url="source-autocomplete", label_field="label"
+            )
+
+        # Populate queryset with assigned + submitted sources for validation
+        # Permission check happens in UserCreatedObjectFormMixin.clean()
+        source_ids = set()
+
+        # Add currently assigned sources
+        if self.instance and self.instance.pk and hasattr(self.instance, "sources"):
+            source_ids.update(self.instance.sources.values_list("id", flat=True))
+
+        # Add submitted sources (from POST data)
+        if data and "sources" in data:
+            submitted_ids = data.getlist("sources")
+            if submitted_ids:
+                source_ids.update(int(sid) for sid in submitted_ids if sid)
+
+        # Set queryset to include all relevant sources (permission check in clean())
+        if source_ids:
+            self.fields["sources"].queryset = Source.objects.filter(id__in=source_ids)
+        else:
+            self.fields["sources"].queryset = Source.objects.none()

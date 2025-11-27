@@ -1,15 +1,17 @@
 import hashlib
+
 from django.db.models import Count, Max, Min, Q
 from django_filters import rest_framework as rf_filters
-from rest_framework import permissions
+from rest_framework import permissions, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from case_studies.soilcom.filters import CollectionFilterSet
-from case_studies.soilcom.models import Collection
+from case_studies.soilcom.models import Collection, Collector
 from case_studies.soilcom.serializers import (
     CollectionFlatSerializer,
     CollectionModelSerializer,
+    CollectorGeometrySerializer,
     WasteCollectionGeometrySerializer,
 )
 from maps.mixins import CachedGeoJSONMixin
@@ -107,7 +109,9 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         for key in params.keys():
             if key in exclude_keys:
                 continue
-            values = params.getlist(key) if hasattr(params, "getlist") else [params.get(key)]
+            values = (
+                params.getlist(key) if hasattr(params, "getlist") else [params.get(key)]
+            )
             # Normalize singletons to string, multi-values to list
             if len(values) == 1:
                 filters[key] = values[0]
@@ -132,4 +136,71 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
     @action(detail=False, methods=["get"], permission_classes=[permissions.AllowAny])
     def geojson(self, request, *args, **kwargs):
         """GeoJSON endpoint with the same permission checks as standard endpoints."""
+        return super().geojson(request, *args, **kwargs)
+
+
+class CollectorViewSet(CachedGeoJSONMixin, viewsets.ReadOnlyModelViewSet):
+    """
+    Collector viewset with GeoJSON endpoint for QGIS map rendering.
+
+    Provides collectors with their catchment geometries and organizational levels.
+    Optimized for QGIS with caching and efficient queries.
+    """
+
+    queryset = Collector.objects.all()
+    serializer_class = CollectorGeometrySerializer
+    permission_classes = [permissions.AllowAny]
+    filterset_fields = ["id", "catchment__region__country"]
+
+    def get_queryset(self):
+        """
+        Optimized queryset with select_related for geometry access.
+        Fetches all necessary relations in a single query.
+        """
+        qs = super().get_queryset()
+        qs = qs.select_related(
+            "catchment",
+            "catchment__region",
+            "catchment__region__borders",
+        ).prefetch_related(
+            "catchment__region__nutsregion",
+            "catchment__region__lauregion",
+        )
+
+        # Filter by country if specified
+        country = self.request.query_params.get("country")
+        if country:
+            qs = qs.filter(catchment__region__country=country)
+
+        # Only include collectors with geometry
+        qs = qs.filter(
+            catchment__isnull=False,
+            catchment__region__isnull=False,
+            catchment__region__borders__isnull=False,
+        )
+
+        return qs
+
+    def get_cache_key(self, request):
+        """Build cache key including country filter."""
+        params = request.query_params
+        country = params.get("country", "all")
+        id_list = params.getlist("id") if hasattr(params, "getlist") else []
+
+        if id_list:
+            try:
+                ids_sorted = sorted([str(int(x)) for x in id_list])
+            except Exception:
+                ids_sorted = sorted([str(x) for x in id_list])
+            return f"collector_geojson:country:{country}:id:{','.join(ids_sorted)}"
+
+        return f"collector_geojson:country:{country}"
+
+    def get_geojson_serializer_class(self):
+        """Use CollectorGeometrySerializer for GeoJSON endpoint."""
+        return CollectorGeometrySerializer
+
+    @action(detail=False, methods=["get"], permission_classes=[permissions.AllowAny])
+    def geojson(self, request, *args, **kwargs):
+        """GeoJSON endpoint optimized for QGIS rendering."""
         return super().geojson(request, *args, **kwargs)

@@ -13,6 +13,9 @@ from django.db.models.signals import post_migrate
 from django.dispatch import receiver
 from django.test.runner import DiscoverRunner
 
+# Module-level flag to ensure we only run ensure_initial_data once per test run
+_initial_data_loaded = False
+
 
 # Signal handler to ensure initial data is loaded for parallel test databases
 @receiver(post_migrate)
@@ -20,16 +23,24 @@ def ensure_test_initial_data(sender: AppConfig, **kwargs):
     """
     Run ensure_initial_data after migrations complete during test setup.
     This runs once for the first database, then gets mirrored to parallel workers.
+
+    Uses a module-level flag to prevent multiple executions even though this
+    signal fires for each app's migrations.
     """
-    # Only run during testing and only once (when utils app migrations finish)
-    if not getattr(settings, 'TESTING', False):
+    global _initial_data_loaded
+
+    # Only run during testing
+    if not getattr(settings, "TESTING", False):
         return
-    
-    # Run only after the last app's migrations to avoid running multiple times
-    # We use 'utils' as it's typically one of the last apps to migrate
-    if sender.name != 'utils':
+
+    # Only run once per test session
+    if _initial_data_loaded:
         return
-        
+
+    _initial_data_loaded = True
+
+    # Run ensure_initial_data to create default owner and other initial data
+    # Permissions are handled by the post_migrate signal in signals.py
     try:
         call_command("ensure_initial_data")
     except Exception as e:
@@ -189,7 +200,7 @@ class SerialAwareTestRunner(DiscoverRunner):
             if self._stats:
                 StopwatchTestResult.print_stats()
             return result
-        
+
         # We have serial tests, so we need custom handling
         # But we still want to use Django's proper test setup
         suite = self.build_suite(test_labels, extra_tests)
@@ -225,17 +236,17 @@ class SerialAwareTestRunner(DiscoverRunner):
         # Run parallel tests first using Django's proper test execution
         result = 0
         if parallel_suite.countTestCases():
-            old_parallel = getattr(self, 'parallel', 1)
+            old_parallel = getattr(self, "parallel", 1)
             result += self.run_suite(parallel_suite, **kwargs)
-            
+
         # Run serial tests with parallelism disabled
         if serial_suite.countTestCases():
-            old_parallel = getattr(self, 'parallel', 1)
+            old_parallel = getattr(self, "parallel", 1)
             self.parallel = 1
             result += self.run_suite(serial_suite, **kwargs)
             self.parallel = old_parallel
 
         if self._stats:
             StopwatchTestResult.print_stats()
-            
+
         return result

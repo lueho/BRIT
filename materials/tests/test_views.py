@@ -1,4 +1,5 @@
 from django.contrib.auth.models import Permission
+from django.contrib.contenttypes.models import ContentType
 from django.urls import reverse
 
 from distributions.models import TemporalDistribution, Timestep
@@ -597,9 +598,13 @@ class SampleModalAddPropertyViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
-        cls.owner.user_permissions.add(
-            Permission.objects.get(codename="add_materialpropertyvalue")
+        content_type = ContentType.objects.get_for_model(MaterialPropertyValue)
+        permission, _ = Permission.objects.get_or_create(
+            codename="add_materialpropertyvalue",
+            content_type=content_type,
+            defaults={"name": "Can add material property value"},
         )
+        cls.owner.user_permissions.add(permission)
         material = Material.objects.create(name="Test Material")
         series = SampleSeries.objects.create(
             owner=cls.owner, name="Test Series", material=material

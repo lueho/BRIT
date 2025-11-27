@@ -8,8 +8,7 @@ from .filters import WasteFlyerFilter
 from .models import WasteFlyer
 
 
-
-@app.task(name='check_wasteflyer_url', trail=True)
+@app.task(name="check_wasteflyer_url", trail=True)
 def check_wasteflyer_url(pk):
     flyer = WasteFlyer.objects.get(pk=pk)
     flyer.url_valid = check_url(flyer.url)
@@ -18,17 +17,17 @@ def check_wasteflyer_url(pk):
     return True
 
 
-@app.task(name='callback')
+@app.task(name="callback")
 def check_wasteflyer_urls_callback(results):
-    return f'Checked {len(results)} flyers.'
+    return f"Checked {len(results)} flyers."
 
 
-@app.task(bind=True, trail=True, name='scheduler')
+@app.task(bind=True, trail=True, name="scheduler")
 def check_wasteflyer_urls(self, params):
-    self.myname = 'scheduler'
+    self.myname = "scheduler"
     qs = WasteFlyerFilter(params, queryset=WasteFlyer.objects.all()).qs
     signatures = []
-    for i, flyer in enumerate(qs):
+    for flyer in qs:
         signatures.append(check_wasteflyer_url.s(flyer.pk))
     callback = check_wasteflyer_urls_callback.s()
     task_chord = chord(signatures)(callback)

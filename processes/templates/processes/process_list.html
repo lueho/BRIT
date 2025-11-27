@@ -1,0 +1,37 @@
+{% extends "filtered_list.html" %}
+{% load crispy_forms_tags %}
+{% load user_created_object_tags %}
+{% load moderation_tags %}
+
+{% block title %}BRIT | Processes{% endblock %}
+
+{% block list_table_head %}
+<thead>
+    <tr>
+        <th>Name</th>
+        <th>Categories</th>
+        <th>Mechanism</th>
+        <th>Description</th>
+        {% if object_list.model|is_user_created %}<th class="actions-column">Status/Actions</th>{% endif %}
+    </tr>
+</thead>
+{% endblock %}
+
+{% block list_table_row %}
+<tr>
+    <td>
+        <a href="{% detail_or_review_url object %}"
+           aria-label="View details of {{ object.name }}">{{ object.name }}</a>
+    </td>
+    <td>
+        {% for category in object.categories.all %}
+            <span class="badge bg-secondary">{{ category.name }}</span>
+        {% endfor %}
+    </td>
+    <td>{{ object.mechanism|default:"—" }}</td>
+    <td>{{ object.short_description|truncatewords:15 }}</td>
+    {% if object_list.model|is_user_created %}
+        <td class="actions-column mobile-no-label">{% include 'object_management/status_actions_cell.html' %}</td>
+    {% endif %}
+</tr>
+{% endblock %}

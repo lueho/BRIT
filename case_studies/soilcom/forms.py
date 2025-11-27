@@ -7,10 +7,12 @@ from django.forms import (
     CheckboxSelectMultiple,
     ChoiceField,
     DateInput,
+    DecimalField,
     HiddenInput,
     IntegerField,
     ModelChoiceField,
     ModelMultipleChoiceField,
+    NumberInput,
     RadioSelect,
 )
 from django.utils.translation import gettext as _
@@ -25,10 +27,13 @@ from materials.models import Material, Sample
 from utils.crispy_fields import ForeignkeyField
 from utils.forms import (
     CreateInlineMixin,
+    DynamicTableInlineFormSetHelper,
     M2MInlineFormSet,
     ModalModelFormMixin,
     SimpleForm,
     SimpleModelForm,
+    SourcesFieldMixin,
+    UserCreatedObjectFormMixin,
 )
 from utils.object_management.models import get_default_owner
 
@@ -172,7 +177,7 @@ class CollectionSeasonForm(SimpleForm):
         )
 
     def __init__(self, *args, **kwargs):
-        super(CollectionSeasonForm, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.fields["distribution"].queryset = TemporalDistribution.objects.filter(
             name="Months of the year"
         )
@@ -205,9 +210,8 @@ class CollectionSeasonForm(SimpleForm):
 
 
 class CollectionSeasonFormSet(M2MInlineFormSet):
-
     def clean(self):
-        for i, form in enumerate(self.forms):
+        for i, _form in enumerate(self.forms):
             if (
                 i > 0
                 and self.forms[i - 1].cleaned_data.get("last_timestep").order
@@ -243,7 +247,7 @@ class WasteFlyerModelForm(SimpleModelForm):
     class Meta:
         model = WasteFlyer
         fields = ("url",)
-        labels = {"url": "Sources (Urls)"}
+        labels = {"url": "URL"}
 
     def save(self, commit=True):
         if commit:
@@ -266,19 +270,77 @@ class WasteFlyerModalModelForm(ModalModelFormMixin, WasteFlyerModelForm):
     pass
 
 
-class BaseWasteFlyerUrlFormSet(M2MInlineFormSet):
+class WasteFlyerFormSetHelper(DynamicTableInlineFormSetHelper):
+    """
+    Custom formset helper for waste flyer URLs with clear labeling.
+    Distinguishes waste management document URLs from bibliographic references.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Add a descriptive legend/title for the formset
+        self.legend = (
+            '<i class="fas fa-link me-1"></i> Waste Management Documents (URLs)'
+        )
+        self.help_text = "Quick links to waste management flyers, collection schedules, or municipal documents. URLs are automatically saved as references."
+        self.form_show_labels = True  # Show URL label for each field
+
+
+class WasteFlyerFormSet(M2MInlineFormSet):
+    """
+    Formset for managing WasteFlyer URLs.
+
+    Handles proper cleanup by only deleting orphaned WasteFlyers that are not
+    connected to any Collection (via flyers or sources) or PropertyValue (via sources).
+    """
 
     def __init__(self, *args, **kwargs):
         self.owner = kwargs.pop("owner", get_default_owner())
         super().__init__(*args, **kwargs)
 
     def save(self, commit=True):
+        for form in self.forms:
+            if not getattr(form.instance, "owner", None):
+                form.instance.owner = self.owner
+
         child_objects = super().save(commit=commit)
-        WasteFlyer.objects.filter(collections=None).delete()
+
+        # Delete WasteFlyers that are completely orphaned - not connected to:
+        # 1. Collection.flyers (via 'collections' reverse relation)
+        # 2. Collection.sources (via 'collection' reverse relation)
+        # 3. CollectionPropertyValue.sources (via 'collectionpropertyvalue' reverse relation)
+        # 4. AggregatedCollectionPropertyValue.sources
+        #    (via 'aggregatedcollectionpropertyvalue' reverse relation)
+        WasteFlyer.objects.filter(
+            collections__isnull=True,
+            collection__isnull=True,
+            collectionpropertyvalue__isnull=True,
+            aggregatedcollectionpropertyvalue__isnull=True,
+        ).delete()
+
         return child_objects
 
 
-class CollectionPropertyValueModelForm(SimpleModelForm):
+class CollectionPropertyValueModelFormHelper(FormHelper):
+    form_tag = False
+    layout = Layout(
+        Field("collection"),
+        Field("property"),
+        Field("unit"),
+        Field("year"),
+        Field("average"),
+        Field("standard_deviation"),
+        # References section (widget renders its own card header with label)
+        Div(
+            Field("sources", template="bootstrap5/field_no_label.html"),
+            css_class="mt-4",
+        ),
+    )
+
+
+class CollectionPropertyValueModelForm(
+    UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModelForm
+):
     collection = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="collection-autocomplete",
@@ -286,6 +348,7 @@ class CollectionPropertyValueModelForm(SimpleModelForm):
         ),
         label="Collection",
     )
+    # sources field and widget provided by SourcesFieldMixin
 
     class Meta:
         model = CollectionPropertyValue
@@ -296,10 +359,31 @@ class CollectionPropertyValueModelForm(SimpleModelForm):
             "year",
             "average",
             "standard_deviation",
+            "sources",
         )
+        form_helper_class = CollectionPropertyValueModelFormHelper
 
 
-class AggregatedCollectionPropertyValueModelForm(SimpleModelForm):
+class AggregatedCollectionPropertyValueModelFormHelper(FormHelper):
+    form_tag = False
+    layout = Layout(
+        Field("collections"),
+        Field("property"),
+        Field("unit"),
+        Field("year"),
+        Field("average"),
+        Field("standard_deviation"),
+        # References section (widget renders its own card header with label)
+        Div(
+            Field("sources", template="bootstrap5/field_no_label.html"),
+            css_class="mt-4",
+        ),
+    )
+
+
+class AggregatedCollectionPropertyValueModelForm(
+    UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModelForm
+):
     collections = TomSelectModelMultipleChoiceField(
         config=TomSelectConfig(
             url="collection-autocomplete",
@@ -307,6 +391,7 @@ class AggregatedCollectionPropertyValueModelForm(SimpleModelForm):
         ),
         label="Collections",
     )
+    # sources field and widget provided by SourcesFieldMixin
 
     class Meta:
         model = AggregatedCollectionPropertyValue
@@ -317,31 +402,45 @@ class AggregatedCollectionPropertyValueModelForm(SimpleModelForm):
             "year",
             "average",
             "standard_deviation",
+            "sources",
         )
+        form_helper_class = AggregatedCollectionPropertyValueModelFormHelper
 
 
 class CollectionModelFormHelper(FormHelper):
     form_tag = False
     layout = Layout(
+        # Collection identification and location
         Field("catchment"),
         ForeignkeyField("collector"),
         ForeignkeyField("collection_system"),
+        # Waste stream configuration
         ForeignkeyField("waste_category"),
         Field("connection_type"),
         Field("allowed_materials"),
         Field("forbidden_materials"),
+        # Collection parameters
         ForeignkeyField("fee_system"),
         Field("frequency"),
         Field("min_bin_size"),
         Field("required_bin_capacity"),
         Field("required_bin_capacity_reference"),
+        # Validity period
         Field("valid_from"),
         Field("valid_until"),
+        # Additional information
         Field("description"),
+        # References section (widget renders its own card header with label)
+        Div(
+            Field("sources", template="bootstrap5/field_no_label.html"),
+            css_class="mt-4",
+        ),
     )
 
 
-class CollectionModelForm(CreateInlineMixin, SimpleModelForm):
+class CollectionModelForm(
+    UserCreatedObjectFormMixin, SourcesFieldMixin, CreateInlineMixin, SimpleModelForm
+):
     """
     Model form for Collection, including all collection parameters and waste stream fields.
     """
@@ -362,6 +461,8 @@ class CollectionModelForm(CreateInlineMixin, SimpleModelForm):
         label="Collector",
         required=True,
     )
+    # sources field provided by SourcesFieldMixin
+    # Widget has its own header, so label won't be shown
     collection_system = ModelChoiceField(
         queryset=CollectionSystem.objects.all(), required=True
     )
@@ -390,14 +491,28 @@ class CollectionModelForm(CreateInlineMixin, SimpleModelForm):
         label="Connection type",
         help_text="Indicates whether connection to the collection system is mandatory, voluntary, or not specified. Leave blank for never set; select 'not specified' for explicit user choice.",
     )
-    min_bin_size = IntegerField(required=False, min_value=0)
-    required_bin_capacity = IntegerField(required=False, min_value=0)
+    min_bin_size = DecimalField(
+        required=False,
+        min_value=0,
+        max_digits=8,
+        decimal_places=1,
+        widget=NumberInput(attrs={"step": "0.1", "min": "0"}),
+    )
+    required_bin_capacity = DecimalField(
+        required=False,
+        min_value=0,
+        max_digits=8,
+        decimal_places=1,
+        widget=NumberInput(attrs={"step": "0.1", "min": "0"}),
+    )
     required_bin_capacity_reference = ChoiceField(
         choices=[("", "---------")] + REQUIRED_BIN_CAPACITY_REFERENCE_CHOICES,
         required=False,
         label="Reference unit for required bin capacity",
         help_text="Defines the unit (person, household, property) for which the required bin capacity applies. Leave blank if not specified.",
     )
+
+    # __init__ logic for sources field is provided by SourcesFieldMixin
 
     class Meta:
         model = Collection
@@ -417,6 +532,7 @@ class CollectionModelForm(CreateInlineMixin, SimpleModelForm):
             "min_bin_size",
             "required_bin_capacity",
             "required_bin_capacity_reference",
+            "sources",
         )
         labels = {
             "description": "Comments",
@@ -436,7 +552,7 @@ class CollectionModelForm(CreateInlineMixin, SimpleModelForm):
         instance = super().save(commit=False)
         data = self.cleaned_data
         instance.name = (
-            f'{data["catchment"]} {data["waste_category"]} {data["collection_system"]}'
+            f"{data['catchment']} {data['waste_category']} {data['collection_system']}"
         )
         allowed_materials = Material.objects.filter(id__in=data["allowed_materials"])
         if not allowed_materials.exists():

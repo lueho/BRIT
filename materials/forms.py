@@ -1,12 +1,11 @@
 from decimal import ROUND_HALF_UP, Decimal
 
 from crispy_forms.helper import FormHelper
-from crispy_forms.layout import HTML, Field, Layout, Row
+from crispy_forms.layout import Field, Layout, Row
 from django.core.exceptions import ValidationError
 from django.forms import (
     DateTimeInput,
     DecimalField,
-    HiddenInput,
     ModelChoiceField,
     NumberInput,
     Widget,
@@ -16,7 +15,6 @@ from django.utils.safestring import mark_safe
 from django_tomselect.forms import (
     TomSelectConfig,
     TomSelectModelChoiceField,
-    TomSelectModelMultipleChoiceField,
 )
 from extra_views import InlineFormSetFactory
 
@@ -27,6 +25,8 @@ from utils.forms import (
     ModalModelForm,
     ModalModelFormMixin,
     SimpleModelForm,
+    SourcesFieldMixin,
+    UserCreatedObjectFormMixin,
 )
 
 from .models import (
@@ -106,18 +106,9 @@ class MaterialPropertyValueModalModelForm(
     pass
 
 
-class AnalyticalMethodModelForm(SimpleModelForm):
-    sources = TomSelectModelMultipleChoiceField(
-        config=TomSelectConfig(
-            url="source-autocomplete",
-            label_field="label",
-        ),
-        attrs={"class": "form-control mb-3"},
-        label="Sources",
-        required=False,
-        help_text="Optional: Select multiple sources if applicable.",
-    )
-
+class AnalyticalMethodModelForm(
+    UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModelForm
+):
     class Meta:
         model = AnalyticalMethod
         fields = (
@@ -155,30 +146,24 @@ class SampleSeriesAddTemporalDistributionModalModelForm(ModalModelForm):
         )
 
 
-class SampleModelForm(SimpleModelForm):
+class SampleModelForm(UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModelForm):
     material = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="material-autocomplete",
-            label_field="name",
+            label_field="abbreviation",
+            value_field="id",
         ),
+        required=False,
         label="Material",
     )
     series = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="sampleseries-autocomplete",
+            label_field="abbreviation",
+            value_field="id",
         ),
         required=False,
         label="Series",
-    )
-    sources = TomSelectModelMultipleChoiceField(
-        config=TomSelectConfig(
-            url="source-autocomplete",
-            label_field="label",
-        ),
-        attrs={"class": "form-control mb-3"},
-        label="Single Select",
-        required=False,
-        help_text="Example of single select with autocomplete and clear button.",
     )
 
     class Meta:
@@ -208,7 +193,6 @@ class SampleModalModelForm(ModalModelFormMixin, SampleModelForm):
 
 
 class CompositionModelForm(SimpleModelForm):
-
     class Meta:
         model = Composition
         fields = ("group", "sample", "fractions_of")
@@ -394,7 +378,6 @@ class WeightShareInlineForm(WeightShareModelForm):
 
 
 class WeightShareInlineFormset(BaseInlineFormSet):
-
     def clean(self):
         super().clean()
 

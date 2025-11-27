@@ -1,0 +1,21 @@
+{% comment %}
+Minimal inline publication status icon for use in lists.
+Only displays for owners, moderators, and staff - not for regular public viewers.
+Usage: {% include "object_management/review_status_icon.html" with object=cpv %}
+{% endcomment %}
+{% load moderation_tags %}
+
+{% object_policy object as policy %}
+{% if policy.is_owner or policy.is_moderator or policy.is_staff %}
+    {% if object.is_private %}
+        <i class="fas fa-lock text-secondary review-status-icon" title="Private"></i>
+    {% elif object.is_in_review %}
+        <i class="fas fa-search text-warning review-status-icon" title="In Review"></i>
+    {% elif object.is_declined %}
+        <i class="fas fa-circle-xmark text-danger review-status-icon" title="Rejected"></i>
+    {% elif object.is_published %}
+        <i class="fas fa-globe text-success review-status-icon" title="Published"></i>
+    {% elif object.is_archived %}
+        <i class="fas fa-archive text-muted review-status-icon" title="Archived"></i>
+    {% endif %}
+{% endif %}

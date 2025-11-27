@@ -171,6 +171,9 @@ class UserCreatedObjectManager(models.Manager):
     def reviewable_by_user(self, user):
         return self.get_queryset().reviewable_by_user(user)
 
+    def in_review(self):
+        return self.get_queryset().in_review()
+
     def accessible_by_user(self, user):
         return self.get_queryset().accessible_by_user(user)
 

@@ -1,12 +1,11 @@
 from django.core.exceptions import ValidationError
-from django.forms import FloatField, BooleanField
+from django.forms import BooleanField, FloatField
 from django.test import TestCase
 
-from ..fields import NullableRangeField, NullablePercentageRangeField
+from ..fields import NullablePercentageRangeField, NullableRangeField
 
 
 class NullableRangeFieldTests(TestCase):
-
     def test_fields_instantiation(self):
         field = NullableRangeField()
         self.assertEqual(len(field.fields), 3)
@@ -36,7 +35,6 @@ class NullableRangeFieldTests(TestCase):
 
 
 class NullablePercentageRangeFieldTests(TestCase):
-
     def test_fields_instantiation(self):
         field = NullablePercentageRangeField()
         self.assertEqual(len(field.fields), 3)

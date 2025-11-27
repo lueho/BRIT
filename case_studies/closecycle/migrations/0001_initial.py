@@ -3,13 +3,13 @@
 import django.contrib.gis.db.models.fields
 import django.db.models.deletion
 import django.utils.timezone
-import utils.models
 from django.conf import settings
 from django.db import migrations, models
 
+import utils.models
+
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [

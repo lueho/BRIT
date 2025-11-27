@@ -19,7 +19,6 @@ from django.apps import apps
 from django.core.management.base import BaseCommand
 from django.db import transaction
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -216,7 +215,7 @@ class Command(BaseCommand):
                 sig = inspect.signature(init_func)
                 if "logger" in sig.parameters:
                     # Function expects a logger parameter
-                    result = init_func(logger=logger)
+                    init_func(logger=logger)
                 else:
                     # Standard function with no parameters
                     init_func()

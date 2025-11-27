@@ -2,12 +2,14 @@ import json
 
 from celery.result import AsyncResult
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
+from django.core.exceptions import PermissionDenied
 from django.http import HttpResponse
 from django.urls import reverse_lazy
 from django.views import View
 from django.views.generic import TemplateView
 
 from utils.forms import TomSelectFormsetHelper
+from utils.object_management.permissions import get_object_policy
 from utils.object_management.views import (
     PrivateObjectFilterView,
     PrivateObjectListView,
@@ -233,20 +235,26 @@ class SourceModalDeleteView(UserCreatedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class SourceCheckUrlView(PermissionRequiredMixin, View):
+class SourceCheckUrlView(LoginRequiredMixin, View):
     object = None
     model = Source
-    permission_required = "bibliography.change_source"
 
     def get(self, request, *args, **kwargs):
         self.object = self.model.objects.get(pk=kwargs.get("pk"))
+        policy = get_object_policy(request.user, self.object, request=request)
+        if not (
+            policy.get("is_owner")
+            or policy.get("is_staff")
+            or policy.get("is_moderator")
+        ):
+            raise PermissionDenied
+
         task = check_source_url.delay(self.object.pk)
         response_data = {"task_id": task.task_id}
         return HttpResponse(json.dumps(response_data), content_type="application/json")
 
 
 class SourceCheckUrlProgressView(LoginRequiredMixin, View):
-
     @staticmethod
     def get(request, task_id):
         result = AsyncResult(task_id)
@@ -278,14 +286,73 @@ class SourceAutocompleteView(UserCreatedObjectAutocompleteView):
         "title__icontains",
         "authors__last_names__icontains",
         "authors__first_names__icontains",
+        "url__icontains",
     ]
-    ordering = "title"
     page_size = 10
-    value_fields = ["id", "title", "authors__last_names", "authors__first_names"]
+    value_fields = [
+        "id",
+        "type",
+        "title",
+        "abbreviation",
+        "url",
+        "authors__last_names",
+        "authors__first_names",
+    ]
+
+    def get_queryset(self):
+        """Order sources to prioritize actual bibliographic sources over URLs."""
+        qs = super().get_queryset()
+        # Annotate with has_authors to prioritize sources with authors
+        # Then order by type (waste_flyer comes last alphabetically)
+        # Then by title
+        from django.db.models import Case, Exists, IntegerField, OuterRef, When
+
+        from bibliography.models import SourceAuthor
+
+        # Check if source has any authors using Exists instead of Count to avoid GROUP BY issues
+        has_authors_subquery = SourceAuthor.objects.filter(source=OuterRef("pk"))
+
+        qs = qs.annotate(
+            has_authors=Exists(has_authors_subquery),
+            # Prioritize non-waste_flyer types
+            type_priority=Case(
+                When(type="waste_flyer", then=1),
+                default=0,
+                output_field=IntegerField(),
+            ),
+        ).order_by("type_priority", "-has_authors", "title")
+
+        return qs
 
     def hook_prepare_results(self, results):
         for result in results:
-            formatted_name = f"{result['authors__last_names']}, {result['authors__first_names']}. {result['title']}"
+            source_type = result.get("type", "custom")
+
+            if source_type == "waste_flyer":
+                # WasteFlyers are identified by URL
+                url = result.get("url", "")
+                formatted_name = url if url else f"WasteFlyer #{result['id']}"
+            else:
+                # Traditional sources use author/title format
+                last_names = result.get("authors__last_names", "").strip()
+                first_names = result.get("authors__first_names", "").strip()
+                title = result.get("title", "").strip()
+
+                if last_names or first_names:
+                    author_part = f"{last_names}, {first_names}".strip(", ")
+                    formatted_name = f"{author_part}. {title}" if title else author_part
+                else:
+                    formatted_name = (
+                        title
+                        if title
+                        else result.get("abbreviation", f"Source #{result['id']}")
+                    )
+
+            # Set all possible label fields that forms might use
             result["text"] = formatted_name
             result["selected_text"] = formatted_name
+            result["abbreviation"] = (
+                formatted_name  # For forms using label_field="abbreviation"
+            )
+            result["label"] = formatted_name  # For forms using label_field="label"
         return results

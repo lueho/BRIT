@@ -141,7 +141,11 @@ class CollectionViewSetTestCase(APITestCase):
             "frequency": self.frequency.id,
         }
         ct = ContentType.objects.get_for_model(Collection)
-        permission = Permission.objects.get(content_type=ct, codename="add_collection")
+        permission, _ = Permission.objects.get_or_create(
+            content_type=ct,
+            codename="add_collection",
+            defaults={"name": "Can add collection"},
+        )
         self.regular_user.user_permissions.add(permission)
         self.regular_user.refresh_from_db()
         request = self.factory.post("/", data)
@@ -219,7 +223,11 @@ class CollectionViewSetTestCase(APITestCase):
         }
 
         ct = ContentType.objects.get_for_model(Collection)
-        permission = Permission.objects.get(content_type=ct, codename="add_collection")
+        permission, _ = Permission.objects.get_or_create(
+            content_type=ct,
+            codename="add_collection",
+            defaults={"name": "Can add collection"},
+        )
         self.regular_user = User.objects.get(pk=self.regular_user.pk)
         self.regular_user.user_permissions.add(permission)
         self.regular_user.refresh_from_db()

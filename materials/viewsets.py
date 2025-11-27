@@ -1,8 +1,18 @@
 from rest_framework.viewsets import ReadOnlyModelViewSet
 
-from .filters import CompositionFilterSet, MaterialFilterSet, SampleFilterSet, SampleSeriesFilterSet
+from .filters import (
+    CompositionFilterSet,
+    MaterialFilterSet,
+    SampleFilterSet,
+    SampleSeriesFilterSet,
+)
 from .models import Composition, Material, Sample, SampleSeries
-from .serializers import CompositionAPISerializer, MaterialAPISerializer, SampleAPISerializer, SampleSeriesAPISerializer
+from .serializers import (
+    CompositionAPISerializer,
+    MaterialAPISerializer,
+    SampleAPISerializer,
+    SampleSeriesAPISerializer,
+)
 
 
 class MaterialViewSet(ReadOnlyModelViewSet):

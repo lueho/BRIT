@@ -16,6 +16,7 @@ from maps.models import Catchment, GeoDataset
 from maps.serializers import BaseResultMapSerializer
 from maps.views import GeoDataSetAutocompleteView, MapMixin
 from materials.models import Material, SampleSeries
+from utils.object_management.permissions import get_object_policy
 from utils.object_management.views import (
     PrivateObjectFilterView,
     PublishedObjectFilterView,
@@ -148,8 +149,12 @@ class ScenarioAddInventoryAlgorithmView(
     object = None
 
     def test_func(self):
-        scenario = Scenario.objects.get(id=self.kwargs.get("pk"))
-        return self.request.user == scenario.owner
+        try:
+            scenario = Scenario.objects.get(id=self.kwargs.get("pk"))
+        except Scenario.DoesNotExist:
+            return False
+        policy = get_object_policy(self.request.user, scenario, request=self.request)
+        return policy["can_edit"]
 
     @staticmethod
     def post(request, *args, **kwargs):
@@ -203,8 +208,12 @@ class ScenarioAlgorithmConfigurationUpdateView(
     object = None
 
     def test_func(self):
-        scenario = Scenario.objects.get(id=self.kwargs.get("scenario_pk"))
-        return self.request.user == scenario.owner
+        try:
+            scenario = Scenario.objects.get(id=self.kwargs.get("scenario_pk"))
+        except Scenario.DoesNotExist:
+            return False
+        policy = get_object_policy(self.request.user, scenario, request=self.request)
+        return policy["can_edit"]
 
     @staticmethod
     def post(request, *args, **kwargs):
@@ -258,8 +267,12 @@ class ScenarioRemoveInventoryAlgorithmView(
     feedstock = None
 
     def test_func(self):
-        self.scenario = Scenario.objects.get(id=self.kwargs.get("scenario_pk"))
-        return self.scenario.owner == self.request.user
+        try:
+            self.scenario = Scenario.objects.get(id=self.kwargs.get("scenario_pk"))
+        except Scenario.DoesNotExist:
+            return False
+        policy = get_object_policy(self.request.user, self.scenario, request=self.request)
+        return policy["can_edit"]
 
     def get(self, request, *args, **kwargs):
         self.scenario = Scenario.objects.get(id=self.kwargs.get("scenario_pk"))

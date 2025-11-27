@@ -4,14 +4,14 @@ import django.contrib.gis.db.models.fields
 import django.core.validators
 import django.db.models.deletion
 import django.utils.timezone
-import maps.models
-import utils.models
 from django.conf import settings
 from django.db import migrations, models
 
+import maps.models
+import utils.models
+
 
 class Migration(migrations.Migration):
-
     initial = True
 
     dependencies = [
