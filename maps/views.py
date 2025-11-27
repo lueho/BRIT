@@ -314,6 +314,8 @@ class GeoDataSetPublishedFilterView(PublishedObjectFilterView):
     model = GeoDataset
     filterset_class = GeoDataSetFilterSet
     dashboard_url = reverse_lazy("maps-dashboard")
+    breadcrumb_section = "maps"
+    breadcrumb_label = "Geo Datasets"
 
 
 class GeoDataSetPrivateFilterView(PrivateObjectFilterView):

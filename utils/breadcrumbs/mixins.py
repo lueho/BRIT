@@ -123,9 +123,12 @@ class BreadcrumbMixin:
                 )
 
         # Add subsection if applicable (e.g., "Samples" within "Materials")
+        # Skip subsection if view has explicit breadcrumb_label (it represents current page)
         subsection = self._get_subsection()
         is_on_subsection_page = False
-        if subsection and subsection != section:
+        has_explicit_label = bool(self.breadcrumb_label)
+
+        if subsection and subsection != section and not has_explicit_label:
             try:
                 subsection_url = reverse(subsection["url_name"])
                 is_on_subsection_page = _urls_match(current_path, subsection_url)

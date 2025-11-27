@@ -16,7 +16,7 @@ SECTIONS = {
     },
     "maps": {
         "label": "Maps",
-        "url_name": "maps_list",
+        "url_name": "maps-dashboard",
         "icon": "fa-globe-europe",
     },
     "materials": {
