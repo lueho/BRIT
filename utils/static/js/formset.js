@@ -120,7 +120,10 @@ class DynamicFormset {
      */
     initWidgets(row) {
         // Initialize TomSelect widgets if this is a tomselect formset
-        if (this.formsetType === "tomselect") {
+        // or if the row contains TomSelect-enabled fields.
+        const hasTomSelectFields = row.querySelector("select[data-tomselect]");
+
+        if (this.formsetType === "tomselect" || hasTomSelectFields) {
             this.initTomSelectWidgets(row);
         }
 
