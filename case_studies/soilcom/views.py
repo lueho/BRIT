@@ -814,19 +814,35 @@ class CollectionCatchmentAutocompleteView(UserCreatedObjectAutocompleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CollectionPublishedListView(PublishedObjectFilterView):
+class CollectionListMixin:
+    """Mixin providing optimized queryset for Collection list views."""
+
+    def get_queryset(self):
+        return (
+            super()
+            .get_queryset()
+            .select_related(
+                "catchment__region",
+                "waste_stream__category",
+                "collector",
+                "collection_system",
+            )
+        )
+
+
+class CollectionPublishedListView(CollectionListMixin, PublishedObjectFilterView):
     model = Collection
     filterset_class = CollectionFilterSet
     dashboard_url = reverse_lazy("wastecollection-dashboard")
 
 
-class CollectionPrivateListView(PrivateObjectFilterView):
+class CollectionPrivateListView(CollectionListMixin, PrivateObjectFilterView):
     model = Collection
     filterset_class = CollectionFilterSet
     dashboard_url = reverse_lazy("wastecollection-dashboard")
 
 
-class CollectionReviewListView(ReviewObjectFilterView):
+class CollectionReviewListView(CollectionListMixin, ReviewObjectFilterView):
     model = Collection
     filterset_class = CollectionFilterSet
     template_name = "collection_review_filter.html"
