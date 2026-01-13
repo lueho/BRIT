@@ -345,7 +345,7 @@ class GeoDataSetCreateView(UserCreatedObjectCreateView):
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs['request'] = self.request
+        kwargs["request"] = self.request
         return kwargs
 
 
@@ -356,10 +356,10 @@ class FilteredMapMixin(MapMixin):
     def get_dataset(self):
         try:
             return GeoDataset.objects.get(model_name=self.model_name)
-        except GeoDataset.DoesNotExist:
+        except GeoDataset.DoesNotExist as err:
             raise ImproperlyConfigured(
                 f"No GeoDataset with model_name {self.model_name} found."
-            )
+            ) from err
 
     def get_region_feature_id(self):
         return self.get_dataset().region_id
@@ -419,7 +419,7 @@ class GeoDataSetUpdateView(UserCreatedObjectUpdateView):
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs['request'] = self.request
+        kwargs["request"] = self.request
         return kwargs
 
 
@@ -586,7 +586,7 @@ class CatchmentCreateMergeLauView(UserCreatedObjectCreateView):
         for geom in geoms[1:]:
             new_geom = new_geom.union(geom)
         new_geom.normalize()
-        if not type(new_geom) == MultiPolygon:
+        if not isinstance(new_geom, MultiPolygon):
             new_geom = MultiPolygon(new_geom)
         return GeoPolygon.objects.create(geom=new_geom)
 
@@ -750,19 +750,6 @@ class CatchmentOptionGeometryAPI(APIView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class NutsRegionSummaryAPIView(APIView):
-    authentication_classes = []
-    permission_classes = []
-
-    @staticmethod
-    def get(request):
-        obj = NutsRegion.objects.filter(id=request.query_params.get("id"))
-        serializer = NutsRegionSummarySerializer(
-            obj, many=True, field_labels_as_keys=True, context={"request": request}
-        )
-        return Response({"summaries": serializer.data})
-
-
 class CatchmentRegionGeometryAPI(APIView):
     """
     Similar to RegionGeometryAPI. Instead of taking the id of the requested region, this takes a catchment id as input
@@ -825,34 +812,6 @@ class NutsRegionPublishedMapView(GeoDataSetPublishedFilteredMapView):
     map_title = "NUTS Regions"
 
 
-class NutsRegionParentsDetailAPI(APIView):
-    """
-    API to fetch all parent levels of a specific NUTS region.
-    """
-
-    authentication_classes = []
-    permission_classes = []
-
-    def get(self, request, pk):
-        try:
-            region = NutsRegion.objects.get(pk=pk)
-        except NutsRegion.DoesNotExist:
-            raise NotFound("A NUTS region with the provided ID does not exist.")
-
-        data = {}
-        current_region = region
-
-        for lvl in range(current_region.levl_code - 1, -1, -1):
-            if current_region.parent:
-                current_region = current_region.parent
-                serializer = NutsRegionOptionSerializer(current_region)
-                data[f"level_{lvl}"] = serializer.data
-            else:
-                break  # No more parents available
-
-        return Response(data)
-
-
 class NutsRegionPedigreeAPI(APIView):
     """
     This API is used to reduce options in select widgets of filters. It returns only the ID and name of the
@@ -878,10 +837,14 @@ class NutsRegionPedigreeAPI(APIView):
 
         try:
             instance = NutsRegion.objects.get(id=request.query_params["id"])
-        except AttributeError:
-            raise NotFound("A NUTS region with the provided id does not exist.")
-        except NutsRegion.DoesNotExist:
-            raise NotFound("A NUTS region with the provided id does not exist.")
+        except AttributeError as err:
+            raise NotFound(
+                "A NUTS region with the provided id does not exist."
+            ) from err
+        except NutsRegion.DoesNotExist as err:
+            raise NotFound(
+                "A NUTS region with the provided id does not exist."
+            ) from err
 
         data = {}
 
@@ -900,25 +863,6 @@ class NutsRegionPedigreeAPI(APIView):
                 data[f"id_level_{lvl}"] = serializer.data
 
         return Response(data)
-
-
-class LauRegionOptionsAPI(APIView):
-    """
-    This API is used to reduce options in select widgets of filters. It returns only the ID and name of the
-    region and not the geometry.
-    """
-
-    authentication_classes = []
-    permission_classes = []
-
-    @staticmethod
-    def get(request):
-        data = {}
-        qs = LauRegion.objects.all()
-        serializer = LauRegionOptionSerializer(qs, many=True)
-        data["id_lau"] = serializer.data
-
-        return JsonResponse(data)
 
 
 class NutsAndLauCatchmentPedigreeAPI(APIView):
@@ -947,10 +891,14 @@ class NutsAndLauCatchmentPedigreeAPI(APIView):
         try:
             catchment = Catchment.objects.get(id=request.query_params["id"])
             instance = catchment.region.nutsregion
-        except AttributeError:
-            raise NotFound("A NUTS region with the provided id does not exist.")
-        except Catchment.DoesNotExist:
-            raise NotFound("A NUTS region with the provided id does not exist.")
+        except AttributeError as err:
+            raise NotFound(
+                "A NUTS region with the provided id does not exist."
+            ) from err
+        except Catchment.DoesNotExist as err:
+            raise NotFound(
+                "A NUTS region with the provided id does not exist."
+            ) from err
 
         data = {}
 

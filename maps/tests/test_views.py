@@ -793,7 +793,6 @@ class CatchmentCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
 
 
 class NutsRegionMapViewTestCase(ViewWithPermissionsTestCase):
-
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
@@ -956,30 +955,6 @@ class NutsAndLauCatchmentPedigreeAPITestCase(ViewSetWithPermissionsTestCase):
             {"id": self.level_3_catchment_1.id, "direction": "children"},
         )
         self.assertIn("id_level_4", response.data)
-
-
-class NutsRegionSummaryAPIViewTestCase(ViewSetWithPermissionsTestCase):
-
-    @classmethod
-    def setUpTestData(cls):
-        super().setUpTestData()
-        NutsRegion.objects.create(nuts_id="TE57", name_latn="Test NUTS")
-
-    def setUp(self):
-        self.region = NutsRegion.objects.get(nuts_id="TE57")
-
-    def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(
-            reverse("data.nutsregion-summary"), {"id": self.region.pk}
-        )
-        self.assertEqual(response.status_code, 200)
-
-    def test_returns_correct_data(self):
-        response = self.client.get(
-            reverse("data.nutsregion-summary"), {"id": self.region.pk}
-        )
-        self.assertIn("summaries", response.data)
-        self.assertEqual(response.data["summaries"][0]["Name"], self.region.name_latn)
 
 
 # ----------- Attribute CRUD -------------------------------------------------------------------------------------------

@@ -31,7 +31,6 @@ from .views import (
     GeoDataSetPrivateFilterView,
     GeoDataSetPublishedFilterView,
     GeoDataSetUpdateView,
-    LauRegionOptionsAPI,
     LocationCreateView,
     LocationDetailView,
     LocationModalDeleteView,
@@ -45,10 +44,8 @@ from .views import (
     NutsRegionLevel1AutocompleteView,
     NutsRegionLevel2AutocompleteView,
     NutsRegionLevel3AutocompleteView,
-    NutsRegionParentsDetailAPI,
     NutsRegionPedigreeAPI,
     NutsRegionPublishedMapView,
-    NutsRegionSummaryAPIView,
     RegionAttributeValueCreateView,
     RegionAttributeValueDetailView,
     RegionAttributeValueModalCreateView,
@@ -232,17 +229,7 @@ urlpatterns = [
         name="region-of-lau-autocomplete",
     ),
     path("regions/map/", RegionMapView.as_view(), name="region-map"),
-    path(
-        "api/nutsregion/<int:pk>/parents/",
-        NutsRegionParentsDetailAPI.as_view(),
-        name="nutsregion-parents-detail",
-    ),
     path("nutsregions/map/", NutsRegionPublishedMapView.as_view(), name="NutsRegion"),
-    path(
-        "nutsregions/summary/",
-        NutsRegionSummaryAPIView.as_view(),
-        name="data.nutsregion-summary",
-    ),
     path(
         "nutsregions/options/data/",
         NutsRegionPedigreeAPI.as_view(),
@@ -272,11 +259,6 @@ urlpatterns = [
         "nutsregions/autocomplete/level3/",
         NutsRegionLevel3AutocompleteView.as_view(),
         name="nutsregion-autocomplete-level3",
-    ),
-    path(
-        "lau_options/data/",
-        LauRegionOptionsAPI.as_view(),
-        name="data.lau_region_options",
     ),
     path(
         "nuts_lau_catchment_options/data/",

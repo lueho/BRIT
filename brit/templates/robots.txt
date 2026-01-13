@@ -4,5 +4,14 @@ Disallow: /admin/
 Disallow: /users/
 Disallow: /media/
 Disallow: /static/
+Disallow: /api/
+Disallow: /*/api/
+Disallow: /*geojson/
+Disallow: /*export/
+Disallow: /*autocomplete/
+Disallow: /*ajax/
+Disallow: /*data/
+Disallow: /*download*/
+Disallow: /*check_urls/
 
-Sitemap: https://bri-tool.herokuapp.com/sitemap.xml
+Sitemap: {{ request.scheme }}://{{ request.get_host }}/sitemap.xml
