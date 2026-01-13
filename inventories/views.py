@@ -108,7 +108,7 @@ class ScenarioDetailView(MapMixin, UserCreatedObjectDetailView):
         self.object = self.get_object()
         scenario = self.object
         scenario.set_status(ScenarioStatus.Status.RUNNING)
-        run_inventory(scenario.id)
+        run_inventory.delay(scenario.id)
         return redirect("scenario-result", scenario.id)
 
 
@@ -271,7 +271,9 @@ class ScenarioRemoveInventoryAlgorithmView(
             self.scenario = Scenario.objects.get(id=self.kwargs.get("scenario_pk"))
         except Scenario.DoesNotExist:
             return False
-        policy = get_object_policy(self.request.user, self.scenario, request=self.request)
+        policy = get_object_policy(
+            self.request.user, self.scenario, request=self.request
+        )
         return policy["can_edit"]
 
     def get(self, request, *args, **kwargs):
@@ -354,7 +356,7 @@ def download_scenario_summary(request, scenario_pk):
     scenario = Scenario.objects.get(id=scenario_pk)
     with io.StringIO(json.dumps(scenario.summary_dict(), indent=4)) as file:
         response = HttpResponse(file, content_type="application/json")
-        response["Content-Disposition"] = "attachment; filename=%s" % file_name
+        response["Content-Disposition"] = f"attachment; filename={file_name}"
         return response
 
 
