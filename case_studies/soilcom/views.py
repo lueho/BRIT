@@ -988,6 +988,23 @@ class CollectionDetailView(MapMixin, UserCreatedObjectDetailView):
     features_layer_api_basename = "api-waste-collection"
     map_title = "Collection"
 
+    def get_queryset(self):
+        """Optimize queries by prefetching related sources and flyers."""
+        return (
+            super()
+            .get_queryset()
+            .select_related(
+                "owner",
+                "catchment",
+                "collector",
+                "collection_system",
+                "waste_stream__category",
+                "frequency",
+                "fee_system",
+            )
+            .prefetch_related("sources", "flyers", "predecessors", "successors")
+        )
+
     def get_override_params(self):
         params = super().get_override_params()
         # Always load the features layer for the current object on detail pages
