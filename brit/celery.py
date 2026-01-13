@@ -8,3 +8,4 @@ app.config_from_object("django.conf:settings", namespace="CELERY")
 app.autodiscover_tasks()
 
 # Ensure all generic export tasks are registered with Celery (import after app is defined)
+import utils.file_export.generic_tasks  # noqa: F401, E402

@@ -73,7 +73,7 @@ async function start_export(exportUrl, format) {
         }
         const element = document.getElementById('export_' + format);
         // Dynamically replace a placeholder ('0') in the progress URL with the actual task_id
-        return element.dataset.exportProgressUrl.replace('0', data.task_id);
+        return element.dataset.exportProgressUrl.replace(/\/0\//, `/${data.task_id}/`);
     } catch (error) {
         console.error("Error starting export:", error);
         throw error;
@@ -94,7 +94,7 @@ async function monitor_export_progress(url, format, count = 0) {
             throw new Error(`Monitoring response was not ok: ${response.status}`);
         }
         const data = await response.json();
-        if (data.state === "PENDING") {
+        if (data.state === "PENDING" || data.state === "STARTED") {
             updateProcessingLink(format, count + 1);
             setTimeout(() => monitor_export_progress(url, format, count + 1), POLLING_INTERVAL_MS);
         } else if (data.state === "SUCCESS") {
@@ -103,6 +103,7 @@ async function monitor_export_progress(url, format, count = 0) {
             cleanup_export(false, data, format);
         } else {
             console.warn("Unexpected export state:", data.state);
+            setTimeout(() => monitor_export_progress(url, format, count + 1), POLLING_INTERVAL_MS);
         }
     } catch (error) {
         console.error("Error monitoring export progress:", error);
@@ -225,7 +226,7 @@ function resetExportLink(format) {
         return;
     }
     elements.wrapper.dataset.exportStatus = "READY";
-    elements.linkText.innerText = `Export to ${format}`;
+    elements.linkText.innerText = `Export to ${format.toUpperCase()}`;
 
     if (elements.statusElement) {
         elements.statusElement.innerHTML = '';

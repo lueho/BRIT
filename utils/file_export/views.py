@@ -117,12 +117,15 @@ class ExportModalView(LoginRequiredMixin, TemplateView):
 
 
 class FilteredListFileExportProgressView(LoginRequiredMixin, View):
-
     @staticmethod
     def get(request, task_id):
         result = AsyncResult(task_id)
+        info = result.info
+        # Handle non-serializable info (e.g., exceptions)
+        if isinstance(info, Exception):
+            info = {"error": str(info)}
         response_data = {
             "state": result.state,
-            "details": result.info,
+            "details": info,
         }
         return HttpResponse(json.dumps(response_data), content_type="application/json")
