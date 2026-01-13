@@ -801,7 +801,8 @@ def update_collection_names(sender, instance, created, **kwargs):
         else:
             collections = instance.collections.all()
         for collection in collections:
-            collection.save()
+            collection.name = collection.construct_name()
+            collection.save(update_fields=["name", "lastmodified_at"])
 
 
 class CollectionPropertyValue(PropertyValue):

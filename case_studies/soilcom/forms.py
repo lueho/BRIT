@@ -571,15 +571,14 @@ class CollectionModelForm(
         if created:
             waste_stream.allowed_materials.add(*data["allowed_materials"])
             waste_stream.forbidden_materials.add(*data["forbidden_materials"])
-        waste_stream.save()
+            waste_stream.save()
         instance.waste_stream = waste_stream
         if commit:
             instance.save()
             for predecessor in instance.predecessors.all():
                 valid_until = instance.valid_from - timedelta(days=1)
                 predecessor.valid_until = valid_until
-                predecessor.full_clean()
-                predecessor.save()
+                predecessor.save(update_fields=["valid_until", "lastmodified_at"])
             return super().save()
         else:
             return super().save(commit=False)
