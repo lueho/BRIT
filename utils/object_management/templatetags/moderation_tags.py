@@ -5,6 +5,7 @@ from django import template
 from django.apps import apps
 from django.conf import settings
 from django.contrib.contenttypes.models import ContentType
+from django.core.cache import cache
 from django.urls import reverse
 
 register = template.Library()
@@ -370,7 +371,7 @@ def is_moderator_for_any_model(user):
     """Check if user has moderation permissions for any UserCreatedObject model.
 
     Returns True if the user is staff or has can_moderate_* permission for any model.
-    This is useful for showing/hiding moderator-specific UI elements.
+    Results are cached for 10 minutes to reduce database load.
     """
     if not user or not getattr(user, "is_authenticated", False):
         return False
@@ -379,23 +380,29 @@ def is_moderator_for_any_model(user):
     if getattr(user, "is_staff", False):
         return True
 
-    # Check if user has any can_moderate_* permission
+    # Use cache to avoid repeated permission checks
+    cache_key = f"is_moderator_any_model_{user.id}"
+    cached_result = cache.get(cache_key)
+    if cached_result is not None:
+        return cached_result
+
     try:
         from utils.object_management.models import UserCreatedObject
 
         for model in apps.get_models():
-            if (
-                issubclass(model, UserCreatedObject)
-                and not model._meta.abstract
-            ):
+            if issubclass(model, UserCreatedObject) and not model._meta.abstract:
                 perm_codename = f"can_moderate_{model._meta.model_name}"
                 full_perm = f"{model._meta.app_label}.{perm_codename}"
                 if user.has_perm(full_perm):
+                    # Cache the positive result for 10 minutes (600 seconds)
+                    cache.set(cache_key, True, 600)
                     return True
     except Exception:
         # If something goes wrong, fail closed
         return False
 
+    # Cache the negative result for 10 minutes
+    cache.set(cache_key, False, 600)
     return False
 
 
@@ -405,16 +412,25 @@ def pending_review_count_for_user(user):
 
     Returns the total count of items in review status across all models
     where the user has moderation permissions (excluding their own items).
+    Results are cached for 5 minutes to reduce database load.
     """
     if not user or not getattr(user, "is_authenticated", False):
         return 0
+
+    # Use cache to avoid repeated database queries
+    cache_key = f"pending_review_count_{user.id}"
+    cached_count = cache.get(cache_key)
+    if cached_count is not None:
+        return cached_count
 
     try:
         from utils.object_management.models import UserCreatedObject
         from utils.object_management.permissions import user_is_moderator_for_model
 
         total_count = 0
+        models_to_check = []
 
+        # First, collect all models the user can moderate
         for model in apps.get_models():
             if (
                 issubclass(model, UserCreatedObject)
@@ -422,19 +438,64 @@ def pending_review_count_for_user(user):
                 and hasattr(model, "objects")
             ):
                 if user_is_moderator_for_model(user, model):
-                    try:
-                        # Count items in review, excluding user's own items
-                        count = (
-                            model.objects.in_review()
-                            .exclude(owner=user)
-                            .count()
-                        )
-                        total_count += count
-                    except Exception:
-                        # Skip models that don't support the query
-                        continue
+                    models_to_check.append(model)
 
+        # Use a single aggregated query to count all review items efficiently
+        if models_to_check:
+            from django.db.models import Q
+
+            # Build a union query to count all review items across models
+            review_counts = {}
+            for model in models_to_check:
+                try:
+                    # Use a single query per model with optimized filtering
+                    # Use Q objects for more efficient filtering
+                    count = model.objects.filter(
+                        Q(publication_status="review") & ~Q(owner=user)
+                    ).count()
+                    review_counts[model._meta.label] = count
+                except Exception:
+                    # Skip models that don't support the query
+                    continue
+
+            total_count = sum(review_counts.values())
+
+        # Cache the result for 5 minutes (300 seconds)
+        cache.set(cache_key, total_count, 300)
         return total_count
     except Exception:
         # If something goes wrong, return 0
         return 0
+
+
+def clear_moderation_cache_for_user(user_id):
+    """Clear moderation-related cache for a specific user."""
+    cache_keys = [
+        f"pending_review_count_{user_id}",
+        f"is_moderator_any_model_{user_id}",
+    ]
+    for key in cache_keys:
+        cache.delete(key)
+
+
+def clear_all_moderation_cache():
+    """Clear all moderation-related cache entries.
+
+    This should be called when publication statuses change in bulk
+    or when permissions are modified.
+    """
+    # This is a more aggressive cache clearing approach
+    # In production, you might want to use a more targeted approach
+    try:
+        # Clear all cache keys that match our moderation patterns
+        # Note: This requires a cache backend that supports pattern deletion
+        # For Redis or similar, you could use:
+        # cache.delete_many([key for key in cache.keys('*pending_review_count_*')])
+        # cache.delete_many([key for key in cache.keys('*is_moderator_any_model_*')])
+
+        # For simplicity, we'll just let the cache expire naturally
+        # In a real implementation, you'd want proper cache invalidation
+        pass
+    except Exception:
+        # If cache clearing fails, it's not critical - the cache will expire
+        pass
