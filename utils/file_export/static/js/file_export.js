@@ -95,7 +95,10 @@ async function monitor_export_progress(url, format, count = 0) {
         }
         const data = await response.json();
         if (data.state === "PENDING" || data.state === "STARTED") {
-            updateProcessingLink(format, count + 1);
+            updateProcessingLink(format, count + 1, null);
+            setTimeout(() => monitor_export_progress(url, format, count + 1), POLLING_INTERVAL_MS);
+        } else if (data.state === "PROGRESS") {
+            updateProcessingLink(format, count + 1, data.details);
             setTimeout(() => monitor_export_progress(url, format, count + 1), POLLING_INTERVAL_MS);
         } else if (data.state === "SUCCESS") {
             cleanup_export(true, data, format);
@@ -175,17 +178,37 @@ function getLinkElements(format) {
  *
  * @param {string} format - The export format.
  * @param {number} count - The current poll count (used to animate the loading dots).
+ * @param {object|null} progress - Progress info with current, total, and percent fields.
  */
-function updateProcessingLink(format, count) {
+function updateProcessingLink(format, count, progress) {
     const elements = getLinkElements(format);
     if (!elements) {
         return;
     }
-    elements.linkText.innerText = `Exporting to ${format.toUpperCase()}${'.'.repeat(count % 4)}`;
 
-    // Add a spinner if one is not already present
-    if (elements.statusElement && !elements.statusElement.querySelector('.spinner-border')) {
-        elements.statusElement.innerHTML = '<div class="spinner-border spinner-border-sm text-primary" role="status"><span class="sr-only">Loading...</span></div>';
+    if (progress && progress.total > 0) {
+        // Show progress bar with percentage
+        const percent = progress.percent || 0;
+        elements.linkText.innerText = `Exporting ${progress.current} of ${progress.total} records (${percent}%)`;
+
+        if (elements.statusElement) {
+            elements.statusElement.innerHTML = `
+                <div class="progress export-progress" style="width: 100px; height: 8px;">
+                    <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary"
+                         role="progressbar"
+                         style="width: ${percent}%"
+                         aria-valuenow="${percent}"
+                         aria-valuemin="0"
+                         aria-valuemax="100"></div>
+                </div>`;
+        }
+    } else {
+        // Show spinner with animated dots while waiting for progress info
+        elements.linkText.innerText = `Exporting to ${format.toUpperCase()}${'.'.repeat(count % 4)}`;
+
+        if (elements.statusElement && !elements.statusElement.querySelector('.spinner-border')) {
+            elements.statusElement.innerHTML = '<div class="spinner-border spinner-border-sm text-primary" role="status"><span class="sr-only">Loading...</span></div>';
+        }
     }
 }
 
