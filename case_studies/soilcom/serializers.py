@@ -1,6 +1,7 @@
 from collections import OrderedDict
 
 from rest_framework import serializers
+from rest_framework_gis.fields import GeometrySerializerMethodField
 from rest_framework_gis.serializers import GeoFeatureModelSerializer
 
 from maps.models import GeoPolygon
@@ -10,6 +11,10 @@ from utils.properties.models import Property
 from utils.serializers import FieldLabelModelSerializer
 
 from . import models
+
+# Geometry simplification tolerance in degrees (approx 100m at equator)
+# Lower values = more detail, higher values = more simplification
+GEOMETRY_SIMPLIFY_TOLERANCE = 0.001
 
 
 class GeoreferencedWasteCollection(GeoPolygon, models.Collection):
@@ -23,14 +28,34 @@ class GeoreferencedCollector(GeoPolygon, models.Collector):
 
 
 class WasteCollectionGeometrySerializer(GeoFeatureModelSerializer):
+    """GeoJSON serializer for waste collections with simplified geometry.
+
+    Uses simplified geometry to reduce payload size and improve performance.
+    The geometry is simplified using ST_SimplifyPreserveTopology to maintain
+    valid topology while reducing point count.
+    """
+
     catchment = serializers.StringRelatedField(source="catchment.name")
     waste_category = serializers.StringRelatedField(source="waste_stream.category.name")
     collection_system = serializers.StringRelatedField(source="collection_system.name")
+    geom = GeometrySerializerMethodField()
 
     class Meta:
         model = GeoreferencedWasteCollection
         geo_field = "geom"
         fields = ["id", "catchment", "waste_category", "collection_system"]
+
+    def get_geom(self, instance):
+        """Return simplified geometry if available, otherwise original.
+
+        The simplified_geom annotation is added by the viewset queryset.
+        Falls back to original geometry if annotation is not present.
+        """
+        # Check for pre-simplified geometry annotation
+        if hasattr(instance, "simplified_geom") and instance.simplified_geom:
+            return instance.simplified_geom
+        # Fall back to original geometry
+        return getattr(instance, "geom", None)
 
 
 class CollectorGeometrySerializer(GeoFeatureModelSerializer):
@@ -374,7 +399,9 @@ class CollectionFlatSerializer(serializers.ModelSerializer):
             ordered_representation[field] = representation.get(field, None)
 
         additional_properties = ["specific waste collected", "Connection rate"]
-        user = getattr(self.context.get("request"), "user", None) if self.context else None
+        user = (
+            getattr(self.context.get("request"), "user", None) if self.context else None
+        )
         for property_name in additional_properties:
             specific_property = Property.objects.filter(name=property_name).first()
             if not specific_property:
