@@ -1034,11 +1034,19 @@ function loadLayers() {
     const region_id = filterParameters.get('region') || (mapConfig.loadRegion ? mapConfig.regionId : null);
     if (region_id) {
         promises.push(fetchRegionGeometry({ id: region_id }));
+    } else {
+        // Remove region layer if filter was cleared
+        removeExistingLayer(regionLayer);
+        regionLayer = null;
     }
 
     const catchment_id = filterParameters.get('catchment') || (mapConfig.loadCatchment ? mapConfig.catchmentId : null);
     if (catchment_id) {
         promises.push(fetchCatchmentGeometry({ id: catchment_id }));
+    } else {
+        // Remove catchment layer if filter was cleared
+        removeExistingLayer(catchmentLayer);
+        catchmentLayer = null;
     }
 
     if (mapConfig.loadFeatures === true) {
