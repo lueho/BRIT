@@ -1,22 +1,35 @@
-import hashlib
-
-from django.db.models import Count, Max, Min, Q
+from django.db.models import F
 from django_filters import rest_framework as rf_filters
 from rest_framework import permissions, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 from case_studies.soilcom.filters import CollectionFilterSet
 from case_studies.soilcom.models import Collection, Collector
 from case_studies.soilcom.serializers import (
+    GEOMETRY_SIMPLIFY_TOLERANCE,
     CollectionFlatSerializer,
     CollectionModelSerializer,
     CollectorGeometrySerializer,
     WasteCollectionGeometrySerializer,
 )
+from maps.db_functions import SimplifyPreserveTopology
 from maps.mixins import CachedGeoJSONMixin
-from maps.utils import _generate_filter_key_part
+from maps.utils import build_collection_cache_key
 from utils.object_management.viewsets import UserCreatedObjectViewSet
+
+
+class GeoJSONAnonThrottle(AnonRateThrottle):
+    """Rate limit for anonymous users on GeoJSON endpoints."""
+
+    rate = "10/minute"
+
+
+class GeoJSONUserThrottle(UserRateThrottle):
+    """Rate limit for authenticated users on GeoJSON endpoints."""
+
+    rate = "60/minute"
 
 
 class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
@@ -34,6 +47,30 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
     filter_backends = (rf_filters.DjangoFilterBackend,)
     filterset_class = CollectionFilterSet
 
+    def get_geojson_queryset(self):
+        """Return optimized queryset for GeoJSON with simplified geometry.
+
+        Uses PostGIS ST_SimplifyPreserveTopology to reduce geometry complexity
+        while maintaining valid topology. This significantly reduces response
+        size and serialization time.
+        """
+        qs = self.get_queryset().select_related(
+            "catchment",
+            "catchment__region",
+            "catchment__region__borders",
+            "waste_stream",
+            "waste_stream__category",
+            "collection_system",
+        )
+        # Add simplified geometry annotation
+        qs = qs.annotate(
+            simplified_geom=SimplifyPreserveTopology(
+                F("catchment__region__borders__geom"),
+                GEOMETRY_SIMPLIFY_TOLERANCE,
+            )
+        )
+        return qs
+
     def get_serializer_class(self):
         """Use detailed serializer for retrieve so the UI receives ownership and status fields.
 
@@ -48,60 +85,22 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
     def get_geojson_serializer_class(self):
         return WasteCollectionGeometrySerializer
 
-    def _compute_dataset_version(self, request) -> str:
-        """Compute a scope-aware dataset version for Collections.
-
-        Uses COUNT, MAX(lastmodified_at), MIN(id), MAX(id) over a queryset constrained by scope and user.
-        """
-        scope = (request.query_params.get("scope") or "published").lower()
-        user = getattr(request, "user", None)
-        qs = Collection.objects.all()
-
-        if scope == "published":
-            qs = qs.filter(publication_status="published")
-        elif scope == "private":
-            if user and user.is_authenticated and not getattr(user, "is_staff", False):
-                qs = qs.filter(owner=user)
-        elif scope == "review":
-            if user and user.is_authenticated and not getattr(user, "is_staff", False):
-                qs = qs.filter(Q(owner=user) | Q(publication_status="review"))
-            else:
-                qs = qs.filter(publication_status="review")
-
-        agg = qs.aggregate(
-            cnt=Count("pk"),
-            max_mod=Max("lastmodified_at"),
-            min_id=Min("pk"),
-            max_id=Max("pk"),
-        )
-        cnt = agg.get("cnt") or 0
-        max_mod = agg.get("max_mod")
-        ts = int(max_mod.timestamp()) if max_mod else 0
-        min_id = agg.get("min_id") or 0
-        max_id = agg.get("max_id") or 0
-        base = f"{scope}:{cnt}:{ts}:{min_id}:{max_id}"
-        return hashlib.sha1(base.encode("utf-8")).hexdigest()[:12]
-
     def get_cache_key(self, request):
         """Build a deterministic cache key including filters and dataset version.
+
+        Uses the shared build_collection_cache_key utility to ensure consistency
+        with cache warm-up tasks.
 
         Format examples:
         - collection_geojson:id:1,2,3:dv:abc123def456
         - collection_geojson:filter:<hash>:dv:abc123def456
         """
         params = request.query_params
+        scope = (params.get("scope") or "published").lower()
+        user = getattr(request, "user", None)
 
-        # Dataset version should be server-computed for safety
-        dv = self._compute_dataset_version(request)
-
-        # If specific IDs are requested, build an ID-specific key
+        # Extract ID list if present
         id_list = params.getlist("id") if hasattr(params, "getlist") else []
-        if id_list:
-            try:
-                ids_sorted = sorted([str(int(x)) for x in id_list])
-            except Exception:
-                ids_sorted = sorted([str(x) for x in id_list])
-            return f"collection_geojson:id:{','.join(ids_sorted)}:dv:{dv}"
 
         # Build filter dict, excluding transient or non-data keys
         exclude_keys = {"csrfmiddlewaretoken", "page", "next", "dv"}
@@ -118,8 +117,12 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
             elif len(values) > 1:
                 filters[key] = sorted(values)
 
-        filter_part = _generate_filter_key_part(filters)
-        return f"collection_geojson:filter:{filter_part}:dv:{dv}"
+        return build_collection_cache_key(
+            scope=scope,
+            user=user,
+            filters=filters if filters else None,
+            id_list=id_list if id_list else None,
+        )
 
     @action(detail=False, methods=["get"], permission_classes=[permissions.AllowAny])
     def summaries(self, request, *args, **kwargs):
@@ -133,9 +136,18 @@ class CollectionViewSet(CachedGeoJSONMixin, UserCreatedObjectViewSet):
         )
         return Response({"summaries": serializer.data})
 
-    @action(detail=False, methods=["get"], permission_classes=[permissions.AllowAny])
+    @action(
+        detail=False,
+        methods=["get"],
+        permission_classes=[permissions.AllowAny],
+        throttle_classes=[GeoJSONAnonThrottle, GeoJSONUserThrottle],
+    )
     def geojson(self, request, *args, **kwargs):
-        """GeoJSON endpoint with the same permission checks as standard endpoints."""
+        """GeoJSON endpoint with optimized geometry and rate limiting.
+
+        Uses simplified geometry to reduce payload size and improve performance.
+        Rate limited to prevent abuse and protect against crawler overload.
+        """
         return super().geojson(request, *args, **kwargs)
 
 
