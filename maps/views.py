@@ -765,8 +765,10 @@ class CatchmentRegionGeometryAPI(APIView):
     @staticmethod
     def get(request, *args, **kwargs):
         if "pk" in request.query_params:
-            catchment = Catchment.objects.get(pk=request.query_params.get("pk"))
             # select_related needed for geometry serialization
+            catchment = Catchment.objects.select_related(
+                "region", "region__borders"
+            ).get(pk=request.query_params.get("pk"))
             regions = Region.objects.select_related("borders").filter(
                 catchment=catchment
             )

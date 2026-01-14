@@ -1,4 +1,6 @@
-from django.db.models import Count
+import hashlib
+
+from django.db.models import Count, Max, Min
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
@@ -79,6 +81,33 @@ class CatchmentViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
         filters = request.query_params.dict()
         catchment_id = filters.get("id")
         return get_catchment_cache_key(catchment_id, filters)
+
+    def get_dataset_version(self, request):
+        """Return a short hash representing the current Catchment dataset state.
+
+        Catchment geometries are derived from the related Region geometry, so we
+        include the related Region last-modified timestamp in the version.
+        """
+        queryset = self.get_geojson_queryset_with_bbox(request)
+        agg = queryset.aggregate(
+            cnt=Count("pk"),
+            max_mod=Max("lastmodified_at"),
+            max_region_mod=Max("region__lastmodified_at"),
+            min_id=Min("pk"),
+            max_id=Max("pk"),
+        )
+        cnt = agg.get("cnt") or 0
+        max_mod = agg.get("max_mod")
+        region_mod = agg.get("max_region_mod")
+        ts = 0
+        if max_mod:
+            ts = max(ts, int(max_mod.timestamp()))
+        if region_mod:
+            ts = max(ts, int(region_mod.timestamp()))
+        min_id = agg.get("min_id") or 0
+        max_id = agg.get("max_id") or 0
+        base = f"{cnt}:{ts}:{min_id}:{max_id}"
+        return hashlib.sha1(base.encode("utf-8")).hexdigest()[:12]
 
     def get_serializer_class(self):
         if self.action == "geojson":

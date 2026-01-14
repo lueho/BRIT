@@ -5,8 +5,9 @@ from django.core.cache import caches
 from django.core.exceptions import ImproperlyConfigured
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
+from django.utils import timezone
 
-from .models import Catchment, LauRegion, NutsRegion, Region
+from .models import Catchment, GeoPolygon, LauRegion, NutsRegion, Region
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +17,7 @@ def get_geojson_cache():
     Retrieve the cache instance using the GEOJSON_CACHE setting.
     Defaults to the 'default' cache if GEOJSON_CACHE is not specified.
     """
-    cache_alias = getattr(settings, 'GEOJSON_CACHE', 'default')
+    cache_alias = getattr(settings, "GEOJSON_CACHE", "default")
     return caches[cache_alias]
 
 
@@ -29,10 +30,12 @@ def clear_geojson_cache_pattern(pattern: str) -> None:
     """
     geojson_cache = get_geojson_cache()
     try:
-        delete_pattern = getattr(geojson_cache, 'delete_pattern', None)
+        delete_pattern = getattr(geojson_cache, "delete_pattern", None)
         if callable(delete_pattern):
             deleted_count = delete_pattern(pattern)
-            logger.info(f"Cleared {deleted_count} cache keys matching pattern: {pattern}")
+            logger.info(
+                f"Cleared {deleted_count} cache keys matching pattern: {pattern}"
+            )
         else:
             msg = (
                 f"Cache backend '{geojson_cache.__class__.__name__}' does not support 'delete_pattern'. "
@@ -68,9 +71,33 @@ def invalidate_region_cache(sender, instance, **kwargs):
     # Broad invalidation for any keys using the region namespace.
     clear_geojson_cache_pattern("region_geojson:*")
 
+    # Catchment geometries depend on the underlying region geometries.
+    clear_geojson_cache_pattern("catchment_geojson:*")
+
     # Invalidate NUTS cache if the region has an associated NUTS region.
-    if hasattr(instance, 'nutsregion'):
+    if hasattr(instance, "nutsregion"):
         clear_geojson_cache_pattern("nuts_geojson:*")
+
+
+@receiver(post_save, sender=GeoPolygon)
+def invalidate_related_region_caches_for_geopolygon(sender, instance, **kwargs):
+    """Invalidate dependent caches when a GeoPolygon geometry changes.
+
+    Regions expose their geometry via the related GeoPolygon (Region.borders).
+    A GeoPolygon save does not necessarily trigger a Region save, so we bump the
+    related Region(s) lastmodified timestamp to ensure dataset versions change.
+    """
+
+    now = timezone.now()
+    updated = Region.objects.filter(borders_id=instance.pk).update(lastmodified_at=now)
+    if not updated:
+        return
+
+    # Ensure any existing cached geojson responses are invalidated.
+    clear_geojson_cache_pattern("region_geojson:*")
+    clear_geojson_cache_pattern("catchment_geojson:*")
+    clear_geojson_cache_pattern("nuts_geojson:*")
+    clear_geojson_cache_pattern("lau_geojson:*")
 
 
 @receiver(post_save, sender=Catchment)
@@ -112,6 +139,6 @@ def invalidate_lau_region_cache(sender, instance, **kwargs):
     clear_geojson_cache_pattern("lau_geojson:*")
 
     # If a LAU region is linked to a parent NUTS region, invalidate its caches as well.
-    if hasattr(instance, 'nuts_parent') and instance.nuts_parent:
+    if hasattr(instance, "nuts_parent") and instance.nuts_parent:
         clear_geojson_cache_pattern(f"nuts_geojson:id:{instance.nuts_parent.id}")
         clear_geojson_cache_pattern(f"nuts_geojson:parent:{instance.nuts_parent.id}:*")
