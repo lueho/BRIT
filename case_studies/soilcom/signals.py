@@ -1,5 +1,6 @@
 import logging
 
+from django.conf import settings
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
@@ -24,6 +25,28 @@ _NON_GEOJSON_FIELDS = frozenset(
 )
 
 
+def _schedule_cache_warmup():
+    """Schedule cache warmup task after cache invalidation.
+
+    Uses Celery to asynchronously warm the cache so the next request
+    doesn't timeout. Only runs if Celery is available.
+    """
+    # Skip during testing
+    if getattr(settings, "TESTING", False):
+        return
+
+    try:
+        from maps.tasks import warm_collection_geojson_cache
+
+        # Delay warmup by 5 seconds to allow any batch updates to complete
+        warm_collection_geojson_cache.apply_async(countdown=5)
+        logger.debug("Scheduled collection GeoJSON cache warm-up task")
+    except ImportError:
+        logger.debug("Cache warm-up task not available")
+    except Exception as e:
+        logger.warning("Failed to schedule cache warm-up task: %s", e)
+
+
 @receiver(post_save, sender=Collection)
 @receiver(post_delete, sender=Collection)
 def invalidate_collection_geojson_cache(sender, instance, **kwargs):
@@ -34,6 +57,7 @@ def invalidate_collection_geojson_cache(sender, instance, **kwargs):
     Uses Redis delete_pattern via maps.signals.clear_geojson_cache_pattern.
 
     Skips cache invalidation for updates that only affect non-GeoJSON fields (e.g., name).
+    After invalidation, schedules a cache warm-up task to prevent H12 timeouts.
     """
     update_fields = kwargs.get("update_fields")
     if update_fields and set(update_fields) <= _NON_GEOJSON_FIELDS:
@@ -50,6 +74,8 @@ def invalidate_collection_geojson_cache(sender, instance, **kwargs):
             "Cleared collection_geojson cache after change to Collection id=%s",
             getattr(instance, "id", None),
         )
+        # Schedule cache warm-up to prevent timeout on next request
+        _schedule_cache_warmup()
     except Exception:
         logger.exception(
             "Failed to clear collection_geojson cache on Collection change"
