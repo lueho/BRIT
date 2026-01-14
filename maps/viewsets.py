@@ -40,7 +40,7 @@ class LocationViewSet(AutoPermModelViewSet):
 
 
 class RegionViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
-    queryset = Region.objects.all()
+    queryset = Region.objects.select_related("borders").all()
     serializer_class = RegionModelSerializer
     filterset_class = RegionFilterSet
     custom_permission_required = {
@@ -70,7 +70,7 @@ class RegionViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
 
 
 class CatchmentViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
-    queryset = Catchment.objects.all()
+    queryset = Catchment.objects.select_related("region", "region__borders").all()
     serializer_class = CatchmentModelSerializer
     filterset_class = CatchmentFilterSet
     custom_permission_required = {"list": None, "retrieve": None, "geojson": None}
@@ -87,7 +87,14 @@ class CatchmentViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
 
 
 class NutsRegionViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
-    queryset = NutsRegion.objects.all()
+    queryset = (
+        NutsRegion.objects.select_related("borders", "parent")
+        .prefetch_related(
+            "regionattributevalue_set__attribute",
+            "regionattributetextvalue_set__attribute",
+        )
+        .all()
+    )
     serializer_class = NutsRegionSummarySerializer
     filterset_fields = ("id", "levl_code", "cntr_code", "parent_id")
     custom_permission_required = {"list": None, "retrieve": None, "geojson": None}

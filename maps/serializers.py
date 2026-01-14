@@ -18,7 +18,6 @@ from .models import (
     MapLayerStyle,
     NutsRegion,
     Region,
-    RegionAttributeTextValue,
 )
 
 
@@ -312,34 +311,37 @@ class NutsRegionSummarySerializer(FieldLabelModelSerializer):
 
     @staticmethod
     def get_population(obj):
-        qs = obj.regionattributevalue_set.filter(attribute__name="Population").order_by(
-            "-date"
-        )
-        if qs.exists():
-            pop = qs[0]
+        # Use prefetched data to avoid N+1 queries
+        values = [
+            v
+            for v in obj.regionattributevalue_set.all()
+            if v.attribute.name == "Population"
+        ]
+        if values:
+            pop = max(values, key=lambda v: v.date if v.date else v.pk)
             return f"{int(pop.value)} ({pop.date.year})"
-        else:
-            return None
+        return None
 
     @staticmethod
     def get_population_density(obj):
-        qs = obj.regionattributevalue_set.filter(
-            attribute__name="Population density"
-        ).order_by("-date")
-        if qs.exists():
-            pd = qs[0]
+        # Use prefetched data to avoid N+1 queries
+        values = [
+            v
+            for v in obj.regionattributevalue_set.all()
+            if v.attribute.name == "Population density"
+        ]
+        if values:
+            pd = max(values, key=lambda v: v.date if v.date else v.pk)
             return f"{pd.value} per km² ({pd.date.year})"
-        else:
-            return None
+        return None
 
     @staticmethod
     def get_urban_rural_remoteness(obj):
-        try:
-            return obj.regionattributetextvalue_set.get(
-                attribute__name="Urban rural remoteness"
-            ).value
-        except RegionAttributeTextValue.DoesNotExist:
-            return None
+        # Use prefetched data to avoid N+1 queries
+        for v in obj.regionattributetextvalue_set.all():
+            if v.attribute.name == "Urban rural remoteness":
+                return v.value
+        return None
 
 
 class LauRegionSummarySerializer(FieldLabelModelSerializer):

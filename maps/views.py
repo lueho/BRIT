@@ -729,18 +729,22 @@ class CatchmentOptionGeometryAPI(APIView):
         child catchments of the parent catchment's region. Otherwise it returns
         *all* catchments.
         """
-        qs = Catchment.objects.all()
+        qs = Catchment.objects.select_related("region", "region__borders").all()
 
         parent_id = request.query_params.get("parent_id")
         if parent_id is not None:
             try:
-                parent_catchment = Catchment.objects.get(pk=parent_id)
+                parent_catchment = Catchment.objects.select_related("region").get(
+                    pk=parent_id
+                )
             except Catchment.DoesNotExist:
                 return JsonResponse(
                     {"detail": "Parent catchment not found."}, status=404
                 )
             parent_region = parent_catchment.region
-            qs = parent_region.child_catchments.all()
+            qs = parent_region.child_catchments.select_related(
+                "region", "region__borders"
+            ).all()
 
         serializer = CatchmentGeoFeatureModelSerializer(qs, many=True)
         return JsonResponse({"geoJson": serializer.data})
@@ -762,8 +766,12 @@ class CatchmentRegionGeometryAPI(APIView):
     @staticmethod
     def get(request, *args, **kwargs):
         if "pk" in request.query_params:
-            catchment = Catchment.objects.get(pk=request.query_params.get("pk"))
-            regions = Region.objects.filter(catchment=catchment)
+            catchment = Catchment.objects.select_related("region").get(
+                pk=request.query_params.get("pk")
+            )
+            regions = Region.objects.select_related("borders").filter(
+                catchment=catchment
+            )
             serializer = RegionGeoFeatureModelSerializer(regions, many=True)
             return JsonResponse({"geoJson": serializer.data})
 
@@ -906,12 +914,14 @@ class NutsAndLauCatchmentPedigreeAPI(APIView):
             for lvl in range(instance.levl_code + 1, 4):
                 qs = NutsRegion.objects.filter(
                     levl_code=lvl, nuts_id__startswith=instance.nuts_id
-                )
+                ).prefetch_related("region_ptr__catchment_set")
                 serializer = NutsRegionCatchmentOptionSerializer(qs, many=True)
                 data[f"id_level_{lvl}"] = serializer.data
             data["id_level_4"] = []
             if instance.levl_code == 3:
-                qs = LauRegion.objects.filter(nuts_parent=instance)
+                qs = LauRegion.objects.filter(nuts_parent=instance).prefetch_related(
+                    "region_ptr__catchment_set"
+                )
                 serializer = LauRegionOptionSerializer(qs, many=True)
                 data["id_level_4"] = serializer.data
 
