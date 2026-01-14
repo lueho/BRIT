@@ -217,6 +217,85 @@ def get_nuts_region_cache_key(level=None, parent_id=None, nuts_id=None, filters=
     return ":".join(parts)
 
 
+def compute_collection_dataset_version(scope="published", user=None):
+    """Compute a scope-aware dataset version hash for Collections.
+
+    This is a shared utility used by both the viewset and cache warm-up task
+    to ensure consistent cache key generation.
+
+    Args:
+        scope: One of "published", "private", or "review"
+        user: The requesting user (for scope-based filtering)
+
+    Returns:
+        A 12-character hash string representing the dataset state.
+    """
+    from django.db.models import Count, Max, Min
+
+    from case_studies.soilcom.models import Collection
+
+    qs = Collection.objects.all()
+
+    if scope == "published":
+        qs = qs.filter(publication_status="published")
+    elif scope == "private":
+        if user and user.is_authenticated and not getattr(user, "is_staff", False):
+            qs = qs.filter(owner=user)
+    elif scope == "review":
+        from django.db.models import Q
+
+        if user and user.is_authenticated and not getattr(user, "is_staff", False):
+            qs = qs.filter(Q(owner=user) | Q(publication_status="review"))
+        else:
+            qs = qs.filter(publication_status="review")
+
+    agg = qs.aggregate(
+        cnt=Count("pk"),
+        max_mod=Max("lastmodified_at"),
+        min_id=Min("pk"),
+        max_id=Max("pk"),
+    )
+    cnt = agg.get("cnt") or 0
+    max_mod = agg.get("max_mod")
+    ts = int(max_mod.timestamp()) if max_mod else 0
+    min_id = agg.get("min_id") or 0
+    max_id = agg.get("max_id") or 0
+    base = f"{scope}:{cnt}:{ts}:{min_id}:{max_id}"
+    return hashlib.sha1(base.encode("utf-8")).hexdigest()[:12]
+
+
+def build_collection_cache_key(
+    scope="published", user=None, filters=None, id_list=None
+):
+    """Build a deterministic cache key for Collection GeoJSON data.
+
+    This is a shared utility used by both the viewset and cache warm-up task
+    to ensure consistent cache key generation.
+
+    Args:
+        scope: One of "published", "private", or "review"
+        user: The requesting user (for dataset version computation)
+        filters: Dict of filter parameters (excluding transient keys)
+        id_list: List of specific IDs if requesting by ID
+
+    Returns:
+        A cache key string.
+    """
+    dv = compute_collection_dataset_version(scope, user)
+
+    # If specific IDs are requested, build an ID-specific key
+    if id_list:
+        try:
+            ids_sorted = sorted([str(int(x)) for x in id_list])
+        except (ValueError, TypeError):
+            ids_sorted = sorted([str(x) for x in id_list])
+        return f"collection_geojson:id:{','.join(ids_sorted)}:dv:{dv}"
+
+    # Build filter part
+    filter_part = _generate_filter_key_part(filters)
+    return f"collection_geojson:filter:{filter_part}:dv:{dv}"
+
+
 def get_or_set_cache(cache_key, data_generator_func, timeout=None):
     """
     Helper function to abstract the cache get/set pattern.
