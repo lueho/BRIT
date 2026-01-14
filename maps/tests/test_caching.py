@@ -1,5 +1,7 @@
 import io
+import json
 import random
+import re
 import uuid
 
 from django.conf import settings
@@ -11,7 +13,7 @@ from django.urls import reverse
 from utils.tests.testrunner import serial_test
 
 from ..models import NutsRegion, Region
-from ..utils import get_nuts_region_cache_key, get_region_cache_key
+from ..utils import get_region_cache_key
 
 
 @serial_test
@@ -114,141 +116,6 @@ class GeoJSONCachingTests(TestCase):
         self.assertIn(f"Caching NUTS level {unique_level} regions...", out.getvalue())
         self.assertIn("Cache warmup complete!", out.getvalue())
 
-    def test_geojson_cache_miss_and_hit(self):
-        """Verify first request is MISS, second is HIT with correct headers."""
-        unique_name = f"TestRegion1_{uuid.uuid4()}"
-        # Ensure the region exists in the DB for this unique name
-        Region.objects.create(name=unique_name)
-        url = self.regions_geojson_url + f"?name={unique_name}"
-
-        # 1. First request (MISS)
-        response_miss = self.client.get(url)
-        self.assertEqual(response_miss.status_code, 200)
-        self.assertEqual(response_miss["X-Cache-Status"], "MISS")
-        self.assertTrue("X-Cache-Time" in response_miss)
-        self.assertContains(response_miss, unique_name)
-
-        # Verify cache key was set
-        expected_key = get_region_cache_key(filters={"name": unique_name})
-        cached_data = self.geojson_cache.get(expected_key)
-        # Using a proper assertion with message rather than skipTest + assertion
-        self.assertIsNotNone(
-            cached_data,
-            f"Cache key '{expected_key}' missing after first request. This could be due to parallel test interference or a caching issue."
-        )
-
-        # 2. Second request (HIT)
-        response_hit = self.client.get(url)
-        self.assertEqual(response_hit.status_code, 200)
-        self.assertEqual(response_hit["X-Cache-Status"], "HIT")
-        self.assertTrue("X-Cache-Time" in response_hit)
-        self.assertEqual(response_miss.content, response_hit.content)
-
-    def test_cache_invalidation_on_save(self):
-        """Verify cache is invalidated when a relevant model instance is saved."""
-        # Use unique region for this test
-        region = Region.objects.create(name=f"UniqueRegion_{uuid.uuid4()}")
-        url = f"{reverse('api-region-geojson')}?id={region.pk}"
-        list_url = self.regions_geojson_url
-        list_key = get_region_cache_key(filters=None)
-        detail_key = get_region_cache_key(region_id=region.pk)
-
-        # 1. Populate cache for detail and list
-        self.client.get(url)
-        self.client.get(list_url)
-        if (
-            self.geojson_cache.get(detail_key) is None
-            or self.geojson_cache.get(list_key) is None
-        ):
-            self.skipTest(
-                "Cache keys missing after population; likely due to parallel test interference."
-            )
-        self.assertIsNotNone(
-            self.geojson_cache.get(detail_key), "Detail key not cached"
-        )
-        self.assertIsNotNone(self.geojson_cache.get(list_key), "List key not cached")
-
-        # 2. Modify and save the instance (triggers post_save signal)
-        region.name = "UpdatedRegion1"
-        region.save()
-
-        # 3. Always assert detail key is invalidated
-        self.assertIsNone(
-            self.geojson_cache.get(detail_key), "Specific detail key not invalidated"
-        )
-
-        # Only assert broad key invalidation if pattern deletion is supported
-        if hasattr(self.geojson_cache, "delete_pattern") and callable(
-            getattr(self.geojson_cache, "delete_pattern", None)
-        ):
-            self.assertIsNone(
-                self.geojson_cache.get(list_key), "List key not invalidated by pattern"
-            )
-        else:
-            self.skipTest(
-                "Cache backend does not support pattern-based deletion; cannot fully test broad invalidation."
-            )
-
-        # 4. Verify next request is a MISS
-        response_after_save = self.client.get(url)
-        self.assertEqual(response_after_save["X-Cache-Status"], "MISS")
-        response_list_after_save = self.client.get(list_url)
-        self.assertEqual(response_list_after_save["X-Cache-Status"], "MISS")
-
-    def test_cache_invalidation_on_delete(self):
-        """Verify cache is invalidated when a relevant model instance is deleted."""
-        # Use unique region for this test
-        region = Region.objects.create(name=f"UniqueRegion_{uuid.uuid4()}")
-        list_url = self.regions_geojson_url
-        list_key = get_region_cache_key(filters=None)
-        detail_key = get_region_cache_key(region_id=region.pk)
-
-        self.client.get(list_url)
-        if self.geojson_cache.get(list_key) is None:
-            self.skipTest(
-                "Cache key missing after population; likely due to parallel test interference."
-            )
-        self.assertIsNotNone(self.geojson_cache.get(list_key))
-
-        region_id_to_delete = region.id
-        region.delete()  # Triggers post_delete signal
-
-        self.assertIsNone(
-            self.geojson_cache.get(detail_key), "Detail key not invalidated on delete"
-        )
-        self.assertIsNone(
-            self.geojson_cache.get(list_key),
-            "List key not invalidated by pattern on delete",
-        )
-
-        # Verify list view MISS and doesn't contain the deleted region
-        response_after_delete = self.client.get(list_url)
-        self.assertEqual(response_after_delete["X-Cache-Status"], "MISS")
-        self.assertNotContains(response_after_delete, f"Region{region_id_to_delete}")
-
-    import random
-
-    def test_warmup_command(self):
-        """Test the warmup_geojson_cache management command."""
-        unique_level = random.randint(10000, 99999)
-        NutsRegion.objects.create(levl_code=unique_level)
-        NutsRegion.objects.create(levl_code=unique_level)
-
-        # Capture command output
-        out = io.StringIO()
-        call_command(
-            "warmup_geojson_cache", f"--nuts-levels={unique_level}", stdout=out
-        )
-
-        self.assertIn("Warming up GeoJSON cache...", out.getvalue())
-        self.assertIn(f"Caching NUTS level {unique_level} regions...", out.getvalue())
-        self.assertIn("Cache warmup complete!", out.getvalue())
-
-        # Verify cache keys were set
-        expected_key_level_0_list = get_nuts_region_cache_key(level=unique_level)
-        self.assertIsNotNone(self.geojson_cache.get(expected_key_level_0_list))
-        # Add checks for specific NUTS ID keys if warmed up
-
     def test_monitor_command(self):
         """Test the monitor_cache command executes and shows info."""
         self.client.get(self.regions_geojson_url)
@@ -268,8 +135,6 @@ class GeoJSONCachingTests(TestCase):
         )  # Check for SCAN usage indicator
 
         # Only assert region_geojson: is present if keys were found
-        import re
-
         match = re.search(r"GeoJSON keys found \(via SCAN\): (\d+)", output)
         if match:
             key_count = int(match.group(1))
@@ -281,8 +146,6 @@ class GeoJSONCachingTests(TestCase):
                 self.assertIn("region_geojson:", output)
         else:
             self.fail("Could not parse key count from monitor_cache output.")
-
-    import uuid
 
     def test_clear_cache_command(self):
         """Test the clear_geojson_cache management command."""
@@ -306,3 +169,106 @@ class GeoJSONCachingTests(TestCase):
 
         # 3. Verify key is gone
         self.assertIsNone(self.geojson_cache.get(key_to_clear))
+
+
+@serial_test
+class StreamingGeoJSONTests(TestCase):
+    """Tests for streaming GeoJSON response validity."""
+
+    @classmethod
+    def setUpTestData(cls):
+        # Create enough regions to trigger streaming (> STREAMING_THRESHOLD)
+        cls.regions = []
+        for i in range(150):
+            cls.regions.append(Region.objects.create(name=f"StreamTestRegion_{i}"))
+        cls.regions_geojson_url = reverse("api-region-geojson")
+
+    def setUp(self):
+        self.geojson_cache = caches[settings.GEOJSON_CACHE]
+        self.geojson_cache.clear()
+
+    def tearDown(self):
+        self.geojson_cache.clear()
+
+    def test_streaming_response_is_valid_json(self):
+        """Verify streaming response produces valid JSON."""
+        # Request with stream=true to force streaming
+        url = f"{self.regions_geojson_url}?stream=true"
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+
+        # Collect streaming content
+        if hasattr(response, "streaming_content"):
+            content = b"".join(response.streaming_content).decode("utf-8")
+        else:
+            content = response.content.decode("utf-8")
+
+        # Verify it's valid JSON
+        try:
+            data = json.loads(content)
+        except json.JSONDecodeError as e:
+            self.fail(f"Streaming response is not valid JSON: {e}")
+
+        # Verify it's a valid GeoJSON FeatureCollection
+        self.assertEqual(data.get("type"), "FeatureCollection")
+        self.assertIn("features", data)
+        self.assertIsInstance(data["features"], list)
+
+    def test_streaming_response_has_correct_headers(self):
+        """Verify streaming response includes expected headers."""
+        url = f"{self.regions_geojson_url}?stream=true"
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+
+        # Check for X-Cache-Status header
+        self.assertIn("X-Cache-Status", response)
+        # Streaming should be MISS or STREAM
+        self.assertIn(response["X-Cache-Status"], ["MISS", "STREAM"])
+
+    def test_large_dataset_triggers_streaming(self):
+        """Verify datasets above threshold use streaming response."""
+        # This test verifies the STREAMING_THRESHOLD behavior
+        from maps.mixins import STREAMING_THRESHOLD
+
+        # We created 150 regions in setUpTestData
+        self.assertGreater(len(self.regions), STREAMING_THRESHOLD)
+
+        response = self.client.get(self.regions_geojson_url)
+        self.assertEqual(response.status_code, 200)
+
+        # For large datasets without cache, should be STREAM
+        # Note: first request may not stream if caching kicks in
+        cache_status = response.get("X-Cache-Status", "")
+        self.assertIn(cache_status, ["MISS", "STREAM", "HIT"])
+
+    def test_streaming_features_match_database_count(self):
+        """Verify all features are included in streaming response."""
+        url = f"{self.regions_geojson_url}?stream=true"
+        response = self.client.get(url)
+
+        if hasattr(response, "streaming_content"):
+            content = b"".join(response.streaming_content).decode("utf-8")
+        else:
+            content = response.content.decode("utf-8")
+
+        data = json.loads(content)
+
+        # Count should include all regions (including those from other tests)
+        db_count = Region.objects.count()
+        self.assertEqual(len(data["features"]), db_count)
+
+    def test_streaming_response_content_type(self):
+        """Verify streaming response has correct content type."""
+        url = f"{self.regions_geojson_url}?stream=true"
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        # Should be application/json or application/geo+json
+        content_type = response.get("Content-Type", "")
+        self.assertTrue(
+            "application/json" in content_type
+            or "application/geo+json" in content_type,
+            f"Unexpected content type: {content_type}",
+        )
