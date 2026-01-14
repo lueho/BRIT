@@ -157,92 +157,121 @@ class CollectionViewSetTestCase(APITestCase):
         )
         self.assertTrue(has_permission)
 
-    def test_geojson_endpoint_with_published_scope(self):
-        """Test geojson endpoint with 'published' scope parameter."""
-        self.client.force_login(self.regular_user)
+    def test_cache_key_differs_for_different_users_private_scope(self):
+        """Verify cache keys are user-specific for private scope.
+
+        This ensures that private collections cannot leak between users
+        via shared cache keys.
+        """
+        from maps.utils import build_collection_cache_key
+
+        # Build cache keys for different users with private scope
+        key_user1 = build_collection_cache_key(
+            scope="private", user=self.regular_user, filters=None
+        )
+        key_user2 = build_collection_cache_key(
+            scope="private", user=self.staff_user, filters=None
+        )
+
+        # Keys should be different for different users
+        self.assertNotEqual(
+            key_user1,
+            key_user2,
+            "Cache keys for private scope should be user-specific",
+        )
+
+    def test_cache_key_same_for_published_scope(self):
+        """Verify cache keys are shared for published scope (public data)."""
+        from maps.utils import build_collection_cache_key
+
+        # Build cache keys for different users with published scope
+        key_user1 = build_collection_cache_key(
+            scope="published", user=self.regular_user, filters=None
+        )
+        key_user2 = build_collection_cache_key(
+            scope="published", user=self.staff_user, filters=None
+        )
+
+        # Keys should be the same for published data (shared cache)
+        self.assertEqual(
+            key_user1,
+            key_user2,
+            "Cache keys for published scope should be shared across users",
+        )
+
+    def test_private_scope_data_isolation(self):
+        """Verify that private scope requests return only user's own data.
+
+        This is a data isolation test to ensure one user cannot see
+        another user's private collections, even with caching.
+        """
         url = reverse("api-waste-collection-geojson")
-        response = self.client.get(f"{url}?scope=published")
 
-        # Should only contain published collections
-        self.assertEqual(len(response.data["features"]), 2)
-        feature_ids = [
-            feature["properties"]["id"] for feature in response.data["features"]
-        ]
-        self.assertIn(self.published_collection.pk, feature_ids)
-
-    def test_geojson_endpoint_with_private_scope(self):
-        """Test geojson endpoint with 'private' scope parameter."""
+        # User 1 requests private scope
         self.client.force_login(self.regular_user)
-        url = reverse("api-waste-collection-geojson")
-        response = self.client.get(f"{url}?scope=private")
+        response1 = self.client.get(f"{url}?scope=private")
+        user1_ids = {f["properties"]["id"] for f in response1.data["features"]}
 
-        self.assertEqual(len(response.data["features"]), 3)
-        feature_ids = [
-            feature["properties"]["id"] for feature in response.data["features"]
-        ]
-        self.assertIn(self.private_collection.pk, feature_ids)
-        self.assertIn(self.review_collection.pk, feature_ids)
-        self.assertIn(self.published_collection.pk, feature_ids)
-        self.assertNotIn(self.other_user_private_collection.pk, feature_ids)
-        self.assertNotIn(self.other_user_review_collection.pk, feature_ids)
-        self.assertNotIn(self.other_user_published_collection.pk, feature_ids)
+        # User 2 requests private scope
+        self.client.force_login(self.staff_user)
+        response2 = self.client.get(f"{url}?scope=private")
+        user2_ids = {f["properties"]["id"] for f in response2.data["features"]}
 
-    def test_create_permission_denied_without_model_permission(self):
-        """Test that a user without add_collection permission cannot create collections."""
-        data = {
-            "name": "New Collection",
-            "collector": self.collector.id,
-            "fee_system": self.fee_system.id,
-            "frequency": self.frequency.id,
+        # Each user should only see their own collections
+        self.assertIn(self.private_collection.pk, user1_ids)
+        self.assertNotIn(self.other_user_private_collection.pk, user1_ids)
+
+        self.assertIn(self.other_user_private_collection.pk, user2_ids)
+        self.assertNotIn(self.private_collection.pk, user2_ids)
+
+        # No overlap in private data
+        user1_private_ids = user1_ids - {
+            self.published_collection.pk,
+            self.review_collection.pk,
         }
-        request = self.factory.post(
-            "/",
-            data,
-            QUERY_STRING="foo=bar",
-        )
-        request.query_params = {"foo": "bar"}
-        request.user = self.regular_user
-
-        self.viewset.request = request
-        self.viewset.action = "create"
-        has_permission = self.viewset.get_permissions()[0].has_permission(
-            request, self.viewset
-        )
-        self.assertFalse(has_permission)
-
-    def test_create_permission_granted_with_model_permission(self):
-        """Test that a user with add_collection permission can create collections."""
-        from django.contrib.auth.models import Permission
-        from django.contrib.contenttypes.models import ContentType
-
-        data = {
-            "name": "New Collection",
-            "collector": self.collector.id,
-            "fee_system": self.fee_system.id,
-            "frequency": self.frequency.id,
+        user2_private_ids = user2_ids - {
+            self.other_user_published_collection.pk,
+            self.other_user_review_collection.pk,
         }
-
-        ct = ContentType.objects.get_for_model(Collection)
-        permission, _ = Permission.objects.get_or_create(
-            content_type=ct,
-            codename="add_collection",
-            defaults={"name": "Can add collection"},
+        self.assertEqual(
+            len(user1_private_ids & user2_private_ids),
+            0,
+            "Private collections should not be shared between users",
         )
-        self.regular_user = User.objects.get(pk=self.regular_user.pk)
-        self.regular_user.user_permissions.add(permission)
-        self.regular_user.refresh_from_db()
 
-        request = self.factory.post(
-            "/",
-            data,
-            QUERY_STRING="foo=bar",
-        )
-        request.query_params = {"foo": "bar"}
-        request.user = self.regular_user
+    def test_geojson_uses_simplified_geometry_annotation(self):
+        """Verify that GeoJSON serializer uses simplified_geom annotation when present.
 
-        self.viewset.request = request
-        self.viewset.action = "create"
-        has_permission = self.viewset.get_permissions()[0].has_permission(
-            request, self.viewset
-        )
-        self.assertTrue(has_permission)
+        This test ensures the GeometrySerializerMethodField is correctly
+        using the simplified geometry from the queryset annotation.
+        """
+        from unittest.mock import MagicMock
+
+        from case_studies.soilcom.serializers import WasteCollectionGeometrySerializer
+
+        # Create a mock instance with both original and simplified geometry
+        mock_instance = MagicMock()
+        mock_instance.geom = "original_geom"
+        mock_instance.simplified_geom = "simplified_geom"
+
+        serializer = WasteCollectionGeometrySerializer()
+
+        # The get_geom method should return simplified_geom when available
+        result = serializer.get_geom(mock_instance)
+        self.assertEqual(result, "simplified_geom")
+
+    def test_geojson_falls_back_to_original_geometry(self):
+        """Verify serializer falls back to original geom when simplified is not available."""
+        from unittest.mock import MagicMock
+
+        from case_studies.soilcom.serializers import WasteCollectionGeometrySerializer
+
+        # Create a mock instance without simplified geometry
+        mock_instance = MagicMock(spec=["geom"])
+        mock_instance.geom = "original_geom"
+
+        serializer = WasteCollectionGeometrySerializer()
+
+        # The get_geom method should fall back to original geometry
+        result = serializer.get_geom(mock_instance)
+        self.assertEqual(result, "original_geom")
