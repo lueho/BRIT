@@ -46,10 +46,10 @@ const defaultLayerOrder = ['region', 'catchment', 'features'];
 
 // --- Cache Configuration ---
 const clientCacheConfig = {
-    maxAge: 3600000, // 1 hour in milliseconds
+    maxAge: 86400000, // 24 hours - version validation ensures freshness
     maxEntries: 500, // Maximum number of entries to keep in the cache
     cacheName: 'britMapsCache',
-    cacheVersion: 2 // Increment to force cache invalidation on schema changes
+    cacheVersion: 3 // Increment to force cache invalidation on schema changes
 };
 
 function initializeDB() {
@@ -75,7 +75,7 @@ function initializeDB() {
     });
 }
 
-async function storeInIndexedDB(url, data) {
+async function storeInIndexedDB(url, data, version = null) {
     try {
         const db = await initializeDB();
         return new Promise((resolve, reject) => {
@@ -85,7 +85,8 @@ async function storeInIndexedDB(url, data) {
             const entry = {
                 url: url,
                 data: data,
-                timestamp: Date.now()
+                timestamp: Date.now(),
+                version: version // Store server version for validation
             };
 
             const request = store.put(entry);
@@ -113,7 +114,8 @@ async function getFromIndexedDB(url) {
                 const entry = event.target.result;
                 if (entry && (Date.now() - entry.timestamp) < clientCacheConfig.maxAge) {
                     console.log(`Cache hit for: ${url}`);
-                    resolve(entry.data);
+                    // Return full entry including version for validation
+                    resolve(entry);
                 } else {
                     console.log(`Cache miss for: ${url}`);
                     resolve(null);
@@ -129,6 +131,74 @@ async function getFromIndexedDB(url) {
         console.warn('Error accessing IndexedDB:', error);
         return null;
     }
+}
+
+/**
+ * Fetch the current data version from the server.
+ * Used for cache validation before serving cached data.
+ * @param {string} baseUrl - The base API URL (without /version/ suffix)
+ * @returns {Promise<string|null>} The version string or null on error
+ */
+async function fetchDataVersion(baseUrl) {
+    try {
+        // Convert geojson URL to version URL
+        const versionUrl = baseUrl.replace('/geojson/', '/version/');
+        const response = await fetch(versionUrl, { method: 'GET' });
+        if (!response.ok) {
+            console.warn(`Version check failed: ${response.status}`);
+            return null;
+        }
+        const data = await response.json();
+        return data.version || response.headers.get('X-Data-Version');
+    } catch (error) {
+        console.warn('Error fetching data version:', error);
+        return null;
+    }
+}
+
+/**
+ * Version-aware cache fetch with stale-while-revalidate pattern.
+ * 1. Check IndexedDB for cached data
+ * 2. If cached, validate version against server
+ * 3. Return cached data if version matches, otherwise fetch fresh
+ * @param {string} url - The full URL to fetch
+ * @param {string} cacheKey - Normalized cache key
+ * @returns {Promise<{data: object, fromCache: boolean}>}
+ */
+async function fetchWithVersionValidation(url, cacheKey) {
+    // Check for cached data
+    const cached = await getFromIndexedDB(cacheKey);
+
+    if (cached && cached.version) {
+        // We have cached data with a version - validate it
+        const currentVersion = await fetchDataVersion(url);
+
+        if (currentVersion && currentVersion === cached.version) {
+            console.log(`Version validated, using cached data for: ${cacheKey}`);
+            return { data: cached.data, fromCache: true };
+        } else {
+            console.log(`Version mismatch (cached: ${cached.version}, current: ${currentVersion}), fetching fresh data`);
+        }
+    } else if (cached) {
+        // Legacy cached data without version - still use timestamp-based validation
+        console.log(`Using legacy cached data for: ${cacheKey}`);
+        return { data: cached.data, fromCache: true };
+    }
+
+    // Fetch fresh data from server
+    const response = await fetch(url);
+    if (!response.ok) {
+        throw new Error(`HTTP error ${response.status}: ${response.statusText}`);
+    }
+
+    const data = await response.json();
+    const version = response.headers.get('X-Data-Version');
+
+    // Store with version for future validation
+    await storeInIndexedDB(cacheKey, data, version);
+    await cleanupCache();
+
+    return { data: data, fromCache: false };
 }
 
 function normalizeUrl(url) {
@@ -392,18 +462,11 @@ function buildUrl(base, params) {
 async function fetchRegionGeometry(params) {
     validateParams(params, ['id']);
     const url = buildUrl(mapConfig.regionLayerGeometriesUrl, { id: params.id });
-    const normalizedUrl = normalizeUrl(url);
+    const cacheKey = normalizeUrl(url);
 
     try {
-        const cachedData = await getFromIndexedDB(normalizedUrl);
-        if (cachedData) {
-            renderRegion(cachedData);
-            return;
-        }
-        const geoJson = await fetchData(url);
-        await storeInIndexedDB(normalizedUrl, geoJson);
-        await cleanupCache();
-        renderRegion(geoJson);
+        const { data } = await fetchWithVersionValidation(url, cacheKey);
+        renderRegion(data);
     } catch (error) {
         console.error('Error fetching region geometry:', error);
         displayErrorMessage(error);
@@ -413,18 +476,11 @@ async function fetchRegionGeometry(params) {
 async function fetchCatchmentGeometry(params) {
     validateParams(params, ['id']);
     const url = buildUrl(mapConfig.catchmentLayerGeometriesUrl, { id: params.id });
-    const normalizedUrl = normalizeUrl(url);
+    const cacheKey = normalizeUrl(url);
 
     try {
-        const cachedData = await getFromIndexedDB(normalizedUrl);
-        if (cachedData) {
-            renderCatchment(cachedData);
-            return;
-        }
-        const geoJson = await fetchData(url);
-        await storeInIndexedDB(normalizedUrl, geoJson);
-        await cleanupCache();
-        renderCatchment(geoJson);
+        const { data } = await fetchWithVersionValidation(url, cacheKey);
+        renderCatchment(data);
     } catch (error) {
         console.error('Error fetching catchment geometry:', error);
         displayErrorMessage(error);
@@ -444,19 +500,9 @@ async function fetchFeatureGeometries(params) {
     console.log('Normalized cache key:', cacheKey);
 
     try {
-        const cachedData = await getFromIndexedDB(cacheKey);
-        if (cachedData) {
-            console.log('Cache hit for feature data:', cachedData);
-            renderFeatures(cachedData);
-            return;
-        } else {
-            console.log('No valid cache found for features. Proceeding to fetch from network.');
-        }
-        const geoJson = await fetchData(url);
-        console.log('Fetched features from network:', geoJson);
-        await storeInIndexedDB(cacheKey, geoJson);
-        await cleanupCache();
-        renderFeatures(geoJson);
+        const { data, fromCache } = await fetchWithVersionValidation(url, cacheKey);
+        console.log(`Features ${fromCache ? 'loaded from cache' : 'fetched from network'}:`, data);
+        renderFeatures(data);
     } catch (error) {
         console.error('Error fetching feature geometries:', error);
         displayErrorMessage(error);

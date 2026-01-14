@@ -64,19 +64,20 @@ class StreamingGeoJSONLoader {
             const totalCount = parseInt(response.headers.get('X-Total-Count') || '0', 10);
             const cacheStatus = response.headers.get('X-Cache-Status') || 'UNKNOWN';
             const contentLength = parseInt(response.headers.get('Content-Length') || '0', 10);
+            const dataVersion = response.headers.get('X-Data-Version') || null;
 
-            console.log(`GeoJSON response: cache=${cacheStatus}, total=${totalCount}, contentLength=${contentLength}`);
+            console.log(`GeoJSON response: cache=${cacheStatus}, total=${totalCount}, contentLength=${contentLength}, version=${dataVersion}`);
 
             // If not streaming or small dataset, use regular JSON parsing
             if (cacheStatus !== 'STREAM' || totalCount <= 100) {
                 const data = await response.json();
                 this.onProgress(totalCount, totalCount);
-                this.onComplete(data);
+                this.onComplete(data, dataVersion);
                 return data;
             }
 
             // Streaming response - parse incrementally
-            return await this._parseStreamingResponse(response, totalCount, contentLength);
+            return await this._parseStreamingResponse(response, totalCount, contentLength, dataVersion);
 
         } catch (error) {
             if (error.name === 'AbortError') {
@@ -88,7 +89,7 @@ class StreamingGeoJSONLoader {
         }
     }
 
-    async _parseStreamingResponse(response, totalCount, contentLength = 0) {
+    async _parseStreamingResponse(response, totalCount, contentLength = 0, dataVersion = null) {
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = '';
@@ -201,7 +202,7 @@ class StreamingGeoJSONLoader {
             };
 
             this.onProgress(features.length, totalCount);
-            this.onComplete(geojson);
+            this.onComplete(geojson, dataVersion);
             return geojson;
 
         } catch (error) {
@@ -293,12 +294,12 @@ async function fetchFeatureGeometriesWithProgress(params) {
 
     console.log('Fetching features with progress for URL:', url);
 
-    // Check local cache first
+    // Check local cache first (getFromIndexedDB returns full entry object with .data property)
     try {
-        const cachedData = await getFromIndexedDB(cacheKey);
-        if (cachedData) {
+        const cached = await getFromIndexedDB(cacheKey);
+        if (cached && cached.data) {
             console.log('Cache hit for feature data');
-            renderFeatures(cachedData);
+            renderFeatures(cached.data);
             return;
         }
     } catch (e) {
@@ -314,12 +315,12 @@ async function fetchFeatureGeometriesWithProgress(params) {
         onProgress: (loaded, total) => {
             progressBar.update(loaded, total);
         },
-        onComplete: async (geojson) => {
+        onComplete: async (geojson, version) => {
             progressBar.hide();
 
-            // Cache the result
+            // Cache the result with version for future validation
             try {
-                await storeInIndexedDB(cacheKey, geojson);
+                await storeInIndexedDB(cacheKey, geojson, version);
                 await cleanupCache();
             } catch (e) {
                 console.warn('Failed to cache GeoJSON:', e);
