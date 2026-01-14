@@ -228,8 +228,8 @@ function createMapProgressBar(containerId = 'map-progress-container') {
             <div class="card shadow">
                 <div class="card-body p-3">
                     <div class="d-flex justify-content-between mb-1">
-                        <small class="text-muted">Loading map data...</small>
-                        <small class="text-muted" id="map-progress-text">0%</small>
+                        <small class="text-muted" id="map-progress-label">Loading map data...</small>
+                        <small class="text-muted" id="map-progress-text"></small>
                     </div>
                     <div class="progress" style="height: 8px;">
                         <div class="progress-bar progress-bar-striped progress-bar-animated" 
@@ -259,12 +259,36 @@ function createMapProgressBar(containerId = 'map-progress-container') {
         hide() {
             container.style.display = 'none';
         },
-        update(loaded, total) {
-            const percent = total > 0 ? Math.round((loaded / total) * 100) : 0;
+        /**
+         * Show indeterminate "connecting" state before we know the total.
+         */
+        showConnecting() {
             const bar = document.getElementById('map-progress-bar');
             const text = document.getElementById('map-progress-text');
             const count = document.getElementById('map-progress-count');
+            const label = document.getElementById('map-progress-label');
 
+            if (label) label.textContent = 'Connecting to server...';
+            if (bar) {
+                // Indeterminate: full width, animated stripes convey activity
+                bar.style.width = '100%';
+                bar.setAttribute('aria-valuenow', '0');
+            }
+            if (text) text.textContent = '';
+            if (count) count.textContent = 'Preparing data, please wait...';
+        },
+        /**
+         * Update with real progress once we know the total.
+         */
+        update(loaded, total) {
+            const bar = document.getElementById('map-progress-bar');
+            const text = document.getElementById('map-progress-text');
+            const count = document.getElementById('map-progress-count');
+            const label = document.getElementById('map-progress-label');
+
+            if (label) label.textContent = 'Loading map data...';
+
+            const percent = total > 0 ? Math.round((loaded / total) * 100) : 0;
             if (bar) {
                 bar.style.width = `${percent}%`;
                 bar.setAttribute('aria-valuenow', percent);
@@ -306,10 +330,10 @@ async function fetchFeatureGeometriesWithProgress(params) {
         console.warn('IndexedDB cache check failed:', e);
     }
 
-    // Create progress bar
+    // Create progress bar and show indeterminate state while connecting
     const progressBar = createMapProgressBar();
     progressBar.show();
-    progressBar.update(0, 0);
+    progressBar.showConnecting();
 
     const loader = new StreamingGeoJSONLoader({
         onProgress: (loaded, total) => {
