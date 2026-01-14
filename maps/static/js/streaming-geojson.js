@@ -268,14 +268,14 @@ function createMapProgressBar(containerId = 'map-progress-container') {
             const count = document.getElementById('map-progress-count');
             const label = document.getElementById('map-progress-label');
 
-            if (label) label.textContent = 'Connecting to server...';
+            if (label) label.textContent = 'Preparing data...';
             if (bar) {
                 // Indeterminate: full width, animated stripes convey activity
                 bar.style.width = '100%';
                 bar.setAttribute('aria-valuenow', '0');
             }
             if (text) text.textContent = '';
-            if (count) count.textContent = 'Preparing data, please wait...';
+            if (count) count.textContent = '';
         },
         /**
          * Update with real progress once we know the total.
@@ -324,6 +324,7 @@ async function fetchFeatureGeometriesWithProgress(params) {
         if (cached && cached.data) {
             console.log('Cache hit for feature data');
             renderFeatures(cached.data);
+            if (typeof orderLayers === 'function') orderLayers();
             return;
         }
     } catch (e) {
@@ -351,6 +352,7 @@ async function fetchFeatureGeometriesWithProgress(params) {
             }
 
             renderFeatures(geojson);
+            if (typeof orderLayers === 'function') orderLayers();
         },
         onError: (error) => {
             progressBar.hide();
