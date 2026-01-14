@@ -3,6 +3,7 @@ import json
 import random
 import re
 import uuid
+from unittest.mock import patch
 
 from django.conf import settings
 from django.core.cache import caches
@@ -229,19 +230,18 @@ class StreamingGeoJSONTests(TestCase):
 
     def test_large_dataset_triggers_streaming(self):
         """Verify datasets above threshold use streaming response."""
-        # This test verifies the STREAMING_THRESHOLD behavior
-        from maps.mixins import STREAMING_THRESHOLD
+        with patch("maps.mixins.STREAMING_THRESHOLD", 100):
+            from maps.mixins import STREAMING_THRESHOLD
 
-        # We created 150 regions in setUpTestData
-        self.assertGreater(len(self.regions), STREAMING_THRESHOLD)
+            # We created 150 regions in setUpTestData
+            self.assertGreater(len(self.regions), STREAMING_THRESHOLD)
 
-        response = self.client.get(self.regions_geojson_url)
-        self.assertEqual(response.status_code, 200)
+            response = self.client.get(self.regions_geojson_url)
+            self.assertEqual(response.status_code, 200)
 
-        # For large datasets without cache, should be STREAM
-        # Note: first request may not stream if caching kicks in
-        cache_status = response.get("X-Cache-Status", "")
-        self.assertIn(cache_status, ["MISS", "STREAM", "HIT"])
+            # For large datasets without cache, should be STREAM
+            cache_status = response.get("X-Cache-Status", "")
+            self.assertEqual(cache_status, "STREAM")
 
     def test_streaming_features_match_database_count(self):
         """Verify all features are included in streaming response."""
