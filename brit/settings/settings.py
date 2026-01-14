@@ -214,6 +214,11 @@ REST_FRAMEWORK = {
         "rest_framework.authentication.SessionAuthentication",
     ),
     "DEFAULT_FILTER_BACKENDS": ("django_filters.rest_framework.DjangoFilterBackend",),
+    # Throttle rates for rate limiting (applied per-view via throttle_classes)
+    "DEFAULT_THROTTLE_RATES": {
+        "anon": "10/minute",
+        "user": "60/minute",
+    },
 }
 
 

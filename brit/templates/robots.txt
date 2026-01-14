@@ -13,5 +13,33 @@ Disallow: /*ajax/
 Disallow: /*data/
 Disallow: /*download*/
 Disallow: /*check_urls/
+Disallow: /*summaries/
+Disallow: /*.json
+Disallow: /*?*csrfmiddlewaretoken=
+
+# Block specific aggressive crawlers
+User-agent: Googlebot-Image
+Disallow: /*/api/
+Disallow: /*geojson/
+
+User-agent: AhrefsBot
+Disallow: /
+
+User-agent: SemrushBot
+Disallow: /
+
+User-agent: MJ12bot
+Disallow: /
+
+User-agent: DotBot
+Disallow: /
+
+# Allow specific paths for main crawlers
+User-agent: Googlebot
+Allow: /home/
+Allow: /about/
+Allow: /learning/
+Disallow: /*/api/
+Disallow: /*geojson/
 
 Sitemap: {{ request.scheme }}://{{ request.get_host }}/sitemap.xml
