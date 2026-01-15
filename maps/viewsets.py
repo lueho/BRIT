@@ -30,7 +30,12 @@ class LocationViewSet(AutoPermModelViewSet):
     queryset = Location.objects.all()
     serializer_class = LocationModelSerializer
     filterset_fields = ("id",)
-    custom_permission_required = {"list": None, "retrieve": None, "geojson": None}
+    custom_permission_required = {
+        "list": None,
+        "retrieve": None,
+        "geojson": None,
+        "version": None,
+    }
 
     @action(detail=False, methods=["get"])
     def geojson(self, request, *args, **kwargs):
@@ -50,6 +55,7 @@ class RegionViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
         "retrieve": None,
         "geojson": None,
         "summaries": None,
+        "version": None,
     }
 
     def get_cache_key(self, request):
@@ -75,7 +81,12 @@ class CatchmentViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
     queryset = Catchment.objects.select_related("region", "region__borders").all()
     serializer_class = CatchmentModelSerializer
     filterset_class = CatchmentFilterSet
-    custom_permission_required = {"list": None, "retrieve": None, "geojson": None}
+    custom_permission_required = {
+        "list": None,
+        "retrieve": None,
+        "geojson": None,
+        "version": None,
+    }
 
     def get_cache_key(self, request):
         filters = request.query_params.dict()
@@ -126,7 +137,12 @@ class NutsRegionViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
     )
     serializer_class = NutsRegionSummarySerializer
     filterset_fields = ("id", "levl_code", "cntr_code", "parent_id")
-    custom_permission_required = {"list": None, "retrieve": None, "geojson": None}
+    custom_permission_required = {
+        "list": None,
+        "retrieve": None,
+        "geojson": None,
+        "version": None,
+    }
 
     def get_cache_key(self, request):
         filters = request.query_params.dict()
