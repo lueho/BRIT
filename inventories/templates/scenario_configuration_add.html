@@ -1,82 +1,65 @@
-{% extends 'simple_form_card.html' %}
+{% extends "simple_form_card.html" %}
 
 {% block extra_post_form_content %}
-    <div id="parameterFormContainer" class=form-group></div>
-{% endblock %}
+    <div id="parameterFormContainer" class="form-group"></div>
+{% endblock extra_post_form_content %}
 
 {% block cancel_button %}
     <a href="{{ view.get_success_url }}" class="btn btn-secondary">Cancel</a>
-{% endblock %}
+{% endblock cancel_button %}
 
 {% block javascript %}
     {{ block.super }}
 
     <script>
+        const form = document.getElementById("configForm");
 
-        const form = document.getElementById("configForm")
+        function renderParameterFields(parameters) {
+            if (!parameters || parameters.length === 0) {
+                document.getElementById("parameterFormContainer").innerHTML = "";
+                return;
+            }
+
+            let html = "<h3>Parameters for this algorithm:</h3>";
+            for (const param of parameters) {
+                html += `
+                    <div id="div_id_parameter_${param.id}" class="form-group">
+                        <label class="requiredField" for="id_parameter_${param.id}">${param.descriptive_name}</label>
+                        <div>
+                            <select id="id_parameter_${param.id}" class="select form-control" name="parameter_${param.id}">
+                                <option value="">---------</option>
+                                ${param.values.map(v => `<option value="${v.id}"${v.default ? ' selected' : ''}>${v.name || v.value}</option>`).join('')}
+                            </select>
+                        </div>
+                    </div>
+                `;
+            }
+            document.getElementById("parameterFormContainer").innerHTML = html;
+        }
 
         async function loadInventoryAlgorithmParameters() {
+            const algorithmId = form.inventory_algorithm.value;
+            if (!algorithmId) {
+                document.getElementById("parameterFormContainer").innerHTML = "";
+                return;
+            }
 
-            const url = "{% url 'ajax_load_inventory_parameters' %}";
-            let args = new URLSearchParams({
-                inventory_algorithm: form.inventory_algorithm.value,
-            });
-
-            let response = await fetch(url + "?" + args);
-            return await response.text();
+            const url = `/inventories/api/inventory-algorithms/${algorithmId}/parameters/`;
+            try {
+                const response = await fetch(url);
+                if (response.ok) {
+                    const parameters = await response.json();
+                    renderParameterFields(parameters);
+                }
+            } catch (err) {
+                console.error("Error loading parameters:", err);
+            }
         }
 
-        async function loadInventoryAlgorithms() {
-
-            const url = "{% url 'ajax_load_inventory_algorithms' %}";
-            let args = new URLSearchParams({
-                scenario: form.scenario.value,
-                feedstock: form.feedstock.value,
-                geodataset: form.geodataset.value,
-                options: "create"
-            });
-
-            let response = await fetch(url + "?" + args);
-            return await response.text();
+        const algorithmField = document.getElementById("id_inventory_algorithm");
+        if (algorithmField) {
+            algorithmField.addEventListener("change", loadInventoryAlgorithmParameters);
         }
-
-        {% comment %} async function loadGeodatasets() {
-
-            const url = "{% url 'ajax_load_geodatasets' %}";
-            let args = new URLSearchParams({
-                scenario: form.scenario.value,
-                feedstock: form.feedstock.value,
-                options: "create"
-            });
-
-            let response = await fetch(url + "?" + args);
-            return await response.text();
-        } {% endcomment %}
-
-        function setInventoryAlgorithmParameterOptions() {
-            loadInventoryAlgorithmParameters()
-                .then(html => document.getElementById("parameterFormContainer").innerHTML = html)
-                .catch((err) => console.log(err))
-        }
-
-        function setInventoryAlgorithmOptions() {
-            loadInventoryAlgorithms()
-                .then(html => document.getElementById("id_inventory_algorithm").innerHTML = html)
-                .then(() => setInventoryAlgorithmParameterOptions())
-                .catch((err) => console.log(err))
-        }
-
-        {% comment %} function setGeoDatasetOptions() {
-            loadGeodatasets()
-                .then(html => document.getElementById("id_geodataset").innerHTML = html)
-                .then(() => setInventoryAlgorithmOptions())
-                .catch((err) => console.log(err))
-        } {% endcomment %}
-
-        {% comment %} document.getElementById("id_feedstock").onchange = () => setGeoDatasetOptions(); {% endcomment %}
-        document.getElementById("id_geodataset").onchange = () => setInventoryAlgorithmOptions();
-        document.getElementById("id_inventory_algorithm").onchange = () => setInventoryAlgorithmParameterOptions();
-
     </script>
 
 {% endblock javascript %}

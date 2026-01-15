@@ -1,16 +1,15 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 
 {% block content %}
     {% load crispy_forms_tags %}
 
     <h2 class="test">Add an algorithm to the scenario "{{ scenario.name }}"</h2>
     <form method="post" id="configForm">
-
         {% csrf_token %}
         {{ form|crispy }}
-        <div id="parameterFormContainer" class=form-group></div>
+        <div id="parameterFormContainer" class="form-group"></div>
         <button type="submit" class="btn btn-primary">Save</button>
-        <a href="{{ view.get_success_url }}" class="btn btn-primary">Cancel</a>
+        <a href="{{ view.get_success_url }}" class="btn btn-secondary">Cancel</a>
     </form>
 
 {% endblock content %}
@@ -20,103 +19,72 @@
     {{ parameters|json_script:"data" }}
 
     <script type="text/javascript">
+        const form = document.getElementById("configForm");
+        const initialParameters = JSON.parse(document.getElementById("data").textContent);
 
-        const form = document.getElementById("configForm")
-        let parameters = JSON.parse(document.getElementById("data").textContent);
+        function renderParameterFields(parameters, preselectedValues = null) {
+            if (!parameters || parameters.length === 0) {
+                document.getElementById("parameterFormContainer").innerHTML = "";
+                return;
+            }
 
-        async function loadInventoryAlgorithmParameters() {
-            const url = "{% url 'ajax_load_inventory_parameters' %}";
-            let args = new URLSearchParams({
-                inventory_algorithm: form.inventory_algorithm.value,
-                options: "update"
-            });
-
-            let response = await fetch(url + "?" + args);
-            return await response.text();
+            let html = "<h3>Parameters for this algorithm:</h3>";
+            for (const param of parameters) {
+                const preselected = preselectedValues ? preselectedValues[param.short_name] : null;
+                html += `
+                    <div id="div_id_parameter_${param.id}" class="form-group">
+                        <label class="requiredField" for="id_parameter_${param.id}">${param.descriptive_name}</label>
+                        <div>
+                            <select id="id_parameter_${param.id}" class="select form-control" name="parameter_${param.id}">
+                                <option value="">---------</option>
+                                ${param.values.map(v => {
+                                    const isSelected = preselected ? v.id == preselected : v.default;
+                                    return `<option value="${v.id}"${isSelected ? ' selected' : ''}>${v.name || v.value}</option>`;
+                                }).join('')}
+                            </select>
+                        </div>
+                    </div>
+                `;
+            }
+            document.getElementById("parameterFormContainer").innerHTML = html;
         }
 
-        async function loadInventoryAlgorithms() {
+        async function loadInventoryAlgorithmParameters(preselectedValues = null) {
+            const algorithmId = form.inventory_algorithm.value;
+            if (!algorithmId) {
+                document.getElementById("parameterFormContainer").innerHTML = "";
+                return;
+            }
 
-            const url = "{% url 'ajax_load_inventory_algorithms' %}";
-            let args = new URLSearchParams({
-                scenario: form.scenario.value,
-                feedstock: form.feedstock.value,
-                geodataset: form.geodataset.value,
-                current_inventory_algorithm: "{{ inventory_algorithm.id }}",
-                options: "update"
-            });
-
-            let response = await fetch(url + "?" + args);
-            return await response.text();
+            const url = `/inventories/api/inventory-algorithms/${algorithmId}/parameters/`;
+            try {
+                const response = await fetch(url);
+                if (response.ok) {
+                    const parameters = await response.json();
+                    renderParameterFields(parameters, preselectedValues);
+                }
+            } catch (err) {
+                console.error("Error loading parameters:", err);
+            }
         }
 
-        async function loadGeodatasets() {
-
-            const url = "{% url 'ajax_load_geodatasets' %}";
-            let args = new URLSearchParams({
-                scenario: form.scenario.value,
-                feedstock: form.feedstock.value,
-                current_geodataset: "{{ geodataset.id }}",
-                options: "update"
-            });
-
-            let response = await fetch(url + "?" + args);
-            return await response.text();
+        function buildPreselectedMap() {
+            const map = {};
+            for (const param of initialParameters) {
+                const name = Object.keys(param)[0];
+                map[name] = param[name];
+            }
+            return map;
         }
 
-        function setInventoryAlgorithmParameterOptions() {
-            loadInventoryAlgorithmParameters()
-                .then(html => document.getElementById("parameterFormContainer").innerHTML = html)
-                .catch((err) => console.log(err))
+        document.addEventListener("DOMContentLoaded", function() {
+            loadInventoryAlgorithmParameters(buildPreselectedMap());
+        });
+
+        const algorithmField = document.getElementById("id_inventory_algorithm");
+        if (algorithmField) {
+            algorithmField.addEventListener("change", () => loadInventoryAlgorithmParameters());
         }
-
-        function setInventoryAlgorithmOptions() {
-            loadInventoryAlgorithms()
-                .then(html => document.getElementById("id_inventory_algorithm").innerHTML = html)
-                .then(() => setInventoryAlgorithmParameterOptions())
-                .catch((err) => console.log(err))
-        }
-
-        function setGeoDatasetOptions() {
-            loadGeodatasets()
-                .then(html => document.getElementById("id_geodataset").innerHTML = html)
-                .then(() => setInventoryAlgorithmOptions())
-                .catch((err) => console.log(err))
-        }
-
-        function setInitialParameterSelection() {
-            loadInventoryAlgorithmParameters()
-                .then(html => document.getElementById("parameterFormContainer").innerHTML = html)
-                .then(() => {
-                    for (const parameter of parameters) {
-                        let name = Object.keys(parameter)[0]
-                        document.getElementById("id_parameter_" + name).value = parameter[name]
-                    }
-                })
-                .catch((err) => console.log(err))
-        }
-
-        function addCurrentAlgorithmField() {
-            let input = document.createElement("input");
-            input.setAttribute("type", "hidden");
-            input.setAttribute("name", "current_algorithm");
-            input.setAttribute("id", "id_current_algorithm");
-            input.setAttribute("value", "{{ inventory_algorithm.id }}")
-            const scenario = document.forms["configForm"].scenario;
-            scenario.insertAdjacentElement("afterend", input);
-        }
-
-        function onLoad() {
-            addCurrentAlgorithmField();
-            setInitialParameterSelection();
-        }
-
-        document.getElementById("id_feedstock").onchange = () => setGeoDatasetOptions();
-        document.getElementById("id_geodataset").onchange = () => setInventoryAlgorithmOptions();
-        document.getElementById("id_inventory_algorithm").onchange = () => setInventoryAlgorithmParameterOptions();
-        window.onload = () => onLoad();
-
     </script>
-
 
 {% endblock javascript %}

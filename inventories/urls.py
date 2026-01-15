@@ -2,6 +2,7 @@ from django.urls import path
 
 from .views import (
     InventoryAlgorithmAutocompleteView,
+    InventoryAlgorithmParametersAPIView,
     PrivateScenarioFilterView,
     PublishedScenarioFilterView,
     ResultMapAPI,
@@ -12,6 +13,7 @@ from .views import (
     ScenarioDetailView,
     ScenarioEvaluationProgressView,
     ScenarioGeoDataSetAutocompleteView,
+    ScenarioInventoryAlgorithmAutocompleteView,
     ScenarioModalDeleteView,
     ScenarioRemoveInventoryAlgorithmView,
     ScenarioResultDetailMapView,
@@ -21,10 +23,6 @@ from .views import (
     download_scenario_result_summary,
     download_scenario_summary,
     get_evaluation_status,
-    load_algorithm_options,
-    load_catchment_options,
-    load_geodataset_options,
-    load_parameter_options,
 )
 
 urlpatterns = [
@@ -42,6 +40,16 @@ urlpatterns = [
         "inventory-algorithms/autocomplete/",
         InventoryAlgorithmAutocompleteView.as_view(),
         name="inventoryalgorithm-autocomplete",
+    ),
+    path(
+        "inventory-algorithms/scenario-autocomplete/",
+        ScenarioInventoryAlgorithmAutocompleteView.as_view(),
+        name="scenario-inventoryalgorithm-autocomplete",
+    ),
+    path(
+        "api/inventory-algorithms/<int:algorithm_pk>/parameters/",
+        InventoryAlgorithmParametersAPIView.as_view(),
+        name="api-inventoryalgorithm-parameters",
     ),
     path("scenarios/", PublishedScenarioFilterView.as_view(), name="scenario-list"),
     path(
@@ -115,22 +123,6 @@ urlpatterns = [
         "scenarios/<int:scenario_pk>/report/",
         download_scenario_summary,
         name="download_scenario_summary",
-    ),
-    path(
-        "ajax/catchment-options/", load_catchment_options, name="ajax_catchment_options"
-    ),
-    path(
-        "ajax/load-geodatasets/", load_geodataset_options, name="ajax_load_geodatasets"
-    ),
-    path(
-        "ajax/load-algorithms/",
-        load_algorithm_options,
-        name="ajax_load_inventory_algorithms",
-    ),
-    path(
-        "ajax/load-inventory-parameters/",
-        load_parameter_options,
-        name="ajax_load_inventory_parameters",
     ),
     path(
         "ajax/result_layer/<layer_name>/",

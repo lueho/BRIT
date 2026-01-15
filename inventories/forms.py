@@ -1,5 +1,4 @@
 from django.forms import HiddenInput
-from django.urls import reverse
 from django_tomselect.forms import TomSelectConfig, TomSelectModelChoiceField
 
 from distributions.models import TemporalDistribution
@@ -75,6 +74,10 @@ class ScenarioInventoryConfigurationForm(SimpleModelForm):
                 "geodataset",
                 "geodataset_id",
             ),
+            exclude_by=(
+                "feedstock",
+                "feedstock_id",
+            ),
             minimum_query_length=0,
             preload="focus",
         ),
@@ -94,7 +97,6 @@ class ScenarioInventoryConfigurationForm(SimpleModelForm):
 
 
 class ScenarioInventoryConfigurationAddForm(ScenarioInventoryConfigurationForm):
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         del self.fields["inventory_parameter"]
@@ -107,22 +109,8 @@ class ScenarioInventoryConfigurationAddForm(ScenarioInventoryConfigurationForm):
         self.fields["geodataset"].queryset = GeoDataset.objects.none()
         self.fields["inventory_algorithm"].queryset = InventoryAlgorithm.objects.none()
 
-        parameter_endpoint = reverse("ajax_load_inventory_parameters")
-        self.fields["geodataset"].widget.attrs["data-extra-query-params"] = (
-            "scenario:id_scenario"
-        )
-        self.fields["inventory_algorithm"].widget.attrs.update(
-            {
-                "data-extra-query-params": "scenario:id_scenario,feedstock:id_feedstock,geodataset:id_geodataset",
-                "data-parameter-endpoint": parameter_endpoint,
-                "data-parameter-target": "parameterFormContainer",
-                "data-query-mode": "create",
-            }
-        )
-
 
 class ScenarioInventoryConfigurationUpdateForm(ScenarioInventoryConfigurationForm):
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         del self.fields["inventory_parameter"]
@@ -141,23 +129,9 @@ class ScenarioInventoryConfigurationUpdateForm(ScenarioInventoryConfigurationFor
             feedstock=feedstock
         )
         self.fields["geodataset"].initial = geodataset
-        self.fields["inventory_algorithm"].queryset = (
-            scenario.available_inventory_algorithms(
-                feedstock=feedstock, geodataset=geodataset
-            )
+        self.fields[
+            "inventory_algorithm"
+        ].queryset = scenario.available_inventory_algorithms(
+            feedstock=feedstock, geodataset=geodataset
         )
         self.fields["inventory_algorithm"].initial = algorithm
-
-        parameter_endpoint = reverse("ajax_load_inventory_parameters")
-        self.fields["geodataset"].widget.attrs.setdefault(
-            "data-extra-query-params", "scenario:id_scenario"
-        )
-        self.fields["inventory_algorithm"].widget.attrs.update(
-            {
-                "data-extra-query-params": "scenario:id_scenario,feedstock:id_feedstock,geodataset:id_geodataset",
-                "data-parameter-endpoint": parameter_endpoint,
-                "data-parameter-target": "parameterFormContainer",
-                "data-query-mode": "update",
-                "data-current-value-field": "id_current_algorithm",
-            }
-        )

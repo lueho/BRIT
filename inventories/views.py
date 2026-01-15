@@ -9,10 +9,11 @@ from django.views.generic import CreateView, DetailView, View
 from django.views.generic.base import TemplateResponseMixin
 from django.views.generic.edit import ModelFormMixin
 from django_tomselect.autocompletes import AutocompleteModelView
+from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from layer_manager.models import Layer
-from maps.models import Catchment, GeoDataset
+from maps.models import GeoDataset
 from maps.serializers import BaseResultMapSerializer
 from maps.views import GeoDataSetAutocompleteView, MapMixin
 from materials.models import Material, SampleSeries
@@ -288,6 +289,17 @@ class ScenarioRemoveInventoryAlgorithmView(
         return redirect("scenario-detail", pk=self.scenario.id)
 
 
+def _extract_filter_id(param: str | None) -> str | None:
+    """Extract ID from TomSelect filter_by/exclude_by parameter string.
+
+    TomSelect passes filter parameters as strings like "field_name='123'".
+    This helper extracts the ID value.
+    """
+    if param and "=" in param:
+        return param.split("=", 1)[1].strip("'") or None
+    return None
+
+
 class ScenarioGeoDataSetAutocompleteView(GeoDataSetAutocompleteView):
     """GeoDataset autocomplete filtered by scenario and feedstock (create mode).
 
@@ -302,8 +314,8 @@ class ScenarioGeoDataSetAutocompleteView(GeoDataSetAutocompleteView):
         we leverage correlated sub-queries so the whole operation executes in **one** SQL
         statement.
         """
-        feedstock_id = self._extract_id(self.filter_by)
-        scenario_id = self._extract_id(self.exclude_by)
+        feedstock_id = _extract_filter_id(self.filter_by)
+        scenario_id = _extract_filter_id(self.exclude_by)
 
         if not (feedstock_id and scenario_id):
             return GeoDataset.objects.none()
@@ -344,11 +356,60 @@ class ScenarioGeoDataSetAutocompleteView(GeoDataSetAutocompleteView):
             already_evaluated=Exists(evaluated_q),
         ).filter(has_algorithm=True, already_evaluated=False)
 
-    @staticmethod
-    def _extract_id(param: str | None) -> str | None:
-        if param and "=" in param:
-            return param.split("=", 1)[1].strip("'") or None
-        return None
+
+class ScenarioInventoryAlgorithmAutocompleteView(InventoryAlgorithmAutocompleteView):
+    """InventoryAlgorithm autocomplete filtered by geodataset and feedstock.
+
+    The form widget passes:
+    - geodataset via ``filter_by``
+    - feedstock via ``exclude_by``
+    """
+
+    def apply_filters(self, queryset):
+        """Return InventoryAlgorithms matching the given geodataset and feedstock.
+
+        Note: This does not check if the algorithm is already configured for a scenario.
+        Duplicate prevention is handled by form validation.
+        """
+        geodataset_id = _extract_filter_id(self.filter_by)
+        feedstock_id = _extract_filter_id(self.exclude_by)
+
+        if not (geodataset_id and feedstock_id):
+            return InventoryAlgorithm.objects.none()
+
+        try:
+            feedstock_series = SampleSeries.objects.get(pk=feedstock_id)
+            geodataset = GeoDataset.objects.get(pk=geodataset_id)
+        except (SampleSeries.DoesNotExist, GeoDataset.DoesNotExist):
+            return InventoryAlgorithm.objects.none()
+
+        return InventoryAlgorithm.objects.filter(
+            feedstocks=feedstock_series.material,
+            geodataset=geodataset,
+        )
+
+
+class InventoryAlgorithmParametersAPIView(APIView):
+    """JSON API endpoint for algorithm parameters and their values.
+
+    Returns parameters with nested values for a given inventory algorithm.
+    Used by the configuration form to dynamically render parameter fields.
+    """
+
+    def get(self, request, algorithm_pk):
+        from .serializers import InventoryAlgorithmParameterSerializer
+
+        try:
+            algorithm = InventoryAlgorithm.objects.get(pk=algorithm_pk)
+        except InventoryAlgorithm.DoesNotExist:
+            return Response({"error": "Algorithm not found"}, status=404)
+
+        parameters = InventoryAlgorithmParameter.objects.filter(
+            inventory_algorithm=algorithm
+        ).prefetch_related("inventoryalgorithmparametervalue_set")
+
+        serializer = InventoryAlgorithmParameterSerializer(parameters, many=True)
+        return Response(serializer.data)
 
 
 def download_scenario_summary(request, scenario_pk):
@@ -360,102 +421,23 @@ def download_scenario_summary(request, scenario_pk):
         return response
 
 
-def load_catchment_options(request):
-    region_id = request.GET.get("region_id") or request.GET.get("region")
-    if region_id:
-        return render(
-            request,
-            "catchment_dropdown_list_options.html",
-            {"catchments": Catchment.objects.filter(parent_region_id=region_id)},
-        )
-    else:
-        return render(
-            request,
-            "catchment_dropdown_list_options.html",
-            {"catchments": Catchment.objects.none()},
-        )
-
-
-def load_geodataset_options(request):
-    scenario = Scenario.objects.get(id=request.GET.get("scenario"))
-    if request.GET.get("feedstock"):
-        feedstock = SampleSeries.objects.get(id=request.GET.get("feedstock"))
-        if request.GET.get("options") == "create":
-            geodatasets = scenario.remaining_geodataset_options(
-                feedstock=feedstock.material
-            )
-        elif request.GET.get("options") == "update":
-            current = GeoDataset.objects.filter(
-                id=request.GET.get("current_geodataset")
-            )
-            geodatasets = scenario.remaining_geodataset_options(
-                feedstock=feedstock.material
-            ).union(current)
-        else:
-            geodatasets = scenario.available_geodatasets()
-    else:
-        geodatasets = GeoDataset.objects.none()
-    return render(
-        request, "geodataset_dropdown_list_options.html", {"geodatasets": geodatasets}
-    )
-
-
-def load_algorithm_options(request):
-    scenario = Scenario.objects.get(id=request.GET.get("scenario"))
-    if request.GET.get("feedstock") and request.GET.get("geodataset"):
-        feedstock = SampleSeries.objects.get(id=request.GET.get("feedstock"))
-        geodataset = GeoDataset.objects.get(id=request.GET.get("geodataset"))
-        if request.GET.get("options") == "create":
-            algorithms = scenario.remaining_inventory_algorithm_options(
-                feedstock, geodataset
-            )
-        elif request.GET.get("options") == "update":
-            current_algorithm = InventoryAlgorithm.objects.filter(
-                id=request.GET.get("current_inventory_algorithm"),
-                feedstock=feedstock.material,
-                geodataset=geodataset,
-            )
-            algorithms = scenario.remaining_inventory_algorithm_options(
-                feedstock, geodataset
-            ).union(current_algorithm)
-        else:
-            algorithms = scenario.available_inventory_algorithms()
-    else:
-        algorithms = InventoryAlgorithm.objects.none()
-    return render(
-        request, "algorithm_dropdown_list_options.html", {"algorithms": algorithms}
-    )
-
-
-def load_parameter_options(request):
-    if request.GET.get("inventory_algorithm"):
-        algorithm = InventoryAlgorithm.objects.get(
-            id=request.GET.get("inventory_algorithm")
-        )
-        parameters = InventoryAlgorithmParameter.objects.filter(
-            inventory_algorithm=algorithm
-        )
-        context = {
-            "parameters": {
-                parameter: InventoryAlgorithmParameterValue.objects.filter(
-                    parameter=parameter
-                )
-                for parameter in parameters
-            }
-        }
-        return render(request, "parameters_dropdown_list_options.html", context)
-    else:
-        return HttpResponse("")
-
-
 class ResultMapAPI(APIView):
-    """Rest API to get features from automatically generated result tables. Endpoint for Leaflet maps"""
+    """REST API to get GeoJSON features from scenario result layers.
 
-    @staticmethod
-    def get(request, *args, **kwargs):
-        layer = Layer.objects.get(table_name=kwargs["layer_name"])
+    Returns GeoJSON feature collection for Leaflet map rendering.
+    The layer_name parameter identifies the dynamically generated result table.
+    """
+
+    def get(self, request, layer_name):
+        try:
+            layer = Layer.objects.select_related("scenario").get(table_name=layer_name)
+        except Layer.DoesNotExist:
+            return Response({"error": "Layer not found"}, status=404)
+
         feature_collection = layer.get_feature_collection()
         features = feature_collection.objects.all()
+
+        # Dynamically configure serializer for the result table model
         serializer_class = BaseResultMapSerializer
         serializer_class.Meta.model = feature_collection
 
@@ -466,7 +448,7 @@ class ResultMapAPI(APIView):
             "geoJson": serializer.data,
         }
 
-        return JsonResponse(data, safe=False)
+        return Response(data)
 
 
 class ScenarioResultView(MapMixin, UserCreatedObjectDetailView):
