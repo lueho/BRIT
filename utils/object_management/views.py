@@ -70,6 +70,12 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
     filterset_class = ReviewDashboardFilterSet
     context_object_name = "review_items"
     paginate_by = getattr(settings, "REVIEW_DASHBOARD_PAGE_SIZE", 20)
+    _available_models_cache = None
+
+    def setup(self, request, *args, **kwargs):
+        """Reset per-request cache."""
+        super().setup(request, *args, **kwargs)
+        self._available_models_cache = None
 
     def get_available_models(self):
         """Discover all concrete UserCreatedObject subclasses that have items in review.
@@ -79,7 +85,12 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
         2. Are in the priority list and user has moderation permissions
 
         Optimized to avoid N+1 queries by pre-fetching all user permissions.
+        Results are cached per-request to avoid repeated expensive queries.
         """
+        # Return cached result if available
+        if self._available_models_cache is not None:
+            return self._available_models_cache
+
         from django.apps import apps
         from django.contrib.auth.models import Permission
 
@@ -153,6 +164,8 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
                         )
                         pass
 
+        # Cache for subsequent calls within the same request
+        self._available_models_cache = available_models
         return available_models
 
     def get_filterset_kwargs(self, filterset_class):
@@ -213,11 +226,23 @@ class ReviewDashboardView(LoginRequiredMixin, FilterDefaultsMixin, FilterView):
         for model_class in available_models:
             # Get items in review for this model, excluding current user's own items
             try:
+                # Build select_related fields dynamically based on model's FK fields
+                select_fields = ["owner", "approved_by"]
+                # Add common FK fields that may exist on specific models
+                for field_name in ("property", "unit", "material", "sample"):
+                    if hasattr(model_class, field_name):
+                        try:
+                            field = model_class._meta.get_field(field_name)
+                            if field.is_relation and field.many_to_one:
+                                select_fields.append(field_name)
+                        except FieldDoesNotExist:
+                            pass
+
                 # Apply database-level ordering and limit to reduce memory usage
                 items = (
                     model_class.objects.in_review()
                     .exclude(owner=self.request.user)
-                    .select_related("owner", "approved_by")
+                    .select_related(*select_fields)
                     .order_by("-submitted_at")[:max_items_per_model]
                 )
                 review_items.extend(list(items))
