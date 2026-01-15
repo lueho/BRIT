@@ -1437,14 +1437,24 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
         """
         Support generic routing by resolving the object from content type + object id
         if provided in URL kwargs. Fallback to the default DetailView behavior.
+
+        Caches the result on self.object to avoid duplicate queries when called
+        from test_func(), dispatch(), and get_context_data().
         """
+        if hasattr(self, "object") and self.object is not None:
+            return self.object
+
         content_type_id = self.kwargs.get("content_type_id")
         object_id = self.kwargs.get("object_id")
         if content_type_id and object_id:
             content_type = get_object_or_404(ContentType, pk=content_type_id)
             model_class = content_type.model_class()
-            return get_object_or_404(model_class, pk=object_id)
-        return super().get_object(queryset)
+            obj = get_object_or_404(model_class, pk=object_id)
+        else:
+            obj = super().get_object(queryset)
+
+        self.object = obj
+        return obj
 
     def get_review_specific_context(self, context):
         """
@@ -1472,9 +1482,11 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
         try:
             obj = self.object
             ct = ContentType.objects.get_for_model(obj.__class__)
-            actions = ReviewAction.objects.filter(
-                content_type=ct, object_id=obj.pk
-            ).order_by("-created_at", "-id")
+            actions = list(
+                ReviewAction.objects.filter(content_type=ct, object_id=obj.pk)
+                .select_related("user")
+                .order_by("-created_at", "-id")
+            )
         except Exception:
             actions = []
 
@@ -1483,7 +1495,7 @@ class ReviewItemDetailView(UserCreatedObjectDetailView):
         # Ensure the embedded review panel in the base detail template is shown
         context["show_review_panel"] = True
         # The review panel expects 'review_logs'
-        context["review_logs"] = list(actions)
+        context["review_logs"] = actions
 
         # Allow subclasses to add model-specific context
         model_specific_context = self.get_review_specific_context(context)

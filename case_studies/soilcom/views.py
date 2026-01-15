@@ -6,9 +6,10 @@ from urllib.parse import urlencode
 from celery.result import AsyncResult
 from django.contrib.auth.mixins import LoginRequiredMixin, PermissionRequiredMixin
 from django.core.exceptions import PermissionDenied
-from django.db.models import Count, Max, Min, Q
+from django.db.models import Count, Max, Min, Prefetch, Q
 from django.forms.models import model_to_dict
 from django.http import HttpResponse, HttpResponseRedirect
+from django.shortcuts import get_object_or_404
 from django.urls import reverse, reverse_lazy
 from django.utils.decorators import method_decorator
 from django.views import View
@@ -1187,6 +1188,47 @@ class CollectionReviewItemDetailView(ReviewItemDetailView):
 
     model = Collection
 
+    def get_object(self, queryset=None):
+        """Fetch the Collection with all related objects prefetched to minimize queries."""
+        if hasattr(self, "object") and self.object is not None:
+            return self.object
+
+        content_type_id = self.kwargs.get("content_type_id")
+        object_id = self.kwargs.get("object_id")
+
+        qs = Collection.objects.select_related(
+            "owner",
+            "catchment",
+            "collector",
+            "collection_system",
+            "waste_stream",
+            "waste_stream__category",
+            "frequency",
+            "fee_system",
+        ).prefetch_related(
+            "sources",
+            "flyers",
+            "samples",
+            "predecessors",
+            "successors",
+            "waste_stream__allowed_materials",
+            "waste_stream__forbidden_materials",
+            Prefetch(
+                "frequency__collectioncountoptions_set",
+                queryset=CollectionCountOptions.objects.select_related(
+                    "season", "season__first_timestep", "season__last_timestep"
+                ),
+            ),
+        )
+
+        if content_type_id and object_id:
+            obj = get_object_or_404(qs, pk=object_id)
+        else:
+            obj = get_object_or_404(qs, pk=self.kwargs.get("pk"))
+
+        self.object = obj
+        return obj
+
     def get_review_specific_context(self, context):
         """Add collection property values for review preview."""
         obj = self.object
@@ -1205,7 +1247,7 @@ class CollectionReviewItemDetailView(ReviewItemDetailView):
                         collection__in=obj.all_versions(),
                         publication_status__in=["published", "review"],
                     )
-                    .select_related("property", "unit", "collection")
+                    .select_related("property", "unit", "collection", "owner")
                     .prefetch_related("sources")
                 )
 
@@ -1242,7 +1284,7 @@ class CollectionReviewItemDetailView(ReviewItemDetailView):
                         collections__in=obj.all_versions(),
                         publication_status__in=["published", "review"],
                     )
-                    .select_related("property", "unit")
+                    .select_related("property", "unit", "owner")
                     .prefetch_related("collections", "sources")
                     .distinct()
                 )
