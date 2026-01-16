@@ -28,6 +28,13 @@ class HamburgRoadsideTrees(models.Model):
         verbose_name = "Hamburg Roadside Tree"
         verbose_name_plural = "Hamburg Roadside Trees"
         ordering = ["baumid"]
+        indexes = [
+            models.Index(fields=["baumid"]),
+            models.Index(fields=["gattung_deutsch"]),
+            models.Index(fields=["pflanzjahr"]),
+            models.Index(fields=["stammumfang"]),
+            models.Index(fields=["bezirk"]),
+        ]
 
 
 class HamburgGreenAreas(models.Model):

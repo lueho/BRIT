@@ -49,11 +49,17 @@ class HamburgRoadsideTreeViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
     }
 
     def get_queryset(self):
-        return HamburgRoadsideTrees.objects.all().order_by("baumid")
+        """Return base queryset with model's default ordering."""
+        return HamburgRoadsideTrees.objects.all()
 
     def get_geojson_queryset(self):
-        """Return optimized queryset for GeoJSON with minimal fields."""
-        return self.get_queryset().only("id", "geom")
+        """Return optimized queryset for GeoJSON with minimal fields.
+
+        - Uses only() to fetch just id and geom (no other columns)
+        - Removes ordering since point features don't need sorting
+        - Avoids deferred field access that would negate .only() benefits
+        """
+        return HamburgRoadsideTrees.objects.only("id", "geom").order_by()
 
     def get_geojson_serializer_class(self):
         return HamburgRoadsideTreeGeometrySerializer
