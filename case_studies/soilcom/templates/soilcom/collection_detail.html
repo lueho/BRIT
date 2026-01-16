@@ -57,20 +57,31 @@
             </a>
           {% endif %}
         {% endif %}
-        {% if request.GET.next %}
+        {# Map button logic - handle review mode properly #}
+        {% if review_mode %}
+          {# In review mode, always link to the map view with review scope #}
           <a class="btn btn-sm btn-outline-secondary"
-             href="{{ request.GET.next }}"
+             href="{% url 'WasteCollection-review' %}?id={{ object.id }}&load_features=true&scope=review"
              title="Map">
             <i class="fas fa-map"></i> <span class="d-none d-md-inline">Map</span>
           </a>
         {% else %}
-          {% with scope=object.publication_status %}
+          {# Not in review mode - use original logic #}
+          {% if request.GET.next %}
             <a class="btn btn-sm btn-outline-secondary"
-               href="{% url 'WasteCollection' %}?id={{ object.id }}&load_features=true{% if scope %}&scope={{ scope }}{% endif %}"
+               href="{{ request.GET.next }}"
                title="Map">
               <i class="fas fa-map"></i> <span class="d-none d-md-inline">Map</span>
             </a>
-          {% endwith %}
+          {% else %}
+            {% with scope=object.publication_status %}
+              <a class="btn btn-sm btn-outline-secondary"
+                 href="{% url 'WasteCollection' %}?id={{ object.id }}&load_features=true{% if scope %}&scope={{ scope }}{% endif %}"
+                 title="Map">
+                <i class="fas fa-map"></i> <span class="d-none d-md-inline">Map</span>
+              </a>
+            {% endwith %}
+          {% endif %}
         {% endif %}
         <a class="btn btn-sm btn-outline-secondary"
            href="{% url 'wastecollection-dashboard' %}"
@@ -91,20 +102,20 @@
         {% elif policy.is_in_review %}
           {% if policy.is_owner or policy.is_staff or policy.is_moderator %}
             <a class="btn btn-sm btn-outline-secondary"
-               href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
+               href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}"
                title="Review view">
               <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review view</span>
             </a>
           {% endif %}
         {% elif policy.is_declined and policy.is_staff %}
           <a class="btn btn-sm btn-outline-secondary"
-             href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
+             href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}"
              title="Review view">
             <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review view</span>
           </a>
         {% elif policy.is_declined and policy.is_moderator %}
           <a class="btn btn-sm btn-outline-secondary"
-             href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}"
+             href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}"
              title="Review view">
             <i class="fas fa-clipboard-check"></i> <span class="d-none d-sm-inline">Review view</span>
           </a>
@@ -285,7 +296,7 @@
                 {% endif %}
                 {% if val_policy.can_approve or val_policy.can_reject %}
                   <a class="btn btn-xs btn-outline-secondary"
-                     href="{% url 'object_management:review_item_detail' content_type_id=val|get_content_type_id object_id=val.id %}?next={{ request.get_full_path|urlencode }}">
+                     href="{% url 'object_management:review_item_detail' content_type_id=val|get_content_type_id object_id=val.id %}?next={{ object.get_absolute_url|urlencode }}">
                     <i class="fas fa-clipboard-check"></i>
                     Review view
                   </a>
@@ -335,7 +346,7 @@
                 {% endif %}
                 {% if agg_policy.can_approve or agg_policy.can_reject %}
                   <a class="btn btn-xs btn-outline-secondary"
-                     href="{% url 'object_management:review_item_detail' content_type_id=val|get_content_type_id object_id=val.id %}?next={{ request.get_full_path|urlencode }}">
+                     href="{% url 'object_management:review_item_detail' content_type_id=val|get_content_type_id object_id=val.id %}?next={{ object.get_absolute_url|urlencode }}">
                     <i class="fas fa-clipboard-check"></i>
                     Review view
                   </a>
