@@ -94,6 +94,57 @@ def warm_collection_geojson_cache(self):
         return {"status": "error", "error": str(e)}
 
 
+@shared_task(bind=True, name="warm_roadside_tree_geojson_cache")
+def warm_roadside_tree_geojson_cache(self):
+    """
+    Pre-warm the Hamburg Roadside Trees GeoJSON cache.
+
+    This task should be triggered after tree data imports to ensure
+    the cache is populated before users request the data. This prevents
+    H12 timeout errors on first requests with ~250k tree points.
+    """
+    from case_studies.flexibi_hamburg.models import HamburgRoadsideTrees
+    from case_studies.flexibi_hamburg.serializers import (
+        HamburgRoadsideTreeGeometrySerializer,
+    )
+
+    logger.info("Starting Roadside Trees GeoJSON cache warm-up")
+
+    try:
+        # Get all trees with optimized query (only id and geom, no ordering)
+        qs = HamburgRoadsideTrees.objects.only("id", "geom").order_by()
+
+        # Serialize the data
+        serializer = HamburgRoadsideTreeGeometrySerializer(qs, many=True)
+        data = serializer.data
+
+        # Cache key must match viewset's get_cache_key() for unfiltered requests
+        cache_key = "tree_geojson:all"
+
+        # Store in cache
+        cache = get_geojson_cache()
+        timeout = getattr(settings, "GEOJSON_CACHE_TIMEOUT", 86400)  # 24 hours
+        cache.set(cache_key, data, timeout=timeout)
+
+        feature_count = (
+            len(data.get("features", [])) if isinstance(data, dict) else len(data)
+        )
+        logger.info(
+            "Roadside Trees GeoJSON cache warmed: %d features, key=%s",
+            feature_count,
+            cache_key,
+        )
+        return {
+            "status": "success",
+            "features_count": feature_count,
+            "cache_key": cache_key,
+        }
+
+    except Exception as e:
+        logger.exception("Failed to warm Roadside Trees GeoJSON cache: %s", e)
+        return {"status": "error", "error": str(e)}
+
+
 @shared_task(bind=True, name="warm_all_geojson_caches")
 def warm_all_geojson_caches(self):
     """
@@ -108,5 +159,13 @@ def warm_all_geojson_caches(self):
     except Exception as e:
         logger.exception("Failed to warm collection cache: %s", e)
         results["collection"] = {"status": "error", "error": str(e)}
+
+    # Warm Roadside Trees cache
+    try:
+        result = warm_roadside_tree_geojson_cache.apply()
+        results["roadside_trees"] = result.get()
+    except Exception as e:
+        logger.exception("Failed to warm roadside trees cache: %s", e)
+        results["roadside_trees"] = {"status": "error", "error": str(e)}
 
     return results
