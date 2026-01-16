@@ -312,7 +312,11 @@ function createMapProgressBar(containerId = 'map-progress-container') {
 async function fetchFeatureGeometriesWithProgress(params) {
     hideMapOverlay();
 
-    const finalParams = mapConfig.featuresId ? { id: mapConfig.featuresId } : params;
+    // Start with provided params, add featuresId if set
+    const finalParams = params instanceof URLSearchParams ? params : new URLSearchParams(params || {});
+    if (mapConfig.featuresId) {
+        finalParams.set('id', mapConfig.featuresId);
+    }
     const url = buildUrl(mapConfig.featuresLayerGeometriesUrl, finalParams);
     const cacheKey = normalizeUrl(url);
 

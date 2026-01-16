@@ -410,10 +410,8 @@ function setLayerOrder(layerOrder) {
 }
 
 function getQueryParameters() {
-    // This is a hook to overwrite if this file is run for any page not containing a standard filter form.
-    // Must return a URLSearchParams object.
-    console.info('getQueryParameters() is not overwritten. Using default implementation.');
-    return parseFilterParameters();
+    // Hook for pages to override. Default reads URL query params.
+    return new URLSearchParams(window.location.search);
 }
 
 function transformSearchParams(params) {
@@ -489,8 +487,11 @@ async function fetchCatchmentGeometry(params) {
 
 async function fetchFeatureGeometries(params) {
     hideMapOverlay();
-    // Use featuresId if set; otherwise, use provided params.
-    const finalParams = mapConfig.featuresId ? { id: mapConfig.featuresId } : params;
+    // Start with provided params, add featuresId if set
+    const finalParams = params instanceof URLSearchParams ? params : new URLSearchParams(params || {});
+    if (mapConfig.featuresId) {
+        finalParams.set('id', mapConfig.featuresId);
+    }
     const url = buildUrl(mapConfig.featuresLayerGeometriesUrl, finalParams);
 
     // Generate a normalized key to use for caching
@@ -974,16 +975,20 @@ function loadMap(mapConfig) {
 }
 
 function getFeaturesLayerFilterParameters() {
-    let params;
     try {
-        params = mapConfig.applyFilterToFeatures
-            ? parseFilterParameters()
-            : getQueryParameters();
-        if (!params) {
-            console.warn('Parameters are undefined. Using default configuration.');
-            return new URLSearchParams();
+        // Prioritize URL query params (initial load with filters in URL)
+        const urlParams = getQueryParameters();
+        if (urlParams && urlParams.toString()) {
+            return urlParams;
         }
-        return params;
+        // Fall back to form params if applyFilterToFeatures is set
+        if (mapConfig.applyFilterToFeatures) {
+            const formParams = parseFilterParameters();
+            if (formParams) {
+                return formParams;
+            }
+        }
+        return new URLSearchParams();
     } catch (error) {
         console.warn('Filter parameters could not be parsed:', error);
         return new URLSearchParams();
@@ -1069,6 +1074,7 @@ function loadLayers(params) {
             .catch(error => console.error('Error loading layers or refreshing map:', error));
     } else {
         console.warn('No layers to load.');
+        cleanup();
     }
 }
 

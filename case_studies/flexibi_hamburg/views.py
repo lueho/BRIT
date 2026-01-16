@@ -23,6 +23,11 @@ class RoadsideTreesPublishedMapIframeView(GeoDataSetPublishedFilteredMapView):
     features_layer_api_basename = "api-hamburg-roadside-trees"
     map_title = "Roadside Trees"
 
+    def post_process_map_config(self, map_config):
+        map_config = super().post_process_map_config(map_config)
+        map_config["applyFilterToFeatures"] = True
+        return map_config
+
 
 class HamburgRoadsideTreesListFileExportView(GenericUserCreatedObjectExportView):
     model_label = "flexibi_hamburg.HamburgRoadsideTrees"
