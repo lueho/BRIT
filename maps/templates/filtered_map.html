@@ -42,8 +42,8 @@
                             </div>
                         </div>
                     </div>
-                    <div class="card-body p-0 vh-100" style="position: relative;">
-                        <div id="map-overlay" style="display: none">
+                    <div class="card-body map-card-body p-0 vh-100">
+                        <div id="map-overlay">
                             <div class="overlay-content">
                                 <p>
                                     This dataset is large. Loading it completely can take a while. Please choose filter
@@ -151,7 +151,7 @@
 {% block javascript %}
     {{ block.super }}
     <script src="{% static 'js/filter_utils.min.js' %}"></script>
-    <script src="{% static 'js/maps.js' %}"></script>
+    <script src="{% static 'js/maps.min.js' %}"></script>
     <script src="{% static 'js/streaming-geojson.min.js' %}"></script>
 
     {{ map_config|json_script:"mapConfig" }}

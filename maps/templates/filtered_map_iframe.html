@@ -1,4 +1,4 @@
-{% extends 'base_iframe.html' %}
+{% extends "base_iframe.html" %}
 {% load static %}
 {% load leaflet_tags %}
 {% load crispy_forms_tags %}
@@ -8,7 +8,9 @@
     <link rel="stylesheet" href="{% static 'css/maps.min.css' %}">
 {% endblock style_sheets %}
 
-{% block title %}Maps | {{ map_title }}{% endblock %}
+{% block title %}
+    Maps | {{ map_title }}
+{% endblock title %}
 
 {% block content %}
     <div class="row pt-4 pb-4">
@@ -18,11 +20,15 @@
                 {% leaflet_css %}
 
                 <div class="card shadow">
-                    <div class="card-header bg-body-tertiary border-bottom-0 py-3"><h5 class="mb-0">
-                        {% block map_card_header %}{{ map_title }}{% endblock %}
-                    </h5></div>
-                    <div class="card-body p-0 vh-75 position-relative">
-                        <div id="map-overlay" class="d-none">
+                    <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+                        <h5 class="mb-0">
+                            {% block map_card_header %}
+                                {{ map_title }}
+                            {% endblock map_card_header %}
+                        </h5>
+                    </div>
+                    <div class="card-body map-card-body p-0 vh-100">
+                        <div id="map-overlay">
                             <div class="overlay-content">
                                 <p>This dataset is large. Loading it completely can take a while. Please choose filter parameters first.</p>
                             </div>
@@ -30,7 +36,8 @@
                         {% leaflet_map "main" %}
                     </div>
                     <div class="card-footer">
-                        {% block map_card_footer %}{% endblock %}
+                        {% block map_card_footer %}
+                        {% endblock map_card_footer %}
                     </div>
                 </div>
             {% endblock map_content %}
@@ -41,8 +48,12 @@
                 <div class="accordion">
                     {% block filter_form_card %}
                         <div class="card shadow">
-                            <div class="card-header bg-body-tertiary border-bottom-0 py-3" role="button" data-bs-toggle="collapse" href="#filter-card-body"
-                                 aria-expanded="true" aria-controls="filter-card-body">
+                            <div class="card-header bg-body-tertiary border-bottom-0 py-3"
+                                 role="button"
+                                 data-bs-toggle="collapse"
+                                 href="#filter-card-body"
+                                 aria-expanded="true"
+                                 aria-controls="filter-card-body">
                                 <h5 class="mb-0">Filter</h5>
                             </div>
                             <div class="card-body collapse show" id="filter-card-body">
@@ -50,15 +61,19 @@
                                 {% block filter_form %}
                                     <form method="get">
                                         {% crispy filter.form %}
+                                        {% block filter_form_buttons %}
+                                            <div class="d-flex justify-content-end gap-2 mt-2">
+                                                <button class="btn btn-sm btn-primary submit-filter"
+                                                        id="filter-button"
+                                                        type="button"
+                                                        onclick="clickedFilterButton()">Filter</button>
+                                                <a class="btn btn-sm btn-outline-secondary"
+                                                   href="{% if private_list_owner %}{{ object_list.model.private_map_url }}?scope=private{% else %}{{ object_list.model.public_map_url }}?scope=published{% endif %}"
+                                                   aria-label="Reset filters">Reset</a>
+                                            </div>
+                                        {% endblock filter_form_buttons %}
                                     </form>
                                 {% endblock filter_form %}
-
-                                {% block filter_form_buttons %}
-                                    <button class="btn btn-primary submit-filter" id="filter-button"
-                                            onclick="clickedFilterButton()">
-                                        Filter
-                                    </button>
-                                {% endblock filter_form_buttons %}
 
                             </div>
                         </div>
@@ -80,11 +95,12 @@
                                 </div>
                                 {% if object.sources.first %}
                                     <p class="card-text mt-3">
-                                        <strong>Sources:</strong><br>
+                                        <strong>Sources:</strong>
+                                        <br>
                                         {% for source in object.sources.all %}
-                                            <a href="{% url 'source-detail-modal' source.id %}"
-                                               class="modal-link">
-                                                {{ source.abbreviation }}{% if not forloop.last %},{% endif %}
+                                            <a href="{% url 'source-detail-modal' source.id %}" class="modal-link">
+                                                {{ source.abbreviation }}
+                                                {% if not forloop.last %},{% endif %}
                                             </a>
                                         {% endfor %}
                                     </p>
@@ -92,7 +108,8 @@
                             </div>
                         </div>
                     {% endblock filter_result_card %}
-                    {% block extra_cards %}{% endblock extra_cards %}
+                    {% block extra_cards %}
+                    {% endblock extra_cards %}
                 </div>
             {% endblock user_actions %}
         </div>
@@ -105,12 +122,19 @@
     {{ block.super }}
     <script src="{% static 'js/filter_utils.min.js' %}"></script>
     <script src="{% static 'js/maps.min.js' %}"></script>
+    <script src="{% static 'js/streaming-geojson.min.js' %}"></script>
 
     {{ map_config|json_script:"mapConfig" }}
     <script type="text/javascript">
-        const mapConfig = JSON.parse(document.getElementById("mapConfig").textContent);
-        window.onload = () => {
-            loadMap(mapConfig);
-        };
+    const mapConfig = JSON.parse(document.getElementById("mapConfig").textContent);
+    
+    // Enable streaming with progress for large datasets
+    if (typeof fetchFeatureGeometriesWithProgress !== 'undefined') {
+        window.fetchFeatureGeometries = fetchFeatureGeometriesWithProgress;
+    }
+    
+    window.onload = () => {
+        loadMap(mapConfig);
+    };
     </script>
-{% endblock %}
+{% endblock javascript %}

@@ -316,8 +316,6 @@ async function fetchFeatureGeometriesWithProgress(params) {
     const url = buildUrl(mapConfig.featuresLayerGeometriesUrl, finalParams);
     const cacheKey = normalizeUrl(url);
 
-    console.log('Fetching features with progress for URL:', url);
-
     // Check local cache first (getFromIndexedDB returns full entry object with .data property)
     try {
         const cached = await getFromIndexedDB(cacheKey);

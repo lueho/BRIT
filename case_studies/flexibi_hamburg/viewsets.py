@@ -103,14 +103,10 @@ class HamburgRoadsideTreeViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
         """Check if filter params represent the unfiltered default state.
 
         Returns True if:
-        - No catchment or genus filters are set
+        - No catchment or genus filters are set (key not present or empty value)
         - Range filters include nulls and are at full database extent
         """
-        # If catchment or genus filters are set, it's not default
-        if filters.get("catchment") or filters.get("gattung_deutsch"):
-            return False
-
-        # Check if range filters are at their default (full extent + include nulls)
+        # Define which keys are range filter params (these can be at defaults)
         range_filter_keys = {
             "plantation_year_min",
             "plantation_year_max",
@@ -120,10 +116,12 @@ class HamburgRoadsideTreeViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
             "stem_circumference_is_null",
         }
 
-        # If there are other filter keys beyond range filters, not default
-        other_keys = set(filters.keys()) - range_filter_keys
-        if other_keys:
-            return False
+        # Check for any non-range filter keys with non-empty values
+        for key, value in filters.items():
+            if key not in range_filter_keys:
+                # Any non-range filter with a truthy value means not default
+                if value and str(value).strip():
+                    return False
 
         # Check if nulls are included (required for "include everything")
         if filters.get("plantation_year_is_null") != "true":

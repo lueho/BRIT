@@ -941,13 +941,13 @@ async function clickedFeature(event) {
 }
 
 function clickedFilterButton() {
-    prepareMapRefresh();
     let params;
     try {
         params = parseFilterParameters();
     } catch (error) {
         console.warn('Filter parameters could not be parsed:', error);
     }
+    prepareMapRefresh();
     mapConfig.loadFeatures = true;
     loadLayers(params);
 }
@@ -1027,8 +1027,9 @@ function unlockCustomElements() {
     }
 }
 
-function loadLayers() {
-    const filterParameters = getFeaturesLayerFilterParameters();
+function loadLayers(params) {
+    // Use passed params if provided, otherwise get from form/URL
+    const filterParameters = params || getFeaturesLayerFilterParameters();
     const promises = [];
 
     const region_id = filterParameters.get('region') || (mapConfig.loadRegion ? mapConfig.regionId : null);
