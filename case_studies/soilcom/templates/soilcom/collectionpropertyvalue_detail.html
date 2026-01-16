@@ -140,7 +140,7 @@
             {% endif %}
             {% if policy.can_approve or policy.can_reject %}
                 <a class="btn btn-outline-secondary"
-                   href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
+                   href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
                     <i class="fas fa-clipboard-check"></i>
                     Open review view
                 </a>

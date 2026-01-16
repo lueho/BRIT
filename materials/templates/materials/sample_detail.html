@@ -112,7 +112,7 @@
                                 {% endif %}
                                 {% if policy.is_owner and policy.is_in_review %}
                                     <a class="dropdown-item"
-                                       href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
+                                       href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
                                         <i class="fas fa-fw fa-clipboard-check"></i> Review view
                                     </a>
                                 {% endif %}
@@ -132,7 +132,7 @@
                     {% endif %}
                     {% if policy.is_owner and policy.is_in_review %}
                         <a class="btn btn-outline-secondary ms-3"
-                           href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
+                           href="{% url 'object_management:review_item_detail' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ object.get_absolute_url|urlencode }}">
                             <i class="fas fa-clipboard-check"></i> Review view
                         </a>
                     {% endif %}
