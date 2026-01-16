@@ -4,6 +4,7 @@ import json
 from django.http import JsonResponse
 from django_filters import rest_framework as rf_filters
 from rest_framework.decorators import action
+from rest_framework.throttling import AnonRateThrottle, UserRateThrottle
 
 from case_studies.flexibi_hamburg.filters import HamburgRoadsideTreesFilterSet
 from case_studies.flexibi_hamburg.models import HamburgRoadsideTrees
@@ -13,6 +14,18 @@ from case_studies.flexibi_hamburg.serializers import (
 )
 from maps.mixins import CachedGeoJSONMixin
 from utils.viewsets import AutoPermModelViewSet
+
+
+class GeoJSONAnonThrottle(AnonRateThrottle):
+    """Rate limit for anonymous users on GeoJSON endpoints."""
+
+    rate = "10/minute"
+
+
+class GeoJSONUserThrottle(UserRateThrottle):
+    """Rate limit for authenticated users on GeoJSON endpoints."""
+
+    rate = "60/minute"
 
 
 class HamburgRoadsideTreeViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
@@ -71,6 +84,19 @@ class HamburgRoadsideTreeViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
         filter_string = json.dumps(dict(sorted(filters.items())), sort_keys=True)
         filter_hash = hashlib.sha1(filter_string.encode("utf-8")).hexdigest()[:16]
         return f"tree_geojson:filter:{filter_hash}"
+
+    @action(
+        detail=False,
+        methods=["get"],
+        throttle_classes=[GeoJSONAnonThrottle, GeoJSONUserThrottle],
+    )
+    def geojson(self, request, *args, **kwargs):
+        """GeoJSON endpoint with rate limiting.
+
+        Uses CachedGeoJSONMixin for caching and streaming, with added
+        throttling to prevent abuse.
+        """
+        return super().geojson(request, *args, **kwargs)
 
     @action(detail=False, methods=["get"])
     def summaries(self, request, *args, **kwargs):
