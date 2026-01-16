@@ -25,11 +25,21 @@ def export_user_created_object_to_file(
     # Build base queryset using context (user_id, list_type)
     user_id = context.get("user_id")
     list_type = context.get("list_type", "public")
+    has_publication_status = "publication_status" in [
+        f.name for f in spec.model._meta.get_fields()
+    ]
+
     if list_type == "private":
         base_qs = spec.model.objects.filter(owner_id=user_id)
+    elif list_type == "review":
+        # Review scope: items in review status (visible to staff/moderators)
+        if has_publication_status:
+            base_qs = spec.model.objects.filter(publication_status="review")
+        else:
+            base_qs = spec.model.objects.none()
     else:
-        # Only filter by publication_status if the field exists
-        if "publication_status" in [f.name for f in spec.model._meta.get_fields()]:
+        # Default: only published items
+        if has_publication_status:
             base_qs = spec.model.objects.filter(publication_status="published")
         else:
             base_qs = spec.model.objects.all()
