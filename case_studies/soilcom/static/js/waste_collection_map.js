@@ -63,7 +63,10 @@ const fieldConfig = {
     sources: {
         include: true,
         format: (value) => {
-            const urlList = formatUrls(value);
+            if (!value) return '';
+            // Handle both array (from API) and string formats
+            const urlString = Array.isArray(value) ? value.join(', ') : value;
+            const urlList = formatUrls(urlString);
             return urlList ? `<ul class="list-disc pl-4">${urlList}</ul>` : '';
         }
     }
