@@ -1006,6 +1006,10 @@ function lockCustomElements() {
             if (!el.classList.contains('submit-filter')) {
                 el.dataset.prevDisabled = el.disabled ? '1' : '0';
                 el.disabled = true;
+                // Handle TomSelect instances
+                if (el.tomselect) {
+                    el.tomselect.disable();
+                }
             }
         });
     } catch (e) {
@@ -1023,6 +1027,10 @@ function unlockCustomElements() {
                 // Only re-enable if we disabled it
                 if (el.dataset.prevDisabled === '0') {
                     el.disabled = false;
+                    // Handle TomSelect instances
+                    if (el.tomselect) {
+                        el.tomselect.enable();
+                    }
                 }
                 delete el.dataset.prevDisabled;
             }

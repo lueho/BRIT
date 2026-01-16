@@ -2,6 +2,11 @@
     position: relative;
 }
 
+/* Ensure TomSelect dropdowns appear above map elements */
+.ts-dropdown {
+    z-index: 10000 !important;
+}
+
 .leaflet-container {
     height: 100%;
 }

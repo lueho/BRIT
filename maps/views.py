@@ -653,9 +653,16 @@ class RegionAutocompleteView(UserCreatedObjectAutocompleteView):
 class NutsRegionAutocompleteView(UserCreatedObjectAutocompleteView):
     model = NutsRegion
     search_lookups = ["region_ptr", "name_latn__icontains", "levl_code__icontains"]
-    value_fields = ["id", "name_latn", "levl_code", "parent_id"]
+    value_fields = ["id", "name_latn", "levl_code", "parent_id", "nuts_id"]
 
     def apply_filters(self, queryset):
+        # Check for ancestor filtering (nuts_id prefix matching)
+        # When ancestor is provided, skip the standard filter_by (parent_id) logic
+        # since we're filtering by ancestor instead of immediate parent
+        ancestor_nuts_id = self.request.GET.get("ancestor")
+        if ancestor_nuts_id:
+            return queryset.filter(nuts_id__startswith=ancestor_nuts_id)
+
         if not self.filter_by and not self.exclude_by:
             return queryset
 
@@ -665,10 +672,12 @@ class NutsRegionAutocompleteView(UserCreatedObjectAutocompleteView):
             lookup, value = (
                 urllib.parse.unquote(self.filter_by).replace("'", "").split("=")
             )
-            dependent_field, dependent_field_lookup = lookup.split("__")
-            levl_code = int(dependent_field.split("_")[-1]) + 1
-            filter_dict = {"levl_code": levl_code, "parent_id": value}
-            queryset = queryset.filter(**filter_dict)
+            # Only apply parent_id filter if a value is provided
+            if value:
+                dependent_field, dependent_field_lookup = lookup.split("__")
+                levl_code = int(dependent_field.split("_")[-1]) + 1
+                filter_dict = {"levl_code": levl_code, "parent_id": value}
+                queryset = queryset.filter(**filter_dict)
 
         return queryset
 

@@ -22,12 +22,22 @@ const fieldConfig = {
 
 function lockForm() {
     document.querySelectorAll("select")
-        .forEach(selector => selector.disabled = true);
+        .forEach(selector => {
+            selector.disabled = true;
+            if (selector.tomselect) {
+                selector.tomselect.disable();
+            }
+        });
 }
 
 function unlockForm() {
     document.querySelectorAll("select")
-        .forEach(selector => selector.disabled = false);
+        .forEach(selector => {
+            selector.disabled = false;
+            if (selector.tomselect) {
+                selector.tomselect.enable();
+            }
+        });
 }
 
 async function updateLayers({ region_params, catchment_params, feature_params } = {}) {
@@ -254,6 +264,24 @@ function clearLowerFields(level) {
     }
 }
 
+/**
+ * Get the nuts_id of the most specific selected ancestor for a given level.
+ * For example, if level 3 is being loaded and level 0 is selected, return level 0's nuts_id.
+ */
+function getAncestorNutsId(targetLevel) {
+    // Check ancestor levels from most specific to least specific
+    for (let level = targetLevel - 1; level >= 0; level--) {
+        const field = document.getElementById(`id_level_${level}`);
+        if (field && field.value && field.tomselect) {
+            const selectedOption = field.tomselect.options[field.value];
+            if (selectedOption && selectedOption.nuts_id) {
+                return selectedOption.nuts_id;
+            }
+        }
+    }
+    return null;
+}
+
 document.addEventListener('DOMContentLoaded', () => {
     const form = document.querySelector('form');
     if (form) {
@@ -273,19 +301,34 @@ document.addEventListener('DOMContentLoaded', () => {
             'id_level_3': 3
         };
 
-        // For each field, intercept the TomSelect instance and modify its load function
+        // For each field, intercept the TomSelect firstUrl function to add ancestor filtering
         Object.entries(levelCodeMap).forEach(([fieldId, levelCode]) => {
             const field = document.getElementById(fieldId);
             if (!field || !field.tomselect) return;
 
-            // Get the original load function from the TomSelect instance
-            const originalLoad = field.tomselect.settings.load;
+            const ts = field.tomselect;
 
-            // Override with a new function that adds the level_code parameter
-            field.tomselect.settings.load = function (query, callback) {
-                // Add level_code parameter to the URL
-                const self = this;
-                return originalLoad.call(this, query, callback, { level_code: levelCode });
+            // Only modify levels > 0 (they can have ancestors)
+            if (levelCode === 0) return;
+
+            // Store the original firstUrl function
+            const originalFirstUrl = ts.settings.firstUrl || ts.settings.originalFirstUrl;
+            if (!originalFirstUrl) return;
+
+            // Override firstUrl to add ancestor parameter
+            ts.settings.firstUrl = function (query) {
+                // Get the base URL from original function
+                let url = originalFirstUrl.call(this, query);
+
+                // Get ancestor nuts_id for filtering
+                const ancestorNutsId = getAncestorNutsId(levelCode);
+
+                // Add ancestor parameter if we have one
+                if (ancestorNutsId) {
+                    url += `&ancestor=${encodeURIComponent(ancestorNutsId)}`;
+                }
+
+                return url;
             };
         });
     }, 500); // Give TomSelect time to initialize
