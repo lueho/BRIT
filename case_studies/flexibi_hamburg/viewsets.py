@@ -1,7 +1,9 @@
+import hashlib
+import json
+
 from django.http import JsonResponse
 from django_filters import rest_framework as rf_filters
 from rest_framework.decorators import action
-from rest_framework.response import Response
 
 from case_studies.flexibi_hamburg.filters import HamburgRoadsideTreesFilterSet
 from case_studies.flexibi_hamburg.models import HamburgRoadsideTrees
@@ -9,10 +11,17 @@ from case_studies.flexibi_hamburg.serializers import (
     HamburgRoadsideTreeGeometrySerializer,
     HamburgRoadsideTreeSimpleModelSerializer,
 )
+from maps.mixins import CachedGeoJSONMixin
 from utils.viewsets import AutoPermModelViewSet
 
 
-class HamburgRoadsideTreeViewSet(AutoPermModelViewSet):
+class HamburgRoadsideTreeViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
+    """ViewSet for Hamburg roadside trees with cached GeoJSON support.
+
+    Uses CachedGeoJSONMixin for server-side caching and streaming support
+    for large datasets.
+    """
+
     queryset = HamburgRoadsideTrees.objects.all()
     serializer_class = HamburgRoadsideTreeSimpleModelSerializer
     filter_backends = (rf_filters.DjangoFilterBackend,)
@@ -23,18 +32,45 @@ class HamburgRoadsideTreeViewSet(AutoPermModelViewSet):
         "retrieve": None,
         "geojson": None,
         "summaries": None,
+        "version": None,
     }
 
     def get_queryset(self):
         return HamburgRoadsideTrees.objects.all().order_by("baumid")
 
-    @action(detail=False, methods=["get"])
-    def geojson(self, request, *args, **kwargs):
-        queryset = self.filter_queryset(self.get_queryset())
-        serializer = HamburgRoadsideTreeGeometrySerializer(
-            queryset, many=True, context={"request": request}
-        )
-        return Response(serializer.data)
+    def get_geojson_queryset(self):
+        """Return optimized queryset for GeoJSON with minimal fields."""
+        return self.get_queryset().only("id", "geom")
+
+    def get_geojson_serializer_class(self):
+        return HamburgRoadsideTreeGeometrySerializer
+
+    def get_cache_key(self, request):
+        """Build a deterministic cache key from filter parameters.
+
+        Format: tree_geojson:filter:<hash>
+        """
+        params = request.query_params
+        exclude_keys = {"csrfmiddlewaretoken", "page", "format"}
+        filters = {}
+
+        for key in params.keys():
+            if key in exclude_keys:
+                continue
+            values = (
+                params.getlist(key) if hasattr(params, "getlist") else [params.get(key)]
+            )
+            if len(values) == 1:
+                filters[key] = values[0]
+            elif len(values) > 1:
+                filters[key] = sorted(values)
+
+        if not filters:
+            return "tree_geojson:all"
+
+        filter_string = json.dumps(dict(sorted(filters.items())), sort_keys=True)
+        filter_hash = hashlib.sha1(filter_string.encode("utf-8")).hexdigest()[:16]
+        return f"tree_geojson:filter:{filter_hash}"
 
     @action(detail=False, methods=["get"])
     def summaries(self, request, *args, **kwargs):
