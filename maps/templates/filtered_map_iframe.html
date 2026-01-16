@@ -27,7 +27,7 @@
                             {% endblock map_card_header %}
                         </h5>
                     </div>
-                    <div class="card-body map-card-body p-0 vh-100">
+                    <div class="card-body map-card-body map-height-iframe p-0">
                         <div id="map-overlay">
                             <div class="overlay-content">
                                 <p>This dataset is large. Loading it completely can take a while. Please choose filter parameters first.</p>
@@ -43,7 +43,7 @@
             {% endblock map_content %}
         </div>
 
-        <div class="col-sm-4">
+        <div class="col-sm-4 filter-panel-scroll">
             {% block user_actions %}
                 <div class="accordion">
                     {% block filter_form_card %}

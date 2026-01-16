@@ -77,3 +77,63 @@
 #summary-container li {
     margin-bottom: 0.5em;
 }
+
+/* ==========================================================================
+   Map Height Utilities
+   Bootstrap 5-compatible responsive map container heights
+   ========================================================================== */
+
+/* 
+ * Default map height for regular views
+ * Accounts for: topbar (56px), page header (~80px), card chrome (~110px), padding (32px)
+ */
+.map-height {
+    height: calc(100vh - 280px);
+    min-height: 400px;
+    max-height: 800px;
+}
+
+/* ==========================================================================
+   Iframe Embed Styles
+   Prevents scrollbar in embedded iframe context
+   ========================================================================== */
+
+/* Prevent body overflow in iframe */
+body.iframe-embed {
+    overflow: hidden;
+}
+
+/* Iframe-specific: fill available space minus card header/footer and row padding */
+.map-height-iframe {
+    height: calc(100vh - 160px);
+    min-height: 350px;
+}
+
+/* Scrollable filter panel for iframe when content exceeds viewport */
+.iframe-embed .filter-panel-scroll {
+    max-height: calc(100vh - 80px);
+    overflow-y: auto;
+}
+
+/* Tablet: slightly reduced height, filter panel may stack */
+@media (max-width: 991.98px) {
+    .map-height {
+        height: calc(100vh - 320px);
+        min-height: 350px;
+        max-height: 600px;
+    }
+}
+
+/* Mobile: fixed reasonable height since filter stacks above */
+@media (max-width: 767.98px) {
+    .map-height {
+        height: 50vh;
+        min-height: 300px;
+        max-height: 500px;
+    }
+
+    .map-height-iframe {
+        height: calc(100vh - 180px);
+        min-height: 280px;
+    }
+}
