@@ -27,5 +27,5 @@ async function clickedFeature(e) {
         ${json.address}<br/>
         Hamburg, Germany
     </p>`;
-    map.openPopup(html, e.latlng, {offset: L.point(0, -1)});
+    map.openPopup(html, e.latlng, { offset: L.point(0, -1) });
 }
