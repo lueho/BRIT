@@ -2,54 +2,69 @@
 {% load static %}
 {% load crispy_forms_tags %}
 
-{% block map_card_footer %}{% endblock map_card_footer %}
+{% block map_card_footer %}
+{% endblock map_card_footer %}
 
 {% block user_actions %}
-    <form method="get">
-        {% crispy filter.form %}
-    </form>
-    <div class="card shadow" id="filter_result_card">
-        <div class="card-header"
-             role="button"
-             data-bs-toggle="collapse"
-             href="#info-card-body"
-             aria-expanded="true"
-             aria-controls="info-card-body">
-            <b>Summary</b>
-        </div>
-        <div class="card-body collapse show" id="info-card-body">
-            <div id="summary-container">
-                <p class="card-text">No data selected, yet.</p>
-            </div>
-            {% if object.sources.first %}
-                <p class="card-text mt-3">
-                    <strong>Sources:</strong><br>
-                    {% for source in object.sources.all %}
-                        <a href="{% url 'source-detail-modal' source.id %}"
-                           class="modal-link">
-                            {{ source.abbreviation }}{% if not forloop.last %},{% endif %}
-                        </a>
-                    {% endfor %}
-                </p>
-            {% endif %}
-            <div class="text-center">
-                <a id="btn-collection-detail"
-                   class="btn btn-primary w-75 d-none"
-                   data-href-template="/waste_collection/collections/__pk__/"
-                   href="#" role="button">
-                    Full Details
-                </a>
-            </div>
-        </div>
+  <form method="get">
+    {% crispy filter.form %}
+    <div class="d-flex justify-content-end gap-2 mt-2 mb-2">
+      <button class="btn btn-primary submit-filter"
+              id="filter-button"
+              type="button"
+              onclick="clickedFilterButton()">Filter</button>
+      <button class="btn btn-outline-secondary"
+              type="button"
+              onclick="resetFilterForm()"
+              aria-label="Reset filters">Reset</button>
     </div>
-    <div id="map-context" data-dv="{{ dataset_version }}" hidden></div>
+  </form>
+  <div class="card shadow" id="filter_result_card">
+    <div class="card-header bg-body-tertiary border-bottom-0 py-3"
+         role="button"
+         data-bs-toggle="collapse"
+         href="#info-card-body"
+         aria-expanded="true"
+         aria-controls="info-card-body">
+      <h5 class="mb-0">Summary</h5>
+    </div>
+    <div class="card-body collapse show" id="info-card-body">
+      <div id="summary-container">
+        <p class="card-text">No data selected, yet.</p>
+      </div>
+      {% if object.sources.first %}
+        <p class="card-text mt-3">
+          <strong>Sources:</strong>
+          <br>
+          {% for source in object.sources.all %}
+            <a href="{% url 'source-detail-modal' source.id %}" class="modal-link">
+              {{ source.abbreviation }}
+              {% if not forloop.last %},{% endif %}
+            </a>
+          {% endfor %}
+        </p>
+      {% endif %}
+      <div class="text-center">
+        <a id="btn-collection-detail"
+           class="btn btn-primary w-75 d-none"
+           data-href-template="/waste_collection/collections/__pk__/"
+           href="#"
+           role="button">Full Details</a>
+      </div>
+    </div>
+  </div>
+  <div id="map-context" data-dv="{{ dataset_version }}" hidden></div>
 {% endblock user_actions %}
 
 {% block javascript %}
-    {{ block.super }}
-    <script src="{% static 'lib/turf-inside/inside.min.js' %}"></script>
-    <script src="{% static 'js/waste_collection_map.min.js' %}"></script>
-    <script>
+  {{ block.super }}
+  <script src="{% static 'lib/turf-inside/inside.min.js' %}"></script>
+  <script src="{% static 'js/waste_collection_map.min.js' %}"></script>
+  <script>
+      function resetFilterForm() {
+        window.location.href = window.location.pathname;
+      }
+
       (function () {
         function getDatasetVersion() {
           try {
@@ -78,5 +93,5 @@
           return params;
         };
       })();
-    </script>
+  </script>
 {% endblock javascript %}

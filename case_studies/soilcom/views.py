@@ -1764,6 +1764,11 @@ class WasteCollectionPublishedMapIframeView(
     map_title = "Household Waste Collection Europe"
     dv_scope = "published"
 
+    def post_process_map_config(self, map_config):
+        map_config = super().post_process_map_config(map_config)
+        map_config["applyFilterToFeatures"] = True
+        return map_config
+
     def get_filterset_kwargs(self, filterset_class=None):
         kwargs = super().get_filterset_kwargs(filterset_class)
         data = kwargs.get("data").copy() if kwargs.get("data") else {}
