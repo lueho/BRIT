@@ -68,6 +68,10 @@ class HamburgRoadsideTreeViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
         """Build a deterministic cache key from filter parameters.
 
         Format: tree_geojson:filter:<hash>
+
+        Detects when range filters are at full extent with nulls included,
+        which means no actual filtering - returns 'tree_geojson:all' to hit
+        the warm cache.
         """
         params = request.query_params
         exclude_keys = {"csrfmiddlewaretoken", "page", "format"}
@@ -87,9 +91,79 @@ class HamburgRoadsideTreeViewSet(CachedGeoJSONMixin, AutoPermModelViewSet):
         if not filters:
             return "tree_geojson:all"
 
+        # Check if filters represent "no filtering" (default state)
+        if self._is_default_filter_state(filters):
+            return "tree_geojson:all"
+
         filter_string = json.dumps(dict(sorted(filters.items())), sort_keys=True)
         filter_hash = hashlib.sha1(filter_string.encode("utf-8")).hexdigest()[:16]
         return f"tree_geojson:filter:{filter_hash}"
+
+    def _is_default_filter_state(self, filters):
+        """Check if filter params represent the unfiltered default state.
+
+        Returns True if:
+        - No catchment or genus filters are set
+        - Range filters include nulls and are at full database extent
+        """
+        # If catchment or genus filters are set, it's not default
+        if filters.get("catchment") or filters.get("gattung_deutsch"):
+            return False
+
+        # Check if range filters are at their default (full extent + include nulls)
+        range_filter_keys = {
+            "plantation_year_min",
+            "plantation_year_max",
+            "plantation_year_is_null",
+            "stem_circumference_min",
+            "stem_circumference_max",
+            "stem_circumference_is_null",
+        }
+
+        # If there are other filter keys beyond range filters, not default
+        other_keys = set(filters.keys()) - range_filter_keys
+        if other_keys:
+            return False
+
+        # Check if nulls are included (required for "include everything")
+        if filters.get("plantation_year_is_null") != "true":
+            return False
+        if filters.get("stem_circumference_is_null") != "true":
+            return False
+
+        # Get database min/max for range filters
+        from django.db.models import Max, Min
+
+        aggregates = HamburgRoadsideTrees.objects.aggregate(
+            year_min=Min("pflanzjahr"),
+            year_max=Max("pflanzjahr"),
+            circ_min=Min("stammumfang"),
+            circ_max=Max("stammumfang"),
+        )
+
+        # Compare filter values to database extent (with tolerance for float formatting)
+        def values_match(filter_val, db_val):
+            if filter_val is None or db_val is None:
+                return filter_val is None and db_val is None
+            try:
+                return abs(float(filter_val) - float(db_val)) < 0.01
+            except (ValueError, TypeError):
+                return False
+
+        if not values_match(filters.get("plantation_year_min"), aggregates["year_min"]):
+            return False
+        if not values_match(filters.get("plantation_year_max"), aggregates["year_max"]):
+            return False
+        if not values_match(
+            filters.get("stem_circumference_min"), aggregates["circ_min"]
+        ):
+            return False
+        if not values_match(
+            filters.get("stem_circumference_max"), aggregates["circ_max"]
+        ):
+            return False
+
+        return True
 
     @action(
         detail=False,
