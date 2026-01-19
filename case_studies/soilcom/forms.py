@@ -54,6 +54,7 @@ from .models import (
     WasteFlyer,
     WasteStream,
 )
+from .tasks import cleanup_orphaned_waste_flyers
 
 
 class CollectorModelForm(SimpleModelForm):
@@ -299,24 +300,23 @@ class WasteFlyerFormSet(M2MInlineFormSet):
         super().__init__(*args, **kwargs)
 
     def save(self, commit=True):
+        parent_object = getattr(self, "parent_object", None)
+        relation_field_name = getattr(self, "relation_field_name", None)
+        existing_ids: set[int] = set()
+        if parent_object and relation_field_name:
+            existing_ids = set(
+                getattr(parent_object, relation_field_name).values_list("id", flat=True)
+            )
+
         for form in self.forms:
             if not getattr(form.instance, "owner", None):
                 form.instance.owner = self.owner
 
         child_objects = super().save(commit=commit)
-
-        # Delete WasteFlyers that are completely orphaned - not connected to:
-        # 1. Collection.flyers (via 'collections' reverse relation)
-        # 2. Collection.sources (via 'collection' reverse relation)
-        # 3. CollectionPropertyValue.sources (via 'collectionpropertyvalue' reverse relation)
-        # 4. AggregatedCollectionPropertyValue.sources
-        #    (via 'aggregatedcollectionpropertyvalue' reverse relation)
-        WasteFlyer.objects.filter(
-            collections__isnull=True,
-            collection__isnull=True,
-            collectionpropertyvalue__isnull=True,
-            aggregatedcollectionpropertyvalue__isnull=True,
-        ).delete()
+        new_ids = {obj.id for obj in child_objects if obj and obj.id}
+        flyers_changed = existing_ids != new_ids
+        if commit and flyers_changed:
+            cleanup_orphaned_waste_flyers.delay()
 
         return child_objects
 

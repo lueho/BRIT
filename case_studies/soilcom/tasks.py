@@ -32,3 +32,15 @@ def check_wasteflyer_urls(self, params):
     callback = check_wasteflyer_urls_callback.s()
     task_chord = chord(signatures)(callback)
     return task_chord
+
+
+@app.task(name="cleanup_orphaned_waste_flyers", trail=True)
+def cleanup_orphaned_waste_flyers():
+    """Delete WasteFlyers that are no longer referenced by any collections or properties."""
+
+    return WasteFlyer.objects.filter(
+        collections__isnull=True,
+        collection__isnull=True,
+        collectionpropertyvalue__isnull=True,
+        aggregatedcollectionpropertyvalue__isnull=True,
+    ).delete()
