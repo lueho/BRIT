@@ -25,6 +25,7 @@ from ..models import (
     WasteComponent,
     WasteStream,
 )
+from ..tasks import cleanup_orphaned_waste_streams
 
 
 def dict_to_querydict(data):
@@ -76,11 +77,17 @@ class DeleteUnusedWasteStreamsSignalTestCase(TestCase):
         )
         self.assertTrue(WasteStream.objects.filter(pk=orphan_stream.pk).exists())
 
-        # Save an existing collection - this should trigger orphan cleanup
-        self.collection.description = "Updated"
-        self.collection.save()
+        # Save an existing collection - this should trigger orphan cleanup task
+        with patch(
+            "case_studies.soilcom.models.celery.current_app.send_task"
+        ) as mock_send_task:
+            self.collection.description = "Updated"
+            self.collection.save()
 
-        # Orphan should be deleted
+        mock_send_task.assert_called_once_with("cleanup_orphaned_waste_streams")
+        cleanup_orphaned_waste_streams()
+
+        # Orphan should be deleted after cleanup task
         self.assertFalse(WasteStream.objects.filter(pk=orphan_stream.pk).exists())
         # Used stream should still exist
         self.assertTrue(WasteStream.objects.filter(pk=self.waste_stream.pk).exists())
@@ -97,9 +104,15 @@ class DeleteUnusedWasteStreamsSignalTestCase(TestCase):
         )
         self.assertTrue(WasteStream.objects.filter(pk=orphan_stream.pk).exists())
 
-        # Save with update_fields - signal still fires
-        self.collection.valid_until = date(2024, 12, 31)
-        self.collection.save(update_fields=["valid_until"])
+        # Save with update_fields - signal still fires and schedules cleanup
+        with patch(
+            "case_studies.soilcom.models.celery.current_app.send_task"
+        ) as mock_send_task:
+            self.collection.valid_until = date(2024, 12, 31)
+            self.collection.save(update_fields=["valid_until"])
+
+        mock_send_task.assert_called_once_with("cleanup_orphaned_waste_streams")
+        cleanup_orphaned_waste_streams()
 
         # Orphan cleanup runs regardless of update_fields
         self.assertFalse(WasteStream.objects.filter(pk=orphan_stream.pk).exists())

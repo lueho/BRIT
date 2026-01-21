@@ -1,6 +1,7 @@
 import logging
 
 from django.conf import settings
+from django.core.cache import caches
 from django.db.models.signals import post_delete, post_save
 from django.dispatch import receiver
 
@@ -35,6 +36,17 @@ def _schedule_cache_warmup():
     if getattr(settings, "TESTING", False):
         return
 
+    cache_alias = getattr(settings, "GEOJSON_CACHE", "default")
+    cache = caches[cache_alias]
+    debounce_seconds = getattr(settings, "COLLECTION_GEOJSON_WARMUP_DEBOUNCE", 60)
+    lock_key = "collection_geojson:warmup:scheduled"
+    lock_acquired = True
+    if debounce_seconds:
+        lock_acquired = cache.add(lock_key, True, timeout=debounce_seconds)
+        if not lock_acquired:
+            logger.debug("Collection GeoJSON warm-up already scheduled; skipping")
+            return
+
     try:
         from maps.tasks import warm_collection_geojson_cache
 
@@ -45,6 +57,8 @@ def _schedule_cache_warmup():
         logger.debug("Cache warm-up task not available")
     except Exception as e:
         logger.warning("Failed to schedule cache warm-up task: %s", e)
+        if lock_acquired and debounce_seconds:
+            cache.delete(lock_key)
 
 
 @receiver(post_save, sender=Collection)

@@ -549,6 +549,100 @@ class WasteStreamQuerysetTestCase(TestCase):
             )
 
 
+class WasteStreamMaterialIdsTestCase(TestCase):
+    """Tests for WasteStreamQuerySet._material_ids helper method."""
+
+    def setUp(self):
+        self.material_1 = Material.objects.create(name="Material 1")
+        self.material_2 = Material.objects.create(name="Material 2")
+
+    def test_material_ids_with_none_returns_none(self):
+        """Verify _material_ids returns None when input is None."""
+        from ..models import WasteStreamQuerySet
+
+        result = WasteStreamQuerySet._material_ids(None)
+        self.assertIsNone(result)
+
+    def test_material_ids_with_empty_queryset_returns_empty_list(self):
+        """Verify _material_ids returns empty list for empty queryset."""
+        from ..models import WasteStreamQuerySet
+
+        empty_qs = Material.objects.none()
+        result = WasteStreamQuerySet._material_ids(empty_qs)
+        self.assertEqual(result, [])
+
+    def test_material_ids_with_queryset_returns_id_list(self):
+        """Verify _material_ids extracts IDs from queryset."""
+        from ..models import WasteStreamQuerySet
+
+        qs = Material.objects.filter(id__in=[self.material_1.id, self.material_2.id])
+        result = WasteStreamQuerySet._material_ids(qs)
+        self.assertEqual(
+            sorted(result), sorted([self.material_1.id, self.material_2.id])
+        )
+
+    def test_material_ids_with_list_of_ids_returns_same_list(self):
+        """Verify _material_ids returns the same list when given list of IDs."""
+        from ..models import WasteStreamQuerySet
+
+        id_list = [self.material_1.id, self.material_2.id]
+        result = WasteStreamQuerySet._material_ids(id_list)
+        self.assertEqual(result, id_list)
+
+    def test_material_ids_with_empty_list_returns_empty_list(self):
+        """Verify _material_ids returns empty list when given empty list."""
+        from ..models import WasteStreamQuerySet
+
+        result = WasteStreamQuerySet._material_ids([])
+        self.assertEqual(result, [])
+
+    def test_get_or_create_accepts_list_of_ids_for_allowed_materials(self):
+        """Verify get_or_create works with list of IDs for allowed_materials."""
+        category = WasteCategory.objects.create(name="Test Category")
+        id_list = [self.material_1.id, self.material_2.id]
+
+        instance, created = WasteStream.objects.get_or_create(
+            category=category,
+            allowed_materials=id_list,
+        )
+        self.assertTrue(created)
+        self.assertEqual(
+            set(instance.allowed_materials.values_list("id", flat=True)),
+            set(id_list),
+        )
+
+        # Second call should find the existing instance
+        instance2, created2 = WasteStream.objects.get_or_create(
+            category=category,
+            allowed_materials=id_list,
+        )
+        self.assertFalse(created2)
+        self.assertEqual(instance.pk, instance2.pk)
+
+    def test_get_or_create_accepts_list_of_ids_for_forbidden_materials(self):
+        """Verify get_or_create works with list of IDs for forbidden_materials."""
+        category = WasteCategory.objects.create(name="Test Category 2")
+        id_list = [self.material_1.id, self.material_2.id]
+
+        instance, created = WasteStream.objects.get_or_create(
+            category=category,
+            forbidden_materials=id_list,
+        )
+        self.assertTrue(created)
+        self.assertEqual(
+            set(instance.forbidden_materials.values_list("id", flat=True)),
+            set(id_list),
+        )
+
+        # Second call should find the existing instance
+        instance2, created2 = WasteStream.objects.get_or_create(
+            category=category,
+            forbidden_materials=id_list,
+        )
+        self.assertFalse(created2)
+        self.assertEqual(instance.pk, instance2.pk)
+
+
 class WasteStreamTestCase(TestCase):
     def test_models_uses_manager_from_custom_waste_stream_queryset(self):
         self.assertEqual(

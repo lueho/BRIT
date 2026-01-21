@@ -6,7 +6,7 @@ from django.core.exceptions import ValidationError
 from django.core.validators import MinValueValidator, RegexValidator
 from django.db import models, transaction
 from django.db.models import Case, Count, IntegerField, Q, Sum, Value, When
-from django.db.models.signals import post_save, pre_save
+from django.db.models.signals import post_delete, post_save, pre_save
 from django.dispatch import receiver
 from django.urls import reverse
 from django.utils import timezone
@@ -87,8 +87,7 @@ class WasteCategory(NamedUserCreatedObject):
 
 class WasteComponentManager(UserCreatedObjectManager):
     def get_queryset(self):
-        categories = MaterialCategory.objects.filter(name__in=("Biowaste component",))
-        return super().get_queryset().filter(categories__in=categories)
+        return super().get_queryset().filter(categories__name="Biowaste component")
 
 
 class WasteComponent(Material):
@@ -107,45 +106,57 @@ def add_material_category(sender, instance, created, **kwargs):
 
 
 class WasteStreamQuerySet(UserCreatedObjectQuerySet):
+    @staticmethod
+    def _material_ids(materials):
+        """Normalize materials input into a list of ids or objects."""
+
+        if materials is None:
+            return None
+        if hasattr(materials, "values_list"):
+            return list(materials.values_list("id", flat=True))
+        return list(materials)
+
     def match_allowed_materials(self, allowed_materials):
-        if allowed_materials is not None and allowed_materials.exists():
+        allowed_ids = self._material_ids(allowed_materials)
+        if allowed_ids is None:
+            return self
+
+        if allowed_ids:
             return self.alias(
                 allowed_materials_count=models.Count(
                     "allowed_materials", distinct=True
                 ),
                 allowed_materials_matches=models.Count(
                     "allowed_materials",
-                    filter=models.Q(allowed_materials__in=allowed_materials),
+                    filter=models.Q(allowed_materials__in=allowed_ids),
                     distinct=True,
                 ),
             ).filter(
-                allowed_materials_count=len(allowed_materials),
-                allowed_materials_matches=len(allowed_materials),
+                allowed_materials_count=len(allowed_ids),
+                allowed_materials_matches=len(allowed_ids),
             )
-        elif allowed_materials is not None:
-            return self.filter(allowed_materials__isnull=True)
-        else:
-            return self
+        return self.filter(allowed_materials__isnull=True)
 
     def match_forbidden_materials(self, forbidden_materials):
-        if forbidden_materials and forbidden_materials.exists():
+        forbidden_ids = self._material_ids(forbidden_materials)
+        if forbidden_ids is None:
+            return self
+
+        if forbidden_ids:
             return self.alias(
                 forbidden_materials_count=models.Count(
                     "forbidden_materials", distinct=True
                 ),
                 forbidden_materials_matches=models.Count(
                     "forbidden_materials",
-                    filter=models.Q(forbidden_materials__in=forbidden_materials),
+                    filter=models.Q(forbidden_materials__in=forbidden_ids),
                     distinct=True,
                 ),
             ).filter(
-                forbidden_materials_count=len(forbidden_materials),
-                forbidden_materials_matches=len(forbidden_materials),
+                forbidden_materials_count=len(forbidden_ids),
+                forbidden_materials_matches=len(forbidden_ids),
             )
-        elif forbidden_materials is not None:
-            return self.filter(forbidden_materials__isnull=True)
-        else:
-            return self
+        return self.filter(forbidden_materials__isnull=True)
 
     def get_or_create(self, defaults=None, **kwargs):
         """
@@ -162,23 +173,38 @@ class WasteStreamQuerySet(UserCreatedObjectQuerySet):
             defaults = defaults.copy()
 
         qs = self
+        unset = object()
 
-        if "allowed_materials" in kwargs:
-            allowed_materials = kwargs.pop("allowed_materials", None)
-            qs = qs.match_allowed_materials(allowed_materials)
-        else:
-            allowed_materials = Material.objects.none()
-
-        if "forbidden_materials" in kwargs:
-            forbidden_materials = kwargs.pop("forbidden_materials", None)
-            qs = qs.match_forbidden_materials(forbidden_materials)
-        else:
-            forbidden_materials = Material.objects.none()
+        allowed_materials = kwargs.pop("allowed_materials", unset)
+        allowed_provided = allowed_materials is not unset
+        forbidden_materials = kwargs.pop("forbidden_materials", unset)
+        forbidden_provided = forbidden_materials is not unset
 
         if defaults:
-            allowed_materials = defaults.pop("allowed_materials", allowed_materials)
-            forbidden_materials = defaults.pop(
-                "forbidden_materials", forbidden_materials
+            if "allowed_materials" in defaults:
+                allowed_materials = defaults.pop("allowed_materials")
+                allowed_provided = True
+            if "forbidden_materials" in defaults:
+                forbidden_materials = defaults.pop("forbidden_materials")
+                forbidden_provided = True
+
+        if not allowed_provided:
+            allowed_materials = None
+        if not forbidden_provided:
+            forbidden_materials = None
+
+        pk_name = self.model._meta.pk.name
+        has_pk = pk_name in kwargs
+
+        if allowed_provided and not has_pk:
+            allowed_ids = self._material_ids(allowed_materials)
+            qs = qs.match_allowed_materials(
+                allowed_ids if allowed_ids is not None else allowed_materials
+            )
+        if forbidden_provided and not has_pk:
+            forbidden_ids = self._material_ids(forbidden_materials)
+            qs = qs.match_forbidden_materials(
+                forbidden_ids if forbidden_ids is not None else forbidden_materials
             )
 
         instance, created = super(WasteStreamQuerySet, qs).get_or_create(
@@ -186,11 +212,18 @@ class WasteStreamQuerySet(UserCreatedObjectQuerySet):
         )
 
         if created:
-            instance.allowed_materials.add(*allowed_materials)
-            instance.forbidden_materials.add(*forbidden_materials)
+            allowed_list = [] if allowed_materials is None else list(allowed_materials)
+            forbidden_list = (
+                [] if forbidden_materials is None else list(forbidden_materials)
+            )
+            if allowed_list:
+                instance.allowed_materials.add(*allowed_list)
+            if forbidden_list:
+                instance.forbidden_materials.add(*forbidden_list)
             if not instance.name:
-                instance.name = f"{instance.category.name} {len(allowed_materials)} {len(forbidden_materials)}"
+                instance.name = f"{instance.category.name} {len(allowed_list)} {len(forbidden_list)}"
                 instance.save()
+
         return instance, created
 
     def update_or_create(self, defaults=None, **kwargs):
@@ -783,10 +816,38 @@ def name_collection(sender, instance, **kwargs):
     instance.name = instance.construct_name()
 
 
+@receiver(pre_save, sender=Collection)
+def capture_previous_waste_stream(sender, instance, **kwargs):
+    """Store previous waste stream id for change detection."""
+
+    update_fields = kwargs.get("update_fields")
+    if update_fields and "waste_stream" not in update_fields:
+        instance._previous_waste_stream_id = instance.waste_stream_id
+        return
+
+    if not instance.pk:
+        instance._previous_waste_stream_id = None
+        return
+
+    instance._previous_waste_stream_id = (
+        sender.objects.filter(pk=instance.pk)
+        .values_list("waste_stream_id", flat=True)
+        .first()
+    )
+
+
 @receiver(post_save, sender=Collection)
-def delete_unused_waste_streams(sender, instance, created, **kwargs):
-    """Deletes all unused waste streams."""
-    WasteStream.objects.filter(collections__isnull=True).delete()
+def schedule_orphaned_waste_stream_cleanup(sender, instance, created, **kwargs):
+    """Schedule orphaned waste stream cleanup when waste stream changes."""
+    if created:
+        return
+    celery.current_app.send_task("cleanup_orphaned_waste_streams")
+
+
+@receiver(post_delete, sender=Collection)
+def schedule_orphaned_waste_stream_cleanup_on_delete(sender, instance, **kwargs):
+    """Schedule orphaned waste stream cleanup after collection deletion."""
+    celery.current_app.send_task("cleanup_orphaned_waste_streams")
 
 
 @receiver(post_save, sender=WasteStream)
