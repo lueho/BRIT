@@ -584,7 +584,8 @@ class CollectionModelForm(
                 valid_until = instance.valid_from - timedelta(days=1)
                 predecessor.valid_until = valid_until
                 predecessor.save(update_fields=["valid_until", "lastmodified_at"])
-            return super().save()
+            self.save_m2m()
+            return instance
         else:
             return super().save(commit=False)
 

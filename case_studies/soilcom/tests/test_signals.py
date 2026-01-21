@@ -390,9 +390,8 @@ class CollectionFormPredecessorSaveTestCase(TestCase):
         form.save()
 
         # With 2 predecessors, old behavior would be 4+ cache clears.
-        # New behavior: predecessor saves skip cache, only main saves trigger it.
-        # Expect <= 2 calls (form save calls instance.save() and super().save())
-        self.assertLessEqual(mock_clear.call_count, 2)
+        # New behavior: predecessor saves skip cache, only one main save triggers it.
+        self.assertLessEqual(mock_clear.call_count, 1)
 
 
 class WasteStreamSaveOptimizationTestCase(TestCase):
