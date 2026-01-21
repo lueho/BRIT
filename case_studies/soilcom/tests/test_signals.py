@@ -69,53 +69,59 @@ class DeleteUnusedWasteStreamsSignalTestCase(TestCase):
             valid_from=date(2024, 1, 1),
         )
 
-    def test_orphan_waste_streams_are_deleted_on_collection_save(self):
-        """Verify unused WasteStreams are cleaned up after collection save."""
-        # Create an orphan WasteStream (not linked to any collection)
+    def test_orphan_waste_streams_are_deleted_on_waste_stream_change(self):
+        """Verify unused WasteStreams are cleaned up when waste_stream changes."""
         orphan_stream = WasteStream.objects.create(
             name="Orphan Stream", category=self.category
         )
+        new_stream = WasteStream.objects.create(
+            name="New Stream", category=self.category
+        )
+
+        with patch(
+            "case_studies.soilcom.models.celery.current_app.send_task"
+        ) as mock_send_task:
+            self.collection.waste_stream = new_stream
+            self.collection.save(update_fields=["waste_stream"])
+
+        mock_send_task.assert_called_once_with("cleanup_orphaned_waste_streams")
+        cleanup_orphaned_waste_streams()
+
+        self.assertFalse(WasteStream.objects.filter(pk=orphan_stream.pk).exists())
+        self.assertFalse(WasteStream.objects.filter(pk=self.waste_stream.pk).exists())
+        self.assertTrue(WasteStream.objects.filter(pk=new_stream.pk).exists())
+
+    def test_orphan_cleanup_not_scheduled_when_waste_stream_unchanged(self):
+        """Verify cleanup is not scheduled when waste_stream is unchanged."""
+        orphan_stream = WasteStream.objects.create(
+            name="Orphan Stream 2", category=self.category
+        )
         self.assertTrue(WasteStream.objects.filter(pk=orphan_stream.pk).exists())
 
-        # Save an existing collection - this should trigger orphan cleanup task
         with patch(
             "case_studies.soilcom.models.celery.current_app.send_task"
         ) as mock_send_task:
             self.collection.description = "Updated"
             self.collection.save()
 
-        mock_send_task.assert_called_once_with("cleanup_orphaned_waste_streams")
-        cleanup_orphaned_waste_streams()
+        mock_send_task.assert_not_called()
+        self.assertTrue(WasteStream.objects.filter(pk=orphan_stream.pk).exists())
 
-        # Orphan should be deleted after cleanup task
-        self.assertFalse(WasteStream.objects.filter(pk=orphan_stream.pk).exists())
-        # Used stream should still exist
-        self.assertTrue(WasteStream.objects.filter(pk=self.waste_stream.pk).exists())
-
-    def test_orphan_cleanup_still_runs_with_update_fields(self):
-        """Verify orphan cleanup runs even with update_fields.
-
-        The delete_unused_waste_streams signal runs on all post_save events,
-        including those with update_fields. This is intentional to ensure
-        orphan WasteStreams are always cleaned up.
-        """
+    def test_orphan_cleanup_not_scheduled_with_update_fields(self):
+        """Verify cleanup is not scheduled when update_fields excludes waste_stream."""
         orphan_stream = WasteStream.objects.create(
-            name="Orphan Stream 2", category=self.category
+            name="Orphan Stream 3", category=self.category
         )
         self.assertTrue(WasteStream.objects.filter(pk=orphan_stream.pk).exists())
 
-        # Save with update_fields - signal still fires and schedules cleanup
         with patch(
             "case_studies.soilcom.models.celery.current_app.send_task"
         ) as mock_send_task:
             self.collection.valid_until = date(2024, 12, 31)
             self.collection.save(update_fields=["valid_until"])
 
-        mock_send_task.assert_called_once_with("cleanup_orphaned_waste_streams")
-        cleanup_orphaned_waste_streams()
-
-        # Orphan cleanup runs regardless of update_fields
-        self.assertFalse(WasteStream.objects.filter(pk=orphan_stream.pk).exists())
+        mock_send_task.assert_not_called()
+        self.assertTrue(WasteStream.objects.filter(pk=orphan_stream.pk).exists())
 
 
 class InvalidateCollectionCacheSignalTestCase(TestCase):

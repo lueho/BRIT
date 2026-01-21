@@ -841,6 +841,9 @@ def schedule_orphaned_waste_stream_cleanup(sender, instance, created, **kwargs):
     """Schedule orphaned waste stream cleanup when waste stream changes."""
     if created:
         return
+    previous_waste_stream_id = getattr(instance, "_previous_waste_stream_id", None)
+    if previous_waste_stream_id == instance.waste_stream_id:
+        return
     celery.current_app.send_task("cleanup_orphaned_waste_streams")
 
 
