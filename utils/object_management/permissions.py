@@ -49,17 +49,27 @@ class UserCreatedObjectPermission(permissions.BasePermission):
             if request.user.is_staff:
                 return True
 
-            # Get model from viewset's queryset
-            try:
-                model = view.get_queryset().model
-                app_label = model._meta.app_label
-                model_name = model._meta.model_name
+            # Get model from viewset's queryset without requiring a DRF Request
+            model = None
+            queryset = getattr(view, "queryset", None)
+            if queryset is not None:
+                model = getattr(queryset, "model", None)
 
-                # Check if user has 'add' permission for this model
-                return request.user.has_perm(f"{app_label}.add_{model_name}")
-            except (AttributeError, Exception):
+            if model is None:
+                try:
+                    model = view.get_queryset().model
+                except Exception:
+                    model = None
+
+            if model is None:
                 # If we can't determine the model permission, default to False for security
                 return False
+
+            app_label = model._meta.app_label
+            model_name = model._meta.model_name
+
+            # Check if user has 'add' permission for this model
+            return request.user.has_perm(f"{app_label}.add_{model_name}")
 
         # For other actions, ensure the user is authenticated
         return request.user and request.user.is_authenticated
@@ -540,9 +550,9 @@ def apply_scope_filter(queryset, scope: str | None, user=None):
                 f"{model.__name__} must define an 'owner' field to use the '{scope_name}' scope."
             )
 
-    staff_or_moderator = getattr(user, "is_staff", False) or user_is_moderator_for_model(
-        user, model
-    )
+    staff_or_moderator = getattr(
+        user, "is_staff", False
+    ) or user_is_moderator_for_model(user, model)
     is_authenticated = bool(user) and getattr(user, "is_authenticated", False)
 
     if scope == "published":

@@ -4,6 +4,7 @@ from unittest.mock import Mock, patch
 
 from django.contrib.auth.models import AnonymousUser, User
 from django.core.exceptions import ValidationError
+from django.db import connection
 from django.db.models import Q
 from django.test import TestCase
 from rest_framework import serializers, status
@@ -17,6 +18,22 @@ from .models import TestGlobalObject
 
 class BaseAPITestCase(TestCase):
     """Common DRF factory + user fixtures *and* a request builder helper."""
+
+    @classmethod
+    def setUpClass(cls):
+        super().setUpClass()
+        table_name = TestGlobalObject._meta.db_table
+        if table_name not in connection.introspection.table_names():
+            with connection.schema_editor() as schema_editor:
+                schema_editor.create_model(TestGlobalObject)
+
+    @classmethod
+    def tearDownClass(cls):
+        table_name = TestGlobalObject._meta.db_table
+        if table_name in connection.introspection.table_names():
+            with connection.schema_editor() as schema_editor:
+                schema_editor.delete_model(TestGlobalObject)
+        super().tearDownClass()
 
     #: mapping of http‑method → Factory function (populated in setUp).
     _VERB_MAP: dict[str, callable]

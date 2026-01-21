@@ -381,6 +381,7 @@ class TestUserCreatedObjectPermission(TestCase):
         model_mock._meta.model_name = "testmodel"
         queryset_mock = Mock()
         queryset_mock.model = model_mock
+        view.queryset = queryset_mock
         view.get_queryset = Mock(return_value=queryset_mock)
 
         # Test - should allow create with model permission
@@ -401,6 +402,7 @@ class TestUserCreatedObjectPermission(TestCase):
         model_mock._meta.model_name = "testmodel"
         queryset_mock = Mock()
         queryset_mock.model = model_mock
+        view.queryset = queryset_mock
         view.get_queryset = Mock(return_value=queryset_mock)
 
         # Test - staff should always be allowed
