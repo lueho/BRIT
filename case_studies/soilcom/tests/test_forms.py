@@ -1,4 +1,5 @@
 from datetime import date
+from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.db.models import signals
@@ -36,6 +37,7 @@ from ..models import (
     WasteFlyer,
     WasteStream,
 )
+from ..tasks import cleanup_orphaned_waste_flyers
 
 
 def dict_to_querydict(data):
@@ -563,6 +565,215 @@ class CollectionModelFormTestCase(TestCase):
         instance = form.save(commit=False)
         self.assertIn(instance.required_bin_capacity_reference, [None, ""])
 
+    def test_predecessor_waste_stream_reused_when_unchanged(self):
+        """Verify waste_stream is reused from predecessor when waste fields unchanged."""
+        predecessor = self.predecessor_collection_1
+        initial_stream_count = WasteStream.objects.count()
+        initial_waste_data = {
+            "waste_category": predecessor.waste_stream.category.id,
+            "allowed_materials": list(
+                predecessor.waste_stream.allowed_materials.values_list("id", flat=True)
+            ),
+            "forbidden_materials": list(
+                predecessor.waste_stream.forbidden_materials.values_list(
+                    "id", flat=True
+                )
+            ),
+        }
+
+        form = CollectionModelForm(
+            predecessor=predecessor,
+            data=dict_to_querydict(
+                {
+                    "catchment": self.catchment.id,
+                    "collector": self.collector.id,
+                    "collection_system": self.collection_system.id,
+                    "waste_category": initial_waste_data["waste_category"],
+                    "allowed_materials": initial_waste_data["allowed_materials"],
+                    "forbidden_materials": initial_waste_data["forbidden_materials"],
+                    "frequency": self.frequency.id,
+                    "valid_from": date(2024, 1, 1),
+                    "connection_type": "VOLUNTARY",
+                }
+            ),
+            initial=initial_waste_data,
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertFalse(
+            {
+                "waste_category",
+                "allowed_materials",
+                "forbidden_materials",
+            }.intersection(form.changed_data)
+        )
+        form.instance.owner = self.collection.owner
+        with patch.object(WasteStream.objects, "get_or_create") as get_or_create_mock:
+            instance = form.save()
+        get_or_create_mock.assert_not_called()
+
+        # No new WasteStream should be created - predecessor's stream reused
+        self.assertEqual(WasteStream.objects.count(), initial_stream_count)
+        self.assertEqual(instance.waste_stream_id, predecessor.waste_stream_id)
+
+    def test_predecessor_waste_stream_not_reused_when_category_changed(self):
+        """Verify waste_stream is not reused when waste_category differs from predecessor."""
+        new_category = WasteCategory.objects.create(
+            name="New Category", publication_status="published"
+        )
+        predecessor = self.predecessor_collection_1
+
+        form = CollectionModelForm(
+            predecessor=predecessor,
+            data=dict_to_querydict(
+                {
+                    "catchment": self.catchment.id,
+                    "collector": self.collector.id,
+                    "collection_system": self.collection_system.id,
+                    "waste_category": new_category.id,  # Different from predecessor
+                    "allowed_materials": [],
+                    "forbidden_materials": [],
+                    "frequency": self.frequency.id,
+                    "valid_from": date(2024, 1, 1),
+                    "connection_type": "VOLUNTARY",
+                }
+            ),
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        form.instance.owner = self.collection.owner
+        instance = form.save()
+
+        self.assertNotEqual(instance.waste_stream_id, predecessor.waste_stream_id)
+        self.assertEqual(instance.waste_stream.category_id, new_category.id)
+        self.assertEqual(instance.waste_stream.allowed_materials.count(), 0)
+        self.assertEqual(instance.waste_stream.forbidden_materials.count(), 0)
+
+    def test_predecessor_waste_stream_not_reused_when_allowed_materials_changed(self):
+        """Verify waste_stream is not reused when allowed_materials differs from predecessor."""
+        predecessor = self.predecessor_collection_1
+
+        # Use only one of the two allowed materials (different from predecessor)
+        form = CollectionModelForm(
+            predecessor=predecessor,
+            data=dict_to_querydict(
+                {
+                    "catchment": self.catchment.id,
+                    "collector": self.collector.id,
+                    "collection_system": self.collection_system.id,
+                    "waste_category": predecessor.waste_stream.category.id,
+                    "allowed_materials": [self.allowed_material_1.id],  # Changed
+                    "forbidden_materials": list(
+                        predecessor.waste_stream.forbidden_materials.values_list(
+                            "id", flat=True
+                        )
+                    ),
+                    "frequency": self.frequency.id,
+                    "valid_from": date(2024, 1, 1),
+                    "connection_type": "VOLUNTARY",
+                }
+            ),
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        form.instance.owner = self.collection.owner
+        instance = form.save()
+
+        self.assertNotEqual(instance.waste_stream_id, predecessor.waste_stream_id)
+        self.assertEqual(
+            instance.waste_stream.category_id, predecessor.waste_stream.category_id
+        )
+        self.assertEqual(
+            set(instance.waste_stream.allowed_materials.values_list("id", flat=True)),
+            {self.allowed_material_1.id},
+        )
+        self.assertEqual(
+            set(instance.waste_stream.forbidden_materials.values_list("id", flat=True)),
+            set(
+                predecessor.waste_stream.forbidden_materials.values_list(
+                    "id", flat=True
+                )
+            ),
+        )
+
+    def test_predecessor_waste_stream_not_reused_when_forbidden_materials_changed(self):
+        """Verify waste_stream is not reused when forbidden_materials differs from predecessor."""
+        predecessor = self.predecessor_collection_1
+
+        form = CollectionModelForm(
+            predecessor=predecessor,
+            data=dict_to_querydict(
+                {
+                    "catchment": self.catchment.id,
+                    "collector": self.collector.id,
+                    "collection_system": self.collection_system.id,
+                    "waste_category": predecessor.waste_stream.category.id,
+                    "allowed_materials": list(
+                        predecessor.waste_stream.allowed_materials.values_list(
+                            "id", flat=True
+                        )
+                    ),
+                    "forbidden_materials": [self.forbidden_material_1.id],
+                    "frequency": self.frequency.id,
+                    "valid_from": date(2024, 1, 1),
+                    "connection_type": "VOLUNTARY",
+                }
+            ),
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        form.instance.owner = self.collection.owner
+        instance = form.save()
+
+        self.assertNotEqual(instance.waste_stream_id, predecessor.waste_stream_id)
+        self.assertEqual(
+            set(instance.waste_stream.allowed_materials.values_list("id", flat=True)),
+            set(
+                predecessor.waste_stream.allowed_materials.values_list("id", flat=True)
+            ),
+        )
+        self.assertEqual(
+            set(instance.waste_stream.forbidden_materials.values_list("id", flat=True)),
+            {self.forbidden_material_1.id},
+        )
+
+    def test_predecessor_without_waste_stream_assigns_waste_stream(self):
+        """Verify waste_stream is assigned when predecessor has no waste_stream."""
+        # Create a predecessor without a waste_stream
+        predecessor = Collection.objects.create(
+            catchment=self.catchment,
+            collector=self.collector,
+            collection_system=self.collection_system,
+            waste_stream=None,
+            frequency=self.frequency,
+            valid_from=date(2022, 1, 1),
+            publication_status="published",
+        )
+
+        form = CollectionModelForm(
+            predecessor=predecessor,
+            data=dict_to_querydict(
+                {
+                    "catchment": self.catchment.id,
+                    "collector": self.collector.id,
+                    "collection_system": self.collection_system.id,
+                    "waste_category": self.waste_category.id,
+                    "allowed_materials": [self.allowed_material_1.id],
+                    "forbidden_materials": [],
+                    "frequency": self.frequency.id,
+                    "valid_from": date(2024, 1, 1),
+                    "connection_type": "VOLUNTARY",
+                }
+            ),
+        )
+        self.assertTrue(form.is_valid(), form.errors)
+        form.instance.owner = self.collection.owner
+        instance = form.save()
+
+        self.assertIsNotNone(instance.waste_stream)
+        self.assertEqual(instance.waste_stream.category_id, self.waste_category.id)
+        self.assertEqual(
+            set(instance.waste_stream.allowed_materials.values_list("id", flat=True)),
+            {self.allowed_material_1.id},
+        )
+        self.assertEqual(instance.waste_stream.forbidden_materials.count(), 0)
+
 
 class WasteFlyerUrlFormSetTestCase(TestCase):
     @classmethod
@@ -640,7 +851,12 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             data, parent_object=self.collection, relation_field_name="flyers"
         )
         self.assertTrue(formset.is_valid())
-        formset.save()
+        with patch(
+            "case_studies.soilcom.forms.cleanup_orphaned_waste_flyers.delay"
+        ) as mock_cleanup:
+            formset.save()
+        mock_cleanup.assert_called_once()
+        cleanup_orphaned_waste_flyers()
         with self.assertRaises(WasteFlyer.DoesNotExist):
             WasteFlyer.objects.get(url="")
 
@@ -663,8 +879,15 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             data, parent_object=self.collection, relation_field_name="flyers"
         )
         self.assertTrue(formset.is_valid())
-        with mute_signals(signals.post_save):
+        with (
+            mute_signals(signals.post_save),
+            patch(
+                "case_studies.soilcom.forms.cleanup_orphaned_waste_flyers.delay"
+            ) as mock_cleanup,
+        ):
             formset.save()
+        mock_cleanup.assert_called_once()
+        cleanup_orphaned_waste_flyers()
         WasteFlyer.objects.get(url="https://www.fest-flyers.org")
         self.assertEqual(len(initial_urls) + 1, self.collection.flyers.count())
 
@@ -687,7 +910,12 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
         )
         self.assertTrue(formset.is_valid())
         original_flyer_count = WasteFlyer.objects.count()
-        formset.save()
+        with patch(
+            "case_studies.soilcom.forms.cleanup_orphaned_waste_flyers.delay"
+        ) as mock_cleanup:
+            formset.save()
+        mock_cleanup.assert_called_once()
+        cleanup_orphaned_waste_flyers()
         WasteFlyer.objects.get(url=initial_urls[1]["url"])
         self.assertEqual(original_flyer_count - 1, self.collection.flyers.count())
         self.assertEqual(original_flyer_count, WasteFlyer.objects.count())
@@ -709,7 +937,12 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
         )
         self.assertTrue(formset.is_valid())
         original_flyer_count = WasteFlyer.objects.count()
-        formset.save()
+        with patch(
+            "case_studies.soilcom.forms.cleanup_orphaned_waste_flyers.delay"
+        ) as mock_cleanup:
+            formset.save()
+        mock_cleanup.assert_called_once()
+        cleanup_orphaned_waste_flyers()
         with self.assertRaises(WasteFlyer.DoesNotExist):
             WasteFlyer.objects.get(url=initial_urls[2]["url"])
         self.assertEqual(original_flyer_count - 1, WasteFlyer.objects.count())
@@ -731,8 +964,15 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
         )
         self.assertTrue(formset.is_valid())
         original_flyer_count = WasteFlyer.objects.count()
-        with mute_signals(signals.post_save):
+        with (
+            mute_signals(signals.post_save),
+            patch(
+                "case_studies.soilcom.forms.cleanup_orphaned_waste_flyers.delay"
+            ) as mock_cleanup,
+        ):
             formset.save()
+        mock_cleanup.assert_called_once()
+        cleanup_orphaned_waste_flyers()
         # get raises an error if the query returns more than one instance
         WasteFlyer.objects.get(url=url)
         # one should be deleted and one created ==> +-0
@@ -772,7 +1012,12 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             data, parent_object=self.collection, relation_field_name="flyers"
         )
         self.assertTrue(formset.is_valid())
-        formset.save()
+        with patch(
+            "case_studies.soilcom.forms.cleanup_orphaned_waste_flyers.delay"
+        ) as mock_cleanup:
+            formset.save()
+        mock_cleanup.assert_called_once()
+        cleanup_orphaned_waste_flyers()
 
         # flyer_1 should still exist because it's referenced by prop_value
         WasteFlyer.objects.get(pk=self.flyer_1.pk)
@@ -817,7 +1062,12 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             data, parent_object=self.collection, relation_field_name="flyers"
         )
         self.assertTrue(formset.is_valid())
-        formset.save()
+        with patch(
+            "case_studies.soilcom.forms.cleanup_orphaned_waste_flyers.delay"
+        ) as mock_cleanup:
+            formset.save()
+        mock_cleanup.assert_called_once()
+        cleanup_orphaned_waste_flyers()
 
         # flyer_2 should still exist because it's referenced by agg_prop_value
         WasteFlyer.objects.get(pk=self.flyer_2.pk)
@@ -846,7 +1096,12 @@ class WasteFlyerUrlFormSetTestCase(TestCase):
             data, parent_object=self.collection, relation_field_name="flyers"
         )
         self.assertTrue(formset.is_valid())
-        formset.save()
+        with patch(
+            "case_studies.soilcom.forms.cleanup_orphaned_waste_flyers.delay"
+        ) as mock_cleanup:
+            formset.save()
+        mock_cleanup.assert_called_once()
+        cleanup_orphaned_waste_flyers()
 
         # flyer_3 should still exist because it's referenced by collection2.sources
         WasteFlyer.objects.get(pk=self.flyer_3.pk)

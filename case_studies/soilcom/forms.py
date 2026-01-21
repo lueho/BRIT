@@ -23,7 +23,7 @@ from django_tomselect.forms import (
 )
 
 from distributions.models import TemporalDistribution, Timestep
-from materials.models import Material, Sample
+from materials.models import Sample
 from utils.crispy_fields import ForeignkeyField
 from utils.forms import (
     CreateInlineMixin,
@@ -445,6 +445,10 @@ class CollectionModelForm(
     Model form for Collection, including all collection parameters and waste stream fields.
     """
 
+    def __init__(self, *args, predecessor=None, **kwargs):
+        self.predecessor = predecessor
+        super().__init__(*args, **kwargs)
+
     catchment = TomSelectModelChoiceField(
         config=TomSelectConfig(
             url="collectioncatchment-autocomplete",
@@ -554,25 +558,26 @@ class CollectionModelForm(
         instance.name = (
             f"{data['catchment']} {data['waste_category']} {data['collection_system']}"
         )
-        allowed_materials = Material.objects.filter(id__in=data["allowed_materials"])
-        if not allowed_materials.exists():
-            allowed_materials = Material.objects.none()
-        forbidden_materials = Material.objects.filter(
-            id__in=data["forbidden_materials"]
-        )
-        if not forbidden_materials.exists():
-            forbidden_materials = Material.objects.none()
-        waste_stream, created = WasteStream.objects.get_or_create(
-            defaults={"owner": instance.owner},
-            category=data["waste_category"],
-            allowed_materials=allowed_materials,
-            forbidden_materials=forbidden_materials,
-        )
-        if created:
-            waste_stream.allowed_materials.add(*data["allowed_materials"])
-            waste_stream.forbidden_materials.add(*data["forbidden_materials"])
-            waste_stream.save()
-        instance.waste_stream = waste_stream
+        allowed_materials = data["allowed_materials"]
+        forbidden_materials = data["forbidden_materials"]
+        if (
+            self.predecessor
+            and self.predecessor.waste_stream_id
+            and not {
+                "waste_category",
+                "allowed_materials",
+                "forbidden_materials",
+            }.intersection(self.changed_data)
+        ):
+            instance.waste_stream = self.predecessor.waste_stream
+        else:
+            waste_stream, created = WasteStream.objects.get_or_create(
+                defaults={"owner": instance.owner},
+                category=data["waste_category"],
+                allowed_materials=allowed_materials,
+                forbidden_materials=forbidden_materials,
+            )
+            instance.waste_stream = waste_stream
         if commit:
             instance.save()
             for predecessor in instance.predecessors.all():

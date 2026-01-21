@@ -941,6 +941,13 @@ class CollectionCreateNewVersionView(CollectionCopyView):
 
     predecessor = None
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        predecessor = self.predecessor or getattr(self, "object", None)
+        if predecessor is not None:
+            kwargs["predecessor"] = predecessor
+        return kwargs
+
     def get_initial(self):
         """
         Returns initial data for the new version form, including all relevant fields from the original collection.
@@ -975,8 +982,7 @@ class CollectionCreateNewVersionView(CollectionCopyView):
             self.predecessor = self.get_object()
             self.object = form.save()
             self.object.add_predecessor(self.predecessor)
-            formset = self.get_formset()
-            formset.is_valid()
+            formset.parent_object = self.object
             formset.save()
             return HttpResponseRedirect(self.get_success_url())
         else:

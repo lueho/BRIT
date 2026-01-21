@@ -52,6 +52,7 @@ from ..models import (
     CollectionSeason,
     FeeSystem,
 )
+from ..tasks import cleanup_orphaned_waste_flyers
 
 
 def setUpModule():
@@ -1153,10 +1154,17 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
         # published collection as well before the request so that the process for deleting orphaned flyers is evoked.
         rest_flyer = WasteFlyer.objects.get(url="https://www.rest-flyer.org")
         self.published_object.flyers.remove(rest_flyer)
-        with mute_signals(post_save):
+        with (
+            mute_signals(post_save),
+            patch(
+                "case_studies.soilcom.forms.cleanup_orphaned_waste_flyers.delay"
+            ) as mock_cleanup,
+        ):
             response = self.client.post(
                 self.get_update_url(self.unpublished_object.pk), data=data
             )
+        mock_cleanup.assert_called_once()
+        cleanup_orphaned_waste_flyers()
         self.assertEqual(response.status_code, 302)
         self.assertIn(
             WasteFlyer.objects.get(url="https://www.fest-flyer.org"),
