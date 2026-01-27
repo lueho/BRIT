@@ -8,8 +8,8 @@
     </span>
 {% elif object.is_in_review %}
     <span class="review-status-badge review-status-in-review"
-          title="In Review{% if object.submitted_at %} - {{ object.submitted_at|date:'Y-m-d H:i' }}{% endif %}">
-        <i class="fas fa-search"></i> In Review
+          title="Review{% if object.submitted_at %} - {{ object.submitted_at|date:'Y-m-d H:i' }}{% endif %}">
+        <i class="fas fa-search"></i> Review
     </span>
 {% elif object.is_declined %}
     <span class="review-status-badge review-status-declined" title="Rejected">
