@@ -64,14 +64,29 @@
         </li>
         <li class="nav-item" role="presentation">
           <button class="nav-link"
+                  id="summary-tab"
+                  data-bs-toggle="tab"
+                  data-bs-target="#summary-pane"
+                  type="button"
+                  role="tab"
+                  aria-controls="summary-pane"
+                  aria-selected="false">
+            <i class="fas fa-list"></i> Summary
+          </button>
+        </li>
+        <li class="nav-item" role="presentation">
+          <button class="nav-link"
                   id="options-tab"
                   data-bs-toggle="tab"
                   data-bs-target="#options-pane"
                   type="button"
                   role="tab"
                   aria-controls="options-pane"
-                  aria-selected="false">
-            <i class="fas fa-gear"></i> Options
+                  aria-selected="false"
+                  aria-label="Options"
+                  title="Options">
+            <i class="fas fa-gear"></i>
+            <span class="visually-hidden">Options</span>
           </button>
         </li>
         <li class="nav-item" role="presentation">
@@ -82,8 +97,11 @@
                   type="button"
                   role="tab"
                   aria-controls="learning-pane"
-                  aria-selected="false">
-            <i class="fas fa-graduation-cap"></i> Learning
+                  aria-selected="false"
+                  aria-label="Learning materials"
+                  title="Learning materials">
+            <i class="fas fa-graduation-cap"></i>
+            <span class="visually-hidden">Learning</span>
           </button>
         </li>
       </ul>
@@ -107,6 +125,29 @@
                  aria-label="Reset filters">Reset</a>
             </div>
           </form>
+        </div>
+        <div class="tab-pane fade"
+             id="summary-pane"
+             role="tabpanel"
+             aria-labelledby="summary-tab"
+             tabindex="0">
+          <div id="filter_result_card">
+            <div id="summary-container">
+              <p class="card-text">Select a collection on the map to view its details.</p>
+            </div>
+            <div class="text-center">
+              <a id="btn-collection-detail"
+                 class="btn btn-primary w-75 d-none"
+                 data-href-template="/waste_collection/collections/__pk__/"
+                 href="#">Full Details</a>
+            </div>
+            <div class="text-center mt-2">
+              <button id="btn-clear-selection"
+                      type="button"
+                      class="btn btn-outline-secondary w-75 d-none"
+                      onclick="clearSelection()">Clear selection</button>
+            </div>
+          </div>
         </div>
         <div class="tab-pane fade"
              id="options-pane"
@@ -171,45 +212,6 @@
              role="tabpanel"
              aria-labelledby="learning-tab"
              tabindex="0">{% include "soilcom/includes/learning_materials.html" %}</div>
-      </div>
-    </div>
-  </div>
-  <div class="card shadow" id="filter_result_card">
-    <div class="card-header"
-         role="button"
-         data-bs-toggle="collapse"
-         href="#info-card-body"
-         aria-expanded="true"
-         aria-controls="info-card-body">
-      <b>Summary</b>
-    </div>
-    <div class="card-body collapse show" id="info-card-body">
-      <div id="summary-container">
-        <p class="card-text">No data selected, yet.</p>
-      </div>
-      {% if object.sources.first %}
-        <p class="card-text mt-3">
-          <strong>Sources:</strong>
-          <br>
-          {% for source in object.sources.all %}
-            <a href="{% url 'source-detail-modal' source.id %}" class="modal-link">
-              {{ source.abbreviation }}
-              {% if not forloop.last %},{% endif %}
-            </a>
-          {% endfor %}
-        </p>
-      {% endif %}
-      <div class="text-center">
-        <a id="btn-collection-detail"
-           class="btn btn-primary w-75 d-none"
-           data-href-template="/waste_collection/collections/__pk__/"
-           href="#">Full Details</a>
-      </div>
-      <div class="text-center mt-2">
-        <button id="btn-clear-selection"
-                type="button"
-                class="btn btn-outline-secondary w-75 d-none"
-                onclick="clearSelection()">Clear selection</button>
       </div>
     </div>
   </div>

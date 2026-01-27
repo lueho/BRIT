@@ -106,6 +106,7 @@ class CollectionFilterFormHelper(FormHelper):
                 RangeSliderField("spec_waste_collected"),
                 "valid_on",
                 "scope",
+                active=False,
             ),
         )
     )

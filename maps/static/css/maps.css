@@ -83,6 +83,25 @@
     margin-bottom: 0.5em;
 }
 
+.wc-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 1rem;
+    max-height: calc(100vh - 2rem);
+    position: sticky;
+    top: 1rem;
+}
+
+.wc-filters-panel {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+}
+
+.wc-summary-card {
+    flex-shrink: 0;
+}
+
 /* ==========================================================================
    Map Height Utilities
    Bootstrap 5-compatible responsive map container heights
@@ -126,6 +145,15 @@ body.iframe-embed {
         height: calc(100vh - 320px);
         min-height: 350px;
         max-height: 600px;
+    }
+
+    .wc-sidebar {
+        max-height: none;
+        position: static;
+    }
+
+    .wc-filters-panel {
+        overflow: visible;
     }
 }
 

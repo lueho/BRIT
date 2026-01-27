@@ -21,7 +21,7 @@ const fieldConfig = {
         format: (value) => value || ''
     },
     allowed_materials: {
-        include: true,
+        include: false,
         format: (value) => {
             if (!value) return '';
             const str = Array.isArray(value) ? value.join(', ') : value;
@@ -29,7 +29,7 @@ const fieldConfig = {
         }
     },
     forbidden_materials: {
-        include: true,
+        include: false,
         format: (value) => {
             if (!value) return '';
             const str = Array.isArray(value) ? value.join(', ') : value;
@@ -61,7 +61,7 @@ const fieldConfig = {
         format: (value) => value ? new Date(value).toLocaleDateString() : ''
     },
     sources: {
-        include: true,
+        include: false,
         format: (value) => {
             if (!value) return '';
             // Handle both array (from API) and string formats
@@ -225,7 +225,8 @@ function featureClickHandler(e, featureGroup) {
                 const fid = f.feature.properties.id;
                 const waste_category = f.feature.properties.waste_category;
                 const collection_system = f.feature.properties.collection_system;
-                return `<a href="javascript:void(0)" onclick="window.__wc_selectFromPopup(${fid})">${waste_category} - ${collection_system}</a>`;
+                const detailUrl = getDetailUrlForId(fid);
+                return `<a href="${detailUrl}" onclick="return window.__wc_selectFromPopup(${fid}, event)">${waste_category} - ${collection_system}</a>`;
             } catch (_) { return ''; }
         }).filter(Boolean).join('<br>');
     }
@@ -284,7 +285,13 @@ function highlightFeatureById(fid, featureGroup) {
     } catch (_) { /* ignore */ }
 }
 
-window.__wc_selectFromPopup = function (fid) {
+window.__wc_selectFromPopup = function (fid, event) {
+    let allowDefault = false;
+    try {
+        if (event) {
+            allowDefault = !!(event.ctrlKey || event.metaKey || event.shiftKey || event.button === 1);
+        }
+    } catch (_) { /* ignore */ }
     try {
         if (typeof window.SelectionController !== 'undefined') {
             window.SelectionController.select(fid);
@@ -293,7 +300,16 @@ window.__wc_selectFromPopup = function (fid) {
             getFeatureDetails(fid);
         }
     } catch (_) { }
+    try {
+        if (event && typeof event.preventDefault === 'function' && !allowDefault) {
+            event.preventDefault();
+        }
+    } catch (_) { /* ignore */ }
     try { if (typeof map !== 'undefined' && map && typeof map.closePopup === 'function') { map.closePopup(); } } catch (_) { }
+    if (allowDefault) {
+        return true;
+    }
+    return false;
 };
 
 // --- SelectionController: central state for current selection ---
@@ -331,7 +347,7 @@ function showSummaryLoading() {
 function clearSummary() {
     try {
         const c = document.getElementById('summary-container');
-        if (c) { c.innerHTML = '<p class="card-text">No data selected, yet.</p>'; }
+        if (c) { c.innerHTML = '<p class="card-text">Select a collection on the map to view its details.</p>'; }
     } catch (_) { /* ignore */ }
 }
 
@@ -344,7 +360,28 @@ function clearSummary() {
     };
 })();
 
+(function hookRenderSummaries() {
+    const original = typeof window.renderSummaries === 'function' ? window.renderSummaries : null;
+    if (!original) return;
+
+    window.renderSummaries = function (featureInfos) {
+        try { original(featureInfos); } catch (e) { console.warn('Original renderSummaries failed:', e); }
+        try {
+            const container = document.getElementById('summary-container');
+            if (container && (!container.textContent || container.textContent.trim() === '')) {
+                clearSummary();
+            }
+        } catch (_) { /* ignore */ }
+    };
+})();
+
 function scrollToSummaries() {
+    try {
+        const summaryTab = document.getElementById("summary-tab");
+        if (summaryTab && typeof bootstrap !== 'undefined' && bootstrap.Tab) {
+            bootstrap.Tab.getOrCreateInstance(summaryTab).show();
+        }
+    } catch (_) { /* ignore */ }
     const importantInfoElement = document.getElementById("filter_result_card");
     if (importantInfoElement) {
         importantInfoElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -657,6 +694,12 @@ const ButtonManager = (function () {
 
     window.renderFeatureDetails = function (data) {
         try { if (original) original(data); } catch (e) { console.warn('Original renderFeatureDetails failed:', e); }
+        try {
+            const container = document.getElementById('summary-container');
+            if (container && (!container.textContent || container.textContent.trim() === '')) {
+                clearSummary();
+            }
+        } catch (_) { /* ignore */ }
         try { ButtonManager.apply(data); } catch (e) { console.warn('ButtonManager.apply hook failed:', e); }
     };
 })();
