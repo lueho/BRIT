@@ -37,10 +37,12 @@ def export_link_modal(export_url_name, **extra_params):
     Return a link that opens the export modal using the existing modal framework.
     """
     export_url = reverse(export_url_name)
+    if extra_params:
+        export_url = f"{export_url}?{urlencode(extra_params, doseq=True)}"
     modal_url = reverse("export-modal")
     params = {"export_url": export_url}
     params.update(extra_params)
-    return f"{modal_url}?{urlencode(params)}"
+    return f"{modal_url}?{urlencode(params, doseq=True)}"
 
 
 @register.inclusion_tag("../templates/export_modal_button.html", takes_context=True)
@@ -63,6 +65,8 @@ def export_modal_button(
     is_authenticated = bool(user and getattr(user, "is_authenticated", False))
 
     export_url = reverse(export_url_name)
+    if extra_params:
+        export_url = f"{export_url}?{urlencode(extra_params, doseq=True)}"
     modal_url = reverse("export-modal")
 
     params = {"export_url": export_url}
