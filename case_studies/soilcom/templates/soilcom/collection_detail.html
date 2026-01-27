@@ -545,7 +545,7 @@
       </a>
     {% endif %}
     {% if policy.can_reject %}
-      <a class="btn btn-outline-danger w-100 modal-link"
+      <a class="btn btn-outline-danger w-100 mb-2 modal-link"
          href="{% url 'object_management:reject_item_modal' content_type_id=object|get_content_type_id object_id=object.id %}?next={{ request.get_full_path|urlencode }}">
         <i class="fas fa-xmark"></i> {% trans "Reject" %}
       </a>
@@ -554,7 +554,7 @@
 
   {# Export #}
   {% if policy.can_export %}
-    {% export_modal_button "collection-export" list_type=policy.export_list_type id=object.id button_classes="btn btn-outline-secondary w-100" %}
+    {% export_modal_button "collection-export" list_type=policy.export_list_type id=object.id button_classes="btn btn-outline-secondary w-100 mb-2" %}
   {% endif %}
 {% endblock options_pane %}
 
