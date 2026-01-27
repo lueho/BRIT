@@ -1,25 +1,77 @@
-{% extends 'maps/catchment_detail.html' %}
+{% extends "maps/catchment_detail.html" %}
 
 {% block additional_details %}
-    <p class="card-text"><strong>Current collections:</strong></p>
-    <ul>
-    {% for collection in object.downstream_collections.currently_valid %}
-        <li><a href="{% url 'collection-detail' collection.pk %}">{{ collection.name }}</a></li>
-    {% endfor %}
-    </ul>
-    <p class="card-text"><strong>Archived collections:</strong></p>
-    <ul>
-    {% for collection in object.downstream_collections.archived %}
-        <li><a href="{% url 'collection-detail' collection.pk %}">{{ collection.name }}</a></li>
-    {% endfor %}
-    </ul>
-{% endblock %}
+    {% if downstream_published_collections %}
+        <p class="card-text">
+            <strong>Published collections:</strong>
+        </p>
+        <ul>
+            {% for collection in downstream_published_collections %}
+                <li>
+                    <a href='{% url "collection-detail" collection.pk %}'>{{ collection.name }}</a>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    {% if downstream_review_collections %}
+        <p class="card-text">
+            <strong>Collections in review:</strong>
+        </p>
+        <ul>
+            {% for collection in downstream_review_collections %}
+                <li>
+                    <a href='{% url "collection-detail" collection.pk %}'>{{ collection.name }}</a>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    {% if downstream_private_collections %}
+        <p class="card-text">
+            <strong>Private collections:</strong>
+        </p>
+        <ul>
+            {% for collection in downstream_private_collections %}
+                <li>
+                    <a href='{% url "collection-detail" collection.pk %}'>{{ collection.name }}</a>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    {% if downstream_declined_collections %}
+        <p class="card-text">
+            <strong>Declined collections:</strong>
+        </p>
+        <ul>
+            {% for collection in downstream_declined_collections %}
+                <li>
+                    <a href='{% url "collection-detail" collection.pk %}'>{{ collection.name }}</a>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+
+    {% if downstream_archived_collections %}
+        <p class="card-text">
+            <strong>Archived collections:</strong>
+        </p>
+        <ul>
+            {% for collection in downstream_archived_collections %}
+                <li>
+                    <a href='{% url "collection-detail" collection.pk %}'>{{ collection.name }}</a>
+                </li>
+            {% endfor %}
+        </ul>
+    {% endif %}
+{% endblock additional_details %}
 
 {% block detail_footer %}
     {{ block.super }}
     {% if perms.soilcom.add_aggregatedcollectionpropertyvalue %}
-        <a href="{% url 'collectioncatchment-add-aggregatedpropertyvalue' object.pk %}">
+        <a href='{% url "collectioncatchment-add-aggregatedpropertyvalue" object.pk %}'>
             <i class="fas fa-fw fa-plus-circle"></i> add property
         </a>
     {% endif %}
-{% endblock %}
+{% endblock detail_footer %}

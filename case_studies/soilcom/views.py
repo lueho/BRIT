@@ -786,6 +786,42 @@ class CollectionCatchmentCreateView(CatchmentCreateView):
 class CollectionCatchmentDetailView(CatchmentDetailView):
     model = CollectionCatchment
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+
+        try:
+            visible_collections = list(
+                filter_queryset_for_user(self.object.downstream_collections, user)
+            )
+        except Exception:
+            visible_collections = []
+
+        status_key_map = {
+            Collection.STATUS_PUBLISHED: "published",
+            Collection.STATUS_REVIEW: "review",
+            Collection.STATUS_PRIVATE: "private",
+            Collection.STATUS_DECLINED: "declined",
+            Collection.STATUS_ARCHIVED: "archived",
+        }
+        grouped = {key: [] for key in status_key_map.values()}
+
+        for collection in visible_collections:
+            key = status_key_map.get(collection.publication_status)
+            if key:
+                grouped[key].append(collection)
+
+        context.update(
+            {
+                "downstream_published_collections": grouped["published"],
+                "downstream_review_collections": grouped["review"],
+                "downstream_private_collections": grouped["private"],
+                "downstream_declined_collections": grouped["declined"],
+                "downstream_archived_collections": grouped["archived"],
+            }
+        )
+        return context
+
 
 class CollectionCatchmentUpdateView(CatchmentUpdateView):
     def get_success_url(self):
@@ -1083,7 +1119,12 @@ class CollectionDetailView(MapMixin, UserCreatedObjectDetailView):
             .select_related("owner")
             .order_by("-lastmodified_at", "-pk")
         )
-        context["visible_predecessors"] = list(predecessors_qs)
+        try:
+            context["visible_predecessors"] = filter_queryset_for_user(
+                predecessors_qs, user
+            )
+        except Exception:
+            context["visible_predecessors"] = self.object.predecessors.none()
 
         return context
 
