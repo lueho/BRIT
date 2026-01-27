@@ -554,10 +554,7 @@
 
   {# Export #}
   {% if policy.can_export %}
-    <a class="btn btn-outline-secondary modal-link w-100"
-       href="{% export_link_modal 'collection-export' list_type=policy.export_list_type %}">
-      <i class="fas fa-file-export"></i> Export data
-    </a>
+    {% export_modal_button "collection-export" list_type=policy.export_list_type id=object.id button_classes="btn btn-outline-secondary w-100" %}
   {% endif %}
 {% endblock options_pane %}
 
