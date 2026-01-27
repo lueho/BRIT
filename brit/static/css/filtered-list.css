@@ -4,7 +4,7 @@
 @media (min-width: 992px) {
   .filter-sticky {
     position: sticky;
-    top: 1rem;
+    top: calc(56px + 1rem);
   }
 }
 
