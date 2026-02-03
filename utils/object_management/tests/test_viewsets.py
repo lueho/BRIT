@@ -88,6 +88,7 @@ class MockUserCreatedObject:  # minimal, deterministic pk
     class _Meta:
         app_label = "test_app"
         model_name = "mockusercreatedobject"
+        concrete_model = None
 
     _meta = _Meta()
 
@@ -100,6 +101,9 @@ class MockUserCreatedObject:  # minimal, deterministic pk
         if self.publication_status != "review":
             raise ValidationError("Only objects in review can be withdrawn")
         self.publication_status = "private"
+
+
+MockUserCreatedObject._meta.concrete_model = MockUserCreatedObject
 
 
 class MockUserCreatedObjectViewSet(UserCreatedObjectViewSet):
@@ -284,18 +288,21 @@ class UserCreatedObjectWorkflowTests(BaseAPITestCase):
     def _action(self, action: str, obj: MockUserCreatedObject):
         req = self._build_request("post", f"/objects/{obj.pk}/action/")
         force_authenticate(req, user=self.regular_user)
+        req.user = self.regular_user
         self.viewset.request = Request(req)
         self.viewset.kwargs = {"pk": obj.pk}
         with (
+            patch.object(self.viewset, "get_object", return_value=obj),
             patch(
-                "utils.object_management.viewsets.get_object_or_404", return_value=obj
+                "utils.object_management.viewsets.ReviewAction.objects.create",
+                return_value=Mock(),
             ),
             patch(
                 "utils.object_management.viewsets.Response",
                 side_effect=lambda d, status: Mock(status_code=status),
             ),
         ):
-            return getattr(self.viewset, action)(req, pk=obj.pk)
+            return getattr(self.viewset, action)(self.viewset.request, pk=obj.pk)
 
     def test_register_for_review(self):
         resp = self._action("register_for_review", self.private_obj)

@@ -1,12 +1,17 @@
+import logging
+
+from django.contrib.contenttypes.models import ContentType
 from django.core.exceptions import ValidationError
 from django.db.models import Q
-from django.shortcuts import get_object_or_404
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.viewsets import ModelViewSet
 
+from .models import ReviewAction
 from .permissions import GlobalObjectPermission, UserCreatedObjectPermission
+
+logger = logging.getLogger(__name__)
 
 
 class GlobalObjectViewSet(ModelViewSet):
@@ -99,6 +104,56 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
         app_label = model._meta.app_label
         return user.has_perm(f"{app_label}.{perm_codename}") or user.is_staff
 
+    def _get_comment(self, request) -> str:
+        try:
+            payload = request.data
+        except Exception:
+            payload = {}
+
+        if isinstance(payload, dict):
+            return (payload.get("comment") or payload.get("message") or "").strip()
+        return ""
+
+    def _post_review_action(
+        self,
+        request,
+        obj,
+        action_name,
+        review_action,
+        previous_status=None,
+    ):
+        comment = self._get_comment(request)
+        if review_action:
+            try:
+                ReviewAction.objects.create(
+                    content_type=ContentType.objects.get_for_model(obj.__class__),
+                    object_id=obj.pk,
+                    user=request.user,
+                    action=review_action,
+                    comment=comment,
+                )
+            except Exception as exc:
+                logger.warning(
+                    "Failed to create ReviewAction for %s: %s", action_name, exc
+                )
+
+        cascade_handler = getattr(obj, "cascade_review_action", None)
+        if not callable(cascade_handler):
+            return
+
+        try:
+            cascade_handler(
+                action_name=action_name,
+                actor=getattr(request, "user", None),
+                previous_status=previous_status,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Review action cascade failed for %s: %s",
+                obj,
+                exc,
+            )
+
     @action(
         detail=True, methods=["post"], permission_classes=[permissions.IsAuthenticated]
     )
@@ -106,13 +161,21 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
         """
         Allows owners to register an object for review.
         """
-        obj = get_object_or_404(self.get_queryset(), pk=pk)
+        obj = self.get_object()
 
         # Enforce object-level permissions
         self.check_object_permissions(request, obj)
 
         try:
+            previous_status = getattr(obj, "publication_status", None)
             obj.register_for_review()
+            self._post_review_action(
+                request,
+                obj,
+                action_name="submit_for_review",
+                review_action=ReviewAction.ACTION_SUBMITTED,
+                previous_status=previous_status,
+            )
             return Response(
                 {
                     "status": f"{self.queryset.model.__name__} has been submitted for review."
@@ -129,13 +192,21 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
         """
         Allows owners to withdraw an object from review.
         """
-        obj = get_object_or_404(self.get_queryset(), pk=pk)
+        obj = self.get_object()
 
         # Enforce object-level permissions
         self.check_object_permissions(request, obj)
 
         try:
+            previous_status = getattr(obj, "publication_status", None)
             obj.withdraw_from_review()
+            self._post_review_action(
+                request,
+                obj,
+                action_name="withdraw_from_review",
+                review_action=ReviewAction.ACTION_WITHDRAWN,
+                previous_status=previous_status,
+            )
             return Response(
                 {
                     "status": f"{self.queryset.model.__name__} has been withdrawn from review."
@@ -153,13 +224,23 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
         Approve an object in 'review' state.
         Only accessible to moderators.
         """
-        obj = get_object_or_404(self.get_queryset(), pk=pk)
+        obj = self.get_object()
 
         # Enforce object-level permissions
         self.check_object_permissions(request, obj)
 
         try:
-            obj.approve()  # Utilize the model's approve method for consistency
+            previous_status = getattr(obj, "publication_status", None)
+            obj.approve(
+                user=request.user
+            )  # Utilize the model's approve method for consistency
+            self._post_review_action(
+                request,
+                obj,
+                action_name="approve",
+                review_action=ReviewAction.ACTION_APPROVED,
+                previous_status=previous_status,
+            )
             # TODO: Implement notification to the owner
             return Response(
                 {
@@ -178,13 +259,21 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
         Reject an object in 'review' state.
         Only accessible to moderators.
         """
-        obj = get_object_or_404(self.get_queryset(), pk=pk)
+        obj = self.get_object()
 
         # Enforce object-level permissions
         self.check_object_permissions(request, obj)
 
         try:
+            previous_status = getattr(obj, "publication_status", None)
             obj.reject()
+            self._post_review_action(
+                request,
+                obj,
+                action_name="reject",
+                review_action=ReviewAction.ACTION_REJECTED,
+                previous_status=previous_status,
+            )
             # TODO: Implement notification to the owner
             return Response(
                 {
@@ -204,7 +293,7 @@ class UserCreatedObjectViewSet(viewsets.ModelViewSet):
         That marks is as outdated but it is still available for
         legacy analyses.
         """
-        obj = get_object_or_404(self.get_queryset(), pk=pk)
+        obj = self.get_object()
 
         # Enforce object-level permissions
         self.check_object_permissions(request, obj)

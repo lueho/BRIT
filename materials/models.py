@@ -11,9 +11,11 @@ from bibliography.models import Source
 from distributions.models import TemporalDistribution, Timestep
 from utils.object_management.models import (
     NamedUserCreatedObject,
+    UserCreatedObject,
     UserCreatedObjectManager,
     get_default_owner,
 )
+from utils.properties.models import PropertyBase
 
 
 class MaterialCategory(NamedUserCreatedObject):
@@ -34,7 +36,6 @@ class BaseMaterial(NamedUserCreatedObject):
 
 
 class MaterialManager(models.Manager):
-
     def get_queryset(self):
         return super().get_queryset().filter(type="material")
 
@@ -162,6 +163,52 @@ class AnalyticalMethod(NamedUserCreatedObject):
         metadata based on self.ontology_uri. You might cache the results locally.
         """
         return {}  # TODO: Implement external metadata retrieval
+
+    def cascade_review_action(self, action_name, actor=None, previous_status=None):
+        """Cascade review actions to linked sources.
+
+        Analytical method review actions are propagated to all linked sources so
+        reviewers can access collaborator references in the review UI.
+        """
+        action_map = {
+            "submit_for_review": {
+                "from": [
+                    UserCreatedObject.STATUS_PRIVATE,
+                    UserCreatedObject.STATUS_DECLINED,
+                ],
+                "handler": "submit_for_review",
+            },
+            "withdraw_from_review": {
+                "from": [UserCreatedObject.STATUS_REVIEW],
+                "handler": "withdraw_from_review",
+            },
+            "approve": {
+                "from": [UserCreatedObject.STATUS_REVIEW],
+                "handler": "approve",
+            },
+            "reject": {
+                "from": [UserCreatedObject.STATUS_REVIEW],
+                "handler": "reject",
+            },
+        }
+        config = action_map.get(action_name)
+        if not config:
+            return
+
+        sources_qs = self.sources.filter(
+            publication_status__in=config["from"],
+        )
+        for source in sources_qs:
+            action = getattr(source, config["handler"], None)
+            if not callable(action):
+                continue
+            try:
+                if action_name == "approve" and actor is not None:
+                    action(user=actor)
+                else:
+                    action()
+            except Exception:
+                continue
 
 
 class SampleSeries(NamedUserCreatedObject):
@@ -321,8 +368,8 @@ def add_default_temporal_distribution(sender, instance, created, **kwargs):
         instance.add_temporal_distribution(TemporalDistribution.objects.default())
 
 
-class MaterialProperty(NamedUserCreatedObject):
-    unit = models.CharField(max_length=63)
+class MaterialProperty(PropertyBase):
+    """Materials-specific property definition."""
 
     def __str__(self):
         return f"{self.name} [{self.unit}]"

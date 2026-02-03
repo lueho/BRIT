@@ -1,8 +1,12 @@
+from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
+from django.test import RequestFactory, TestCase
 from django.urls import reverse
 
+from bibliography.models import Source
 from distributions.models import TemporalDistribution, Timestep
+from utils.object_management.views import SubmitForReviewView
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 
 from ..models import (
@@ -18,6 +22,8 @@ from ..models import (
     SampleSeries,
     WeightShare,
 )
+
+User = get_user_model()
 
 
 class MaterialDashboardViewTestCase(ViewWithPermissionsTestCase):
@@ -36,6 +42,478 @@ class MaterialDashboardViewTestCase(ViewWithPermissionsTestCase):
         self.client.force_login(self.member)
         response = self.client.get(reverse("materials-dashboard"))
         self.assertEqual(200, response.status_code)
+
+
+class AnalyticalMethodReviewCascadeTest(TestCase):
+    """Ensure analytical method review actions cascade to linked sources."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="method_owner")
+        cls.other_owner = User.objects.create_user(username="source_owner")
+        cls.factory = RequestFactory()
+
+        cls.analytical_method = AnalyticalMethod.objects.create(
+            owner=cls.owner,
+            name="Method A",
+            publication_status="private",
+        )
+        cls.owner_source = Source.objects.create(
+            owner=cls.owner,
+            abbreviation="S-OWN",
+            title="Owner Source",
+            publication_status="private",
+        )
+        cls.owner_declined_source = Source.objects.create(
+            owner=cls.owner,
+            abbreviation="S-DECL",
+            title="Declined Source",
+            publication_status="declined",
+        )
+        cls.other_source = Source.objects.create(
+            owner=cls.other_owner,
+            abbreviation="S-OTHER",
+            title="Other Source",
+            publication_status="private",
+        )
+        cls.published_source = Source.objects.create(
+            owner=cls.owner,
+            abbreviation="S-PUB",
+            title="Published Source",
+            publication_status="published",
+        )
+
+        cls.analytical_method.sources.add(
+            cls.owner_source,
+            cls.owner_declined_source,
+            cls.other_source,
+            cls.published_source,
+        )
+
+    def test_submit_cascades_to_all_sources(self):
+        """Submit for review cascades to all linked private/declined sources."""
+        request = self.factory.post("/")
+        request.user = self.owner
+
+        view = SubmitForReviewView()
+        view.request = request
+        view.object = self.analytical_method
+        view.action_attr_name = "submit_for_review"
+
+        view.post_action_hook(request, "private")
+
+        self.owner_source.refresh_from_db()
+        self.owner_declined_source.refresh_from_db()
+        self.other_source.refresh_from_db()
+        self.published_source.refresh_from_db()
+
+        self.assertEqual(self.owner_source.publication_status, "review")
+        self.assertEqual(self.owner_declined_source.publication_status, "review")
+        self.assertEqual(self.other_source.publication_status, "review")
+        self.assertEqual(self.published_source.publication_status, "published")
+
+    def test_withdraw_cascades_to_sources_in_review(self):
+        """Withdraw cascades to all linked sources in review."""
+        Source.objects.filter(
+            pk__in=[
+                self.owner_source.pk,
+                self.owner_declined_source.pk,
+                self.other_source.pk,
+            ]
+        ).update(publication_status="review")
+
+        request = self.factory.post("/")
+        request.user = self.owner
+
+        view = SubmitForReviewView()
+        view.request = request
+        view.object = self.analytical_method
+        view.action_attr_name = "withdraw_from_review"
+
+        view.post_action_hook(request, "review")
+
+        self.owner_source.refresh_from_db()
+        self.owner_declined_source.refresh_from_db()
+        self.other_source.refresh_from_db()
+        self.published_source.refresh_from_db()
+
+        self.assertEqual(self.owner_source.publication_status, "private")
+        self.assertEqual(self.owner_declined_source.publication_status, "private")
+        self.assertEqual(self.other_source.publication_status, "private")
+        self.assertEqual(self.published_source.publication_status, "published")
+
+    def test_approve_cascades_to_sources_in_review(self):
+        """Approve cascades to all linked sources in review."""
+        Source.objects.filter(
+            pk__in=[
+                self.owner_source.pk,
+                self.owner_declined_source.pk,
+                self.other_source.pk,
+            ]
+        ).update(publication_status="review")
+
+        request = self.factory.post("/")
+        request.user = self.owner
+
+        view = SubmitForReviewView()
+        view.request = request
+        view.object = self.analytical_method
+        view.action_attr_name = "approve"
+
+        view.post_action_hook(request, "review")
+
+        self.owner_source.refresh_from_db()
+        self.owner_declined_source.refresh_from_db()
+        self.other_source.refresh_from_db()
+        self.published_source.refresh_from_db()
+
+        self.assertEqual(self.owner_source.publication_status, "published")
+        self.assertEqual(self.owner_declined_source.publication_status, "published")
+        self.assertEqual(self.other_source.publication_status, "published")
+        self.assertEqual(self.owner_source.approved_by, self.owner)
+        self.assertEqual(self.owner_declined_source.approved_by, self.owner)
+        self.assertEqual(self.other_source.approved_by, self.owner)
+        self.assertEqual(self.published_source.publication_status, "published")
+
+    def test_reject_cascades_to_sources_in_review(self):
+        """Reject cascades to all linked sources in review."""
+        Source.objects.filter(
+            pk__in=[
+                self.owner_source.pk,
+                self.owner_declined_source.pk,
+                self.other_source.pk,
+            ]
+        ).update(publication_status="review")
+
+        request = self.factory.post("/")
+        request.user = self.owner
+
+        view = SubmitForReviewView()
+        view.request = request
+        view.object = self.analytical_method
+        view.action_attr_name = "reject"
+
+        view.post_action_hook(request, "review")
+
+        self.owner_source.refresh_from_db()
+        self.owner_declined_source.refresh_from_db()
+        self.other_source.refresh_from_db()
+        self.published_source.refresh_from_db()
+
+        self.assertEqual(self.owner_source.publication_status, "declined")
+        self.assertEqual(self.owner_declined_source.publication_status, "declined")
+        self.assertEqual(self.other_source.publication_status, "declined")
+        self.assertEqual(self.published_source.publication_status, "published")
+
+    def test_submit_with_no_sources(self):
+        """Submit cascade is a no-op when no sources are linked."""
+        method = AnalyticalMethod.objects.create(
+            owner=self.owner,
+            name="Method Empty",
+            publication_status="private",
+        )
+        request = self.factory.post("/")
+        request.user = self.owner
+
+        view = SubmitForReviewView()
+        view.request = request
+        view.object = method
+        view.action_attr_name = "submit_for_review"
+
+        view.post_action_hook(request, "private")
+
+        self.assertEqual(method.sources.count(), 0)
+
+    def test_submit_ignores_review_archived_and_unlinked_sources(self):
+        """Submit cascade only affects linked private/declined sources."""
+        method = AnalyticalMethod.objects.create(
+            owner=self.owner,
+            name="Method Extra",
+            publication_status="private",
+        )
+        private_source = Source.objects.create(
+            owner=self.owner,
+            abbreviation="S-PRIV",
+            title="Private Source",
+            publication_status="private",
+        )
+        declined_source = Source.objects.create(
+            owner=self.owner,
+            abbreviation="S-DEC2",
+            title="Declined Source",
+            publication_status="declined",
+        )
+        review_source = Source.objects.create(
+            owner=self.owner,
+            abbreviation="S-REV2",
+            title="Review Source",
+            publication_status="review",
+        )
+        archived_source = Source.objects.create(
+            owner=self.owner,
+            abbreviation="S-ARCH",
+            title="Archived Source",
+            publication_status="archived",
+        )
+        unlinked_source = Source.objects.create(
+            owner=self.owner,
+            abbreviation="S-UNLINK",
+            title="Unlinked Source",
+            publication_status="private",
+        )
+
+        method.sources.add(
+            private_source,
+            declined_source,
+            review_source,
+            archived_source,
+        )
+
+        request = self.factory.post("/")
+        request.user = self.owner
+
+        view = SubmitForReviewView()
+        view.request = request
+        view.object = method
+        view.action_attr_name = "submit_for_review"
+
+        view.post_action_hook(request, "private")
+
+        private_source.refresh_from_db()
+        declined_source.refresh_from_db()
+        review_source.refresh_from_db()
+        archived_source.refresh_from_db()
+        unlinked_source.refresh_from_db()
+
+        self.assertEqual(private_source.publication_status, "review")
+        self.assertEqual(declined_source.publication_status, "review")
+        self.assertEqual(review_source.publication_status, "review")
+        self.assertEqual(archived_source.publication_status, "archived")
+        self.assertEqual(unlinked_source.publication_status, "private")
+
+    def test_withdraw_leaves_non_review_sources_unchanged(self):
+        """Withdraw cascade only affects linked sources in review."""
+        method = AnalyticalMethod.objects.create(
+            owner=self.owner,
+            name="Method Withdraw",
+            publication_status="review",
+        )
+        review_source = Source.objects.create(
+            owner=self.owner,
+            abbreviation="S-REV3",
+            title="Review Source",
+            publication_status="review",
+        )
+        private_source = Source.objects.create(
+            owner=self.owner,
+            abbreviation="S-PRIV2",
+            title="Private Source",
+            publication_status="private",
+        )
+        declined_source = Source.objects.create(
+            owner=self.owner,
+            abbreviation="S-DEC3",
+            title="Declined Source",
+            publication_status="declined",
+        )
+        published_source = Source.objects.create(
+            owner=self.owner,
+            abbreviation="S-PUB2",
+            title="Published Source",
+            publication_status="published",
+        )
+        archived_source = Source.objects.create(
+            owner=self.owner,
+            abbreviation="S-ARCH2",
+            title="Archived Source",
+            publication_status="archived",
+        )
+
+        method.sources.add(
+            review_source,
+            private_source,
+            declined_source,
+            published_source,
+            archived_source,
+        )
+
+        request = self.factory.post("/")
+        request.user = self.owner
+
+        view = SubmitForReviewView()
+        view.request = request
+        view.object = method
+        view.action_attr_name = "withdraw_from_review"
+
+        view.post_action_hook(request, "review")
+
+        review_source.refresh_from_db()
+        private_source.refresh_from_db()
+        declined_source.refresh_from_db()
+        published_source.refresh_from_db()
+        archived_source.refresh_from_db()
+
+        self.assertEqual(review_source.publication_status, "private")
+        self.assertEqual(private_source.publication_status, "private")
+        self.assertEqual(declined_source.publication_status, "declined")
+        self.assertEqual(published_source.publication_status, "published")
+        self.assertEqual(archived_source.publication_status, "archived")
+
+    def test_approve_leaves_non_review_sources_unchanged(self):
+        """Approve cascade only affects linked sources in review."""
+        method = AnalyticalMethod.objects.create(
+            owner=self.owner,
+            name="Method Approve",
+            publication_status="review",
+        )
+        review_source = Source.objects.create(
+            owner=self.owner,
+            abbreviation="S-REV4",
+            title="Review Source",
+            publication_status="review",
+        )
+        collaborator_review = Source.objects.create(
+            owner=self.other_owner,
+            abbreviation="S-REV5",
+            title="Collaborator Review",
+            publication_status="review",
+        )
+        private_source = Source.objects.create(
+            owner=self.owner,
+            abbreviation="S-PRIV3",
+            title="Private Source",
+            publication_status="private",
+        )
+        declined_source = Source.objects.create(
+            owner=self.owner,
+            abbreviation="S-DEC4",
+            title="Declined Source",
+            publication_status="declined",
+        )
+        published_source = Source.objects.create(
+            owner=self.owner,
+            abbreviation="S-PUB3",
+            title="Published Source",
+            publication_status="published",
+        )
+        archived_source = Source.objects.create(
+            owner=self.owner,
+            abbreviation="S-ARCH3",
+            title="Archived Source",
+            publication_status="archived",
+        )
+
+        method.sources.add(
+            review_source,
+            collaborator_review,
+            private_source,
+            declined_source,
+            published_source,
+            archived_source,
+        )
+
+        request = self.factory.post("/")
+        request.user = self.owner
+
+        view = SubmitForReviewView()
+        view.request = request
+        view.object = method
+        view.action_attr_name = "approve"
+
+        view.post_action_hook(request, "review")
+
+        review_source.refresh_from_db()
+        collaborator_review.refresh_from_db()
+        private_source.refresh_from_db()
+        declined_source.refresh_from_db()
+        published_source.refresh_from_db()
+        archived_source.refresh_from_db()
+
+        self.assertEqual(review_source.publication_status, "published")
+        self.assertEqual(collaborator_review.publication_status, "published")
+        self.assertEqual(review_source.approved_by, self.owner)
+        self.assertEqual(collaborator_review.approved_by, self.owner)
+        self.assertEqual(private_source.publication_status, "private")
+        self.assertEqual(declined_source.publication_status, "declined")
+        self.assertEqual(published_source.publication_status, "published")
+        self.assertEqual(archived_source.publication_status, "archived")
+
+    def test_reject_leaves_non_review_sources_unchanged(self):
+        """Reject cascade only affects linked sources in review."""
+        method = AnalyticalMethod.objects.create(
+            owner=self.owner,
+            name="Method Reject",
+            publication_status="review",
+        )
+        review_source = Source.objects.create(
+            owner=self.owner,
+            abbreviation="S-REV6",
+            title="Review Source",
+            publication_status="review",
+        )
+        collaborator_review = Source.objects.create(
+            owner=self.other_owner,
+            abbreviation="S-REV7",
+            title="Collaborator Review",
+            publication_status="review",
+        )
+        private_source = Source.objects.create(
+            owner=self.owner,
+            abbreviation="S-PRIV4",
+            title="Private Source",
+            publication_status="private",
+        )
+        declined_source = Source.objects.create(
+            owner=self.owner,
+            abbreviation="S-DEC5",
+            title="Declined Source",
+            publication_status="declined",
+        )
+        published_source = Source.objects.create(
+            owner=self.owner,
+            abbreviation="S-PUB4",
+            title="Published Source",
+            publication_status="published",
+        )
+        archived_source = Source.objects.create(
+            owner=self.owner,
+            abbreviation="S-ARCH4",
+            title="Archived Source",
+            publication_status="archived",
+        )
+
+        method.sources.add(
+            review_source,
+            collaborator_review,
+            private_source,
+            declined_source,
+            published_source,
+            archived_source,
+        )
+
+        request = self.factory.post("/")
+        request.user = self.owner
+
+        view = SubmitForReviewView()
+        view.request = request
+        view.object = method
+        view.action_attr_name = "reject"
+
+        view.post_action_hook(request, "review")
+
+        review_source.refresh_from_db()
+        collaborator_review.refresh_from_db()
+        private_source.refresh_from_db()
+        declined_source.refresh_from_db()
+        published_source.refresh_from_db()
+        archived_source.refresh_from_db()
+
+        self.assertEqual(review_source.publication_status, "declined")
+        self.assertEqual(collaborator_review.publication_status, "declined")
+        self.assertEqual(private_source.publication_status, "private")
+        self.assertEqual(declined_source.publication_status, "declined")
+        self.assertEqual(published_source.publication_status, "published")
+        self.assertEqual(archived_source.publication_status, "archived")
 
 
 # ----------- Material Category CRUD -----------------------------------------------------------------------------------

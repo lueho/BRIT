@@ -1,11 +1,15 @@
 from django.contrib.auth.models import User
 from django.urls import reverse
+from rest_framework import status
 from rest_framework.test import APIRequestFactory, APITestCase
 
 from case_studies.soilcom.models import (
+    AggregatedCollectionPropertyValue,
     Catchment,
     Collection,
+    CollectionCatchment,
     CollectionFrequency,
+    CollectionPropertyValue,
     CollectionSystem,
     Collector,
     FeeSystem,
@@ -14,6 +18,7 @@ from case_studies.soilcom.models import (
 )
 from case_studies.soilcom.viewsets import CollectionViewSet
 from utils.object_management.models import UserCreatedObject
+from utils.properties.models import Property, Unit
 
 
 class CollectionViewSetTestCase(APITestCase):
@@ -275,3 +280,127 @@ class CollectionViewSetTestCase(APITestCase):
         # The get_geom method should fall back to original geometry
         result = serializer.get_geom(mock_instance)
         self.assertEqual(result, "original_geom")
+
+
+class CollectionReviewActionApiTestCase(APITestCase):
+    """Ensure review action API endpoints trigger collection cascade behavior."""
+
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="owner")
+        cls.other_owner = User.objects.create_user(username="other-owner")
+        cls.staff = User.objects.create_user(username="staff", is_staff=True)
+
+        cls.catchment = CollectionCatchment.objects.create(name="Test Catchment")
+        cls.collector = Collector.objects.create(name="Test Collector")
+        cls.collection_system = CollectionSystem.objects.create(
+            name="Test Collection System"
+        )
+        cls.waste_category = WasteCategory.objects.create(name="Test Waste Category")
+        cls.waste_stream = WasteStream.objects.create(
+            name="Test Waste Stream", category=cls.waste_category
+        )
+        cls.frequency = CollectionFrequency.objects.create(name="Test Frequency")
+        cls.fee_system = FeeSystem.objects.create(name="Test Fee System")
+
+        cls.unit = Unit.objects.create(name="Test Unit", publication_status="published")
+        cls.property = Property.objects.create(
+            name="Test Property",
+            unit="kg",
+            publication_status="published",
+        )
+        cls.property.allowed_units.add(cls.unit)
+
+    def _create_collection(self, name, owner, publication_status):
+        return Collection.objects.create(
+            name=name,
+            owner=owner,
+            catchment=self.catchment,
+            waste_stream=self.waste_stream,
+            collection_system=self.collection_system,
+            publication_status=publication_status,
+            collector=self.collector,
+            fee_system=self.fee_system,
+            frequency=self.frequency,
+        )
+
+    def _create_cpv(self, collection, owner, status, year=2020):
+        return CollectionPropertyValue.objects.create(
+            collection=collection,
+            property=self.property,
+            unit=self.unit,
+            owner=owner,
+            publication_status=status,
+            year=year,
+            average=10.0,
+        )
+
+    def _create_acpv(self, collections, owner, status, year=2020):
+        acpv = AggregatedCollectionPropertyValue.objects.create(
+            property=self.property,
+            unit=self.unit,
+            owner=owner,
+            publication_status=status,
+            year=year,
+            average=20.0,
+        )
+        acpv.collections.set(collections)
+        return acpv
+
+    def test_register_for_review_cascades_property_values(self):
+        collection = self._create_collection(
+            "Collection Submit",
+            owner=self.owner,
+            publication_status="private",
+        )
+        cpv_private = self._create_cpv(collection, self.owner, "private")
+        cpv_declined = self._create_cpv(collection, self.owner, "declined", year=2021)
+        cpv_published = self._create_cpv(collection, self.owner, "published", year=2022)
+        acpv_private = self._create_acpv([collection], self.owner, "private")
+
+        self.client.force_login(self.owner)
+        url = reverse(
+            "api-waste-collection-register-for-review", kwargs={"pk": collection.pk}
+        )
+        response = self.client.post(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        collection.refresh_from_db()
+        cpv_private.refresh_from_db()
+        cpv_declined.refresh_from_db()
+        cpv_published.refresh_from_db()
+        acpv_private.refresh_from_db()
+
+        self.assertEqual(collection.publication_status, "review")
+        self.assertEqual(cpv_private.publication_status, "review")
+        self.assertEqual(cpv_declined.publication_status, "review")
+        self.assertEqual(cpv_published.publication_status, "published")
+        self.assertEqual(acpv_private.publication_status, "review")
+
+    def test_approve_cascades_property_values(self):
+        collection = self._create_collection(
+            "Collection Approve",
+            owner=self.owner,
+            publication_status="review",
+        )
+        cpv_owner = self._create_cpv(collection, self.owner, "review")
+        cpv_other = self._create_cpv(collection, self.other_owner, "review", year=2021)
+        acpv_review = self._create_acpv([collection], self.owner, "review")
+
+        self.client.force_login(self.staff)
+        url = reverse("api-waste-collection-approve", kwargs={"pk": collection.pk})
+        response = self.client.post(url)
+
+        self.assertEqual(response.status_code, status.HTTP_200_OK)
+        collection.refresh_from_db()
+        cpv_owner.refresh_from_db()
+        cpv_other.refresh_from_db()
+        acpv_review.refresh_from_db()
+
+        self.assertEqual(collection.publication_status, "published")
+        self.assertEqual(cpv_owner.publication_status, "published")
+        self.assertEqual(cpv_other.publication_status, "published")
+        self.assertEqual(cpv_owner.approved_by, self.staff)
+        self.assertEqual(cpv_other.approved_by, self.staff)
+        self.assertEqual(acpv_review.publication_status, "published")
+        self.assertEqual(acpv_review.approved_by, self.staff)

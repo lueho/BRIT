@@ -508,7 +508,27 @@ class BaseReviewActionView(LoginRequiredMixin, UserPassesTestMixin, View):
             request: The HTTP request
             previous_status: The object's publication_status before the action
         """
-        pass
+        obj = getattr(self, "object", None)
+        action_name = getattr(self, "action_attr_name", None)
+        if not obj or not action_name:
+            return
+
+        cascade_handler = getattr(obj, "cascade_review_action", None)
+        if not callable(cascade_handler):
+            return
+
+        try:
+            cascade_handler(
+                action_name=action_name,
+                actor=getattr(request, "user", None),
+                previous_status=previous_status,
+            )
+        except Exception as exc:
+            logger.warning(
+                "Review action cascade failed for %s: %s",
+                obj,
+                exc,
+            )
 
     # Default POST handler for all review action views (modal and non‑modal)
     def post(self, request, *args, **kwargs):  # type: ignore[override]
