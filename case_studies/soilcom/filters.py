@@ -391,6 +391,16 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
         form_helper = CollectionFilterFormHelper
 
     def __init__(self, *args, **kwargs):
+        data = kwargs.get("data")
+        if data:
+            data = data.copy()
+            catchment_value = data.get("catchment")
+            if catchment_value:
+                try:
+                    int(catchment_value)
+                except (TypeError, ValueError):
+                    data.pop("catchment", None)
+            kwargs["data"] = data
         super().__init__(*args, **kwargs)
         self.filters["connection_rate"].set_min_max()
         self.filters["collections_per_year"].set_min_max()
