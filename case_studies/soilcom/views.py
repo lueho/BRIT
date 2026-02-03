@@ -1143,86 +1143,8 @@ class CollectionReviewActionCascadeMixin:
     """
 
     def post_action_hook(self, request, previous_status=None):
-        """Cascade the review action to related property values."""
+        """Delegate to the base hook (model cascade is handled centrally)."""
         super().post_action_hook(request, previous_status)
-
-        # Determine action from view's action_attr_name
-        action_name = getattr(self, "action_attr_name", None)
-        if not action_name or not hasattr(self, "object"):
-            return
-
-        # Get all versions in the chain
-        versions = (
-            self.object.all_versions()
-            if hasattr(self.object, "all_versions")
-            else [self.object]
-        )
-
-        actor_id = getattr(request.user, "id", None)
-
-        # Determine which property values to cascade to
-        cpv_statuses = self._allowed_statuses_for_action(action_name)
-        if not cpv_statuses:
-            return
-
-        # Query property values
-        cpv_qs = CollectionPropertyValue.objects.filter(collection__in=versions)
-        cpv_qs = cpv_qs.filter(publication_status__in=cpv_statuses)
-
-        # Apply owner filtering for submit/withdraw (not for reject/approve)
-        if action_name in ("submit_for_review", "withdraw_from_review") and actor_id:
-            from django.db.models import Q
-
-            cpv_qs = cpv_qs.filter(
-                Q(owner_id=actor_id) | Q(collection__owner_id=actor_id)
-            )
-
-        cpv_list = list(cpv_qs.select_related("collection", "property", "unit"))
-
-        # Query aggregated property values
-        agg_qs = AggregatedCollectionPropertyValue.objects.filter(
-            collections__in=versions
-        ).distinct()
-        agg_qs = agg_qs.filter(publication_status__in=cpv_statuses)
-
-        # Apply owner filtering for submit/withdraw (not for reject/approve)
-        if action_name in ("submit_for_review", "withdraw_from_review") and actor_id:
-            agg_qs = agg_qs.filter(owner_id=actor_id)
-
-        agg_list = list(
-            agg_qs.select_related("property", "unit").prefetch_related("collections")
-        )
-
-        # Apply the transition to all property values
-        self._apply_transition(cpv_list + agg_list, action_name)
-
-    def _allowed_statuses_for_action(self, action_name):
-        """Return which publication statuses should be affected by this action."""
-        if action_name == "submit_for_review":
-            return ["private", "declined"]
-        elif action_name == "withdraw_from_review":
-            return ["review"]
-        elif action_name == "reject":
-            return ["review"]
-        elif action_name == "approve":
-            return ["review"]
-        return []
-
-    def _apply_transition(self, values, action_name):
-        """Apply the review action to each value."""
-        for val in values:
-            action_method = getattr(val, action_name, None)
-            if not callable(action_method):
-                continue
-            try:
-                # For approve, pass the user
-                if action_name == "approve":
-                    action_method(user=self.request.user)
-                else:
-                    action_method()
-            except Exception:
-                # Log but don't fail - cascade errors shouldn't block the main action
-                pass
 
 
 class CollectionReviewItemDetailView(ReviewItemDetailView):

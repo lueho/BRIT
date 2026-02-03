@@ -732,6 +732,67 @@ class Collection(NamedUserCreatedObject):
         if not self.predecessors.filter(id=predecessor.id).exists():
             self.predecessors.add(predecessor)
 
+    def cascade_review_action(self, action_name, actor=None, previous_status=None):
+        """Cascade review actions to property values across the collection chain."""
+        versions = self.all_versions() if hasattr(self, "all_versions") else [self]
+        actor_id = getattr(actor, "id", None)
+
+        allowed_statuses = self._allowed_statuses_for_review_action(action_name)
+        if not allowed_statuses:
+            return
+
+        cpv_qs = CollectionPropertyValue.objects.filter(collection__in=versions)
+        cpv_qs = cpv_qs.filter(publication_status__in=allowed_statuses)
+
+        if action_name in ("submit_for_review", "withdraw_from_review") and actor_id:
+            cpv_qs = cpv_qs.filter(
+                Q(owner_id=actor_id) | Q(collection__owner_id=actor_id)
+            )
+
+        cpv_list = list(cpv_qs.select_related("collection", "property", "unit"))
+
+        agg_qs = AggregatedCollectionPropertyValue.objects.filter(
+            collections__in=versions
+        ).distinct()
+        agg_qs = agg_qs.filter(publication_status__in=allowed_statuses)
+
+        if action_name in ("submit_for_review", "withdraw_from_review") and actor_id:
+            agg_qs = agg_qs.filter(owner_id=actor_id)
+
+        agg_list = list(
+            agg_qs.select_related("property", "unit").prefetch_related("collections")
+        )
+
+        self._apply_review_action_transition(
+            cpv_list + agg_list, action_name, actor=actor
+        )
+
+    @staticmethod
+    def _allowed_statuses_for_review_action(action_name):
+        """Return which publication statuses should be affected by a review action."""
+        if action_name == "submit_for_review":
+            return ["private", "declined"]
+        if action_name == "withdraw_from_review":
+            return ["review"]
+        if action_name in ("approve", "reject"):
+            return ["review"]
+        return []
+
+    @staticmethod
+    def _apply_review_action_transition(values, action_name, actor=None):
+        """Apply the review action to each related value."""
+        for value in values:
+            action_method = getattr(value, action_name, None)
+            if not callable(action_method):
+                continue
+            try:
+                if action_name == "approve":
+                    action_method(user=actor)
+                else:
+                    action_method()
+            except Exception:
+                continue
+
     def approve(self, user=None):
         """
         Publish the collection and archive predecessors, with concurrency check.
