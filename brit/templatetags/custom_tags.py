@@ -1,3 +1,5 @@
+from decimal import Decimal, InvalidOperation
+
 from django import template
 
 register = template.Library()
@@ -11,6 +13,32 @@ def verbose_name(obj):
 @register.filter
 def class_name(obj):
     return obj.__class__.__name__.lower()
+
+
+@register.filter
+def trim_decimal(value, places=10):
+    """Format numeric values without trailing zeros."""
+
+    if value is None:
+        return ""
+    try:
+        places_value = int(places) if places is not None else 10
+    except (TypeError, ValueError):
+        places_value = 10
+    if places_value < 0:
+        places_value = 0
+    try:
+        dec_value = value if isinstance(value, Decimal) else Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        return value
+
+    if places_value == 0:
+        quantizer = Decimal("1")
+    else:
+        quantizer = Decimal("1." + "0" * places_value)
+    quantized = dec_value.quantize(quantizer)
+    text = format(quantized, "f").rstrip("0").rstrip(".")
+    return "0" if text == "-0" else text
 
 
 # Solution from: https://www.caktusgroup.com/blog/2018/10/18/filtering-and-pagination-django/
@@ -35,7 +63,7 @@ def param_replace(context, **kwargs):
     Based on
     https://stackoverflow.com/questions/22734695/next-and-before-links-for-a-django-paginated-query/22735278#22735278
     """
-    d = context['request'].GET.copy()
+    d = context["request"].GET.copy()
     for k, v in kwargs.items():
         d[k] = v
     for k in [k for k, v in d.items() if not v]:
