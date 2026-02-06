@@ -27,6 +27,8 @@
  * @property mapConfig.applyFilterToFeatures // true: filter is parsed / false: query parameters from URL are used
  * @property mapConfig.adjustBoundsToLayer // Possible values: 'region', 'catchment', 'features'
  * @property mapConfig.layerOrder // Array defining the order of layers from bottom to top
+ * @property mapConfig.showComposedOf // true: show composed_of borders for the current region
+ * @property mapConfig.composedOfRegionId // region id used to fetch composed_of borders
  */
 
 /**
@@ -1042,8 +1044,17 @@ function unlockCustomElements() {
 
 function loadLayers(params) {
     // Use passed params if provided, otherwise get from form/URL
-    const filterParameters = params || getFeaturesLayerFilterParameters();
+    let filterParameters = params || getFeaturesLayerFilterParameters();
     const promises = [];
+
+    if (mapConfig.showComposedOf && mapConfig.composedOfRegionId) {
+        mapConfig.loadFeatures = true;
+        const composedParams = filterParameters instanceof URLSearchParams
+            ? new URLSearchParams(filterParameters.toString())
+            : new URLSearchParams(filterParameters);
+        composedParams.set('composed_of', mapConfig.composedOfRegionId);
+        filterParameters = composedParams;
+    }
 
     const region_id = filterParameters.get('region') || (mapConfig.loadRegion ? mapConfig.regionId : null);
     if (region_id) {

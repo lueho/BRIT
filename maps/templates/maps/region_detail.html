@@ -5,12 +5,53 @@
 {% block detail_header %}Region: {{ object.name }}{% endblock %}
 
 {% block detail_body %}
-    <p class="card-text"><strong>Name:</strong><br>{{ object.name }}</p>
+    <p class="card-text">
+        <strong>Name:</strong>
+        <br>
+        {{ object.name }}
+    </p>
     {% if object.country %}
-        <p class="card-text"><strong>Country:</strong><br>{{ object.country }}</p>
+        <p class="card-text">
+            <strong>Country:</strong>
+            <br>
+            {{ object.country }}
+        </p>
     {% endif %}
     {% if object.description %}
-        <p class="card-text"><strong>Description:</strong><br>{{ object.description }}</p>
+        <p class="card-text">
+            <strong>Description:</strong>
+            <br>
+            {{ object.description }}
+        </p>
     {% endif %}
     {% block additional_details %}{% endblock %}
+{% endblock %}
+
+{% block options_secondary_actions %}
+    <div class="form-check mb-2">
+        <input class="form-check-input"
+               type="checkbox"
+               id="toggle-composed-of"
+               {% if show_composed_of %}checked{% endif %}>
+        <label class="form-check-label" for="toggle-composed-of">Show composed-of borders</label>
+    </div>
+    <script>
+        (function () {
+            const toggle = document.getElementById('toggle-composed-of');
+            if (!toggle) {
+                return;
+            }
+            toggle.addEventListener('change', (event) => {
+                const url = new URL(window.location.href);
+                if (event.target.checked) {
+                    url.searchParams.set('show_composed_of', '1');
+                    url.searchParams.set('composed_of', '{{ object.id }}');
+                } else {
+                    url.searchParams.delete('show_composed_of');
+                    url.searchParams.delete('composed_of');
+                }
+                window.location.href = url.toString();
+            });
+        })();
+    </script>
 {% endblock %}

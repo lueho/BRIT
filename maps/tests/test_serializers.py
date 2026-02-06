@@ -110,7 +110,6 @@ class MapConfigurationSerializerTestCase(TestCase):
 
     @patch("maps.models.reverse", side_effect=mock_reverse_side_effect)
     def test_serialization_with_override_params_features(self, mock_reverse):
-
         override_params = {
             "load_features": False,
             "features_feature_id": "1",
@@ -213,7 +212,6 @@ class MapConfigurationSerializerTestCase(TestCase):
     def test_serialization_with_override_params_region_and_catchment(
         self, mock_reverse
     ):
-
         override_params = {
             "region_feature_id": "999",
             "catchment_feature_id": "888",
@@ -268,7 +266,6 @@ class MapConfigurationSerializerTestCase(TestCase):
 
     @patch("maps.models.reverse", side_effect=mock_reverse_side_effect)
     def test_serialization_field_renaming(self, mock_reverse):
-
         serializer = MapConfigurationSerializer(instance=self.map_config)
         serialized_data = serializer.data
 
@@ -282,7 +279,6 @@ class MapConfigurationSerializerTestCase(TestCase):
 
     @patch("maps.models.reverse", side_effect=mock_reverse_side_effect)
     def test_serialization_load_layer_overridden(self, mock_reverse):
-
         override_params = {
             "load_region": True,
             "load_catchment": False,
@@ -374,7 +370,6 @@ class MapConfigurationSerializerTestCase(TestCase):
 
     @patch("maps.models.reverse", side_effect=mock_reverse_side_effect)
     def test_serialization_with_partial_override_params(self, mock_reverse):
-
         # Override only some parameters
         override_params = {
             "load_features": False,
@@ -397,7 +392,6 @@ class MapConfigurationSerializerTestCase(TestCase):
 
 
 class NutsRegionSummarySerializerTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         attribute = Attribute.objects.create(name="Population density", unit="1/km²")
@@ -437,7 +431,7 @@ class NutsRegionSummarySerializerTestCase(TestCase):
         )
         data = NutsRegionSummarySerializer(self.region).data
         self.assertIn("population", data)
-        self.assertTrue(type(data["population"] == int))
+        self.assertEqual(data["population"], "123321 (2021)")
 
     def test_population_method_field_returns_non_for_non_existing(self):
         data = NutsRegionSummarySerializer(self.region).data

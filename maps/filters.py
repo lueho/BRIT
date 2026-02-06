@@ -1,5 +1,5 @@
 from django.forms import HiddenInput
-from django_filters import CharFilter, ModelChoiceFilter, NumberFilter
+from django_filters import CharFilter, ChoiceFilter, ModelChoiceFilter, NumberFilter
 from django_tomselect.app_settings import TomSelectConfig
 from django_tomselect.widgets import TomSelectModelWidget
 
@@ -22,9 +22,33 @@ class CatchmentFilterSet(BaseCrispyFilterSet):
 
 
 class RegionFilterSet(BaseCrispyFilterSet):
+    REGION_TYPE_CHOICES = (
+        ("custom", "Custom"),
+        ("nuts", "NUTS"),
+        ("lau", "LAU"),
+    )
+
     name_icontains = CharFilter(
         field_name="name", lookup_expr="icontains", label="Name contains"
     )
+    region_type = ChoiceFilter(
+        label="Type",
+        choices=REGION_TYPE_CHOICES,
+        method="filter_region_type",
+    )
+    composed_of = NumberFilter(
+        field_name="composing_regions__id",
+        label="Composed of region id",
+    )
+
+    def filter_region_type(self, queryset, name, value):
+        if value == "custom":
+            return queryset.filter(nutsregion__isnull=True, lauregion__isnull=True)
+        if value == "nuts":
+            return queryset.filter(nutsregion__isnull=False)
+        if value == "lau":
+            return queryset.filter(lauregion__isnull=False)
+        return queryset
 
     class Meta:
         model = Region
@@ -32,7 +56,9 @@ class RegionFilterSet(BaseCrispyFilterSet):
             "id",
             "name",
             "name_icontains",
+            "region_type",
             "country",
+            "composed_of",
         )
 
 

@@ -493,6 +493,50 @@ class RegionDetailView(MapMixin, UserCreatedObjectDetailView):
     model = Region
     features_layer_api_basename = "api-region"
 
+    def get_region_feature_id(self):
+        return self.object.pk
+
+    def get_override_params(self):
+        params = super().get_override_params()
+        params.pop("features_feature_id", None)
+
+        show_composed = self.request.GET.get("show_composed_of") in {"1", "true"}
+        if show_composed:
+            params["load_features"] = True
+            params["features_layer_style"] = {
+                "color": "#f49a33",
+                "weight": 2,
+                "opacity": 1.0,
+                "fillColor": "#f49a33",
+                "fillOpacity": 0.0,
+                "dashArray": "6, 6",
+                "lineCap": "round",
+                "lineJoin": "round",
+                "fillRule": "evenodd",
+                "className": "",
+                "radius": 3,
+            }
+        else:
+            params["load_features"] = False
+
+        return params
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["show_composed_of"] = self.request.GET.get("show_composed_of") in {
+            "1",
+            "true",
+        }
+        return context
+
+    def post_process_map_config(self, map_config):
+        map_config = super().post_process_map_config(map_config)
+        show_composed = self.request.GET.get("show_composed_of") in {"1", "true"}
+        map_config["showComposedOf"] = show_composed
+        if show_composed:
+            map_config["composedOfRegionId"] = self.object.pk
+        return map_config
+
 
 class RegionCreateView(UserCreatedObjectCreateView):
     form_class = RegionModelForm
