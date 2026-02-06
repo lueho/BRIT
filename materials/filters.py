@@ -1,9 +1,13 @@
-from django_filters import ModelChoiceFilter
+from django_filters import BooleanFilter, DateFromToRangeFilter, ModelChoiceFilter
 from django_filters import rest_framework as rf_filters
 from django_tomselect.app_settings import TomSelectConfig
 from django_tomselect.widgets import TomSelectModelWidget
 
 from utils.filters import BaseCrispyFilterSet, UserCreatedObjectScopedFilterSet
+from utils.object_management.permissions import (
+    apply_scope_filter,
+    filter_queryset_for_user,
+)
 
 from .models import Composition, Material, Sample, SampleSeries
 
@@ -45,6 +49,31 @@ class SampleFilter(UserCreatedObjectScopedFilterSet):
             )
         ),
     )
+    standalone = BooleanFilter(field_name="standalone", label="Standalone")
+    created_at = DateFromToRangeFilter(field_name="created_at", label="Created")
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = getattr(self, "request", None)
+        queryset = Sample.objects.all()
+        if request and hasattr(request, "user"):
+            queryset = filter_queryset_for_user(queryset, request.user)
+
+        scope_value = None
+        try:
+            if hasattr(self, "data") and self.data:
+                scope_value = self.data.get("scope")
+            if not scope_value and hasattr(self, "form"):
+                scope_value = self.form.initial.get("scope")
+        except Exception:
+            scope_value = None
+
+        if scope_value:
+            queryset = apply_scope_filter(
+                queryset, scope_value, user=getattr(request, "user", None)
+            )
+
+        self.filters["name"].queryset = queryset
 
     class Meta:
         model = Sample
@@ -52,6 +81,8 @@ class SampleFilter(UserCreatedObjectScopedFilterSet):
             "scope",
             "name",
             "material",
+            "standalone",
+            "created_at",
         )
 
 

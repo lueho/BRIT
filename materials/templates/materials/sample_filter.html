@@ -18,6 +18,8 @@
                 <th>Id</th>
                 <th>Name</th>
                 <th>Material</th>
+                <th>Standalone</th>
+                <th>Created</th>
                 {% if object_list.model|is_user_created %}<th class="actions-column">Status/Actions</th>{% endif %}
             </tr>
         </thead>
@@ -33,6 +35,8 @@
                     <td data-label="Material">
                         <a href="{% url 'material-detail' object.material.pk %}">{{ object.material.name }}</a>
                     </td>
+                    <td data-label="Standalone">{{ object.standalone|yesno:"Yes,No" }}</td>
+                    <td data-label="Created">{{ object.created_at|date:"Y-m-d" }}</td>
                     {% if object_list.model|is_user_created %}
                         <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
                     {% endif %}
