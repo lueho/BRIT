@@ -129,7 +129,7 @@ class MaterialPropertyValueModelSerializer(ModelSerializer):
     property_url = HyperlinkedRelatedField(
         source="property", read_only=True, view_name="materialproperty-detail-modal"
     )
-    unit = StringRelatedField(source="property.unit")
+    unit = ReadOnlyField(source="property.unit")
     analytical_method = StringRelatedField()
     sources = SourceAbbreviationSerializer(many=True)
 
@@ -236,7 +236,7 @@ class MaterialAPISerializer(ModelSerializer):
 
 class MaterialPropertyAPISerializer(ModelSerializer):
     name = StringRelatedField(source="property")
-    unit = StringRelatedField(source="property.unit")
+    unit = ReadOnlyField(source="property.unit")
 
     class Meta:
         model = MaterialPropertyValue
