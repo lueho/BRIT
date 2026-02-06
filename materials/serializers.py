@@ -130,6 +130,8 @@ class MaterialPropertyValueModelSerializer(ModelSerializer):
         source="property", read_only=True, view_name="materialproperty-detail-modal"
     )
     unit = StringRelatedField(source="property.unit")
+    analytical_method = StringRelatedField()
+    sources = SourceAbbreviationSerializer(many=True)
 
     class Meta:
         model = MaterialPropertyValue
@@ -138,6 +140,8 @@ class MaterialPropertyValueModelSerializer(ModelSerializer):
             "property",
             "property_name",
             "property_url",
+            "analytical_method",
+            "sources",
             "average",
             "standard_deviation",
             "unit",

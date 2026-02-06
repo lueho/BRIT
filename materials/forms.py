@@ -94,10 +94,18 @@ class MaterialPropertyModalModelForm(ModalModelFormMixin, MaterialPropertyModelF
     pass
 
 
-class MaterialPropertyValueModelForm(SimpleModelForm):
+class MaterialPropertyValueModelForm(
+    UserCreatedObjectFormMixin, SourcesFieldMixin, SimpleModelForm
+):
     class Meta:
         model = MaterialPropertyValue
-        fields = ("property", "average", "standard_deviation")
+        fields = (
+            "property",
+            "analytical_method",
+            "sources",
+            "average",
+            "standard_deviation",
+        )
 
 
 class MaterialPropertyValueModalModelForm(
