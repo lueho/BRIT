@@ -287,6 +287,7 @@ class GeoPolygon(models.Model):
 
 class Region(NamedUserCreatedObject):
     country = models.CharField(max_length=56, null=False)
+    type = models.CharField(max_length=14, choices=TYPES, default="custom")
     borders = models.ForeignKey(GeoPolygon, on_delete=models.PROTECT, null=True)
     composed_of = models.ManyToManyField(
         "self", symmetrical=False, related_name="composing_regions", blank=True
@@ -416,6 +417,11 @@ class NutsRegion(Region):
 
         return pedigree
 
+    def save(self, *args, **kwargs):
+        """Automatically set type to 'nuts' for NUTS regions."""
+        self.type = "nuts"
+        super().save(*args, **kwargs)
+
     def __str__(self):
         return f"{self.nuts_name} ({self.nuts_id})"
 
@@ -428,6 +434,11 @@ class LauRegion(Region):
     nuts_parent = models.ForeignKey(
         NutsRegion, related_name="lau_children", on_delete=models.PROTECT, null=True
     )
+
+    def save(self, *args, **kwargs):
+        """Automatically set type to 'lau' for LAU regions."""
+        self.type = "lau"
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return f"{self.lau_name} ({self.lau_id})"
