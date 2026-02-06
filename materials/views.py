@@ -14,6 +14,7 @@ from extra_views import UpdateWithInlinesView
 
 from distributions.models import TemporalDistribution
 from distributions.plots import DoughnutChart
+from utils.file_export.views import SingleObjectFileExportView
 from utils.object_management.permissions import get_object_policy
 from utils.object_management.views import (
     PrivateObjectFilterView,
@@ -500,7 +501,7 @@ class SampleCreateView(UserCreatedObjectCreateView):
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs['request'] = self.request
+        kwargs["request"] = self.request
         return kwargs
 
 
@@ -510,7 +511,7 @@ class SampleModalCreateView(UserCreatedObjectModalCreateView):
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs['request'] = self.request
+        kwargs["request"] = self.request
         return kwargs
 
 
@@ -527,7 +528,24 @@ class SampleDetailView(UserCreatedObjectDetailView):
             chart_data = CompositionDoughnutChartSerializer(composition).data
             chart = DoughnutChart(**chart_data)
             charts[f"composition-chart-{composition.id}"] = chart.as_dict()
-        context.update({"data": data, "charts": charts})
+        component_measurements = (
+            self.object.component_measurements.select_related(
+                "group",
+                "component",
+                "basis_component",
+                "analytical_method",
+                "unit",
+            )
+            .prefetch_related("sources")
+            .order_by("group__name", "component__name", "id")
+        )
+        context.update(
+            {
+                "data": data,
+                "charts": charts,
+                "component_measurements": component_measurements,
+            }
+        )
         return context
 
 
@@ -537,7 +555,7 @@ class SampleUpdateView(UserCreatedObjectUpdateView):
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs['request'] = self.request
+        kwargs["request"] = self.request
         return kwargs
 
 
@@ -639,7 +657,7 @@ class SampleCreateDuplicateView(UserCreatedObjectUpdateView):
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
-        kwargs['request'] = self.request
+        kwargs["request"] = self.request
         return kwargs
 
     def get_initial(self):
@@ -873,10 +891,10 @@ class AddSeasonalVariationView(
 
     def get_form(self, **kwargs):
         form = super().get_form(**kwargs)
-        form.fields["temporal_distribution"].queryset = (
-            TemporalDistribution.objects.exclude(
-                id__in=self.get_object().blocked_distribution_ids
-            )
+        form.fields[
+            "temporal_distribution"
+        ].queryset = TemporalDistribution.objects.exclude(
+            id__in=self.get_object().blocked_distribution_ids
         )
         return form
 
@@ -926,3 +944,19 @@ class FeaturedMaterialListView(ListView):
 
     def get_queryset(self):
         return SampleSeries.objects.filter(publish=True)
+
+
+# ----------- Sample Export Views --------------------------------------------------------------------------------------
+# ----------------------------------------------------------------------------------------------------------------------
+
+
+class SampleExportView(SingleObjectFileExportView):
+    """Export sample measurements to Excel."""
+
+    model = Sample
+
+    def get_task_function(self):
+        """Return the Celery task, imported inline to avoid circular imports."""
+        from .tasks import export_sample_measurements_to_excel
+
+        return export_sample_measurements_to_excel

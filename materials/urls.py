@@ -224,6 +224,11 @@ urlpatterns = [
         name="sample-duplicate",
     ),
     path(
+        "samples/<int:pk>/export/",
+        views.SampleExportView.as_view(),
+        name="sample-export",
+    ),
+    path(
         "categories/",
         views.MaterialCategoryPublishedListView.as_view(),
         name="materialcategory-list",
