@@ -5,6 +5,20 @@ from bibliography.models import Source
 from utils.object_management.models import NamedUserCreatedObject, get_default_owner
 
 
+class PropertyBase(NamedUserCreatedObject):
+    """
+    Abstract base for module-specific property definitions.
+
+    This keeps shared behavior (review workflow, ownership, naming) centralized
+    while allowing each module to store its own property records.
+    """
+
+    unit = models.CharField(max_length=63)
+
+    class Meta:
+        abstract = True
+
+
 class Unit(NamedUserCreatedObject):
     dimensionless = models.BooleanField(default=False, null=True)
     reference_quantity = models.ForeignKey(
@@ -30,13 +44,12 @@ def get_default_unit_pk():
     return unit.pk
 
 
-class Property(NamedUserCreatedObject):
+class Property(PropertyBase):
     """
     Defines properties that can be shared among other models. Allows to compare instances of different models that share
     the same properties while enforcing the use of matching units.
     """
 
-    unit = models.CharField(max_length=63)
     allowed_units = models.ManyToManyField(Unit)
 
 
