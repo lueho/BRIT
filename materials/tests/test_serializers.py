@@ -34,11 +34,15 @@ class MaterialPropertySerializerTestCase(TestCase):
     def setUpTestData(cls):
         prop = MaterialProperty.objects.create(name="Test Property", unit="Test Unit")
         MaterialPropertyValue.objects.create(
-            property=prop, average=123.321, standard_deviation=0.1337
+            property=prop,
+            average=Decimal("123.321"),
+            standard_deviation=Decimal("0.1337"),
         )
 
     def setUp(self):
-        self.value = MaterialPropertyValue.objects.get(standard_deviation=0.1337)
+        self.value = MaterialPropertyValue.objects.get(
+            standard_deviation=Decimal("0.1337")
+        )
 
     def test_serializer(self):
         request = RequestFactory().get(reverse("home"))

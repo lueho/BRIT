@@ -255,7 +255,7 @@ class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
         }
         post_data.update(related_post_data)
         response = self.client.post(self.get_create_url(), post_data, follow=True)
-        self.assertNotEqual(response.status_code, 500)
+        self.assertEqual(response.status_code, 200)
         from ..models import Source
 
         source = Source.objects.latest("pk")

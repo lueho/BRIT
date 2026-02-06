@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.contrib.auth.models import User
 from django.db.models import signals
 from django.test import TestCase
@@ -19,7 +21,6 @@ from materials.models import (
 
 
 class InitialDataTestCase(TestCase):
-
     def test_base_component_group_is_created_from_migrations(self):
         MaterialComponentGroup.objects.get(name="Total Material")
         self.assertEqual(MaterialComponentGroup.objects.all().count(), 1)
@@ -34,7 +35,6 @@ class InitialDataTestCase(TestCase):
 
 
 class MaterialComponentGroupTestCase(TestCase):
-
     def test_get_default_material_component_group(self):
         default = MaterialComponentGroup.objects.default()
         self.assertIsInstance(default, MaterialComponentGroup)
@@ -42,7 +42,6 @@ class MaterialComponentGroupTestCase(TestCase):
 
 
 class MaterialComponentTestCase(TestCase):
-
     def test_get_default_material_component_manager_function(self):
         default = MaterialComponent.objects.default()
         self.assertIsInstance(default, MaterialComponent)
@@ -55,7 +54,6 @@ class MaterialComponentTestCase(TestCase):
 
 
 class MaterialTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         User.objects.create(username="standard_user")
@@ -94,12 +92,8 @@ class MaterialTestCase(TestCase):
         self.default_group = MaterialComponentGroup.objects.default()
         self.default_component = MaterialComponent.objects.default()
 
-    def test_true_is_not_false(self):
-        self.assertTrue(True)
-
 
 class SampleSeriesTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         User.objects.create(username="standard_user")
@@ -237,16 +231,11 @@ class SampleSeriesTestCase(TestCase):
                 )
 
 
-class MaterialPropertyTestCase(TestCase):
-    pass
-
-
 class MaterialPropertyValueTestCase(TestCase):
-
     def test_duplicate_creates_new_instance_with_identical_field_values(self):
         prop = MaterialProperty.objects.create(name="Test Property")
         value = MaterialPropertyValue.objects.create(
-            property=prop, average=27.3, standard_deviation=0.1337
+            property=prop, average=Decimal("27.3"), standard_deviation=Decimal("0.1337")
         )
         creator = User.objects.create(username="creator")
         duplicate = value.duplicate(creator)
@@ -259,7 +248,6 @@ class MaterialPropertyValueTestCase(TestCase):
 
 
 class SampleTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         MaterialComponentGroup.objects.create(name="Custom Group")
@@ -274,7 +262,7 @@ class SampleTestCase(TestCase):
 
         prop = MaterialProperty.objects.create(name="Test Property", unit="Test Unit")
         MaterialPropertyValue.objects.create(
-            property=prop, average=12.3, standard_deviation=0.321
+            property=prop, average=Decimal("12.3"), standard_deviation=Decimal("0.321")
         )
 
     def setUp(self):
@@ -290,7 +278,7 @@ class SampleTestCase(TestCase):
 
     def test_duplicate_creates_new_instance_with_identical_field_values(self):
         creator = User.objects.create(username="creator")
-        property_value = MaterialPropertyValue.objects.get(average=12.3)
+        property_value = MaterialPropertyValue.objects.get(average=Decimal("12.3"))
         self.sample.properties.add(property_value)
         duplicate = self.sample.duplicate(creator)
         self.assertIsInstance(duplicate, Sample)
@@ -334,7 +322,6 @@ class SampleTestCase(TestCase):
 
 
 class CompositionTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         User.objects.create(username="standard_user")
@@ -516,7 +503,6 @@ class CompositionTestCase(TestCase):
 
 
 class WeightShareTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         material = Material.objects.create(name="Test Material")

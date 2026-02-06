@@ -1,3 +1,5 @@
+from decimal import Decimal
+
 from django.contrib.auth import get_user_model
 from django.contrib.auth.models import Permission
 from django.contrib.contenttypes.models import ContentType
@@ -1065,7 +1067,7 @@ class SampleAddPropertyViewTestCase(ViewWithPermissionsTestCase):
             reverse("sample-add-property", kwargs={"pk": self.sample.pk}), data
         )
         value = MaterialPropertyValue.objects.get(
-            average=123.321, standard_deviation=0.1337
+            average=Decimal("123.321"), standard_deviation=Decimal("0.1337")
         )
         self.assertIn(value, self.sample.properties.all())
 
@@ -1090,7 +1092,9 @@ class SampleModalAddPropertyViewTestCase(ViewWithPermissionsTestCase):
         cls.sample = Sample.objects.create(
             owner=cls.owner, name="Test Sample", material=material, series=series
         )
-        MaterialProperty.objects.create(name="Test Property", unit="Test Unit")
+        MaterialProperty.objects.create(
+            name="Test Property", unit="Test Unit", owner=cls.owner
+        )
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse("sample-add-property-modal", kwargs={"pk": self.sample.pk})
@@ -1155,7 +1159,7 @@ class SampleModalAddPropertyViewTestCase(ViewWithPermissionsTestCase):
             reverse("sample-add-property-modal", kwargs={"pk": self.sample.pk}), data
         )
         value = MaterialPropertyValue.objects.get(
-            average=123.321, standard_deviation=0.1337
+            average=Decimal("123.321"), standard_deviation=Decimal("0.1337")
         )
         self.assertIn(value, self.sample.properties.all())
 
