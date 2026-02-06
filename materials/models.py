@@ -15,7 +15,17 @@ from utils.object_management.models import (
     UserCreatedObjectManager,
     get_default_owner,
 )
-from utils.properties.models import PropertyBase
+from utils.properties.models import PropertyBase, Unit, get_default_unit_pk
+
+
+class MaterialComponentKind(models.TextChoices):
+    SINGLE = "single", "Single component"
+    AGGREGATE = "aggregate", "Aggregate component"
+
+
+class MaterialPropertyAggregationKind(models.TextChoices):
+    MASS_RELATED = "mass_related", "Mass-related"
+    NON_MASS_RELATED = "non_mass_related", "Non mass-related"
 
 
 class MaterialCategory(NamedUserCreatedObject):
@@ -28,7 +38,30 @@ class BaseMaterial(NamedUserCreatedObject):
     """
 
     type = models.CharField(max_length=127, default="material")
+    abbreviation = models.CharField(
+        max_length=50,
+        blank=True,
+        help_text="Short abbreviation or acronym for this material/component.",
+    )
     categories = models.ManyToManyField(MaterialCategory, blank=True)
+    component_kind = models.CharField(
+        max_length=20,
+        choices=MaterialComponentKind.choices,
+        default=MaterialComponentKind.SINGLE,
+        blank=True,
+        help_text="Only used for material components: single components versus aggregate groups.",
+    )
+    basis_component = models.ForeignKey(
+        "self",
+        on_delete=models.PROTECT,
+        related_name="derived_components",
+        null=True,
+        blank=True,
+        limit_choices_to={"type": "component"},
+        help_text=(
+            "Basis component for this component (e.g. Dry Matter). Only used for components."
+        ),
+    )
 
     class Meta:
         verbose_name = "Material"
@@ -371,22 +404,75 @@ def add_default_temporal_distribution(sender, instance, created, **kwargs):
 class MaterialProperty(PropertyBase):
     """Materials-specific property definition."""
 
+    abbreviation = models.CharField(max_length=50, blank=True)
+    group = models.ForeignKey(
+        "MaterialPropertyGroup",
+        on_delete=models.PROTECT,
+        related_name="properties",
+        null=True,
+        blank=True,
+        help_text=(
+            "Aggregation domain used to avoid double-counting overlapping measurements."
+        ),
+    )
+    aggregation_kind = models.CharField(
+        max_length=30,
+        choices=MaterialPropertyAggregationKind.choices,
+        default=MaterialPropertyAggregationKind.NON_MASS_RELATED,
+    )
+    default_basis_component = models.ForeignKey(
+        MaterialComponent,
+        on_delete=models.PROTECT,
+        related_name="default_basis_properties",
+        null=True,
+        blank=True,
+        help_text=(
+            "Mass basis component used to normalize this property (e.g. Dry Matter)."
+        ),
+    )
+    allowed_units = models.ManyToManyField(
+        Unit,
+        blank=True,
+        help_text="Units that are acceptable for this property.",
+    )
+
     def __str__(self):
         return f"{self.name} [{self.unit}]"
 
 
+class MaterialPropertyGroup(NamedUserCreatedObject):
+    """Aggregation domain for material properties to prevent double-counting."""
+
+    class Meta:
+        unique_together = [["name", "owner"]]
+
+
 class MaterialPropertyValue(NamedUserCreatedObject):
     property = models.ForeignKey(MaterialProperty, on_delete=models.PROTECT)
-    average = models.FloatField()
-    standard_deviation = models.FloatField()
+    analytical_method = models.ForeignKey(
+        AnalyticalMethod,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        help_text="Analytical method used for this measurement.",
+    )
+    sources = models.ManyToManyField(
+        Source,
+        blank=True,
+        help_text="Sources or references for this measurement.",
+    )
+    average = models.DecimalField(max_digits=20, decimal_places=10)
+    standard_deviation = models.DecimalField(max_digits=20, decimal_places=10)
 
     def duplicate(self, creator):
         duplicate = MaterialPropertyValue.objects.create(
             owner=creator,
             property=self.property,
+            analytical_method=self.analytical_method,
             average=self.average,
             standard_deviation=self.standard_deviation,
         )
+        duplicate.sources.set(self.sources.all())
 
         return duplicate
 
@@ -413,6 +499,25 @@ class Sample(NamedUserCreatedObject):
         null=True,
         help_text="Name of town, address or coordinates",
     )
+    analysis_date = models.DateTimeField(
+        blank=True,
+        null=True,
+        help_text="Date when the analysis was performed.",
+    )
+    analysis_laboratory = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Laboratory where the analysis was performed.",
+    )
+    lab_accreditation = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text="Laboratory accreditation information.",
+    )
+    analysis_objective = models.TextField(
+        blank=True,
+        help_text="Objective or purpose of the analysis.",
+    )
     series = models.ForeignKey(
         SampleSeries,
         related_name="samples",
@@ -420,6 +525,10 @@ class Sample(NamedUserCreatedObject):
         blank=True,
         null=True,
         help_text="If this sample belongs to a sample series or campaign, select it here.",
+    )
+    standalone = models.BooleanField(
+        default=False,
+        help_text="True if this sample is not part of a sample series.",
     )
     timestep = models.ForeignKey(
         Timestep,
@@ -463,10 +572,21 @@ class Sample(NamedUserCreatedObject):
         duplicate = Sample.objects.create(
             owner=creator,
             name=kwargs.get("name", f"{self.name} (copy)"),
+            description=kwargs.get("description", self.description),
             material=kwargs.get("material", self.material),
             series=kwargs.get("series", self.series),
             timestep=kwargs.get("timestep", self.timestep),
             datetime=kwargs.get("datetime", self.datetime),
+            location=kwargs.get("location", self.location),
+            analysis_date=kwargs.get("analysis_date", self.analysis_date),
+            analysis_laboratory=kwargs.get(
+                "analysis_laboratory", self.analysis_laboratory
+            ),
+            lab_accreditation=kwargs.get("lab_accreditation", self.lab_accreditation),
+            analysis_objective=kwargs.get(
+                "analysis_objective", self.analysis_objective
+            ),
+            standalone=kwargs.get("standalone", self.standalone),
         )
         post_save.connect(add_default_composition, sender=Sample)
         for composition in self.compositions.all():
@@ -476,6 +596,9 @@ class Sample(NamedUserCreatedObject):
 
         for prop in self.properties.all():
             duplicate.properties.add(prop.duplicate(creator))
+
+        for measurement in self.component_measurements.all():
+            measurement.duplicate(creator, sample=duplicate)
 
         return duplicate
 
@@ -641,6 +764,92 @@ class Composition(NamedUserCreatedObject):
 
     def __str__(self):
         return f"Composition of {self.group.name} of sample {self.sample.name}"
+
+
+class ComponentMeasurement(UserCreatedObject):
+    """Raw (unnormalized) component measurements for a sample."""
+
+    sample = models.ForeignKey(
+        Sample,
+        related_name="component_measurements",
+        on_delete=models.CASCADE,
+        help_text="The sample these measurements belong to.",
+    )
+    group = models.ForeignKey(
+        MaterialComponentGroup,
+        related_name="component_measurements",
+        on_delete=models.PROTECT,
+        help_text="Grouping domain for the measurement (e.g. chemical elements).",
+    )
+    component = models.ForeignKey(
+        MaterialComponent,
+        related_name="component_measurements",
+        on_delete=models.PROTECT,
+    )
+    basis_component = models.ForeignKey(
+        MaterialComponent,
+        related_name="basis_component_measurements",
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        help_text="Basis component for the measurement (e.g. Dry Matter).",
+    )
+    analytical_method = models.ForeignKey(
+        AnalyticalMethod,
+        on_delete=models.PROTECT,
+        null=True,
+        blank=True,
+        help_text="Analytical method used for this measurement.",
+    )
+    sources = models.ManyToManyField(
+        Source,
+        blank=True,
+        help_text="Sources or references for this measurement.",
+    )
+    unit = models.ForeignKey(
+        Unit,
+        on_delete=models.PROTECT,
+        default=get_default_unit_pk,
+        help_text="Unit for the measured value (e.g. %, g/kg).",
+    )
+    average = models.DecimalField(
+        max_digits=20, decimal_places=10, default=Decimal("0.0"), null=False
+    )
+    standard_deviation = models.DecimalField(
+        max_digits=20, decimal_places=10, default=Decimal("0.0"), null=False
+    )
+    sample_size = models.PositiveIntegerField(
+        null=True,
+        blank=True,
+        help_text="Number of samples/replicates (n) used for the measurement.",
+    )
+    comment = models.TextField(
+        blank=True,
+        help_text="Additional comments about the measurement.",
+    )
+
+    class Meta:
+        ordering = ["component__name", "id"]
+
+    def duplicate(self, creator, sample=None):
+        duplicate = ComponentMeasurement.objects.create(
+            owner=creator,
+            sample=sample or self.sample,
+            group=self.group,
+            component=self.component,
+            basis_component=self.basis_component,
+            analytical_method=self.analytical_method,
+            unit=self.unit,
+            average=self.average,
+            standard_deviation=self.standard_deviation,
+            sample_size=self.sample_size,
+            comment=self.comment,
+        )
+        duplicate.sources.set(self.sources.all())
+        return duplicate
+
+    def __str__(self):
+        return f"Raw measurement of {self.component.name} for sample {self.sample.name}"
 
 
 @receiver(pre_save, sender=Composition)
