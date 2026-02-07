@@ -35,6 +35,7 @@ from utils.object_management.views import (
 from utils.views import NextOrSuccessUrlMixin
 
 from .filters import (
+    MaterialListFilter,
     SampleFilter,
     SampleSeriesFilter,
 )
@@ -145,15 +146,17 @@ class MaterialCategoryModalDeleteView(UserCreatedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class MaterialPublishedListView(PublishedObjectListView):
+class MaterialPublishedListView(PublishedObjectFilterView):
     model = Material
     queryset = Material.objects.filter(type="material")
+    filterset_class = MaterialListFilter
     dashboard_url = reverse_lazy("materials-dashboard")
 
 
-class MaterialPrivateListView(PrivateObjectListView):
+class MaterialPrivateListView(PrivateObjectFilterView):
     model = Material
     queryset = Material.objects.filter(type="material")
+    filterset_class = MaterialListFilter
     dashboard_url = reverse_lazy("materials-dashboard")
 
 
