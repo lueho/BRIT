@@ -2,15 +2,12 @@
 {% load static %}
 {% load moderation_tags %}
 {% load custom_tags %}
-
 {% block title %}
   BRIT | Sample: {{ object.name }}
 {% endblock title %}
-
 {% block detail_header %}
   Sample: {{ object.name }}
 {% endblock detail_header %}
-
 {% block detail_top_image %}
   {% if object.image %}
     <div class="card-img-top">
@@ -22,7 +19,6 @@
     </div>
   {% endif %}
 {% endblock detail_top_image %}
-
 {% block detail_body %}
   <p class="card-text">
     <strong>Name:</strong>
@@ -35,7 +31,6 @@
     <a href="{% url 'material-detail-modal' object.material.pk %}"
        class="modal-link">{{ object.material.name }}</a>
   </p>
-
   {% if object.series %}
     <p class="card-text">
       <strong>Series:</strong>
@@ -44,7 +39,6 @@
          class="modal-link">{{ object.series.name }}</a>
     </p>
   {% endif %}
-
   {% if object.timestep %}
     <p class="card-text">
       <strong>Timestep:</strong>
@@ -52,7 +46,6 @@
       {{ object.timestep }}
     </p>
   {% endif %}
-
   {% if object.datetime %}
     <p class="card-text">
       <strong>Date/Time:</strong>
@@ -60,7 +53,6 @@
       {{ object.datetime|date:"Y-m-d H:i" }}
     </p>
   {% endif %}
-
   {% if object.location %}
     <p class="card-text">
       <strong>Location:</strong>
@@ -68,7 +60,6 @@
       {{ object.location }}
     </p>
   {% endif %}
-
   {% if object.description %}
     <p class="card-text">
       <strong>Description:</strong>
@@ -76,7 +67,6 @@
       {{ object.description }}
     </p>
   {% endif %}
-
   {% if object.analysis_date %}
     <p class="card-text">
       <strong>Analysis Date:</strong>
@@ -84,7 +74,6 @@
       {{ object.analysis_date|date:"Y-m-d" }}
     </p>
   {% endif %}
-
   {% if object.analysis_laboratory %}
     <p class="card-text">
       <strong>Laboratory:</strong>
@@ -92,7 +81,6 @@
       {{ object.analysis_laboratory }}
     </p>
   {% endif %}
-
   {% if object.lab_accreditation %}
     <p class="card-text">
       <strong>Lab Accreditation:</strong>
@@ -100,7 +88,6 @@
       {{ object.lab_accreditation }}
     </p>
   {% endif %}
-
   {% if object.analysis_objective %}
     <p class="card-text">
       <strong>Analysis Objective:</strong>
@@ -108,7 +95,6 @@
       {{ object.analysis_objective }}
     </p>
   {% endif %}
-
   {% with sample_sources=object.sources.all %}
     {% if sample_sources %}
       <p class="card-text">
@@ -122,7 +108,6 @@
     {% endif %}
   {% endwith %}
 {% endblock detail_body %}
-
 {% block detail_header_primary_actions %}
   <div class="btn-group me-2" role="group">
     {% with back_url=request.GET.back %}
@@ -156,7 +141,6 @@
   </div>
   {{ block.super }}
 {% endblock detail_header_primary_actions %}
-
 {% block options_primary_actions %}
   {% object_policy object as policy %}
   {% if policy.can_edit %}
@@ -178,7 +162,21 @@
     </a>
   {% endif %}
 {% endblock options_primary_actions %}
-
+{% block options_secondary_actions %}
+  <hr class="my-2">
+  <a class="btn btn-outline-secondary w-100 mb-2"
+     href="{% url 'sample-list' %}">
+    <i class="fas fa-list"></i> Public Samples
+  </a>
+  <a class="btn btn-outline-secondary w-100 mb-2"
+     href="{% url 'sample-list-owned' %}">
+    <i class="fas fa-list"></i> My Samples
+  </a>
+  <a class="btn btn-outline-secondary w-100 mb-2"
+     href="{% url 'materials-explorer' %}">
+    <i class="fas fa-table-cells-large"></i> Explorer
+  </a>
+{% endblock options_secondary_actions %}
 {% block options_export %}
   {% if component_measurements %}
     <hr class="my-2">
@@ -190,10 +188,8 @@
     </button>
   {% endif %}
 {% endblock options_export %}
-
 {% block second_row %}
   {% object_policy object as policy %}
-
   {# --- Measurements Card (Properties + Component Measurements) --- #}
   {% with properties=object.properties.all %}
     {% regroup component_measurements by group as measurements_by_group %}
@@ -230,7 +226,6 @@
             </li>
           </ul>
         </div>
-
         <div class="card-body tab-content p-0"
              id="sample-measurements-tabs-content">
           <div class="tab-pane fade show active"
@@ -299,7 +294,6 @@
                 {% endif %}
               </div>
             {% endif %}
-
             {% if policy.can_add_property %}
               <div class="p-3 border-top">
                 <a href="{% url 'sample-add-property' object.id %}">
@@ -318,7 +312,6 @@
               </div>
             {% endif %}
           </div>
-
           <div class="tab-pane fade"
                id="sample-component-measurements-tab"
                role="tabpanel"
@@ -338,7 +331,6 @@
                   </button>
                 </div>
               </div>
-
               <div class="accordion accordion-flush" id="measurementsAccordion">
                 {% for group in measurements_by_group %}
                   <div class="accordion-item">
@@ -434,7 +426,6 @@
       </div>
     </div>
   {% endwith %}
-
   {# --- Composition Cards --- #}
   {% if data.compositions %}
     {% for composition in data.compositions %}
@@ -561,14 +552,10 @@
       </div>
     </div>
   {% endif %}
-
 {% endblock second_row %}
-
 {% block detail_with_options_scripts %}
   {{ charts|json_script:"charts" }}
-
   <script>
-
     const charts = JSON.parse(document.getElementById("charts").textContent);
 
     Object.keys(charts).forEach(key => {
