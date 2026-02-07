@@ -1,12 +1,11 @@
 {% extends "detail_with_options.html" %}
 
 {% block detail_body %}
-    {% include "growthcycle_table.html" %}
+{% include "growthcycle_table.html" %}
 {% endblock detail_body %}
 
-{% block list_link %}
-    <a href="{% url 'greenhouse-detail' object.greenhouse.pk %}"
-       class="ms-3">
-        <i class="fas fa-fw fa-list"></i> see all
-    </a>
-{% endblock list_link %}
+{% block detail_card_footer %}
+<a href="{% url 'greenhouse-detail' object.greenhouse.pk %}" class="nowrap">
+    <i class="fas fa-fw fa-arrow-left"></i> back to greenhouse
+</a>
+{% endblock detail_card_footer %}
