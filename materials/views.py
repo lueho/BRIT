@@ -93,6 +93,34 @@ from .serializers import (
 class MaterialsDashboardView(TemplateView):
     template_name = "materials_dashboard.html"
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["material_count"] = Material.objects.filter(
+            type="material", publication_status="published"
+        ).count()
+        context["category_count"] = MaterialCategory.objects.filter(
+            publication_status="published"
+        ).count()
+        context["sample_count"] = Sample.objects.filter(
+            publication_status="published"
+        ).count()
+        context["series_count"] = SampleSeries.objects.filter(
+            publication_status="published"
+        ).count()
+        context["method_count"] = AnalyticalMethod.objects.filter(
+            publication_status="published"
+        ).count()
+        context["component_count"] = MaterialComponent.objects.filter(
+            publication_status="published"
+        ).count()
+        context["group_count"] = MaterialComponentGroup.objects.filter(
+            publication_status="published"
+        ).count()
+        context["property_count"] = MaterialProperty.objects.filter(
+            publication_status="published"
+        ).count()
+        return context
+
 
 # ----------- Material Category CRUD ----------------------------------------------------------------------------------
 # ---------------------------------------------------------------------------------------------------------------------
