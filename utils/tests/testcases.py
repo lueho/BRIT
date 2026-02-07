@@ -848,18 +848,15 @@ class AbstractTestCases:
             url = self.get_modal_detail_url(self.unpublished_object.pk)
             response = self.client.get(url)
             self.assertEqual(response.status_code, 403)
-            self.assertContains(
-                response, self.permission_denied_message, status_code=403
-            )
+            self.assertContains(response, "Access restricted", status_code=403)
 
         def test_modal_detail_view_unpublished_as_anonymous(self):
             if not self.modal_detail_view:
                 self.skipTest("Modal detail view is not enabled for this test case.")
             url = self.get_modal_detail_url(self.unpublished_object.pk)
             response = self.client.get(url)
-            login_url = settings.LOGIN_URL
-            expected_redirect = f"{login_url}?next={url}"
-            self.assertRedirects(response, expected_redirect)
+            self.assertEqual(response.status_code, 200)
+            self.assertContains(response, "Access restricted")
 
         def test_modal_detail_view_nonexistent_object(self):
             if not self.modal_detail_view:

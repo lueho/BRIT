@@ -22,9 +22,9 @@ from django.core.exceptions import (
     ObjectDoesNotExist,
     PermissionDenied,
 )
-from django.http import Http404, HttpResponseRedirect
+from django.http import Http404, HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404
-from django.template.loader import select_template
+from django.template.loader import render_to_string, select_template
 from django.urls import reverse
 from django.views.generic import CreateView, DetailView, ListView, UpdateView, View
 from django_filters.views import FilterView
@@ -1572,6 +1572,27 @@ class UserCreatedObjectModalDetailView(
     UserCreatedObjectReadAccessMixin, BSModalReadView
 ):
     template_name_suffix = "_detail_modal"
+
+    def handle_no_permission(self):
+        if self.request.user.is_authenticated:
+            return HttpResponse(
+                render_to_string(
+                    "modal_message.html",
+                    {
+                        "title": "Access restricted",
+                        "message": self.get_permission_denied_message(),
+                    },
+                ),
+                status=403,
+            )
+        html = render_to_string(
+            "modal_message.html",
+            {
+                "title": "Access restricted",
+                "message": "This content is not publicly available. Please log in if you are the owner.",
+            },
+        )
+        return HttpResponse(html)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
