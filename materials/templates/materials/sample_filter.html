@@ -12,38 +12,36 @@
 {% endblock list_card_header %}
 
 {% block list_table %}
-    <table class="table table-responsive-stack">
-        <thead>
-            <tr>
-                <th>Id</th>
-                <th>Name</th>
-                <th>Material</th>
-                <th>Standalone</th>
-                <th>Created</th>
-                {% if object_list.model|is_user_created %}<th class="actions-column">Status/Actions</th>{% endif %}
-            </tr>
-        </thead>
-        <tbody>
-            {% for object in object_list %}
-                <tr>
-                    <td data-label="Id">
-                        <a href="{% detail_or_review_url object %}">{{ object.id }}</a>
-                    </td>
-                    <td data-label="Name">
-                        <a href="{% url 'sample-detail' object.pk %}">{{ object.name }}</a>
-                    </td>
-                    <td data-label="Material">
-                        <a href="{% url 'material-detail' object.material.pk %}">{{ object.material.name }}</a>
-                    </td>
-                    <td data-label="Standalone">{{ object.standalone|yesno:"Yes,No" }}</td>
-                    <td data-label="Created">{{ object.created_at|date:"Y-m-d" }}</td>
-                    {% if object_list.model|is_user_created %}
-                        <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
-                    {% endif %}
-                </tr>
-            {% endfor %}
-        </tbody>
-    </table>
+    <p class="text-muted small mb-2">
+        Showing {{ page_obj.start_index }}-{{ page_obj.end_index }} of {{ page_obj.paginator.count }} results
+    </p>
+    <div class="collection-list-min-height">
+        <div class="table-responsive">
+            <table class="table modern-table">
+                <thead>
+                    <tr>
+                        <th>Sample</th>
+                        {% if object_list.model|is_user_created %}<th class="actions-column">Status/Actions</th>{% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for object in object_list %}
+                        <tr>
+                            <td data-label="Sample" class="ps-3">
+                                <a href="{% detail_or_review_url object %}" class="text-decoration-none">
+                                    <strong class="d-block">{{ object.name }}</strong>
+                                    <span class="text-muted small">{{ object.material.name }}{% if object.created_at %} · {{ object.created_at|date:"Y-m-d" }}{% endif %}{% if object.standalone %} · Standalone{% endif %}</span>
+                                </a>
+                            </td>
+                            {% if object_list.model|is_user_created %}
+                                <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
+                            {% endif %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
 {% endblock list_table %}
 
 {% block options_pane_body %}
