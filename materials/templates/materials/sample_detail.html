@@ -14,7 +14,7 @@
 {% block detail_top_image %}
   {% if object.image %}
     <div class="card-img-top">
-      <img class="w-100 m-0" src="{{ object.image.url }}" alt="Image of sample">
+      <img class="w-100 m-0" src="{{ object.image.url }}" alt="Image of sample" style="max-height: 300px; object-fit: cover;">
     </div>
   {% endif %}
 {% endblock detail_top_image %}
