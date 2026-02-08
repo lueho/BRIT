@@ -5,7 +5,9 @@
 
 {# Generic status + actions cell for UserCreatedObject rows #}
 <div class="action-container d-flex align-items-center justify-content-end">
-  <div class="status-badge-container">{% include "object_management/review_status_badge.html" with object=object %}</div>
+  {% if list_type == 'private' %}
+    <div class="status-badge-container">{% include "object_management/review_status_badge.html" with object=object %}</div>
+  {% endif %}
 
   <div class="dropdown d-inline-block ms-auto">
     <button class="btn btn-sm btn-secondary dropdown-toggle"
@@ -13,7 +15,7 @@
             data-bs-toggle="dropdown"
             data-bs-container="body"
             aria-expanded="false"
-            aria-label="More actions">
+            aria-label="Actions for {{ object.name }}">
       <i class="fas fa-ellipsis-vertical"></i>
     </button>
     <div class="dropdown-menu dropdown-menu-end">
