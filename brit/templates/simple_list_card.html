@@ -73,7 +73,7 @@
                      aria-pressed="{% if list_type == 'private' %}true{% else %}false{% endif %}"
                      {% if list_type == 'private' %}aria-disabled="true" tabindex="-1"{% endif %}
                      href="{{ object_list.model.private_list_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=private">
-                    My
+                    Mine
                   </a>
                   {% if user|can_moderate:object_list.model and object_list.model.review_list_url %}
                     <a class="btn btn-outline-secondary {% if list_type == 'review' %}active disabled{% endif %}"
