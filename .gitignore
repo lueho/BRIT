@@ -10,6 +10,12 @@
 .windsurfrules
 *code-workspace*
 
+# SCSS build artifacts
+brit/static/lib/bootstrap/scss/*.css
+brit/static/lib/bootstrap/scss/*.css.map
+brit/static/scss/*.css
+brit/static/scss/*.css.map
+
 /test-results/
 /.venv/
 /.devcontainer/
