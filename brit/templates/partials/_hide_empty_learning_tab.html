@@ -1,0 +1,29 @@
+<script type="text/javascript">
+  // Hide the Learning tab and pane if the pane has no visible content
+  (function () {
+    const pane = document.getElementById('learning-pane');
+    const tabBtn = document.getElementById('learning-tab');
+    if (!pane) return;
+    // Determine if the pane has any element children or non-whitespace text
+    const hasElements = pane.querySelector('*') !== null;
+    const hasText = (pane.textContent || '').trim().length > 0;
+    const hasContent = hasElements || hasText;
+    if (!hasContent) {
+      // Remove/hide the tab button
+      if (tabBtn) {
+        const li = tabBtn.closest('li');
+        if (li && li.parentElement) {
+          li.parentElement.removeChild(li);
+        } else {
+          tabBtn.classList.add('d-none');
+        }
+      }
+      // Remove/hide the empty pane
+      if (pane.parentElement) {
+        pane.parentElement.removeChild(pane);
+      } else {
+        pane.classList.add('d-none');
+      }
+    }
+  })();
+</script>

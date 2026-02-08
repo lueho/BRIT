@@ -5,354 +5,258 @@
 {% load moderation_tags %}
 {% load user_created_object_tags %}
 {% block title %}
-  BRIT | {{ header }}
+BRIT | {{ header }}
 {% endblock title %}
 {% block custom_style %}
 {% endblock custom_style %}
 {% block content %}
-  <div class="row">
-    <div class="col-lg-8 order-2 order-lg-1">
-      <div class="card shadow">
-        <div class="card-header py-3">
-          <div class="d-flex align-items-center justify-content-between">
-            <h5 class="mb-0">
-              {% block list_card_header %}
-                {% if header %}
-                  {{ header }}
-                {% elif list_type == 'private' %}
-                  My {{ object_list.model.get_verbose_name_plural }}
-                {% else %}
-                  {{ object_list.model.get_verbose_name_plural|capfirst }}
-                {% endif %}
-              {% endblock list_card_header %}
-            </h5>
-            <div class="d-flex align-items-center justify-content-end flex-wrap gap-2">
-              {# View toggle (List / Map) – Map button shown only if a map URL exists for current scope #}
-              {% if public_map_url or private_map_url or review_map_url %}
-                <div class="btn-group btn-group-sm" role="group" aria-label="View toggle">
-                  <a class="btn btn-outline-secondary active disabled"
-                     aria-current="page"
-                     role="button"
-                     aria-pressed="true"
-                     aria-disabled="true"
-                     tabindex="-1"
-                     title="View as list"
-                     href="{{ request.get_full_path }}"><i class="fas fa-list"></i></a>
-                  {% if list_type == 'private' %}
-                    {% with map_base=private_map_url %}
-                      {% if map_base %}
-                        <a class="btn btn-outline-secondary"
-                           role="button"
-                           aria-pressed="false"
-                           title="View as map"
-                           href="{{ map_base }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=private&load_features=true"><i class="fas fa-map"></i></a>
-                      {% endif %}
-                    {% endwith %}
-                  {% elif list_type == 'review' %}
-                    {% with map_base=review_map_url %}
-                      {% if map_base %}
-                        <a class="btn btn-outline-secondary"
-                           role="button"
-                           aria-pressed="false"
-                           title="View as map"
-                           href="{{ map_base }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=review&load_features=true"><i class="fas fa-map"></i></a>
-                      {% endif %}
-                    {% endwith %}
-                  {% else %}
-                    {% with map_base=public_map_url %}
-                      {% if map_base %}
-                        <a class="btn btn-outline-secondary"
-                           role="button"
-                           aria-pressed="false"
-                           title="View as map"
-                           href="{{ map_base }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=published&load_features=true"><i class="fas fa-map"></i></a>
-                      {% endif %}
-                    {% endwith %}
-                  {% endif %}
-                </div>
+<div class="row">
+  <div class="col-lg-8 order-2 order-lg-1">
+    <div class="card shadow">
+      <div class="card-header py-3">
+        <div class="d-flex align-items-center justify-content-between">
+          <h5 class="mb-0">
+            {% block list_card_header %}
+            {% if header %}
+            {{ header }}
+            {% elif list_type == 'private' %}
+            My {{ object_list.model.get_verbose_name_plural }}
+            {% else %}
+            {{ object_list.model.get_verbose_name_plural|capfirst }}
+            {% endif %}
+            {% endblock list_card_header %}
+          </h5>
+          <div class="d-flex align-items-center justify-content-end flex-wrap gap-2">
+            {# View toggle (List / Map) – Map button shown only if a map URL exists for current scope #}
+            {% if public_map_url or private_map_url or review_map_url %}
+            <div class="btn-group btn-group-sm" role="group" aria-label="View toggle">
+              <a class="btn btn-outline-secondary active disabled" aria-current="page" role="button" aria-pressed="true"
+                aria-disabled="true" tabindex="-1" title="View as list" href="{{ request.get_full_path }}"><i
+                  class="fas fa-list"></i></a>
+              {% if list_type == 'private' %}
+              {% with map_base=private_map_url %}
+              {% if map_base %}
+              <a class="btn btn-outline-secondary" role="button" aria-pressed="false" title="View as map"
+                href="{{ map_base }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=private&load_features=true"><i
+                  class="fas fa-map"></i></a>
               {% endif %}
-              {# Scope toggle – visible for authenticated users and only for UserCreatedObject models #}
-              {% if user.is_authenticated and object_list.model|is_user_created %}
-                <div class="btn-group btn-group-sm" role="group" aria-label="Scope toggle">
-                  <a class="btn btn-outline-secondary {% if list_type == 'published' %}active disabled{% endif %}"
-                     role="button"
-                     title="Show published items"
-                     aria-pressed="{% if list_type == 'published' %}true{% else %}false{% endif %}"
-                     {% if list_type == 'published' %}aria-disabled="true" tabindex="-1"{% endif %}
-                     href="{{ object_list.model.public_list_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=published">
-                    Published
-                  </a>
-                  <a class="btn btn-outline-secondary {% if list_type == 'private' %}active disabled{% endif %}"
-                     role="button"
-                     title="Show only my items"
-                     aria-pressed="{% if list_type == 'private' %}true{% else %}false{% endif %}"
-                     {% if list_type == 'private' %}aria-disabled="true" tabindex="-1"{% endif %}
-                     href="{{ object_list.model.private_list_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=private">
-                    Mine
-                  </a>
-                  {% if user|can_moderate:object_list.model and object_list.model.review_list_url %}
-                    <a class="btn btn-outline-secondary {% if list_type == 'review' %}active disabled{% endif %}"
-                       role="button"
-                       title="Show items pending review"
-                       aria-pressed="{% if list_type == 'review' %}true{% else %}false{% endif %}"
-                       {% if list_type == 'review' %}aria-disabled="true" tabindex="-1"{% endif %}
-                       href="{{ object_list.model.review_list_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=review">
-                      Review
-                    </a>
-                  {% endif %}
-                </div>
+              {% endwith %}
+              {% elif list_type == 'review' %}
+              {% with map_base=review_map_url %}
+              {% if map_base %}
+              <a class="btn btn-outline-secondary" role="button" aria-pressed="false" title="View as map"
+                href="{{ map_base }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=review&load_features=true"><i
+                  class="fas fa-map"></i></a>
               {% endif %}
-              {% if dashboard_url %}
-                <a class="btn btn-sm btn-outline-secondary"
-                   href="{{ dashboard_url }}"
-                   title="Open Explorer (dashboard)">
-                  <i class="fas fa-table-cells-large"></i> Explorer
-                </a>
+              {% endwith %}
+              {% else %}
+              {% with map_base=public_map_url %}
+              {% if map_base %}
+              <a class="btn btn-outline-secondary" role="button" aria-pressed="false" title="View as map"
+                href="{{ map_base }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=published&load_features=true"><i
+                  class="fas fa-map"></i></a>
+              {% endif %}
+              {% endwith %}
               {% endif %}
             </div>
+            {% endif %}
+            {# Scope toggle – visible for authenticated users and only for UserCreatedObject models #}
+            {% if user.is_authenticated and object_list.model|is_user_created %}
+            <div class="btn-group btn-group-sm" role="group" aria-label="Scope toggle">
+              <a class="btn btn-outline-secondary {% if list_type == 'published' %}active disabled{% endif %}"
+                role="button" title="Show published items"
+                aria-pressed="{% if list_type == 'published' %}true{% else %}false{% endif %}" {% if
+                list_type=='published' %}aria-disabled="true" tabindex="-1" {% endif %}
+                href="{{ object_list.model.public_list_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=published">
+                Published
+              </a>
+              <a class="btn btn-outline-secondary {% if list_type == 'private' %}active disabled{% endif %}"
+                role="button" title="Show only my items"
+                aria-pressed="{% if list_type == 'private' %}true{% else %}false{% endif %}" {% if list_type=='private'
+                %}aria-disabled="true" tabindex="-1" {% endif %}
+                href="{{ object_list.model.private_list_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=private">
+                Mine
+              </a>
+              {% if user|can_moderate:object_list.model and object_list.model.review_list_url %}
+              <a class="btn btn-outline-secondary {% if list_type == 'review' %}active disabled{% endif %}"
+                role="button" title="Show items pending review"
+                aria-pressed="{% if list_type == 'review' %}true{% else %}false{% endif %}" {% if list_type=='review'
+                %}aria-disabled="true" tabindex="-1" {% endif %}
+                href="{{ object_list.model.review_list_url }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=review">
+                Review
+              </a>
+              {% endif %}
+            </div>
+            {% endif %}
+            {% if dashboard_url %}
+            <a class="btn btn-sm btn-outline-secondary" href="{{ dashboard_url }}" title="Open Explorer (dashboard)">
+              <i class="fas fa-table-cells-large"></i> Explorer
+            </a>
+            {% endif %}
           </div>
         </div>
-        <div class="card-body">
-          {% block list_card_body %}
-            {% block list_result_count %}
-              {% if page_obj %}
-                <p class="text-muted small mb-2">
-                  Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }} results
-                </p>
-              {% endif %}
-            {% endblock list_result_count %}
-            {% block list_table %}
-              <div class="table-responsive">
-                <table class="table modern-table">
-                  {% block list_table_head %}
-                    <thead>
-                      <tr>
-                        <th>Name</th>
-                        {% if object_list.model|is_user_created %}<th class="actions-column">Status/Actions</th>{% endif %}
-                      </tr>
-                    </thead>
-                  {% endblock list_table_head %}
-                  <tbody>
-                    {% for object in object_list %}
-                      {% block list_table_row %}
-                        <tr tabindex="0" role="link"
-                            onclick="window.location='{% detail_or_review_url object %}'"
-                            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();window.location='{% detail_or_review_url object %}'}">
-                          <td data-label="Name" class="ps-3">
-                            <a href="{% detail_or_review_url object %}" class="text-decoration-none">
-                              <strong class="d-block">{{ object.name }}</strong>
-                              {% if object.description %}<span class="text-muted small">{{ object.description|truncatewords:15 }}</span>{% endif %}
-                            </a>
-                          </td>
-                          {% if object_list.model|is_user_created %}
-                            <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
-                          {% endif %}
-                        </tr>
-                      {% endblock list_table_row %}
-                    {% endfor %}
-                  </tbody>
-                  {% if not object_list %}
-                    <tbody>
-                      <tr>
-                        <td colspan="2" class="text-center text-muted py-4">
-                          <i class="fas fa-filter me-1"></i> No items match your current filters.
-                          <a href="{% if list_type == 'private' %}{{ object_list.model.private_list_url }}?scope=private{% elif list_type == 'review' %}{{ object_list.model.review_list_url }}?scope=review{% else %}{{ object_list.model.public_list_url }}?scope=published{% endif %}">Reset filters</a>
-                        </td>
-                      </tr>
-                    </tbody>
-                  {% endif %}
-                  {% block list_table_footer %}
-                  {% endblock list_table_footer %}
-                </table>
-              </div>
-            {% endblock list_table %}
-            {% block list_pagination %}
-              {% if page_obj.has_other_pages %}
-                <nav aria-label="Pagination" class="mt-3">
-                  <ul class="pagination pagination-sm justify-content-center mb-0">
-                    <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
-                      <a class="page-link" {% if page_obj.has_previous %}href="?{% param_replace page=1 %}"{% endif %} aria-label="First page">&laquo;</a>
-                    </li>
-                    <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
-                      <a class="page-link" {% if page_obj.has_previous %}href="?{% param_replace page=page_obj.previous_page_number %}"{% endif %} aria-label="Previous page">&lsaquo;</a>
-                    </li>
-                    <li class="page-item disabled">
-                      <span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
-                    </li>
-                    <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
-                      <a class="page-link" {% if page_obj.has_next %}href="?{% param_replace page=page_obj.next_page_number %}"{% endif %} aria-label="Next page">&rsaquo;</a>
-                    </li>
-                    <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
-                      <a class="page-link" {% if page_obj.has_next %}href="?{% param_replace page=page_obj.paginator.num_pages %}"{% endif %} aria-label="Last page">&raquo;</a>
-                    </li>
-                  </ul>
-                </nav>
-              {% endif %}
-            {% endblock list_pagination %}
-          {% endblock list_card_body %}
+      </div>
+      <div class="card-body">
+        {% block list_card_body %}
+        {% block list_result_count %}
+        {% if page_obj %}
+        <p class="text-muted small mb-2">
+          Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }} results
+        </p>
+        {% endif %}
+        {% endblock list_result_count %}
+        {% block list_table %}
+        <div class="table-responsive">
+          <table class="table modern-table">
+            {% block list_table_head %}
+            <thead>
+              <tr>
+                <th>Name</th>
+                {% if object_list.model|is_user_created %}<th class="actions-column">Status/Actions</th>{% endif %}
+              </tr>
+            </thead>
+            {% endblock list_table_head %}
+            <tbody>
+              {% for object in object_list %}
+              {% block list_table_row %}
+              <tr tabindex="0" role="link" onclick="window.location='{% detail_or_review_url object %}'"
+                onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();window.location='{% detail_or_review_url object %}'}">
+                <td data-label="Name" class="ps-3">
+                  <a href="{% detail_or_review_url object %}" class="text-decoration-none">
+                    <strong class="d-block">{{ object.name }}</strong>
+                    {% if object.description %}<span class="text-muted small">{{ object.description|truncatewords:15
+                      }}</span>{% endif %}
+                  </a>
+                </td>
+                {% if object_list.model|is_user_created %}
+                <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}
+                </td>
+                {% endif %}
+              </tr>
+              {% endblock list_table_row %}
+              {% endfor %}
+            </tbody>
+            {% if not object_list %}
+            <tbody>
+              <tr>
+                <td colspan="2" class="text-center text-muted py-4">
+                  <i class="fas fa-filter me-1"></i> No items match your current filters.
+                  <a
+                    href="{% if list_type == 'private' %}{{ object_list.model.private_list_url }}?scope=private{% elif list_type == 'review' %}{{ object_list.model.review_list_url }}?scope=review{% else %}{{ object_list.model.public_list_url }}?scope=published{% endif %}">Reset
+                    filters</a>
+                </td>
+              </tr>
+            </tbody>
+            {% endif %}
+            {% block list_table_footer %}
+            {% endblock list_table_footer %}
+          </table>
         </div>
-        <div class="card-footer d-flex">
-          {% block list_card_footer %}
-          {% endblock list_card_footer %}
+        {% endblock list_table %}
+        {% block list_pagination %}
+        {% include "partials/_pagination.html" %}
+        {% endblock list_pagination %}
+        {% endblock list_card_body %}
+      </div>
+      <div class="card-footer d-flex">
+        {% block list_card_footer %}
+        {% endblock list_card_footer %}
+      </div>
+    </div>
+  </div>
+  <div class="col-lg-4 order-1 order-lg-2">
+    {% block filter_column %}
+    <div class="card shadow filter-sticky">
+      <div class="card-header p-0 border-0 bg-body-tertiary">
+        <ul class="nav nav-pills sidebar-tabs px-3 pt-3 pb-2" id="sidebarTabs" role="tablist">
+          <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="filters-tab" data-bs-toggle="tab" data-bs-target="#filters-pane"
+              type="button" role="tab" aria-controls="filters-pane" aria-selected="true">
+              <i class="fas fa-filter"></i> Filters
+            </button>
+          </li>
+          {% block options_tab_button %}
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="options-tab" data-bs-toggle="tab" data-bs-target="#options-pane" type="button"
+              role="tab" aria-controls="options-pane" aria-selected="false">
+              <i class="fas fa-gear"></i> Options
+            </button>
+          </li>
+          {% endblock options_tab_button %}
+          {% block learning_tab_button %}
+          <li class="nav-item" role="presentation">
+            <button class="nav-link" id="learning-tab" data-bs-toggle="tab" data-bs-target="#learning-pane"
+              type="button" role="tab" aria-controls="learning-pane" aria-selected="false">
+              <i class="fas fa-graduation-cap"></i> Learning
+            </button>
+          </li>
+          {% endblock learning_tab_button %}
+        </ul>
+      </div>
+      <div class="card-body">
+        <div class="tab-content">
+          <div class="tab-pane fade show active" id="filters-pane" role="tabpanel" aria-labelledby="filters-tab"
+            tabindex="0">
+            {% block filters_pane_body %}
+            {% block filter_body %}
+            <form method="get">
+              {% crispy filter.form %}
+              <div class="d-flex justify-content-end gap-2 mt-2">
+                <button id="btn-filter" class="btn btn-sm btn-primary submit-filter" type="submit">Filter</button>
+                <a class="btn btn-sm btn-outline-secondary"
+                  href="{% if list_type == 'private' %}{{ object_list.model.private_list_url }}?scope=private{% elif list_type == 'review' %}{{ object_list.model.review_list_url }}?scope=review{% else %}{{ object_list.model.public_list_url }}?scope=published{% endif %}"
+                  aria-label="Reset filters">Reset</a>
+              </div>
+            </form>
+            {% endblock filter_body %}
+            {% endblock filters_pane_body %}
+          </div>
+          {% block options_tab_pane %}
+          <div class="tab-pane fade" id="options-pane" role="tabpanel" aria-labelledby="options-tab" tabindex="0">
+            {% block options_pane_body %}
+            {% block list_card_footer_create_link %}
+            {% if create_permission in perms or user.is_staff %}
+            <a class="btn btn-success w-100 mb-2" href="{{ object_list.model.create_url }}"
+              aria-label="Create new {{ object_list.model.get_verbose_name }}">
+              <i class="fas fa-plus"></i> Create new {{ object_list.model.get_verbose_name }}
+            </a>
+            {% endif %}
+            {% endblock list_card_footer_create_link %}
+            {% if dashboard_url %}
+            <a class="btn btn-outline-secondary w-100 mb-2" href="{{ dashboard_url }}">
+              <i class="fas fa-table-cells-large"></i> Open Explorer
+            </a>
+            {% endif %}
+            {# Export actions placeholder – override per list to add export buttons #}
+            {% block list_card_export_actions %}
+            {% endblock list_card_export_actions %}
+            {% block list_card_options_dropdown_additional_links %}
+            {% endblock list_card_options_dropdown_additional_links %}
+            {% if not user.is_authenticated %}
+            <p class="text-muted small mt-3 mb-0">
+              Log in to enable export and additional options.
+            </p>
+            {% endif %}
+            {% endblock options_pane_body %}
+          </div>
+          {% endblock options_tab_pane %}
+          {% block learning_tab_pane %}
+          <div class="tab-pane fade" id="learning-pane" role="tabpanel" aria-labelledby="learning-tab" tabindex="0">
+            {% block learning_pane_body %}
+            {% endblock learning_pane_body %}
+          </div>
+          {% endblock learning_tab_pane %}
         </div>
       </div>
     </div>
-    <div class="col-lg-4 order-1 order-lg-2">
-      {% block filter_column %}
-        <div class="card shadow filter-sticky">
-          <div class="card-header p-0 border-0 bg-body-tertiary">
-            <ul class="nav nav-pills sidebar-tabs px-3 pt-3 pb-2"
-                id="sidebarTabs"
-                role="tablist">
-              <li class="nav-item" role="presentation">
-                <button class="nav-link active"
-                        id="filters-tab"
-                        data-bs-toggle="tab"
-                        data-bs-target="#filters-pane"
-                        type="button"
-                        role="tab"
-                        aria-controls="filters-pane"
-                        aria-selected="true">
-                  <i class="fas fa-filter"></i> Filters
-                </button>
-              </li>
-              {% block options_tab_button %}
-                <li class="nav-item" role="presentation">
-                  <button class="nav-link"
-                          id="options-tab"
-                          data-bs-toggle="tab"
-                          data-bs-target="#options-pane"
-                          type="button"
-                          role="tab"
-                          aria-controls="options-pane"
-                          aria-selected="false">
-                    <i class="fas fa-gear"></i> Options
-                  </button>
-                </li>
-              {% endblock options_tab_button %}
-              {% block learning_tab_button %}
-                <li class="nav-item" role="presentation">
-                  <button class="nav-link"
-                          id="learning-tab"
-                          data-bs-toggle="tab"
-                          data-bs-target="#learning-pane"
-                          type="button"
-                          role="tab"
-                          aria-controls="learning-pane"
-                          aria-selected="false">
-                    <i class="fas fa-graduation-cap"></i> Learning
-                  </button>
-                </li>
-              {% endblock learning_tab_button %}
-            </ul>
-          </div>
-          <div class="card-body">
-            <div class="tab-content">
-              <div class="tab-pane fade show active"
-                   id="filters-pane"
-                   role="tabpanel"
-                   aria-labelledby="filters-tab"
-                   tabindex="0">
-                {% block filters_pane_body %}
-                  {% block filter_body %}
-                    <form method="get">
-                      {% crispy filter.form %}
-                      <div class="d-flex justify-content-end gap-2 mt-2">
-                        <button id="btn-filter"
-                                class="btn btn-sm btn-primary submit-filter"
-                                type="submit">Filter</button>
-                        <a class="btn btn-sm btn-outline-secondary"
-                           href="{% if list_type == 'private' %}{{ object_list.model.private_list_url }}?scope=private{% elif list_type == 'review' %}{{ object_list.model.review_list_url }}?scope=review{% else %}{{ object_list.model.public_list_url }}?scope=published{% endif %}"
-                           aria-label="Reset filters">Reset</a>
-                      </div>
-                    </form>
-                  {% endblock filter_body %}
-                {% endblock filters_pane_body %}
-              </div>
-              {% block options_tab_pane %}
-                <div class="tab-pane fade"
-                     id="options-pane"
-                     role="tabpanel"
-                     aria-labelledby="options-tab"
-                     tabindex="0">
-                  {% block options_pane_body %}
-                    {% block list_card_footer_create_link %}
-                      {% if create_permission in perms or user.is_staff %}
-                        <a class="btn btn-success w-100 mb-2"
-                           href="{{ object_list.model.create_url }}"
-                           aria-label="Create new {{ object_list.model.get_verbose_name }}">
-                          <i class="fas fa-plus"></i> Create new {{ object_list.model.get_verbose_name }}
-                        </a>
-                      {% endif %}
-                    {% endblock list_card_footer_create_link %}
-                    {% if dashboard_url %}
-                      <a class="btn btn-outline-secondary w-100 mb-2"
-                         href="{{ dashboard_url }}">
-                        <i class="fas fa-table-cells-large"></i> Open Explorer
-                      </a>
-                    {% endif %}
-                    {# Export actions placeholder – override per list to add export buttons #}
-                    {% block list_card_export_actions %}
-                    {% endblock list_card_export_actions %}
-                    {% block list_card_options_dropdown_additional_links %}
-                    {% endblock list_card_options_dropdown_additional_links %}
-                    {% if not user.is_authenticated %}
-                      <p class="text-muted small mt-3 mb-0">
-                        Log in to enable export and additional options.
-                      </p>
-                    {% endif %}
-                  {% endblock options_pane_body %}
-                </div>
-              {% endblock options_tab_pane %}
-              {% block learning_tab_pane %}
-                <div class="tab-pane fade"
-                     id="learning-pane"
-                     role="tabpanel"
-                     aria-labelledby="learning-tab"
-                     tabindex="0">
-                  {% block learning_pane_body %}
-                  {% endblock learning_pane_body %}
-                </div>
-              {% endblock learning_tab_pane %}
-            </div>
-          </div>
-        </div>
-        {% block extra_options %}
-        {% endblock extra_options %}
-      {% endblock filter_column %}
-    </div>
+    {% block extra_options %}
+    {% endblock extra_options %}
+    {% endblock filter_column %}
   </div>
+</div>
 {% endblock content %}
 {% block javascript %}
-  {{ block.super }}
-  <script src="{% static 'js/filter_utils.min.js' %}" type="text/javascript"></script>
-  <script type="text/javascript">
-    // Hide the Learning tab and pane if the pane has no visible content
-    (function () {
-      const pane = document.getElementById('learning-pane');
-      const tabBtn = document.getElementById('learning-tab');
-      if (!pane) return;
-      // Determine if the pane has any element children or non-whitespace text
-      const hasElements = pane.querySelector('*') !== null;
-      const hasText = (pane.textContent || '').trim().length > 0;
-      const hasContent = hasElements || hasText;
-      if (!hasContent) {
-        // Remove/hide the tab button
-        if (tabBtn) {
-          const li = tabBtn.closest('li');
-          if (li && li.parentElement) {
-            li.parentElement.removeChild(li);
-          } else {
-            tabBtn.classList.add('d-none');
-          }
-        }
-        // Remove/hide the empty pane
-        if (pane.parentElement) {
-          pane.parentElement.removeChild(pane);
-        } else {
-          pane.classList.add('d-none');
-        }
-      }
-    })();
-  </script>
+{{ block.super }}
+<script src="{% static 'js/filter_utils.min.js' %}" type="text/javascript"></script>
+{% include "partials/_hide_empty_learning_tab.html" %}
 {% endblock javascript %}
