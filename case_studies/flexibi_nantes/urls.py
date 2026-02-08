@@ -2,6 +2,7 @@ from django.urls import include, path
 
 from .rounter import router
 from .views import (
+    CultureAutocompleteView,
     CultureCreateView,
     CultureDetailView,
     CultureModalCreateView,
@@ -52,6 +53,11 @@ urlpatterns = [
         "cultures/<int:pk>/delete/modal/",
         CultureModalDeleteView.as_view(),
         name="culture-delete-modal",
+    ),
+    path(
+        "cultures/autocomplete/",
+        CultureAutocompleteView.as_view(),
+        name="culture-autocomplete",
     ),
     path(
         "greenhouses/map/",

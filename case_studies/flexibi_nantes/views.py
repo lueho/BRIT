@@ -12,9 +12,7 @@ from materials.models import MaterialComponentGroup
 from utils.file_export.views import GenericUserCreatedObjectExportView
 from utils.object_management.views import (
     PrivateObjectFilterView,
-    PrivateObjectListView,
     PublishedObjectFilterView,
-    PublishedObjectListView,
     UserCreatedObjectAutocompleteView,
     UserCreatedObjectCreateView,
     UserCreatedObjectDetailView,
@@ -26,7 +24,7 @@ from utils.object_management.views import (
 )
 from utils.views import NextOrSuccessUrlMixin
 
-from .filters import GreenhouseTypeFilter, NantesGreenhousesFilterSet
+from .filters import CultureListFilter, GreenhouseTypeFilter, NantesGreenhousesFilterSet
 from .forms import (
     CultureModalModelForm,
     CultureModelForm,
@@ -46,11 +44,17 @@ from .models import Culture, Greenhouse, GrowthTimeStepSet
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CulturePublishedListView(PublishedObjectListView):
+class CulturePublishedListView(PublishedObjectFilterView):
     model = Culture
+    filterset_class = CultureListFilter
 
 
-class CulturePrivateListView(PrivateObjectListView):
+class CulturePrivateListView(PrivateObjectFilterView):
+    model = Culture
+    filterset_class = CultureListFilter
+
+
+class CultureAutocompleteView(UserCreatedObjectAutocompleteView):
     model = Culture
 
 
