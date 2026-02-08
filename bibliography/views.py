@@ -287,6 +287,7 @@ class SourceListCheckUrlsView(PermissionRequiredMixin, View):
 class SourceAutocompleteView(UserCreatedObjectAutocompleteView):
     model = Source
     search_lookups = [
+        "abbreviation__icontains",
         "title__icontains",
         "authors__last_names__icontains",
         "authors__first_names__icontains",
