@@ -216,6 +216,7 @@ class MapMixinTestCase(TestCase):
 
 class LocationCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Location
+    add_scope_query_param_to_list_urls = True
 
     view_dashboard_name = "maps-dashboard"
     view_create_name = "location-create"
@@ -243,6 +244,7 @@ class LocationCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
 
 class RegionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Region
+    add_scope_query_param_to_list_urls = True
 
     view_dashboard_name = "maps-dashboard"
     view_create_name = "region-create"
@@ -965,6 +967,7 @@ class AttributeCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTest
     modal_detail_view = True
     modal_update_view = True
     modal_create_view = True
+    add_scope_query_param_to_list_urls = True
 
     model = Attribute
 
