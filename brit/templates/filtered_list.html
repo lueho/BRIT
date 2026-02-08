@@ -128,7 +128,6 @@
                     <thead>
                       <tr>
                         <th>Name</th>
-                        <th>Description</th>
                         {% if object_list.model|is_user_created %}<th class="actions-column">Status/Actions</th>{% endif %}
                       </tr>
                     </thead>
@@ -138,10 +137,12 @@
                       {% block list_table_row %}
                         <tr tabindex="0"
                             onclick="window.location='{% detail_or_review_url object %}'">
-                          <td data-label="Name">
-                            <a href="{% detail_or_review_url object %}">{{ object.name }}</a>
+                          <td data-label="Name" class="ps-3">
+                            <a href="{% detail_or_review_url object %}" class="text-decoration-none">
+                              <strong class="d-block">{{ object.name }}</strong>
+                              {% if object.description %}<span class="text-muted small">{{ object.description|truncatewords:15 }}</span>{% endif %}
+                            </a>
                           </td>
-                          <td data-label="Description">{{ object.description }}</td>
                           {% if object_list.model|is_user_created %}
                             <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
                           {% endif %}
