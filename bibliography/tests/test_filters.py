@@ -39,15 +39,15 @@ class SourceFilterTestCase(TestCase):
             )
         SourceAuthor.objects.create(source=cls.source2, author=cls.author2, position=1)
 
-    def test_title_icontains(self):
+    def test_title_filter_by_source_pk(self):
         factory = RequestFactory()
-        filter_params = {"title": "Custom"}
+        filter_params = {"title": self.source.pk}
         request = factory.get(
             reverse("source-detail", kwargs={"pk": self.source.pk}), filter_params
         )
         qs = SourceFilter(request.GET, Source.objects.all()).qs
         self.assertEqual(1, qs.count())
-        self.assertEqual("Test Custom Source", qs.first().title)
+        self.assertEqual(self.source, qs.first())
 
     def test_author_filter_by_pk(self):
         factory = RequestFactory()

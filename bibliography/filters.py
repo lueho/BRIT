@@ -79,7 +79,23 @@ class SourceModelFilterSet(FilterSet):
 
 
 class SourceFilter(UserCreatedObjectScopedFilterSet):
-    title = CharFilter(lookup_expr="icontains")
+    title = ModelChoiceFilter(
+        queryset=Source.objects.all(),
+        label="Title",
+        method="filter_by_source",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(
+                url="source-autocomplete",
+                label_field="text",
+            ),
+        ),
+    )
+
+    def filter_by_source(self, queryset, name, value):
+        if value:
+            return queryset.filter(pk=value.pk)
+        return queryset
+
     author = ModelChoiceFilter(
         queryset=Author.objects.all(),
         field_name="authors",
