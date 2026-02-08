@@ -1,38 +1,51 @@
-{% extends 'filtered_list.html' %}
+{% extends "filtered_list.html" %}
 {% load user_created_object_tags %}
 {% load moderation_tags %}
 
-{% block title %}BRIT | Inventories{% endblock %}
+{% block title %}BRIT | Inventories{% endblock title %}
 
-{% block list_card_header %}<strong><i class="fas fa-fw fa-chart-bar"></i> Inventories</strong>{% endblock %}
+{% block list_card_header %}
+<strong><i class="fas fa-fw fa-chart-bar"></i> Inventories</strong>
+{% endblock list_card_header %}
 
 {% block list_table %}
-    <table class="table table-responsive-stack">
-        <thead>
-        <tr>
-            <th>Name</th>
-            <th>Catchment</th>
-            <th>Description</th>
-            {% if object_list.model|is_user_created %}
-                <th class="actions-column">Status/Actions</th>
-            {% endif %}
-        </tr>
-        </thead>
-        <tbody>
-        {% for object in object_list %}
-            <tr>
-                <td data-label="Name"><a href="{% detail_or_review_url object %}">{{ object.name }}</a></td>
-                <td data-label="Catchment"><a href="{% detail_or_review_url object.catchment %}">{{ object.catchment }}</a>
-                </td>
-                <td data-label="Description">{{ object.description }}</td>
-                {% if object_list.model|is_user_created %}
-                    <td class="actions-column mobile-no-label">
-                        {% include 'object_management/status_actions_cell.html' %}
+<div class="collection-list-min-height">
+    <div class="table-responsive">
+        <table class="table modern-table">
+            <thead>
+                <tr>
+                    <th>Inventory</th>
+                    {% if object_list.model|is_user_created %}
+                    <th class="actions-column">Status/Actions</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for object in object_list %}
+                <tr>
+                    <td data-label="Inventory" class="ps-3">
+                        <a href="{% detail_or_review_url object %}" class="text-decoration-none">
+                            <strong class="d-block">{{ object.name }}</strong>
+                            <span class="text-muted small">
+                                {{ object.catchment }}
+                                {% if object.description %}
+                                &middot; {{ object.description|truncatewords:20 }}
+                                {% endif %}
+                            </span>
+                        </a>
                     </td>
-                {% endif %}
-            </tr>
-        {% endfor %}
-        </tbody>
-        <tfoot></tfoot>
-    </table>
-{% endblock %}
+                    {% if object_list.model|is_user_created %}
+                    <td class="actions-column mobile-no-label">
+                        {% include "object_management/status_actions_cell.html" %}
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock list_table %}
+
+{% block learning_tab_button %}{% endblock learning_tab_button %}
+{% block learning_tab_pane %}{% endblock learning_tab_pane %}
