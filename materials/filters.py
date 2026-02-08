@@ -1,15 +1,33 @@
-from django_filters import BooleanFilter, DateFromToRangeFilter, ModelChoiceFilter
+from django_filters import (
+    BooleanFilter,
+    CharFilter,
+    ChoiceFilter,
+    DateFromToRangeFilter,
+    ModelChoiceFilter,
+)
 from django_filters import rest_framework as rf_filters
 from django_tomselect.app_settings import TomSelectConfig
 from django_tomselect.widgets import TomSelectModelWidget
 
-from utils.filters import BaseCrispyFilterSet, UserCreatedObjectScopedFilterSet
+from utils.filters import UserCreatedObjectScopedFilterSet
 from utils.object_management.permissions import (
     apply_scope_filter,
     filter_queryset_for_user,
 )
 
-from .models import Composition, Material, MaterialCategory, Sample, SampleSeries
+from .models import (
+    AnalyticalMethod,
+    Composition,
+    Material,
+    MaterialCategory,
+    MaterialComponent,
+    MaterialComponentGroup,
+    MaterialComponentKind,
+    MaterialProperty,
+    MaterialPropertyAggregationKind,
+    Sample,
+    SampleSeries,
+)
 
 
 class MaterialFilterSet(rf_filters.FilterSet):
@@ -65,6 +83,124 @@ class MaterialListFilter(UserCreatedObjectScopedFilterSet):
             "scope",
             "name",
             "category",
+        )
+
+
+class MaterialCategoryListFilter(UserCreatedObjectScopedFilterSet):
+    name = CharFilter(
+        field_name="name",
+        lookup_expr="icontains",
+        label="Name",
+    )
+
+    class Meta:
+        model = MaterialCategory
+        fields = ("scope", "name")
+
+
+class MaterialComponentListFilter(UserCreatedObjectScopedFilterSet):
+    name = ModelChoiceFilter(
+        queryset=MaterialComponent.objects.none(),
+        field_name="name",
+        label="Component Name",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(
+                url="materialcomponent-autocomplete",
+                filter_by=("scope", "name"),
+            ),
+        ),
+    )
+    component_kind = ChoiceFilter(
+        field_name="component_kind",
+        label="Kind",
+        choices=MaterialComponentKind.choices,
+        empty_label="All",
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = getattr(self, "request", None)
+        queryset = MaterialComponent.objects.all()
+        if request and hasattr(request, "user"):
+            queryset = filter_queryset_for_user(queryset, request.user)
+
+        scope_value = None
+        try:
+            if hasattr(self, "data") and self.data:
+                scope_value = self.data.get("scope")
+            if not scope_value and hasattr(self, "form"):
+                scope_value = self.form.initial.get("scope")
+        except Exception:
+            scope_value = None
+
+        if scope_value:
+            queryset = apply_scope_filter(
+                queryset, scope_value, user=getattr(request, "user", None)
+            )
+
+        self.filters["name"].queryset = queryset
+
+    class Meta:
+        model = MaterialComponent
+        fields = (
+            "scope",
+            "name",
+            "component_kind",
+        )
+
+
+class MaterialComponentGroupListFilter(UserCreatedObjectScopedFilterSet):
+    name = CharFilter(
+        field_name="name",
+        lookup_expr="icontains",
+        label="Name",
+    )
+
+    class Meta:
+        model = MaterialComponentGroup
+        fields = ("scope", "name")
+
+
+class MaterialPropertyListFilter(UserCreatedObjectScopedFilterSet):
+    name = CharFilter(
+        field_name="name",
+        lookup_expr="icontains",
+        label="Name",
+    )
+    aggregation_kind = ChoiceFilter(
+        field_name="aggregation_kind",
+        label="Aggregation",
+        choices=MaterialPropertyAggregationKind.choices,
+        empty_label="All",
+    )
+
+    class Meta:
+        model = MaterialProperty
+        fields = (
+            "scope",
+            "name",
+            "aggregation_kind",
+        )
+
+
+class AnalyticalMethodListFilter(UserCreatedObjectScopedFilterSet):
+    name = CharFilter(
+        field_name="name",
+        lookup_expr="icontains",
+        label="Name",
+    )
+    technique = CharFilter(
+        field_name="technique",
+        lookup_expr="icontains",
+        label="Technique",
+    )
+
+    class Meta:
+        model = AnalyticalMethod
+        fields = (
+            "scope",
+            "name",
+            "technique",
         )
 
 
@@ -162,7 +298,7 @@ class UserOwnedSampleFilter(SampleFilter):
     )
 
 
-class SampleSeriesFilter(BaseCrispyFilterSet):
+class SampleSeriesFilter(UserCreatedObjectScopedFilterSet):
     material = ModelChoiceFilter(
         queryset=Material.objects.filter(type="material"),
         field_name="material__name",
@@ -176,7 +312,7 @@ class SampleSeriesFilter(BaseCrispyFilterSet):
 
     class Meta:
         model = SampleSeries
-        fields = ("material",)
+        fields = ("scope", "material")
 
 
 class SampleFilterSet(rf_filters.FilterSet):

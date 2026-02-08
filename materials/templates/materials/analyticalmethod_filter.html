@@ -4,11 +4,11 @@
 {% load moderation_tags %}
 
 {% block title %}
-    BRIT | Materials | Samples
+    BRIT | Materials | Analytical Methods
 {% endblock title %}
 
 {% block list_card_header %}
-    <strong>Samples</strong>
+    <strong>Analytical Methods</strong>
 {% endblock list_card_header %}
 
 {% block list_table %}
@@ -20,17 +20,17 @@
             <table class="table modern-table">
                 <thead>
                     <tr>
-                        <th>Sample</th>
+                        <th>Analytical Method</th>
                         {% if object_list.model|is_user_created %}<th class="actions-column">Status/Actions</th>{% endif %}
                     </tr>
                 </thead>
                 <tbody>
                     {% for object in object_list %}
                         <tr>
-                            <td data-label="Sample" class="ps-3">
+                            <td data-label="Analytical Method" class="ps-3">
                                 <a href="{% detail_or_review_url object %}" class="text-decoration-none">
                                     <strong class="d-block">{{ object.name }}</strong>
-                                    <span class="text-muted small">{{ object.material.name }}{% if object.created_at %} · {{ object.created_at|date:"Y-m-d" }}{% endif %}{% if object.standalone %} · Standalone{% endif %}</span>
+                                    <span class="text-muted small">{% if object.technique %}{{ object.technique }}{% endif %}{% if object.standard %} · {{ object.standard }}{% endif %}{% if object.instrument_type %} · {{ object.instrument_type }}{% endif %}</span>
                                 </a>
                             </td>
                             {% if object_list.model|is_user_created %}

@@ -528,6 +528,7 @@ class MaterialCategoryCRUDViewsTestCase(
     modal_detail_view = True
     modal_update_view = True
     modal_create_view = True
+    add_scope_query_param_to_list_urls = True
 
     model = MaterialCategory
 
@@ -591,6 +592,7 @@ class MaterialComponentCRUDViewsTestCase(
     modal_detail_view = True
     modal_update_view = True
     modal_create_view = True
+    add_scope_query_param_to_list_urls = True
 
     model = MaterialComponent
 
@@ -627,6 +629,7 @@ class MaterialComponentGroupCRUDViewsTestCase(
     modal_detail_view = True
     modal_update_view = True
     modal_create_view = True
+    add_scope_query_param_to_list_urls = True
 
     model = MaterialComponentGroup
 
@@ -663,6 +666,7 @@ class MaterialPropertyCRUDViewsTestCase(
     modal_detail_view = True
     modal_update_view = True
     modal_create_view = True
+    add_scope_query_param_to_list_urls = True
 
     model = MaterialProperty
 
@@ -766,6 +770,7 @@ class AnalyticalMethodCRUDViewsTestCase(
     AbstractTestCases.UserCreatedObjectCRUDViewTestCase
 ):
     modal_detail_view = True
+    add_scope_query_param_to_list_urls = True
 
     model = AnalyticalMethod
 
@@ -791,6 +796,7 @@ class SampleSeriesCRUDViewsTestCase(
 ):
     modal_detail_view = True
     modal_create_view = True
+    add_scope_query_param_to_list_urls = True
 
     model = SampleSeries
 

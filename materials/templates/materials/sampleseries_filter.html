@@ -44,13 +44,29 @@
     </div>
 {% endblock list_table %}
 
+{% block options_pane_body %}
+    {% if create_permission in perms or user.is_staff %}
+        <a class="btn btn-success w-100 mb-2"
+           href="{{ object_list.model.create_url }}"
+           aria-label="Create new {{ object_list.model.get_verbose_name }}">
+            <i class="fas fa-plus"></i> Create new {{ object_list.model.get_verbose_name }}
+        </a>
+    {% endif %}
+{% endblock options_pane_body %}
+
+{% block learning_tab_button %}
+{% endblock learning_tab_button %}
+{% block learning_tab_pane %}
+{% endblock learning_tab_pane %}
+
 {% block filter_body %}
     <form method="get">
         {% crispy filter.form %}
-        <button id="btn-filter" class="btn btn-primary" type="submit">Filter</button>
+        <div class="d-flex justify-content-end gap-2 mt-2">
+            <button id="btn-filter" class="btn btn-sm btn-primary submit-filter" type="submit">Filter</button>
+            <a class="btn btn-sm btn-outline-secondary"
+               href="{% if list_type == 'private' %}{{ object_list.model.private_list_url }}?scope=private{% else %}{{ object_list.model.public_list_url }}?scope=published{% endif %}"
+               aria-label="Reset filters">Reset</a>
+        </div>
     </form>
 {% endblock filter_body %}
-
-{% block javascript %}
-    {{ block.super }}
-{% endblock javascript %}
