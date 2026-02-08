@@ -1,204 +1,242 @@
 {% extends 'base.html' %}
+{% load static %}
 
-{% block title %}BRIT | Waste Collection{% endblock %}
+{% block title %}
+BRIT | Waste Collection Explorer
+{% endblock title %}
+
+{% block custom_style %}
+<style>
+    .explorer-card {
+        transition: box-shadow 0.2s ease, transform 0.15s ease;
+        border: 1px solid var(--bs-border-color);
+        cursor: pointer;
+    }
+
+    .explorer-card:hover {
+        box-shadow: 0 .5rem 1.25rem rgba(0, 0, 0, .1);
+        transform: translateY(-2px);
+    }
+
+    .explorer-card .card-link {
+        text-decoration: none;
+        color: inherit;
+    }
+
+    .explorer-card .card-link:hover {
+        color: inherit;
+    }
+
+    .explorer-icon {
+        width: 2.5rem;
+        height: 2.5rem;
+        border-radius: 0.75rem;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 1.1rem;
+        flex-shrink: 0;
+    }
+
+    .explorer-section-heading {
+        font-size: 0.7rem;
+        letter-spacing: 0.08em;
+    }
+</style>
+{% endblock custom_style %}
 
 {% block content %}
+<div class="mb-4">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div>
+            <h2 class="mb-2">Waste Collection Explorer</h2>
+            <p class="text-muted mb-0">Browse all waste collection data in the BRIT database. Select a category below to
+                view, filter, and manage records.</p>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'wastecollection-diagram' %}" class="btn btn-outline-secondary btn-sm">
+                <i class="fas fa-project-diagram me-1"></i> Model Diagram
+            </a>
+            <a href="{% url 'WasteCollection' %}" class="btn btn-outline-primary btn-sm">
+                <i class="fas fa-map me-1"></i> Collection Map
+            </a>
+        </div>
+    </div>
+</div>
 
-    <!-- General Household Waste Card -->
-    <div class="row">
-        <div class="col col-12 col-md-6">
-            <div class="card shadow h-100">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3"><h5 class="mb-0">Household Waste Collection</h5></div>
-                <div class="card-body">
-                    <p class="card-text">
-                        Household waste contains a large amount of organic matter that can serve as a valuable
-                        bioresource if properly separated from other waste streams. This module describes the waste
-                        collection systems currently in place. Since a significant portion of the organic matter ends up
-                        in residual waste, the effectiveness of the separation system must always be evaluated against
-                        the residual waste collection. The following models are used to describe these systems.
-                    </p>
+<h6 class="text-muted text-uppercase explorer-section-heading fw-bold mb-3">
+    <i class="fas fa-truck me-1"></i> Collections &amp; Geography
+</h6>
+<div class="row g-3 mb-4">
+    <div class="col-12 col-sm-6 col-lg-3">
+        <div class="card shadow-sm h-100 explorer-card" onclick="window.location='{% url 'collection-list' %}'">
+            <div class="card-body d-flex flex-column">
+                <div class="d-flex align-items-center mb-2">
+                    <span class="explorer-icon bg-primary bg-opacity-10 text-primary"><i
+                            class="fas fa-recycle"></i></span>
+                    <h6 class="mb-0 ms-2">Collections</h6>
                 </div>
-                <div class="card-footer">
-                    <a href="{% url 'WasteCollection' %}" class="btn btn-primary">Collection Map</a>
+                <p class="card-text text-muted small flex-grow-1">The central model where all information comes
+                    together: catchment, collector, waste stream, frequency, and fees.</p>
+                <div class="d-flex align-items-center justify-content-between mt-auto pt-2">
+                    <span class="badge bg-light text-dark border">{{ collection_count }} published</span>
+                    <a href="{% url 'collection-list' %}" class="btn btn-sm btn-outline-primary card-link">Browse</a>
                 </div>
             </div>
         </div>
     </div>
-
-    <!-- Secondary cards -->
-    <div class="row">
-        <!-- Collections Card -->
-        <div class="col col-12 col-md-6 col-lg-3 mt-4">
-            <div class="card shadow h-100">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-                    <h5 class="mb-0"><a href="{% url 'collection-list' %}" class="stretched-link text-decoration-none text-body">Collections</a></h5>
+    <div class="col-12 col-sm-6 col-lg-3">
+        <div class="card shadow-sm h-100 explorer-card"
+            onclick="window.location='{% url 'collectioncatchment-list' %}'">
+            <div class="card-body d-flex flex-column">
+                <div class="d-flex align-items-center mb-2">
+                    <span class="explorer-icon bg-primary bg-opacity-10 text-primary"><i
+                            class="fas fa-map-marked-alt"></i></span>
+                    <h6 class="mb-0 ms-2">Catchments</h6>
                 </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        The Collections model is where all the information comes together. Here you find all the
-                        assembled data, including the other models below.
-                    </p>
-                </div>
-                <div class="card-footer">
-                    <a href="{% url 'collection-list' %}" class="btn btn-primary">View waste collections</a>
-                </div>
-            </div>
-        </div>
-        <!-- Collectors Card -->
-        <div class="col col-12 col-md-6 col-lg-3 mt-4">
-            <div class="card shadow h-100">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-                    <h5 class="mb-0"><a href="{% url 'collector-list' %}" class="stretched-link text-decoration-none text-body">Collectors</a></h5>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        Collectors are organizations responsible for managing waste collection services. They provide
-                        the necessary infrastructure, handle waste retrieval, and ensure proper treatment to maintain
-                        efficient operations.
-                    </p>
-                </div>
-                <div class="card-footer">
-                    <a href="{% url 'collector-list' %}" class="btn btn-primary">View collectors</a>
-                </div>
-            </div>
-        </div>
-        <!-- Catchments Card -->
-        <div class="col col-12 col-md-6 col-lg-3 mt-4">
-            <div class="card shadow h-100">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-                    <h5 class="mb-0"><a href="{% url 'collectioncatchment-list' %}" class="stretched-link text-decoration-none text-body">Catchments</a></h5>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        Catchments define the geographical areas served by waste collection services, often aligning
-                        with administrative regions to ensure a consistent system.
-                    </p>
-                </div>
-                <div class="card-footer">
-                    <a href="{% url 'collectioncatchment-list' %}" class="btn btn-primary">View catchments</a>
-                </div>
-            </div>
-        </div>
-        <!-- Collection Systems Card -->
-        <div class="col col-12 col-md-6 col-lg-3 mt-4">
-            <div class="card shadow h-100">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-                    <h5 class="mb-0"><a href="{% url 'collectionsystem-list' %}" class="stretched-link text-decoration-none text-body">Collection systems</a></h5>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        Collection systems outline the logistical methods behind waste gathering. They define how
-                        citizens collect waste and how it is transferred to the collectors.
-                    </p>
-                </div>
-                <div class="card-footer">
-                    <a href="{% url 'collectionsystem-list' %}" class="btn btn-primary">View collection systems</a>
-                </div>
-            </div>
-        </div>
-        <!-- Waste Categories Card -->
-        <div class="col col-12 col-md-6 col-lg-3 mt-4">
-            <div class="card shadow h-100">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-                    <h5 class="mb-0"><a href="{% url 'wastecategory-list' %}" class="stretched-link text-decoration-none text-body">Waste categories</a></h5>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        Waste categories organize similar waste streams into defined groups. This classification is
-                        essential for effective recycling and process chain management.
-                    </p>
-                </div>
-                <div class="card-footer">
-                    <a href="{% url 'wastecategory-list' %}" class="btn btn-primary">View waste categories</a>
-                </div>
-            </div>
-        </div>
-        <!-- Waste Categories Card -->
-        <div class="col col-12 col-md-6 col-lg-3 mt-4">
-            <div class="card shadow h-100">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-                    <h5 class="mb-0"><a href="{% url 'feesystem-list' %}" class="stretched-link text-decoration-none text-body">Fee systems</a></h5>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        Fee systems determine how waste collection services are financed. They can be based on various
-                        factors, including the amount of waste generated or the type of collection system in place.
-                    </p>
-                </div>
-                <div class="card-footer">
-                    <a href="{% url 'feesystem-list' %}" class="btn btn-primary">View fee systems</a>
-                </div>
-            </div>
-        </div>
-        <!-- Collection Frequencies Card -->
-        <div class="col col-12 col-md-6 col-lg-3 mt-4">
-            <div class="card shadow h-100">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-                    <h5 class="mb-0"><a href="{% url 'collectionfrequency-list' %}" class="stretched-link text-decoration-none text-body">Collection frequencies</a></h5>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        Collection frequencies define the regularity of waste pick-up services, with the main unit of
-                        measurement being collections per year. Additional options account for seasonal variations.
-                    </p>
-                </div>
-                <div class="card-footer">
-                    <a href="{% url 'collectionfrequency-list' %}" class="btn btn-primary">View collection
-                        frequencies</a>
-                </div>
-            </div>
-        </div>
-        <!-- Waste Components Card -->
-        <div class="col col-12 col-md-6 col-lg-3 mt-4">
-            <div class="card shadow h-100">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-                    <h5 class="mb-0"><a href="{% url 'wastecomponent-list' %}" class="stretched-link text-decoration-none text-body">Waste components</a></h5>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        Waste components refer to the individual materials found within waste streams. They serve to
-                        specify which materials are allowed or forbidden in each waste stream.
-                    </p>
-                </div>
-                <div class="card-footer">
-                    <a href="{% url 'wastecomponent-list' %}" class="btn btn-primary">View waste components</a>
-                </div>
-            </div>
-        </div>
-        <!-- Flyers Card -->
-        <div class="col col-12 col-md-6 col-lg-3 mt-4">
-            <div class="card shadow h-100">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-                    <h5 class="mb-0"><a href="{% url 'wasteflyer-list' %}" class="stretched-link text-decoration-none text-body">Flyers</a></h5>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        Flyers serve as key sources of information for the collection systems. They detail collection
-                        schedules and guidelines, ensuring that data remains current through online updates.
-                    </p>
-                </div>
-                <div class="card-footer">
-                    <a href="{% url 'wasteflyer-list' %}" class="btn btn-primary">View Flyers</a>
-                </div>
-            </div>
-        </div>
-        <!-- Properties Card -->
-        <div class="col col-12 col-md-6 col-lg-3 mt-4">
-            <div class="card shadow h-100">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
-                    <h5 class="mb-0"><a href="{% url 'property-list' %}" class="stretched-link text-decoration-none text-body">Properties</a></h5>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        Properties add extra attributes to waste collections, such as annual statistics on collected
-                        amounts.
-                    </p>
-                </div>
-                <div class="card-footer">
-                    <a href="{% url 'property-list' %}" class="btn btn-primary">View Properties</a>
+                <p class="card-text text-muted small flex-grow-1">Geographical areas served by waste collection
+                    services, often aligning with administrative regions.</p>
+                <div class="d-flex align-items-center justify-content-between mt-auto pt-2">
+                    <span class="badge bg-light text-dark border">{{ catchment_count }} published</span>
+                    <a href="{% url 'collectioncatchment-list' %}"
+                        class="btn btn-sm btn-outline-primary card-link">Browse</a>
                 </div>
             </div>
         </div>
     </div>
+    <div class="col-12 col-sm-6 col-lg-3">
+        <div class="card shadow-sm h-100 explorer-card" onclick="window.location='{% url 'collector-list' %}'">
+            <div class="card-body d-flex flex-column">
+                <div class="d-flex align-items-center mb-2">
+                    <span class="explorer-icon bg-primary bg-opacity-10 text-primary"><i
+                            class="fas fa-building"></i></span>
+                    <h6 class="mb-0 ms-2">Collectors</h6>
+                </div>
+                <p class="card-text text-muted small flex-grow-1">Organizations responsible for managing waste
+                    collection services, infrastructure, and retrieval operations.</p>
+                <div class="d-flex align-items-center justify-content-between mt-auto pt-2">
+                    <span class="badge bg-light text-dark border">{{ collector_count }} published</span>
+                    <a href="{% url 'collector-list' %}" class="btn btn-sm btn-outline-primary card-link">Browse</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 
+<h6 class="text-muted text-uppercase explorer-section-heading fw-bold mb-3">
+    <i class="fas fa-cogs me-1"></i> Classification &amp; Configuration
+</h6>
+<div class="row g-3 mb-4">
+    <div class="col-12 col-sm-6 col-lg-3">
+        <div class="card shadow-sm h-100 explorer-card" onclick="window.location='{% url 'wastecategory-list' %}'">
+            <div class="card-body d-flex flex-column">
+                <div class="d-flex align-items-center mb-2">
+                    <span class="explorer-icon bg-success bg-opacity-10 text-success"><i class="fas fa-tags"></i></span>
+                    <h6 class="mb-0 ms-2">Waste Categories</h6>
+                </div>
+                <p class="card-text text-muted small flex-grow-1">Classification groups for waste streams, essential for
+                    effective recycling and process chain management.</p>
+                <div class="d-flex align-items-center justify-content-between mt-auto pt-2">
+                    <span class="badge bg-light text-dark border">{{ wastecategory_count }} published</span>
+                    <a href="{% url 'wastecategory-list' %}" class="btn btn-sm btn-outline-primary card-link">Browse</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-lg-3">
+        <div class="card shadow-sm h-100 explorer-card" onclick="window.location='{% url 'collectionsystem-list' %}'">
+            <div class="card-body d-flex flex-column">
+                <div class="d-flex align-items-center mb-2">
+                    <span class="explorer-icon bg-success bg-opacity-10 text-success"><i
+                            class="fas fa-dumpster"></i></span>
+                    <h6 class="mb-0 ms-2">Collection Systems</h6>
+                </div>
+                <p class="card-text text-muted small flex-grow-1">Logistical methods defining how citizens collect waste
+                    and how it is transferred to collectors.</p>
+                <div class="d-flex align-items-center justify-content-between mt-auto pt-2">
+                    <span class="badge bg-light text-dark border">{{ collectionsystem_count }} published</span>
+                    <a href="{% url 'collectionsystem-list' %}"
+                        class="btn btn-sm btn-outline-primary card-link">Browse</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-lg-3">
+        <div class="card shadow-sm h-100 explorer-card" onclick="window.location='{% url 'feesystem-list' %}'">
+            <div class="card-body d-flex flex-column">
+                <div class="d-flex align-items-center mb-2">
+                    <span class="explorer-icon bg-success bg-opacity-10 text-success"><i
+                            class="fas fa-coins"></i></span>
+                    <h6 class="mb-0 ms-2">Fee Systems</h6>
+                </div>
+                <p class="card-text text-muted small flex-grow-1">Financing schemes for waste collection services, based
+                    on waste volume, collection type, or other factors.</p>
+                <div class="d-flex align-items-center justify-content-between mt-auto pt-2">
+                    <span class="badge bg-light text-dark border">{{ feesystem_count }} published</span>
+                    <a href="{% url 'feesystem-list' %}" class="btn btn-sm btn-outline-primary card-link">Browse</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-lg-3">
+        <div class="card shadow-sm h-100 explorer-card"
+            onclick="window.location='{% url 'collectionfrequency-list' %}'">
+            <div class="card-body d-flex flex-column">
+                <div class="d-flex align-items-center mb-2">
+                    <span class="explorer-icon bg-success bg-opacity-10 text-success"><i
+                            class="fas fa-calendar-alt"></i></span>
+                    <h6 class="mb-0 ms-2">Collection Frequencies</h6>
+                </div>
+                <p class="card-text text-muted small flex-grow-1">Pick-up schedules measured in collections per year,
+                    with options for seasonal variations.</p>
+                <div class="d-flex align-items-center justify-content-between mt-auto pt-2">
+                    <span class="badge bg-light text-dark border">{{ frequency_count }} published</span>
+                    <a href="{% url 'collectionfrequency-list' %}"
+                        class="btn btn-sm btn-outline-primary card-link">Browse</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<h6 class="text-muted text-uppercase explorer-section-heading fw-bold mb-3">
+    <i class="fas fa-puzzle-piece me-1"></i> Components &amp; Sources
+</h6>
+<div class="row g-3 mb-4">
+    <div class="col-12 col-sm-6 col-lg-3">
+        <div class="card shadow-sm h-100 explorer-card" onclick="window.location='{% url 'wastecomponent-list' %}'">
+            <div class="card-body d-flex flex-column">
+                <div class="d-flex align-items-center mb-2">
+                    <span class="explorer-icon bg-warning bg-opacity-10 text-warning"><i
+                            class="fas fa-cubes"></i></span>
+                    <h6 class="mb-0 ms-2">Waste Components</h6>
+                </div>
+                <p class="card-text text-muted small flex-grow-1">Individual materials found in waste streams,
+                    specifying which materials are allowed or forbidden.</p>
+                <div class="d-flex align-items-center justify-content-between mt-auto pt-2">
+                    <span class="badge bg-light text-dark border">{{ wastecomponent_count }} published</span>
+                    <a href="{% url 'wastecomponent-list' %}"
+                        class="btn btn-sm btn-outline-primary card-link">Browse</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-lg-3">
+        <div class="card shadow-sm h-100 explorer-card" onclick="window.location='{% url 'wasteflyer-list' %}'">
+            <div class="card-body d-flex flex-column">
+                <div class="d-flex align-items-center mb-2">
+                    <span class="explorer-icon bg-warning bg-opacity-10 text-warning"><i
+                            class="fas fa-file-alt"></i></span>
+                    <h6 class="mb-0 ms-2">Waste Flyers</h6>
+                </div>
+                <p class="card-text text-muted small flex-grow-1">Information sources detailing collection schedules and
+                    guidelines, kept current through online updates.</p>
+                <div class="d-flex align-items-center justify-content-between mt-auto pt-2">
+                    <span class="badge bg-light text-dark border">{{ wasteflyer_count }} published</span>
+                    <a href="{% url 'wasteflyer-list' %}" class="btn btn-sm btn-outline-primary card-link">Browse</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
 {% endblock content %}
