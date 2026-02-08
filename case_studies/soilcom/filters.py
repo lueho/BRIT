@@ -19,9 +19,12 @@ from django_tomselect.widgets import TomSelectModelWidget
 
 from utils.crispy_fields import FilterAccordionGroup, RangeSliderField
 from utils.filters import (
-    BaseCrispyFilterSet,
     NullableRangeFilter,
     UserCreatedObjectScopedFilterSet,
+)
+from utils.object_management.permissions import (
+    apply_scope_filter,
+    filter_queryset_for_user,
 )
 from utils.widgets import NullableRangeSliderWidget
 
@@ -33,6 +36,7 @@ from .models import (
     CollectionCountOptions,
     CollectionFrequency,
     CollectionPropertyValue,
+    CollectionSystem,
     Collector,
     FeeSystem,
     WasteCategory,
@@ -52,16 +56,222 @@ class CollectorFilter(UserCreatedObjectScopedFilterSet):
         fields = ("scope", "name", "catchment")
 
 
-class CollectionCatchmentFilterSet(BaseCrispyFilterSet):
+class CollectionCatchmentFilterSet(UserCreatedObjectScopedFilterSet):
     name = CharFilter(lookup_expr="icontains")
 
     class Meta:
         model = CollectionCatchment
         fields = (
+            "scope",
             "id",
             "name",
             "type",
         )
+
+
+class CollectionSystemListFilter(UserCreatedObjectScopedFilterSet):
+    name = ModelChoiceFilter(
+        queryset=CollectionSystem.objects.none(),
+        field_name="name",
+        label="System Name",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(
+                url="collectionsystem-autocomplete",
+                filter_by=("scope", "name"),
+            ),
+        ),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = getattr(self, "request", None)
+        queryset = CollectionSystem.objects.all()
+        if request and hasattr(request, "user"):
+            queryset = filter_queryset_for_user(queryset, request.user)
+
+        scope_value = None
+        try:
+            if hasattr(self, "data") and self.data:
+                scope_value = self.data.get("scope")
+            if not scope_value and hasattr(self, "form"):
+                scope_value = self.form.initial.get("scope")
+        except Exception:
+            scope_value = None
+
+        if scope_value:
+            queryset = apply_scope_filter(
+                queryset, scope_value, user=getattr(request, "user", None)
+            )
+
+        self.filters["name"].queryset = queryset
+
+    class Meta:
+        model = CollectionSystem
+        fields = ("scope", "name")
+
+
+class WasteCategoryListFilter(UserCreatedObjectScopedFilterSet):
+    name = ModelChoiceFilter(
+        queryset=WasteCategory.objects.none(),
+        field_name="name",
+        label="Category Name",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(
+                url="wastecategory-autocomplete",
+                filter_by=("scope", "name"),
+            ),
+        ),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = getattr(self, "request", None)
+        queryset = WasteCategory.objects.all()
+        if request and hasattr(request, "user"):
+            queryset = filter_queryset_for_user(queryset, request.user)
+
+        scope_value = None
+        try:
+            if hasattr(self, "data") and self.data:
+                scope_value = self.data.get("scope")
+            if not scope_value and hasattr(self, "form"):
+                scope_value = self.form.initial.get("scope")
+        except Exception:
+            scope_value = None
+
+        if scope_value:
+            queryset = apply_scope_filter(
+                queryset, scope_value, user=getattr(request, "user", None)
+            )
+
+        self.filters["name"].queryset = queryset
+
+    class Meta:
+        model = WasteCategory
+        fields = ("scope", "name")
+
+
+class WasteComponentListFilter(UserCreatedObjectScopedFilterSet):
+    name = ModelChoiceFilter(
+        queryset=WasteComponent.objects.none(),
+        field_name="name",
+        label="Component Name",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(
+                url="wastecomponent-autocomplete",
+                filter_by=("scope", "name"),
+            ),
+        ),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = getattr(self, "request", None)
+        queryset = WasteComponent.objects.all()
+        if request and hasattr(request, "user"):
+            queryset = filter_queryset_for_user(queryset, request.user)
+
+        scope_value = None
+        try:
+            if hasattr(self, "data") and self.data:
+                scope_value = self.data.get("scope")
+            if not scope_value and hasattr(self, "form"):
+                scope_value = self.form.initial.get("scope")
+        except Exception:
+            scope_value = None
+
+        if scope_value:
+            queryset = apply_scope_filter(
+                queryset, scope_value, user=getattr(request, "user", None)
+            )
+
+        self.filters["name"].queryset = queryset
+
+    class Meta:
+        model = WasteComponent
+        fields = ("scope", "name")
+
+
+class FeeSystemListFilter(UserCreatedObjectScopedFilterSet):
+    name = ModelChoiceFilter(
+        queryset=FeeSystem.objects.none(),
+        field_name="name",
+        label="Fee System Name",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(
+                url="feesystem-autocomplete",
+                filter_by=("scope", "name"),
+            ),
+        ),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = getattr(self, "request", None)
+        queryset = FeeSystem.objects.all()
+        if request and hasattr(request, "user"):
+            queryset = filter_queryset_for_user(queryset, request.user)
+
+        scope_value = None
+        try:
+            if hasattr(self, "data") and self.data:
+                scope_value = self.data.get("scope")
+            if not scope_value and hasattr(self, "form"):
+                scope_value = self.form.initial.get("scope")
+        except Exception:
+            scope_value = None
+
+        if scope_value:
+            queryset = apply_scope_filter(
+                queryset, scope_value, user=getattr(request, "user", None)
+            )
+
+        self.filters["name"].queryset = queryset
+
+    class Meta:
+        model = FeeSystem
+        fields = ("scope", "name")
+
+
+class CollectionFrequencyListFilter(UserCreatedObjectScopedFilterSet):
+    name = ModelChoiceFilter(
+        queryset=CollectionFrequency.objects.none(),
+        field_name="name",
+        label="Frequency Name",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(
+                url="collectionfrequency-autocomplete",
+                filter_by=("scope", "name"),
+            ),
+        ),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = getattr(self, "request", None)
+        queryset = CollectionFrequency.objects.all()
+        if request and hasattr(request, "user"):
+            queryset = filter_queryset_for_user(queryset, request.user)
+
+        scope_value = None
+        try:
+            if hasattr(self, "data") and self.data:
+                scope_value = self.data.get("scope")
+            if not scope_value and hasattr(self, "form"):
+                scope_value = self.form.initial.get("scope")
+        except Exception:
+            scope_value = None
+
+        if scope_value:
+            queryset = apply_scope_filter(
+                queryset, scope_value, user=getattr(request, "user", None)
+            )
+
+        self.filters["name"].queryset = queryset
+
+    class Meta:
+        model = CollectionFrequency
+        fields = ("scope", "name")
 
 
 SEASONAL_FREQUENCY_CHOICES = (

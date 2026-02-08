@@ -153,6 +153,11 @@ urlpatterns = [
         name="collectionsystem-delete-modal",
     ),
     path(
+        "collectionsystems/autocomplete/",
+        views.CollectionSystemAutocompleteView.as_view(),
+        name="collectionsystem-autocomplete",
+    ),
+    path(
         "collectionsystems/options/",
         views.CollectionSystemOptions.as_view(),
         name="collectionsystem-options",
@@ -201,6 +206,11 @@ urlpatterns = [
         "wastecategories/<int:pk>/delete/modal/",
         views.WasteCategoryModalDeleteView.as_view(),
         name="wastecategory-delete-modal",
+    ),
+    path(
+        "wastecategories/autocomplete/",
+        views.WasteCategoryAutocompleteView.as_view(),
+        name="wastecategory-autocomplete",
     ),
     path(
         "wastecategories/options/",
@@ -253,6 +263,11 @@ urlpatterns = [
         name="wastecomponent-delete-modal",
     ),
     path(
+        "wastecomponents/autocomplete/",
+        views.WasteComponentAutocompleteView.as_view(),
+        name="wastecomponent-autocomplete",
+    ),
+    path(
         "feesystems/", views.FeeSystemPublishedListView.as_view(), name="feesystem-list"
     ),
     path(
@@ -279,6 +294,11 @@ urlpatterns = [
         "feesystems/<int:pk>/delete/modal/",
         views.FeeSystemModalDeleteView.as_view(),
         name="feesystem-delete-modal",
+    ),
+    path(
+        "feesystems/autocomplete/",
+        views.FeeSystemAutocompleteView.as_view(),
+        name="feesystem-autocomplete",
     ),
     path(
         "frequencies/",

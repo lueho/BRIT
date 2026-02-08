@@ -1,109 +1,100 @@
-{% extends 'filtered_list.html' %}
+{% extends "filtered_list.html" %}
 {% load crispy_forms_tags %}
 {% load user_created_object_tags %}
 {% load moderation_tags %}
 
-{% block title %}BRIT | Waste Collection Flyers{% endblock %}
+{% block title %}BRIT | Waste Collection Flyers{% endblock title %}
 
-{% block list_card_header %}<strong>Flyers</strong>{% endblock %}
+{% block list_card_header %}<strong>Flyers</strong>{% endblock list_card_header %}
 
 {% block list_table %}
+<div class="collection-list-min-height">
     <div class="table-responsive">
-        <table class="table table-hover table-responsive-stack">
+        <table class="table modern-table">
             <thead>
-            <tr>
-                <th scope="col" class="col-1">Id</th>
-                <th scope="col" class="col-9">URL</th>
-                <th scope="col">Valid</th>
-                <th scope="col">Checked</th>
-                {% if object_list.model|is_user_created %}
-                    <th class="actions-column">Status/Actions</th>
-                {% endif %}
-            </tr>
-            </thead>
-            <tbody>
-            {% for object in object_list %}
                 <tr>
-                    <td data-label="Id"><a href="{% detail_or_review_url object %}">{{ object.id }}</a></td>
-                    <td data-label="URL" class="url-cell"><span><a href="{{ object.url }}"
-                                                                   target="_blank">{{ object.url }}</a></span>
-                    </td>
-                    <td data-label="Valid">{{ object.url_valid }}</td>
-                    <td data-label="Checked">{{ object.url_checked|date:'d.m.Y' }}</td>
+                    <th>Flyer</th>
                     {% if object_list.model|is_user_created %}
-                        <td class="actions-column mobile-no-label">
-                            {% include 'object_management/status_actions_cell.html' %}
-                        </td>
+                    <th class="actions-column">Status/Actions</th>
                     {% endif %}
                 </tr>
-            {% endfor %}
+            </thead>
+            <tbody>
+                {% for object in object_list %}
+                <tr>
+                    <td data-label="Flyer" class="ps-3">
+                        <a href="{% detail_or_review_url object %}" class="text-decoration-none">
+                            <strong class="d-block text-truncate" style="max-width: 500px;">{{ object.url }}</strong>
+                            <span class="text-muted small">Valid: {{ object.url_valid }}{% if object.url_checked %}
+                                &middot; Checked: {{ object.url_checked|date:'d.m.Y' }}{% endif %}</span>
+                        </a>
+                    </td>
+                    {% if object_list.model|is_user_created %}
+                    <td class="actions-column mobile-no-label">
+                        {% include "object_management/status_actions_cell.html" %}
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
             </tbody>
-            <tfoot>
-            </tfoot>
         </table>
     </div>
+</div>
 {% endblock list_table %}
 
 {% block list_card_options_dropdown_additional_links %}
-    {% if private_list_owner == user or user.is_staff %}
-        <a id="check_url" class="btn btn-outline-secondary w-100 mb-2" href="javascript:void(0)" onclick="check_url()">
-            <i class="fas fa-fw fa-check-circle"></i>
-            <span>Check URLs</span>
-        </a>
-    {% endif %}
+{% if private_list_owner == user or user.is_staff %}
+<a id="check_url" class="btn btn-outline-secondary w-100 mb-2" href="javascript:void(0)" onclick="check_url()">
+    <i class="fas fa-fw fa-check-circle"></i>
+    <span>Check URLs</span>
+</a>
+{% endif %}
 {% endblock list_card_options_dropdown_additional_links %}
 
-{% block filter_body %}
-    <form method="get">
-        {% crispy filter.form %}
-        <button id="btn-filter" class="btn btn-primary" type="submit">Filter</button>
-    </form>
-{% endblock filter_body %}
-
 {% block javascript %}
-    {{ block.super }}
+{{ block.super }}
 
-    <script type="text/javascript">
+<script type="text/javascript">
 
-        async function monitor_task_progress(url, count = 0) {
-            const response = await fetch(url);
-            const data = await response.json();
-            const elCheckUrlLinkWrapper = document.getElementById('check_url');
-            const elCheckUrlLink = elCheckUrlLinkWrapper.children[0];
-            const elCheckUrlLinkText = elCheckUrlLink.children[1];
-            if (data["state"] === "PENDING") {
-                elCheckUrlLinkText.innerText = "checking" + ".".repeat(count++ % 4);
-                setTimeout(monitor_task_progress, 500, url, count);
-            } else if (data["state"] === "SUCCESS") {
-                document.location.reload();
-            } else if (data["state"] === "FAILURE") {
-                elCheckUrlLinkText.innerText = "check failed";
-            }
+    async function monitor_task_progress(url, count = 0) {
+        const response = await fetch(url);
+        const data = await response.json();
+        const elCheckUrlLinkWrapper = document.getElementById('check_url');
+        const elCheckUrlLink = elCheckUrlLinkWrapper.children[0];
+        const elCheckUrlLinkText = elCheckUrlLink.children[1];
+        if (data["state"] === "PENDING") {
+            elCheckUrlLinkText.innerText = "checking" + ".".repeat(count++ % 4);
+            setTimeout(monitor_task_progress, 500, url, count);
+        } else if (data["state"] === "SUCCESS") {
+            document.location.reload();
+        } else if (data["state"] === "FAILURE") {
+            elCheckUrlLinkText.innerText = "check failed";
         }
+    }
 
-        async function start_task() {
-            const urlParams = new URLSearchParams(window.location.search);
-            const url = "{% url 'wasteflyer-list-check-urls' %}?" + urlParams.toString();
-            const response = await fetch(url);
-            const data = await response.json();
-            return data["task_id"];
-        }
+    async function start_task() {
+        const urlParams = new URLSearchParams(window.location.search);
+        const url = "{% url 'wasteflyer-list-check-urls' %}?" + urlParams.toString();
+        const response = await fetch(url);
+        const data = await response.json();
+        return data["task_id"];
+    }
 
-        function block_link() {
-            const elCheckUrlLinkWrapper = document.getElementById('check_url');
-            const elCheckUrlLink = elCheckUrlLinkWrapper.children[0];
-            const elCheckUrlLinkText = elCheckUrlLink.children[1];
-            elCheckUrlLinkText.innerText = "checking";
-            elCheckUrlLink.classList.add("disabled");
-        }
+    function block_link() {
+        const elCheckUrlLinkWrapper = document.getElementById('check_url');
+        const elCheckUrlLink = elCheckUrlLinkWrapper.children[0];
+        const elCheckUrlLinkText = elCheckUrlLink.children[1];
+        elCheckUrlLinkText.innerText = "checking";
+        elCheckUrlLink.classList.add("disabled");
+    }
 
-        async function check_url() {
-            block_link();
-            const taskId = await start_task();
-            const url = "{% url 'wasteflyer-list-check-urls-progress' task_id=0 %}".replace('0', taskId);
-            monitor_task_progress(url);
-        }
+    async function check_url() {
+        block_link();
+        const taskId = await start_task();
+        const url = "{% url 'wasteflyer-list-check-urls-progress' task_id=0 %}".replace('0', taskId);
+        monitor_task_progress(url);
+    }
 
-    </script>
+</script>
 
 {% endblock javascript %}

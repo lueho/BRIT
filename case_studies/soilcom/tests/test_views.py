@@ -101,6 +101,7 @@ class CollectionSystemCRUDViewsTestCase(
     modal_detail_view = True
     modal_update_view = True
     modal_create_view = True
+    add_scope_query_param_to_list_urls = True
 
     model = CollectionSystem
 
@@ -129,6 +130,7 @@ class WasteCategoryCRUDViewsTestCase(
     modal_detail_view = True
     modal_update_view = True
     modal_create_view = True
+    add_scope_query_param_to_list_urls = True
 
     model = WasteCategory
 
@@ -157,6 +159,7 @@ class WasteComponentCRUDViewsTestCase(
     modal_detail_view = True
     modal_update_view = True
     modal_create_view = True
+    add_scope_query_param_to_list_urls = True
 
     model = WasteComponent
 
@@ -197,6 +200,7 @@ class WasteComponentCRUDViewsTestCase(
 
 class FeeSystemCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = FeeSystem
+    add_scope_query_param_to_list_urls = True
 
     view_dashboard_name = "wastecollection-dashboard"
     view_create_name = "feesystem-create"
@@ -219,6 +223,7 @@ class WasteFlyerCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
     modal_detail_view = True
     update_view = False
     delete_view = False
+    add_scope_query_param_to_list_urls = True
 
     model = WasteFlyer
 
@@ -269,6 +274,7 @@ class CollectionFrequencyCRUDViewsTestCase(
 ):
     modal_detail_view = True
     modal_update_view = True
+    add_scope_query_param_to_list_urls = True
 
     model = CollectionFrequency
 

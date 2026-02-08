@@ -46,9 +46,7 @@ from utils.object_management.views import (
     ApproveItemView,
     OwnedObjectModelSelectOptionsView,
     PrivateObjectFilterView,
-    PrivateObjectListView,
     PublishedObjectFilterView,
-    PublishedObjectListView,
     RejectItemModalView,
     RejectItemView,
     ReviewItemDetailView,
@@ -68,7 +66,16 @@ from utils.object_management.views import (
     WithdrawFromReviewView,
 )
 
-from .filters import CollectionFilterSet, CollectorFilter, WasteFlyerFilter
+from .filters import (
+    CollectionFilterSet,
+    CollectionFrequencyListFilter,
+    CollectionSystemListFilter,
+    CollectorFilter,
+    FeeSystemListFilter,
+    WasteCategoryListFilter,
+    WasteComponentListFilter,
+    WasteFlyerFilter,
+)
 from .forms import (
     AggregatedCollectionPropertyValueModelForm,
     CollectionAddPredecessorForm,
@@ -213,14 +220,20 @@ class CollectorAutocompleteView(UserCreatedObjectAutocompleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class CollectionSystemPublishedListView(PublishedObjectListView):
+class CollectionSystemPublishedListView(PublishedObjectFilterView):
     model = CollectionSystem
+    filterset_class = CollectionSystemListFilter
     dashboard_url = reverse_lazy("wastecollection-dashboard")
 
 
-class CollectionSystemPrivateListView(PrivateObjectListView):
+class CollectionSystemPrivateListView(PrivateObjectFilterView):
     model = CollectionSystem
+    filterset_class = CollectionSystemListFilter
     dashboard_url = reverse_lazy("wastecollection-dashboard")
+
+
+class CollectionSystemAutocompleteView(UserCreatedObjectAutocompleteView):
+    model = CollectionSystem
 
 
 class CollectionSystemCreateView(UserCreatedObjectCreateView):
@@ -259,14 +272,20 @@ class CollectionSystemModalDeleteView(UserCreatedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class WasteCategoryPublishedListView(PublishedObjectListView):
+class WasteCategoryPublishedListView(PublishedObjectFilterView):
     model = WasteCategory
+    filterset_class = WasteCategoryListFilter
     dashboard_url = reverse_lazy("wastecollection-dashboard")
 
 
-class WasteCategoryPrivateListView(PrivateObjectListView):
+class WasteCategoryPrivateListView(PrivateObjectFilterView):
     model = WasteCategory
+    filterset_class = WasteCategoryListFilter
     dashboard_url = reverse_lazy("wastecollection-dashboard")
+
+
+class WasteCategoryAutocompleteView(UserCreatedObjectAutocompleteView):
+    model = WasteCategory
 
 
 class WasteCategoryCreateView(UserCreatedObjectCreateView):
@@ -305,14 +324,20 @@ class WasteCategoryModalDeleteView(UserCreatedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class WasteComponentPublishedListView(PublishedObjectListView):
+class WasteComponentPublishedListView(PublishedObjectFilterView):
     model = WasteComponent
+    filterset_class = WasteComponentListFilter
     dashboard_url = reverse_lazy("wastecollection-dashboard")
 
 
-class WasteComponentPrivateListView(PrivateObjectListView):
+class WasteComponentPrivateListView(PrivateObjectFilterView):
     model = WasteComponent
+    filterset_class = WasteComponentListFilter
     dashboard_url = reverse_lazy("wastecollection-dashboard")
+
+
+class WasteComponentAutocompleteView(UserCreatedObjectAutocompleteView):
+    model = WasteComponent
 
 
 class WasteComponentCreateView(UserCreatedObjectCreateView):
@@ -351,14 +376,20 @@ class WasteComponentModalDeleteView(UserCreatedObjectModalDeleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class FeeSystemPublishedListView(PublishedObjectListView):
+class FeeSystemPublishedListView(PublishedObjectFilterView):
     model = FeeSystem
+    filterset_class = FeeSystemListFilter
     dashboard_url = reverse_lazy("wastecollection-dashboard")
 
 
-class FeeSystemPrivateListView(PrivateObjectListView):
+class FeeSystemPrivateListView(PrivateObjectFilterView):
     model = FeeSystem
+    filterset_class = FeeSystemListFilter
     dashboard_url = reverse_lazy("wastecollection-dashboard")
+
+
+class FeeSystemAutocompleteView(UserCreatedObjectAutocompleteView):
+    model = FeeSystem
 
 
 class FeeSystemCreateView(UserCreatedObjectCreateView):
@@ -485,13 +516,15 @@ class WasteFlyerListCheckUrlsProgressView(LoginRequiredMixin, View):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class FrequencyPublishedListView(PublishedObjectListView):
+class FrequencyPublishedListView(PublishedObjectFilterView):
     model = CollectionFrequency
+    filterset_class = CollectionFrequencyListFilter
     dashboard_url = reverse_lazy("wastecollection-dashboard")
 
 
-class FrequencyPrivateListView(PrivateObjectListView):
+class FrequencyPrivateListView(PrivateObjectFilterView):
     model = CollectionFrequency
+    filterset_class = CollectionFrequencyListFilter
     dashboard_url = reverse_lazy("wastecollection-dashboard")
 
 
