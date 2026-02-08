@@ -117,6 +117,41 @@ from .tasks import check_wasteflyer_urls
 class CollectionDashboardView(TemplateView):
     template_name = "wastecollection_dashboard.html"
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["collection_count"] = Collection.objects.filter(
+            publication_status="published"
+        ).count()
+        context["catchment_count"] = CollectionCatchment.objects.filter(
+            publication_status="published"
+        ).count()
+        context["collector_count"] = Collector.objects.filter(
+            publication_status="published"
+        ).count()
+        context["wastecategory_count"] = WasteCategory.objects.filter(
+            publication_status="published"
+        ).count()
+        context["collectionsystem_count"] = CollectionSystem.objects.filter(
+            publication_status="published"
+        ).count()
+        context["feesystem_count"] = FeeSystem.objects.filter(
+            publication_status="published"
+        ).count()
+        context["frequency_count"] = CollectionFrequency.objects.filter(
+            publication_status="published"
+        ).count()
+        context["wastecomponent_count"] = WasteComponent.objects.filter(
+            publication_status="published"
+        ).count()
+        context["wasteflyer_count"] = WasteFlyer.objects.filter(
+            publication_status="published"
+        ).count()
+        return context
+
+
+class CollectionDiagramView(TemplateView):
+    template_name = "wastecollection_diagram.html"
+
 
 # ----------- Collector CRUD -------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------

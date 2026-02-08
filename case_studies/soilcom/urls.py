@@ -10,6 +10,11 @@ urlpatterns = [
         name="wastecollection-dashboard",
     ),
     path(
+        "diagram/",
+        views.CollectionDiagramView.as_view(),
+        name="wastecollection-diagram",
+    ),
+    path(
         "catchments/",
         views.CollectionCatchmentPublishedFilterView.as_view(),
         name="collectioncatchment-list",
