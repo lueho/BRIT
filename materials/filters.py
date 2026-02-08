@@ -70,6 +70,8 @@ class MaterialListFilter(UserCreatedObjectScopedFilterSet):
         try:
             if hasattr(self, "data") and self.data:
                 scope_value = self.data.get("scope")
+            if not scope_value and hasattr(self, "form"):
+                scope_value = self.form.initial.get("scope")
         except Exception:
             scope_value = None
 
@@ -113,6 +115,8 @@ class MaterialCategoryListFilter(UserCreatedObjectScopedFilterSet):
         try:
             if hasattr(self, "data") and self.data:
                 scope_value = self.data.get("scope")
+            if not scope_value and hasattr(self, "form"):
+                scope_value = self.form.initial.get("scope")
         except Exception:
             scope_value = None
 
@@ -158,6 +162,8 @@ class MaterialComponentListFilter(UserCreatedObjectScopedFilterSet):
         try:
             if hasattr(self, "data") and self.data:
                 scope_value = self.data.get("scope")
+            if not scope_value and hasattr(self, "form"):
+                scope_value = self.form.initial.get("scope")
         except Exception:
             scope_value = None
 
@@ -201,6 +207,8 @@ class MaterialComponentGroupListFilter(UserCreatedObjectScopedFilterSet):
         try:
             if hasattr(self, "data") and self.data:
                 scope_value = self.data.get("scope")
+            if not scope_value and hasattr(self, "form"):
+                scope_value = self.form.initial.get("scope")
         except Exception:
             scope_value = None
 
@@ -246,6 +254,8 @@ class MaterialPropertyListFilter(UserCreatedObjectScopedFilterSet):
         try:
             if hasattr(self, "data") and self.data:
                 scope_value = self.data.get("scope")
+            if not scope_value and hasattr(self, "form"):
+                scope_value = self.form.initial.get("scope")
         except Exception:
             scope_value = None
 
@@ -294,6 +304,8 @@ class AnalyticalMethodListFilter(UserCreatedObjectScopedFilterSet):
         try:
             if hasattr(self, "data") and self.data:
                 scope_value = self.data.get("scope")
+            if not scope_value and hasattr(self, "form"):
+                scope_value = self.form.initial.get("scope")
         except Exception:
             scope_value = None
 
@@ -358,6 +370,8 @@ class SampleFilter(UserCreatedObjectScopedFilterSet):
         try:
             if hasattr(self, "data") and self.data:
                 scope_value = self.data.get("scope")
+            if not scope_value and hasattr(self, "form"):
+                scope_value = self.form.initial.get("scope")
         except Exception:
             scope_value = None
 

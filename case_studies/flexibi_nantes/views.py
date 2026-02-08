@@ -59,7 +59,8 @@ class CultureAutocompleteView(UserCreatedObjectAutocompleteView):
 
 
 class CultureCreateView(UserCreatedObjectCreateView):
-    form_class = CultureModelForm
+    model = Culture
+    fields = ("name", "residue", "description")
     permission_required = "flexibi_nantes.add_culture"
 
 

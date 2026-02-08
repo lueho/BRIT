@@ -214,5 +214,30 @@ BRIT | {{ object.name }} details
 {{ block.super }}
 {% block detail_with_options_scripts %}
 {% endblock detail_with_options_scripts %}
-{% include "partials/_hide_empty_learning_tab.html" %}
+<script type="text/javascript">
+  // Hide the Learning tab and pane if the pane has no visible content
+  (function () {
+    const pane = document.getElementById('learning-pane');
+    const tabBtn = document.getElementById('learning-tab');
+    if (!pane) return;
+    const hasElements = pane.querySelector('*') !== null;
+    const hasText = (pane.textContent || '').trim().length > 0;
+    const hasContent = hasElements || hasText;
+    if (!hasContent) {
+      if (tabBtn) {
+        const li = tabBtn.closest('li');
+        if (li && li.parentElement) {
+          li.parentElement.removeChild(li);
+        } else {
+          tabBtn.classList.add('d-none');
+        }
+      }
+      if (pane.parentElement) {
+        pane.parentElement.removeChild(pane);
+      } else {
+        pane.classList.add('d-none');
+      }
+    }
+  })();
+</script>
 {% endblock javascript %}

@@ -35,6 +35,8 @@ class ProcessGroupListFilter(UserCreatedObjectScopedFilterSet):
         try:
             if hasattr(self, "data") and self.data:
                 scope_value = self.data.get("scope")
+            if not scope_value and hasattr(self, "form"):
+                scope_value = self.form.initial.get("scope")
         except Exception:
             scope_value = None
 
@@ -74,6 +76,8 @@ class MechanismCategoryListFilter(UserCreatedObjectScopedFilterSet):
         try:
             if hasattr(self, "data") and self.data:
                 scope_value = self.data.get("scope")
+            if not scope_value and hasattr(self, "form"):
+                scope_value = self.form.initial.get("scope")
         except Exception:
             scope_value = None
 
@@ -128,6 +132,8 @@ class ProcessTypeListFilter(UserCreatedObjectScopedFilterSet):
         try:
             if hasattr(self, "data") and self.data:
                 scope_value = self.data.get("scope")
+            if not scope_value and hasattr(self, "form"):
+                scope_value = self.form.initial.get("scope")
         except Exception:
             scope_value = None
 

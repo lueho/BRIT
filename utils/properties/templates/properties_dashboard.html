@@ -1,60 +1,58 @@
 {% extends 'base.html' %}
-{% load static %}
 
 {% block title %}BRIT | Properties Explorer{% endblock %}
 
-{% block custom_style %}
-{% include "partials/_explorer_card_styles.html" %}
-{% endblock custom_style %}
-
 {% block content %}
-<div class="mb-4">
-    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-        <div>
-            <h2 class="mb-2">Properties Explorer</h2>
-            <p class="text-muted mb-0">Browse all property-related data in the BRIT database. Select a category below
-                to view, filter, and manage records.</p>
-        </div>
-    </div>
-</div>
 
-<h6 class="text-muted text-uppercase explorer-section-heading fw-bold mb-3">
-    <i class="fas fa-ruler-combined me-1"></i> Properties &amp; Units
-</h6>
-<div class="row g-3 mb-4">
-    <div class="col-12 col-sm-6 col-lg-4">
-        <div class="card shadow-sm h-100 explorer-card" onclick="window.location='{% url 'property-list' %}'">
-            <div class="card-body d-flex flex-column">
-                <div class="d-flex align-items-center mb-2">
-                    <span class="explorer-icon bg-primary bg-opacity-10 text-primary"><i
-                            class="fas fa-sliders"></i></span>
-                    <h6 class="mb-0 ms-2">Properties</h6>
+    <div class="row">
+        <div class="col col-12 col-md-6">
+            <div class="card shadow h-100">
+                <div class="card-header bg-body-tertiary border-bottom-0 py-3"><h5 class="mb-0">Properties</h5></div>
+                <div class="card-body">
+                    <p class="card-text">
+                        This is the properties explorer. All models related to properties can be managed from here.
+                    </p>
                 </div>
-                <p class="card-text text-muted small flex-grow-1">Measurable characteristics used to describe and
-                    compare objects across all modules of the tool.</p>
-                <div class="d-flex align-items-center justify-content-between mt-auto pt-2">
-                    <span class="badge bg-light text-dark border">{{ property_count }} published</span>
-                    <a href="{% url 'property-list' %}" class="btn btn-sm btn-outline-primary card-link">Browse</a>
+                <div class="card-footer">
                 </div>
             </div>
         </div>
     </div>
-    <div class="col-12 col-sm-6 col-lg-4">
-        <div class="card shadow-sm h-100 explorer-card" onclick="window.location='{% url 'unit-list' %}'">
-            <div class="card-body d-flex flex-column">
-                <div class="d-flex align-items-center mb-2">
-                    <span class="explorer-icon bg-primary bg-opacity-10 text-primary"><i
-                            class="fas fa-weight-scale"></i></span>
-                    <h6 class="mb-0 ms-2">Units</h6>
+
+    <div class="row">
+
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+                    <h5 class="mb-0"><a href="{% url 'unit-list' %}" class="stretched-link text-decoration-none text-body">Units</a></h5>
                 </div>
-                <p class="card-text text-muted small flex-grow-1">Physical, chemical, and other measurement units
-                    assigned to properties for consistent quantification.</p>
-                <div class="d-flex align-items-center justify-content-between mt-auto pt-2">
-                    <span class="badge bg-light text-dark border">{{ unit_count }} published</span>
-                    <a href="{% url 'unit-list' %}" class="btn btn-sm btn-outline-primary card-link">Browse</a>
+                <div class="card-body">
+                    <p class="card-text">
+                        Manage the available units here.
+                    </p>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'unit-list' %}" class="btn btn-primary">View Units</a>
                 </div>
             </div>
         </div>
+
+        <div class="col col-12 col-md-6 col-lg-3 mt-4">
+            <div class="card shadow h-100">
+                <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+                    <h5 class="mb-0"><a href="{% url 'property-list' %}" class="stretched-link text-decoration-none text-body">Properties</a></h5>
+                </div>
+                <div class="card-body">
+                    <p class="card-text">
+                        Manage all available properties here.
+                    </p>
+                </div>
+                <div class="card-footer">
+                    <a href="{% url 'property-list' %}" class="btn btn-primary">View Properties</a>
+                </div>
+            </div>
+        </div>
+
     </div>
-</div>
+
 {% endblock content %}
