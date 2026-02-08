@@ -300,26 +300,19 @@ class SourceAutocompleteView(UserCreatedObjectAutocompleteView):
         "title",
         "abbreviation",
         "url",
-        "authors__last_names",
-        "authors__first_names",
     ]
 
     def get_queryset(self):
         """Order sources to prioritize actual bibliographic sources over URLs."""
         qs = super().get_queryset()
-        # Annotate with has_authors to prioritize sources with authors
-        # Then order by type (waste_flyer comes last alphabetically)
-        # Then by title
         from django.db.models import Case, Exists, IntegerField, OuterRef, When
 
         from bibliography.models import SourceAuthor
 
-        # Check if source has any authors using Exists instead of Count to avoid GROUP BY issues
         has_authors_subquery = SourceAuthor.objects.filter(source=OuterRef("pk"))
 
         qs = qs.annotate(
             has_authors=Exists(has_authors_subquery),
-            # Prioritize non-waste_flyer types
             type_priority=Case(
                 When(type="waste_flyer", then=1),
                 default=0,
@@ -330,21 +323,30 @@ class SourceAutocompleteView(UserCreatedObjectAutocompleteView):
         return qs
 
     def hook_prepare_results(self, results):
+        from bibliography.models import SourceAuthor
+
+        source_ids = [r["id"] for r in results]
+        authors_by_source = {}
+        author_qs = (
+            SourceAuthor.objects.filter(source_id__in=source_ids)
+            .order_by("source_id", "position")
+            .select_related("author")
+        )
+        for sa in author_qs:
+            authors_by_source.setdefault(sa.source_id, []).append(sa.author)
+
         for result in results:
             source_type = result.get("type", "custom")
 
             if source_type == "waste_flyer":
-                # WasteFlyers are identified by URL
                 url = result.get("url", "")
                 formatted_name = url if url else f"WasteFlyer #{result['id']}"
             else:
-                # Traditional sources use author/title format
-                last_names = result.get("authors__last_names", "").strip()
-                first_names = result.get("authors__first_names", "").strip()
                 title = result.get("title", "").strip()
+                authors = authors_by_source.get(result["id"], [])
 
-                if last_names or first_names:
-                    author_part = f"{last_names}, {first_names}".strip(", ")
+                if authors:
+                    author_part = "; ".join(a.abbreviated_full_name for a in authors)
                     formatted_name = f"{author_part}. {title}" if title else author_part
                 else:
                     formatted_name = (
@@ -353,11 +355,8 @@ class SourceAutocompleteView(UserCreatedObjectAutocompleteView):
                         else result.get("abbreviation", f"Source #{result['id']}")
                     )
 
-            # Set all possible label fields that forms might use
             result["text"] = formatted_name
             result["selected_text"] = formatted_name
-            result["abbreviation"] = (
-                formatted_name  # For forms using label_field="abbreviation"
-            )
-            result["label"] = formatted_name  # For forms using label_field="label"
+            result["abbreviation"] = formatted_name
+            result["label"] = formatted_name
         return results
