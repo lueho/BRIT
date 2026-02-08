@@ -128,6 +128,10 @@ class MaterialsDashboardView(TemplateView):
         return context
 
 
+class MaterialsDiagramView(TemplateView):
+    template_name = "materials_diagram.html"
+
+
 # ----------- Material Category CRUD ----------------------------------------------------------------------------------
 # ---------------------------------------------------------------------------------------------------------------------
 
