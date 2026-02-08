@@ -14,10 +14,6 @@
 
 {% block list_table %}
     {% if review_items %}
-        <p class="text-muted small mb-2">
-            Showing {{ page_obj.start_index }}-{{ page_obj.end_index }} of {{ page_obj.paginator.count }} results
-        </p>
-        
         <div class="table-responsive">
             <table class="table modern-table">
                 <thead>

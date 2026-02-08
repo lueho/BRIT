@@ -114,6 +114,13 @@
         </div>
         <div class="card-body">
           {% block list_card_body %}
+            {% block list_result_count %}
+              {% if page_obj %}
+                <p class="text-muted small mb-2">
+                  Showing {{ page_obj.start_index }}–{{ page_obj.end_index }} of {{ page_obj.paginator.count }} results
+                </p>
+              {% endif %}
+            {% endblock list_result_count %}
             {% block list_table %}
               <div class="table-responsive">
                 <table class="table modern-table">
