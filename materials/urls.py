@@ -13,6 +13,7 @@ urlpatterns = [
     path(
         "explorer/", views.MaterialsDashboardView.as_view(), name="materials-dashboard"
     ),
+    path("diagram/", views.MaterialsDiagramView.as_view(), name="materials-diagram"),
     path("materials/", views.MaterialPublishedListView.as_view(), name="material-list"),
     path(
         "materials/user/",
