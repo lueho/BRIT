@@ -52,6 +52,11 @@ class MaterialListFilter(UserCreatedObjectScopedFilterSet):
         queryset=MaterialCategory.objects.all(),
         field_name="categories",
         label="Category",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(
+                url="materialcategory-autocomplete",
+            ),
+        ),
     )
 
     def __init__(self, *args, **kwargs):
@@ -87,11 +92,40 @@ class MaterialListFilter(UserCreatedObjectScopedFilterSet):
 
 
 class MaterialCategoryListFilter(UserCreatedObjectScopedFilterSet):
-    name = CharFilter(
+    name = ModelChoiceFilter(
+        queryset=MaterialCategory.objects.none(),
         field_name="name",
-        lookup_expr="icontains",
-        label="Name",
+        label="Category Name",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(
+                url="materialcategory-autocomplete",
+                filter_by=("scope", "name"),
+            ),
+        ),
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = getattr(self, "request", None)
+        queryset = MaterialCategory.objects.all()
+        if request and hasattr(request, "user"):
+            queryset = filter_queryset_for_user(queryset, request.user)
+
+        scope_value = None
+        try:
+            if hasattr(self, "data") and self.data:
+                scope_value = self.data.get("scope")
+            if not scope_value and hasattr(self, "form"):
+                scope_value = self.form.initial.get("scope")
+        except Exception:
+            scope_value = None
+
+        if scope_value:
+            queryset = apply_scope_filter(
+                queryset, scope_value, user=getattr(request, "user", None)
+            )
+
+        self.filters["name"].queryset = queryset
 
     class Meta:
         model = MaterialCategory
@@ -150,11 +184,40 @@ class MaterialComponentListFilter(UserCreatedObjectScopedFilterSet):
 
 
 class MaterialComponentGroupListFilter(UserCreatedObjectScopedFilterSet):
-    name = CharFilter(
+    name = ModelChoiceFilter(
+        queryset=MaterialComponentGroup.objects.none(),
         field_name="name",
-        lookup_expr="icontains",
-        label="Name",
+        label="Group Name",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(
+                url="materialcomponentgroup-autocomplete",
+                filter_by=("scope", "name"),
+            ),
+        ),
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = getattr(self, "request", None)
+        queryset = MaterialComponentGroup.objects.all()
+        if request and hasattr(request, "user"):
+            queryset = filter_queryset_for_user(queryset, request.user)
+
+        scope_value = None
+        try:
+            if hasattr(self, "data") and self.data:
+                scope_value = self.data.get("scope")
+            if not scope_value and hasattr(self, "form"):
+                scope_value = self.form.initial.get("scope")
+        except Exception:
+            scope_value = None
+
+        if scope_value:
+            queryset = apply_scope_filter(
+                queryset, scope_value, user=getattr(request, "user", None)
+            )
+
+        self.filters["name"].queryset = queryset
 
     class Meta:
         model = MaterialComponentGroup
@@ -162,10 +225,16 @@ class MaterialComponentGroupListFilter(UserCreatedObjectScopedFilterSet):
 
 
 class MaterialPropertyListFilter(UserCreatedObjectScopedFilterSet):
-    name = CharFilter(
+    name = ModelChoiceFilter(
+        queryset=MaterialProperty.objects.none(),
         field_name="name",
-        lookup_expr="icontains",
-        label="Name",
+        label="Property Name",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(
+                url="materialproperty-autocomplete",
+                filter_by=("scope", "name"),
+            ),
+        ),
     )
     aggregation_kind = ChoiceFilter(
         field_name="aggregation_kind",
@@ -173,6 +242,29 @@ class MaterialPropertyListFilter(UserCreatedObjectScopedFilterSet):
         choices=MaterialPropertyAggregationKind.choices,
         empty_label="All",
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = getattr(self, "request", None)
+        queryset = MaterialProperty.objects.all()
+        if request and hasattr(request, "user"):
+            queryset = filter_queryset_for_user(queryset, request.user)
+
+        scope_value = None
+        try:
+            if hasattr(self, "data") and self.data:
+                scope_value = self.data.get("scope")
+            if not scope_value and hasattr(self, "form"):
+                scope_value = self.form.initial.get("scope")
+        except Exception:
+            scope_value = None
+
+        if scope_value:
+            queryset = apply_scope_filter(
+                queryset, scope_value, user=getattr(request, "user", None)
+            )
+
+        self.filters["name"].queryset = queryset
 
     class Meta:
         model = MaterialProperty
@@ -184,16 +276,45 @@ class MaterialPropertyListFilter(UserCreatedObjectScopedFilterSet):
 
 
 class AnalyticalMethodListFilter(UserCreatedObjectScopedFilterSet):
-    name = CharFilter(
+    name = ModelChoiceFilter(
+        queryset=AnalyticalMethod.objects.none(),
         field_name="name",
-        lookup_expr="icontains",
-        label="Name",
+        label="Method Name",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(
+                url="analyticalmethod-autocomplete",
+                filter_by=("scope", "name"),
+            ),
+        ),
     )
     technique = CharFilter(
         field_name="technique",
         lookup_expr="icontains",
         label="Technique",
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = getattr(self, "request", None)
+        queryset = AnalyticalMethod.objects.all()
+        if request and hasattr(request, "user"):
+            queryset = filter_queryset_for_user(queryset, request.user)
+
+        scope_value = None
+        try:
+            if hasattr(self, "data") and self.data:
+                scope_value = self.data.get("scope")
+            if not scope_value and hasattr(self, "form"):
+                scope_value = self.form.initial.get("scope")
+        except Exception:
+            scope_value = None
+
+        if scope_value:
+            queryset = apply_scope_filter(
+                queryset, scope_value, user=getattr(request, "user", None)
+            )
+
+        self.filters["name"].queryset = queryset
 
     class Meta:
         model = AnalyticalMethod

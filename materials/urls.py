@@ -103,6 +103,11 @@ urlpatterns = [
         name="analyticalmethod-delete-modal",
     ),
     path(
+        "analytical_methods/autocomplete/",
+        views.AnalyticalMethodAutocompleteView.as_view(),
+        name="analyticalmethod-autocomplete",
+    ),
+    path(
         "sample_series/",
         views.SampleSeriesPublishedListView.as_view(),
         name="sampleseries-list",
@@ -299,6 +304,11 @@ urlpatterns = [
         name="materialcategory-delete-modal",
     ),
     path(
+        "categories/autocomplete/",
+        views.MaterialCategoryAutocompleteView.as_view(),
+        name="materialcategory-autocomplete",
+    ),
+    path(
         "components/",
         views.ComponentPublishedListView.as_view(),
         name="materialcomponent-list",
@@ -404,6 +414,11 @@ urlpatterns = [
         name="materialcomponentgroup-delete-modal",
     ),
     path(
+        "componentgroups/autocomplete/",
+        views.MaterialComponentGroupAutocompleteView.as_view(),
+        name="materialcomponentgroup-autocomplete",
+    ),
+    path(
         "properties/",
         views.MaterialPropertyPublishedListView.as_view(),
         name="materialproperty-list",
@@ -452,6 +467,11 @@ urlpatterns = [
         "properties/<int:pk>/delete/modal/",
         views.MaterialPropertyModalDeleteView.as_view(),
         name="materialproperty-delete-modal",
+    ),
+    path(
+        "properties/autocomplete/",
+        views.MaterialPropertyAutocompleteView.as_view(),
+        name="materialproperty-autocomplete",
     ),
     path(
         "property_values/<int:pk>/delete/modal/",
