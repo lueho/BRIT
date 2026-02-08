@@ -43,6 +43,19 @@ from .tasks import check_source_url, check_source_urls
 class BibliographyDashboardView(TemplateView):
     template_name = "bibliography_dashboard.html"
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["author_count"] = Author.objects.filter(
+            publication_status="published"
+        ).count()
+        context["licence_count"] = Licence.objects.filter(
+            publication_status="published"
+        ).count()
+        context["source_count"] = Source.objects.filter(
+            publication_status="published"
+        ).count()
+        return context
+
 
 # ----------- Author CRUD ----------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
