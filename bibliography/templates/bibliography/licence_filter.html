@@ -1,0 +1,47 @@
+{% extends "filtered_list.html" %}
+{% load crispy_forms_tags %}
+{% load user_created_object_tags %}
+{% load moderation_tags %}
+
+{% block title %}
+    BRIT | Bibliography | Licences
+{% endblock title %}
+
+{% block list_card_header %}
+    <strong>Licences</strong>
+{% endblock list_card_header %}
+
+{% block list_table %}
+    <div class="collection-list-min-height">
+        <div class="table-responsive">
+            <table class="table modern-table">
+                <thead>
+                    <tr>
+                        <th>Licence</th>
+                        {% if object_list.model|is_user_created %}<th class="actions-column">Status/Actions</th>{% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for object in object_list %}
+                        <tr>
+                            <td data-label="Licence" class="ps-3">
+                                <a href="{% detail_or_review_url object %}" class="text-decoration-none">
+                                    <strong class="d-block">{{ object.name }}</strong>
+                                    {% if object.reference_url %}<span class="text-muted small">{{ object.reference_url }}</span>{% endif %}
+                                </a>
+                            </td>
+                            {% if object_list.model|is_user_created %}
+                                <td class="actions-column mobile-no-label">{% include "object_management/status_actions_cell.html" %}</td>
+                            {% endif %}
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+{% endblock list_table %}
+
+{% block learning_tab_button %}
+{% endblock learning_tab_button %}
+{% block learning_tab_pane %}
+{% endblock learning_tab_pane %}

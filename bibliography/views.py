@@ -12,9 +12,7 @@ from utils.forms import TomSelectFormsetHelper
 from utils.object_management.permissions import get_object_policy
 from utils.object_management.views import (
     PrivateObjectFilterView,
-    PrivateObjectListView,
     PublishedObjectFilterView,
-    PublishedObjectListView,
     UserCreatedObjectAutocompleteView,
     UserCreatedObjectCreateView,
     UserCreatedObjectCreateWithInlinesView,
@@ -27,7 +25,7 @@ from utils.object_management.views import (
     UserCreatedObjectUpdateWithInlinesView,
 )
 
-from .filters import AuthorFilterSet, SourceFilter
+from .filters import AuthorFilterSet, LicenceListFilter, SourceFilter
 from .forms import (
     AuthorModalModelForm,
     AuthorModelForm,
@@ -122,13 +120,15 @@ class AuthorAutocompleteView(UserCreatedObjectAutocompleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class LicencePublishedListView(PublishedObjectListView):
+class LicencePublishedListView(PublishedObjectFilterView):
     model = Licence
+    filterset_class = LicenceListFilter
     dashboard_url = reverse_lazy("bibliography-dashboard")
 
 
-class LicencePrivateListView(PrivateObjectListView):
+class LicencePrivateListView(PrivateObjectFilterView):
     model = Licence
+    filterset_class = LicenceListFilter
     dashboard_url = reverse_lazy("bibliography-dashboard")
 
 
@@ -162,6 +162,10 @@ class LicenceModalUpdateView(UserCreatedObjectModalUpdateView):
 
 
 class LicenceModalDeleteView(UserCreatedObjectModalDeleteView):
+    model = Licence
+
+
+class LicenceAutocompleteView(UserCreatedObjectAutocompleteView):
     model = Licence
 
 

@@ -25,6 +25,7 @@ class AuthorCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
     modal_detail_view = True
     modal_update_view = True
     modal_create_view = True
+    add_scope_query_param_to_list_urls = True
 
     model = Author
 
@@ -93,6 +94,7 @@ class LicenceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
     modal_detail_view = True
     modal_update_view = True
     modal_create_view = True
+    add_scope_query_param_to_list_urls = True
 
     model = Licence
 
@@ -116,6 +118,7 @@ class LicenceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
 
 class SourceCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     model = Source
+    add_scope_query_param_to_list_urls = True
 
     view_dashboard_name = "bibliography-dashboard"
 
