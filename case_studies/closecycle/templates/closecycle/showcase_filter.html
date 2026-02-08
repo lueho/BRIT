@@ -1,40 +1,46 @@
-{% extends 'simple_list_card.html' %}
+{% extends "filtered_list.html" %}
+{% load crispy_forms_tags %}
 {% load user_created_object_tags %}
 {% load moderation_tags %}
 
-{% block title %}BRIT | CLOSECYCLE Showcases{% endblock %}
+{% block title %}BRIT | CLOSECYCLE Showcases{% endblock title %}
+
+{% block list_card_header %}<strong>Showcases</strong>{% endblock list_card_header %}
 
 {% block list_table %}
-    <table class="table">
-        <thead>
-        <tr>
-            <th>Name</th>
-            <th>Region</th>
-            <th>Description</th>
-            {% if object_list.model|is_user_created %}
-                <th class="actions-column">Status/Actions</th>
-            {% endif %}
-        </tr>
-        </thead>
-        <tbody>
-        {% for object in object_list %}
-            <tr>
-                <td>
-                    <a href="{% detail_or_review_url object %}">{{ object.name }}</a>
-                </td>
-                <td>
-                    <a href="{{ object.region.get_absolute_url }}">{{ object.region.name }}</a>
-                </td>
-                <td>{{ object.description }}</td>
-                {% if object_list.model|is_user_created %}
-                    <td class="actions-column mobile-no-label">
-                        {% include 'object_management/status_actions_cell.html' %}
+<div class="collection-list-min-height">
+    <div class="table-responsive">
+        <table class="table modern-table">
+            <thead>
+                <tr>
+                    <th>Showcase</th>
+                    {% if object_list.model|is_user_created %}
+                    <th class="actions-column">Status/Actions</th>
+                    {% endif %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for object in object_list %}
+                <tr>
+                    <td data-label="Showcase" class="ps-3">
+                        <a href="{% detail_or_review_url object %}" class="text-decoration-none">
+                            <strong class="d-block">{{ object.name }}</strong>
+                            <span class="text-muted small">{{ object.region.name }}{% if object.description %} &middot;
+                                {{ object.description|truncatewords:15 }}{% endif %}</span>
+                        </a>
                     </td>
-                {% endif %}
-            </tr>
-        {% endfor %}
-        </tbody>
-        <tfoot>
-        </tfoot>
-    </table>
+                    {% if object_list.model|is_user_created %}
+                    <td class="actions-column mobile-no-label">
+                        {% include "object_management/status_actions_cell.html" %}
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
 {% endblock list_table %}
+
+{% block learning_tab_button %}{% endblock learning_tab_button %}
+{% block learning_tab_pane %}{% endblock learning_tab_pane %}
