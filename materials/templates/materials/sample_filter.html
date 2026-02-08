@@ -2,15 +2,12 @@
 {% load crispy_forms_tags %}
 {% load user_created_object_tags %}
 {% load moderation_tags %}
-
 {% block title %}
     BRIT | Materials | Samples
 {% endblock title %}
-
 {% block list_card_header %}
     <strong>Samples</strong>
 {% endblock list_card_header %}
-
 {% block list_table %}
     <div class="collection-list-min-height">
         <div class="table-responsive">
@@ -52,7 +49,6 @@
         </div>
     </div>
 {% endblock list_table %}
-
 {% block options_pane_body %}
     {% if create_permission in perms or user.is_staff %}
         <a class="btn btn-success w-100 mb-2"
@@ -62,12 +58,10 @@
         </a>
     {% endif %}
 {% endblock options_pane_body %}
-
 {% block learning_tab_button %}
 {% endblock learning_tab_button %}
 {% block learning_tab_pane %}
 {% endblock learning_tab_pane %}
-
 {% block filter_body %}
     <form method="get">
         {% crispy filter.form %}
