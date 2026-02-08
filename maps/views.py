@@ -28,9 +28,7 @@ from utils.object_management.views import (
     CreateUserObjectMixin,
     OwnedObjectModelSelectOptionsView,
     PrivateObjectFilterView,
-    PrivateObjectListView,
     PublishedObjectFilterView,
-    PublishedObjectListView,
     ReviewObjectFilterView,
     UserCreatedObjectAutocompleteView,
     UserCreatedObjectCreateView,
@@ -43,8 +41,10 @@ from utils.object_management.views import (
 )
 
 from .filters import (
+    AttributeListFilter,
     CatchmentFilterSet,
     GeoDataSetFilterSet,
+    LocationListFilter,
     NutsRegionFilterSet,
     RegionFilterSet,
 )
@@ -466,14 +466,20 @@ class GeoDataSetAutocompleteView(UserCreatedObjectAutocompleteView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class LocationPublishedListView(PublishedObjectListView):
+class LocationPublishedListView(PublishedObjectFilterView):
     model = Location
+    filterset_class = LocationListFilter
     dashboard_url = reverse_lazy("maps-dashboard")
 
 
-class LocationPrivateListView(PrivateObjectListView):
+class LocationPrivateListView(PrivateObjectFilterView):
     model = Location
+    filterset_class = LocationListFilter
     dashboard_url = reverse_lazy("maps-dashboard")
+
+
+class LocationAutocompleteView(UserCreatedObjectAutocompleteView):
+    model = Location
 
 
 class LocationCreateView(UserCreatedObjectCreateView):
@@ -1031,14 +1037,20 @@ class NutsAndLauCatchmentPedigreeAPI(APIView):
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class AttributePublishedListView(PublishedObjectListView):
+class AttributePublishedListView(PublishedObjectFilterView):
     model = Attribute
+    filterset_class = AttributeListFilter
     dashboard_url = reverse_lazy("maps-dashboard")
 
 
-class AttributePrivateListView(PrivateObjectListView):
+class AttributePrivateListView(PrivateObjectFilterView):
     model = Attribute
+    filterset_class = AttributeListFilter
     dashboard_url = reverse_lazy("maps-dashboard")
+
+
+class AttributeAutocompleteView(UserCreatedObjectAutocompleteView):
+    model = Attribute
 
 
 class AttributeCreateView(UserCreatedObjectCreateView):

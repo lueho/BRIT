@@ -2,6 +2,7 @@ from django.urls import include, path
 
 from .router import router
 from .views import (
+    AttributeAutocompleteView,
     AttributeCreateView,
     AttributeDetailView,
     AttributeModalCreateView,
@@ -31,6 +32,7 @@ from .views import (
     GeoDataSetPrivateFilterView,
     GeoDataSetPublishedFilterView,
     GeoDataSetUpdateView,
+    LocationAutocompleteView,
     LocationCreateView,
     LocationDetailView,
     LocationModalDeleteView,
@@ -127,6 +129,11 @@ urlpatterns = [
         "attributes/<int:pk>/delete/modal",
         AttributeModalDeleteView.as_view(),
         name="attribute-delete-modal",
+    ),
+    path(
+        "attributes/autocomplete/",
+        AttributeAutocompleteView.as_view(),
+        name="attribute-autocomplete",
     ),
     path(
         "attribute_values/create/",
@@ -293,6 +300,11 @@ urlpatterns = [
         "locations/<int:pk>/delete/",
         LocationModalDeleteView.as_view(),
         name="location-delete-modal",
+    ),
+    path(
+        "locations/autocomplete/",
+        LocationAutocompleteView.as_view(),
+        name="location-autocomplete",
     ),
     path(
         "clear-geojson-cache/",

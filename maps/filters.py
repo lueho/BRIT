@@ -3,25 +3,30 @@ from django_filters import CharFilter, ModelChoiceFilter, NumberFilter
 from django_tomselect.app_settings import TomSelectConfig
 from django_tomselect.widgets import TomSelectModelWidget
 
-from utils.filters import BaseCrispyFilterSet
+from utils.filters import BaseCrispyFilterSet, UserCreatedObjectScopedFilterSet
+from utils.object_management.permissions import (
+    apply_scope_filter,
+    filter_queryset_for_user,
+)
 
-from .models import Catchment, GeoDataset, NutsRegion, Region
+from .models import Attribute, Catchment, GeoDataset, Location, NutsRegion, Region
 
 
-class CatchmentFilterSet(BaseCrispyFilterSet):
+class CatchmentFilterSet(UserCreatedObjectScopedFilterSet):
     id = NumberFilter(widget=HiddenInput())
     name = CharFilter(lookup_expr="icontains")
 
     class Meta:
         model = Catchment
         fields = (
+            "scope",
             "id",
             "name",
             "type",
         )
 
 
-class RegionFilterSet(BaseCrispyFilterSet):
+class RegionFilterSet(UserCreatedObjectScopedFilterSet):
     name_icontains = CharFilter(
         field_name="name", lookup_expr="icontains", label="Name contains"
     )
@@ -33,6 +38,7 @@ class RegionFilterSet(BaseCrispyFilterSet):
     class Meta:
         model = Region
         fields = (
+            "scope",
             "id",
             "name",
             "name_icontains",
@@ -111,3 +117,85 @@ class GeoDataSetFilterSet(BaseCrispyFilterSet):
     class Meta:
         model = GeoDataset
         fields = ("id",)
+
+
+class LocationListFilter(UserCreatedObjectScopedFilterSet):
+    name = ModelChoiceFilter(
+        queryset=Location.objects.none(),
+        field_name="name",
+        label="Location Name",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(
+                url="location-autocomplete",
+                filter_by=("scope", "name"),
+            ),
+        ),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = getattr(self, "request", None)
+        queryset = Location.objects.all()
+        if request and hasattr(request, "user"):
+            queryset = filter_queryset_for_user(queryset, request.user)
+
+        scope_value = None
+        try:
+            if hasattr(self, "data") and self.data:
+                scope_value = self.data.get("scope")
+            if not scope_value and hasattr(self, "form"):
+                scope_value = self.form.initial.get("scope")
+        except Exception:
+            scope_value = None
+
+        if scope_value:
+            queryset = apply_scope_filter(
+                queryset, scope_value, user=getattr(request, "user", None)
+            )
+
+        self.filters["name"].queryset = queryset
+
+    class Meta:
+        model = Location
+        fields = ("scope", "name")
+
+
+class AttributeListFilter(UserCreatedObjectScopedFilterSet):
+    name = ModelChoiceFilter(
+        queryset=Attribute.objects.none(),
+        field_name="name",
+        label="Attribute Name",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(
+                url="attribute-autocomplete",
+                filter_by=("scope", "name"),
+            ),
+        ),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = getattr(self, "request", None)
+        queryset = Attribute.objects.all()
+        if request and hasattr(request, "user"):
+            queryset = filter_queryset_for_user(queryset, request.user)
+
+        scope_value = None
+        try:
+            if hasattr(self, "data") and self.data:
+                scope_value = self.data.get("scope")
+            if not scope_value and hasattr(self, "form"):
+                scope_value = self.form.initial.get("scope")
+        except Exception:
+            scope_value = None
+
+        if scope_value:
+            queryset = apply_scope_filter(
+                queryset, scope_value, user=getattr(request, "user", None)
+            )
+
+        self.filters["name"].queryset = queryset
+
+    class Meta:
+        model = Attribute
+        fields = ("scope", "name")
