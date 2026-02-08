@@ -36,7 +36,7 @@ def get_default_owner_pk():
 
 STATUS_CHOICES = (
     ("private", "Private"),
-    ("review", "Under Review"),
+    ("review", "Review"),
     ("published", "Published"),
     ("declined", "Declined"),
     ("archived", "Archived"),
