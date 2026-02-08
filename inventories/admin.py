@@ -1,5 +1,4 @@
 from django.contrib import admin
-from django.contrib.admin import ModelAdmin
 from django.urls import reverse
 from django.utils.html import format_html
 
@@ -16,71 +15,49 @@ from .models import (
 
 
 @admin.register(InventoryAlgorithm)
-class InventoryAlgorithmAdmin(ModelAdmin):
-    list_display = (
-        "name",
-        "geodataset_link",
-        "default",
-        "description",
-    )
+class InventoryAlgorithmAdmin(admin.ModelAdmin):
+    list_display = ("name", "geodataset_link", "default", "description")
+    search_fields = ("name", "description", "function_name")
+    list_filter = ("default",)
+    ordering = ("name",)
 
     @staticmethod
     def geodataset_link(obj):
         url = reverse("admin:inventories_geodataset_change", args=(obj.geodataset.id,))
         return format_html("<a href='{}'>{}</a>", url, obj.geodataset.name)
 
-    # @staticmethod
-    # def feedstock_link(obj):
-    #     url = reverse('admin:inventories_material_change', args=(obj.feedstock.id,))
-    #     return format_html("<a href='{}'>{}</a>", url, obj.feedstock.name)
-
-    # @staticmethod
-    # def parameter_list(obj):
-    #     parameter_list = format_html_join(
-    #         '\n', "<li><a href='{}'>{}</a></li>",
-    #         ((reverse('admin:inventories_inventoryalgorithmparameter_change', args=(p.id,)), p) for p in
-    #          InventoryAlgorithmParameter.objects.filter(inventory_algorithm=obj))
-    #     )
-    #     return parameter_list
-
 
 @admin.register(InventoryAlgorithmParameter)
-class InventoryAlgorithmParameterAdmin(ModelAdmin):
+class InventoryAlgorithmParameterAdmin(admin.ModelAdmin):
     list_display = (
         "descriptive_name",
+        "short_name",
         "unit",
         "is_required",
         "description",
     )
-
-    # @staticmethod
-    # def algorithm(obj):
-    #     url = reverse('admin:inventories_inventoryalgorithm_change', args=(obj.inventory_algorithm.id,))
-    #     return format_html("<a href='{}'>{}</a>", url, obj.inventory_algorithm.name)
+    search_fields = ("descriptive_name", "short_name", "description")
+    list_filter = ("is_required",)
+    ordering = ("descriptive_name",)
 
 
 @admin.register(InventoryAlgorithmParameterValue)
-class InventoryAlgorithmParameterValueAdmin(ModelAdmin):
+class InventoryAlgorithmParameterValueAdmin(admin.ModelAdmin):
     list_display = (
         "name",
+        "parameter",
         "value",
         "standard_deviation",
         "default",
         "source",
     )
-
-    # @staticmethod
-    # def parameter_link(obj):
-    #     url = reverse('admin:inventories_inventoryalgorithmparameter_change', args=(obj.parameter.id,))
-    #     return format_html("<a href='{}'>{}</a>", url, obj.parameter.descriptive_name)
-
-    # @staticmethod
-    # def unit(obj):
-    #     return obj.parameter.unit
+    search_fields = ("name", "source")
+    list_filter = ("default",)
+    ordering = ("parameter", "name")
 
 
 @admin.register(ScenarioInventoryConfiguration)
-class ScenarioInventoryConfigurationAdmin(ModelAdmin):
+class ScenarioInventoryConfigurationAdmin(admin.ModelAdmin):
     list_display = (
         "scenario",
         "feedstock_link",
@@ -89,17 +66,18 @@ class ScenarioInventoryConfigurationAdmin(ModelAdmin):
         "parameter",
         "value",
     )
+    ordering = ("scenario",)
 
     @staticmethod
     def feedstock_link(obj):
-        url = reverse(
-            "admin:material_manager_materialsettings_change", args=(obj.feedstock.id,)
-        )
+        if not obj.feedstock:
+            return "-"
+        url = reverse("admin:materials_sampleseries_change", args=(obj.feedstock.id,))
         return format_html("<a href='{}'>{}</a>", url, obj.feedstock.name)
 
     @staticmethod
     def geodataset_link(obj):
-        url = reverse("admin:inventories_geodataset_change", args=(obj.geodataset.id,))
+        url = reverse("admin:maps_geodataset_change", args=(obj.geodataset.id,))
         return format_html("<a href='{}'>{}</a>", url, obj.geodataset.name)
 
     @staticmethod
@@ -112,6 +90,8 @@ class ScenarioInventoryConfigurationAdmin(ModelAdmin):
 
     @staticmethod
     def parameter(obj):
+        if not obj.inventory_parameter:
+            return "-"
         url = reverse(
             "admin:inventories_inventoryalgorithmparameter_change",
             args=(obj.inventory_parameter.id,),
@@ -122,6 +102,8 @@ class ScenarioInventoryConfigurationAdmin(ModelAdmin):
 
     @staticmethod
     def value(obj):
+        if not obj.inventory_value:
+            return "-"
         url = reverse(
             "admin:inventories_inventoryalgorithmparametervalue_change",
             args=(obj.inventory_value.id,),
@@ -130,16 +112,31 @@ class ScenarioInventoryConfigurationAdmin(ModelAdmin):
 
 
 @admin.register(Scenario)
-class ScenarioAdmin(ModelAdmin):
-    list_display = ("name", "region_link", "catchment_link", "description", "status")
+class ScenarioAdmin(admin.ModelAdmin):
+    list_display = (
+        "name",
+        "region_link",
+        "catchment_link",
+        "description",
+        "status",
+        "owner",
+        "publication_status",
+    )
+    search_fields = ("name", "description")
+    list_filter = ("publication_status",)
+    ordering = ("name",)
 
     @staticmethod
     def region_link(obj):
+        if not obj.region:
+            return "-"
         url = reverse("admin:maps_region_change", args=(obj.region.id,))
         return format_html("<a href='{}'>{}</a>", url, obj.region.name)
 
     @staticmethod
     def catchment_link(obj):
+        if not obj.catchment:
+            return "-"
         url = reverse("admin:maps_catchment_change", args=(obj.catchment.id,))
         return format_html("<a href='{}'>{}</a>", url, obj.catchment.name)
 
@@ -149,14 +146,26 @@ class ScenarioAdmin(ModelAdmin):
 
 
 @admin.register(ScenarioStatus)
-class ScenarioStatusAdmin(ModelAdmin):
+class ScenarioStatusAdmin(admin.ModelAdmin):
     list_display = ("scenario", "status")
+    list_filter = ("status",)
+    ordering = ("scenario",)
 
 
-# @admin.register(SeasonalDistribution)
-# class LiteratureSourceAdmin(ModelAdmin):
-#     list_display = ('id', 'timesteps', 'cycles', 'start_stop', 'values', 'material', 'component')
+@admin.register(InventoryAmountShare)
+class InventoryAmountShareAdmin(admin.ModelAdmin):
+    list_display = (
+        "scenario",
+        "feedstock",
+        "timestep",
+        "average",
+        "standard_deviation",
+        "owner",
+    )
+    ordering = ("scenario", "feedstock", "timestep")
 
 
-admin.site.register(InventoryAmountShare)
-admin.site.register(RunningTask)
+@admin.register(RunningTask)
+class RunningTaskAdmin(admin.ModelAdmin):
+    list_display = ("scenario", "algorithm", "uuid")
+    ordering = ("scenario",)
