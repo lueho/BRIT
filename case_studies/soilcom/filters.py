@@ -93,8 +93,6 @@ class CollectionSystemListFilter(UserCreatedObjectScopedFilterSet):
         try:
             if hasattr(self, "data") and self.data:
                 scope_value = self.data.get("scope")
-            if not scope_value and hasattr(self, "form"):
-                scope_value = self.form.initial.get("scope")
         except Exception:
             scope_value = None
 
@@ -134,8 +132,6 @@ class WasteCategoryListFilter(UserCreatedObjectScopedFilterSet):
         try:
             if hasattr(self, "data") and self.data:
                 scope_value = self.data.get("scope")
-            if not scope_value and hasattr(self, "form"):
-                scope_value = self.form.initial.get("scope")
         except Exception:
             scope_value = None
 
@@ -175,8 +171,6 @@ class WasteComponentListFilter(UserCreatedObjectScopedFilterSet):
         try:
             if hasattr(self, "data") and self.data:
                 scope_value = self.data.get("scope")
-            if not scope_value and hasattr(self, "form"):
-                scope_value = self.form.initial.get("scope")
         except Exception:
             scope_value = None
 
@@ -216,8 +210,6 @@ class FeeSystemListFilter(UserCreatedObjectScopedFilterSet):
         try:
             if hasattr(self, "data") and self.data:
                 scope_value = self.data.get("scope")
-            if not scope_value and hasattr(self, "form"):
-                scope_value = self.form.initial.get("scope")
         except Exception:
             scope_value = None
 
@@ -257,8 +249,6 @@ class CollectionFrequencyListFilter(UserCreatedObjectScopedFilterSet):
         try:
             if hasattr(self, "data") and self.data:
                 scope_value = self.data.get("scope")
-            if not scope_value and hasattr(self, "form"):
-                scope_value = self.form.initial.get("scope")
         except Exception:
             scope_value = None
 
@@ -641,9 +631,6 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
             # django_filters passes data in .data (QueryDict)
             if hasattr(self, "data") and self.data:
                 scope_val = self.data.get("scope")
-            # Fallback to initial on form if provided by view defaults
-            if not scope_val and hasattr(self.form, "initial"):
-                scope_val = self.form.initial.get("scope")
         except Exception:
             scope_val = None
 

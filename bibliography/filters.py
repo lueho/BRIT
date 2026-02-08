@@ -45,8 +45,6 @@ class LicenceListFilter(UserCreatedObjectScopedFilterSet):
         try:
             if hasattr(self, "data") and self.data:
                 scope_value = self.data.get("scope")
-            if not scope_value and hasattr(self, "form"):
-                scope_value = self.form.initial.get("scope")
         except Exception:
             scope_value = None
 
@@ -124,6 +122,13 @@ class SourceFilter(UserCreatedObjectScopedFilterSet):
         super().__init__(*args, **kwargs)
         request = getattr(self, "request", None)
 
+        scope_value = None
+        try:
+            if hasattr(self, "data") and self.data:
+                scope_value = self.data.get("scope")
+        except Exception:
+            scope_value = None
+
         for field_name, model_cls in (
             ("title", Source),
             ("author", Author),
@@ -132,15 +137,6 @@ class SourceFilter(UserCreatedObjectScopedFilterSet):
             queryset = model_cls.objects.all()
             if request and hasattr(request, "user"):
                 queryset = filter_queryset_for_user(queryset, request.user)
-
-            scope_value = None
-            try:
-                if hasattr(self, "data") and self.data:
-                    scope_value = self.data.get("scope")
-                if not scope_value and hasattr(self, "form"):
-                    scope_value = self.form.initial.get("scope")
-            except Exception:
-                scope_value = None
 
             if scope_value:
                 queryset = apply_scope_filter(
