@@ -22,7 +22,24 @@ MECHANISM_CATEGORIES = [
 PROCESS_GROUPS = [
     {
         "name": "Pulping",
-        "description": "Processes for disintegrating biomass into individual fibres.",
+        "description": (
+            "For TBN the available lignin-containing biomass (e.g. wood and agricultural "
+            "residues) is usually of lower quality compared to industrial pulpwood grades. "
+            "Fibre production from these biomasses can be performed using a thermo-chemical "
+            "disintegration or a chemical delignification process. In most cases, the "
+            "resulting fibres contain lignin and have low brightness or a brown colour. "
+            "These grades can be used for packaging papers, e.g. corrugated board, in "
+            "combination with fibres from waste paper recycling. Fibres with low lignin "
+            "content can be further bleached to produce white fibres with high brightness, "
+            "suitable for graphic papers. In this case the technology is more complex and "
+            "requires larger facilities, often not compatible with TBN.\n\n"
+            "Pulping is a general process for converting raw biomass like wood or straw "
+            "into pulp, a key input for paper and other fibre-based products. It involves "
+            "breaking down the fibrous material through mechanical, chemical, or "
+            "semi-chemical means to separate the fibres. The resulting pulp can then be "
+            "processed into various grades for different applications. This overview "
+            "provides access to specific pulping technologies and related information."
+        ),
     },
     {
         "name": "Material",
@@ -52,6 +69,69 @@ MECHANISM_ASSIGNMENTS = {
     "Liquor Circulation Digesters for Wood": ["Physicochemical"],
     "Horizontal Tube Digester for Straw": ["Physicochemical"],
 }
+
+# Maps ProcessType name → {input: [...], output: [...], source_url: str}
+PROCESS_MATERIALS = {
+    "Anaerobic Digestion": {
+        "input": ["Manure", "Organic Waste"],
+        "output": ["Biogas", "Digestate"],
+        "source_url": "https://www.tech4biowaste.eu/wiki/Anaerobic_digestion",
+        "source_title": "Tech4Biowaste: Anaerobic Digestion",
+    },
+    "Gasification": {
+        "input": ["Wood Chips", "Biomass"],
+        "output": ["Syngas", "Biochar"],
+        "source_url": "https://www.tech4biowaste.eu/wiki/Gasification",
+        "source_title": "Tech4Biowaste: Gasification",
+    },
+    "Pyrolysis": {
+        "input": ["Forest Residues", "Straw"],
+        "output": ["Bio-oil", "Biochar", "Syngas"],
+        "source_url": "https://www.tech4biowaste.eu/wiki/Pyrolysis",
+        "source_title": "Tech4Biowaste: Pyrolysis",
+    },
+    "Composting": {
+        "input": ["Organic Waste", "Green Waste"],
+        "output": ["Compost"],
+        "source_url": "https://www.tech4biowaste.eu/wiki/Composting",
+        "source_title": "Tech4Biowaste: Composting",
+    },
+    "Hydrothermal Processing": {
+        "input": ["Wet Biomass"],
+        "output": ["Hydrochar", "Process Water"],
+        "source_url": "https://www.tech4biowaste.eu/wiki/Hydrothermal_processing",
+        "source_title": "Tech4Biowaste: Hydrothermal Processing",
+    },
+    "Torrefaction": {
+        "input": ["Biomass"],
+        "output": ["Torrified Biomass"],
+        "source_url": "https://www.tech4biowaste.eu/wiki/Torrefaction",
+        "source_title": "Tech4Biowaste: Torrefaction",
+    },
+    "Steam Explosion": {
+        "input": ["Lignocellulosic Biomass"],
+        "output": ["Exploded Biomass"],
+        "source_url": "https://www.tech4biowaste.eu/wiki/Steam_explosion",
+        "source_title": "Tech4Biowaste: Steam Explosion",
+    },
+    "Ultrasonication": {
+        "input": ["Sludge"],
+        "output": ["Disintegrated Sludge"],
+        "source_url": "https://www.tech4biowaste.eu/wiki/Ultrasonication",
+        "source_title": "Tech4Biowaste: Ultrasonication",
+    },
+    "Biocomposite Processing": {
+        "input": ["Biopolymers", "Natural Fibres"],
+        "output": ["Biocomposite"],
+        "source_url": "https://www.tech4biowaste.eu/wiki/Biocomposite_processing",
+        "source_title": "Tech4Biowaste: Biocomposite Processing",
+    },
+}
+
+# Collect all unique material names from the mock data
+ALL_MATERIAL_NAMES = sorted(
+    {n for info in PROCESS_MATERIALS.values() for n in info["input"] + info["output"]}
+)
 
 
 def seed_data(apps, schema_editor):
@@ -112,13 +192,58 @@ def seed_data(apps, schema_editor):
             for mech_name in mech_names:
                 pt.mechanism_categories.add(mechanisms[mech_name])
 
+    # Seed materials
+    Material = apps.get_model("materials", "Material")
+    materials = {}
+    for mat_name in ALL_MATERIAL_NAMES:
+        obj, _ = Material.objects.get_or_create(
+            name=mat_name,
+            owner=owner,
+            defaults={
+                "type": "material",
+                "publication_status": "published",
+            },
+        )
+        materials[mat_name] = obj
+
+    # Seed sources and link materials to process types
+    Source = apps.get_model("bibliography", "Source")
+    for pt_name, info in PROCESS_MATERIALS.items():
+        for pt in ProcessType.objects.filter(name=pt_name):
+            for mat_name in info["input"]:
+                pt.input_materials.add(materials[mat_name])
+            for mat_name in info["output"]:
+                pt.output_materials.add(materials[mat_name])
+            source, _ = Source.objects.get_or_create(
+                url=info["source_url"],
+                owner=owner,
+                defaults={
+                    "title": info["source_title"],
+                    "type": "website",
+                    "publication_status": "published",
+                },
+            )
+            pt.sources.add(source)
+
 
 def reverse_seed(apps, schema_editor):
     ProcessGroup = apps.get_model("processes", "ProcessGroup")
     MechanismCategory = apps.get_model("processes", "MechanismCategory")
     ProcessType = apps.get_model("processes", "ProcessType")
+    Material = apps.get_model("materials", "Material")
+    Source = apps.get_model("bibliography", "Source")
 
-    # Clear M2M assignments
+    # Clear material/source M2M assignments and delete seeded sources
+    source_urls = [info["source_url"] for info in PROCESS_MATERIALS.values()]
+    for pt_name in PROCESS_MATERIALS:
+        for pt in ProcessType.objects.filter(name=pt_name):
+            pt.input_materials.clear()
+            pt.output_materials.clear()
+            pt.sources.clear()
+    Source.objects.filter(url__in=source_urls).delete()
+    Material.objects.filter(name__in=ALL_MATERIAL_NAMES).delete()
+
+    # Clear mechanism M2M assignments
     for pt_name in MECHANISM_ASSIGNMENTS:
         for pt in ProcessType.objects.filter(name=pt_name):
             pt.mechanism_categories.clear()
@@ -137,6 +262,8 @@ def reverse_seed(apps, schema_editor):
 class Migration(migrations.Migration):
     dependencies = [
         ("processes", "0004_rename_category_to_group_add_mechanism"),
+        ("materials", "0005_alter_analyticalmethod_publication_status_and_more"),
+        ("bibliography", "0004_alter_author_publication_status_and_more"),
     ]
 
     operations = [
