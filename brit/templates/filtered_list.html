@@ -37,7 +37,7 @@
                      aria-disabled="true"
                      tabindex="-1"
                      title="View as list"
-                     href="{{ request.get_full_path }}">List</a>
+                     href="{{ request.get_full_path }}"><i class="fas fa-list"></i></a>
                   {% if list_type == 'private' %}
                     {% with map_base=private_map_url %}
                       {% if map_base %}
@@ -45,7 +45,7 @@
                            role="button"
                            aria-pressed="false"
                            title="View as map"
-                           href="{{ map_base }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=private&load_features=true">Map</a>
+                           href="{{ map_base }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=private&load_features=true"><i class="fas fa-map"></i></a>
                       {% endif %}
                     {% endwith %}
                   {% elif list_type == 'review' %}
@@ -55,7 +55,7 @@
                            role="button"
                            aria-pressed="false"
                            title="View as map"
-                           href="{{ map_base }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=review&load_features=true">Map</a>
+                           href="{{ map_base }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=review&load_features=true"><i class="fas fa-map"></i></a>
                       {% endif %}
                     {% endwith %}
                   {% else %}
@@ -65,7 +65,7 @@
                            role="button"
                            aria-pressed="false"
                            title="View as map"
-                           href="{{ map_base }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=published&load_features=true">Map</a>
+                           href="{{ map_base }}?{% for key, value in request.GET.items %}{% if key != 'scope' and key != 'id' and key != 'page' and key != 'publication_status' %}{{ key }}={{ value|urlencode }}&{% endif %}{% endfor %}scope=published&load_features=true"><i class="fas fa-map"></i></a>
                       {% endif %}
                     {% endwith %}
                   {% endif %}
