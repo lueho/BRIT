@@ -70,20 +70,37 @@ def author_icontains(queryset, _, value):
 
 
 class SourceModelFilterSet(FilterSet):
-    abbreviation = CharFilter(lookup_expr="icontains")
     authors = CharFilter(method=author_icontains, label="Author names contain")
     title = CharFilter(lookup_expr="icontains")
 
     class Meta:
         model = Source
-        fields = ("abbreviation", "authors", "title", "type", "year")
+        fields = ("authors", "title", "type", "year")
 
 
 class SourceFilter(UserCreatedObjectScopedFilterSet):
-    abbreviation = CharFilter(lookup_expr="icontains")
-    authors = CharFilter(method=author_icontains, label="Author names contain")
     title = CharFilter(lookup_expr="icontains")
+    author = ModelChoiceFilter(
+        queryset=Author.objects.all(),
+        field_name="authors",
+        label="Author",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(
+                url="author-autocomplete",
+                label_field="label",
+            ),
+        ),
+    )
+    licence = ModelChoiceFilter(
+        queryset=Licence.objects.all(),
+        label="Licence",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(
+                url="licence-autocomplete",
+            ),
+        ),
+    )
 
     class Meta:
         model = Source
-        fields = ("scope", "abbreviation", "authors", "title", "type", "year")
+        fields = ("scope", "title", "author", "type", "year", "licence")
