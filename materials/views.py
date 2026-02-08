@@ -176,6 +176,10 @@ class MaterialCategoryModalDeleteView(UserCreatedObjectModalDeleteView):
     model = MaterialCategory
 
 
+class MaterialCategoryAutocompleteView(UserCreatedObjectAutocompleteView):
+    model = MaterialCategory
+
+
 # ----------- Material CRUD --------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -338,6 +342,10 @@ class MaterialComponentGroupModalDeleteView(UserCreatedObjectModalDeleteView):
     model = MaterialComponentGroup
 
 
+class MaterialComponentGroupAutocompleteView(UserCreatedObjectAutocompleteView):
+    model = MaterialComponentGroup
+
+
 # ----------- Material Property CRUD -----------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
 
@@ -383,6 +391,10 @@ class MaterialPropertyModalUpdateView(UserCreatedObjectModalUpdateView):
 
 
 class MaterialPropertyModalDeleteView(UserCreatedObjectModalDeleteView):
+    model = MaterialProperty
+
+
+class MaterialPropertyAutocompleteView(UserCreatedObjectAutocompleteView):
     model = MaterialProperty
 
 
@@ -434,6 +446,10 @@ class AnalyticalMethodUpdateView(UserCreatedObjectUpdateView):
 
 
 class AnalyticalMethodModalDeleteView(UserCreatedObjectModalDeleteView):
+    model = AnalyticalMethod
+
+
+class AnalyticalMethodAutocompleteView(UserCreatedObjectAutocompleteView):
     model = AnalyticalMethod
 
 
