@@ -9,9 +9,6 @@
 {% endblock title %}
 
 {% block list_table %}
-    <p class="text-muted small mb-2">
-        Showing {{ page_obj.start_index }}-{{ page_obj.end_index }} of {{ page_obj.paginator.count }} results
-    </p>
     {% load custom_tags %}
     {% if chips %}
         <div class="mb-2 d-flex flex-wrap gap-2">
