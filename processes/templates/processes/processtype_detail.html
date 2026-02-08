@@ -1,0 +1,124 @@
+{% extends "detail_with_options.html" %}
+{% load static %}
+
+{% block title %}
+BRIT | Process Type: {{ object.name }}
+{% endblock title %}
+
+{% block detail_header %}
+Process Type: {{ object.name }}
+{% endblock detail_header %}
+
+{% block detail_top_image %}
+{% if object.image %}
+<div class="card-img-top">
+  <img class="w-100 m-0" src="{{ object.image.url }}" alt="Image of {{ object.name }}"
+    style="max-height: 300px; object-fit: cover;">
+</div>
+{% endif %}
+{% endblock detail_top_image %}
+
+{% block detail_body %}
+<p class="card-text">
+  <strong>Name:</strong>
+  <br>
+  {{ object.name }}
+</p>
+
+{% if object.group %}
+<p class="card-text">
+  <strong>Group:</strong>
+  <br>
+  <a href="{{ object.group.get_absolute_url }}" class="badge bg-secondary text-decoration-none">
+    {{ object.group.name }}
+  </a>
+</p>
+{% endif %}
+
+{% if object.mechanism_categories.exists %}
+<div class="mb-3">
+  <strong>Mechanism Categories:</strong>
+  <div class="mt-1">
+    {% for mc in object.mechanism_categories.all %}
+    <a href="{{ mc.get_absolute_url }}" class="badge bg-info text-decoration-none me-1">{{ mc.name }}</a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if object.short_description %}
+<p class="card-text">
+  <strong>Short Description:</strong>
+  <br>
+  {{ object.short_description }}
+</p>
+{% endif %}
+
+{% if object.description %}
+<p class="card-text">
+  <strong>Description:</strong>
+  <br>
+  {{ object.description|safe }}
+</p>
+{% endif %}
+
+{% if object.mechanism %}
+<p class="card-text">
+  <strong>Mechanism:</strong>
+  <br>
+  {{ object.mechanism }}
+</p>
+{% endif %}
+
+{% if object.temperature_range %}
+<p class="card-text">
+  <strong>Temperature Range:</strong>
+  <br>
+  {{ object.temperature_range }}
+</p>
+{% endif %}
+
+{% if object.yield_range %}
+<p class="card-text">
+  <strong>Yield Range:</strong>
+  <br>
+  {{ object.yield_range }}
+</p>
+{% endif %}
+
+{% if object.input_materials.exists %}
+<div class="mb-3">
+  <strong>Input Materials:</strong>
+  <div class="mt-1">
+    {% for m in object.input_materials.all %}
+    <a href="{{ m.get_absolute_url }}" class="btn btn-sm btn-outline-primary mb-1">{{ m.name }}</a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if object.output_materials.exists %}
+<div class="mb-3">
+  <strong>Output Materials:</strong>
+  <div class="mt-1">
+    {% for m in object.output_materials.all %}
+    <a href="{{ m.get_absolute_url }}" class="btn btn-sm btn-outline-success mb-1">{{ m.name }}</a>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% if object.sources.exists %}
+<div class="mb-3">
+  <strong>Literature:</strong>
+  <ul class="list-unstyled mt-1 mb-0">
+    {% for source in object.sources.all %}
+    <li>
+      <a href="{{ source.get_absolute_url }}" class="modal-link">{{ source }} <i
+          class="fas fa-external-link-alt fa-xs"></i></a>
+    </li>
+    {% endfor %}
+  </ul>
+</div>
+{% endif %}
+{% endblock detail_body %}

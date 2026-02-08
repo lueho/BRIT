@@ -1,0 +1,130 @@
+{% extends "detail_with_options.html" %}
+{% load static %}
+
+{% block title %}
+BRIT | {{ object.name }}
+{% endblock title %}
+
+{% block detail_header %}
+{{ object.name }}
+{% endblock detail_header %}
+
+{% block detail_body %}
+{% if short_description %}
+<p class="lead text-muted mb-3">{{ short_description }}</p>
+<hr>
+{% endif %}
+
+<div class="row">
+  <div class="{% if aggregate_params %}col-md-8{% else %}col-12{% endif %}">
+    {% if object.description %}
+    <h6 class="text-uppercase text-muted fw-bold small mb-2">Description</h6>
+    <div class="mb-4">{{ object.description|linebreaksbr }}</div>
+    {% endif %}
+
+    {% if flowsheets %}
+    <h6 class="text-uppercase text-muted fw-bold small mb-2">Process Flowsheets</h6>
+    <ul class="list-group list-group-flush mb-3">
+      {% for fs in flowsheets %}
+      <li class="list-group-item px-0">
+        <a href="{{ fs.url }}" class="text-decoration-none">
+          <i class="fas fa-fw fa-project-diagram text-primary me-1"></i> {{ fs.label }}
+        </a>
+      </li>
+      {% endfor %}
+      <li class="list-group-item px-0 text-muted">
+        <i class="fas fa-fw fa-project-diagram me-1"></i> Pulping of Wood <span
+          class="badge bg-light text-muted border ms-1">coming soon</span>
+      </li>
+    </ul>
+    {% endif %}
+  </div>
+
+  {% if aggregate_params %}
+  <div class="col-md-4">
+    <div class="card bg-body-tertiary border-0">
+      <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+        <h6 class="mb-0"><i class="fas fa-sliders-h me-1"></i> Typical Parameters</h6>
+      </div>
+      <div class="card-body pt-0">
+        <dl class="mb-0">
+          {% if aggregate_params.mechanism %}
+          <dt>Mechanism</dt>
+          <dd class="mb-2">{{ aggregate_params.mechanism }}</dd>
+          {% endif %}
+          {% if aggregate_params.temperature %}
+          <dt>Temperature</dt>
+          <dd class="mb-2">{{ aggregate_params.temperature }}</dd>
+          {% endif %}
+          {% if aggregate_params.yield %}
+          <dt>Yield</dt>
+          <dd class="mb-0">{{ aggregate_params.yield }}</dd>
+          {% endif %}
+        </dl>
+      </div>
+    </div>
+  </div>
+  {% endif %}
+</div>
+{% endblock detail_body %}
+
+{% block second_row %}
+{% if process_types %}
+<div class="col-12">
+  <div class="card shadow">
+    <div class="card-header bg-body-tertiary border-bottom-0 py-3">
+      <h5 class="mb-0">
+        <i class="fas fa-cogs me-2 text-primary"></i>
+        Process Technologies in this Group
+      </h5>
+    </div>
+    <div class="card-body">
+      <div class="row g-4">
+        {% for pt in process_types %}
+        <div class="col-12 col-md-6 col-xl-4">
+          <div class="card h-100 border shadow-sm">
+            {% if pt.image %}
+            <img src="{{ pt.image.url }}" class="card-img-top" alt="{{ pt.name }}"
+              style="height: 200px; object-fit: contain; background: #f8f9fa;">
+            {% elif pt.static_image %}
+            <img src="{% static pt.static_image %}" class="card-img-top" alt="{{ pt.name }}"
+              style="height: 200px; object-fit: contain; background: #f8f9fa;">
+            {% endif %}
+            <div class="card-body d-flex flex-column">
+              <h6 class="card-title fw-bold mb-1">{{ pt.name }}</h6>
+              {% if pt.short_description %}
+              <p class="card-text text-muted small flex-grow-1 mb-2">{{ pt.short_description }}</p>
+              {% endif %}
+              {% if pt.mechanism or pt.temperature_range or pt.yield_range %}
+              <div class="border-top pt-2 mb-2">
+                <dl class="row small mb-0">
+                  {% if pt.mechanism %}
+                  <dt class="col-5 text-muted fw-normal">Mechanism</dt>
+                  <dd class="col-7 mb-1">{{ pt.mechanism }}</dd>
+                  {% endif %}
+                  {% if pt.temperature_range %}
+                  <dt class="col-5 text-muted fw-normal">Temp.</dt>
+                  <dd class="col-7 mb-1">{{ pt.temperature_range }}</dd>
+                  {% endif %}
+                  {% if pt.yield_range %}
+                  <dt class="col-5 text-muted fw-normal">Yield</dt>
+                  <dd class="col-7 mb-0">{{ pt.yield_range }}</dd>
+                  {% endif %}
+                </dl>
+              </div>
+              {% endif %}
+              <div class="mt-auto pt-1">
+                <a href="{{ pt.get_absolute_url }}" class="btn btn-sm btn-primary w-100">
+                  <i class="fas fa-arrow-right me-1"></i> View Details
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+{% endblock second_row %}
