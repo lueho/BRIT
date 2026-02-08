@@ -1,235 +1,215 @@
 {% extends "base.html" %}
 {% load static %}
 {% block title %}
-  BRIT | Bioresource Information Tool
+BRIT | Bioresource Information Tool
 {% endblock title %}
 {% block content %}
-  <div class="row g-4 mb-4">
-    <div class="col-12 col-md-6">
-      <div class="card shadow h-100">
-        <div class="card-header bg-light border-0 py-3">
-          <h5 class="mb-0">Introduction</h5>
-        </div>
-        <div class="card-body">
-          <h3 class="card-text">
-            <strong>What is BRIT?</strong>
-          </h3>
-          <p class="card-text">
-            The Bioresource Information Tool (BRIT) provides information about sources, quantities and
-            properties of residue-based bioresources. It is an open source, open data tool and this
-            instance is hosted by the Hamburg University of Technology.
-            You explore case studies from the
-            <a href="http://www.flexibi-biorefineries.eu" target="_blank">FLEXIBI</a> and
-            <a href="https://northsearegion.eu/soilcom/" target="_blank">SOILCOM</a>
-            project, as well as raw data from these projects and other sources.
-            This tool is under constant development. We highly appreciate any kind of feedback.
-          </p>
-          <p class="card-text">
-            <a href="mailto:info@bioresource-tools.net" class="btn btn-primary">Contact</a>
-          </p>
-        </div>
+<div class="row g-4 mb-4">
+  <div class="col-12 col-md-6">
+    <div class="card shadow h-100">
+      <div class="card-header bg-light border-0 py-3">
+        <h5 class="mb-0">Introduction</h5>
       </div>
-    </div>
-    <div class="col-12 col-md-6">
-      <div class="card shadow h-100">
-        <div class="card-header bg-light border-0 py-3">
-          <h5 class="mb-0">News & Updates</h5>
-        </div>
-        <div class="card-body">
-          <h3 class="card-text">
-            <strong>BRIT part of CLOSECYCLE Project</strong>
-          </h3>
-          <div class="row">
-            <div class="col-12 col-lg-7 col-xl-6 order-2 order-lg-1">
-              <p class="card-text">
-                <a href="https://www.closecycle.eu" target="_blank">CLOSECYCLE</a> is an
-                <a href="https://www.interregnorthsea.eu/" target="_blank">INTERREG North Sea Region</a>
-                project, co-funded by the European Union. BRIT is part of the digital package of work
-                package 1, serving stakeholders of Territorial Biorefinery Networks
-                (TBN).
-              </p>
-              <p class="card-text">
-                <a href="{% url 'Showcase' %}" class="btn btn-primary">CLOSECYCLE showcases</a>
-              </p>
-            </div>
-            <div class="col-12 col-lg-7 col-xl-6 order-1 order-lg-2">
-              <p class="card-text">
-                <a href="https://www.closecycle.eu" target="_blank">
-                  <img class="w-100 m-0 p-1"
-                       src="{% static 'img/interreg_with_closecycle_logo.png' %}"
-                       alt="Logo of INTERREG North Sea Region CLOSECYCLE Project">
-                </a>
-              </p>
-            </div>
-          </div>
-        </div>
+      <div class="card-body">
+        <h3 class="card-text">
+          <strong>What is BRIT?</strong>
+        </h3>
+        <p class="card-text">
+          The Bioresource Information Tool (BRIT) provides information about sources, quantities and
+          properties of residue-based bioresources. It is an open source, open data tool and this
+          instance is hosted by the Hamburg University of Technology.
+          You explore case studies from the
+          <a href="http://www.flexibi-biorefineries.eu" target="_blank">FLEXIBI</a> and
+          <a href="https://northsearegion.eu/soilcom/" target="_blank">SOILCOM</a>
+          project, as well as raw data from these projects and other sources.
+          This tool is under constant development. We highly appreciate any kind of feedback.
+        </p>
+        <p class="card-text">
+          <a href="mailto:info@bioresource-tools.net" class="btn btn-primary">Contact</a>
+        </p>
       </div>
     </div>
   </div>
-  <div class="row g-4">
-    <!-- Maps Card -->
-    <div class="col-12 col-sm-6 col-xl-4 col-xxl-3">
-      <div class="card shadow h-100">
-        <div class="card-header bg-light border-0 py-3">
-          <h5 class="mb-0">
-            <a href="{% url 'maps_list' %}"
-               class="text-decoration-none text-body text-decoration-underline-hover">
-              <i class="fas fa-fw fa-globe-europe me-2"></i>Maps
-            </a>
-          </h5>
-        </div>
-        <div class="card-img-top">
-          <a class="d-flex align-items-center justify-content-center stretched-link"
-             href="{% url 'maps_list' %}">
-            <img class="w-100 m-0"
-                 src="{% static 'img/maps_cover_card.png' %}"
-                 alt="Maps Module Cover Image">
-          </a>
-        </div>
-        <div class="card-body">
-          <p class="card-text">
-            Explore maps of sources of bioresources found in the implemented case studies. You can
-            filter and find out more about the spatial distribution of potential resources.
-          </p>
-        </div>
+  <div class="col-12 col-md-6">
+    <div class="card shadow h-100">
+      <div class="card-header bg-light border-0 py-3">
+        <h5 class="mb-0">News & Updates</h5>
       </div>
-    </div>
-    <!-- Materials Card -->
-    <div class="col-12 col-sm-6 col-xl-4 col-xxl-3">
-      <div class="card shadow h-100">
-        <div class="card-header bg-light border-0 py-3">
-          <h5 class="mb-0">
-            <a href="{% url 'sample-list-featured' %}"
-               class="text-decoration-none text-body text-decoration-underline-hover">
-              <i class="fas fa-fw fa-leaf me-2"></i>Materials
-            </a>
-          </h5>
-        </div>
-        <div class="card-img">
-          <a class="d-flex align-items-center justify-content-center stretched-link"
-             href="{% url 'sample-list-featured' %}">
-            <img class="w-100 m-0"
-                 src="{% static 'img/materials_cover_card.png' %}"
-                 alt="Materials Module Cover Image">
-          </a>
-        </div>
-        <div class="card-body">
-          <p class="card-text">
-            This is a database of materials that are bioresources found in the implemented case studies.
-            It characterizes the material composition and its seasonal change.
-          </p>
-        </div>
-      </div>
-    </div>
-    <!-- Sources Card -->
-    <div class="col-12 col-sm-6 col-xl-4 col-xxl-3">
-      <div class="card shadow h-100">
-        <div class="card-header bg-light border-0 py-3">
-          <h5 class="mb-0">
-            <a href="{% url 'sources-list' %}"
-               class="text-decoration-none text-body text-decoration-underline-hover">
-              <i class="fas fa-fw fa-expand-arrows-alt me-2"></i>Sources
-            </a>
-          </h5>
-        </div>
-        <div class="card-img">
-          <a class="d-flex align-items-center justify-content-center stretched-link"
-             href="{% url 'sources-list' %}">
-            <img class="w-100 m-0 p-1"
-                 src="{% static 'img/sources_cover_card.png' %}"
-                 alt="Sources Module Cover Image">
-          </a>
-        </div>
-        <div class="card-body">
-          <p class="card-text">
-            Bioresources are generated in various ways. This module provides models for sources of
-            bioresources.
-          </p>
-        </div>
-      </div>
-    </div>
-    <!-- Inventories Card -->
-    <div class="col-12 col-sm-6 col-xl-4 col-xxl-3">
-      <div class="card shadow h-100">
-        <div class="card-header bg-light border-0 py-3">
-          <h5 class="mb-0">
-            <a href="{% url 'scenario-list' %}"
-               class="text-decoration-none text-body text-decoration-underline-hover">
-              <i class="fas fa-fw fa-chart-bar me-2"></i>Inventories
-            </a>
-          </h5>
-        </div>
-        <div class="card-img-top">
-          <a class="d-flex align-items-center justify-content-center stretched-link"
-             href="{% url 'scenario-list' %}">
-            <img class="w-100 m-0 p-1"
-                 src="{% static 'img/cover_card_inventories.png' %}"
-                 alt="Inventories Module Cover Image">
-          </a>
-        </div>
-        <div class="card-body">
-          <p class="card-text">
-            Inventories are case studies about which bioresources are available in a given region.
-            Explore ready case studies from our research projects or create your own scenarios.
-          </p>
-        </div>
-      </div>
-    </div>
-    <!-- Bibliography Card -->
-    <div class="col-12 col-sm-6 col-xl-4 col-xxl-3">
-      <div class="card shadow h-100">
-        <div class="card-header bg-light border-0 py-3">
-          <h5 class="mb-0">
-            <a href="{% url 'source-list' %}"
-               class="text-decoration-none text-body text-decoration-underline-hover">
-              <i class="fas fa-fw fa-book me-2"></i>Bibliography
-            </a>
-          </h5>
-        </div>
-        <div class="card-img-top">
-          <a class="d-flex align-items-center justify-content-center stretched-link"
-             href="{% url 'source-list' %}">
-            <img class="w-100 m-0"
-                 src="{% static 'img/bibliography_cover_card.png' %}"
-                 alt="Bibliography Module Cover Image">
-          </a>
-        </div>
-        <div class="card-body">
-          <p class="card-text">
-            This is a library of sources that contain valuable information about bioresources. The
-            sources can be explored and managed here. Any source from the library can be referred to
-            in the respective models in the other modules.
-          </p>
-        </div>
-      </div>
-    </div>
-    <!-- Processes Card (with permission check) -->
-    {% if perms.processes.access_app_feature %}
-      <div class="col-12 col-sm-6 col-xl-4 col-xxl-3">
-        <div class="card shadow h-100">
-          <div class="card-header bg-light border-0 py-3">
-            <h5 class="mb-0">
-              <a href="{% url 'processes:dashboard' %}"
-                 class="text-decoration-none text-body text-decoration-underline-hover">
-                <i class="fas fa-fw fa-flask me-2"></i>Processes
-              </a>
-            </h5>
-          </div>
-          <div class="card-img">
-            <a class="d-flex align-items-center justify-content-center stretched-link"
-               href="{% url 'processes:dashboard' %}">
-              <img class="w-100 m-0"
-                   src="{% static 'img/processes_cover_card.png' %}"
-                   alt="Processes Module Cover Image">
-            </a>
-          </div>
-          <div class="card-body">
+      <div class="card-body">
+        <h3 class="card-text">
+          <strong>BRIT part of CLOSECYCLE Project</strong>
+        </h3>
+        <div class="row">
+          <div class="col-12 col-lg-7 col-xl-6 order-2 order-lg-1">
             <p class="card-text">
-              Explore and model process types and steps as part of the process integration module. This is a mock interface for stakeholder review.
+              <a href="https://www.closecycle.eu" target="_blank">CLOSECYCLE</a> is an
+              <a href="https://www.interregnorthsea.eu/" target="_blank">INTERREG North Sea Region</a>
+              project, co-funded by the European Union. BRIT is part of the digital package of work
+              package 1, serving stakeholders of Territorial Biorefinery Networks
+              (TBN).
+            </p>
+            <p class="card-text">
+              <a href="{% url 'Showcase' %}" class="btn btn-primary">CLOSECYCLE showcases</a>
+            </p>
+          </div>
+          <div class="col-12 col-lg-7 col-xl-6 order-1 order-lg-2">
+            <p class="card-text">
+              <a href="https://www.closecycle.eu" target="_blank">
+                <img class="w-100 m-0 p-1" src="{% static 'img/interreg_with_closecycle_logo.png' %}"
+                  alt="Logo of INTERREG North Sea Region CLOSECYCLE Project">
+              </a>
             </p>
           </div>
         </div>
       </div>
-    {% endif %}
+    </div>
   </div>
+</div>
+<div class="row g-4">
+  <!-- Maps Card -->
+  <div class="col-12 col-sm-6 col-xl-4 col-xxl-3">
+    <div class="card shadow h-100">
+      <div class="card-header bg-light border-0 py-3">
+        <h5 class="mb-0">
+          <a href="{% url 'maps_list' %}" class="text-decoration-none text-body text-decoration-underline-hover">
+            <i class="fas fa-fw fa-globe-europe me-2"></i>Maps
+          </a>
+        </h5>
+      </div>
+      <div class="card-img-top">
+        <a class="d-flex align-items-center justify-content-center stretched-link" href="{% url 'maps_list' %}">
+          <img class="w-100 m-0" src="{% static 'img/maps_cover_card.png' %}" alt="Maps Module Cover Image">
+        </a>
+      </div>
+      <div class="card-body">
+        <p class="card-text">
+          Explore maps of sources of bioresources found in the implemented case studies. You can
+          filter and find out more about the spatial distribution of potential resources.
+        </p>
+      </div>
+    </div>
+  </div>
+  <!-- Materials Card -->
+  <div class="col-12 col-sm-6 col-xl-4 col-xxl-3">
+    <div class="card shadow h-100">
+      <div class="card-header bg-light border-0 py-3">
+        <h5 class="mb-0">
+          <a href="{% url 'sample-list-featured' %}"
+            class="text-decoration-none text-body text-decoration-underline-hover">
+            <i class="fas fa-fw fa-leaf me-2"></i>Materials
+          </a>
+        </h5>
+      </div>
+      <div class="card-img">
+        <a class="d-flex align-items-center justify-content-center stretched-link"
+          href="{% url 'sample-list-featured' %}">
+          <img class="w-100 m-0" src="{% static 'img/materials_cover_card.png' %}" alt="Materials Module Cover Image">
+        </a>
+      </div>
+      <div class="card-body">
+        <p class="card-text">
+          This is a database of materials that are bioresources found in the implemented case studies.
+          It characterizes the material composition and its seasonal change.
+        </p>
+      </div>
+    </div>
+  </div>
+  <!-- Sources Card -->
+  <div class="col-12 col-sm-6 col-xl-4 col-xxl-3">
+    <div class="card shadow h-100">
+      <div class="card-header bg-light border-0 py-3">
+        <h5 class="mb-0">
+          <a href="{% url 'sources-list' %}" class="text-decoration-none text-body text-decoration-underline-hover">
+            <i class="fas fa-fw fa-expand-arrows-alt me-2"></i>Sources
+          </a>
+        </h5>
+      </div>
+      <div class="card-img">
+        <a class="d-flex align-items-center justify-content-center stretched-link" href="{% url 'sources-list' %}">
+          <img class="w-100 m-0 p-1" src="{% static 'img/sources_cover_card.png' %}" alt="Sources Module Cover Image">
+        </a>
+      </div>
+      <div class="card-body">
+        <p class="card-text">
+          Bioresources are generated in various ways. This module provides models for sources of
+          bioresources.
+        </p>
+      </div>
+    </div>
+  </div>
+  <!-- Inventories Card -->
+  <div class="col-12 col-sm-6 col-xl-4 col-xxl-3">
+    <div class="card shadow h-100">
+      <div class="card-header bg-light border-0 py-3">
+        <h5 class="mb-0">
+          <a href="{% url 'scenario-list' %}" class="text-decoration-none text-body text-decoration-underline-hover">
+            <i class="fas fa-fw fa-chart-bar me-2"></i>Inventories
+          </a>
+        </h5>
+      </div>
+      <div class="card-img-top">
+        <a class="d-flex align-items-center justify-content-center stretched-link" href="{% url 'scenario-list' %}">
+          <img class="w-100 m-0 p-1" src="{% static 'img/cover_card_inventories.png' %}"
+            alt="Inventories Module Cover Image">
+        </a>
+      </div>
+      <div class="card-body">
+        <p class="card-text">
+          Inventories are case studies about which bioresources are available in a given region.
+          Explore ready case studies from our research projects or create your own scenarios.
+        </p>
+      </div>
+    </div>
+  </div>
+  <!-- Bibliography Card -->
+  <div class="col-12 col-sm-6 col-xl-4 col-xxl-3">
+    <div class="card shadow h-100">
+      <div class="card-header bg-light border-0 py-3">
+        <h5 class="mb-0">
+          <a href="{% url 'source-list' %}" class="text-decoration-none text-body text-decoration-underline-hover">
+            <i class="fas fa-fw fa-book me-2"></i>Bibliography
+          </a>
+        </h5>
+      </div>
+      <div class="card-img-top">
+        <a class="d-flex align-items-center justify-content-center stretched-link" href="{% url 'source-list' %}">
+          <img class="w-100 m-0" src="{% static 'img/bibliography_cover_card.png' %}"
+            alt="Bibliography Module Cover Image">
+        </a>
+      </div>
+      <div class="card-body">
+        <p class="card-text">
+          This is a library of sources that contain valuable information about bioresources. The
+          sources can be explored and managed here. Any source from the library can be referred to
+          in the respective models in the other modules.
+        </p>
+      </div>
+    </div>
+  </div>
+  <!-- Processes Card -->
+  <div class="col-12 col-sm-6 col-xl-4 col-xxl-3">
+    <div class="card shadow h-100">
+      <div class="card-header bg-light border-0 py-3">
+        <h5 class="mb-0">
+          <a href="{% url 'processes-dashboard' %}"
+            class="text-decoration-none text-body text-decoration-underline-hover">
+            <i class="fas fa-fw fa-flask me-2"></i>Processes
+          </a>
+        </h5>
+      </div>
+      <div class="card-img">
+        <a class="d-flex align-items-center justify-content-center stretched-link"
+          href="{% url 'processes-dashboard' %}">
+          <img class="w-100 m-0" src="{% static 'img/processes_cover_card.png' %}" alt="Processes Module Cover Image">
+        </a>
+      </div>
+      <div class="card-body">
+        <p class="card-text">
+          Explore and compare material-conversion processes with operating parameters, input/output materials, and
+          literature references.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock content %}
