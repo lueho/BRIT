@@ -80,13 +80,14 @@ class SourceModelFilterSet(FilterSet):
 
 class SourceFilter(UserCreatedObjectScopedFilterSet):
     title = ModelChoiceFilter(
-        queryset=Source.objects.all(),
+        queryset=Source.objects.none(),
         label="Title",
         method="filter_by_source",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
                 url="source-autocomplete",
                 label_field="text",
+                filter_by=("scope", "title"),
             ),
         ),
     )
@@ -97,25 +98,56 @@ class SourceFilter(UserCreatedObjectScopedFilterSet):
         return queryset
 
     author = ModelChoiceFilter(
-        queryset=Author.objects.all(),
+        queryset=Author.objects.none(),
         field_name="authors",
         label="Author",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
                 url="author-autocomplete",
                 label_field="label",
+                filter_by=("scope", "name"),
             ),
         ),
     )
     licence = ModelChoiceFilter(
-        queryset=Licence.objects.all(),
+        queryset=Licence.objects.none(),
         label="Licence",
         widget=TomSelectModelWidget(
             config=TomSelectConfig(
                 url="licence-autocomplete",
+                filter_by=("scope", "name"),
             ),
         ),
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = getattr(self, "request", None)
+
+        for field_name, model_cls in (
+            ("title", Source),
+            ("author", Author),
+            ("licence", Licence),
+        ):
+            queryset = model_cls.objects.all()
+            if request and hasattr(request, "user"):
+                queryset = filter_queryset_for_user(queryset, request.user)
+
+            scope_value = None
+            try:
+                if hasattr(self, "data") and self.data:
+                    scope_value = self.data.get("scope")
+                if not scope_value and hasattr(self, "form"):
+                    scope_value = self.form.initial.get("scope")
+            except Exception:
+                scope_value = None
+
+            if scope_value:
+                queryset = apply_scope_filter(
+                    queryset, scope_value, user=getattr(request, "user", None)
+                )
+
+            self.filters[field_name].queryset = queryset
 
     class Meta:
         model = Source
