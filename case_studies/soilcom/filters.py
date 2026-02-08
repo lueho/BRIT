@@ -93,6 +93,8 @@ class CollectionSystemListFilter(UserCreatedObjectScopedFilterSet):
         try:
             if hasattr(self, "data") and self.data:
                 scope_value = self.data.get("scope")
+            if not scope_value and hasattr(self, "form"):
+                scope_value = self.form.initial.get("scope")
         except Exception:
             scope_value = None
 
@@ -132,6 +134,8 @@ class WasteCategoryListFilter(UserCreatedObjectScopedFilterSet):
         try:
             if hasattr(self, "data") and self.data:
                 scope_value = self.data.get("scope")
+            if not scope_value and hasattr(self, "form"):
+                scope_value = self.form.initial.get("scope")
         except Exception:
             scope_value = None
 
@@ -171,6 +175,8 @@ class WasteComponentListFilter(UserCreatedObjectScopedFilterSet):
         try:
             if hasattr(self, "data") and self.data:
                 scope_value = self.data.get("scope")
+            if not scope_value and hasattr(self, "form"):
+                scope_value = self.form.initial.get("scope")
         except Exception:
             scope_value = None
 
@@ -210,6 +216,8 @@ class FeeSystemListFilter(UserCreatedObjectScopedFilterSet):
         try:
             if hasattr(self, "data") and self.data:
                 scope_value = self.data.get("scope")
+            if not scope_value and hasattr(self, "form"):
+                scope_value = self.form.initial.get("scope")
         except Exception:
             scope_value = None
 
@@ -249,6 +257,8 @@ class CollectionFrequencyListFilter(UserCreatedObjectScopedFilterSet):
         try:
             if hasattr(self, "data") and self.data:
                 scope_value = self.data.get("scope")
+            if not scope_value and hasattr(self, "form"):
+                scope_value = self.form.initial.get("scope")
         except Exception:
             scope_value = None
 
@@ -479,22 +489,16 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
         queryset=Collection.objects.all(), to_field_name="id"
     )
     catchment = ModelChoiceFilter(
-        queryset=CollectionCatchment.objects.none(),
+        queryset=CollectionCatchment.objects.all(),
         widget=TomSelectModelWidget(
-            config=TomSelectConfig(
-                url="catchment-autocomplete",
-                filter_by=("scope", "name"),
-            )
+            config=TomSelectConfig(url="catchment-autocomplete")
         ),
         method="catchment_filter",
     )
     collector = ModelChoiceFilter(
-        queryset=Collector.objects.none(),
+        queryset=Collector.objects.all(),
         widget=TomSelectModelWidget(
-            config=TomSelectConfig(
-                url="collector-autocomplete",
-                filter_by=("scope", "name"),
-            )
+            config=TomSelectConfig(url="collector-autocomplete")
         ),
     )
     waste_category = ModelMultipleChoiceFilter(
@@ -531,7 +535,7 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
         label="Specific waste collected [kg/(cap.*a)]",
     )
     fee_system = ModelChoiceFilter(
-        queryset=FeeSystem.objects.none(),
+        queryset=FeeSystem.objects.all(),
     )
     valid_on = DateFilter(
         method="filter_valid_on",
@@ -616,23 +620,15 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
             self.filters["required_bin_capacity"].set_min_max()
             self.filters["min_bin_size"].set_min_max()
 
-        request = getattr(self, "request", None)
-        for field_name, model_cls in (
-            ("catchment", CollectionCatchment),
-            ("collector", Collector),
-            ("fee_system", FeeSystem),
-        ):
-            qs = model_cls.objects.all()
-            if request and hasattr(request, "user"):
-                qs = filter_queryset_for_user(qs, request.user)
-            self.filters[field_name].queryset = qs
-
         # Only show publication_status filter when scope is private ("My collections")
         try:
             scope_val = None
             # django_filters passes data in .data (QueryDict)
             if hasattr(self, "data") and self.data:
                 scope_val = self.data.get("scope")
+            # Fallback to initial on form if provided by view defaults
+            if not scope_val and hasattr(self.form, "initial"):
+                scope_val = self.form.initial.get("scope")
         except Exception:
             scope_val = None
 
@@ -712,24 +708,13 @@ class WasteFlyerFilter(UserCreatedObjectScopedFilterSet):
         label="Url checked after",
     )
     catchment = ModelChoiceFilter(
-        queryset=CollectionCatchment.objects.none(),
+        queryset=CollectionCatchment.objects.all(),
         label="Catchment",
         widget=TomSelectModelWidget(
-            config=TomSelectConfig(
-                url="catchment-autocomplete",
-                filter_by=("scope", "name"),
-            )
+            config=TomSelectConfig(url="catchment-autocomplete")
         ),
         method="get_catchment",
     )
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        request = getattr(self, "request", None)
-        qs = CollectionCatchment.objects.all()
-        if request and hasattr(request, "user"):
-            qs = filter_queryset_for_user(qs, request.user)
-        self.filters["catchment"].queryset = qs
 
     class Meta:
         model = WasteFlyer

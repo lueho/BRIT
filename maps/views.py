@@ -329,25 +329,6 @@ class MapMixin:
 class MapsDashboardView(TemplateView):
     template_name = "maps_dashboard.html"
 
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context["geodataset_count"] = GeoDataset.objects.filter(
-            publication_status="published"
-        ).count()
-        context["catchment_count"] = Catchment.objects.filter(
-            publication_status="published"
-        ).count()
-        context["region_count"] = Region.objects.filter(
-            publication_status="published"
-        ).count()
-        context["location_count"] = Location.objects.filter(
-            publication_status="published"
-        ).count()
-        context["attribute_count"] = Attribute.objects.filter(
-            publication_status="published"
-        ).count()
-        return context
-
 
 # ----------- GeoDataSet CRUD ------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
