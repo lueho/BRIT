@@ -138,8 +138,8 @@ BRIT | {{ object.name }} details
             {% endif %}
             {% endif %}
 
-            {# Generic Delete button: published → staff only; private/review/declined → owner or staff; archived → staff
-            #}
+            {% comment %}Generic Delete button: published → staff only; private/review/declined → owner or staff;
+            archived → staff{% endcomment %}
             {% if policy.can_delete %}
             {% if object.delete_url %}
             <a class="btn btn-outline-danger w-100 mb-2"
