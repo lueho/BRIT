@@ -15,6 +15,7 @@ from ..models import Culture, Greenhouse, GreenhouseGrowthCycle, GrowthTimeStepS
 
 class CultureCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     dashboard_view = False
+    add_scope_query_param_to_list_urls = True
 
     model = Culture
 
@@ -49,6 +50,7 @@ class CultureCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCa
 class GreenhouseCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     dashboard_view = False
     public_list_view = False
+    add_scope_query_param_to_list_urls = True
 
     model = Greenhouse
 

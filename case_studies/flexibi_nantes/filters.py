@@ -10,9 +10,13 @@ from django_tomselect.app_settings import TomSelectConfig
 from django_tomselect.widgets import TomSelectModelWidget
 
 from maps.models import Catchment
-from utils.filters import BaseCrispyFilterSet
+from utils.filters import BaseCrispyFilterSet, UserCreatedObjectScopedFilterSet
+from utils.object_management.permissions import (
+    apply_scope_filter,
+    filter_queryset_for_user,
+)
 
-from .models import Greenhouse, NantesGreenhouses
+from .models import Culture, Greenhouse, NantesGreenhouses
 
 HEATING_CHOICES = (
     ("", "All"),
@@ -52,7 +56,7 @@ class GreenhouseTypeFilterFormHelper(FormHelper):
     )
 
 
-class GreenhouseTypeFilter(BaseCrispyFilterSet):
+class GreenhouseTypeFilter(UserCreatedObjectScopedFilterSet):
     heated = BooleanFilter(widget=RadioSelect(choices=HEATING_CHOICES), label="Heating")
     lighted = BooleanFilter(
         widget=RadioSelect(choices=LIGHTING_CHOICES), label="Lighting"
@@ -66,8 +70,49 @@ class GreenhouseTypeFilter(BaseCrispyFilterSet):
 
     class Meta:
         model = Greenhouse
-        fields = ("heated", "lighted", "above_ground", "high_wire")
+        fields = ("scope", "heated", "lighted", "above_ground", "high_wire")
         form_helper = GreenhouseTypeFilterFormHelper
+
+
+class CultureListFilter(UserCreatedObjectScopedFilterSet):
+    name = ModelChoiceFilter(
+        queryset=Culture.objects.none(),
+        field_name="name",
+        label="Culture Name",
+        widget=TomSelectModelWidget(
+            config=TomSelectConfig(
+                url="culture-autocomplete",
+                filter_by=("scope", "name"),
+            ),
+        ),
+    )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = getattr(self, "request", None)
+        queryset = Culture.objects.all()
+        if request and hasattr(request, "user"):
+            queryset = filter_queryset_for_user(queryset, request.user)
+
+        scope_value = None
+        try:
+            if hasattr(self, "data") and self.data:
+                scope_value = self.data.get("scope")
+            if not scope_value and hasattr(self, "form"):
+                scope_value = self.form.initial.get("scope")
+        except Exception:
+            scope_value = None
+
+        if scope_value:
+            queryset = apply_scope_filter(
+                queryset, scope_value, user=getattr(request, "user", None)
+            )
+
+        self.filters["name"].queryset = queryset
+
+    class Meta:
+        model = Culture
+        fields = ("scope", "name")
 
 
 class NantesGreenhouseFilterSetFormHelper(FormHelper):
