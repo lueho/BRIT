@@ -157,6 +157,18 @@ class ModelSelectOptionsView(ListView):
 class UtilsDashboardView(TemplateView):
     template_name = "utils_dashboard.html"
 
+    def get_context_data(self, **kwargs):
+        from utils.properties.models import Property, Unit
+
+        context = super().get_context_data(**kwargs)
+        context["unit_count"] = Unit.objects.filter(
+            publication_status="published"
+        ).count()
+        context["property_count"] = Property.objects.filter(
+            publication_status="published"
+        ).count()
+        return context
+
 
 class DynamicRedirectView(View):
     """

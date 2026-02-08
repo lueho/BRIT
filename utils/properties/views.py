@@ -18,6 +18,16 @@ from .models import Property, Unit
 class PropertiesDashboardView(TemplateView):
     template_name = "properties_dashboard.html"
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["unit_count"] = Unit.objects.filter(
+            publication_status="published"
+        ).count()
+        context["property_count"] = Property.objects.filter(
+            publication_status="published"
+        ).count()
+        return context
+
 
 # ----------- Unit CRUD ------------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
