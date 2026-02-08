@@ -13,53 +13,89 @@ class SourceFilterTestCase(TestCase):
 
     @classmethod
     def setUpTestData(cls):
-        cls.author1 = Author.objects.create(first_names='One', last_names='Test Author')
-        author2 = Author.objects.create(first_names='Two', last_names='Test Author')
-        licence = Licence.objects.create(name='Test Licence', reference_url='https://www.test-licence.org')
+        cls.author1 = Author.objects.create(first_names="One", last_names="Test Author")
+        cls.author2 = Author.objects.create(first_names="Two", last_names="Test Author")
+        cls.licence = Licence.objects.create(
+            name="Test Licence", reference_url="https://www.test-licence.org"
+        )
+        licence2 = Licence.objects.create(
+            name="Other Licence", reference_url="https://www.other-licence.org"
+        )
         with mute_signals(post_save):
             cls.source = Source.objects.create(
-                type='custom',
-                title='Test Custom Source',
-                abbreviation='TS1',
-                licence=licence,
+                type="custom",
+                title="Test Custom Source",
+                abbreviation="TS1",
+                licence=cls.licence,
             )
         SourceAuthor.objects.create(source=cls.source, author=cls.author1, position=1)
-        SourceAuthor.objects.create(source=cls.source, author=author2, position=2)
+        SourceAuthor.objects.create(source=cls.source, author=cls.author2, position=2)
         with mute_signals(post_save):
-            source = Source.objects.create(
-                type='book',
-                title='Test Book',
-                abbreviation='TS2',
-                licence=licence,
+            cls.source2 = Source.objects.create(
+                type="book",
+                title="Test Book",
+                abbreviation="TS2",
+                licence=licence2,
             )
-        SourceAuthor.objects.create(source=source, author=author2, position=1)
+        SourceAuthor.objects.create(source=cls.source2, author=cls.author2, position=1)
 
     def test_title_icontains(self):
         factory = RequestFactory()
-        filter_params = {
-            'title': 'Custom'
-        }
-        request = factory.get(reverse('source-detail', kwargs={'pk': self.source.pk}), filter_params)
+        filter_params = {"title": "Custom"}
+        request = factory.get(
+            reverse("source-detail", kwargs={"pk": self.source.pk}), filter_params
+        )
         qs = SourceFilter(request.GET, Source.objects.all()).qs
         self.assertEqual(1, qs.count())
-        self.assertEqual('Test Custom Source', qs.first().title)
+        self.assertEqual("Test Custom Source", qs.first().title)
 
-    def test_author_icontains_finds_last_names(self):
+    def test_author_filter_by_pk(self):
         factory = RequestFactory()
-        filter_params = {
-            'authors': 'Test'
-        }
-        request = factory.get(reverse('source-detail', kwargs={'pk': self.source.pk}), filter_params)
+        filter_params = {"author": self.author1.pk}
+        request = factory.get(
+            reverse("source-detail", kwargs={"pk": self.source.pk}), filter_params
+        )
+        qs = SourceFilter(request.GET, Source.objects.all()).qs
+        self.assertEqual(1, qs.count())
+        self.assertEqual(self.source, qs.first())
+
+    def test_author_filter_shared_author_returns_both(self):
+        factory = RequestFactory()
+        filter_params = {"author": self.author2.pk}
+        request = factory.get(
+            reverse("source-detail", kwargs={"pk": self.source.pk}), filter_params
+        )
         qs = SourceFilter(request.GET, Source.objects.all()).qs
         self.assertEqual(2, qs.count())
-        self.assertQuerySetEqual(qs.order_by('id'), Source.objects.order_by('id'))
 
-    def test_author_icontains_finds_first_names(self):
+    def test_type_filter(self):
         factory = RequestFactory()
-        filter_params = {
-            'authors': 'One'
-        }
-        request = factory.get(reverse('source-detail', kwargs={'pk': self.source.pk}), filter_params)
+        filter_params = {"type": "book"}
+        request = factory.get(
+            reverse("source-detail", kwargs={"pk": self.source.pk}), filter_params
+        )
+        qs = SourceFilter(request.GET, Source.objects.all()).qs
+        self.assertEqual(1, qs.count())
+        self.assertEqual(self.source2, qs.first())
+
+    def test_year_filter(self):
+        with mute_signals(post_save):
+            Source.objects.create(title="Dated Source", abbreviation="DS", year=2021)
+        factory = RequestFactory()
+        filter_params = {"year": 2021}
+        request = factory.get(
+            reverse("source-detail", kwargs={"pk": self.source.pk}), filter_params
+        )
+        qs = SourceFilter(request.GET, Source.objects.all()).qs
+        self.assertEqual(1, qs.count())
+        self.assertEqual(2021, qs.first().year)
+
+    def test_licence_filter(self):
+        factory = RequestFactory()
+        filter_params = {"licence": self.licence.pk}
+        request = factory.get(
+            reverse("source-detail", kwargs={"pk": self.source.pk}), filter_params
+        )
         qs = SourceFilter(request.GET, Source.objects.all()).qs
         self.assertEqual(1, qs.count())
         self.assertEqual(self.source, qs.first())
