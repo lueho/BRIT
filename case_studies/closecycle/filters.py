@@ -6,6 +6,7 @@ from utils.filters import UserCreatedObjectScopedFilterSet
 from .models import Showcase
 
 COUNTRY_CHOICES = (
+    ("", "All countries"),
     ("BE", "Belgium"),
     ("DE", "Germany"),
     ("DK", "Denmark"),
