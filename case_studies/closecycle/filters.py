@@ -1,7 +1,7 @@
 from django.forms import Select
 from django_filters import CharFilter
 
-from utils.filters import BaseCrispyFilterSet
+from utils.filters import UserCreatedObjectScopedFilterSet
 
 from .models import Showcase
 
@@ -16,7 +16,7 @@ COUNTRY_CHOICES = (
 )
 
 
-class ShowcaseFilterSet(BaseCrispyFilterSet):
+class ShowcaseFilterSet(UserCreatedObjectScopedFilterSet):
     country = CharFilter(
         field_name="region__country",
         lookup_expr="exact",
@@ -27,6 +27,7 @@ class ShowcaseFilterSet(BaseCrispyFilterSet):
     class Meta:
         model = Showcase
         fields = (
+            "scope",
             "id",
             "country",
         )

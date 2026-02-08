@@ -6,6 +6,7 @@ from ..models import Showcase
 
 class ShowCaseCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
     dashboard_view = False
+    add_scope_query_param_to_list_urls = True
 
     model = Showcase
 
