@@ -489,16 +489,22 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
         queryset=Collection.objects.all(), to_field_name="id"
     )
     catchment = ModelChoiceFilter(
-        queryset=CollectionCatchment.objects.all(),
+        queryset=CollectionCatchment.objects.none(),
         widget=TomSelectModelWidget(
-            config=TomSelectConfig(url="catchment-autocomplete")
+            config=TomSelectConfig(
+                url="catchment-autocomplete",
+                filter_by=("scope", "name"),
+            )
         ),
         method="catchment_filter",
     )
     collector = ModelChoiceFilter(
-        queryset=Collector.objects.all(),
+        queryset=Collector.objects.none(),
         widget=TomSelectModelWidget(
-            config=TomSelectConfig(url="collector-autocomplete")
+            config=TomSelectConfig(
+                url="collector-autocomplete",
+                filter_by=("scope", "name"),
+            )
         ),
     )
     waste_category = ModelMultipleChoiceFilter(
@@ -535,7 +541,7 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
         label="Specific waste collected [kg/(cap.*a)]",
     )
     fee_system = ModelChoiceFilter(
-        queryset=FeeSystem.objects.all(),
+        queryset=FeeSystem.objects.none(),
     )
     valid_on = DateFilter(
         method="filter_valid_on",
@@ -619,6 +625,17 @@ class CollectionFilterSet(UserCreatedObjectScopedFilterSet):
             self.filters["spec_waste_collected"].set_min_max()
             self.filters["required_bin_capacity"].set_min_max()
             self.filters["min_bin_size"].set_min_max()
+
+        request = getattr(self, "request", None)
+        for field_name, model_cls in (
+            ("catchment", CollectionCatchment),
+            ("collector", Collector),
+            ("fee_system", FeeSystem),
+        ):
+            qs = model_cls.objects.all()
+            if request and hasattr(request, "user"):
+                qs = filter_queryset_for_user(qs, request.user)
+            self.filters[field_name].queryset = qs
 
         # Only show publication_status filter when scope is private ("My collections")
         try:
@@ -708,13 +725,24 @@ class WasteFlyerFilter(UserCreatedObjectScopedFilterSet):
         label="Url checked after",
     )
     catchment = ModelChoiceFilter(
-        queryset=CollectionCatchment.objects.all(),
+        queryset=CollectionCatchment.objects.none(),
         label="Catchment",
         widget=TomSelectModelWidget(
-            config=TomSelectConfig(url="catchment-autocomplete")
+            config=TomSelectConfig(
+                url="catchment-autocomplete",
+                filter_by=("scope", "name"),
+            )
         ),
         method="get_catchment",
     )
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        request = getattr(self, "request", None)
+        qs = CollectionCatchment.objects.all()
+        if request and hasattr(request, "user"):
+            qs = filter_queryset_for_user(qs, request.user)
+        self.filters["catchment"].queryset = qs
 
     class Meta:
         model = WasteFlyer
