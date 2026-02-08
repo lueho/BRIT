@@ -1,34 +1,172 @@
 from django.urls import path
 
-from .views import (
-    ProcessDashboard,
-    ProcessMaterialDetail,
-    ProcessOverview,
-    ProcessRun,
-    ProcessTypeDetail,
-    ProcessTypeList,
-    StrawAndWoodProcessInfoView,
-)
+from . import views
 
-app_name = "processes"
 urlpatterns = [
-    path("dashboard/", ProcessDashboard.as_view(), name="dashboard"),
-    path("types/", ProcessTypeList.as_view(), name="type_list"),
-    path("types/<int:pk>/", ProcessTypeDetail.as_view(), name="type_detail"),
+    # Dashboard
+    path("", views.ProcessesDashboardView.as_view(), name="processes-dashboard"),
+    # Process Group
     path(
-        "types/<int:pk>/overview/",
-        ProcessOverview.as_view(),
-        name="process_overview",
+        "groups/",
+        views.ProcessGroupPublishedListView.as_view(),
+        name="processgroup-list",
     ),
-    path("types/<int:pk>/run/", ProcessRun.as_view(), name="run"),
     path(
-        "materials/<int:pk>/",
-        ProcessMaterialDetail.as_view(),
-        name="mock_material_detail",
+        "groups/user/",
+        views.ProcessGroupPrivateListView.as_view(),
+        name="processgroup-list-owned",
+    ),
+    path(
+        "groups/create/",
+        views.ProcessGroupCreateView.as_view(),
+        name="processgroup-create",
+    ),
+    path(
+        "groups/create/modal/",
+        views.ProcessGroupModalCreateView.as_view(),
+        name="processgroup-create-modal",
+    ),
+    path(
+        "groups/<int:pk>/",
+        views.ProcessGroupDetailView.as_view(),
+        name="processgroup-detail",
+    ),
+    path(
+        "groups/<int:pk>/modal/",
+        views.ProcessGroupModalDetailView.as_view(),
+        name="processgroup-detail-modal",
+    ),
+    path(
+        "groups/<int:pk>/update/",
+        views.ProcessGroupUpdateView.as_view(),
+        name="processgroup-update",
+    ),
+    path(
+        "groups/<int:pk>/update/modal/",
+        views.ProcessGroupModalUpdateView.as_view(),
+        name="processgroup-update-modal",
+    ),
+    path(
+        "groups/<int:pk>/delete/modal/",
+        views.ProcessGroupModalDeleteView.as_view(),
+        name="processgroup-delete-modal",
+    ),
+    path(
+        "groups/autocomplete/",
+        views.ProcessGroupAutocompleteView.as_view(),
+        name="processgroup-autocomplete",
+    ),
+    # Mechanism Category
+    path(
+        "mechanisms/",
+        views.MechanismCategoryPublishedListView.as_view(),
+        name="mechanismcategory-list",
+    ),
+    path(
+        "mechanisms/user/",
+        views.MechanismCategoryPrivateListView.as_view(),
+        name="mechanismcategory-list-owned",
+    ),
+    path(
+        "mechanisms/create/",
+        views.MechanismCategoryCreateView.as_view(),
+        name="mechanismcategory-create",
+    ),
+    path(
+        "mechanisms/create/modal/",
+        views.MechanismCategoryModalCreateView.as_view(),
+        name="mechanismcategory-create-modal",
+    ),
+    path(
+        "mechanisms/<int:pk>/",
+        views.MechanismCategoryDetailView.as_view(),
+        name="mechanismcategory-detail",
+    ),
+    path(
+        "mechanisms/<int:pk>/modal/",
+        views.MechanismCategoryModalDetailView.as_view(),
+        name="mechanismcategory-detail-modal",
+    ),
+    path(
+        "mechanisms/<int:pk>/update/",
+        views.MechanismCategoryUpdateView.as_view(),
+        name="mechanismcategory-update",
+    ),
+    path(
+        "mechanisms/<int:pk>/update/modal/",
+        views.MechanismCategoryModalUpdateView.as_view(),
+        name="mechanismcategory-update-modal",
+    ),
+    path(
+        "mechanisms/<int:pk>/delete/modal/",
+        views.MechanismCategoryModalDeleteView.as_view(),
+        name="mechanismcategory-delete-modal",
+    ),
+    path(
+        "mechanisms/autocomplete/",
+        views.MechanismCategoryAutocompleteView.as_view(),
+        name="mechanismcategory-autocomplete",
+    ),
+    # Process Type
+    path(
+        "types/",
+        views.ProcessTypePublishedListView.as_view(),
+        name="processtype-list",
+    ),
+    path(
+        "types/user/",
+        views.ProcessTypePrivateListView.as_view(),
+        name="processtype-list-owned",
+    ),
+    path(
+        "types/create/",
+        views.ProcessTypeCreateView.as_view(),
+        name="processtype-create",
+    ),
+    path(
+        "types/create/modal/",
+        views.ProcessTypeModalCreateView.as_view(),
+        name="processtype-create-modal",
+    ),
+    path(
+        "types/<int:pk>/",
+        views.ProcessTypeDetailView.as_view(),
+        name="processtype-detail",
+    ),
+    path(
+        "types/<int:pk>/modal/",
+        views.ProcessTypeModalDetailView.as_view(),
+        name="processtype-detail-modal",
+    ),
+    path(
+        "types/<int:pk>/update/",
+        views.ProcessTypeUpdateView.as_view(),
+        name="processtype-update",
+    ),
+    path(
+        "types/<int:pk>/update/modal/",
+        views.ProcessTypeModalUpdateView.as_view(),
+        name="processtype-update-modal",
+    ),
+    path(
+        "types/<int:pk>/delete/modal/",
+        views.ProcessTypeModalDeleteView.as_view(),
+        name="processtype-delete-modal",
+    ),
+    path(
+        "types/autocomplete/",
+        views.ProcessTypeAutocompleteView.as_view(),
+        name="processtype-autocomplete",
+    ),
+    # Pulping overview & flowsheets
+    path(
+        "overview/pulping/",
+        views.PulpingOverviewRedirectView.as_view(),
+        name="pulping-overview",
     ),
     path(
         "infocards/pulping_straw/",
-        StrawAndWoodProcessInfoView.as_view(),
-        name="pulping_straw_info",
+        views.StrawAndWoodProcessInfoView.as_view(),
+        name="pulping-straw-infocard",
     ),
 ]
