@@ -1,77 +1,77 @@
 {% extends 'base.html' %}
+{% load static %}
 
 {% block title %}BRIT | Bibliography Explorer{% endblock %}
 
-{% block content %}
+{% block custom_style %}
+{% include "partials/_explorer_card_styles.html" %}
+{% endblock custom_style %}
 
-    <div class="row">
-        <div class="col col-12 col-md-6">
-            <div class="card shadow h-100">
-                <div class="card-header bg-body-tertiary border-bottom-0 py-3"><h5 class="mb-0">Bibliography</h5></div>
-                <div class="card-body">
-                    <p class="card-text">
-                        This is the bibliography explorer. All sources for the data in the database can be managed
-                        from here.
-                    </p>
+{% block content %}
+<div class="mb-4">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div>
+            <h2 class="mb-2">Bibliography Explorer</h2>
+            <p class="text-muted mb-0">Browse all bibliography data in the BRIT database. Select a category below to
+                view, filter, and manage records.</p>
+        </div>
+    </div>
+</div>
+
+<h6 class="text-muted text-uppercase explorer-section-heading fw-bold mb-3">
+    <i class="fas fa-book me-1"></i> References &amp; Attributions
+</h6>
+<div class="row g-3 mb-4">
+    <div class="col-12 col-sm-6 col-lg-4">
+        <div class="card shadow-sm h-100 explorer-card" onclick="window.location='{% url 'source-list' %}'">
+            <div class="card-body d-flex flex-column">
+                <div class="d-flex align-items-center mb-2">
+                    <span class="explorer-icon bg-primary bg-opacity-10 text-primary"><i
+                            class="fas fa-book-open"></i></span>
+                    <h6 class="mb-0 ms-2">Sources</h6>
                 </div>
-                <div class="card-footer">
+                <p class="card-text text-muted small flex-grow-1">Publications, reports, and other citable references
+                    that provide the scientific basis for data in the database.</p>
+                <div class="d-flex align-items-center justify-content-between mt-auto pt-2">
+                    <span class="badge bg-light text-dark border">{{ source_count }} published</span>
+                    <a href="{% url 'source-list' %}" class="btn btn-sm btn-outline-primary card-link">Browse</a>
                 </div>
             </div>
         </div>
     </div>
-
-    <div class="row">
-
-        <div class="col col-12 col-md-6 col-lg-3 mt-4">
-            <div class="card shadow h-100">
-                <div class="card-header">
-                    <a href="{% url 'author-list' %}" class="stretched-link"><strong>Authors</strong></a>
+    <div class="col-12 col-sm-6 col-lg-4">
+        <div class="card shadow-sm h-100 explorer-card" onclick="window.location='{% url 'author-list' %}'">
+            <div class="card-body d-flex flex-column">
+                <div class="d-flex align-items-center mb-2">
+                    <span class="explorer-icon bg-primary bg-opacity-10 text-primary"><i
+                            class="fas fa-user-pen"></i></span>
+                    <h6 class="mb-0 ms-2">Authors</h6>
                 </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        Manage the catalogue of authors here.
-                    </p>
-                </div>
-                <div class="card-footer">
-                    <a href="{% url 'author-list' %}" class="btn btn-primary">View Authors</a>
+                <p class="card-text text-muted small flex-grow-1">Researchers and contributors whose work is cited in
+                    the database, linked to their publications.</p>
+                <div class="d-flex align-items-center justify-content-between mt-auto pt-2">
+                    <span class="badge bg-light text-dark border">{{ author_count }} published</span>
+                    <a href="{% url 'author-list' %}" class="btn btn-sm btn-outline-primary card-link">Browse</a>
                 </div>
             </div>
         </div>
-
-        <div class="col col-12 col-md-6 col-lg-3 mt-4">
-            <div class="card shadow h-100">
-                <div class="card-header">
-                    <a href="{% url 'licence-list' %}" class="stretched-link"><strong>Licences</strong></a>
+    </div>
+    <div class="col-12 col-sm-6 col-lg-4">
+        <div class="card shadow-sm h-100 explorer-card" onclick="window.location='{% url 'licence-list' %}'">
+            <div class="card-body d-flex flex-column">
+                <div class="d-flex align-items-center mb-2">
+                    <span class="explorer-icon bg-primary bg-opacity-10 text-primary"><i
+                            class="fas fa-scale-balanced"></i></span>
+                    <h6 class="mb-0 ms-2">Licences</h6>
                 </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        All data that is cited in this tool needs to have a proper open source licence in order to avoid
-                        breach of intellectual property rights. This is a catalogue of licences one of which every cited
-                        source needs to be associated.
-                    </p>
-                </div>
-                <div class="card-footer">
-                    <a href="{% url 'licence-list' %}" class="btn btn-primary">View Licences</a>
-                </div>
-            </div>
-        </div>
-
-        <div class="col col-12 col-md-6 col-lg-3 mt-4">
-            <div class="card shadow h-100">
-                <div class="card-header">
-                    <a href="{% url 'source-list' %}" class="stretched-link"><strong>Sources</strong></a>
-                </div>
-                <div class="card-body">
-                    <p class="card-text">
-                        Source is the general term for any item that might appear in a bibliography. Preferable peer
-                        reviewed publications should be used whenever possible. However, in some cases project or
-                        company report as well as trustworthy raw data publications are invaluable sources.
-                    </p>
-                </div>
-                <div class="card-footer">
-                    <a href="{% url 'source-list' %}" class="btn btn-primary">View Sources</a>
+                <p class="card-text text-muted small flex-grow-1">Open-source licences ensuring proper attribution and
+                    legal use of cited data and publications.</p>
+                <div class="d-flex align-items-center justify-content-between mt-auto pt-2">
+                    <span class="badge bg-light text-dark border">{{ licence_count }} published</span>
+                    <a href="{% url 'licence-list' %}" class="btn btn-sm btn-outline-primary card-link">Browse</a>
                 </div>
             </div>
         </div>
-
+    </div>
+</div>
 {% endblock content %}
