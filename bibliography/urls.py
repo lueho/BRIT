@@ -13,6 +13,7 @@ from .views import (
     AuthorPublishedListView,
     AuthorUpdateView,
     BibliographyDashboardView,
+    LicenceAutocompleteView,
     LicenceCreateView,
     LicenceDetailView,
     LicenceModalCreateView,
@@ -108,6 +109,11 @@ urlpatterns = [
         "licences/<int:pk>/delete/modal/",
         LicenceModalDeleteView.as_view(),
         name="licence-delete-modal",
+    ),
+    path(
+        "licences/autocomplete/",
+        LicenceAutocompleteView.as_view(),
+        name="licence-autocomplete",
     ),
     path("sources/", SourcePublishedFilterView.as_view(), name="source-list"),
     path(

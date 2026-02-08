@@ -1,63 +1,56 @@
-{% extends 'filtered_list.html' %}
-{% load static %}
+{% extends "filtered_list.html" %}
 {% load crispy_forms_tags %}
 {% load user_created_object_tags %}
 {% load moderation_tags %}
 
-{% block title %}BRIT | Bibliography | Sources{% endblock %}
+{% block title %}BRIT | Bibliography | Sources{% endblock title %}
 
-{% block list_card_header %}<strong><i class="fas fa-fw fa-chart-bar"></i> Bibliography</strong>{% endblock %}
+{% block list_card_header %}<strong>Sources</strong>{% endblock list_card_header %}
 
 {% block list_table %}
-    <table class="table table-responsive-stack">
-        <thead>
-        <tr>
-            <th>Abbreviation</th>
-            <th>Authors/Publisher</th>
-            <th>Title</th>
-            <th>Type</th>
-            {% if object_list.model|is_user_created %}
-                <th class="actions-column">Status/Actions</th>
-            {% endif %}
-        </tr>
-        </thead>
-        {% for object in object_list %}
-            <tr>
-                <td data-label="Abbreviation"><a href="{% detail_or_review_url object %}">{{ object.abbreviation }}</a></td>
-                <td data-label="Authors/Publisher">
-                    {% if object.ordered_authors.exists %}
-                        {% if object.authors.count > 2 %}
-                            {% for author in object.authors_ordered %}
-                                <a href="{{ author.get_absolute_url }}">{{ author.abbreviated_full_name }}</a>
-                                {% if not forloop.last %};{% endif %}
-                            {% endfor %}
-                        {% else %}
-                            {% for author in object.authors_ordered %}
-                                <a href="{{ author.get_absolute_url }}">{{ author }}</a>{% if not forloop.last %};
-                            {% endif %}
-                            {% endfor %}
-                        {% endif %}
-                    {% elif object.publisher %}
-                        {{ object.publisher }}
+<div class="collection-list-min-height">
+    <div class="table-responsive">
+        <table class="table modern-table">
+            <thead>
+                <tr>
+                    <th>Source</th>
+                    {% if object_list.model|is_user_created %}
+                    <th class="actions-column">Status/Actions</th>
                     {% endif %}
-                </td>
-                <td data-label="Title"><a href="{% detail_or_review_url object %}">{{ object.title }}</a></td>
-                <td data-label="Type">{{ object.type }}</td>
-                {% if object_list.model|is_user_created %}
-                    <td class="actions-column mobile-no-label">
-                        {% include 'object_management/status_actions_cell.html' %}
+                </tr>
+            </thead>
+            <tbody>
+                {% for object in object_list %}
+                <tr>
+                    <td data-label="Source" class="ps-3">
+                        <a href="{% detail_or_review_url object %}" class="text-decoration-none">
+                            <strong class="d-block">{{ object.abbreviation }}</strong>
+                            <span class="text-muted small">
+                                {% if object.ordered_authors.exists %}
+                                {% for author in object.authors_ordered %}
+                                {{ author.abbreviated_full_name }}{% if not forloop.last %};{% endif %}
+                                {% endfor %}.
+                                {% elif object.publisher %}
+                                {{ object.publisher }}.
+                                {% endif %}
+                                {{ object.title|truncatewords:20 }}
+                                {% if object.year %}({{ object.year }}){% endif %}
+                                &middot; {{ object.get_type_display }}
+                            </span>
+                        </a>
                     </td>
-                {% endif %}
-            </tr>
-        {% endfor %}
-    </table>
+                    {% if object_list.model|is_user_created %}
+                    <td class="actions-column mobile-no-label">
+                        {% include "object_management/status_actions_cell.html" %}
+                    </td>
+                    {% endif %}
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
 {% endblock list_table %}
 
-{% block filter_body %}
-    <form method="get">
-        {% crispy filter.form %}
-        <button id="btn-filter" class="btn btn-primary" type="submit">Filter</button>
-    </form>
-{% endblock filter_body %}
-
-{% block filter_footer %}{% endblock filter_footer %}
+{% block learning_tab_button %}{% endblock learning_tab_button %}
+{% block learning_tab_pane %}{% endblock learning_tab_pane %}
