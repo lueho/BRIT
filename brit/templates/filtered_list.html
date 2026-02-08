@@ -167,19 +167,27 @@
               </div>
             {% endblock list_table %}
             {% block list_pagination %}
-              <div class="pagination">
-                <span class="step-links">
-                  {% if page_obj.has_previous %}
-                    <a href="?{% param_replace page=1 %}">« first</a>
-                    <a href="?{% param_replace page=page_obj.previous_page_number %}">previous</a>
-                  {% endif %}
-                  <span class="current">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}.</span>
-                  {% if page_obj.has_next %}
-                    <a href="?{% param_replace page=page_obj.next_page_number %}">next</a>
-                    <a href="?{% param_replace page=page_obj.paginator.num_pages %}">last »</a>
-                  {% endif %}
-                </span>
-              </div>
+              {% if page_obj.has_other_pages %}
+                <nav aria-label="Pagination" class="mt-3">
+                  <ul class="pagination pagination-sm justify-content-center mb-0">
+                    <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+                      <a class="page-link" {% if page_obj.has_previous %}href="?{% param_replace page=1 %}"{% endif %} aria-label="First page">&laquo;</a>
+                    </li>
+                    <li class="page-item {% if not page_obj.has_previous %}disabled{% endif %}">
+                      <a class="page-link" {% if page_obj.has_previous %}href="?{% param_replace page=page_obj.previous_page_number %}"{% endif %} aria-label="Previous page">&lsaquo;</a>
+                    </li>
+                    <li class="page-item disabled">
+                      <span class="page-link">{{ page_obj.number }} / {{ page_obj.paginator.num_pages }}</span>
+                    </li>
+                    <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+                      <a class="page-link" {% if page_obj.has_next %}href="?{% param_replace page=page_obj.next_page_number %}"{% endif %} aria-label="Next page">&rsaquo;</a>
+                    </li>
+                    <li class="page-item {% if not page_obj.has_next %}disabled{% endif %}">
+                      <a class="page-link" {% if page_obj.has_next %}href="?{% param_replace page=page_obj.paginator.num_pages %}"{% endif %} aria-label="Last page">&raquo;</a>
+                    </li>
+                  </ul>
+                </nav>
+              {% endif %}
             {% endblock list_pagination %}
           {% endblock list_card_body %}
         </div>
