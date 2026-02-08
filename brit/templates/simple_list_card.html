@@ -100,12 +100,11 @@
         <div class="card-body overflow-auto">
           {% block list_card_body %}
             {% block list_table %}
-              <table class="table">
+              <table class="table modern-table">
                 {% block list_table_head %}
                   <thead>
                     <tr>
                       <th>Name</th>
-                      <th>Description</th>
                       {% if object_list.model|is_user_created %}<th class="actions-column">Status/Actions</th>{% endif %}
                     </tr>
                   </thead>
@@ -114,11 +113,14 @@
                   {% for object in object_list %}
                     {% block list_table_row %}
                       <tr>
-                        <td>
+                        <td class="ps-3">
                           <a href="{% detail_or_review_url object %}"
-                             aria-label="View details of {{ object.name }}">{{ object.name }}</a>
+                             class="text-decoration-none"
+                             aria-label="View details of {{ object.name }}">
+                            <strong class="d-block">{{ object.name }}</strong>
+                            {% if object.description %}<span class="text-muted small">{{ object.description|truncatewords:15 }}</span>{% endif %}
+                          </a>
                         </td>
-                        <td>{{ object.description }}</td>
                         {% if object_list.model|is_user_created %}
                           <td class="actions-column mobile-no-label">{% include 'object_management/status_actions_cell.html' %}</td>
                         {% endif %}
@@ -126,7 +128,7 @@
                     {% endblock list_table_row %}
                   {% empty %}
                     <tr>
-                      <td colspan="3">No objects available.</td>
+                      <td colspan="2" class="text-center text-muted py-4">No objects available.</td>
                     </tr>
                   {% endfor %}
                 </tbody>
