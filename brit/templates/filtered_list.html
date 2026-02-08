@@ -135,8 +135,9 @@
                   <tbody>
                     {% for object in object_list %}
                       {% block list_table_row %}
-                        <tr tabindex="0"
-                            onclick="window.location='{% detail_or_review_url object %}'">
+                        <tr tabindex="0" role="link"
+                            onclick="window.location='{% detail_or_review_url object %}'"
+                            onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();window.location='{% detail_or_review_url object %}'}">
                           <td data-label="Name" class="ps-3">
                             <a href="{% detail_or_review_url object %}" class="text-decoration-none">
                               <strong class="d-block">{{ object.name }}</strong>
