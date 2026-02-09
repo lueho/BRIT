@@ -121,7 +121,7 @@ from .models import (
 from .tasks import check_wasteflyer_urls
 
 
-class CollectionDashboardView(TemplateView):
+class CollectionExplorerView(TemplateView):
     template_name = "wastecollection_dashboard.html"
 
     def get_context_data(self, **kwargs):
@@ -167,13 +167,13 @@ class CollectionDiagramView(TemplateView):
 class CollectorPublishedListView(PublishedObjectFilterView):
     model = Collector
     filterset_class = CollectorFilter
-    dashboard_url = reverse_lazy("wastecollection-dashboard")
+    dashboard_url = reverse_lazy("wastecollection-explorer")
 
 
 class CollectorPrivateListView(PrivateObjectFilterView):
     model = Collector
     filterset_class = CollectorFilter
-    dashboard_url = reverse_lazy("wastecollection-dashboard")
+    dashboard_url = reverse_lazy("wastecollection-explorer")
 
 
 class CollectorCreateView(UserCreatedObjectCreateView):
@@ -223,13 +223,13 @@ class CollectorAutocompleteView(UserCreatedObjectAutocompleteView):
 class CollectionSystemPublishedListView(PublishedObjectFilterView):
     model = CollectionSystem
     filterset_class = CollectionSystemListFilter
-    dashboard_url = reverse_lazy("wastecollection-dashboard")
+    dashboard_url = reverse_lazy("wastecollection-explorer")
 
 
 class CollectionSystemPrivateListView(PrivateObjectFilterView):
     model = CollectionSystem
     filterset_class = CollectionSystemListFilter
-    dashboard_url = reverse_lazy("wastecollection-dashboard")
+    dashboard_url = reverse_lazy("wastecollection-explorer")
 
 
 class CollectionSystemAutocompleteView(UserCreatedObjectAutocompleteView):
@@ -275,13 +275,13 @@ class CollectionSystemModalDeleteView(UserCreatedObjectModalDeleteView):
 class WasteCategoryPublishedListView(PublishedObjectFilterView):
     model = WasteCategory
     filterset_class = WasteCategoryListFilter
-    dashboard_url = reverse_lazy("wastecollection-dashboard")
+    dashboard_url = reverse_lazy("wastecollection-explorer")
 
 
 class WasteCategoryPrivateListView(PrivateObjectFilterView):
     model = WasteCategory
     filterset_class = WasteCategoryListFilter
-    dashboard_url = reverse_lazy("wastecollection-dashboard")
+    dashboard_url = reverse_lazy("wastecollection-explorer")
 
 
 class WasteCategoryAutocompleteView(UserCreatedObjectAutocompleteView):
@@ -327,13 +327,13 @@ class WasteCategoryModalDeleteView(UserCreatedObjectModalDeleteView):
 class WasteComponentPublishedListView(PublishedObjectFilterView):
     model = WasteComponent
     filterset_class = WasteComponentListFilter
-    dashboard_url = reverse_lazy("wastecollection-dashboard")
+    dashboard_url = reverse_lazy("wastecollection-explorer")
 
 
 class WasteComponentPrivateListView(PrivateObjectFilterView):
     model = WasteComponent
     filterset_class = WasteComponentListFilter
-    dashboard_url = reverse_lazy("wastecollection-dashboard")
+    dashboard_url = reverse_lazy("wastecollection-explorer")
 
 
 class WasteComponentAutocompleteView(UserCreatedObjectAutocompleteView):
@@ -379,13 +379,13 @@ class WasteComponentModalDeleteView(UserCreatedObjectModalDeleteView):
 class FeeSystemPublishedListView(PublishedObjectFilterView):
     model = FeeSystem
     filterset_class = FeeSystemListFilter
-    dashboard_url = reverse_lazy("wastecollection-dashboard")
+    dashboard_url = reverse_lazy("wastecollection-explorer")
 
 
 class FeeSystemPrivateListView(PrivateObjectFilterView):
     model = FeeSystem
     filterset_class = FeeSystemListFilter
-    dashboard_url = reverse_lazy("wastecollection-dashboard")
+    dashboard_url = reverse_lazy("wastecollection-explorer")
 
 
 class FeeSystemAutocompleteView(UserCreatedObjectAutocompleteView):
@@ -417,14 +417,14 @@ class FeeSystemModalDeleteView(UserCreatedObjectModalDeleteView):
 class WasteFlyerPublishedFilterView(PublishedObjectFilterView):
     model = WasteFlyer
     filterset_class = WasteFlyerFilter
-    dashboard_url = reverse_lazy("wastecollection-dashboard")
+    dashboard_url = reverse_lazy("wastecollection-explorer")
     ordering = "id"
 
 
 class WasteFlyerPrivateFilterView(PrivateObjectFilterView):
     model = WasteFlyer
     filterset_class = WasteFlyerFilter
-    dashboard_url = reverse_lazy("wastecollection-dashboard")
+    dashboard_url = reverse_lazy("wastecollection-explorer")
     ordering = "id"
 
 
@@ -519,13 +519,13 @@ class WasteFlyerListCheckUrlsProgressView(LoginRequiredMixin, View):
 class FrequencyPublishedListView(PublishedObjectFilterView):
     model = CollectionFrequency
     filterset_class = CollectionFrequencyListFilter
-    dashboard_url = reverse_lazy("wastecollection-dashboard")
+    dashboard_url = reverse_lazy("wastecollection-explorer")
 
 
 class FrequencyPrivateListView(PrivateObjectFilterView):
     model = CollectionFrequency
     filterset_class = CollectionFrequencyListFilter
-    dashboard_url = reverse_lazy("wastecollection-dashboard")
+    dashboard_url = reverse_lazy("wastecollection-explorer")
 
 
 class FrequencyCreateView(M2MInlineFormSetMixin, UserCreatedObjectCreateView):
@@ -838,13 +838,13 @@ class AggregatedCollectionPropertyValueModalDeleteView(
 class CollectionCatchmentPublishedFilterView(PublishedObjectFilterView):
     model = CollectionCatchment
     filterset_class = CatchmentFilterSet
-    dashboard_url = reverse_lazy("wastecollection-dashboard")
+    dashboard_url = reverse_lazy("wastecollection-explorer")
 
 
 class CollectionCatchmentPrivateFilterView(PrivateObjectFilterView):
     model = CollectionCatchment
     filterset_class = CatchmentFilterSet
-    dashboard_url = reverse_lazy("wastecollection-dashboard")
+    dashboard_url = reverse_lazy("wastecollection-explorer")
 
 
 class CollectionCatchmentCreateView(CatchmentCreateView):
@@ -938,20 +938,20 @@ class CollectionListMixin:
 class CollectionPublishedListView(CollectionListMixin, PublishedObjectFilterView):
     model = Collection
     filterset_class = CollectionFilterSet
-    dashboard_url = reverse_lazy("wastecollection-dashboard")
+    dashboard_url = reverse_lazy("wastecollection-explorer")
 
 
 class CollectionPrivateListView(CollectionListMixin, PrivateObjectFilterView):
     model = Collection
     filterset_class = CollectionFilterSet
-    dashboard_url = reverse_lazy("wastecollection-dashboard")
+    dashboard_url = reverse_lazy("wastecollection-explorer")
 
 
 class CollectionReviewListView(CollectionListMixin, ReviewObjectFilterView):
     model = Collection
     filterset_class = CollectionFilterSet
     template_name = "collection_review_filter.html"
-    dashboard_url = reverse_lazy("wastecollection-dashboard")
+    dashboard_url = reverse_lazy("wastecollection-explorer")
 
 
 class CollectionCreateView(M2MInlineFormSetMixin, UserCreatedObjectCreateView):
@@ -1466,7 +1466,7 @@ class CollectionModalDeleteView(UserCreatedObjectModalDeleteView):
 class CollectionReviewFilterView(ReviewObjectFilterView):
     model = Collection
     filterset_class = CollectionFilterSet
-    dashboard_url = reverse_lazy("wastecollection-dashboard")
+    dashboard_url = reverse_lazy("wastecollection-explorer")
 
     def get_filterset_kwargs(self, filterset_class=None):
         kwargs = super().get_filterset_kwargs(filterset_class)
@@ -1758,7 +1758,7 @@ class WasteCollectionPublishedMapView(
     filterset_class = CollectionFilterSet
     features_layer_api_basename = "api-waste-collection"
     map_title = "Household Waste Collections"
-    dashboard_url = reverse_lazy("wastecollection-dashboard")
+    dashboard_url = reverse_lazy("wastecollection-explorer")
     dv_scope = "published"
 
     def get_filterset_kwargs(self, filterset_class=None):
@@ -1777,7 +1777,7 @@ class WasteCollectionPrivateMapView(
     filterset_class = CollectionFilterSet
     features_layer_api_basename = "api-waste-collection"
     map_title = "My Household Waste Collections"
-    dashboard_url = reverse_lazy("wastecollection-dashboard")
+    dashboard_url = reverse_lazy("wastecollection-explorer")
     dv_scope = "private"
 
     def get_filterset_kwargs(self, filterset_class=None):
@@ -1797,7 +1797,7 @@ class WasteCollectionReviewMapView(
     filterset_class = CollectionFilterSet
     features_layer_api_basename = "api-waste-collection"
     map_title = "Collections in Review"
-    dashboard_url = reverse_lazy("wastecollection-dashboard")
+    dashboard_url = reverse_lazy("wastecollection-explorer")
     dv_scope = "review"
 
     def get_filterset_kwargs(self, filterset_class=None):

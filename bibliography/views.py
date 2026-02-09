@@ -40,8 +40,22 @@ from .serializers import HyperlinkedSourceSerializer
 from .tasks import check_source_url, check_source_urls
 
 
-class BibliographyDashboardView(TemplateView):
+class BibliographyExplorerView(TemplateView):
     template_name = "bibliography_dashboard.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["source_count"] = Source.objects.filter(
+            type__in=[t[0] for t in SOURCE_TYPES],
+            publication_status="published",
+        ).count()
+        context["author_count"] = Author.objects.filter(
+            publication_status="published"
+        ).count()
+        context["licence_count"] = Licence.objects.filter(
+            publication_status="published"
+        ).count()
+        return context
 
 
 # ----------- Author CRUD ----------------------------------------------------------------------------------------------
@@ -51,14 +65,14 @@ class BibliographyDashboardView(TemplateView):
 class AuthorPublishedListView(PublishedObjectFilterView):
     model = Author
     filterset_class = AuthorFilterSet
-    dashboard_url = reverse_lazy("bibliography-dashboard")
+    dashboard_url = reverse_lazy("bibliography-explorer")
     ordering = "last_names"
 
 
 class AuthorPrivateListView(PrivateObjectFilterView):
     model = Author
     filterset_class = AuthorFilterSet
-    dashboard_url = reverse_lazy("bibliography-dashboard")
+    dashboard_url = reverse_lazy("bibliography-explorer")
     ordering = "last_names"
 
 
@@ -123,13 +137,13 @@ class AuthorAutocompleteView(UserCreatedObjectAutocompleteView):
 class LicencePublishedListView(PublishedObjectFilterView):
     model = Licence
     filterset_class = LicenceListFilter
-    dashboard_url = reverse_lazy("bibliography-dashboard")
+    dashboard_url = reverse_lazy("bibliography-explorer")
 
 
 class LicencePrivateListView(PrivateObjectFilterView):
     model = Licence
     filterset_class = LicenceListFilter
-    dashboard_url = reverse_lazy("bibliography-dashboard")
+    dashboard_url = reverse_lazy("bibliography-explorer")
 
 
 class LicenceCreateView(UserCreatedObjectCreateView):
@@ -179,7 +193,7 @@ class SourcePublishedFilterView(PublishedObjectFilterView):
         "abbreviation"
     )
     filterset_class = SourceFilter
-    dashboard_url = reverse_lazy("bibliography-dashboard")
+    dashboard_url = reverse_lazy("bibliography-explorer")
 
 
 class SourcePrivateFilterView(PrivateObjectFilterView):
@@ -188,7 +202,7 @@ class SourcePrivateFilterView(PrivateObjectFilterView):
         "abbreviation"
     )
     filterset_class = SourceFilter
-    dashboard_url = reverse_lazy("bibliography-dashboard")
+    dashboard_url = reverse_lazy("bibliography-explorer")
 
 
 class SourceCreateView(UserCreatedObjectCreateWithInlinesView):

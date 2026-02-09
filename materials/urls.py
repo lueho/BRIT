@@ -10,9 +10,7 @@ urlpatterns = [
         RedirectView.as_view(url="/materials/samples/featured/"),
         name="materials-home",
     ),
-    path(
-        "explorer/", views.MaterialsDashboardView.as_view(), name="materials-dashboard"
-    ),
+    path("explorer/", views.MaterialsExplorerView.as_view(), name="materials-explorer"),
     path("diagram/", views.MaterialsDiagramView.as_view(), name="materials-diagram"),
     path("materials/", views.MaterialPublishedListView.as_view(), name="material-list"),
     path(

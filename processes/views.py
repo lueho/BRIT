@@ -33,7 +33,7 @@ from .models import MechanismCategory, ProcessGroup, ProcessType
 # ----------------------------------------------------------------------------------------------------------------------
 
 
-class ProcessesDashboardView(TemplateView):
+class ProcessesExplorerView(TemplateView):
     template_name = "processes/processes_dashboard.html"
 
     def get_context_data(self, **kwargs):
@@ -60,13 +60,13 @@ class ProcessesDashboardView(TemplateView):
 class ProcessGroupPublishedListView(PublishedObjectFilterView):
     model = ProcessGroup
     filterset_class = ProcessGroupListFilter
-    dashboard_url = reverse_lazy("processes-dashboard")
+    dashboard_url = reverse_lazy("processes-explorer")
 
 
 class ProcessGroupPrivateListView(PrivateObjectFilterView):
     model = ProcessGroup
     filterset_class = ProcessGroupListFilter
-    dashboard_url = reverse_lazy("processes-dashboard")
+    dashboard_url = reverse_lazy("processes-explorer")
 
 
 class ProcessGroupCreateView(UserCreatedObjectCreateView):
@@ -170,13 +170,13 @@ class ProcessGroupAutocompleteView(UserCreatedObjectAutocompleteView):
 class MechanismCategoryPublishedListView(PublishedObjectFilterView):
     model = MechanismCategory
     filterset_class = MechanismCategoryListFilter
-    dashboard_url = reverse_lazy("processes-dashboard")
+    dashboard_url = reverse_lazy("processes-explorer")
 
 
 class MechanismCategoryPrivateListView(PrivateObjectFilterView):
     model = MechanismCategory
     filterset_class = MechanismCategoryListFilter
-    dashboard_url = reverse_lazy("processes-dashboard")
+    dashboard_url = reverse_lazy("processes-explorer")
 
 
 class MechanismCategoryCreateView(UserCreatedObjectCreateView):
@@ -222,13 +222,13 @@ class MechanismCategoryAutocompleteView(UserCreatedObjectAutocompleteView):
 class ProcessTypePublishedListView(PublishedObjectFilterView):
     model = ProcessType
     filterset_class = ProcessTypeListFilter
-    dashboard_url = reverse_lazy("processes-dashboard")
+    dashboard_url = reverse_lazy("processes-explorer")
 
 
 class ProcessTypePrivateListView(PrivateObjectFilterView):
     model = ProcessType
     filterset_class = ProcessTypeListFilter
-    dashboard_url = reverse_lazy("processes-dashboard")
+    dashboard_url = reverse_lazy("processes-explorer")
 
 
 class ProcessTypeCreateView(UserCreatedObjectCreateView):
@@ -280,7 +280,7 @@ class PulpingOverviewRedirectView(TemplateView):
         pulping = ProcessGroup.objects.filter(name="Pulping").first()
         if pulping:
             return redirect(pulping.get_absolute_url())
-        return redirect("processes-dashboard")
+        return redirect("processes-explorer")
 
 
 class StrawAndWoodProcessInfoView(TemplateView):

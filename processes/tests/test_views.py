@@ -13,21 +13,21 @@ class ProcessesDashboardViewTestCase(ViewWithPermissionsTestCase):
     member_permissions = "add_processtype"
 
     def test_get_http_200_ok_for_anonymous(self):
-        response = self.client.get(reverse("processes-dashboard"))
+        response = self.client.get(reverse("processes-explorer"))
         self.assertEqual(200, response.status_code)
 
     def test_get_http_200_ok_for_outsiders(self):
         self.client.force_login(self.outsider)
-        response = self.client.get(reverse("processes-dashboard"))
+        response = self.client.get(reverse("processes-explorer"))
         self.assertEqual(200, response.status_code)
 
     def test_get_http_200_ok_for_members(self):
         self.client.force_login(self.member)
-        response = self.client.get(reverse("processes-dashboard"))
+        response = self.client.get(reverse("processes-explorer"))
         self.assertEqual(200, response.status_code)
 
     def test_context_contains_counts(self):
-        response = self.client.get(reverse("processes-dashboard"))
+        response = self.client.get(reverse("processes-explorer"))
         self.assertIn("processtype_count", response.context)
         self.assertIn("processgroup_count", response.context)
         self.assertIn("mechanismcategory_count", response.context)
@@ -44,7 +44,7 @@ class ProcessGroupCRUDViewTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTe
         "description": "Updated description",
     }
 
-    view_dashboard_name = "processes-dashboard"
+    view_dashboard_name = "processes-explorer"
     view_create_name = "processgroup-create"
     view_modal_create_name = "processgroup-create-modal"
     view_published_list_name = "processgroup-list"
@@ -89,7 +89,7 @@ class MechanismCategoryCRUDViewTestCase(
         "description": "Updated description",
     }
 
-    view_dashboard_name = "processes-dashboard"
+    view_dashboard_name = "processes-explorer"
     view_create_name = "mechanismcategory-create"
     view_modal_create_name = "mechanismcategory-create-modal"
     view_published_list_name = "mechanismcategory-list"
@@ -136,7 +136,7 @@ class ProcessTypeCRUDViewTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
         "mechanism": "Updated Mechanism",
     }
 
-    view_dashboard_name = "processes-dashboard"
+    view_dashboard_name = "processes-explorer"
     view_create_name = "processtype-create"
     view_modal_create_name = "processtype-create-modal"
     view_published_list_name = "processtype-list"
