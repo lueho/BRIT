@@ -1,13 +1,13 @@
 from django.urls import path
 from django.views.generic import RedirectView
 
-from .views import SourcesListView
+from .views import SourcesExplorerView
 
 urlpatterns = [
+    path("explorer/", SourcesExplorerView.as_view(), name="sources-explorer"),
     path(
-        "explorer/",
-        RedirectView.as_view(pattern_name="sources-list", permanent=False),
-        name="sources-explorer",
+        "list/",
+        RedirectView.as_view(pattern_name="sources-explorer", permanent=True),
+        name="sources-list",
     ),
-    path("list/", SourcesListView.as_view(), name="sources-list"),
 ]

@@ -3,14 +3,14 @@ from django.urls import reverse
 from utils.tests.testcases import ViewWithPermissionsTestCase
 
 
-class SourcesListViewTestCase(ViewWithPermissionsTestCase):
-    url_name = "sources-list"
+class SourcesExplorerViewTestCase(ViewWithPermissionsTestCase):
+    url_name = "sources-explorer"
 
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
 
-    def test_get_http_200_redirect_for_anonymous(self):
+    def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse(self.url_name))
         self.assertEqual(response.status_code, 200)
 
@@ -19,8 +19,19 @@ class SourcesListViewTestCase(ViewWithPermissionsTestCase):
         response = self.client.get(reverse(self.url_name))
         self.assertEqual(response.status_code, 200)
 
-    def test_explorer_url_redirects_to_sources_list(self):
-        response = self.client.get(reverse("sources-explorer"))
-        self.assertRedirects(
-            response, reverse("sources-list"), fetch_redirect_response=False
-        )
+
+class SourcesListViewTestCase(ViewWithPermissionsTestCase):
+    url_name = "sources-list"
+
+    @classmethod
+    def setUpTestData(cls):
+        super().setUpTestData()
+
+    def test_get_http_301_redirect_for_anonymous(self):
+        response = self.client.get(reverse(self.url_name))
+        self.assertEqual(response.status_code, 301)
+
+    def test_get_http_301_redirect_for_outsiders(self):
+        self.client.force_login(self.outsider)
+        response = self.client.get(reverse(self.url_name))
+        self.assertEqual(response.status_code, 301)
