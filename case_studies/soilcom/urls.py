@@ -6,8 +6,8 @@ from .router import router
 urlpatterns = [
     path(
         "explorer/",
-        views.CollectionDashboardView.as_view(),
-        name="wastecollection-dashboard",
+        views.CollectionExplorerView.as_view(),
+        name="wastecollection-explorer",
     ),
     path(
         "diagram/",

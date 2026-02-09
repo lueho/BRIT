@@ -12,7 +12,7 @@ from .views import (
     AuthorPrivateListView,
     AuthorPublishedListView,
     AuthorUpdateView,
-    BibliographyDashboardView,
+    BibliographyExplorerView,
     LicenceAutocompleteView,
     LicenceCreateView,
     LicenceDetailView,
@@ -40,8 +40,8 @@ from .views import (
 urlpatterns = [
     path(
         "explorer/",
-        BibliographyDashboardView.as_view(),
-        name="bibliography-dashboard",
+        BibliographyExplorerView.as_view(),
+        name="bibliography-explorer",
     ),
     path("authors/", AuthorPublishedListView.as_view(), name="author-list"),
     path("authors/user/", AuthorPrivateListView.as_view(), name="author-list-owned"),

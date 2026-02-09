@@ -3,8 +3,8 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
-    # Dashboard
-    path("", views.ProcessesDashboardView.as_view(), name="processes-dashboard"),
+    # Explorer
+    path("explorer/", views.ProcessesExplorerView.as_view(), name="processes-explorer"),
     # Process Group
     path(
         "groups/",
