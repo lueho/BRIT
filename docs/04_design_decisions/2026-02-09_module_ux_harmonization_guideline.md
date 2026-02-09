@@ -615,69 +615,88 @@ The Sources page currently serves three functions:
 - Any data — it's a pure `TemplateView` with no model, no queryset, no filters
 - Entity enumeration — unlike explorers, it doesn't list entity types within a single app
 
-### 9.4 Hub Page Design Concept
+### 9.4 Sources Domain Ontology
 
-#### 9.4.1 Decision: Hub Pages Are Not a Necessary Navigation Layer
+The Sources module encompasses a family of **source types** — categories of real-world systems that generate bioresources. Each source type has two orthogonal facets:
 
-With the harmonized list views (intro banner + learning tab + sidebar entries), the intermediate hub layer adds friction without adding value. The user can reach every sub-module directly from:
-- The **sidebar** (one click from anywhere)
-- The **Home page** (cover image cards for all modules)
-- The **explorer** of a parent module (if applicable)
+#### 9.4.1 Terminology
 
-Hub pages were necessary when sub-modules lacked their own contextual information. Now that every primary list view is self-describing, the hub is redundant for navigation.
+| Term | Definition |
+|---|---|
+| **Source type** | A category of bioresource-generating system (e.g., roadside trees, greenhouses, household waste collection) |
+| **Generation model** | A parametric description of *how* a source type produces bioresources — growth models, maintenance schedules, collection parameters, residue yields |
+| **Source distribution** | A spatial dataset describing *where and how many* instances of a source type exist in a geographic catchment |
 
-#### 9.4.2 When Hub Pages Make Sense
+#### 9.4.2 Two Facets per Source Type
 
-Hub pages remain justified in **one specific scenario**: when a conceptual grouping has no corresponding Django app but needs a landing page for external linking or marketing purposes. For example:
-- A "Sources" landing page linked from a research paper or project website
-- A "Case Studies" overview linked from a partner institution
+Every source type has (or will have) both facets:
 
-In this case, the hub page serves as an **external entry point**, not an internal navigation layer.
+| Source type | Generation model (how) | Source distribution (where/how many) |
+|---|---|---|
+| **Roadside trees** | Growth model, pruning/maintenance schedule → green residue yield | GIS point dataset of tree locations (Hamburg) |
+| **Greenhouses** | Growth cycles, cultures → organic residue output | GIS dataset of greenhouse locations (Nantes) |
+| **Household waste collection** | Collection system parameters, waste streams, frequencies → biowaste volume | Catchment polygons (future) |
 
-#### 9.4.3 Recommended Pattern for Hub Pages (When Needed)
+Current implementation status:
 
-If a hub page is retained or created, it should follow a standardized template:
+| Source type | Generation model | Source distribution (map) |
+|---|---|---|
+| Household waste collection | `collection-list` ✅ | — not yet |
+| Greenhouses | `greenhouse-list` ✅ | `NantesGreenhouses` ✅ |
+| Roadside trees | — not yet | `HamburgRoadsideTrees` ✅ |
+
+Each source type currently has one facet implemented. The explorer should expose both facets per source type, marking missing ones as not yet available.
+
+#### 9.4.3 How Both Facets Combine in Inventories
+
+In the **Inventories** module, both facets come together:
+
+1. The user selects a **generation model** — how much bioresource does one unit of this source type produce?
+2. The user selects a **source distribution** (catchment + geodataset) — how many units of this source type exist in this area?
+3. The inventory algorithm combines them to produce a **bioresource potential estimate**.
+
+This means Sources is not just a navigation hub but describes a core domain concept that feeds directly into the inventory workflow.
+
+### 9.5 Sources Explorer Design (Implemented)
+
+#### 9.5.1 Decision: Sources as a Cross-App Explorer
+
+Sources is structurally different from other explorers (Materials, Processes, etc.) because it enumerates **separate Django apps** rather than entity types within a single app:
+
+| Explorer | What it enumerates | Apps involved |
+|---|---|---|
+| Materials Explorer | Entity types within `materials` app | 1 app |
+| Processes Explorer | Entity types within `processes` app | 1 app |
+| **Sources Explorer** | Source types across multiple apps | `soilcom`, `flexibi_nantes`, `flexibi_hamburg` |
+
+Despite this structural difference, the visual pattern is identical: explorer cards with icon, title, description, count, and browse link, using the shared `explorer-cards.css` styles.
+
+#### 9.5.2 Two-Action Card Pattern
+
+Because each source type has two facets, each explorer card provides **two entry points**:
 
 ```
-hub_page.html (extends base.html)
-├── Title + brief description (1–2 paragraphs)
-├── Sub-module cards (cover image + title + description + link)
-│   └── Consistent card style with Home page cards
-└── No learning material section (handled by sub-module list views)
+┌──────────────────────────────────────────────┐
+│ [icon] Source Type Name                      │
+│                                              │
+│ Description of this source type and the      │
+│ bioresources it generates.                   │
+│                                              │
+│ [N published]   [Browse models] [View map]   │
+└──────────────────────────────────────────────┘
 ```
 
-**Design rules:**
-- **No duplicated content**: description and learning material belong in the sub-module's list view, not in the hub
-- **Card style matches Home page**: same `card shadow h-100` pattern with `card-img-top` and `card-body`
-- **No sidebar entry**: hub pages are reached from the Home page or via direct URL, not from the sidebar
-- **URL pattern**: `/<concept>/` (e.g., `/sources/list/`)
+- **Browse models** → links to the generation model list view (e.g., `collection-list`)
+- **View map** → links to the source distribution map view (e.g., `NantesGreenhouses`)
+- If a facet is not yet implemented, its button is disabled or absent
 
-### 9.5 Recommendations for Sources
+This keeps the source type as the primary organizing concept (matching the user's mental model: "I want to work with greenhouses") while making both dimensions directly accessible.
 
-#### Option A: Remove from sidebar, keep as external landing page (Recommended)
+#### 9.5.3 Navigation
 
-1. Remove the "Sources" entry from the sidebar (`_sidebar.html`)
-2. Keep the `sources-list` URL and view for backwards compatibility and external links
-3. Update the Home page Sources card to link directly to one of:
-   - The Waste Collection list (`collection-list`) — if Waste Collection is the primary sub-module
-   - Keep linking to `sources-list` — if the conceptual grouping page is valuable for external audiences
-4. Add Greenhouses to the sidebar under Case Studies (if it should be a top-level entry point) or leave it accessible via the Waste Collection explorer
-
-**Rationale:** The sidebar should only contain items that lead to data or tools. Sources contains neither — it's a routing page. Users reaching Sources from an external link still get a useful overview; internal users navigate directly via the sidebar.
-
-#### Option B: Convert Sources to an Explorer
-
-If the "sources" concept evolves into a proper Django app with its own entity types (e.g., SourceModel, SourceCategory), then Sources should become an explorer like Materials Explorer — enumerating entity types with counts and browse links.
-
-This is the right path **only if** the data model justifies it. Currently, Sources has no models of its own.
-
-#### Option C: Eliminate Sources entirely
-
-1. Remove from sidebar
-2. Redirect `sources-list` → Home page
-3. Remove `sources_list.html` template and `SourcesListView`
-
-This is the simplest option but loses the external landing page.
+- **Sidebar** → "Sources" links to `sources-explorer`
+- **Home page** → Sources card links to `sources-explorer`
+- **Old URL** → `sources-list` redirects 301 to `sources-explorer`
 
 ### 9.6 Recommendations for the Learning Page
 
@@ -693,9 +712,9 @@ The Learning page (`learning.html`) is structurally similar to a hub page — it
 
 | Page | Current state | Recommendation |
 |---|---|---|
-| **Sources** | Sidebar entry → hub page → sub-module lists | Remove from sidebar; keep URL as external landing page |
+| **Sources** | Explorer with two-action cards per source type | Keep; add map buttons as source distributions become available |
 | **Learning** | Sidebar entry → centralized learning catalog | Keep as-is |
-| **Home** | Global hub with module cards | Keep as-is; optionally add Greenhouses card |
+| **Home** | Global hub with module cards | Keep as-is |
 | **Explorers** | Module-internal entity catalog | Keep as-is; no changes needed |
 
-The guiding principle: **the sidebar links to places where users can work with data**. Hub pages that only route to other pages should not occupy sidebar real estate. They can exist as external entry points or be eliminated entirely if their content is fully covered by intro banners and learning tabs in the list views they point to.
+The guiding principle: **the sidebar links to places where users can work with data**. The Sources Explorer qualifies because it provides direct access to generation models and source distributions — the two facets that combine in the inventory workflow.
