@@ -239,7 +239,7 @@ class Layer(models.Model):
 
     def feature_table_url(self):
         return reverse(
-            "scenario_result_map",
+            "scenario-result-map",
             kwargs={"pk": self.scenario.id, "algo_pk": self.algorithm.id},
         )
 

@@ -61,7 +61,7 @@
                     {% endif %}
                     {% if policy.is_owner or policy.is_staff %}
                         <a class="dropdown-item"
-                           href="{% url 'download_scenario_summary' object.id %}">
+                           href="{% url 'scenario-download-summary' object.id %}">
                             <i class="fas fa-fw fa-file-arrow-down"></i> Download definition file
                         </a>
                     {% endif %}
