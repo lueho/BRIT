@@ -372,3 +372,200 @@ User arrives at Home
 The key principle: **users land where they can immediately be productive** (the primary model list), and the explorer is available one click away for when they need to manage supporting data. This mirrors the Materials module's current approach, which already does it right — the sidebar links to Samples, not to the explorer.
 
 This flow is **predictable**, **consistent**, and **task-oriented**. A user who has learned one module's navigation can immediately orient themselves in any other module.
+
+---
+
+## 8. Primary List View: Description & Learning Content
+
+### 8.1 Problem Statement
+
+When a user first arrives at a module via the sidebar, they land on the primary model list. In some modules this list includes contextual information (a brief description of the module and links to learning materials); in others it is a bare data table. The modules that do provide context use two incompatible patterns, leading to an inconsistent first impression.
+
+### 8.2 Existing Patterns (Status Quo)
+
+Three patterns currently coexist in the codebase:
+
+#### Pattern A: Standalone Landing Page
+
+**Used by:** Materials (`featured_sample_list.html`, `featured_materials_list.html`), Sources (`sources_list.html`)
+
+The sidebar links to a **separate** page that extends `base.html` directly. This page shows:
+- A description card (left column) explaining the module
+- A learning material card (right column) linking to external lectures
+- Below: a grid of featured/curated items (not the full filterable list)
+
+The actual filterable list (`sample_filter.html`, `sampleseries_filter.html`) is reached via a secondary "see as list" link in the card footer.
+
+**Problems:**
+1. Adds an **extra click** between sidebar and the real, filterable data
+2. Description and learning content are **not available** when the user navigates directly to the filtered list (e.g. via a bookmark or back-link)
+3. Featured items are displayed as a **card grid** without filters, pagination, or scope toggles — a different interaction model than every other list in the application
+4. Learning content is **duplicated** (identical HOOU links appear in both `featured_sample_list.html` and `sources_list.html`)
+
+#### Pattern B: Learning Sidebar Tab in Filtered List
+
+**Used by:** Waste Collection (`collection_filter.html`), Greenhouses (`greenhouse_filter.html`)
+
+The primary list view extends `filtered_list.html` and overrides `{% block learning_pane_body %}` to populate the Learning tab in the sidebar. The `filtered_list.html` base template auto-hides the Learning tab via JavaScript when no content is provided.
+
+**Advantages:**
+1. **No extra click** — contextual content is alongside the data
+2. Uses existing `filtered_list.html` sidebar tab infrastructure
+3. Learning tab **auto-hides** via JS when empty (graceful degradation)
+4. Content is available regardless of how the user reached the list
+
+**Limitations:**
+1. No module **description** visible on first load — only learning resources in a sidebar tab
+2. Learning resources in a tab that is not active by default — easy to miss
+
+#### Pattern C: Plain Filtered List (No Context)
+
+**Used by:** Processes (`processtype_filter.html`), Inventories (`scenario_filter.html`), Bibliography (`source_filter.html`), CLOSECYCLE (`showcase_filter.html`), Maps
+
+The primary list view extends `filtered_list.html` but explicitly empties the Learning tab:
+```django
+{% block learning_tab_button %}{% endblock learning_tab_button %}
+{% block learning_tab_pane %}{% endblock learning_tab_pane %}
+```
+
+No description, no learning resources. The user sees only a data table with filters.
+
+### 8.3 Current State Per Module
+
+| Module | Sidebar target | Pattern | Description? | Learning? |
+|---|---|---|---|---|
+| **Materials** | `sample-list-featured` | A (standalone) | ✅ in landing page | ✅ in landing page |
+| **Sources** | `sources-list` | A (standalone) | ✅ in landing page | ✅ in landing page |
+| **Waste Collection** | `collection-list` | B (sidebar tab) | ❌ | ✅ in sidebar tab |
+| **Greenhouses** (Nantes) | `greenhouse-list` | B (sidebar tab) | ❌ | ✅ in sidebar tab |
+| **Processes** | `processtype-list` | C (bare) | ❌ | ❌ |
+| **Inventories** | `scenario-list` | C (bare) | ❌ | ❌ |
+| **Bibliography** | `source-list` | C (bare) | ❌ | ❌ |
+| **CLOSECYCLE** | `showcase-list` | C (bare) | ❌ | ❌ |
+| **Maps** | `maps_list` | C (bare) | ❌ | ❌ |
+
+### 8.4 Optimized Design Pattern
+
+Combine the best aspects of all three patterns into a single, consistent approach that works within the existing `filtered_list.html` infrastructure.
+
+#### 8.4.1 Concept: Intro Banner + Learning Sidebar Tab
+
+```
+filtered_list.html
+├── {% block list_intro %}              ← NEW optional block
+│   ├── Module description (1–2 sentences)
+│   └── Quick-access links (Explorer, Map view, etc.)
+├── List card (existing)
+│   ├── Header with scope/view/explorer toggles
+│   ├── Filterable data table
+│   └── Pagination
+└── Sidebar (existing)
+    ├── Filters tab (active by default)
+    ├── Options tab (Create, Explorer, Export)
+    └── Learning tab (auto-hidden when empty)
+        └── External resources, lectures, courses
+```
+
+#### 8.4.2 The `list_intro` Block
+
+Add a new `{% block list_intro %}{% endblock list_intro %}` to `filtered_list.html`, placed **above** the list card (before the `<div class="row">`). When overridden, it renders a compact, dismissible intro banner:
+
+```html
+{% block list_intro %}
+<div class="alert alert-light border shadow-sm mb-3 d-flex align-items-start" role="region" aria-label="Module introduction">
+  <div class="flex-grow-1">
+    <strong><i class="fas fa-leaf me-1"></i> Materials</strong>
+    <p class="mb-0 small text-muted">
+      Define and analyze heterogeneous materials from biogeneous residues.
+      Explore compositions with respect to different separation methods.
+    </p>
+  </div>
+  <button type="button" class="btn-close ms-3" data-bs-dismiss="alert" aria-label="Dismiss"></button>
+</div>
+{% endblock list_intro %}
+```
+
+**Design decisions:**
+- **Compact**: 2–3 lines max, does not push the data table off-screen
+- **Dismissible**: uses Bootstrap alert dismiss so returning users can hide it
+- **Non-intrusive**: uses `alert-light` styling, blending with the page rather than demanding attention
+- **Optional**: the base block is empty, so modules without a description are unaffected
+
+#### 8.4.3 The Learning Sidebar Tab
+
+The `filtered_list.html` Learning tab infrastructure already exists and auto-hides when empty. Each module's primary list template should override `{% block learning_pane_body %}` with:
+
+1. A **featured resource** card (the most relevant external learning material)
+2. A **resource list** with links to additional lectures/courses
+
+Use the component pattern already established in `soilcom/includes/learning_materials.html`:
+
+```html
+{% block learning_pane_body %}
+  {% include "<module>/includes/learning_materials.html" %}
+{% endblock learning_pane_body %}
+```
+
+Each module that has learning resources creates a `<module>/includes/learning_materials.html` partial. This keeps the content reusable across list views, detail views, and map views within the same module.
+
+#### 8.4.4 Deprecation of Standalone Landing Pages (Pattern A)
+
+Once the intro banner and learning tab are in place for Materials and Sources:
+
+1. Move the description text from `featured_sample_list.html` into `sample_filter.html`'s `{% block list_intro %}`
+2. Move the learning links from `featured_sample_list.html` into `sample_filter.html`'s `{% block learning_pane_body %}`
+3. Redirect `sample-list-featured` → `sample-list` (or keep as alias for backwards compatibility)
+4. Same for `sampleseries-list-featured` and `sources-list`
+
+The Sources module (`sources_list.html`) is a special case — it functions as a hub page linking to sub-modules (Waste Collection, Greenhouses) rather than a data list. This page may remain as a static overview or evolve into a proper explorer page. Evaluate separately.
+
+### 8.5 Improvement Plan
+
+#### Phase 1: Infrastructure (filtered_list.html changes)
+
+| Step | Description | Effort |
+|---|---|---|
+| 1.1 | Add `{% block list_intro %}{% endblock %}` to `filtered_list.html` above the list card | Tiny |
+| 1.2 | Verify the Learning tab auto-hide JS works correctly for all modules | Tiny |
+
+#### Phase 2: Populate Learning Content
+
+For each module's primary list template, override `{% block learning_pane_body %}` and remove the explicit learning tab emptying (`{% block learning_tab_button %}{% endblock %}`).
+
+| Step | Module | Primary list template | Learning content source | Effort |
+|---|---|---|---|---|
+| 2.1 | Waste Collection | `collection_filter.html` | Already done ✅ | — |
+| 2.2 | Greenhouses | `greenhouse_filter.html` | Already done ✅ | — |
+| 2.3 | Materials (Samples) | `sample_filter.html` | Move from `featured_sample_list.html` | Small |
+| 2.4 | Processes | `processtype_filter.html` | Write new content (link to HOOU bioresource lectures) | Small |
+| 2.5 | Bibliography | `source_filter.html` | Write new content (citation guidelines, data licensing) | Small |
+| 2.6 | Inventories | `scenario_filter.html` | Write new content (inventory methodology, scenario workflow) | Small |
+| 2.7 | CLOSECYCLE | `showcase_filter.html` | Write new content (CLOSECYCLE project overview) | Small |
+| 2.8 | Maps | `maps/geodataset_filter.html` or equivalent | Write new content (GIS data sources, NUTS regions) | Small |
+
+#### Phase 3: Add Intro Banners
+
+For each module's primary list template, override `{% block list_intro %}` with a concise module description.
+
+| Step | Module | Template | Description text source | Effort |
+|---|---|---|---|---|
+| 3.1 | Materials (Samples) | `sample_filter.html` | Adapt from `featured_sample_list.html` | Tiny |
+| 3.2 | Processes | `processtype_filter.html` | Write new (1–2 sentences about process types) | Tiny |
+| 3.3 | Bibliography | `source_filter.html` | Write new (1–2 sentences about sources/citations) | Tiny |
+| 3.4 | Inventories | `scenario_filter.html` | Write new (1–2 sentences about scenarios) | Tiny |
+| 3.5 | Waste Collection | `collection_filter.html` | Write new (1–2 sentences about biowaste collection data) | Tiny |
+| 3.6 | CLOSECYCLE | `showcase_filter.html` | Write new (1–2 sentences about circular economy showcases) | Tiny |
+| 3.7 | Maps | primary list template | Write new (1–2 sentences about geodatasets) | Tiny |
+
+#### Phase 4: Deprecate Standalone Landing Pages
+
+| Step | Description | Effort |
+|---|---|---|
+| 4.1 | Update Materials sidebar link from `sample-list-featured` → `sample-list` | Tiny |
+| 4.2 | Keep `sample-list-featured` URL as redirect to `sample-list` for backwards compatibility | Tiny |
+| 4.3 | Keep `sampleseries-list-featured` URL as redirect to `sampleseries-list` | Tiny |
+| 4.4 | Evaluate Sources module: convert `sources_list.html` to a proper explorer, or merge hub links into Home | Medium |
+
+### 8.6 Summary
+
+The optimized pattern is: **every primary list view provides its own context**. A brief intro banner above the table orients first-time visitors, the Learning sidebar tab offers deeper educational resources, and the Options tab provides the Explorer back-link. No intermediate landing pages, no duplicated content, no inconsistent interaction models. A user arriving at any module via the sidebar sees the same layout: intro → data → sidebar with filters, options, and learning.
