@@ -96,7 +96,7 @@ from .serializers import (
 )
 
 
-class MaterialsDashboardView(TemplateView):
+class MaterialsExplorerView(TemplateView):
     template_name = "materials_dashboard.html"
 
     def get_context_data(self, **kwargs):
@@ -135,13 +135,13 @@ class MaterialsDashboardView(TemplateView):
 class MaterialCategoryPublishedListView(PublishedObjectFilterView):
     model = MaterialCategory
     filterset_class = MaterialCategoryListFilter
-    dashboard_url = reverse_lazy("materials-dashboard")
+    dashboard_url = reverse_lazy("materials-explorer")
 
 
 class MaterialCategoryPrivateListView(PrivateObjectFilterView):
     model = MaterialCategory
     filterset_class = MaterialCategoryListFilter
-    dashboard_url = reverse_lazy("materials-dashboard")
+    dashboard_url = reverse_lazy("materials-explorer")
 
 
 class MaterialCategoryReviewListView(ReviewObjectListView):
@@ -191,14 +191,14 @@ class MaterialPublishedListView(PublishedObjectFilterView):
     model = Material
     queryset = Material.objects.filter(type="material")
     filterset_class = MaterialListFilter
-    dashboard_url = reverse_lazy("materials-dashboard")
+    dashboard_url = reverse_lazy("materials-explorer")
 
 
 class MaterialPrivateListView(PrivateObjectFilterView):
     model = Material
     queryset = Material.objects.filter(type="material")
     filterset_class = MaterialListFilter
-    dashboard_url = reverse_lazy("materials-dashboard")
+    dashboard_url = reverse_lazy("materials-explorer")
 
 
 class MaterialReviewListView(ReviewObjectListView):
@@ -254,13 +254,13 @@ class MaterialAutocompleteView(UserCreatedObjectAutocompleteView):
 class ComponentPublishedListView(PublishedObjectFilterView):
     model = MaterialComponent
     filterset_class = MaterialComponentListFilter
-    dashboard_url = reverse_lazy("materials-dashboard")
+    dashboard_url = reverse_lazy("materials-explorer")
 
 
 class ComponentPrivateListView(PrivateObjectFilterView):
     model = MaterialComponent
     filterset_class = MaterialComponentListFilter
-    dashboard_url = reverse_lazy("materials-dashboard")
+    dashboard_url = reverse_lazy("materials-explorer")
 
 
 class ComponentReviewListView(ReviewObjectListView):
@@ -315,13 +315,13 @@ class ComponentAutocompleteView(UserCreatedObjectAutocompleteView):
 class MaterialComponentGroupPublishedListView(PublishedObjectFilterView):
     model = MaterialComponentGroup
     filterset_class = MaterialComponentGroupListFilter
-    dashboard_url = reverse_lazy("materials-dashboard")
+    dashboard_url = reverse_lazy("materials-explorer")
 
 
 class MaterialComponentGroupPrivateListView(PrivateObjectFilterView):
     model = MaterialComponentGroup
     filterset_class = MaterialComponentGroupListFilter
-    dashboard_url = reverse_lazy("materials-dashboard")
+    dashboard_url = reverse_lazy("materials-explorer")
 
 
 class MaterialComponentGroupReviewListView(ReviewObjectListView):
@@ -368,13 +368,13 @@ class MaterialComponentGroupModalDeleteView(UserCreatedObjectModalDeleteView):
 class MaterialPropertyPublishedListView(PublishedObjectFilterView):
     model = MaterialProperty
     filterset_class = MaterialPropertyListFilter
-    dashboard_url = reverse_lazy("materials-dashboard")
+    dashboard_url = reverse_lazy("materials-explorer")
 
 
 class MaterialPropertyPrivateListView(PrivateObjectFilterView):
     model = MaterialProperty
     filterset_class = MaterialPropertyListFilter
-    dashboard_url = reverse_lazy("materials-dashboard")
+    dashboard_url = reverse_lazy("materials-explorer")
 
 
 class MaterialPropertyReviewListView(ReviewObjectListView):
@@ -434,13 +434,13 @@ class MaterialPropertyValueModalDeleteView(UserCreatedObjectModalDeleteView):
 class AnalyticalMethodPublishedListView(PublishedObjectFilterView):
     model = AnalyticalMethod
     filterset_class = AnalyticalMethodListFilter
-    dashboard_url = reverse_lazy("materials-dashboard")
+    dashboard_url = reverse_lazy("materials-explorer")
 
 
 class AnalyticalMethodPrivateListView(PrivateObjectFilterView):
     model = AnalyticalMethod
     filterset_class = AnalyticalMethodListFilter
-    dashboard_url = reverse_lazy("materials-dashboard")
+    dashboard_url = reverse_lazy("materials-explorer")
 
 
 class AnalyticalMethodReviewListView(ReviewObjectListView):
@@ -477,13 +477,13 @@ class AnalyticalMethodModalDeleteView(UserCreatedObjectModalDeleteView):
 class SampleSeriesPublishedListView(PublishedObjectFilterView):
     model = SampleSeries
     filterset_class = SampleSeriesFilter
-    dashboard_url = reverse_lazy("materials-dashboard")
+    dashboard_url = reverse_lazy("materials-explorer")
 
 
 class SampleSeriesPrivateListView(PrivateObjectFilterView):
     model = SampleSeries
     filterset_class = SampleSeriesFilter
-    dashboard_url = reverse_lazy("materials-dashboard")
+    dashboard_url = reverse_lazy("materials-explorer")
 
 
 class SampleSeriesReviewListView(ReviewObjectFilterView):
@@ -564,13 +564,13 @@ class SampleSeriesAutoCompleteView(UserCreatedObjectAutocompleteView):
 class SamplePublishedListView(PublishedObjectFilterView):
     model = Sample
     filterset_class = SampleFilter
-    dashboard_url = reverse_lazy("materials-dashboard")
+    dashboard_url = reverse_lazy("materials-explorer")
 
 
 class SamplePrivateListView(PrivateObjectFilterView):
     model = Sample
     filterset_class = SampleFilter
-    dashboard_url = reverse_lazy("materials-dashboard")
+    dashboard_url = reverse_lazy("materials-explorer")
 
 
 class SampleReviewListView(ReviewObjectFilterView):
