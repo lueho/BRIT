@@ -7,7 +7,7 @@ from .router import router
 urlpatterns = [
     path(
         "",
-        RedirectView.as_view(url="/materials/samples/featured/"),
+        RedirectView.as_view(url="/materials/samples/"),
         name="materials-home",
     ),
     path("explorer/", views.MaterialsExplorerView.as_view(), name="materials-explorer"),
@@ -123,7 +123,7 @@ urlpatterns = [
     ),
     path(
         "sample_series/featured/",
-        views.FeaturedMaterialListView.as_view(),
+        RedirectView.as_view(pattern_name="sampleseries-list", permanent=True),
         name="sampleseries-list-featured",
     ),
     path(
@@ -204,7 +204,7 @@ urlpatterns = [
     ),
     path(
         "samples/featured/",
-        views.FeaturedSampleListView.as_view(),
+        RedirectView.as_view(pattern_name="sample-list", permanent=True),
         name="sample-list-featured",
     ),
     path(

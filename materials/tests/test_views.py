@@ -997,12 +997,12 @@ class BackURLNavigationTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestC
 class FeaturedSampleListViewTestCase(ViewWithPermissionsTestCase):
     def test_get_http_200_ok_for_anonymous(self):
         response = self.client.get(reverse("sample-list-featured"))
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 301)
 
     def test_get_http_200_ok_for_logged_in_users(self):
         self.client.force_login(self.outsider)
         response = self.client.get(reverse("sample-list-featured"))
-        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.status_code, 301)
 
 
 class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCase):
