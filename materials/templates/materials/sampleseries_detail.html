@@ -1,15 +1,12 @@
 {% extends "detail_with_options.html" %}
 {% load static %}
 {% load moderation_tags %}
-
 {% block title %}
   BRIT | Sample Series: {{ object.name }}
 {% endblock title %}
-
 {% block detail_header %}
   {{ object.material.name }}: {{ object.name }}
 {% endblock detail_header %}
-
 {% block detail_top_image %}
   {% if object.image %}
     <div class="card-img-top">
@@ -21,7 +18,6 @@
     </div>
   {% endif %}
 {% endblock detail_top_image %}
-
 {% block detail_body %}
   {% if object.name %}
     <p class="card-text">
@@ -44,7 +40,6 @@
     </p>
   {% endif %}
 {% endblock detail_body %}
-
 {% block detail_header_primary_actions %}
   <div class="btn-group me-2" role="group">
     {% with back_url=request.GET.back %}
@@ -78,7 +73,6 @@
   </div>
   {{ block.super }}
 {% endblock detail_header_primary_actions %}
-
 {% block options_primary_actions %}
   {% object_policy object as policy %}
   {% if policy.can_edit %}
@@ -100,18 +94,20 @@
     </a>
   {% endif %}
 {% endblock options_primary_actions %}
-
 {% block options_secondary_actions %}
   {% object_policy object as policy %}
+  <hr class="my-2">
   {% if policy.can_manage_samples %}
-    <hr class="my-2">
     <a class="btn btn-outline-secondary w-100 mb-2 modal-link"
        href="{% url 'sampleseries-add-distribution-modal' object.pk %}">
       <i class="fas fa-circle-plus"></i> Add distribution
     </a>
   {% endif %}
+  <a class="btn btn-outline-secondary w-100 mb-2"
+     href="{% url 'materials-explorer' %}">
+    <i class="fas fa-table-cells-large"></i> Explorer
+  </a>
 {% endblock options_secondary_actions %}
-
 {% block second_row %}
   {% for distribution in data.distributions %}
     <div class="col col-12 col-md-6 col-lg-4">
