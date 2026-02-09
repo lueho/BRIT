@@ -2,6 +2,23 @@
 {% load crispy_forms_tags %}
 {% load user_created_object_tags %}
 {% load moderation_tags %}
+{% block list_intro %}
+    <div class="alert alert-light border shadow-sm mb-3 d-flex align-items-start"
+         role="region"
+         aria-label="Module introduction">
+        <div class="flex-grow-1">
+            <strong><i class="fas fa-leaf me-1"></i> Materials</strong>
+            <p class="mb-0 small text-muted">
+                Define and analyze heterogeneous materials from biogeneous residues.
+                Explore compositions with respect to different separation methods.
+            </p>
+        </div>
+        <button type="button"
+                class="btn-close ms-3"
+                data-bs-dismiss="alert"
+                aria-label="Dismiss"></button>
+    </div>
+{% endblock list_intro %}
 {% block title %}
     BRIT | Materials | Samples
 {% endblock title %}

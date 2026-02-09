@@ -5,6 +5,23 @@
 {% block title %}
     BRIT | Bibliography | Sources
 {% endblock title %}
+{% block list_intro %}
+    <div class="alert alert-light border shadow-sm mb-3 d-flex align-items-start"
+         role="region"
+         aria-label="Module introduction">
+        <div class="flex-grow-1">
+            <strong><i class="fas fa-book me-1"></i> Bibliography</strong>
+            <p class="mb-0 small text-muted">
+                Manage sources, authors, and licences referenced throughout the platform.
+                Link citations to materials, processes, and other entities.
+            </p>
+        </div>
+        <button type="button"
+                class="btn-close ms-3"
+                data-bs-dismiss="alert"
+                aria-label="Dismiss"></button>
+    </div>
+{% endblock list_intro %}
 {% block list_card_header %}
     <strong>Sources</strong>
 {% endblock list_card_header %}

@@ -3,6 +3,23 @@
 {% load crispy_forms_tags %}
 {% load file_export_tags %}
 {% load moderation_tags %}
+{% block list_intro %}
+    <div class="alert alert-light border shadow-sm mb-3 d-flex align-items-start"
+         role="region"
+         aria-label="Module introduction">
+        <div class="flex-grow-1">
+            <strong><i class="fas fa-recycle me-1"></i> Waste Collection</strong>
+            <p class="mb-0 small text-muted">
+                Explore household biowaste collection systems across European regions.
+                Compare collectors, waste streams, and collection frequencies.
+            </p>
+        </div>
+        <button type="button"
+                class="btn-close ms-3"
+                data-bs-dismiss="alert"
+                aria-label="Dismiss"></button>
+    </div>
+{% endblock list_intro %}
 {% block title %}
     BRIT | Household waste collections
 {% endblock title %}

@@ -4,6 +4,23 @@
 {% block title %}
     BRIT | Inventories
 {% endblock title %}
+{% block list_intro %}
+    <div class="alert alert-light border shadow-sm mb-3 d-flex align-items-start"
+         role="region"
+         aria-label="Module introduction">
+        <div class="flex-grow-1">
+            <strong><i class="fas fa-chart-bar me-1"></i> Inventories</strong>
+            <p class="mb-0 small text-muted">
+                Create and evaluate scenarios for regional bioresource inventories.
+                Combine geodata with algorithms to estimate bioresource potentials.
+            </p>
+        </div>
+        <button type="button"
+                class="btn-close ms-3"
+                data-bs-dismiss="alert"
+                aria-label="Dismiss"></button>
+    </div>
+{% endblock list_intro %}
 {% block list_card_header %}
     <strong><i class="fas fa-fw fa-chart-bar"></i> Inventories</strong>
 {% endblock list_card_header %}
