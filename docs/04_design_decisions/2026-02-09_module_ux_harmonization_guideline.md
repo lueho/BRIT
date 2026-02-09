@@ -569,3 +569,133 @@ For each module's primary list template, override `{% block list_intro %}` with 
 ### 8.6 Summary
 
 The optimized pattern is: **every primary list view provides its own context**. A brief intro banner above the table orients first-time visitors, the Learning sidebar tab offers deeper educational resources, and the Options tab provides the Explorer back-link. No intermediate landing pages, no duplicated content, no inconsistent interaction models. A user arriving at any module via the sidebar sees the same layout: intro → data → sidebar with filters, options, and learning.
+
+---
+
+## 9. Hub Pages: Concept and Recommendations
+
+### 9.1 Problem Statement
+
+Some pages in the application act as **hubs** — they don't show data themselves but instead group and link to related sub-modules. The Sources page (`sources_list.html`) is the primary example. With the completion of Phases 1–4 (intro banners, learning tabs, sidebar entries for all modules), the role of hub pages needs to be re-evaluated: do they still serve a purpose, and if so, what should the standardized pattern be?
+
+### 9.2 Inventory of Page Types
+
+The application currently has five distinct page types:
+
+| Type | Purpose | Template pattern | Examples |
+|---|---|---|---|
+| **Home page** | Global hub: links to all top-level modules with cover images and descriptions | `home.html` extends `base.html` | Home |
+| **Explorer** | Module-internal catalog: enumerates entity types within a single Django app with counts and browse links | `*_dashboard.html` extends `base.html` | Materials Explorer, Processes Explorer, Waste Collection Explorer, Bibliography Explorer, Inventories Explorer, Maps Explorer |
+| **Hub page** | Cross-module aggregator: groups related modules/apps under a conceptual theme with descriptions and cover images | `sources_list.html` extends `base.html` | Sources |
+| **Primary list view** | Filterable data table with intro banner, learning sidebar, and scope toggles | `*_filter.html` extends `filtered_list.html` | Sample list, Process type list, Collection list, etc. |
+| **Learning page** | Centralized learning resource catalog: HOOU courses and lectures with cover images | `learning.html` extends `base.html` | Learning |
+
+### 9.3 Analysis of the Sources Hub Page
+
+The Sources page currently serves three functions:
+
+1. **Domain description** — Explains the concept of bioresource sources (two paragraphs)
+2. **Learning resources** — Links to HOOU lectures (identical to those now in learning sidebar tabs)
+3. **Sub-module navigation** — Cards with cover images linking to Waste Collection and Greenhouses
+
+**Redundancies after Phase 1–4:**
+- Function 1 is now handled by **intro banners** on each sub-module's primary list view
+- Function 2 is now handled by **learning sidebar tabs** on each sub-module's primary list view
+- Function 3 is partially redundant because:
+  - Waste Collection has its own **sidebar entry** under Case Studies
+  - CLOSECYCLE has its own **sidebar entry** under Case Studies
+  - Greenhouses is accessible from the Waste Collection explorer or sidebar
+  - The **Home page** already links to Sources (and could link to sub-modules directly)
+
+**What Sources still provides:**
+- A conceptual grouping: "these are all models describing how bioresources are generated"
+- An intermediate navigation layer between Home and the sub-module lists
+
+**What Sources doesn't provide:**
+- Any data — it's a pure `TemplateView` with no model, no queryset, no filters
+- Entity enumeration — unlike explorers, it doesn't list entity types within a single app
+
+### 9.4 Hub Page Design Concept
+
+#### 9.4.1 Decision: Hub Pages Are Not a Necessary Navigation Layer
+
+With the harmonized list views (intro banner + learning tab + sidebar entries), the intermediate hub layer adds friction without adding value. The user can reach every sub-module directly from:
+- The **sidebar** (one click from anywhere)
+- The **Home page** (cover image cards for all modules)
+- The **explorer** of a parent module (if applicable)
+
+Hub pages were necessary when sub-modules lacked their own contextual information. Now that every primary list view is self-describing, the hub is redundant for navigation.
+
+#### 9.4.2 When Hub Pages Make Sense
+
+Hub pages remain justified in **one specific scenario**: when a conceptual grouping has no corresponding Django app but needs a landing page for external linking or marketing purposes. For example:
+- A "Sources" landing page linked from a research paper or project website
+- A "Case Studies" overview linked from a partner institution
+
+In this case, the hub page serves as an **external entry point**, not an internal navigation layer.
+
+#### 9.4.3 Recommended Pattern for Hub Pages (When Needed)
+
+If a hub page is retained or created, it should follow a standardized template:
+
+```
+hub_page.html (extends base.html)
+├── Title + brief description (1–2 paragraphs)
+├── Sub-module cards (cover image + title + description + link)
+│   └── Consistent card style with Home page cards
+└── No learning material section (handled by sub-module list views)
+```
+
+**Design rules:**
+- **No duplicated content**: description and learning material belong in the sub-module's list view, not in the hub
+- **Card style matches Home page**: same `card shadow h-100` pattern with `card-img-top` and `card-body`
+- **No sidebar entry**: hub pages are reached from the Home page or via direct URL, not from the sidebar
+- **URL pattern**: `/<concept>/` (e.g., `/sources/list/`)
+
+### 9.5 Recommendations for Sources
+
+#### Option A: Remove from sidebar, keep as external landing page (Recommended)
+
+1. Remove the "Sources" entry from the sidebar (`_sidebar.html`)
+2. Keep the `sources-list` URL and view for backwards compatibility and external links
+3. Update the Home page Sources card to link directly to one of:
+   - The Waste Collection list (`collection-list`) — if Waste Collection is the primary sub-module
+   - Keep linking to `sources-list` — if the conceptual grouping page is valuable for external audiences
+4. Add Greenhouses to the sidebar under Case Studies (if it should be a top-level entry point) or leave it accessible via the Waste Collection explorer
+
+**Rationale:** The sidebar should only contain items that lead to data or tools. Sources contains neither — it's a routing page. Users reaching Sources from an external link still get a useful overview; internal users navigate directly via the sidebar.
+
+#### Option B: Convert Sources to an Explorer
+
+If the "sources" concept evolves into a proper Django app with its own entity types (e.g., SourceModel, SourceCategory), then Sources should become an explorer like Materials Explorer — enumerating entity types with counts and browse links.
+
+This is the right path **only if** the data model justifies it. Currently, Sources has no models of its own.
+
+#### Option C: Eliminate Sources entirely
+
+1. Remove from sidebar
+2. Redirect `sources-list` → Home page
+3. Remove `sources_list.html` template and `SourcesListView`
+
+This is the simplest option but loses the external landing page.
+
+### 9.6 Recommendations for the Learning Page
+
+The Learning page (`learning.html`) is structurally similar to a hub page — it groups external resources with cover images and descriptions. However, it serves a different purpose:
+
+- It's a **catalog** of all learning resources in one place
+- Individual modules now have module-specific learning content in their sidebar tabs
+- The Learning page provides the **complete collection** and additional context about the HOOU partnership
+
+**Recommendation:** Keep the Learning page as-is. It serves as a centralized reference that complements the per-module learning tabs. The sidebar entry under "Sites" is appropriate — it's a site-wide resource, not a module.
+
+### 9.7 Summary
+
+| Page | Current state | Recommendation |
+|---|---|---|
+| **Sources** | Sidebar entry → hub page → sub-module lists | Remove from sidebar; keep URL as external landing page |
+| **Learning** | Sidebar entry → centralized learning catalog | Keep as-is |
+| **Home** | Global hub with module cards | Keep as-is; optionally add Greenhouses card |
+| **Explorers** | Module-internal entity catalog | Keep as-is; no changes needed |
+
+The guiding principle: **the sidebar links to places where users can work with data**. Hub pages that only route to other pages should not occupy sidebar real estate. They can exist as external entry points or be eliminated entirely if their content is fully covered by intro banners and learning tabs in the list views they point to.
