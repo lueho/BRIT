@@ -1,15 +1,12 @@
 {% extends "filtered_list.html" %}
 {% load user_created_object_tags %}
 {% load moderation_tags %}
-
 {% block title %}
     BRIT | Inventories
 {% endblock title %}
-
 {% block list_card_header %}
     <strong><i class="fas fa-fw fa-chart-bar"></i> Inventories</strong>
 {% endblock list_card_header %}
-
 {% block list_table %}
     <div class="collection-list-min-height">
         <div class="table-responsive">
@@ -45,8 +42,6 @@
         </div>
     </div>
 {% endblock list_table %}
-
-{% block learning_tab_button %}
-{% endblock learning_tab_button %}
-{% block learning_tab_pane %}
-{% endblock learning_tab_pane %}
+{% block learning_pane_body %}
+    {% include "inventories/includes/learning_materials.html" %}
+{% endblock learning_pane_body %}
