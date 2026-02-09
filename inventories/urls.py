@@ -1,6 +1,7 @@
 from django.urls import path
 
 from .views import (
+    InventoriesExplorerView,
     InventoryAlgorithmAutocompleteView,
     InventoryAlgorithmParametersAPIView,
     PrivateScenarioFilterView,
@@ -26,10 +27,11 @@ from .views import (
 )
 
 urlpatterns = [
+    path("explorer/", InventoriesExplorerView.as_view(), name="inventories-explorer"),
     path(
         "materials/<int:material_pk>/<int:component_pk>/seasonal_distributions/create/",
         SeasonalDistributionCreateView.as_view(),
-        name="seasonal_distribution_create",
+        name="seasonal-distribution-create",
     ),
     path(
         "geodatasets/scenario-autocomplete/",
@@ -82,51 +84,51 @@ urlpatterns = [
     path(
         "scenarios/<int:pk>/add_inventory_algorithm/",
         ScenarioAddInventoryAlgorithmView.as_view(),
-        name="add_scenario_configuration",
+        name="scenario-add-configuration",
     ),
     path(
         "scenarios/<int:scenario_pk>/change_config/<int:algorithm_pk>/",
         ScenarioAlgorithmConfigurationUpdateView.as_view(),
-        name="scenario_update_config",
+        name="scenario-update-config",
     ),
     path(
         "scenarios/<int:scenario_pk>/configuration/<int:feedstock_pk>/<int:algorithm_pk>/remove/",
         ScenarioRemoveInventoryAlgorithmView.as_view(),
-        name="remove_algorithm_from_scenario",
+        name="scenario-remove-algorithm",
     ),
     path(
         "scenarios/<int:scenario_pk>/materials/<int:material_pk>/<int:component_pk>/seasonal_distributions/create/",
         SeasonalDistributionCreateView.as_view(),
-        name="seasonal_distribution_create",
+        name="seasonal-distribution-create",
     ),
     path(
         "scenarios/<int:pk>/<int:algorithm_pk>/<int:feedstock_pk>/",
         ScenarioResultDetailMapView.as_view(),
-        name="scenario_result_map",
+        name="scenario-result-map",
     ),
     path(
         "scenarios/<int:pk>/evaluating/",
         ScenarioEvaluationProgressView.as_view(),
-        name="scenario_evaluation_progress",
+        name="scenario-evaluation-progress",
     ),
     path(
         "scenarios/evaluating/<str:task_id>/",
         get_evaluation_status,
-        name="get_evaluation_status",
+        name="scenario-evaluation-status",
     ),
     path(
         "scenarios/<int:scenario_pk>/download_result_summary/",
         download_scenario_result_summary,
-        name="download_result_summary",
+        name="scenario-download-result-summary",
     ),
     path(
         "scenarios/<int:scenario_pk>/report/",
         download_scenario_summary,
-        name="download_scenario_summary",
+        name="scenario-download-summary",
     ),
     path(
         "ajax/result_layer/<layer_name>/",
         ResultMapAPI.as_view(),
-        name="data.result_layer",
+        name="data-result-layer",
     ),
 ]

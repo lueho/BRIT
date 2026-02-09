@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+BRIT | Inventories Explorer
+{% endblock title %}
+
+{% block content %}
+<div class="mb-4">
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div>
+            <h2 class="mb-2">Inventories Explorer</h2>
+            <p class="text-muted mb-0">Create and manage bioresource inventory scenarios. Configure algorithms,
+                feedstocks, and geodatasets to estimate regional bioresource potentials.</p>
+        </div>
+    </div>
+</div>
+
+<h6 class="text-muted text-uppercase explorer-section-heading fw-bold mb-3">
+    <i class="fas fa-chart-bar me-1"></i> Inventory Tools
+</h6>
+<div class="row g-3 mb-4">
+    <div class="col-12 col-sm-6 col-lg-4">
+        <div class="card shadow-sm h-100 explorer-card" onclick="window.location='{% url 'scenario-list' %}'">
+            <div class="card-body d-flex flex-column">
+                <div class="d-flex align-items-center mb-2">
+                    <span class="explorer-icon bg-primary bg-opacity-10 text-primary"><i
+                            class="fas fa-sliders-h"></i></span>
+                    <h6 class="mb-0 ms-2">Scenarios</h6>
+                </div>
+                <p class="card-text text-muted small flex-grow-1">User-defined inventory scenarios that combine
+                    algorithms, feedstocks, and geographic datasets to estimate bioresource potentials.</p>
+                <div class="d-flex align-items-center justify-content-between mt-auto pt-2">
+                    <span class="badge bg-light text-dark border">{{ scenario_count }} published</span>
+                    <a href="{% url 'scenario-list' %}" class="btn btn-sm btn-outline-primary card-link">Browse</a>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-12 col-sm-6 col-lg-4">
+        <div class="card shadow-sm h-100 explorer-card">
+            <div class="card-body d-flex flex-column">
+                <div class="d-flex align-items-center mb-2">
+                    <span class="explorer-icon bg-secondary bg-opacity-10 text-secondary"><i
+                            class="fas fa-cog"></i></span>
+                    <h6 class="mb-0 ms-2">Inventory Algorithms</h6>
+                </div>
+                <p class="card-text text-muted small flex-grow-1">Pre-configured calculation methods that link
+                    feedstocks to geodatasets. Algorithms are managed by administrators and available for use in
+                    scenarios.</p>
+                <div class="d-flex align-items-center justify-content-between mt-auto pt-2">
+                    <span class="badge bg-light text-dark border">{{ algorithm_count }} available</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock content %}

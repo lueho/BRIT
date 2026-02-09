@@ -5,7 +5,8 @@ from celery.result import AsyncResult
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render
-from django.views.generic import CreateView, DetailView, View
+from django.urls import reverse_lazy
+from django.views.generic import CreateView, DetailView, TemplateView, View
 from django.views.generic.base import TemplateResponseMixin
 from django.views.generic.edit import ModelFormMixin
 from django_tomselect.autocompletes import AutocompleteModelView
@@ -48,6 +49,18 @@ from .models import (
 from .tasks import run_inventory
 
 
+class InventoriesExplorerView(TemplateView):
+    template_name = "inventories_explorer.html"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["scenario_count"] = Scenario.objects.filter(
+            publication_status="published"
+        ).count()
+        context["algorithm_count"] = InventoryAlgorithm.objects.count()
+        return context
+
+
 class SeasonalDistributionCreateView(LoginRequiredMixin, CreateView):
     form_class = SeasonalDistributionModelForm
     template_name = "seasonal_distribution_create.html"
@@ -76,11 +89,13 @@ class InventoryAlgorithmAutocompleteView(AutocompleteModelView):
 class PublishedScenarioFilterView(PublishedObjectFilterView):
     model = Scenario
     filterset_class = ScenarioFilterSet
+    dashboard_url = reverse_lazy("inventories-explorer")
 
 
 class PrivateScenarioFilterView(PrivateObjectFilterView):
     model = Scenario
     filterset_class = ScenarioFilterSet
+    dashboard_url = reverse_lazy("inventories-explorer")
 
 
 class ScenarioCreateView(UserCreatedObjectCreateView):
