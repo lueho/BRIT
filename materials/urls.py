@@ -20,6 +20,11 @@ urlpatterns = [
         name="material-list-owned",
     ),
     path(
+        "materials/review/",
+        views.MaterialReviewListView.as_view(),
+        name="material-list-review",
+    ),
+    path(
         "materials/create/", views.MaterialCreateView.as_view(), name="material-create"
     ),
     path(
@@ -68,6 +73,11 @@ urlpatterns = [
         name="analyticalmethod-list-owned",
     ),
     path(
+        "analytical_methods/review/",
+        views.AnalyticalMethodReviewListView.as_view(),
+        name="analyticalmethod-list-review",
+    ),
+    path(
         "analytical_methods/create/",
         views.AnalyticalMethodCreateView.as_view(),
         name="analyticalmethod-create",
@@ -111,6 +121,11 @@ urlpatterns = [
         "sample_series/user/",
         views.SampleSeriesPrivateListView.as_view(),
         name="sampleseries-list-owned",
+    ),
+    path(
+        "sample_series/review/",
+        views.SampleSeriesReviewListView.as_view(),
+        name="sampleseries-list-review",
     ),
     path(
         "sample_series/create/",
@@ -186,6 +201,11 @@ urlpatterns = [
     path(
         "samples/user/", views.SamplePrivateListView.as_view(), name="sample-list-owned"
     ),
+    path(
+        "samples/review/",
+        views.SampleReviewListView.as_view(),
+        name="sample-list-review",
+    ),
     path("samples/create/", views.SampleCreateView.as_view(), name="sample-create"),
     path(
         "samples/create/modal/",
@@ -239,6 +259,11 @@ urlpatterns = [
         name="materialcategory-list-owned",
     ),
     path(
+        "categories/review/",
+        views.MaterialCategoryReviewListView.as_view(),
+        name="materialcategory-list-review",
+    ),
+    path(
         "categories/create/",
         views.MaterialCategoryCreateView.as_view(),
         name="materialcategory-create",
@@ -282,6 +307,11 @@ urlpatterns = [
         "components/user/",
         views.ComponentPrivateListView.as_view(),
         name="materialcomponent-list-owned",
+    ),
+    path(
+        "components/review/",
+        views.ComponentReviewListView.as_view(),
+        name="materialcomponent-list-review",
     ),
     path(
         "components/create/",
@@ -334,6 +364,11 @@ urlpatterns = [
         name="materialcomponentgroup-list-owned",
     ),
     path(
+        "componentgroups/review/",
+        views.MaterialComponentGroupReviewListView.as_view(),
+        name="materialcomponentgroup-list-review",
+    ),
+    path(
         "componentgroups/create/",
         views.MaterialComponentGroupCreateView.as_view(),
         name="materialcomponentgroup-create",
@@ -377,6 +412,11 @@ urlpatterns = [
         "properties/user/",
         views.MaterialPropertyPrivateListView.as_view(),
         name="materialproperty-list-owned",
+    ),
+    path(
+        "properties/review/",
+        views.MaterialPropertyReviewListView.as_view(),
+        name="materialproperty-list-review",
     ),
     path(
         "properties/create/",

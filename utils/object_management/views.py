@@ -1127,6 +1127,15 @@ class PrivateObjectListView(PrivateObjectListMixin, ListView):
         return template_names
 
 
+class ReviewObjectListView(ReviewObjectListMixin, ListView):
+    """A view to display a list of objects under review for moderators/staff."""
+
+    def get_template_names(self):
+        template_names = super().get_template_names()
+        template_names.append("simple_list_card.html")
+        return template_names
+
+
 class UserCreatedObjectReadAccessMixin(UserPassesTestMixin):
     """
     A Mixin to control access to objects based on 'publication_status' and 'owner'.
