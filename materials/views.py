@@ -20,6 +20,8 @@ from utils.object_management.views import (
     PrivateObjectFilterView,
     PublishedObjectFilterView,
     PublishedObjectListView,
+    ReviewObjectFilterView,
+    ReviewObjectListView,
     UserCreatedObjectAutocompleteView,
     UserCreatedObjectCreateView,
     UserCreatedObjectDetailView,
@@ -146,6 +148,11 @@ class MaterialCategoryPrivateListView(PrivateObjectFilterView):
     dashboard_url = reverse_lazy("materials-explorer")
 
 
+class MaterialCategoryReviewListView(ReviewObjectListView):
+    model = MaterialCategory
+    dashboard_url = reverse_lazy("materials-dashboard")
+
+
 class MaterialCategoryCreateView(UserCreatedObjectCreateView):
     form_class = MaterialCategoryModelForm
     permission_required = "materials.add_materialcategory"
@@ -200,6 +207,12 @@ class MaterialPrivateListView(PrivateObjectFilterView):
     queryset = Material.objects.filter(type="material")
     filterset_class = MaterialListFilter
     dashboard_url = reverse_lazy("materials-explorer")
+
+
+class MaterialReviewListView(ReviewObjectListView):
+    model = Material
+    queryset = Material.objects.filter(type="material")
+    dashboard_url = reverse_lazy("materials-dashboard")
 
 
 class MaterialCreateView(UserCreatedObjectCreateView):
@@ -258,6 +271,11 @@ class ComponentPrivateListView(PrivateObjectFilterView):
     dashboard_url = reverse_lazy("materials-explorer")
 
 
+class ComponentReviewListView(ReviewObjectListView):
+    model = MaterialComponent
+    dashboard_url = reverse_lazy("materials-dashboard")
+
+
 class ComponentCreateView(UserCreatedObjectCreateView):
     form_class = ComponentModelForm
     permission_required = "materials.add_materialcomponent"
@@ -314,6 +332,11 @@ class MaterialComponentGroupPrivateListView(PrivateObjectFilterView):
     dashboard_url = reverse_lazy("materials-explorer")
 
 
+class MaterialComponentGroupReviewListView(ReviewObjectListView):
+    model = MaterialComponentGroup
+    dashboard_url = reverse_lazy("materials-dashboard")
+
+
 class MaterialComponentGroupCreateView(UserCreatedObjectCreateView):
     form_class = ComponentGroupModelForm
     permission_required = "materials.add_materialcomponentgroup"
@@ -364,6 +387,11 @@ class MaterialPropertyPrivateListView(PrivateObjectFilterView):
     model = MaterialProperty
     filterset_class = MaterialPropertyListFilter
     dashboard_url = reverse_lazy("materials-explorer")
+
+
+class MaterialPropertyReviewListView(ReviewObjectListView):
+    model = MaterialProperty
+    dashboard_url = reverse_lazy("materials-dashboard")
 
 
 class MaterialPropertyCreateView(UserCreatedObjectCreateView):
@@ -431,6 +459,11 @@ class AnalyticalMethodPrivateListView(PrivateObjectFilterView):
     dashboard_url = reverse_lazy("materials-explorer")
 
 
+class AnalyticalMethodReviewListView(ReviewObjectListView):
+    model = AnalyticalMethod
+    dashboard_url = reverse_lazy("materials-dashboard")
+
+
 class AnalyticalMethodCreateView(UserCreatedObjectCreateView):
     form_class = AnalyticalMethodModelForm
     permission_required = "materials.add_analyticalmethod"
@@ -471,6 +504,12 @@ class SampleSeriesPrivateListView(PrivateObjectFilterView):
     model = SampleSeries
     filterset_class = SampleSeriesFilter
     dashboard_url = reverse_lazy("materials-explorer")
+
+
+class SampleSeriesReviewListView(ReviewObjectFilterView):
+    model = SampleSeries
+    filterset_class = SampleSeriesFilter
+    dashboard_url = reverse_lazy("materials-dashboard")
 
 
 class SampleSeriesCreateView(UserCreatedObjectCreateView):
@@ -552,6 +591,12 @@ class SamplePrivateListView(PrivateObjectFilterView):
     model = Sample
     filterset_class = SampleFilter
     dashboard_url = reverse_lazy("materials-explorer")
+
+
+class SampleReviewListView(ReviewObjectFilterView):
+    model = Sample
+    filterset_class = SampleFilter
+    dashboard_url = reverse_lazy("materials-dashboard")
 
 
 class FeaturedSampleListView(PublishedObjectListView):
