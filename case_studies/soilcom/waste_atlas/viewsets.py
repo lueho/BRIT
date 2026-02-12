@@ -727,11 +727,15 @@ def _get_collection_amount(country, year, waste_categories):
     # ------------------------------------------------------------------
     data = []
     for cid, (_col_id, system, _) in best.items():
-        if system == "No separate collection":
-            amount = None
-        else:
-            amount = amounts.get(cid)
-        data.append({"catchment_id": cid, "amount": amount})
+        no_collection = system == "No separate collection"
+        amount = None if no_collection else amounts.get(cid)
+        data.append(
+            {
+                "catchment_id": cid,
+                "amount": amount,
+                "no_collection": no_collection,
+            }
+        )
     return data
 
 
