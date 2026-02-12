@@ -933,6 +933,10 @@ def update_collection_names(sender, instance, created, **kwargs):
 class CollectionPropertyValue(PropertyValue):
     collection = models.ForeignKey(Collection, on_delete=models.CASCADE)
     year = models.PositiveSmallIntegerField(null=True, validators=[YEAR_VALIDATOR])
+    is_derived = models.BooleanField(
+        default=False,
+        help_text="True when this value was computed from another property (e.g. total ↔ specific via population).",
+    )
 
 
 class AggregatedCollectionPropertyValue(PropertyValue):
