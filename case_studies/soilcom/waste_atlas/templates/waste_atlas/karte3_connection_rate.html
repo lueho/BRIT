@@ -1,0 +1,48 @@
+{% extends "waste_atlas/choropleth_map.html" %}
+
+{% block atlas_config %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    WasteAtlasChoropleth.init({
+      svgId:       'atlas-svg',
+      containerId: 'map-container',
+      loadingId:   'loading-overlay',
+      country:     '{{ country }}',
+      year:        parseInt('{{ year }}', 10) || 2022,
+      title:       'Anschlussgrade an Tür-zu-Tür-Bioabfallsammlungen',
+      dataUrl:     '/waste_collection/api/waste-atlas/connection-rate/',
+      dataField:   '_classified',
+      categories: [
+        { value: '75-100', label: '100% – 75%',                 color: '#00608e' },
+        { value: '50-74',  label: '74% – 50%',                  color: '#0090cb' },
+        { value: '25-49',  label: '49% – 25%',                  color: '#7fcce9' },
+        { value: '0-24',   label: '24% – 0%',                   color: '#d1e7e6' },
+        { value: 'no_d2d', label: 'Keine Tür-zu-Tür-Sammlung',  color: '#fff696' }
+      ],
+      noDataColor: '#ffffff',
+      noDataLabel: 'Keine Daten',
+      legendTitle: 'Anschlussgrad',
+      fileBase:    'karte3_anschlussgrad',
+      transformData: function (records) {
+        return records.map(function (r) {
+          var cls;
+          if (!r.is_door_to_door) {
+            cls = 'no_d2d';
+          } else if (r.connection_rate == null) {
+            cls = null;
+          } else if (r.connection_rate >= 0.75) {
+            cls = '75-100';
+          } else if (r.connection_rate >= 0.50) {
+            cls = '50-74';
+          } else if (r.connection_rate >= 0.25) {
+            cls = '25-49';
+          } else {
+            cls = '0-24';
+          }
+          return { catchment_id: r.catchment_id, _classified: cls };
+        });
+      }
+    });
+  });
+</script>
+{% endblock atlas_config %}

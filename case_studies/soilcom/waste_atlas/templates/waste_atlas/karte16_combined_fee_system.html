@@ -1,0 +1,52 @@
+{% extends "waste_atlas/choropleth_map.html" %}
+
+{% block atlas_config %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    WasteAtlasChoropleth.init({
+      svgId:       'atlas-svg',
+      containerId: 'map-container',
+      loadingId:   'loading-overlay',
+      country:     '{{ country }}',
+      year:        parseInt('{{ year }}', 10) || 2022,
+      title:       'Gebührensysteme in Kombination (Bio × Rest)',
+      dataUrl:     '/waste_collection/api/waste-atlas/combined-fee-system/',
+      dataField:   '_classified',
+      categories: [
+        { value: 'flex_flex',    label: 'Bio flexibel, Rest flexibel',          color: '#a6cee3' },
+        { value: 'payt_payt',    label: 'Bio PAYT, Rest PAYT',                  color: '#4b2a60' },
+        { value: 'free_flex',    label: 'Bio gebührenfrei, Rest flexibel',       color: '#1f78b4' },
+        { value: 'other',        label: 'Andere Kombinationen',                  color: '#66c2a5' },
+        { value: 'no_bio',       label: 'Keine separate Bioabfallsammlung',      color: '#FFF696' }
+      ],
+      noDataColor: '#ffffff',
+      noDataLabel: 'Keine Daten',
+      legendTitle: 'Gebührensystem',
+      fileBase:    'karte16_gebuehrensystem_kombination',
+      transformData: function (records) {
+        function key(fee) {
+          if (fee === 'Flexible' || fee === 'Flexible+') return 'flex';
+          if (fee === 'Pay as you throw (PAYT)') return 'payt';
+          if (fee === 'No fee') return 'free';
+          if (fee === 'Flat fee') return 'flat';
+          return fee;
+        }
+        return records.map(function (r) {
+          var cls;
+          if (r.bio_fee === 'No separate collection') {
+            cls = 'no_bio';
+          } else {
+            var b = key(r.bio_fee);
+            var re = key(r.residual_fee);
+            if (b === 'flex' && re === 'flex') cls = 'flex_flex';
+            else if (b === 'payt' && re === 'payt') cls = 'payt_payt';
+            else if (b === 'free' && re === 'flex') cls = 'free_flex';
+            else cls = 'other';
+          }
+          return { catchment_id: r.catchment_id, _classified: cls };
+        });
+      }
+    });
+  });
+</script>
+{% endblock atlas_config %}

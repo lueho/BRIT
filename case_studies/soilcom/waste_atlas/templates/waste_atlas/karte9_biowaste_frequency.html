@@ -1,0 +1,28 @@
+{% extends "waste_atlas/choropleth_map.html" %}
+
+{% block atlas_config %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    WasteAtlasChoropleth.init({
+      svgId:       'atlas-svg',
+      containerId: 'map-container',
+      loadingId:   'loading-overlay',
+      country:     '{{ country }}',
+      year:        parseInt('{{ year }}', 10) || 2022,
+      title:       'Sammelrhythmus-Arten der Entsorger zur Bioabfallabholung',
+      dataUrl:     '/waste_collection/api/waste-atlas/biowaste-frequency-type/',
+      dataField:   'frequency_type',
+      categories: [
+        { value: 'Fixed-Seasonal',        label: 'Saisonal',                  color: '#2e8b57' },
+        { value: 'Fixed-Flexible',         label: 'Flexibel',                  color: '#4169e1' },
+        { value: 'Fixed',                  label: 'Fix',                       color: '#8c9eff' },
+        { value: 'No separate collection', label: 'Keine Tür-zu-Tür-Sammlung', color: '#fff696' }
+      ],
+      noDataColor: '#e0e0e0',
+      noDataLabel: 'Keine Daten',
+      legendTitle: 'Sammelrhythmus',
+      fileBase:    'karte9_sammelrhythmus_bioabfall'
+    });
+  });
+</script>
+{% endblock atlas_config %}

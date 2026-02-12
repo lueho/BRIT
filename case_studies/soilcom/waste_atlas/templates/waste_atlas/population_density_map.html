@@ -1,0 +1,120 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}
+  Waste Atlas — Population Density Map
+{% endblock title %}
+
+{% block meta_keywords %}
+  waste atlas, population density, choropleth, waste collection
+{% endblock meta_keywords %}
+
+{% block custom_style %}
+  <style>
+  #atlas-controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 1rem;
+    margin-bottom: 1rem;
+  }
+  #atlas-controls label { font-weight: 600; margin-right: .25rem; }
+  #atlas-controls select,
+  #atlas-controls input[type="number"] {
+    padding: .25rem .5rem;
+    border: 1px solid #ced4da;
+    border-radius: .25rem;
+  }
+  .atlas-year-input { width: 5.5rem; }
+  #map-container {
+    background: #fff;
+    border: 1px solid #dee2e6;
+    border-radius: .375rem;
+    overflow: hidden;
+    position: relative;
+  }
+  #map-container svg { display: block; }
+  .atlas-legend { font-family: 'Nunito', sans-serif; }
+  .atlas-legend text { font-size: 12px; }
+  #loading-overlay {
+    position: absolute;
+    inset: 0;
+    background: rgba(255,255,255,.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 10;
+    font-size: 1.1rem;
+    color: #555;
+  }
+  #export-buttons { margin-top: .75rem; }
+  #export-buttons .btn { margin-right: .5rem; }
+  </style>
+{% endblock custom_style %}
+
+{% block content %}
+  <h2>Waste Atlas — Population Density per Catchment</h2>
+
+  <div id="atlas-controls">
+    <div>
+      <label for="sel-country">Country</label>
+      <select id="sel-country">
+        <option value="DE" {% if country == "DE" %}selected{% endif %}>Germany (DE)</option>
+      </select>
+    </div>
+    <div>
+      <label for="sel-year">Year</label>
+      <input id="sel-year"
+             type="number"
+             min="2000"
+             max="2099"
+             value="{{ year }}"
+             class="atlas-year-input">
+    </div>
+    <button class="btn btn-primary btn-sm" id="btn-load" type="button">
+      <i class="fas fa-sync-alt"></i> Load
+    </button>
+  </div>
+
+  <div id="map-container">
+    <div id="loading-overlay">
+      <i class="fas fa-spinner fa-spin me-2"></i> Loading map data…
+    </div>
+    <svg id="atlas-svg">
+    </svg>
+  </div>
+
+  <div id="export-buttons">
+    <button class="btn btn-outline-secondary btn-sm"
+            id="btn-export-svg"
+            type="button"
+            disabled>
+      <i class="fas fa-download"></i> Download SVG
+    </button>
+    <button class="btn btn-outline-secondary btn-sm"
+            id="btn-export-png"
+            type="button"
+            disabled>
+      <i class="fas fa-image"></i> Download PNG (300 DPI)
+    </button>
+  </div>
+{% endblock content %}
+
+{% block javascript %}
+  {{ block.super }}
+  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
+  <script src="{% static 'js/waste_atlas_population_map.js' %}"></script>
+  <script>
+    document.addEventListener('DOMContentLoaded', function () {
+      var country = '{{ country }}';
+      var year = '{{ year }}';
+      WasteAtlasPopulationMap.init({
+        svgId: 'atlas-svg',
+        containerId: 'map-container',
+        loadingId: 'loading-overlay',
+        country: country,
+        year: parseInt(year, 10) || 2022,
+      });
+    });
+  </script>
+{% endblock javascript %}

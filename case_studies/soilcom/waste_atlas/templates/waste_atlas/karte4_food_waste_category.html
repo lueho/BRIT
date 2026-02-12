@@ -1,0 +1,29 @@
+{% extends "waste_atlas/choropleth_map.html" %}
+
+{% block atlas_config %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    WasteAtlasChoropleth.init({
+      svgId:       'atlas-svg',
+      containerId: 'map-container',
+      loadingId:   'loading-overlay',
+      country:     '{{ country }}',
+      year:        parseInt('{{ year }}', 10) || 2022,
+      title:       'Erlaubte Lebensmittelabfälle im Bioabfall',
+      dataUrl:     '/waste_collection/api/waste-atlas/food-waste-category/',
+      dataField:   'food_waste_category',
+      categories: [
+        { value: 'All four materials',      label: 'Alle Lebensmittelabfälle',          color: '#2c7da0' },
+        { value: 'No raw meat',             label: 'Keine rohen tierischen Produkte',   color: '#61a35c' },
+        { value: 'No meat',                 label: 'Keine tierischen Produkte',         color: '#41b6c4' },
+        { value: 'Only raw plant-based',    label: 'Nur rohe pflanzliche Produkte',     color: '#9ac93e' },
+        { value: 'No separate collection',  label: 'Keine separate Bioabfallsammlung',  color: '#fff696' }
+      ],
+      noDataColor: '#e0e0e0',
+      noDataLabel: 'Keine Daten',
+      legendTitle: 'Erlaubte Lebensmittelabfälle',
+      fileBase:    'karte4_kuechenabfall'
+    });
+  });
+</script>
+{% endblock atlas_config %}

@@ -1,0 +1,55 @@
+{% extends "waste_atlas/choropleth_map.html" %}
+
+{% block atlas_config %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    WasteAtlasChoropleth.init({
+      svgId:       'atlas-svg',
+      containerId: 'map-container',
+      loadingId:   'loading-overlay',
+      country:     '{{ country }}',
+      year:        parseInt('{{ year }}', 10) || 2022,
+      title:       'Sammelhäufigkeit in Kombination (Bio × Rest)',
+      dataUrl:     '/waste_collection/api/waste-atlas/combined-collection-count/',
+      dataField:   '_classified',
+      categories: [
+        { value: 'bio_more_res_more',     label: 'Bio öfter, Rest öfter',           color: '#64427b' },
+        { value: 'bio_more_res_bi',       label: 'Bio öfter, Rest alle zwei Wochen', color: '#9c67a5' },
+        { value: 'bio_more_res_less',     label: 'Bio öfter, Rest seltener',         color: '#c5a5cf' },
+        { value: 'bio_bi_res_more',       label: 'Bio alle zwei Wochen, Rest öfter', color: '#2862a8' },
+        { value: 'bio_bi_res_bi',         label: 'Bio alle zwei Wochen, Rest alle zwei Wochen', color: '#4292c6' },
+        { value: 'bio_bi_res_less',       label: 'Bio alle zwei Wochen, Rest seltener', color: '#73b2d8' },
+        { value: 'bio_less_res_more',     label: 'Bio seltener, Rest öfter',         color: '#e33e88' },
+        { value: 'bio_less_res_bi',       label: 'Bio seltener, Rest alle zwei Wochen', color: '#ff7986' },
+        { value: 'bio_less_res_less',     label: 'Bio seltener, Rest seltener',      color: '#f7b1b8' },
+        { value: 'no_bio',               label: 'Keine Tür-zu-Tür Bioabfallsammlung', color: '#fff696' }
+      ],
+      noDataColor: '#ffffff',
+      noDataLabel: 'Keine Daten',
+      legendTitle: 'Sammelhäufigkeit',
+      fileBase:    'karte13_haeufigkeit_kombination',
+      transformData: function (records) {
+        function bucket(count) {
+          if (count === null || count === undefined) return null;
+          if (count > 26) return 'more';
+          if (count >= 24) return 'bi';
+          return 'less';
+        }
+        return records.map(function (r) {
+          var b = bucket(r.bio_count);
+          var re = bucket(r.residual_count);
+          var cls;
+          if (b === null) {
+            cls = 'no_bio';
+          } else if (re === null) {
+            cls = null;
+          } else {
+            cls = 'bio_' + b + '_res_' + re;
+          }
+          return { catchment_id: r.catchment_id, _classified: cls };
+        });
+      }
+    });
+  });
+</script>
+{% endblock atlas_config %}
