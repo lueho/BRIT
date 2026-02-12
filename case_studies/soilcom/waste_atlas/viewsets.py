@@ -1,5 +1,4 @@
 from django.db.models import (
-    Avg,
     Case,
     CharField,
     Exists,
@@ -658,9 +657,13 @@ _AMOUNT_YEARS = (2020, 2021)
 def _get_collection_amount(country, year, waste_categories):
     """Return per-catchment average collection amount (kg/person/year).
 
-    Uses ``CollectionPropertyValue`` first, falling back to
-    ``AggregatedCollectionPropertyValue`` if no direct value exists.
+    Looks up ``CollectionPropertyValue`` for **any** collection in the same
+    catchment and waste-category group (not just the selected year's
+    collection), falling back to ``AggregatedCollectionPropertyValue``.
+    This ensures data entered against earlier-year collections is still
+    found when viewing a newer year.
     """
+    # Step 1: pick primary collection system per catchment for the selected year
     rows = (
         Collection.objects.filter(
             valid_from__year=year,
@@ -677,42 +680,66 @@ def _get_collection_amount(country, year, waste_categories):
         if cid not in best or p < best[cid][2]:
             best[cid] = (col_id, system, p)
 
-    collection_ids = [v[0] for v in best.values()]
+    catchment_ids = list(best.keys())
 
-    # Direct property values (avg over 2020-2021)
+    # Step 2: find ALL collections (any year) for these catchments + categories
+    all_col_rows = Collection.objects.filter(
+        catchment_id__in=catchment_ids,
+        waste_stream__category__name__in=waste_categories,
+    ).values_list("id", "catchment_id")
+    # Map: catchment_id -> set of collection IDs (across all years)
+    cid_to_cols: dict[int, set[int]] = {}
+    all_collection_ids: set[int] = set()
+    for col_id, cid in all_col_rows:
+        cid_to_cols.setdefault(cid, set()).add(col_id)
+        all_collection_ids.add(col_id)
+
+    # Reverse map: collection_id -> catchment_id
+    col_to_cid: dict[int, int] = {}
+    for cid, col_ids in cid_to_cols.items():
+        for col_id in col_ids:
+            col_to_cid[col_id] = cid
+
+    # Step 3: direct CPV values (avg over 2020-2021), grouped by catchment
     cpv_qs = (
         CollectionPropertyValue.objects.filter(
-            collection_id__in=collection_ids,
+            collection_id__in=all_collection_ids,
             property_id=_COLLECTION_AMOUNT_PROPERTY_ID,
             year__in=_AMOUNT_YEARS,
         )
         .exclude(average=0)
-        .values("collection_id")
+        .values_list("collection_id", "average")
     )
+    cpv_by_catchment: dict[int, list[float]] = {}
+    for col_id, avg in cpv_qs:
+        cid = col_to_cid.get(col_id)
+        if cid is not None:
+            cpv_by_catchment.setdefault(cid, []).append(avg)
 
-    cpv_avgs = {
-        row["collection_id"]: row["avg"] for row in cpv_qs.annotate(avg=Avg("average"))
-    }
-
-    # Aggregated fallback (avg over 2020-2021)
+    # Step 4: aggregated fallback, grouped by catchment
     agg_qs = (
         AggregatedCollectionPropertyValue.objects.filter(
-            collections__id__in=collection_ids,
+            collections__id__in=all_collection_ids,
             property_id=_COLLECTION_AMOUNT_PROPERTY_ID,
             year__in=_AMOUNT_YEARS,
         )
         .exclude(average=0)
-        .values("collections__id")
-        .annotate(avg=Avg("average"))
+        .values_list("collections__id", "average")
     )
-    agg_avgs = {row["collections__id"]: row["avg"] for row in agg_qs}
+    agg_by_catchment: dict[int, list[float]] = {}
+    for col_id, avg in agg_qs:
+        cid = col_to_cid.get(col_id)
+        if cid is not None and cid not in cpv_by_catchment:
+            agg_by_catchment.setdefault(cid, []).append(avg)
 
+    # Step 5: compute per-catchment average
     data = []
-    for cid, (col_id, system, _) in best.items():
+    for cid, (_col_id, system, _) in best.items():
         if system == "No separate collection":
             amount = None
         else:
-            amount = cpv_avgs.get(col_id) or agg_avgs.get(col_id)
+            vals = cpv_by_catchment.get(cid) or agg_by_catchment.get(cid)
+            amount = sum(vals) / len(vals) if vals else None
         data.append({"catchment_id": cid, "amount": amount})
     return data
 
