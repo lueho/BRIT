@@ -649,21 +649,34 @@ class CombinedFeeSystemViewSet(viewsets.ViewSet):
         return Response(serializer.data)
 
 
-# Property ID for "specific waste collected" (collection amounts)
-_COLLECTION_AMOUNT_PROPERTY_ID = 1
-_AMOUNT_YEARS = (2020, 2021)
+# Property IDs (properties_property table)
+_SPECIFIC_WASTE_PROPERTY_ID = 1  # "specific waste collected" (kg/person/a)
+_TOTAL_WASTE_PROPERTY_ID = 9  # "total waste collected" (Mg/a)
+_MG_TO_KG = 1000  # conversion factor: 1 Mg = 1000 kg
+
+# For the 2022 atlas version the actual 2022 amounts were not yet
+# available, so the average of 2020 and 2021 is used instead.
+_2022_AMOUNT_YEARS = (2020, 2021)
 
 
 def _get_collection_amount(country, year, waste_categories):
-    """Return per-catchment average collection amount (kg/person/year).
+    """Return per-catchment collection amount in kg/person/year.
 
-    Looks up ``CollectionPropertyValue`` for **any** collection in the same
-    catchment and waste-category group (not just the selected year's
-    collection), falling back to ``AggregatedCollectionPropertyValue``.
-    This ensures data entered against earlier-year collections is still
-    found when viewing a newer year.
+    Strategy varies by atlas year:
+
+    * **2022** – average of ``specific waste collected`` (property 1) over
+      2020–2021, with ``AggregatedCollectionPropertyValue`` as fallback.
+    * **2024** – ``specific waste collected`` for 2024 directly.  Where
+      only ``total waste collected`` (property 9, in Mg/a) is available
+      the specific amount is derived as ``total * 1000 / population``.
+
+    Data is looked up across **all** collections for a catchment (any
+    year) so that values attached to an earlier collection version are
+    still found.
     """
-    # Step 1: pick primary collection system per catchment for the selected year
+    # ------------------------------------------------------------------
+    # Step 1: pick primary collection system per catchment
+    # ------------------------------------------------------------------
     rows = (
         Collection.objects.filter(
             valid_from__year=year,
@@ -682,30 +695,53 @@ def _get_collection_amount(country, year, waste_categories):
 
     catchment_ids = list(best.keys())
 
-    # Step 2: find ALL collections (any year) for these catchments + categories
+    # ------------------------------------------------------------------
+    # Step 2: map catchments → all collection IDs (any year)
+    # ------------------------------------------------------------------
     all_col_rows = Collection.objects.filter(
         catchment_id__in=catchment_ids,
         waste_stream__category__name__in=waste_categories,
     ).values_list("id", "catchment_id")
-    # Map: catchment_id -> set of collection IDs (across all years)
+
     cid_to_cols: dict[int, set[int]] = {}
     all_collection_ids: set[int] = set()
     for col_id, cid in all_col_rows:
         cid_to_cols.setdefault(cid, set()).add(col_id)
         all_collection_ids.add(col_id)
 
-    # Reverse map: collection_id -> catchment_id
     col_to_cid: dict[int, int] = {}
     for cid, col_ids in cid_to_cols.items():
         for col_id in col_ids:
             col_to_cid[col_id] = cid
 
-    # Step 3: direct CPV values (avg over 2020-2021), grouped by catchment
+    # ------------------------------------------------------------------
+    # Step 3: look up amounts (strategy depends on year)
+    # ------------------------------------------------------------------
+    if year == 2022:
+        amounts = _amounts_for_2022(all_collection_ids, col_to_cid)
+    else:
+        amounts = _amounts_for_2024(year, all_collection_ids, col_to_cid, catchment_ids)
+
+    # ------------------------------------------------------------------
+    # Step 4: build result list
+    # ------------------------------------------------------------------
+    data = []
+    for cid, (_col_id, system, _) in best.items():
+        if system == "No separate collection":
+            amount = None
+        else:
+            amount = amounts.get(cid)
+        data.append({"catchment_id": cid, "amount": amount})
+    return data
+
+
+def _amounts_for_2022(all_collection_ids, col_to_cid):
+    """Average of *specific waste collected* over 2020–2021 per catchment."""
     cpv_qs = (
         CollectionPropertyValue.objects.filter(
             collection_id__in=all_collection_ids,
-            property_id=_COLLECTION_AMOUNT_PROPERTY_ID,
-            year__in=_AMOUNT_YEARS,
+            property_id=_SPECIFIC_WASTE_PROPERTY_ID,
+            year__in=_2022_AMOUNT_YEARS,
         )
         .exclude(average=0)
         .values_list("collection_id", "average")
@@ -716,32 +752,102 @@ def _get_collection_amount(country, year, waste_categories):
         if cid is not None:
             cpv_by_catchment.setdefault(cid, []).append(avg)
 
-    # Step 4: aggregated fallback, grouped by catchment
-    agg_qs = (
-        AggregatedCollectionPropertyValue.objects.filter(
-            collections__id__in=all_collection_ids,
-            property_id=_COLLECTION_AMOUNT_PROPERTY_ID,
-            year__in=_AMOUNT_YEARS,
+    # Aggregated fallback
+    missing_cols = {
+        col_id for col_id, cid in col_to_cid.items() if cid not in cpv_by_catchment
+    }
+    if missing_cols:
+        agg_qs = (
+            AggregatedCollectionPropertyValue.objects.filter(
+                collections__id__in=missing_cols,
+                property_id=_SPECIFIC_WASTE_PROPERTY_ID,
+                year__in=_2022_AMOUNT_YEARS,
+            )
+            .exclude(average=0)
+            .values_list("collections__id", "average")
+        )
+        for col_id, avg in agg_qs:
+            cid = col_to_cid.get(col_id)
+            if cid is not None and cid not in cpv_by_catchment:
+                cpv_by_catchment.setdefault(cid, []).append(avg)
+
+    return {cid: sum(vals) / len(vals) for cid, vals in cpv_by_catchment.items()}
+
+
+def _amounts_for_2024(year, all_collection_ids, col_to_cid, catchment_ids):
+    """Specific waste collected for *year* directly, with total/population fallback."""
+    # --- direct specific values (property 1, exact year) ---------------
+    cpv_qs = (
+        CollectionPropertyValue.objects.filter(
+            collection_id__in=all_collection_ids,
+            property_id=_SPECIFIC_WASTE_PROPERTY_ID,
+            year=year,
         )
         .exclude(average=0)
-        .values_list("collections__id", "average")
+        .values_list("collection_id", "average")
     )
-    agg_by_catchment: dict[int, list[float]] = {}
-    for col_id, avg in agg_qs:
+    result: dict[int, float] = {}
+    for col_id, avg in cpv_qs:
         cid = col_to_cid.get(col_id)
-        if cid is not None and cid not in cpv_by_catchment:
-            agg_by_catchment.setdefault(cid, []).append(avg)
+        if cid is not None and cid not in result:
+            result[cid] = avg
 
-    # Step 5: compute per-catchment average
-    data = []
-    for cid, (_col_id, system, _) in best.items():
-        if system == "No separate collection":
-            amount = None
-        else:
-            vals = cpv_by_catchment.get(cid) or agg_by_catchment.get(cid)
-            amount = sum(vals) / len(vals) if vals else None
-        data.append({"catchment_id": cid, "amount": amount})
-    return data
+    # --- fallback: total waste (property 9) / population ---------------
+    missing_cids = [cid for cid in catchment_ids if cid not in result]
+    if not missing_cids:
+        return result
+
+    # Collect total waste values keyed by catchment
+    missing_cols = {
+        col_id for col_id, cid in col_to_cid.items() if cid in set(missing_cids)
+    }
+    total_qs = (
+        CollectionPropertyValue.objects.filter(
+            collection_id__in=missing_cols,
+            property_id=_TOTAL_WASTE_PROPERTY_ID,
+            year=year,
+        )
+        .exclude(average=0)
+        .values_list("collection_id", "average")
+    )
+    total_by_catchment: dict[int, float] = {}
+    for col_id, avg in total_qs:
+        cid = col_to_cid.get(col_id)
+        if cid is not None and cid not in total_by_catchment:
+            total_by_catchment[cid] = avg
+
+    if not total_by_catchment:
+        return result
+
+    # Load population for those catchments
+    pop_qs = (
+        RegionAttributeValue.objects.filter(
+            region__catchment__id__in=list(total_by_catchment.keys()),
+            attribute_id=POPULATION_ATTRIBUTE_ID,
+        )
+        .order_by("region_id", "-date")
+        .distinct("region_id")
+        .values_list("region_id", "value")
+    )
+    # Map region_id → population
+    region_pop: dict[int, float] = dict(pop_qs)
+
+    # Map catchment_id → region_id
+    catchment_regions = dict(
+        CollectionCatchment.objects.filter(
+            id__in=list(total_by_catchment.keys()),
+        ).values_list("id", "region_id")
+    )
+
+    for cid, total_mg in total_by_catchment.items():
+        region_id = catchment_regions.get(cid)
+        if region_id is None:
+            continue
+        pop = region_pop.get(region_id)
+        if pop and pop > 0:
+            result[cid] = round(total_mg * _MG_TO_KG / pop, 1)
+
+    return result
 
 
 class ResidualCollectionAmountViewSet(viewsets.ViewSet):
