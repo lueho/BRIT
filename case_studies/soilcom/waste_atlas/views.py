@@ -26,7 +26,7 @@ class AtlasMapView(WasteAtlasGroupMixin, TemplateView):
         """Pass country, year, and map_title to the template."""
         ctx = super().get_context_data(**kwargs)
         ctx["country"] = self.request.GET.get("country", "DE")
-        ctx["year"] = self.request.GET.get("year", "2022")
+        ctx["year"] = self.request.GET.get("year", "2024")
         ctx["map_title"] = self.map_title
         return ctx
 
