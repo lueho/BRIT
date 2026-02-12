@@ -1,0 +1,128 @@
+from rest_framework import routers
+
+from .viewsets import (
+    BiowasteCollectionAmountViewSet,
+    BiowasteCollectionCountViewSet,
+    BiowasteFeeSystemViewSet,
+    BiowasteFrequencyTypeViewSet,
+    CatchmentPopulationViewSet,
+    CatchmentViewSet,
+    CollectionSupportViewSet,
+    CollectionSystemViewSet,
+    CombinedCollectionCountViewSet,
+    CombinedFeeSystemViewSet,
+    CombinedFrequencyTypeViewSet,
+    ConnectionRateViewSet,
+    FoodWasteCategoryViewSet,
+    OrgaLevelViewSet,
+    PaperBagsStatusViewSet,
+    PlasticBagsStatusViewSet,
+    ResidualCollectionAmountViewSet,
+    ResidualCollectionCountViewSet,
+    ResidualFeeSystemViewSet,
+    ResidualFrequencyTypeViewSet,
+    WasteRatioViewSet,
+)
+
+router = routers.DefaultRouter()
+router.register("catchment", CatchmentViewSet, basename="api-waste-atlas-catchment")
+router.register(
+    "population",
+    CatchmentPopulationViewSet,
+    basename="api-waste-atlas-population",
+)
+router.register(
+    "orga-level",
+    OrgaLevelViewSet,
+    basename="api-waste-atlas-orga-level",
+)
+router.register(
+    "collection-system",
+    CollectionSystemViewSet,
+    basename="api-waste-atlas-collection-system",
+)
+router.register(
+    "connection-rate",
+    ConnectionRateViewSet,
+    basename="api-waste-atlas-connection-rate",
+)
+router.register(
+    "food-waste-category",
+    FoodWasteCategoryViewSet,
+    basename="api-waste-atlas-food-waste-category",
+)
+router.register(
+    "paper-bags",
+    PaperBagsStatusViewSet,
+    basename="api-waste-atlas-paper-bags",
+)
+router.register(
+    "plastic-bags",
+    PlasticBagsStatusViewSet,
+    basename="api-waste-atlas-plastic-bags",
+)
+router.register(
+    "collection-support",
+    CollectionSupportViewSet,
+    basename="api-waste-atlas-collection-support",
+)
+router.register(
+    "residual-frequency-type",
+    ResidualFrequencyTypeViewSet,
+    basename="api-waste-atlas-residual-frequency-type",
+)
+router.register(
+    "biowaste-frequency-type",
+    BiowasteFrequencyTypeViewSet,
+    basename="api-waste-atlas-biowaste-frequency-type",
+)
+router.register(
+    "combined-frequency-type",
+    CombinedFrequencyTypeViewSet,
+    basename="api-waste-atlas-combined-frequency-type",
+)
+router.register(
+    "residual-collection-count",
+    ResidualCollectionCountViewSet,
+    basename="api-waste-atlas-residual-collection-count",
+)
+router.register(
+    "biowaste-collection-count",
+    BiowasteCollectionCountViewSet,
+    basename="api-waste-atlas-biowaste-collection-count",
+)
+router.register(
+    "combined-collection-count",
+    CombinedCollectionCountViewSet,
+    basename="api-waste-atlas-combined-collection-count",
+)
+router.register(
+    "residual-fee-system",
+    ResidualFeeSystemViewSet,
+    basename="api-waste-atlas-residual-fee-system",
+)
+router.register(
+    "biowaste-fee-system",
+    BiowasteFeeSystemViewSet,
+    basename="api-waste-atlas-biowaste-fee-system",
+)
+router.register(
+    "combined-fee-system",
+    CombinedFeeSystemViewSet,
+    basename="api-waste-atlas-combined-fee-system",
+)
+router.register(
+    "residual-collection-amount",
+    ResidualCollectionAmountViewSet,
+    basename="api-waste-atlas-residual-collection-amount",
+)
+router.register(
+    "biowaste-collection-amount",
+    BiowasteCollectionAmountViewSet,
+    basename="api-waste-atlas-biowaste-collection-amount",
+)
+router.register(
+    "waste-ratio",
+    WasteRatioViewSet,
+    basename="api-waste-atlas-waste-ratio",
+)

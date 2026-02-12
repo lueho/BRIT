@@ -542,6 +542,7 @@ urlpatterns = [
         name="WasteCollectionIframe",
     ),
     path("api/", include(router.urls)),
+    path("api/waste-atlas/", include("case_studies.soilcom.waste_atlas.urls")),
     path(
         "collections/export/",
         views.CollectionListFileExportView.as_view(),

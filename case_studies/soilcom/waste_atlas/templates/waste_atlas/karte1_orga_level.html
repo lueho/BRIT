@@ -1,0 +1,27 @@
+{% extends "waste_atlas/choropleth_map.html" %}
+
+{% block atlas_config %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    WasteAtlasChoropleth.init({
+      svgId:       'atlas-svg',
+      containerId: 'map-container',
+      loadingId:   'loading-overlay',
+      country:     '{{ country }}',
+      year:        parseInt('{{ year }}', 10) || 2022,
+      title:       'Administrative Ebene der Abfallsammlung',
+      dataUrl:     '/waste_collection/api/waste-atlas/orga-level/',
+      dataField:   'orga_level',
+      categories: [
+        { value: 'nuts', label: 'Landkreise & kreisfreie Städte', color: '#93d163' },
+        { value: 'lau',  label: 'Kommunalebene',                  color: '#72a0dd' },
+        { value: 'individual', label: 'Andere administrative Ebene', color: '#d491f3' }
+      ],
+      noDataColor: '#e0e0e0',
+      noDataLabel: 'Keine Daten',
+      legendTitle: 'Organisationsebene',
+      fileBase:    'karte1_orga_level'
+    });
+  });
+</script>
+{% endblock atlas_config %}

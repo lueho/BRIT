@@ -1,0 +1,51 @@
+{% extends "waste_atlas/choropleth_map.html" %}
+
+{% block atlas_config %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    WasteAtlasChoropleth.init({
+      svgId:       'atlas-svg',
+      containerId: 'map-container',
+      loadingId:   'loading-overlay',
+      country:     '{{ country }}',
+      year:        parseInt('{{ year }}', 10) || 2022,
+      title:       'Sammelrhythmus in Kombination (Bio × Rest)',
+      dataUrl:     '/waste_collection/api/waste-atlas/combined-frequency-type/',
+      dataField:   '_classified',
+      categories: [
+        { value: 'bio_seasonal_res_flexible', label: 'Bio saisonal, Rest flexibel',  color: '#2e8b57' },
+        { value: 'bio_flexible_res_flexible', label: 'Bio flexibel, Rest flexibel',  color: '#4169e1' },
+        { value: 'bio_fixed_res_flexible',    label: 'Bio fix, Rest flexibel',       color: '#8c9eff' },
+        { value: 'bio_seasonal_res_fixed',    label: 'Bio saisonal, Rest fix',       color: '#66cdaa' },
+        { value: 'bio_flexible_res_fixed',    label: 'Bio flexibel, Rest fix',       color: '#e08840' },
+        { value: 'bio_fixed_res_fixed',       label: 'Bio fix, Rest fix',            color: '#b0b0ff' },
+        { value: 'no_bio_collection',         label: 'Keine Tür-zu-Tür-Bioabfallsammlung', color: '#fff696' }
+      ],
+      noDataColor: '#ffffff',
+      noDataLabel: 'Keine Daten',
+      legendTitle: 'Sammelrhythmus',
+      fileBase:    'karte10_sammelrhythmus_kombination',
+      transformData: function (records) {
+        var TYPE_KEY = {
+          'Fixed':          'fixed',
+          'Fixed-Flexible': 'flexible',
+          'Fixed-Seasonal': 'seasonal'
+        };
+        var NO_BIO = ['No separate collection', 'Bring point', 'Recycling centre',
+                      'On demand kerbside collection', 'Home-composting'];
+        return records.map(function (r) {
+          var cls;
+          if (NO_BIO.indexOf(r.bio_frequency) !== -1) {
+            cls = 'no_bio_collection';
+          } else {
+            var b = TYPE_KEY[r.bio_frequency] || 'unknown';
+            var re = TYPE_KEY[r.residual_frequency] || 'unknown';
+            cls = 'bio_' + b + '_res_' + re;
+          }
+          return { catchment_id: r.catchment_id, _classified: cls };
+        });
+      }
+    });
+  });
+</script>
+{% endblock atlas_config %}

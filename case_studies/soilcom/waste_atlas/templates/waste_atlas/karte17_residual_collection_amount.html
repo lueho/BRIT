@@ -1,0 +1,45 @@
+{% extends "waste_atlas/choropleth_map.html" %}
+
+{% block atlas_config %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    WasteAtlasChoropleth.init({
+      svgId:       'atlas-svg',
+      containerId: 'map-container',
+      loadingId:   'loading-overlay',
+      country:     '{{ country }}',
+      year:        parseInt('{{ year }}', 10) || 2022,
+      title:       'Spezifisch gesammelte Menge an Restmüll pro Person und Jahr',
+      dataUrl:     '/waste_collection/api/waste-atlas/residual-collection-amount/',
+      dataField:   '_classified',
+      categories: [
+        { value: 'high',      label: '226 – 311 kg (Viel)',       color: '#d95f0e' },
+        { value: 'medium',    label: '151 – 225 kg (Mittel)',     color: '#fe9929' },
+        { value: 'low',       label: '76 – 150 kg (Wenig)',       color: '#fed98e' },
+        { value: 'very_low',  label: '0 – 75 kg (Sehr wenig)',    color: '#ffffd4' }
+      ],
+      noDataColor: '#e0e0e0',
+      noDataLabel: 'Keine Daten',
+      legendTitle: 'Sammelmenge (kg/P/a)',
+      fileBase:    'karte17_sammelmengen_restmuell',
+      transformData: function (records) {
+        return records.map(function (r) {
+          var cls;
+          if (r.amount === null) {
+            cls = null;
+          } else if (r.amount > 225) {
+            cls = 'high';
+          } else if (r.amount > 150) {
+            cls = 'medium';
+          } else if (r.amount > 75) {
+            cls = 'low';
+          } else {
+            cls = 'very_low';
+          }
+          return { catchment_id: r.catchment_id, _classified: cls };
+        });
+      }
+    });
+  });
+</script>
+{% endblock atlas_config %}

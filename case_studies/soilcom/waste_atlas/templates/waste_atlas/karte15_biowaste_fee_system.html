@@ -1,0 +1,30 @@
+{% extends "waste_atlas/choropleth_map.html" %}
+
+{% block atlas_config %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    WasteAtlasChoropleth.init({
+      svgId:       'atlas-svg',
+      containerId: 'map-container',
+      loadingId:   'loading-overlay',
+      country:     '{{ country }}',
+      year:        parseInt('{{ year }}', 10) || 2022,
+      title:       'Gebührensysteme der Bioabfallabholung',
+      dataUrl:     '/waste_collection/api/waste-atlas/biowaste-fee-system/',
+      dataField:   'fee_system',
+      categories: [
+        { value: 'Flat fee',                label: 'Flat rate',                         color: '#228B22' },
+        { value: 'Flexible',                label: 'Flexibel',                          color: '#00ced1' },
+        { value: 'Flexible+',               label: 'Flexibel+',                         color: '#FFD700' },
+        { value: 'Pay as you throw (PAYT)', label: 'Pay as you throw',                  color: '#4b2a60' },
+        { value: 'No fee',                  label: 'Gebührenfrei',                       color: '#e41a1c' },
+        { value: 'No separate collection',  label: 'Keine separate Bioabfallsammlung',   color: '#FFF696' }
+      ],
+      noDataColor: '#ffffff',
+      noDataLabel: 'Keine Daten',
+      legendTitle: 'Gebührensystem',
+      fileBase:    'karte15_gebuehrensystem_bioabfall'
+    });
+  });
+</script>
+{% endblock atlas_config %}

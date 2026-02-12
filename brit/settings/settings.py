@@ -54,6 +54,7 @@ INSTALLED_APPS = [
     "case_studies.flexibi_nantes.apps.CaseStudyNantesConfig",
     "case_studies.flexibi_hamburg.apps.FlexibiHamburgConfig",
     "case_studies.soilcom.apps.SoilcomConfig",
+    "case_studies.soilcom.waste_atlas.apps.WasteAtlasConfig",
     "case_studies.closecycle.apps.ClosecycleConfig",
     "interfaces.simucf.apps.SimucfConfig",
     "utils.file_export.apps.FileExportConfig",

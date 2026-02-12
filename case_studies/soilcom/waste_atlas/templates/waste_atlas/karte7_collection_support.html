@@ -1,0 +1,49 @@
+{% extends "waste_atlas/choropleth_map.html" %}
+
+{% block atlas_config %}
+<script>
+  document.addEventListener('DOMContentLoaded', function () {
+    WasteAtlasChoropleth.init({
+      svgId:       'atlas-svg',
+      containerId: 'map-container',
+      loadingId:   'loading-overlay',
+      country:     '{{ country }}',
+      year:        parseInt('{{ year }}', 10) || 2022,
+      title:       'Erlaubte Materialien für Sammelhilfen zur Bioabfalltrennung',
+      dataUrl:     '/waste_collection/api/waste-atlas/collection-support/',
+      dataField:   '_classified',
+      categories: [
+        { value: 'paper_a_plastic_a', label: 'Papier erlaubt, BAK erlaubt',       color: '#4caf50' },
+        { value: 'paper_f_plastic_a', label: 'Papier verboten, BAK erlaubt',      color: '#fdd835' },
+        { value: 'paper_a_plastic_f', label: 'Papier erlaubt, BAK verboten',      color: '#2196f3' },
+        { value: 'paper_a_plastic_n', label: 'Papier erlaubt, BAK keine Daten',   color: '#90caf9' },
+        { value: 'paper_f_plastic_f', label: 'Papier verboten, BAK verboten',     color: '#7e57c2' },
+        { value: 'paper_n_plastic_f', label: 'Papier keine Daten, BAK verboten',  color: '#ff7043' },
+        { value: 'no_collection',     label: 'Keine getrennte Bioabfallsammlung',  color: '#fff696' }
+      ],
+      noDataColor: '#ffffff',
+      noDataLabel: 'Keine Daten',
+      legendTitle: 'Sammelhilfen',
+      fileBase:    'karte7_sammelhilfen',
+      transformData: function (records) {
+        var KEY_MAP = {
+          'allowed':  'a',
+          'forbidden': 'f',
+          'no_data':  'n'
+        };
+        return records.map(function (r) {
+          var cls;
+          if (r.paper_bags === 'no_collection') {
+            cls = 'no_collection';
+          } else {
+            var p = KEY_MAP[r.paper_bags] || 'n';
+            var b = KEY_MAP[r.plastic_bags] || 'n';
+            cls = 'paper_' + p + '_plastic_' + b;
+          }
+          return { catchment_id: r.catchment_id, _classified: cls };
+        });
+      }
+    });
+  });
+</script>
+{% endblock atlas_config %}
