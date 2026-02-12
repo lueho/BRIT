@@ -94,3 +94,46 @@ def invalidate_collection_geojson_cache(sender, instance, **kwargs):
         logger.exception(
             "Failed to clear collection_geojson cache on Collection change"
         )
+
+
+# ---------------------------------------------------------------------------
+# Derived CollectionPropertyValue (specific ↔ total waste collected)
+# ---------------------------------------------------------------------------
+
+_CONVERTIBLE_PROPERTY_IDS = frozenset({1, 9})  # specific / total waste
+
+
+def sync_derived_cpv_on_save(sender, instance, **kwargs):
+    """Create or update the derived counterpart when a source CPV is saved."""
+    if instance.is_derived:
+        return
+    if instance.property_id not in _CONVERTIBLE_PROPERTY_IDS:
+        return
+
+    from .derived_values import create_or_update_derived_cpv
+
+    try:
+        create_or_update_derived_cpv(instance)
+    except Exception:
+        logger.exception(
+            "Failed to sync derived CPV for CollectionPropertyValue id=%s",
+            instance.pk,
+        )
+
+
+def sync_derived_cpv_on_delete(sender, instance, **kwargs):
+    """Delete derived counterparts when a source CPV is deleted."""
+    if instance.is_derived:
+        return
+    if instance.property_id not in _CONVERTIBLE_PROPERTY_IDS:
+        return
+
+    from .derived_values import delete_derived_cpv
+
+    try:
+        delete_derived_cpv(instance)
+    except Exception:
+        logger.exception(
+            "Failed to delete derived CPV for CollectionPropertyValue id=%s",
+            instance.pk,
+        )

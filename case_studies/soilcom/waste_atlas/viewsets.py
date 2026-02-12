@@ -651,8 +651,6 @@ class CombinedFeeSystemViewSet(viewsets.ViewSet):
 
 # Property IDs (properties_property table)
 _SPECIFIC_WASTE_PROPERTY_ID = 1  # "specific waste collected" (kg/person/a)
-_TOTAL_WASTE_PROPERTY_ID = 9  # "total waste collected" (Mg/a)
-_MG_TO_KG = 1000  # conversion factor: 1 Mg = 1000 kg
 
 # For the 2022 atlas version the actual 2022 amounts were not yet
 # available, so the average of 2020 and 2021 is used instead.
@@ -666,9 +664,9 @@ def _get_collection_amount(country, year, waste_categories):
 
     * **2022** – average of ``specific waste collected`` (property 1) over
       2020–2021, with ``AggregatedCollectionPropertyValue`` as fallback.
-    * **2024** – ``specific waste collected`` for 2024 directly.  Where
-      only ``total waste collected`` (property 9, in Mg/a) is available
-      the specific amount is derived as ``total * 1000 / population``.
+    * **2024** – ``specific waste collected`` for 2024 directly.  Derived
+      CPV records (computed from total waste / population) are included
+      automatically via the ``is_derived`` mechanism.
 
     Data is looked up across **all** collections for a catchment (any
     year) so that values attached to an earlier collection version are
@@ -720,7 +718,7 @@ def _get_collection_amount(country, year, waste_categories):
     if year == 2022:
         amounts = _amounts_for_2022(all_collection_ids, col_to_cid)
     else:
-        amounts = _amounts_for_2024(year, all_collection_ids, col_to_cid, catchment_ids)
+        amounts = _amounts_for_2024(year, all_collection_ids, col_to_cid)
 
     # ------------------------------------------------------------------
     # Step 4: build result list
@@ -778,9 +776,13 @@ def _amounts_for_2022(all_collection_ids, col_to_cid):
     return {cid: sum(vals) / len(vals) for cid, vals in cpv_by_catchment.items()}
 
 
-def _amounts_for_2024(year, all_collection_ids, col_to_cid, catchment_ids):
-    """Specific waste collected for *year* directly, with total/population fallback."""
-    # --- direct specific values (property 1, exact year) ---------------
+def _amounts_for_2024(year, all_collection_ids, col_to_cid):
+    """Specific waste collected for *year* directly.
+
+    Derived CPV records (computed from total waste / population) are
+    stored in the database with ``is_derived=True`` and are picked up
+    by this query automatically.
+    """
     cpv_qs = (
         CollectionPropertyValue.objects.filter(
             collection_id__in=all_collection_ids,
@@ -795,62 +797,6 @@ def _amounts_for_2024(year, all_collection_ids, col_to_cid, catchment_ids):
         cid = col_to_cid.get(col_id)
         if cid is not None and cid not in result:
             result[cid] = avg
-
-    # --- fallback: total waste (property 9) / population ---------------
-    missing_cids = [cid for cid in catchment_ids if cid not in result]
-    if not missing_cids:
-        return result
-
-    # Collect total waste values keyed by catchment
-    missing_cols = {
-        col_id for col_id, cid in col_to_cid.items() if cid in set(missing_cids)
-    }
-    total_qs = (
-        CollectionPropertyValue.objects.filter(
-            collection_id__in=missing_cols,
-            property_id=_TOTAL_WASTE_PROPERTY_ID,
-            year=year,
-        )
-        .exclude(average=0)
-        .values_list("collection_id", "average")
-    )
-    total_by_catchment: dict[int, float] = {}
-    for col_id, avg in total_qs:
-        cid = col_to_cid.get(col_id)
-        if cid is not None and cid not in total_by_catchment:
-            total_by_catchment[cid] = avg
-
-    if not total_by_catchment:
-        return result
-
-    # Load population for those catchments
-    pop_qs = (
-        RegionAttributeValue.objects.filter(
-            region__catchment__id__in=list(total_by_catchment.keys()),
-            attribute_id=POPULATION_ATTRIBUTE_ID,
-        )
-        .order_by("region_id", "-date")
-        .distinct("region_id")
-        .values_list("region_id", "value")
-    )
-    # Map region_id → population
-    region_pop: dict[int, float] = dict(pop_qs)
-
-    # Map catchment_id → region_id
-    catchment_regions = dict(
-        CollectionCatchment.objects.filter(
-            id__in=list(total_by_catchment.keys()),
-        ).values_list("id", "region_id")
-    )
-
-    for cid, total_mg in total_by_catchment.items():
-        region_id = catchment_regions.get(cid)
-        if region_id is None:
-            continue
-        pop = region_pop.get(region_id)
-        if pop and pop > 0:
-            result[cid] = round(total_mg * _MG_TO_KG / pop, 1)
-
     return result
 
 
