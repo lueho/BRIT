@@ -940,6 +940,34 @@ class CollectionCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTes
         response = self.client.get(self.get_detail_url(self.published_object.pk))
         self.assertContains(response, "https://www.test-flyer.org")
 
+    def test_detail_context_includes_material_lists(self):
+        response = self.client.get(self.get_detail_url(self.published_object.pk))
+
+        self.assertIn("allowed_materials", response.context)
+        self.assertIn("forbidden_materials", response.context)
+        self.assertIn(self.allowed_material_1, response.context["allowed_materials"])
+        self.assertIn(self.allowed_material_2, response.context["allowed_materials"])
+        self.assertIn(
+            self.forbidden_material_1, response.context["forbidden_materials"]
+        )
+        self.assertIn(
+            self.forbidden_material_2, response.context["forbidden_materials"]
+        )
+
+    def test_detail_context_includes_samples_list(self):
+        sample = Sample.objects.create(
+            name="Detail Sample",
+            material=self.allowed_material_1,
+            publication_status="published",
+        )
+        self.published_object.samples.add(sample)
+
+        response = self.client.get(self.get_detail_url(self.published_object.pk))
+
+        self.assertIn("samples", response.context)
+        self.assertIn(sample, response.context["samples"])
+        self.assertContains(response, "Detail Sample")
+
     def test_uses_custom_template(self):
         self.client.force_login(self.owner_user)
         response = self.client.get(self.get_update_url(self.unpublished_object.pk))

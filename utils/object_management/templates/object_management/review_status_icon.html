@@ -5,7 +5,9 @@ Usage: {% include "object_management/review_status_icon.html" with object=cpv %}
 {% endcomment %}
 {% load moderation_tags %}
 
-{% object_policy object as policy %}
+{% if not policy %}
+    {% object_policy object as policy %}
+{% endif %}
 {% if policy.is_owner or policy.is_moderator or policy.is_staff %}
     {% if object.is_private %}
         <i class="fas fa-lock text-secondary review-status-icon" title="Private"></i>

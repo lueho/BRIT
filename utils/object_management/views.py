@@ -1360,6 +1360,15 @@ class UserCreatedObjectDetailView(UserCreatedObjectReadAccessMixin, DetailView):
         template_names.append("detail_with_options.html")
         return template_names
 
+    def get_object(self, queryset=None):
+        cached_object = getattr(self, "object", None)
+        if cached_object is not None:
+            return cached_object
+
+        obj = super().get_object(queryset)
+        self.object = obj
+        return obj
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         obj = self.object

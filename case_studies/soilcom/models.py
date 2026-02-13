@@ -615,7 +615,7 @@ class Collection(NamedUserCreatedObject):
 
         qs = (
             CollectionPropertyValue.objects.filter(collection__in=self.all_versions())
-            .select_related("property", "unit", "collection")
+            .select_related("property", "unit", "collection", "owner", "approved_by")
             .prefetch_related("sources")
         )
 
@@ -659,7 +659,7 @@ class Collection(NamedUserCreatedObject):
             AggregatedCollectionPropertyValue.objects.filter(
                 collections__in=self.all_versions()
             )
-            .select_related("property", "unit")
+            .select_related("property", "unit", "owner", "approved_by")
             .prefetch_related("collections", "sources")
             .distinct()
         )

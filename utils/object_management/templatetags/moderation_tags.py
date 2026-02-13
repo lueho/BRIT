@@ -430,7 +430,7 @@ def pending_review_count_for_user(user):
         total_count = 0
         models_to_check = []
 
-        # First, collect all models the user can moderate
+        # First, collect all models the user can moderate.
         for model in apps.get_models():
             if (
                 issubclass(model, UserCreatedObject)
@@ -440,25 +440,31 @@ def pending_review_count_for_user(user):
                 if user_is_moderator_for_model(user, model):
                     models_to_check.append(model)
 
-        # Use a single aggregated query to count all review items efficiently
+        # Count review items while deduplicating identical querysets.
+        #
+        # Multiple proxy models can map to the same underlying table and manager
+        # filter, which otherwise produces duplicate COUNT(*) queries.
         if models_to_check:
             from django.db.models import Q
 
-            # Build a union query to count all review items across models
-            review_counts = {}
+            query_signatures = set()
             for model in models_to_check:
                 try:
-                    # Use a single query per model with optimized filtering
-                    # Use Q objects for more efficient filtering
-                    count = model.objects.filter(
+                    queryset = model.objects.filter(
                         Q(publication_status="review") & ~Q(owner=user)
-                    ).count()
-                    review_counts[model._meta.label] = count
+                    )
+                    # Ignore model-level ordering when building the signature,
+                    # because COUNT(*) drops ORDER BY and would otherwise run
+                    # duplicate count queries for equivalent filters.
+                    signature = str(queryset.order_by().query)
+                    if signature in query_signatures:
+                        continue
+
+                    query_signatures.add(signature)
+                    total_count += queryset.count()
                 except Exception:
                     # Skip models that don't support the query
                     continue
-
-            total_count = sum(review_counts.values())
 
         # Cache the result for 5 minutes (300 seconds)
         cache.set(cache_key, total_count, 300)

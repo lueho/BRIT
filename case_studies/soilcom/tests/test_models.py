@@ -1018,6 +1018,46 @@ class CollectionStatisticsAccessorsTestCase(TestCase):
         self.assertEqual(len(filtered), 1)
         self.assertEqual(filtered[0].pk, v_succ.pk)
 
+    def test_collectionpropertyvalues_for_display_prefetches_owner(self):
+        from case_studies.soilcom.models import CollectionPropertyValue
+        from utils.properties.models import Property, Unit
+
+        prop = Property.objects.create(name="QOwner", publication_status="published")
+        unit = Unit.objects.create(name="QUnit", publication_status="published")
+        CollectionPropertyValue.objects.create(
+            collection=self.succ,
+            property=prop,
+            unit=unit,
+            year=2023,
+            average=3.14,
+            publication_status="published",
+        )
+
+        cpvs = self.succ.collectionpropertyvalues_for_display(user=None)
+
+        with self.assertNumQueries(0):
+            _ = [value.owner.username for value in cpvs]
+
+    def test_aggregatedcollectionpropertyvalues_for_display_prefetches_owner(self):
+        from case_studies.soilcom.models import AggregatedCollectionPropertyValue
+        from utils.properties.models import Property, Unit
+
+        prop = Property.objects.create(name="AQOwner", publication_status="published")
+        unit = Unit.objects.create(name="AQUnit", publication_status="published")
+        aggregated = AggregatedCollectionPropertyValue.objects.create(
+            property=prop,
+            unit=unit,
+            year=2024,
+            average=2.71,
+            publication_status="published",
+        )
+        aggregated.collections.add(self.succ)
+
+        values = self.succ.aggregatedcollectionpropertyvalues_for_display(user=None)
+
+        with self.assertNumQueries(0):
+            _ = [value.owner.username for value in values]
+
 
 class CollectionSeasonTestCase(TestCase):
     @classmethod
