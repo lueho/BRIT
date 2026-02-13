@@ -1001,15 +1001,24 @@ class SampleAddPropertyViewTestCase(ViewWithPermissionsTestCase):
     @classmethod
     def setUpTestData(cls):
         super().setUpTestData()
+        content_type = ContentType.objects.get_for_model(MaterialPropertyValue)
+        permission, _ = Permission.objects.get_or_create(
+            codename="add_materialpropertyvalue",
+            content_type=content_type,
+            defaults={"name": "Can add material property value"},
+        )
+        cls.owner.user_permissions.add(permission)
         material = Material.objects.create(name="Test Material")
-        series = SampleSeries.objects.create(name="Test Series", material=material)
+        series = SampleSeries.objects.create(
+            owner=cls.owner, name="Test Series", material=material
+        )
         cls.sample = Sample.objects.create(
-            name="Test Sample", material=material, series=series
+            owner=cls.owner, name="Test Sample", material=material, series=series
         )
         cls.property = MaterialProperty.objects.create(
-            name="Test Property", unit="Test Unit"
+            name="Test Property", unit="Test Unit", owner=cls.owner
         )
-        cls.unit = Unit.objects.create(name="mg/L")
+        cls.unit = Unit.objects.create(name="mg/L", owner=cls.owner)
         cls.property.allowed_units.add(cls.unit)
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
