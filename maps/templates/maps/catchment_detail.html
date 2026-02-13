@@ -5,22 +5,50 @@
 {% block detail_header %}Catchment: {{ object.name }}{% endblock %}
 
 {% block detail_body %}
-    <p class="card-text"><strong>Name:</strong><br>{{ object.name }}</p>
-    <p class="card-text"><strong>Type:</strong><br>{{ object.type }}</p>
+    <p class="card-text">
+        <strong>Name:</strong>
+        <br>
+        {{ object.name }}
+    </p>
+    <p class="card-text">
+        <strong>Type:</strong>
+        <br>
+        {{ object.type }}
+    </p>
     {% if object.region %}
         <p class="card-text">
-            <strong>Region:</strong><br>
+            <strong>Region:</strong>
+            <br>
             <a href="{% url 'region-detail' object.region.pk %}">{{ object.region.name }}</a>
         </p>
     {% endif %}
     {% if object.parent_region %}
         <p class="card-text">
-            <strong>Parent region:</strong><br>
+            <strong>Parent region:</strong>
+            <br>
             <a href="{% url 'region-detail' object.parent_region.pk %}">{{ object.parent_region.name }}</a>
         </p>
     {% endif %}
     {% if object.description %}
-        <p class="card-text"><strong>Description:</strong><br>{{ object.description }}</p>
+        <p class="card-text">
+            <strong>Description:</strong>
+            <br>
+            {{ object.description }}
+        </p>
+    {% endif %}
+    {% if region_attribute_values %}
+        <p class="card-text">
+            <strong>Region attributes:</strong>
+        </p>
+        {% regroup region_attribute_values by attribute as attr_groups %}
+        {% for group in attr_groups %}
+            <p class="card-text mb-1">
+                <strong>{{ group.grouper.name }}</strong> [{{ group.grouper.unit }}]
+            </p>
+            <ul class="list-unstyled ms-3 mb-2">
+                {% for rav in group.list %}<li>{{ rav.date|date:"Y"|default:"—" }}: {{ rav.value }}</li>{% endfor %}
+            </ul>
+        {% endfor %}
     {% endif %}
     {% block additional_details %}{% endblock %}
 {% endblock %}
