@@ -3,13 +3,16 @@ from decimal import ROUND_HALF_UP, Decimal
 from django.contrib.auth.models import Group, Permission, User
 from django.contrib.contenttypes.models import ContentType
 from django.forms import inlineformset_factory
+from django.http import QueryDict
 from django.test import TestCase
 
 from distributions.models import Timestep
+from utils.properties.models import Unit
 
 from ..forms import (
     AddComponentModalForm,
     AddCompositionModalForm,
+    MaterialPropertyValueModelForm,
     WeightShareInlineFormset,
     WeightShareModelForm,
 )
@@ -18,6 +21,7 @@ from ..models import (
     Material,
     MaterialComponent,
     MaterialComponentGroup,
+    MaterialProperty,
     Sample,
     SampleSeries,
     WeightShare,
@@ -25,7 +29,6 @@ from ..models import (
 
 
 class AddComponentGroupModalModelFormTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         Material.objects.create(name="Test Material")
@@ -58,7 +61,6 @@ class AddComponentGroupModalModelFormTestCase(TestCase):
 
 
 class AddComponentModalModelFormTestCase(TestCase):
-
     @classmethod
     def setUpTestData(cls):
         material = Material.objects.create(name="Test Material")
@@ -105,12 +107,38 @@ class AddComponentModalModelFormTestCase(TestCase):
         )
 
 
-class CompositionUpdateFormTestCase(TestCase):
+class MaterialPropertyValueModelFormTestCase(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.allowed_unit = Unit.objects.create(name="mg/L")
+        cls.disallowed_unit = Unit.objects.create(name="g/L")
+        cls.property = MaterialProperty.objects.create(name="Nitrogen", unit="g/L")
+        cls.property.allowed_units.add(cls.allowed_unit)
 
+    def test_form_includes_unit_field(self):
+        form = MaterialPropertyValueModelForm()
+        self.assertIn("unit", form.fields)
+
+    def test_form_rejects_unit_not_in_allowed_units(self):
+        data = QueryDict("", mutable=True)
+        data.update(
+            {
+                "property": self.property.pk,
+                "unit": self.disallowed_unit.pk,
+                "average": "12.3",
+                "standard_deviation": "0.5",
+            }
+        )
+        form = MaterialPropertyValueModelForm(data=data)
+        self.assertFalse(form.is_valid())
+        self.assertIn("unit", form.errors)
+
+
+class CompositionUpdateFormTestCase(TestCase):
     @classmethod
     def setUpTestData(cls):
         owner = User.objects.create_user(username="owner")
-        outsider = User.objects.create_user(username="outsider")
+        User.objects.create_user(username="outsider")
         member = User.objects.create_user(username="member")
 
         members_group = Group.objects.create(name="members")

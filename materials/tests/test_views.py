@@ -9,6 +9,7 @@ from django.urls import reverse
 from bibliography.models import Source
 from distributions.models import TemporalDistribution, Timestep
 from utils.object_management.views import SubmitForReviewView
+from utils.properties.models import Unit
 from utils.tests.testcases import AbstractTestCases, ViewWithPermissionsTestCase
 
 from ..models import (
@@ -895,7 +896,6 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
             name="Test Property", unit="Test Unit", publication_status="published"
         )
         MaterialPropertyValue.objects.create(
-            name="Test Value",
             property=prop,
             average=123.3,
             standard_deviation=0.13,
@@ -906,14 +906,18 @@ class SampleCRUDViewsTestCase(AbstractTestCases.UserCreatedObjectCRUDViewTestCas
     @classmethod
     def create_published_object(cls):
         published_sample = super().create_published_object()
-        property_value = MaterialPropertyValue.objects.get(name="Test Value")
+        property_value = MaterialPropertyValue.objects.get(
+            property__name="Test Property"
+        )
         published_sample.properties.add(property_value)
         return published_sample
 
     @classmethod
     def create_unpublished_object(cls):
         unpublished_sample = super().create_unpublished_object()
-        property_value = MaterialPropertyValue.objects.get(name="Test Value")
+        property_value = MaterialPropertyValue.objects.get(
+            property__name="Test Property"
+        )
         unpublished_sample.properties.add(property_value)
         return unpublished_sample
 
@@ -1009,7 +1013,11 @@ class SampleAddPropertyViewTestCase(ViewWithPermissionsTestCase):
         cls.sample = Sample.objects.create(
             name="Test Sample", material=material, series=series
         )
-        MaterialProperty.objects.create(name="Test Property", unit="Test Unit")
+        cls.property = MaterialProperty.objects.create(
+            name="Test Property", unit="Test Unit"
+        )
+        cls.unit = Unit.objects.create(name="mg/L")
+        cls.property.allowed_units.add(cls.unit)
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse("sample-add-property", kwargs={"pk": self.sample.pk})
@@ -1077,6 +1085,23 @@ class SampleAddPropertyViewTestCase(ViewWithPermissionsTestCase):
             average=Decimal("123.321"), standard_deviation=Decimal("0.1337")
         )
         self.assertIn(value, self.sample.properties.all())
+
+    def test_post_persists_selected_unit(self):
+        self.client.force_login(self.sample.owner)
+        data = {
+            "property": self.property.pk,
+            "unit": self.unit.pk,
+            "average": 123.321,
+            "standard_deviation": 0.1337,
+        }
+        self.client.post(
+            reverse("sample-add-property", kwargs={"pk": self.sample.pk}), data
+        )
+        value = MaterialPropertyValue.objects.get(
+            average=Decimal("123.321"),
+            standard_deviation=Decimal("0.1337"),
+        )
+        self.assertEqual(value.unit, self.unit)
 
 
 class SampleModalAddPropertyViewTestCase(ViewWithPermissionsTestCase):
@@ -1099,9 +1124,11 @@ class SampleModalAddPropertyViewTestCase(ViewWithPermissionsTestCase):
         cls.sample = Sample.objects.create(
             owner=cls.owner, name="Test Sample", material=material, series=series
         )
-        MaterialProperty.objects.create(
+        cls.property = MaterialProperty.objects.create(
             name="Test Property", unit="Test Unit", owner=cls.owner
         )
+        cls.unit = Unit.objects.create(name="g/L", owner=cls.owner)
+        cls.property.allowed_units.add(cls.unit)
 
     def test_get_http_302_redirect_to_login_for_anonymous(self):
         url = reverse("sample-add-property-modal", kwargs={"pk": self.sample.pk})
@@ -1169,6 +1196,23 @@ class SampleModalAddPropertyViewTestCase(ViewWithPermissionsTestCase):
             average=Decimal("123.321"), standard_deviation=Decimal("0.1337")
         )
         self.assertIn(value, self.sample.properties.all())
+
+    def test_post_persists_selected_unit(self):
+        self.client.force_login(self.sample.owner)
+        data = {
+            "property": self.property.pk,
+            "unit": self.unit.pk,
+            "average": 123.321,
+            "standard_deviation": 0.1337,
+        }
+        self.client.post(
+            reverse("sample-add-property-modal", kwargs={"pk": self.sample.pk}), data
+        )
+        value = MaterialPropertyValue.objects.get(
+            average=Decimal("123.321"),
+            standard_deviation=Decimal("0.1337"),
+        )
+        self.assertEqual(value.unit, self.unit)
 
 
 class SampleCreateDuplicateViewTestCase(ViewWithPermissionsTestCase):

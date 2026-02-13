@@ -14,7 +14,11 @@
 {% block detail_top_image %}
   {% if object.image %}
     <div class="card-img-top">
-      <img class="w-100 m-0" src="{{ object.image.url }}" alt="Image of sample" style="max-height: 300px; object-fit: cover;">
+      <img class="w-100 m-0"
+           src="{{ object.image.url }}"
+           alt="Image of sample"
+           style="max-height: 300px;
+                  object-fit: cover">
     </div>
   {% endif %}
 {% endblock detail_top_image %}
@@ -28,14 +32,16 @@
   <p class="card-text">
     <strong>Material:</strong>
     <br>
-    <a href="{% url 'material-detail-modal' object.material.pk %}" class="modal-link">{{ object.material.name }}</a>
+    <a href="{% url 'material-detail-modal' object.material.pk %}"
+       class="modal-link">{{ object.material.name }}</a>
   </p>
 
   {% if object.series %}
     <p class="card-text">
       <strong>Series:</strong>
       <br>
-      <a href="{% url 'sampleseries-detail-modal' object.series.pk %}" class="modal-link">{{ object.series.name }}</a>
+      <a href="{% url 'sampleseries-detail-modal' object.series.pk %}"
+         class="modal-link">{{ object.series.name }}</a>
     </p>
   {% endif %}
 
@@ -109,7 +115,8 @@
         <strong>Sources:</strong>
         <br>
         {% for source in sample_sources %}
-          <a href="{% url 'source-detail-modal' source.pk %}" class="modal-link">{{ source.abbreviation }}</a>{% if not forloop.last %},{% endif %}
+          <a href="{% url 'source-detail-modal' source.pk %}" class="modal-link">{{ source.abbreviation }}</a>
+          {% if not forloop.last %},{% endif %}
         {% endfor %}
       </p>
     {% endif %}
@@ -119,17 +126,20 @@
 {% block options_primary_actions %}
   {% object_policy object as policy %}
   {% if policy.can_edit %}
-    <a class="btn btn-outline-primary w-100 mb-2" href="{% url 'sample-update' object.id %}?next={{ request.get_full_path|urlencode }}">
+    <a class="btn btn-outline-primary w-100 mb-2"
+       href="{% url 'sample-update' object.id %}?next={{ request.get_full_path|urlencode }}">
       <i class="fas fa-pen-to-square"></i> Edit
     </a>
   {% endif %}
   {% if policy.can_duplicate %}
-    <a class="btn btn-outline-secondary w-100 mb-2" href="{% url 'sample-duplicate' object.id %}">
+    <a class="btn btn-outline-secondary w-100 mb-2"
+       href="{% url 'sample-duplicate' object.id %}">
       <i class="fas fa-copy"></i> Duplicate
     </a>
   {% endif %}
   {% if policy.can_delete %}
-    <a class="btn btn-outline-danger w-100 mb-2 modal-link" href="{% url 'sample-delete-modal' object.pk %}?next={{ request.get_full_path|urlencode }}">
+    <a class="btn btn-outline-danger w-100 mb-2 modal-link"
+       href="{% url 'sample-delete-modal' object.pk %}?next={{ request.get_full_path|urlencode }}">
       <i class="fas fa-trash"></i> Delete
     </a>
   {% endif %}
@@ -137,13 +147,16 @@
 
 {% block options_secondary_actions %}
   <hr class="my-2">
-  <a class="btn btn-outline-secondary w-100 mb-2" href="{% url 'sample-list' %}">
+  <a class="btn btn-outline-secondary w-100 mb-2"
+     href="{% url 'sample-list' %}">
     <i class="fas fa-list"></i> Public Samples
   </a>
-  <a class="btn btn-outline-secondary w-100 mb-2" href="{% url 'sample-list-owned' %}">
+  <a class="btn btn-outline-secondary w-100 mb-2"
+     href="{% url 'sample-list-owned' %}">
     <i class="fas fa-list"></i> My Samples
   </a>
-  <a class="btn btn-outline-secondary w-100 mb-2" href="{% url 'materials-explorer' %}">
+  <a class="btn btn-outline-secondary w-100 mb-2"
+     href="{% url 'materials-explorer' %}">
     <i class="fas fa-table-cells-large"></i> Explorer
   </a>
 {% endblock options_secondary_actions %}
@@ -151,7 +164,10 @@
 {% block options_export %}
   {% if component_measurements %}
     <hr class="my-2">
-    <button type="button" class="btn btn-outline-primary w-100 mb-2" id="exportBtn" onclick="exportMeasurements()">
+    <button type="button"
+            class="btn btn-outline-primary w-100 mb-2"
+            id="exportBtn"
+            onclick="exportMeasurements()">
       <i class="fas fa-file-excel"></i> Export Measurements
     </button>
   {% endif %}
@@ -184,28 +200,32 @@
                   {% for property in properties %}
                     <tr>
                       <td>
-                        <a href="{% url 'materialproperty-detail-modal' property.property.pk %}" class="modal-link">{{ property.property.name }}</a>
+                        <a href="{% url 'materialproperty-detail-modal' property.property.pk %}"
+                           class="modal-link">{{ property.property.name }}</a>
                       </td>
                       <td class="text-nowrap">
                         {{ property.average|trim_decimal:6 }} ± {{ property.standard_deviation|trim_decimal:6 }} {{ property.property.unit }}
                       </td>
                       <td>
                         {% if property.analytical_method %}
-                          <a href="{% url 'analyticalmethod-detail-modal' property.analytical_method.pk %}" class="modal-link">{{ property.analytical_method.name }}</a>
+                          <a href="{% url 'analyticalmethod-detail-modal' property.analytical_method.pk %}"
+                             class="modal-link">{{ property.analytical_method.name }}</a>
                         {% else %}
                           -
                         {% endif %}
                       </td>
                       <td>
                         {% for source in property.sources.all %}
-                          <a href="{% url 'source-detail-modal' source.pk %}" class="modal-link">{{ source.abbreviation }}</a>{% if not forloop.last %},{% endif %}
+                          <a href="{% url 'source-detail-modal' source.pk %}" class="modal-link">{{ source.abbreviation }}</a>
+                          {% if not forloop.last %},{% endif %}
                         {% empty %}
                           -
                         {% endfor %}
                       </td>
                       {% if policy.can_add_property %}
                         <td class="remove-property collapse multi-collapse">
-                          <a href="{% url 'materialpropertyvalue-delete-modal' property.id %}?next={{ request.path }}" class="modal-link">
+                          <a href="{% url 'materialpropertyvalue-delete-modal' property.id %}?next={{ request.path }}"
+                             class="modal-link">
                             <i class="fas fa-fw fa-trash"></i>
                           </a>
                         </td>
@@ -225,7 +245,12 @@
           <a href="{% url 'sample-add-property' object.id %}">
             <i class="fas fa-fw fa-plus"></i> Add property
           </a>
-          <a class="ms-3" href="javascript:void(0);" data-bs-toggle="collapse" data-bs-target=".remove-property" aria-expanded="false" aria-controls="remove-property">
+          <a class="ms-3"
+             href="javascript:void(0);"
+             data-bs-toggle="collapse"
+             data-bs-target=".remove-property"
+             aria-expanded="false"
+             aria-controls="remove-property">
             <i class="fas fa-fw fa-minus"></i> Remove properties
           </a>
         {% endif %}
@@ -243,10 +268,14 @@
           {% if measurements_by_group %}
             <div class="d-flex gap-2">
               <div class="btn-group btn-group-sm" role="group">
-                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="expandAllGroups()">
+                <button type="button"
+                        class="btn btn-outline-secondary btn-sm"
+                        onclick="expandAllGroups()">
                   <i class="fas fa-expand-alt"></i> Expand
                 </button>
-                <button type="button" class="btn btn-outline-secondary btn-sm" onclick="collapseAllGroups()">
+                <button type="button"
+                        class="btn btn-outline-secondary btn-sm"
+                        onclick="collapseAllGroups()">
                   <i class="fas fa-compress-alt"></i> Collapse
                 </button>
               </div>
@@ -259,12 +288,20 @@
               {% for group in measurements_by_group %}
                 <div class="accordion-item">
                   <h2 class="accordion-header" id="heading-{{ forloop.counter }}">
-                    <button class="accordion-button {% if not forloop.first %}collapsed{% endif %} py-2" type="button" data-bs-toggle="collapse" data-bs-target="#collapse-{{ forloop.counter }}" aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}" aria-controls="collapse-{{ forloop.counter }}">
+                    <button class="accordion-button {% if not forloop.first %}collapsed{% endif %} py-2"
+                            type="button"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#collapse-{{ forloop.counter }}"
+                            aria-expanded="{% if forloop.first %}true{% else %}false{% endif %}"
+                            aria-controls="collapse-{{ forloop.counter }}">
                       <strong>{{ group.grouper.name }}</strong>
                       <span class="badge bg-secondary ms-2">{{ group.list|length }}</span>
                     </button>
                   </h2>
-                  <div id="collapse-{{ forloop.counter }}" class="accordion-collapse collapse {% if forloop.first %}show{% endif %}" aria-labelledby="heading-{{ forloop.counter }}" data-bs-parent="#measurementsAccordion">
+                  <div id="collapse-{{ forloop.counter }}"
+                       class="accordion-collapse collapse {% if forloop.first %}show{% endif %}"
+                       aria-labelledby="heading-{{ forloop.counter }}"
+                       data-bs-parent="#measurementsAccordion">
                     <div class="accordion-body p-0">
                       <div class="table-responsive">
                         <table class="table table-sm table-striped mb-0">
@@ -296,7 +333,10 @@
                                 <td class="text-center">{{ measurement.sample_size|default:"-" }}</td>
                                 <td>
                                   {% if measurement.analytical_method %}
-                                    <a href="{% url 'analyticalmethod-detail-modal' measurement.analytical_method.pk %}" class="modal-link text-truncate d-inline-block" style="max-width: 120px" title="{{ measurement.analytical_method.name }}">
+                                    <a href="{% url 'analyticalmethod-detail-modal' measurement.analytical_method.pk %}"
+                                       class="modal-link text-truncate d-inline-block"
+                                       style="max-width: 120px"
+                                       title="{{ measurement.analytical_method.name }}">
                                       {{ measurement.analytical_method.name }}
                                     </a>
                                   {% else %}
@@ -305,7 +345,9 @@
                                 </td>
                                 <td>
                                   {% for source in measurement.sources.all %}
-                                    <a href="{% url 'source-detail-modal' source.pk %}" class="modal-link badge bg-light text-dark text-decoration-none" title="{{ source.title|default:source.abbreviation }}">
+                                    <a href="{% url 'source-detail-modal' source.pk %}"
+                                       class="modal-link badge bg-light text-dark text-decoration-none"
+                                       title="{{ source.title|default:source.abbreviation }}">
                                       {{ source.abbreviation|default:"Source" }}
                                     </a>
                                   {% empty %}
@@ -343,19 +385,38 @@
       <div class="card shadow h-100 tab-card">
         <div class="card-header tab-card-header bg-body-tertiary border-bottom-0 py-3">
           <h5 class="mb-0">
-            <a href="{% url 'materialcomponentgroup-detail-modal' composition.group %}" class="modal-link text-decoration-none text-body">{{ composition.group_name }}</a>
+            <a href="{% url 'materialcomponentgroup-detail-modal' composition.group %}"
+               class="modal-link text-decoration-none text-body">{{ composition.group_name }}</a>
           </h5>
-          <ul class="nav nav-tabs card-header-tabs" id="composition-tabs-{{ composition.id }}" role="tablist">
+          <ul class="nav nav-tabs card-header-tabs"
+              id="composition-tabs-{{ composition.id }}"
+              role="tablist">
             <li class="nav-item">
-              <a class="nav-link active" id="composition-table-tab-{{ composition.id }}" data-bs-toggle="tab" href="#composition-table-{{ composition.id }}-tab" role="tab" aria-controls="composition-table-{{ composition.id }}-tab" aria-selected="true">Table</a>
+              <a class="nav-link active"
+                 id="composition-table-tab-{{ composition.id }}"
+                 data-bs-toggle="tab"
+                 href="#composition-table-{{ composition.id }}-tab"
+                 role="tab"
+                 aria-controls="composition-table-{{ composition.id }}-tab"
+                 aria-selected="true">Table</a>
             </li>
             <li class="nav-item">
-              <a class="nav-link" id="composition-chart-tab-{{ composition.id }}" data-bs-toggle="tab" href="#composition-chart-{{ composition.id }}-tab" role="tab" aria-controls="composition-chart-{{ composition.id }}-tab" aria-selected="false">Chart</a>
+              <a class="nav-link"
+                 id="composition-chart-tab-{{ composition.id }}"
+                 data-bs-toggle="tab"
+                 href="#composition-chart-{{ composition.id }}-tab"
+                 role="tab"
+                 aria-controls="composition-chart-{{ composition.id }}-tab"
+                 aria-selected="false">Chart</a>
             </li>
           </ul>
         </div>
-        <div class="card-body tab-content" id="composition-tabs-{{ composition.id }}-content">
-          <div class="tab-pane fade show active" id="composition-table-{{ composition.id }}-tab" role="tabpanel" aria-labelledby="composition-table-tab-{{ composition.id }}">
+        <div class="card-body tab-content"
+             id="composition-tabs-{{ composition.id }}-content">
+          <div class="tab-pane fade show active"
+               id="composition-table-{{ composition.id }}-tab"
+               role="tabpanel"
+               aria-labelledby="composition-table-tab-{{ composition.id }}">
             <table class="table">
               <thead>
                 <tr>
@@ -367,7 +428,8 @@
                 {% for share in composition.shares %}
                   <tr>
                     <td>
-                      <a href="{% url 'materialcomponent-detail-modal' share.component %}" class="modal-link">{{ share.component_name }}</a>
+                      <a href="{% url 'materialcomponent-detail-modal' share.component %}"
+                         class="modal-link">{{ share.component_name }}</a>
                     </td>
                     {# <td>{{ share.average }} ± {{ share.standard_deviation }} %</td>#}
                     <td>{{ share.as_percentage }}</td>
@@ -377,23 +439,34 @@
               <tfoot></tfoot>
             </table>
           </div>
-          <div class="tab-pane fade p-0" id="composition-chart-{{ composition.id }}-tab" role="tabpanel" aria-labelledby="composition-chart-tab-{{ composition.id }}">
+          <div class="tab-pane fade p-0"
+               id="composition-chart-{{ composition.id }}-tab"
+               role="tabpanel"
+               aria-labelledby="composition-chart-tab-{{ composition.id }}">
             <div id="composition-chart-{{ composition.id }}"></div>
           </div>
           <strong>Shares of:</strong> {{ composition.fractions_of_name }}
         </div>
         <div class="card-footer d-flex">
           {% if policy.can_manage_samples %}
-            <a id="move-group-{{ composition.id }}-left" href="{% url 'composition-order-down' composition.id %}?next={{ request.path }}" class="me-3 nowrap">
+            <a id="move-group-{{ composition.id }}-left"
+               href="{% url 'composition-order-down' composition.id %}?next={{ request.path }}"
+               class="me-3 nowrap">
               <i class="fas fa-fw fa-arrow-left"></i>
             </a>
-            <a id="edit-group-{{ composition.id }}" href="{% url 'composition-update' composition.id %}?next={{ request.path }}" class="me-3 nowrap">
+            <a id="edit-group-{{ composition.id }}"
+               href="{% url 'composition-update' composition.id %}?next={{ request.path }}"
+               class="me-3 nowrap">
               <i class="fas fa-fw fa-pen-to-square"></i> Edit
             </a>
-            <a id="remove-group-{{ composition.id }}" href="{% url 'composition-delete-modal' composition.id %}?next={{ request.path }}" class="me-3 nowrap modal-link">
+            <a id="remove-group-{{ composition.id }}"
+               href="{% url 'composition-delete-modal' composition.id %}?next={{ request.path }}"
+               class="me-3 nowrap modal-link">
               <i class="fas fa-fw fa-trash"></i> Delete
             </a>
-            <a id="move-group-{{ composition.id }}-right" href="{% url 'composition-order-up' composition.id %}?next={{ request.path }}" class="ms-auto nowrap">
+            <a id="move-group-{{ composition.id }}-right"
+               href="{% url 'composition-order-up' composition.id %}?next={{ request.path }}"
+               class="ms-auto nowrap">
               <i class="fas fa-fw fa-arrow-right"></i>
             </a>
           {% endif %}

@@ -18,6 +18,7 @@ from materials.models import (
     SampleSeries,
     WeightShare,
 )
+from utils.properties.models import Unit
 
 
 class InitialDataTestCase(TestCase):
@@ -234,8 +235,12 @@ class SampleSeriesTestCase(TestCase):
 class MaterialPropertyValueTestCase(TestCase):
     def test_duplicate_creates_new_instance_with_identical_field_values(self):
         prop = MaterialProperty.objects.create(name="Test Property")
+        unit = Unit.objects.create(name="g/kg")
         value = MaterialPropertyValue.objects.create(
-            property=prop, average=Decimal("27.3"), standard_deviation=Decimal("0.1337")
+            property=prop,
+            unit=unit,
+            average=Decimal("27.3"),
+            standard_deviation=Decimal("0.1337"),
         )
         creator = User.objects.create(username="creator")
         duplicate = value.duplicate(creator)
@@ -243,6 +248,7 @@ class MaterialPropertyValueTestCase(TestCase):
         self.assertNotEqual(duplicate, value)
         self.assertEqual(duplicate.owner, creator)
         self.assertEqual(duplicate.property, value.property)
+        self.assertEqual(duplicate.unit, value.unit)
         self.assertEqual(duplicate.average, value.average)
         self.assertEqual(duplicate.standard_deviation, value.standard_deviation)
 
