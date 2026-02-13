@@ -11,6 +11,7 @@ from django_filters.views import FilterView
 from factory.django import mute_signals
 
 from case_studies.soilcom.models import Collection
+from case_studies.soilcom.views import CollectionDetailView
 from utils.object_management.models import UserCreatedObject
 from utils.properties.models import Property
 
@@ -361,3 +362,30 @@ class ReadAccessArchivedDetailTests(TestCase):
         # Unauthenticated request should be redirected to login (302)
         response = self.client.get(url)
         self.assertEqual(response.status_code, 302)
+
+
+class DetailViewObjectCachingTests(TestCase):
+    @classmethod
+    def setUpTestData(cls):
+        cls.owner = User.objects.create_user(username="detail-cache-owner")
+        with mute_signals(post_save, pre_save):
+            cls.collection = Collection.objects.create(
+                name="Cache Target Collection",
+                owner=cls.owner,
+                publication_status=UserCreatedObject.STATUS_PUBLISHED,
+            )
+
+    def test_get_object_returns_cached_instance_on_second_call(self):
+        request = RequestFactory().get(
+            reverse("collection-detail", kwargs={"pk": self.collection.pk})
+        )
+        request.user = self.owner
+        view = CollectionDetailView()
+        view.setup(request, pk=self.collection.pk)
+
+        first = view.get_object()
+
+        with self.assertNumQueries(0):
+            second = view.get_object()
+
+        self.assertEqual(first.pk, second.pk)

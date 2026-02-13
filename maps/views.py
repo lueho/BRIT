@@ -90,6 +90,7 @@ class MapMixin:
     features_layer_api_basename = None
     api_prefix = "api-"
     api_geom_suffix = "-geojson"
+    _cached_map_configuration = None
 
     def get_map_title(self):
         """
@@ -158,22 +159,37 @@ class MapMixin:
         Retrieves the appropriate MapConfiguration instance.
         Override this method in child classes for custom retrieval logic.
         """
+        if self._cached_map_configuration is not None:
+            return self._cached_map_configuration
+
+        map_config = None
 
         # If the object has a MapConfiguration assigned to it by attribute, use it
         if hasattr(self, "object") and self.object:
             try:
-                return getattr(self.object, self.map_config_related_name)
+                map_config = getattr(self.object, self.map_config_related_name)
             except AttributeError:
                 pass
+
+        if map_config is not None:
+            self._cached_map_configuration = (
+                MapConfiguration.objects.prefetch_related("layers__style")
+                .filter(pk=map_config.pk)
+                .first()
+            )
+            return self._cached_map_configuration
 
         # If a model is given (e.g. in a DetailView), which has a MapConfiguration, use it
         if hasattr(self, "model") and self.model:
             self.model_name = self.model.__name__
             try:
-                model_config = ModelMapConfiguration.objects.get(
-                    model_name=self.model_name
+                model_config = (
+                    ModelMapConfiguration.objects.select_related("map_config")
+                    .prefetch_related("map_config__layers__style")
+                    .get(model_name=self.model_name)
                 )
-                return model_config.map_config
+                self._cached_map_configuration = model_config.map_config
+                return self._cached_map_configuration
             except ModelMapConfiguration.DoesNotExist:
                 pass
 
@@ -181,10 +197,13 @@ class MapMixin:
         if hasattr(self, "filterset_class") and self.filterset_class:
             self.model_name = self.filterset_class.Meta.model.__name__
             try:
-                model_config = ModelMapConfiguration.objects.get(
-                    model_name=self.model_name
+                model_config = (
+                    ModelMapConfiguration.objects.select_related("map_config")
+                    .prefetch_related("map_config__layers__style")
+                    .get(model_name=self.model_name)
                 )
-                return model_config.map_config
+                self._cached_map_configuration = model_config.map_config
+                return self._cached_map_configuration
             except ModelMapConfiguration.DoesNotExist:
                 pass
 
@@ -193,7 +212,12 @@ class MapMixin:
         map_config_id = self.request.GET.get("map_config_id")
         if map_config_id:
             try:
-                return MapConfiguration.objects.get(id=map_config_id)
+                self._cached_map_configuration = (
+                    MapConfiguration.objects.prefetch_related("layers__style").get(
+                        id=map_config_id
+                    )
+                )
+                return self._cached_map_configuration
             except MapConfiguration.DoesNotExist:
                 pass
 
@@ -210,7 +234,10 @@ class MapMixin:
             except NoReverseMatch:
                 pass
 
-        return MapConfiguration.objects.get(name="Default Map Configuration")
+        self._cached_map_configuration = MapConfiguration.objects.prefetch_related(
+            "layers__style"
+        ).get(name="Default Map Configuration")
+        return self._cached_map_configuration
 
     def get_override_params(self):
         params = {}

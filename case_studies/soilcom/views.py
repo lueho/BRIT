@@ -1045,7 +1045,16 @@ class CollectionDetailView(MapMixin, UserCreatedObjectDetailView):
                 "frequency",
                 "fee_system",
             )
-            .prefetch_related("sources", "flyers", "predecessors", "successors")
+            .prefetch_related(
+                "sources",
+                "flyers",
+                "predecessors",
+                "successors",
+                "waste_stream__allowed_materials",
+                "waste_stream__forbidden_materials",
+                "samples",
+                "frequency__collectioncountoptions_set",
+            )
         )
 
     def get_override_params(self):
@@ -1081,6 +1090,15 @@ class CollectionDetailView(MapMixin, UserCreatedObjectDetailView):
 
         context["collection_property_values"] = cpvs
         context["aggregated_collection_property_values"] = agg_cpvs
+
+        waste_stream = getattr(self.object, "waste_stream", None)
+        context["allowed_materials"] = (
+            list(waste_stream.allowed_materials.all()) if waste_stream else []
+        )
+        context["forbidden_materials"] = (
+            list(waste_stream.forbidden_materials.all()) if waste_stream else []
+        )
+        context["samples"] = list(self.object.samples.all())
 
         # Collect all sources from collection, flyers, CPVs, and ACPVs
         all_sources = set()

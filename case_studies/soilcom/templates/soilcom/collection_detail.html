@@ -203,24 +203,24 @@
     </p>
   {% endif %}
 
-  {% if object.waste_stream.allowed_materials.exists %}
+  {% if allowed_materials %}
     <p class="card-text">
       <strong>Allowed Materials:</strong>
     </p>
     <ul>
-      {% for material in object.waste_stream.allowed_materials.all %}
+      {% for material in allowed_materials %}
         <li>
           <a href="{{ material.get_absolute_url }}">{{ material }}</a>
         </li>
       {% endfor %}
     </ul>
   {% endif %}
-  {% if object.waste_stream.forbidden_materials.exists %}
+  {% if forbidden_materials %}
     <p class="card-text">
       <strong>Forbidden Materials:</strong>
     </p>
     <ul>
-      {% for material in object.waste_stream.forbidden_materials.all %}
+      {% for material in forbidden_materials %}
         <li>
           <a href="{{ material.get_absolute_url }}">{{ material }}</a>
         </li>
@@ -268,7 +268,8 @@
       <ul>
         {% for val in prop.list|dictsortreversed:"year" %}
           <li>
-            {% include "object_management/review_status_icon.html" with object=val %}
+            {% object_policy val as val_policy %}
+            {% include "object_management/review_status_icon.html" with object=val policy=val_policy %}
             <a href="{{ val.get_absolute_url }}">
               {% if val.standard_deviation %}
                 {{ val.average }} ± {{ val.standard_deviation }} {{ val.unit.name }} (
@@ -279,7 +280,6 @@
                 {% if val.is_derived %}<span class="text-muted fst-italic">(derived)</span>{% endif %}
               {% endif %}
             </a>
-            {% object_policy val as val_policy %}
             {% if val_policy.can_submit_review or val_policy.can_withdraw_review or val_policy.can_approve or val_policy.can_reject %}
               <div class="mt-1 d-flex flex-wrap gap-2">
                 {% if val_policy.can_submit_review %}
@@ -320,7 +320,8 @@
       <ul>
         {% for val in prop.list|dictsortreversed:"year" %}
           <li>
-            {% include "object_management/review_status_icon.html" with object=val %}
+            {% object_policy val as agg_policy %}
+            {% include "object_management/review_status_icon.html" with object=val policy=agg_policy %}
             <a href="{{ val.get_absolute_url }}">
               {% if val.standard_deviation %}
                 {{ val.average }} ± {{ val.standard_deviation }} {{ val.unit.name }} (
@@ -329,7 +330,6 @@
                 {{ val.average }} {{ val.unit.name }} ({{ val.year }}) (aggregated)
               {% endif %}
             </a>
-            {% object_policy val as agg_policy %}
             {% if agg_policy.can_submit_review or agg_policy.can_withdraw_review or agg_policy.can_approve or agg_policy.can_reject %}
               <div class="mt-1 d-flex flex-wrap gap-2">
                 {% if agg_policy.can_submit_review %}
@@ -361,12 +361,12 @@
     {% endfor %}
   {% endif %}
 
-  {% if object.samples.exists %}
+  {% if samples %}
     <p class="card-text">
       <strong>Samples</strong>
     </p>
     <ul>
-      {% for sample in object.samples.all %}
+      {% for sample in samples %}
         <li>
           <a href="{{ sample.get_absolute_url }}">{{ sample.name }}</a>
         </li>

@@ -209,6 +209,17 @@ class MapMixinTestCase(TestCase):
         self.assertFalse(map_config["loadCatchment"])
         self.assertFalse(map_config["loadFeatures"])
 
+    def test_get_map_configuration_uses_instance_cache(self):
+        request = self.factory.get(f"/?map_config_id={self.map_config.id}")
+        self.view.request = request
+
+        first = self.view.get_map_configuration()
+
+        with self.assertNumQueries(0):
+            second = self.view.get_map_configuration()
+
+        self.assertEqual(first.pk, second.pk)
+
 
 # ----------- Location CRUD---------------------------------------------------------------------------------------------
 # ----------------------------------------------------------------------------------------------------------------------
