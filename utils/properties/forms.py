@@ -5,7 +5,13 @@ from .models import Property, Unit
 class UnitModelForm(SimpleModelForm):
     class Meta:
         model = Unit
-        fields = ["name", "dimensionless", "reference_quantity", "description"]
+        fields = [
+            "name",
+            "symbol",
+            "dimensionless",
+            "reference_quantity",
+            "description",
+        ]
 
 
 class PropertyModelForm(SimpleModelForm):

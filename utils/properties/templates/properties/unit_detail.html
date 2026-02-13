@@ -10,6 +10,13 @@
         <strong>Dimensionless:</strong>
         {{ object.dimensionless }}
     </p>
+    {% if object.symbol %}
+        <p class="card-text">
+            <strong>Symbol:</strong>
+            <br>
+            {{ object.symbol }}
+        </p>
+    {% endif %}
     {% if object.reference_quantity %}
         <p class="card-text">
             <strong>Unit:</strong>
