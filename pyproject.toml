@@ -41,6 +41,7 @@ dependencies = [
     "ambient-toolbox>=12.4.4",
     "requests>=2.32.4",
     "django-tree-queries>=0.20.0",
+    "pint>=0.23",
 
 ]
 

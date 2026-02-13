@@ -10,7 +10,14 @@ from utils.properties.models import (
 class UnitModelSerializer(ModelSerializer):
     class Meta:
         model = Unit
-        fields = ("id", "name", "dimensionless", "reference_quantity", "description")
+        fields = (
+            "id",
+            "name",
+            "symbol",
+            "dimensionless",
+            "reference_quantity",
+            "description",
+        )
 
 
 class PropertyModelSerializer(ModelSerializer):

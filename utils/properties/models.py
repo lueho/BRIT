@@ -1,8 +1,11 @@
+from functools import cached_property
+
 from django.conf import settings
 from django.db import models
 
 from bibliography.models import Source
 from utils.object_management.models import NamedUserCreatedObject, get_default_owner
+from utils.properties.units import UnitConversionError, get_unit_registry
 
 
 class PropertyBase(NamedUserCreatedObject):
@@ -21,6 +24,11 @@ class PropertyBase(NamedUserCreatedObject):
 
 class Unit(NamedUserCreatedObject):
     dimensionless = models.BooleanField(default=False, null=True)
+    symbol = models.CharField(
+        max_length=63,
+        blank=True,
+        help_text="Pint-compatible unit symbol (e.g. kg, mg/L, percent).",
+    )
     reference_quantity = models.ForeignKey(
         "Property",
         related_name="reference_quantity_in_units",
@@ -31,6 +39,48 @@ class Unit(NamedUserCreatedObject):
 
     class Meta:
         unique_together = ["owner", "name"]
+
+    @cached_property
+    def pint_unit(self):
+        """
+        Return a pint.Unit for this instance's symbol, or None if unavailable.
+        """
+        symbol = (self.symbol or "").strip()
+        if not symbol:
+            return None
+
+        registry = get_unit_registry()
+        if registry is None:
+            return None
+
+        try:
+            return registry.Unit(symbol)
+        except Exception:
+            return None
+
+    def convert(self, value, target_unit):
+        """
+        Convert ``value`` from this unit to ``target_unit``.
+        """
+        if target_unit is None:
+            raise UnitConversionError("Target unit is required for conversion.")
+
+        registry = get_unit_registry()
+        if registry is None:
+            raise UnitConversionError("pint is not installed.")
+
+        if self.pint_unit is None or target_unit.pint_unit is None:
+            raise UnitConversionError(
+                f"Cannot convert from '{self}' to '{target_unit}': unmapped unit symbol."
+            )
+
+        try:
+            quantity = registry.Quantity(value, self.pint_unit)
+            return quantity.to(target_unit.pint_unit).magnitude
+        except Exception as exc:
+            raise UnitConversionError(
+                f"Failed to convert from '{self}' to '{target_unit}'."
+            ) from exc
 
 
 def get_default_unit_pk():
